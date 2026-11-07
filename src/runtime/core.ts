@@ -1,6 +1,9 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
 import type { CookieDeleteOptions } from '../server/cookies'
+import type { CorsOptions } from '../server/cors'
+import type { RateLimit } from './action-shared'
+import type { ByteSize } from './byte-size'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
@@ -357,8 +360,24 @@ type PlainObject<Value> = [Value] extends [never] ? object : Value extends reado
 // What the guards of a route hand on together, outermost first.
 export type GuardValues<Guards extends readonly unknown[]> = Guards extends readonly [infer First, ...infer Rest] ? Omit<GuardValue<First>, keyof GuardValues<Rest>> & GuardValues<Rest> : object
 
-// What the `GET` of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out.
-export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> = RequestContext<Params, Guarded>
+// What a method of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out. `query` is the search params read against the file's `page.query`.
+export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object, Query = Readonly<Record<string, unknown>>> = RequestContext<Params, Guarded> & { query: Query }
+
+// `export const page = { ... }` in an endpoint file, which serves `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS` exports. A webhook or a callback takes `rateLimit`, `cors` and `maxSize` here as an API module takes them.
+export interface EndpointSettings {
+  // A static export writes the file's `GET` once: `true` for a path without params, else the params of each page to write, as a list or a function returning one.
+  prerender?: boolean | object
+  // `false` serves the file with no guard, where `requireGuards` would refuse it.
+  guards?: false
+  // The search params `ctx.query` is read against; a query it refuses answers 400.
+  query?: TSchema
+  // At most `max` requests from one client, or from whatever `key` names, every `window`, counted across the file's methods after its guards; past that it answers 429 with `Retry-After`.
+  rateLimit?: RateLimit | RateLimit[] | undefined
+  // Lets other sites' pages call the file from the browser: `cors: { origins: ['https://app.example.com'] }`. `false` keeps it to its own site where the app's `cors` opens the others.
+  cors?: CorsOptions | false | undefined
+  // The most a request to the file may send, bytes or a size such as `'20mb'`; a bigger one answers 413 before it is read.
+  maxSize?: ByteSize | undefined
+}
 // A string or a Blob it returns is served with the type its file's extension names; a Response goes out as it is.
 export type EndpointBody = string | Blob | Response
 

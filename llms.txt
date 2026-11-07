@@ -50,7 +50,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages
 - [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onBeforeNavigate`, `onNavigate`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
-- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`, `redirects`, `rewrite`, `base`
+- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`, `rewrite`, `base`
 - [Prerendering and static export](llms/prerendering.md): `prerender`
 - [Server islands](llms/server-islands.md): `defer`
 - [CDN caching](llms/cdn-caching.md): `ttl`

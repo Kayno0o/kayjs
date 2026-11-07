@@ -3337,6 +3337,32 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     }
   })
 
+  it('types each method an endpoint file exports, and warns of an export that is no method', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p hi\n',
+      'src/routes/hook.json.ts': 'export const POST = () => Response.json({})\nexport function post() {}\nexport const helper = 1\nexport const page = { rateLimit: { max: 1, window: \'1m\' } }\n',
+      'src/routes/wrong.json.ts': 'export const DELETE = () => 42\n',
+      'src/routes/none.json.ts': 'export const handler = () => \'x\'\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.filter(d => d.code === 'endpoint-export').map(d => [d.file.slice(root.length + 1), d.severity, d.message, d.help])).toEqual([
+        ['src/routes/hook.json.ts', 'warning', expect.stringContaining('`helper` is exported by an endpoint file but is no method'), expect.stringContaining('GET, HEAD, POST')],
+        ['src/routes/hook.json.ts', 'warning', expect.stringContaining('`post`'), 'rename it `POST`'],
+        ['src/routes/none.json.ts', 'warning', expect.stringContaining('`handler`'), expect.stringContaining('GET, HEAD, POST')],
+      ])
+      expect(await refusals(root)).toEqual([
+        ['src/routes/none.json.ts', expect.stringMatching(/^It must export a GET handler/)],
+        ['src/routes/wrong.json.ts', expect.stringMatching(/^It must export a DELETE handler/)],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a feed without the site\'s URL its links need', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p hi\n',

@@ -14,6 +14,7 @@ import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
+import type { Unmatched } from './page-routes'
 import { relative } from 'node:path'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { joinBase } from '../runtime/base'
@@ -116,6 +117,8 @@ export interface ActionOptions {
   skipBroken?: boolean | undefined
   // The app's `actions` defaults and hooks, which every action starts from.
   actions?: ActionsConfig | undefined
+  // The answer for a path no page serves, known once the page routes exist, which an endpoint answering 404 to a request asking HTML renders.
+  unmatched?: (() => Unmatched | undefined) | undefined
 }
 
 export interface RouteMatch {

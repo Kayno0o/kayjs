@@ -139,9 +139,14 @@ export function lateApp() {
   let held: WeakRef<App> | undefined
   // Set once the routes it reads are known, which the setup handing it out comes before.
   let spelling = (location: string) => location
+  let unmatched: Unmatched | undefined
 
   return {
     spell: (location: string) => spelling(location),
+    unmatched: () => unmatched,
+    answerUnmatched(answer: Unmatched | undefined) {
+      unmatched = answer
+    },
     hold(app: App, spell: (location: string) => string) {
       held = new WeakRef(app)
       spelling = spell
@@ -510,7 +515,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions }
+  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
@@ -533,19 +538,19 @@ export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPa
   boot.registered.actions = actionLimits.size > 0
   boot.registered.api = api.mounted
 
-  await serveEndpoints(app, setup.endpoints, actionOptions)
+  const endpointLimits = await serveEndpoints(app, setup.endpoints, actionOptions)
 
   if (jobsPage)
     serveJobsPage(app, jobsPage, actionOptions)
 
-  return { actionLimits, toolActions, apiModules, api }
+  return { actionLimits, toolActions, apiModules, api, endpointLimits }
 }
 
 type Served = Awaited<ReturnType<typeof appRoutes>>
 
 // The rules a redirect added while the site runs is checked against, the API's claims and the body limits of every route. Returns where the OpenAPI document and the MCP metadata go.
 // Not async, as the closures the runtime redirects keep past the app would hold an async function's parameters, the app among them.
-export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api }: Served, servers: unknown[]) {
+export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpointLimits }: Served, servers: unknown[]) {
   const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt } = boot
   // Claimed before kay's own files, which give way to them.
   const openapi = openApiSettings(options.openapi)
@@ -573,7 +578,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api }: Served
     }
   }
 
-  limitBodies(app, options.limits?.body ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.limits?.byPath, servers), api.routeLimits)
+  limitBodies(app, options.limits?.body ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.limits?.byPath, servers), [...api.routeLimits, ...endpointLimits])
 
   return { openapi, apiAt, servesOpenApi, metadataPaths }
 }
@@ -775,6 +780,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: env.trailingSlash ?? 'never', fallback, respond, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout') })
 
   pageFor.unmatched = unmatched
+  boot.late.answerUnmatched(unmatched)
 
   answerUncaught(app, { dev: env.dev, onError: options.observe?.onError, page: uncaught })
   agreeOnWildcards(app)

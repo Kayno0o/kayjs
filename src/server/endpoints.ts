@@ -1,44 +1,75 @@
-import type { Elysia } from 'elysia'
+import type { Server } from 'bun'
+import type { Context, Elysia } from 'elysia'
 import type { ExportProblem } from '../compiler/errors'
-import type { EndpointContext, Locals } from '../runtime'
+import type { EndpointContext, EndpointSettings, Locals } from '../runtime'
+import type { RateLimit } from '../runtime/action'
+import type { ByteSize } from '../runtime/byte-size'
 import type { ActionOptions } from './actions'
+import type { RouteBodyLimit } from './body'
+import type { CorsRule } from './cors'
+import type { EndpointVerb } from './endpoint-verbs'
 import type { LoadedGuard } from './guards'
+import type { Unmatched } from './page-routes'
 import type { Endpoint } from './routes'
 import { basename, relative } from 'node:path'
 import { exportProblem, KayError } from '../compiler/errors'
-import { contextLocale, passGuards, stopped } from './actions'
+import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, passGuards, stopped } from './actions'
 import { importModule } from './bundle'
+import { cookieJar } from './cookies'
+import { corsAdmits, corsRule, grantedByKay, preflight, withCors } from './cors'
+import { allowedVerbs, ENDPOINT_VERBS, isEndpointVerb } from './endpoint-verbs'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest } from './log'
 import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
+import { apiLimitWait, checkApiLimit, tooManyRequests } from './protection'
+import { readQuery } from './query'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
-import { routerKey } from './routes'
+import { endpointPath, routerKey } from './routes'
 import { markPrivate, readPersonally, wasReadPersonally } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 
 type Handler = (ctx: EndpointContext) => unknown
 
 interface ServedEndpoint extends Omit<Endpoint, 'guards'> {
-  get: Handler
+  handlers: Map<EndpointVerb, Handler>
   guards: LoadedGuard[]
   // What a string it returns is served as, read off its extension: `text/plain;charset=utf-8` for `llms.txt`.
   type: string
+  // Its `page.query`, which `ctx.query` is read against.
+  query: unknown
+  // Its `page.rateLimit`, each counted under its own name.
+  limits: { name: string, limit: RateLimit }[]
+  // Its `page.cors`, else the app's; undefined for none.
+  cors: CorsRule | undefined
+  maxSize: ByteSize | undefined
+}
+
+// What the Elysia route hands the endpoint: the request and the server it came through, which the client's address is read from.
+interface EndpointRequest {
+  request: Request
+  server?: Server<unknown> | null | undefined
 }
 
 const TEXT = 'text/plain; charset=utf-8'
+const HTML = /\btext\/html\b/
 
-// Each endpoint at its path; endpoints whose router paths only differ by the extension of their last param share one route, which picks the one whose extension the path ends in.
-export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options: ActionOptions): Promise<void> {
+// Each endpoint at its path, answering every method: its own handlers, and 405 with `Allow` for the rest. Endpoints whose router paths only differ by the extension of their last param share one route, which picks the one whose extension the path ends in.
+// Gives back the body limit of each endpoint, by the method and path pattern it answers.
+export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options: ActionOptions): Promise<RouteBodyLimit[]> {
   const routes = new Map<string, ServedEndpoint[]>()
+  const appCors = options.cors === undefined ? undefined : corsRule(options.cors)
+  const limits: RouteBodyLimit[] = []
 
   for (const endpoint of endpoints) {
     const key = routerKey(endpoint.pattern)
+    const served = await loadEndpoint(endpoint, options.requireGuards, appCors)
 
-    routes.set(key, [...routes.get(key) ?? [], await loadEndpoint(endpoint, options.requireGuards)])
+    routes.set(key, [...routes.get(key) ?? [], served])
+    limits.push({ method: 'ALL', path: endpoint.pattern, ...endpoint.suffix !== undefined && { suffix: endpoint.suffix }, limit: served.maxSize === undefined ? undefined : { bytes: served.maxSize, refuse: refusing(served.cors) } })
   }
 
   for (const served of routes.values()) {
@@ -48,20 +79,33 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
     // Params are matched by position, since two endpoints sharing a route may name them apart.
     const names = served[0]!.params
 
-    app.get(served[0]!.pattern, async (context) => {
+    const handle = async (context: Context) => {
       const raw = names.map(name => (context.params as Record<string, unknown>)[name])
       const values = raw.filter(value => typeof value === 'string')
       const last = values.at(-1) ?? ''
       const endpoint = values.length === raw.length ? served.find(({ suffix }) => suffix === undefined || (last.length > suffix.length && last.endsWith(suffix))) : undefined
 
       if (!endpoint)
-        return new Response('Not Found', { status: 404, headers: { 'content-type': TEXT } })
+        return notFound(new Response('Not Found', { status: 404, headers: { 'content-type': TEXT } }), { ...context }, options)
 
       const params = Object.fromEntries(endpoint.params.map((name, index) => [name, index === values.length - 1 && endpoint.suffix !== undefined ? last.slice(0, -endpoint.suffix.length) : values[index]!]))
 
-      return answeringRequest(context.request, async () => timedOut(context.request, options, async () => withTimeout(context.request, undefined, options.timeout, async () => answer(endpoint, sharedContext(context.request, () => ({ ...context })), params, options))))
-    })
+      return answeringRequest(context.request, async () => timedOut(context.request, options, async () => withTimeout(context.request, undefined, options.timeout, async () => answer(endpoint, sharedContext(context.request, () => ({ ...context })) as EndpointRequest, params, options))))
+    }
+
+    // Each method the files serve, and GET always, so the page for a path nothing serves, a wildcard on GET, never takes a path whose files export no GET from the 405; `all` answers the rest.
+    for (const verb of new Set(['GET', ...served.flatMap(({ handlers }) => [...handlers.keys()])]))
+      app.route(verb, served[0]!.pattern, handle)
+
+    app.all(served[0]!.pattern, handle)
   }
+
+  return limits
+}
+
+// A body over `maxSize` is refused before it is read, with the file's cors grant on the 413 so a page of another site reads it.
+function refusing(cors: CorsRule | undefined): (request: Request) => Response {
+  return request => granted(cors, request, new Response('Request body too large', { status: 413, headers: { 'content-type': TEXT } }))
 }
 
 // A timeout is reported as any server error and answered 504, the catch-all for errors no route caught being registered after the endpoints.
@@ -79,29 +123,113 @@ async function timedOut(request: Request, { onError }: ActionOptions, run: () =>
   }
 }
 
-async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): Promise<ServedEndpoint> {
-  const get = (await importModule<{ GET?: unknown }>(endpoint.file)).GET
+async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined, appCors: CorsRule | undefined): Promise<ServedEndpoint> {
+  const module = await importModule<Record<string, unknown>>(endpoint.file)
+  const handlers = new Map(ENDPOINT_VERBS.flatMap(verb => typeof module[verb] === 'function' ? [[verb, module[verb] as Handler] as const] : []))
 
-  if (typeof get !== 'function')
-    throw new KayError('route-invalid', `kay: ${endpoint.file} must export a GET handler: export function GET(ctx) { return 'text' }`)
+  if (handlers.size === 0)
+    throw new KayError('route-invalid', `kay: ${endpoint.file} must export a handler for a method: ${ENDPOINT_VERBS.slice(0, -1).join(', ')} or ${ENDPOINT_VERBS.at(-1)}, as in export function GET(ctx) { return 'text' }; a route with its own Elysia plugin is an API module`)
 
-  return { ...endpoint, get: get as Handler, guards: requiredGuards(await Promise.all(endpoint.guards.map(loadGuard)), endpoint, {}, required), type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type }
+  const settings = (module.page ?? {}) as EndpointSettings
+  const place = endpointPath(endpoint)
+  const limits = [settings.rateLimit ?? []].flat().map((limit, index) => {
+    const name = index === 0 ? place : `${place}#${index}`
+
+    checkApiLimit(name, limit)
+
+    return { name, limit }
+  })
+
+  return {
+    ...endpoint,
+    handlers,
+    guards: requiredGuards(await Promise.all(endpoint.guards.map(loadGuard)), endpoint, {}, required),
+    type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type,
+    query: settings.query,
+    limits,
+    cors: ownCors(settings.cors, appCors),
+    maxSize: settings.maxSize,
+  }
 }
 
-// Guards first, as for a page; what they set, and what the endpoint sets through its `cookies` and `headers`, goes out with its answer, a redirect, a denial or a 404 it throws included.
-async function answer(endpoint: ServedEndpoint, context: { request: Request }, params: Record<string, string>, options: ActionOptions): Promise<Response> {
+// The file's own `cors` rule, none for `false`, else the app's.
+function ownCors(own: EndpointSettings['cors'], appCors: CorsRule | undefined): CorsRule | undefined {
+  if (own === undefined)
+    return appCors
+
+  return own === false ? undefined : corsRule(own)
+}
+
+// The answer of the method asked, then the grant of the file's `cors` on it, whatever the answer is.
+async function answer(endpoint: ServedEndpoint, context: EndpointRequest, params: Record<string, string>, options: ActionOptions): Promise<Response> {
+  const response = await respond(endpoint, context, params, options)
+
+  return grantedByKay.has(response) ? response : granted(endpoint.cors, context.request, response)
+}
+
+// The response with the headers the rule grants the caller, on a copy when its headers are immutable.
+function granted(cors: CorsRule | undefined, request: Request, response: Response): Response {
+  if (!cors)
+    return response
+
+  try {
+    withCors(cors, request, response.headers)
+  }
+  catch {
+    response = new Response(response.body, response)
+    withCors(cors, request, response.headers)
+  }
+
+  grantedByKay.add(response)
+
+  return response
+}
+
+// A preflight and a method the file lacks first, before any guard: a browser sends no credentials with the first, and the second needs none to be told what is served.
+// Then the guards, as for a page; what they set, and what the endpoint sets through its `cookies` and `headers`, goes out with its answer, a redirect, a denial or a 404 it throws included.
+async function respond(endpoint: ServedEndpoint, context: EndpointRequest, params: Record<string, string>, options: ActionOptions): Promise<Response> {
   const { request } = context
+  const { cors } = endpoint
+  const allow = allowedVerbs(endpoint.handlers.keys())
+
+  if (cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method'))
+    return preflight(cors, allow, request)
+
+  const verb = request.method === 'HEAD' && !endpoint.handlers.has('HEAD') ? 'GET' : request.method
+  const handler = isEndpointVerb(verb) ? endpoint.handlers.get(verb) : undefined
+
+  if (!handler)
+    return request.method === 'OPTIONS' ? new Response(null, { status: 204, headers: { allow: allow.join(', ') } }) : new Response('Method Not Allowed', { status: 405, headers: { 'content-type': TEXT, 'allow': allow.join(', ') } })
+
+  // Before the guards, so a library reading the session for them, such as kayjs-auth, knows the origin is let in.
+  if (cors && corsAdmits(cors, request))
+    admitCrossSite(request)
+
   const passed = await passGuards(endpoint.guards, context, params, options)
 
   if (passed instanceof Response)
     return markedPrivate(passed, request)
 
+  // A browser lets any page post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
+  if (crossSiteRefused(request))
+    return crossSiteResponse(request, 'request')
+
   const { jar, headers } = passed
+  const tooMany = endpoint.limits.length === 0 ? undefined : await limited(endpoint, context, options)
+
+  if (tooMany)
+    return markedPrivate(tooMany, request)
+
+  const url = new URL(request.url)
+  let query: Readonly<Record<string, unknown>> | undefined
   const ctx: EndpointContext = {
     request,
-    url: new URL(request.url),
+    url,
     params,
     locale: contextLocale(options),
+    get query() {
+      return query ??= readQuery(endpoint.query, url)
+    },
     get cookies() {
       readPersonally(request)
 
@@ -121,11 +249,15 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
   let response: Response
 
   try {
-    response = responseOf(endpoint, await endpoint.get(ctx))
+    // A schema is read before the handler, which a query it refuses never reaches.
+    if (endpoint.query !== undefined)
+      void ctx.query
+
+    response = responseOf(endpoint, verb, await handler(ctx))
   }
   catch (error) {
     if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
-      return markedPrivate(stopped(error, request, passed, options), request)
+      return markedPrivate(await notFound(stopped(error, request, passed, options), context, options), request)
 
     reportServerError(error, request, options.onError)
 
@@ -154,6 +286,41 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
   return response
 }
 
+// 429 with `Retry-After` once the caller is over a limit of the file, counted after the guards so a caller they refuse costs no allowance.
+async function limited(endpoint: ServedEndpoint, context: EndpointRequest, options: ActionOptions): Promise<Response | undefined> {
+  const { request } = context
+  const wait = await apiLimitWait(endpoint.limits, request, context.server, () => ({
+    request,
+    locale: contextLocale(options),
+    get cookies() {
+      return cookieJar(request).cookies
+    },
+    locals: context as unknown as Locals,
+  }))
+
+  return wait === undefined ? undefined : tooManyRequests(wait)
+}
+
+// A 404 drawn by the routes directory's `_404.kay` for a request asking HTML, keeping the cookies and headers the plain answer carries; any other answer, and a request asking anything else, goes out as it is.
+async function notFound(plain: Response, context: EndpointRequest, options: ActionOptions): Promise<Response> {
+  if (plain.status !== 404 || !HTML.test(context.request.headers.get('accept') ?? ''))
+    return plain
+
+  const page = await options.unmatched?.()?.(context as unknown as Parameters<Unmatched>[0])
+
+  if (!page)
+    return plain
+
+  for (const [name, value] of plain.headers) {
+    if (name === 'set-cookie')
+      page.headers.append(name, value)
+    else if (name !== 'content-type' && name !== 'content-length')
+      page.headers.set(name, value)
+  }
+
+  return page
+}
+
 // A redirect, a denial or a 404 thrown after the cookies were read is for that visitor alone too, unless it sets its own `cache-control`.
 function markedPrivate(response: Response, request: Request): Response {
   if (wasReadPersonally(request))
@@ -162,7 +329,7 @@ function markedPrivate(response: Response, request: Request): Response {
   return response
 }
 
-function responseOf(endpoint: ServedEndpoint, body: unknown): Response {
+function responseOf(endpoint: ServedEndpoint, verb: string, body: unknown): Response {
   if (body instanceof Response)
     return body
 
@@ -173,10 +340,10 @@ function responseOf(endpoint: ServedEndpoint, body: unknown): Response {
   if (body instanceof Blob)
     return new Response(body, { headers: { 'content-type': body.type || endpoint.type } })
 
-  throw new KayError('route-invalid', `kay: ${endpoint.file}'s GET returned ${body === null ? 'null' : typeof body}, where it returns a string, a Blob or a Response`)
+  throw new KayError('route-invalid', `kay: ${endpoint.file}'s ${verb} returned ${body === null ? 'null' : typeof body}, where it returns a string, a Blob or a Response`)
 }
 
-// The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file.
+// The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file. A file with no GET has no page to write.
 export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: boolean): Promise<{ paths: string[], problems: ExportProblem[] }> {
   const paths: string[] = []
   const problems: ExportProblem[] = []
@@ -185,13 +352,18 @@ export async function exportedEndpoints(root: string, endpoints: Endpoint[], req
     const file = relative(root, endpoint.file)
 
     try {
+      const module = await importModule<{ GET?: unknown }>(endpoint.file)
+
+      if (typeof module.GET !== 'function')
+        continue
+
       if (endpoint.guards.length > 0)
         throw new KayError('export-guard', 'a guard covers it, and only a server can run one per request')
 
       if (required === true && endpoint.open !== true)
         throw new KayError('export-guard', 'requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
 
-      const prerender = pageSetting(await importModule(endpoint.file), 'prerender')
+      const prerender = pageSetting(module, 'prerender')
       const listed = prerender === undefined && endpoint.params.length === 0 ? true : prerender
 
       if (listed === undefined)

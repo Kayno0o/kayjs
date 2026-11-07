@@ -324,7 +324,18 @@ interface ElementSize
 type EndpointBody = string | Blob | Response
 
 [.] EndpointContext
-type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> = RequestContext<Params, Guarded>
+type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object, Query = Readonly<Record<string, unknown>>> = RequestContext<Params, Guarded> & {
+  query: Query
+}
+
+[.] EndpointSettings
+interface EndpointSettings
+  cors?: CorsOptions | false | undefined
+  guards?: false
+  maxSize?: ByteSize | undefined
+  prerender?: boolean | object
+  query?: TSchema
+  rateLimit?: RateLimit | RateLimit[] | undefined
 
 [.] ErrorPageContext
 interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>

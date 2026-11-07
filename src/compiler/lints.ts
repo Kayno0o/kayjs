@@ -418,6 +418,14 @@ export const LINTS = {
     wrong: '// kay.config.ts sets requireGuards: true\n// src/routes/pricing.kay, with no _guard.ts above it',
     right: '--- server\nexport const page = { guards: false }\n---\nh1 Pricing',
   },
+  'endpoint-export': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'An endpoint file exporting a name that is no method: only `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`, in capitals, are served, and `page` holds its settings, so `post` or `handler` is never called.',
+    wrong: '// src/routes/hook.json.ts\nexport function post() {\n  return Response.json({ ok: true })\n}',
+    right: '// src/routes/hook.json.ts\nexport function POST() {\n  return Response.json({ ok: true })\n}',
+  },
   'unguarded-tool': {
     level: 'warn',
     group: 'security',

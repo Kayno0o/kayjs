@@ -136,7 +136,7 @@ A page reads its data in a `--- server` fence, with the request in `ctx`. See [D
 
 ## Endpoint files
 
-A `.ts` file with an extension before `.ts` serves that path with what its `GET` returns. Use it for an `llms.txt`, a JSON feed or a CSV export.
+A `.ts` file with an extension before `.ts` serves that path with what its `GET` returns. Use it for an `llms.txt`, a JSON feed, a CSV export or a webhook, which exports `POST` or another method in place of `GET`.
 
 ```ts
 // src/routes/feeds/[slug].json.ts
@@ -150,7 +150,9 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 }
 ```
 
-`GET` receives the same `ctx` as a page, without the parts only a page has. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, such as `text/plain` for `llms.txt`. The guards above it run first, as they do for a page. `kay build --static` writes it to a file.
+A handler receives the same `ctx` as a page, without the parts only a page has.
+
+A method the file does not export answers 405, and `export const page = { query, rateLimit, cors, maxSize }` sets what an API route sets. A 404 shows your `_404.kay` to a browser asking for HTML. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, such as `text/plain` for `llms.txt`. The guards above it run first, as they do for a page. `kay build --static` writes its `GET` to a file.
 
 ## Not found and errors
 

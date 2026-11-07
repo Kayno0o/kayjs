@@ -29,6 +29,8 @@ export interface MountLimit {
 export interface RouteBodyLimit {
   method: string
   path: string
+  // The extension an endpoint's last param ends in, which the path must end in too.
+  suffix?: string | undefined
   // Undefined for a route setting none, which keeps its module's.
   limit: BodyLimit | undefined
 }
@@ -81,7 +83,7 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
 
     // Elysia serves `/path/` as `/path`, so a trailing slash reaches the same route.
     const path = withoutSlash(requestUrl(request).pathname)
-    const own = matchers.find(route => (route.method === request.method || route.method === 'ALL') && route.matcher.test(path))
+    const own = matchers.find(route => (route.method === request.method || route.method === 'ALL') && route.matcher.test(path) && (route.suffix === undefined || path.endsWith(route.suffix)))
     const limit = own?.limit ?? actions.get(path) ?? mounted(path)
     const allowed = limit?.bytes ?? Math.max(bytes, limit?.files ?? 0)
 

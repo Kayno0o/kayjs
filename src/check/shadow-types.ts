@@ -34,6 +34,7 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { deprecatedAuthOptions } from './deprecated-auth-options'
 import { deprecatedEscapeOption } from './deprecated-escape-option'
 import { ownFile } from './diagnose'
+import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
@@ -134,6 +135,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options, served }) => redirectChecks(root, options, served),
   async ({ options, served }) => unguardedRoutes(options, served),
   async ({ served }) => unreadOpenSettings(served),
+  async ({ options, served }) => endpointExports(options, served),
   async ({ options, served }) => unguardedTools(options, served),
   async ({ options, served }) => mcpRoutes(options, served),
   async ({ root, options, served }) => largePublicImages(options, root, served),

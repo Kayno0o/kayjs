@@ -6,7 +6,7 @@ The rest of [Pages and routing](routing.md).
 
 ### Endpoint files
 
-A `.ts` file in `src/routes/` whose name carries an extension before `.ts` serves that path with what its `GET` returns, such as an `llms.txt` or a JSON feed, without an API module:
+A `.ts` file in `src/routes/` whose name carries an extension before `.ts` serves that path with what its `GET` returns, such as an `llms.txt` or a JSON feed, without an API module. It exports a handler per method it answers, `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` or `OPTIONS`, so a webhook or a callback is a file too:
 
 ```ts
 // src/routes/feeds/[slug].json.ts
@@ -25,6 +25,20 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 | `llms.txt.ts` | `/llms.txt` |
 | `feeds/[slug].json.ts` | `/feeds/:slug.json`, read as `params.slug` |
 | `exports/[year]/report.csv.ts` | `/exports/:year/report.csv` |
+
+```ts
+// src/routes/hooks/stripe.json.ts
+import type { EndpointContext } from 'kay'
+import { s } from 'kay'
+
+export const page = { rateLimit: { max: 60, window: '1m' }, maxSize: '1mb', query: s.Object({ test: s.Optional(s.Boolean()) }) }
+
+export async function POST({ request, query }: EndpointContext) {
+  await handleEvent(await request.json(), query.test === true)
+
+  return Response.json({ received: true })
+}
+```
 
 ### Redirects
 
@@ -61,9 +75,12 @@ export default defineConfig({
 
 ### Rules: Endpoint files
 
-- `GET(ctx)` takes an `EndpointContext`, the request context of "The request context": `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, as a page's `ctx` has them; what it sets through `cookies` and `headers` goes out with its answer, `locale` is the site's `lang` as an endpoint has no locale prefix, and `redirect`, `notFound` and `deny` answer as plain text, `deny` with its message.
+- Each handler (`GET(ctx)`, `POST(ctx)`...) takes an `EndpointContext`, the request context of "The request context": `request`, `url`, `locale`, `params`, `query`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`, as a page's `ctx` has them; what it sets through `cookies` and `headers` goes out with its answer, `locale` is the site's `lang` as an endpoint has no locale prefix, and `redirect`, `notFound` and `deny` answer as plain text, `deny` with its message.
 - It returns a string, a `Blob` or a `Response`, or a promise of one: a string is sent as the type its extension names, `text/plain` for `.txt`, in UTF-8, a Blob with its own type or else that one, and a Response as it is, its status and headers included.
 - A handler that throws answers 500 and goes to `onError`.
+- A file with a handler for none of the methods stops the server. A method it lacks answers 405 with `Allow`, `HEAD` is the `GET`'s without its body unless the file exports `HEAD`, and `OPTIONS` answers 204 with `Allow` unless the file exports `OPTIONS`; `kay check` warns (`endpoint-export`) of an export that is no method, `post` or `handler`, apart from `page`.
+- `export const page = { query, rateLimit, cors, maxSize }` settings, as an API module or a page has them: `query` is a schema `ctx.query` is read against, a query it refuses answering 400; `rateLimit` counts a client across the file's methods after its guards and answers 429 with `Retry-After`; `maxSize` answers 413 before the body is read; `cors` lets other sites' pages call it, answers their preflight and grants their origin (the app's `cors` applies when it sets none, `cors: false` opts out). A browser's cross-site `POST`, `PUT`, `PATCH` or `DELETE` that `cors` does not let in is refused 403, while a request with no `Origin`, such as a webhook, goes through.
+- A 404 an endpoint answers, a path whose extension no file takes or a `notFound()`, renders the routes directory's `_404.kay` for a request that accepts `text/html`, and stays plain text for any other.
 - The `_guard.ts` files above an endpoint run before it, as they do for a page: a redirect or a denial answers, and the cookies and headers they set go out with its answer.
 - A param is a plain `[name]` segment, the extension of the last one written after its brackets, `[slug].json`; a rest, an optional or a matcher param stops the server.
 - Endpoints whose paths only differ by that extension share the path, `feeds/[slug].json.ts` beside `feeds/[name].xml.ts`.
@@ -71,8 +88,8 @@ export default defineConfig({
 - An endpoint serving a page's path in any locale, another endpoint's, a public file's, a redirect's, an API route's or a feed's stops the server, which `kay check` reports.
 - Locale prefixes and layouts leave endpoints alone, and the sitemap lists none.
 - A `.ts` file without an extension before `.ts`, `format.ts`, stays a helper, as do `.test.ts` and `.d.ts` files.
-- `kay check` checks links to endpoints, `a(href="/feeds/news.json")`, and that each exports a `GET` returning one of those.
-- `kay build --compile` embeds them, and `kay build --static` writes each to its path: one without params as it is, one with params for each set of values `export const page = { prerender: [...] }` lists, as a page does.
+- `kay check` checks links to endpoints, `a(href="/feeds/news.json")`, and that each exports a handler per method, returning one of those.
+- `kay build --compile` embeds them, and `kay build --static` writes the `GET` of each to its path, and skips a file with no `GET`: one without params as it is, one with params for each set of values `export const page = { prerender: [...] }` lists, as a page does.
 
 ### Rules: Redirects
 
