@@ -39,7 +39,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
   it('lists each endpoint only when the app serves it', () => {
     const lines = (served: Partial<PlumbingServed>) => plumbing({ ...NONE, ...served }).map(line).filter(entry => !ALWAYS.includes(entry))
 
-    expect(lines({ actions: true })).toEqual(['POST /_kay/action/<file>/<name>'])
+    expect(lines({ actions: true })).toEqual(['POST /_kay/action/<file>/<name>', 'GET /_kay/fields/<file>/<name>'])
     expect(lines({ cspReports: true })).toEqual(['POST /_kay/csp'])
     expect(lines({ preview: true })).toEqual(['GET /_kay/preview', 'POST /_kay/draft'])
     expect(lines({ publicEnv: true })).toEqual(['GET /_kay/env.js'])
@@ -57,7 +57,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
   it('gives each a purpose and a page of the docs', () => {
     const every = plumbing({ actions: true, publicEnv: true, preview: true, cspReports: true, buildFiles: ['/_kay/search.json', '/_kay/search/a/0.json', '/_kay/THIRD-PARTY-LICENSES.txt', '/_kay/images/a.webp', '/_kay/assets/a.png'], mounted: [['GET', '/_kay/analytics.js'], ['GET', '/_kay/analytics/notice.js'], ['POST', '/_kay/analytics'], ['GET', '/_kay/analytics/script.js'], ['POST', '/_kay/analytics/collect'], ['GET', '/_kay/vitals.js'], ['POST', '/_kay/vitals']].map(([method, path]) => ({ method: method!, path: path! })) })
 
-    expect(every).toHaveLength(23)
+    expect(every).toHaveLength(24)
 
     for (const { purpose, docs } of every) {
       expect(purpose).not.toBe('')
@@ -108,7 +108,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
     })
     const lines = plumbed(found).map(line)
 
-    for (const expected of ['POST /_kay/action/<file>/<name>', 'POST /_kay/csp', 'GET /_kay/preview', 'POST /_kay/draft', 'GET /_kay/env.js', 'GET /_kay/analytics.js', 'POST /_kay/analytics', 'GET /_kay/vitals.js', 'POST /_kay/vitals'])
+    for (const expected of ['POST /_kay/action/<file>/<name>', 'GET /_kay/fields/<file>/<name>', 'POST /_kay/csp', 'GET /_kay/preview', 'POST /_kay/draft', 'GET /_kay/env.js', 'GET /_kay/analytics.js', 'POST /_kay/analytics', 'GET /_kay/vitals.js', 'POST /_kay/vitals'])
       expect(lines).toContain(expected)
 
     expect(lines.filter(entry => entry === 'GET /_kay/env.js')).toHaveLength(1)

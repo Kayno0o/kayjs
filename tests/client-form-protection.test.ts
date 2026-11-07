@@ -9,10 +9,13 @@ import { browserPath, testSite } from '../src/test'
 const ROOT = 'tests/fixtures/client-forms'
 // Created first: it is the site that makes the fixture's modules importable.
 const site = await testSite({ root: ROOT, security: false, browser: true })
-const { guarded, trapped, open } = await import(join(import.meta.dir, 'fixtures/client-forms/src/routes/index.kay')) as {
+const { guarded, trapped, open, limited, plainOnly, quiet } = await import(join(import.meta.dir, 'fixtures/client-forms/src/routes/index.kay')) as {
   guarded: Action<{ note: string, website?: string }, number, 'website'>
   trapped: Action<{ website?: string }, number, 'website'>
   open: Action<Record<string, never>, number>
+  limited: Action<Record<string, never>, number>
+  plainOnly: Action<Record<string, never>, number>
+  quiet: Action<Record<string, never>, number>
 }
 const path = browserPath()
 const HONEYPOT = '<input name="website" type="text" tabindex="-1"'
@@ -43,6 +46,17 @@ describe('the protection a form built in the browser asks its action for', () =>
   it('answers the honeypot alone for an action with no minTime, and nothing for one with neither', async () => {
     expect((await fields(site, trapped.url)).html).toBe(`<div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true" inert>${HONEYPOT} autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore></div>`)
     expect((await fields(site, open.url)).html).toBe('')
+  })
+
+  it('answers nothing for an action with a rateLimit alone', async () => {
+    expect((await fields(site, limited.url)).html).toBe('')
+  })
+
+  it('leaves plain and pretend as they were: a plain post with no stamp is refused, a call is not, and a post sent too soon is answered as if it went through', async () => {
+    expect((await fields(site, plainOnly.url)).html).toContain(STAMP_FIELD)
+    expect((await site.submit(plainOnly, {}, { from: '/', stamp: '' })).html).toContain('This form has expired')
+    expect(await site.call(plainOnly, {})).toBe(1)
+    expect((await site.submit(quiet, {}, { from: '/', openedFor: 0 })).html).not.toContain('Sent too fast')
   })
 
   it('answers 404 for an address that is no action\'s', async () => {
@@ -138,5 +152,95 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form an 
     await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 300)))
     expect(await page.evaluate(() => document.querySelectorAll('form.open input, form.open div').length)).toBe(0)
     expect(await page.evaluate(() => document.querySelectorAll('form.server input[name="kay_since"]').length)).toBe(1)
+  })
+
+  type Page = Awaited<ReturnType<typeof site.open>>
+
+  // The requests the page made for form fields.
+  async function fieldRequests(page: Page): Promise<string[]> {
+    return page.evaluate(() => performance.getEntriesByType('resource').map(entry => new URL(entry.name).pathname).filter(name => name.includes('/_kay/fields/')))
+  }
+
+  async function focusOn(page: Page, selector: string): Promise<void> {
+    await page.evaluate((query: string) => {
+      const control = document.querySelector(query) as HTMLElement
+
+      control.blur()
+      control.focus()
+    }, selector)
+  }
+
+  it('asks once for a form of an action with no check, and for none the server rendered with its fields, in an island or outside one', async () => {
+    await using page = await site.open('/', { path })
+
+    await page.click('button.show')
+    await page.waitFor('form.open')
+    await focusOn(page, 'form.hydrated button')
+    await focusOn(page, 'form.server input')
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 300)))
+    expect(await fieldRequests(page)).toEqual([])
+
+    await focusOn(page, 'form.open button')
+    await focusOn(page, 'form.limited button')
+    await focusOn(page, 'form.open button')
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 300)))
+    expect(await fieldRequests(page)).toHaveLength(2)
+  })
+
+  it('asks again after a failed request, and when the island drew the form again without the fields', async () => {
+    await using page = await site.open('/', { path })
+
+    await page.click('button.show')
+    await page.waitFor('form.built')
+    await page.evaluate(() => {
+      Object.assign(window, { realFetch: window.fetch.bind(window), fetch: async () => Promise.reject(new Error('offline')) })
+    })
+    await focusOn(page, 'form.built input')
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 200)))
+    expect(await page.evaluate(() => document.querySelectorAll('form.built input[name="kay_since"]').length)).toBe(0)
+
+    await page.evaluate(() => {
+      Object.assign(window, { fetch: (window as unknown as { realFetch: typeof fetch }).realFetch })
+    })
+    await focusOn(page, 'form.built input')
+    await page.waitFor('form.built input[name="kay_since"]')
+
+    await page.evaluate(() => {
+      for (const node of document.querySelectorAll('form.built input[name="kay_since"], form.built div[inert]'))
+        node.remove()
+    })
+    await focusOn(page, 'form.built input')
+    await page.waitFor('form.built input[name="kay_since"]')
+    expect(await page.evaluate(() => document.querySelectorAll('form.built input[name="kay_since"]').length)).toBe(1)
+    expect(await page.evaluate(() => document.querySelectorAll('form.built input[name="website"]').length)).toBe(1)
+  })
+
+  it('gives each of two forms of one action its own fields', async () => {
+    await using page = await site.open('/', { path })
+
+    await page.click('button.show')
+    await page.waitFor('form.twin')
+    await focusOn(page, 'form.built input')
+    await focusOn(page, 'form.twin input')
+    await page.waitFor('form.twin input[name="kay_since"]')
+    await page.waitFor('form.built input[name="kay_since"]')
+    expect(await page.evaluate(() => document.querySelectorAll('form.twin input[name="kay_since"]').length)).toBe(1)
+    expect(await page.evaluate(() => document.querySelectorAll('form.built input[name="kay_since"]').length)).toBe(1)
+  })
+
+  it('asks for the action a submitter names, not the form\'s', async () => {
+    await using page = await site.open('/', { path })
+
+    await page.click('button.show')
+    await page.waitFor('form.multi')
+    await focusOn(page, 'form.multi input')
+    await page.waitFor('form.multi input[name="kay_since"]')
+    await page.evaluate(() => {
+      const form = document.querySelector('form.multi') as HTMLFormElement
+
+      form.requestSubmit(form.querySelector('button.alt'))
+    })
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 500)))
+    expect((await fieldRequests(page)).some(name => name.endsWith('/trapped'))).toBe(true)
   })
 })

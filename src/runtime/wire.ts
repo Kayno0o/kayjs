@@ -9,6 +9,8 @@ const MARK = '!'
 
 export const ACTION_TYPE = 'Action'
 export const ACTION_PREFIX = '/_kay/action/'
+// Where the browser asks for the honeypot and stamp of a form it builds, for the action at the same path under `ACTION_PREFIX`; apart from it so a test waiting for the post is not answered by this.
+export const FIELDS_PREFIX = '/_kay/fields/'
 const ACTION_MARK = Symbol.for('kay.action')
 
 // `actions` lets a function that is an action through, as island props do, as its URL: anywhere else it stays unsendable.

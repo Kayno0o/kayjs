@@ -3,7 +3,7 @@ import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE, IMPORTED, VARIANTS } from '../run
 import { LIVE_ROUTE } from '../runtime/live-value'
 import { SEARCH_DIR, SEARCH_MANIFEST } from '../runtime/search'
 import { DRAFT_ROUTE } from '../runtime/swap'
-import { ACTION_PREFIX } from '../runtime/wire'
+import { ACTION_PREFIX, FIELDS_PREFIX } from '../runtime/wire'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, NOTICE_SCRIPT_PATH } from './analytics'
 import { PUBLIC_ENV_PATH } from './env-state'
 import { ERROR_REPORTS } from './errors'
@@ -55,6 +55,7 @@ const KNOWN: Known[] = [
   { method: 'GET', path: CARD_ROUTE, purpose: 'share cards, drawn on the first request', docs: '/llms/images', when: always },
   { method: 'GET', path: `${FILES_ROUTE}*`, purpose: 'stored files, a private one to a signed link', docs: '/llms/files', when: always },
   { method: 'POST', path: `${ACTION_PREFIX}<file>/<name>`, route: `${ACTION_PREFIX}*`, purpose: 'a page or layout\'s actions', docs: '/llms/actions', when: served => served.actions },
+  { method: 'GET', path: `${FIELDS_PREFIX}<file>/<name>`, route: `${FIELDS_PREFIX}*`, purpose: 'the honeypot and stamp of a form an island builds, for an action', docs: '/llms/action-protection', when: served => served.actions },
   { method: 'POST', path: LIVE_ROUTE, purpose: 'live values: one connection per tab', docs: '/llms/api-from-islands', when: always },
   { method: 'POST', path: ERROR_REPORTS, purpose: 'the errors islands meet in the browser', docs: '/llms/islands', when: always },
   { method: 'POST', path: CSP_REPORTS, purpose: 'what the Content-Security-Policy blocked, with `security.reports`', docs: '/llms/proxy-and-security', when: served => served.cspReports },

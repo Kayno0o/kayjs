@@ -43,6 +43,7 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | `/_kay/card` | share cards |
 | `/_kay/files/` | stored files |
 | `/_kay/action/` | actions |
+| `/_kay/fields/` | the honeypot and stamp of a form an island builds |
 | `/_kay/live` | live values |
 | `/_kay/health` | the health check |
 | `/_kay/jobs` | the jobs page, with `jobs: { guard }` |

@@ -1,15 +1,26 @@
 ---
 import { signal } from 'kay'
-import { guarded, open, trapped } from '../routes/index.kay'
+import { guarded, limited, open, trapped } from '../routes/index.kay'
 
 const shown = signal(false)
 ---
 button.show(type="button" onClick={() => shown.set(true)}) Show
+form.hydrated(action={trapped})
+  button Send
 if shown()
   form.built(action={guarded})
     input(name="note")
     button Send
+  form.twin(action={guarded})
+    input(name="note")
+    button Send
+  form.multi(action={guarded})
+    input(name="note")
+    button Send
+    button.alt(formaction={trapped.url}) Other
   form.trap(action={trapped})
     button Send
   form.open(action={open})
+    button Send
+  form.limited(action={limited})
     button Send

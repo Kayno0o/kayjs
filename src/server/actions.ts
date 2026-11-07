@@ -17,7 +17,6 @@ import type { DocumentedAction } from './openapi'
 import type { Unmatched } from './page-routes'
 import { relative } from 'node:path'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM, protectionFields } from '../runtime/action'
-
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
@@ -27,7 +26,7 @@ import { withDefaultBounds } from '../runtime/schema-bounds'
 import { configuredSite } from '../runtime/site'
 import { sizeText } from '../runtime/size-text'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
-import { ACTION_PREFIX, encodeValue, unsendable } from '../runtime/wire'
+import { ACTION_PREFIX, encodeValue, FIELDS_PREFIX, unsendable } from '../runtime/wire'
 import { pageLocale } from '../runtime/words.server'
 import { actionClash } from './action-clash'
 import { hooksOf, refusedBeforeRun, tellError, tellSuccess, withActionDefaults } from './action-hooks'
@@ -82,8 +81,7 @@ function refusalMessage(action: ServerAction<TSchema, unknown>, { status, retryA
 }
 
 const TEXT = 'text/plain; charset=utf-8'
-// Where an action's form fields are asked for, apart from the address it is posted to so a test waiting for the post is not answered by this.
-const FIELDS_PREFIX = '/_kay/fields/'
+
 // The methods that change nothing, which any page may send anywhere.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
@@ -187,9 +185,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
-      // A span per call, the handler's own spans and the page it renders back nested in it.
       // What a form the browser builds asks for, as the server writes it into the forms it renders: its honeypot and a stamp signed now.
       app.get(value.url.replace(ACTION_PREFIX, FIELDS_PREFIX), () => Response.json({ html: protectionFields(value) }, { headers: { 'cache-control': 'no-store' } }))
+      // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }, named))))
         const response = await timedAction(context.request, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
