@@ -434,12 +434,14 @@ describe('a served app', () => {
 
     await Bun.write(join(root, 'src/routes/index.kay'), 'main Home\n')
     await Bun.write(join(root, 'src/routes/_404.kay'), 'main Gone\n')
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', join(root, 'out')], { env: { PATH: process.env.PATH!, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+    // A folder of its own as the build's cwd, as another test file of the run may write a 404 log under the shared one.
+    const cwd = await scratchDir('not-found-static-cwd-')
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static', '--outdir', join(root, 'out')], { cwd, env: { PATH: process.env.PATH!, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     expect({ code, errors }).toMatchObject({ code: 0 })
     expect(existsSync(join(root, 'data/not-found.sqlite'))).toBe(false)
-    expect(existsSync(join(process.cwd(), 'data/not-found.sqlite'))).toBe(false)
+    expect(existsSync(join(cwd, 'data'))).toBe(false)
   })
 })
 
