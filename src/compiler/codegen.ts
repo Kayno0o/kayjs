@@ -1160,8 +1160,9 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 }
 
 // What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, the first in the template, with the span of that component's tag. A name imported from a module that exports it as a literal of strings and numbers is data, `imported` telling which.
-export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): IslandCause | undefined {
-  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/') && imported?.[binding.source]?.[binding.imported] !== 'data').map(binding => binding.local)])
+// `certain` leaves out the imported names, which only the types know to be functions: what the compiler alone knows cannot be sent is a function written there, one declared in the script, or a block taking parameters.
+export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals, certain = false): IslandCause | undefined {
+  const names = new Set([...script.functions, ...certain ? [] : script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/') && imported?.[binding.source]?.[binding.imported] !== 'data').map(binding => binding.local)])
   let cause: IslandCause | undefined
 
   visitNodes(file.template, (node) => {

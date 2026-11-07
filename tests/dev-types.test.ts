@@ -127,6 +127,24 @@ describe('the type check beside kay dev', () => {
     }
   }, 120_000)
 
+  it('shows `island-prop`, a lint only the types find, for a static component passing an island a function', async () => {
+    const root = await project({
+      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst { v } = props<{ v: unknown }>()\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {String(v)}\n',
+      'src/components/pinned.kay': '--- static\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n',
+      'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\n---\nPinned\n',
+    })
+    const events: Event[] = []
+    const stop = await dev(root, { format: 'json', port: 0, log: line => void events.push(JSON.parse(line) as Event) })
+
+    try {
+      await until(() => events.some(({ event }) => event === 'types'))
+      expect(events.find(({ event }) => event === 'types')!.errors).toEqual([expect.objectContaining({ code: 'island-prop', file: 'src/components/pinned.kay' })])
+    }
+    finally {
+      await stop()
+    }
+  }, 120_000)
+
   it('lists none of the type errors a previous run left once the config fails to load for the type check and the first check is skipped', async () => {
     const root = await project({ 'kay.config.ts': '// The server loads it, the process typing the project does not.\nif (process.argv[1]?.endsWith(\'types.ts\'))\n  throw new Error(\'no config\')\n\nexport default {}\n', 'src/routes/index.kay': 'p Fixed\n' })
     const file = join(root, KAY_DIR, `dev${testWorker()}`, DEV_ERRORS_FILE)

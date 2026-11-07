@@ -48,12 +48,17 @@ export function islandPin(file: KayFile, comment: IslandComment | undefined = is
   return comment === undefined ? undefined : { ...comment, comment: true }
 }
 
+function commentDeletion(file: KayFile, comment: IslandComment): { start: number, end: number, text: '' } {
+  const lineEnd = file.source[comment.end] === '\r' ? comment.end + 2 : comment.end + 1
+
+  return { start: comment.start, end: Math.min(lineEnd, file.source.length), text: '' }
+}
+
 // The fix of the lint: the comment deleted with its line, and the script fence line written with the pin unless a fence line says it or `--- client` is an island already.
 // A static pin the fence cannot take (`--- client`, no script fence, one that is not the comment's) has no fix.
 function rewrite(file: KayFile, comment: IslandComment): Diagnostic['fixes'] {
   const source = file.source
-  const lineEnd = source[comment.end] === '\r' ? comment.end + 2 : comment.end + 1
-  const deletion = { start: comment.start, end: Math.min(lineEnd, source.length), text: '' }
+  const deletion = commentDeletion(file, comment)
   const script = file.script
 
   if (script === undefined || comment.start < script.start || comment.end > script.end)
@@ -98,7 +103,14 @@ export function islandFence(file: KayFile): Fix | undefined {
 
   const named = SCRIPT_HEADER.exec(file.source.slice(line.start, line.end))
 
-  return named === null ? undefined : { title, edits: [{ start: line.start, end: line.start + named[0].length, text: '--- island' }] }
+  if (named === null)
+    return undefined
+
+  // A `// kay-static` comment would contradict the fence it is next to, so it goes in the same fix.
+  const comment = islandComment(file)
+  const contradiction = comment?.kind === 'static' && file.script !== undefined && comment.start >= file.script.start && comment.end <= file.script.end ? [commentDeletion(file, comment)] : []
+
+  return { title, edits: [{ start: line.start, end: line.start + named[0].length, text: '--- island' }, ...contradiction] }
 }
 
 // A pin on a page, a layout or a special page: they render on the server and are never islands.

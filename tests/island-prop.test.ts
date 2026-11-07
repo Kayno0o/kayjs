@@ -1,6 +1,7 @@
 import type { Diagnostic } from '../src/compiler/ast'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { applySafeFixes, check as checkProject } from '../src/check'
 import { browserRole, compileKay, promotedChecks } from '../src/compiler'
@@ -170,6 +171,24 @@ describe('the fence line island-prop writes', () => {
     expect(written('--- static\nconst a = 1\n---\np {a}\n')).toBe('--- island\nconst a = 1\n---\np {a}\n')
   })
 
+  it('opens a script fence before a `--- module` or `--- style` one, which then compiles as an island', () => {
+    for (const other of ['--- module\nexport const a = 1\n---', '--- style\np { color: red }\n---']) {
+      const source = `${other}\np hi\n`
+      const rewritten = written(source)
+
+      expect(rewritten).toBe(`--- island\n---\n${source}`)
+      expect(compileKay(rewritten, 'src/components/part.kay', { check: true }).diagnostics).toEqual([])
+      expect(compileKay(rewritten, 'src/components/part.kay', { check: true }).island).toBeDefined()
+    }
+  })
+
+  it('deletes a `// kay-static` comment in the same fix, so no comment contradicts the fence', () => {
+    const source = '---\n// kay-static\nconst a = 1\n---\np {a}\n'
+
+    expect(written(source)).toBe('--- island\nconst a = 1\n---\np {a}\n')
+    expect(islandFence(parseKay('---\n// kay-island\nconst a = 1\n---\np {a}\n'))!.edits).toHaveLength(1)
+  })
+
   it('writes nothing for an island already or a component that renders on the server only', () => {
     for (const source of ['--- island\n---\np\n', '--- client\n---\np\n', '--- server\nconst a = 1\n---\np {a}\n'])
       expect(fence(source)).toBeUndefined()
@@ -195,6 +214,96 @@ describe('--- static, with the promotion gone to the types', () => {
     expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayPromotedProp(Picker)')
     expect(compileKay('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
     expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayPromotedFunctionProp(Picker)')
+  })
+})
+
+describe('--- static, passing what the compiler knows is not data', () => {
+  const part = 'src/components/part.kay'
+  const staticPins = (source: string, options = {}) => compileKay(source, part, options).diagnostics.filter(diagnostic => diagnostic.code === 'static-pin')
+
+  it('is a `static-pin` error of the build for a function written or declared in the component, and a block taking parameters', () => {
+    const local = '--- static\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
+    const literal = '--- static\nimport Picker from \'./picker.kay\'\n---\nPicker(format={() => 1})\n'
+    const block = '--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n'
+
+    for (const source of [local, literal, block]) {
+      const [found] = staticPins(source, { output: 'html' })
+
+      expect(found?.message).toContain('passes an island what cannot be sent as data')
+      expect(staticPins(source, { check: true })).toEqual([])
+    }
+
+    expect(staticPins(literal.replace('--- static', '---\n// kay-static'), { output: 'html' })).toHaveLength(1)
+  })
+
+  it('leaves an imported value to the types, and a promotable component to the promotion', () => {
+    expect(staticPins('--- static\nimport Picker from \'./picker.kay\'\nimport { save } from \'../data\'\n---\nPicker(v={save})\n', { output: 'html' })).toEqual([])
+    expect(staticPins('---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n', { output: 'html' })).toEqual([])
+  })
+
+  it('fails `kay build`, naming the component, rather than throwing on the first request', async () => {
+    const root = await project({
+      'src/components/island.kay': island,
+      'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', '--- static'),
+      'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\n---\nPinned\n',
+    })
+
+    try {
+      // In a process of its own, as the prerender registers the .kay loader for the project.
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst { built, ...result } = await buildProject(${JSON.stringify(root)}, {})\n\nconsole.log(JSON.stringify({ ...result, built: built && { ...built, report: undefined } }))\n`
+      const run = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
+
+      const result = JSON.parse(output.trim().split('\n').at(-1)!) as { failed?: { stage: string }, built?: unknown, checked: { code: string, file: string }[] }
+
+      // The build's check stage refuses it with the type verdict; the compile's `static-pin` above stands where the types are not read.
+      expect(errors).toBe('')
+      expect(result.failed).toEqual({ stage: 'check' })
+      expect(result.built).toBeUndefined()
+      expect(result.checked.map(({ code, file }) => [code, file.slice(root.length + 1)])).toEqual([['island-prop', 'src/components/pinned.kay']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the lints around libraries and `// kay-island`', () => {
+  it('hides `promoted-island` in a library\'s component, which is the library\'s to migrate, and keeps it in the app\'s', async () => {
+    const passing = '---\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n'
+    const root = await project({
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
+      'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
+      'node_modules/ui-lib/src/island.kay': island,
+      'node_modules/ui-lib/src/card.kay': passing,
+      'src/components/island.kay': island,
+      'src/components/own.kay': passing,
+      'src/routes/index.kay': '---\nimport Card from \'ui-lib/card.kay\'\nimport Own from \'../components/own.kay\'\n---\nCard\nOwn\n',
+    })
+
+    try {
+      const found = await check(root)
+
+      expect(found.filter(diagnostic => diagnostic.code === 'promoted-island').map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/components/own.kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports nothing for a `// kay-island` comment, which already accepts the promotion', async () => {
+    const root = await project({
+      'src/components/island.kay': island,
+      'src/components/said.kay': component('// kay-island\nfunction pick() {}', 'Island(v={pick})'),
+      'src/routes/index.kay': '---\nimport Said from \'../components/said.kay\'\n---\nSaid\n',
+    })
+
+    try {
+      expect(reported(await check(root))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 
