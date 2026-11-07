@@ -1389,11 +1389,39 @@ describe('custom events', () => {
   it('writes the outbound and download options on the tracker tag, and refuses a wrong one', async () => {
     const home = await (await (await site(plausible({ events: { outbound: true, downloads: ['pdf', 'zip'] } }))).handle(new Request('http://localhost/'))).text()
 
-    expect(home).toContain('data-outbound')
     expect(home).toContain('data-downloads="[&quot;pdf&quot;,&quot;zip&quot;]"')
     expect(() => analytics(plausible({ events: { downloads: ['.pdf'] } }))).toThrow('events')
     expect(() => analytics(plausible({ events: { outbound: 'yes' } }))).toThrow('events')
     expect(() => analytics({ provider: 'fathom', siteId: 'ABCDEFGH', events: { outbound: true } } as never)).toThrow('events')
-    expect(await (await (await site(plausible())).handle(new Request('http://localhost/'))).text()).not.toContain('data-outbound')
+    expect(await (await (await site(plausible())).handle(new Request('http://localhost/'))).text()).not.toContain('data-downloads')
+  })
+
+  it('builds the tracker for the config, the plain one held to a budget over the tracker without event code', async () => {
+    const served = async (more: object) => ((await (await site(plausible(more))).handle(new Request('http://localhost/_kay/analytics.js'))).text())
+    const gzip = (text: string) => Bun.gzipSync(text).length
+    const plain = await served({})
+    const marked = await served({ events: true })
+    const both = await served({ events: { outbound: true, downloads: true } })
+
+    // The tracker before events were counted was 1891 B of gzip; a page that asks for none pays 150 B at most.
+    expect(gzip(plain)).toBeLessThanOrEqual(1891 + 150)
+    expect(plain).not.toContain('data-analytics-event')
+    expect(plain).not.toContain('Outbound Link')
+    expect(marked).toContain('data-analytics-event')
+    expect(marked).not.toContain('Outbound Link')
+    expect(marked).not.toContain('File Download')
+    expect(both).toContain('Outbound Link: Click')
+    expect(both).toContain('File Download')
+    expect(gzip(plain)).toBeLessThan(gzip(marked))
+    expect(gzip(marked)).toBeLessThan(gzip(both))
+  })
+
+  it('keeps a GA4 parameter value within Google\'s 100 characters and the parameters within its 25', async () => {
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('x', { long: 'y'.repeat(300), ...Object.fromEntries(Array.from({ length: 9 }, (_, at) => [`k${at}`, at])) }))
+
+    const params = (lastBody() as { events: { params: Record<string, unknown> }[] }).events[0]!.params
+
+    expect((params.long as string).length).toBe(100)
+    expect(Object.keys(params).length).toBeLessThanOrEqual(25)
   })
 })

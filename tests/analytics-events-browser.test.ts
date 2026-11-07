@@ -57,7 +57,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     await page.click('#inner')
     await visits(count + 1)
 
-    expect(sent().at(-1)).toMatchObject({ name: 'buy', props: { plan: 'pro', seatCount: '3' } })
+    expect(sent().at(-1)).toMatchObject({ name: 'buy', props: { 'plan': 'pro', 'seat-count': '3' } })
   })
 
   it('counts a link to another site and a file download with the address and no query, and an ordinary link nothing', async () => {

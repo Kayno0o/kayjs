@@ -1,8 +1,18 @@
+import type { AnalyticsOptions } from './analytics'
 import { SHIPPED_WORDS } from './analytics-words'
 
 // The tracker every page loads: a page view on load and on each page swap, sent to the app's own origin, behind the consent gate when the app set one, or until the visitor opts out.
 // Plain JavaScript in a string because the browser loads it as a file the server serves, and it must stay small: every page pays for it.
-export const ANALYTICS_SCRIPT = `(() => {
+// The tracker built for the app's config: the code for clicks on marked elements, outbound links and downloads is in it only when `events` turns them on, so a page that asked for none pays for `track` alone.
+export function trackerFor(options: AnalyticsOptions): string {
+  const events = options.events
+  const downloads = typeof events === 'object' ? events.downloads : undefined
+
+  return trackerScript(events !== undefined && events !== false, typeof events === 'object' && events.outbound === true, downloads !== undefined && downloads !== false)
+}
+
+function trackerScript(events: boolean, outbound: boolean, downloads: boolean): string {
+  return `(() => {
   const script = document.currentScript
   const data = script.dataset
   const path = new URL(script.src).pathname.slice(0, -3)
@@ -15,8 +25,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const maxAge = Number(data.maxAge) || 15552000
   const exclude = data.exclude ? JSON.parse(data.exclude).map(pattern => pattern.split('/').filter(Boolean)) : []
   const load = data.load ? JSON.parse(data.load) : undefined
-  const downloads = data.downloads ? new Set(JSON.parse(data.downloads).map(word => word.toLowerCase())) : undefined
-  let loaded = false
+${downloads ? '  const files = new Set(JSON.parse(data.downloads).map(word => word.toLowerCase()))\n' : ''}  let loaded = false
   let last = document.referrer
   let wanted
   let asking
@@ -125,42 +134,8 @@ export const ANALYTICS_SCRIPT = `(() => {
   }
 
   // A named event with a few short props, counted by the app's server behind the same consent, exclude and rate rules as a visit; a provider that runs its own script counts none.
-  function track(event, props) {
-    if (!load)
-      void view(location.href, String(event), props)
-  }
-
+  const track = (event, props) => load || view(location.href, event, props)
   const api = window.kayAnalytics = { consent: choice, decide, ask, data, scope, track, wanted: () => wanted }
-
-  // A click on an element marked data-analytics-event, else on a link to another site or a file when the app asked for those.
-  function clicked(element) {
-    const marked = element.closest('[data-analytics-event]')
-
-    if (marked) {
-      const props = {}
-
-      for (const [key, value] of Object.entries(marked.dataset)) {
-        if (key.startsWith('analyticsProp') && key.length > 13)
-          props[key[13].toLowerCase() + key.slice(14)] = value
-      }
-
-      track(marked.dataset.analyticsEvent, props)
-
-      return
-    }
-
-    const link = element.closest('a[href]')
-
-    if (!link || !/^https?:$/.test(link.protocol))
-      return
-
-    const href = link.origin + link.pathname
-
-    if (data.outbound !== undefined && link.origin !== location.origin)
-      track('Outbound Link: Click', { url: href })
-    else if (downloads && (link.hasAttribute('download') || downloads.has(link.pathname.split('.').pop().toLowerCase())))
-      track('File Download', { url: href })
-  }
 
   document.addEventListener('kay:navigate', event => {
     if (!load)
@@ -172,10 +147,7 @@ export const ANALYTICS_SCRIPT = `(() => {
 
     if ((gated || informed) && opening)
       ask(opening)
-
-    if (event.target instanceof Element)
-      clicked(event.target)
-  })
+${events ? clicks(outbound, downloads) : ''}  })
 
   if ((gated || informed) && choice() === '')
     ask()
@@ -183,6 +155,37 @@ export const ANALYTICS_SCRIPT = `(() => {
   start()
 })()
 `
+}
+
+// What a click means once the app turned `events` on: an element marked data-analytics-event, else a link to another site (outbound) or to a file (downloads) when asked for.
+function clicks(outbound: boolean, downloads: boolean): string {
+  return `
+    const target = event.target instanceof Element ? event.target : undefined
+    const marked = target?.closest('[data-analytics-event]')
+    const props = {}
+
+    // The props are the element's data-analytics-prop-* attributes, named without the prefix.
+    for (const { name, value } of marked?.attributes ?? []) {
+      if (name.startsWith('data-analytics-prop-'))
+        props[name.slice(20)] = value
+    }
+
+    if (marked)
+      track(marked.dataset.analyticsEvent, props)
+${outbound || downloads ? linkClicks(outbound, downloads) : ''}`
+}
+
+function linkClicks(outbound: boolean, downloads: boolean): string {
+  return `
+    const link = marked ? undefined : target?.closest('a[href]')
+
+    if (link && /^https?:$/.test(link.protocol)) {
+      const url = link.origin + link.pathname
+
+      ${[outbound && 'if (link.origin !== location.origin)\n        track(\'Outbound Link: Click\', { url })', downloads && 'if (link.hasAttribute(\'download\') || files.has(link.pathname.split(\'.\').pop().toLowerCase()))\n        track(\'File Download\', { url })'].filter(Boolean).join('\n      else ')}
+    }
+`
+}
 
 export const NOTICE_SCRIPT = `(() => {
   const api = window.kayAnalytics

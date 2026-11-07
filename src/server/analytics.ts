@@ -5,7 +5,7 @@ import type { Words } from './analytics-words'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
 import { wholeSeconds } from '../runtime/duration'
-import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
+import { NOTICE_SCRIPT, trackerFor } from './analytics-script'
 import { SHIPPED_WORDS } from './analytics-words'
 
 export { consent } from '../runtime/consent'
@@ -68,7 +68,7 @@ interface Counted extends Common {
   // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
   titles?: boolean | undefined
   // Counts clicks the tracker can tell from a link: `outbound` one to another site (event `Outbound Link: Click`) and `downloads` one to a file (event `File Download`, with `true` for pdf, zip, office, audio, video and image archives, or a list of extensions), each with the address of the target without its query as the `url` prop. Off by default.
-  events?: { outbound?: boolean | undefined, downloads?: boolean | string[] | undefined } | undefined
+  events?: boolean | { outbound?: boolean | undefined, downloads?: boolean | string[] | undefined } | undefined
 }
 
 export interface PlausibleOptions extends Counted {
@@ -236,8 +236,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     : {
       ...(options.exclude?.length ?? 0) > 0 && { 'data-exclude': JSON.stringify(options.exclude) },
       ...options.titles === true && { 'data-titles': '' },
-      ...options.events?.outbound === true && { 'data-outbound': '' },
-      ...options.events?.downloads !== undefined && options.events.downloads !== false && { 'data-downloads': JSON.stringify(options.events.downloads === true ? DOWNLOAD_EXTENSIONS : options.events.downloads) },
+      ...typeof options.events === 'object' && options.events.downloads !== undefined && options.events.downloads !== false && { 'data-downloads': JSON.stringify(options.events.downloads === true ? DOWNLOAD_EXTENSIONS : options.events.downloads) },
     }
 
   if (options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom') {
@@ -264,7 +263,7 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     name: 'kay/analytics',
     asksConsent: asking,
     // Fathom and Cloudflare only need the notice's script, which a static export writes itself.
-    ...loads && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: ANALYTICS_SCRIPT, [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
+    ...loads && options.provider !== 'custom' && { staticFiles: { [ANALYTICS_SCRIPT_PATH]: trackerFor(options), [NOTICE_SCRIPT_PATH]: NOTICE_SCRIPT } },
     ...options.provider === 'custom' && { needsServer: true },
     ...(options.provider === 'custom' || loads) && { server: async () => (await import('./analytics-server')).analyticsServer(options) },
     config: {
@@ -350,11 +349,11 @@ function checked(options: AnalyticsOptions): void {
 
   const events = options.events as Record<string, unknown> | undefined
 
-  if (events !== undefined) {
-    const downloads = events.downloads
+  if (events !== undefined && typeof events !== 'boolean') {
+    const downloads = events?.downloads
 
     if (typeof events !== 'object' || events === null || (events.outbound !== undefined && typeof events.outbound !== 'boolean') || (downloads !== undefined && typeof downloads !== 'boolean' && !(Array.isArray(downloads) && downloads.every(word => typeof word === 'string' && EXTENSION.test(word)))))
-      refuse(`takes events as { outbound?: boolean, downloads?: boolean | string[] } with extensions such as 'pdf'; got ${JSON.stringify(events)}`)
+      refuse(`takes events as true or { outbound?: boolean, downloads?: boolean | string[] } with extensions such as 'pdf'; got ${JSON.stringify(events)}`)
   }
 
   if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined || options.events !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))

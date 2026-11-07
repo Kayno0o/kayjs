@@ -8,7 +8,7 @@ import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, INTEGRITY, isGated, NOTICE_SCRIPT_PATH } from './analytics'
-import { ANALYTICS_SCRIPT, NOTICE_SCRIPT } from './analytics-script'
+import { NOTICE_SCRIPT, trackerFor } from './analytics-script'
 import { BASE_PATH, routerPath } from './base'
 import { declined } from './consent-cookie'
 import { readCapped } from './errors'
@@ -48,9 +48,10 @@ const MAX_PROP_VALUE_LENGTH = 300
 const PROP_KEY = /^[\w.:-]+$/
 const NON_WORD = /\W+/g
 const LETTER_FIRST = /^[a-z]/i
-// GA4 takes names of letters, digits and underscores that start with a letter, 40 characters at most, and 25 parameters, 3 of which a visit already carries.
+// GA4 (https://developers.google.com/analytics/devguides/collection/protocol/ga4/sending-events): names and parameter names of letters, digits and underscores starting with a letter, 40 characters at most; 25 parameters an event, 5 of which a page event carries already; a value 100 characters at most.
 const GA4_NAME_LENGTH = 40
-const GA4_PROPS = 22
+const GA4_PROPS = 20
+const GA4_VALUE_LENGTH = 100
 // Logged once a minute at most per kind, so a provider that is down does not fill the log with a line per visit and a burst of one kind does not hide another.
 const lastWarnings = new Map<string, number>()
 
@@ -98,6 +99,7 @@ interface Forward {
 // Simple Analytics: https://docs.simpleanalytics.com/events-api, a JSON body with the user agent and no address.
 // Google Analytics 4: the Measurement Protocol, https://developers.google.com/analytics/devguides/collection/protocol/ga4/sending-events: POST `/mp/collect?measurement_id&api_secret` with `client_id` and `events`; `ip_override` places the visit, `device` carries the language and screen.
 // Matomo: the tracking HTTP API, https://developer.matomo.org/api-reference/tracking-api: `matomo.php` with `idsite`, `rec`, `url`, `ua` and the rest, and `cip` for the address only with a `token_auth`; no visitor id is sent, so Matomo tells visitors apart without a cookie.
+// Simple Analytics events (https://docs.simpleanalytics.com/events-api: `type: 'event'`, `event`, `metadata`) could not be fetched when this was written and are written from memory of that page.
 const PROVIDERS = {
   plausible: (options: Extract<AnalyticsOptions, { provider: 'plausible' }>, visit: Visit): Forward => ({
     method: 'POST',
@@ -149,7 +151,7 @@ const PROVIDERS = {
     body: {
       client_id: visit.visitor,
       events: [{ name: visit.event === undefined ? 'page_view' : ga4Name(visit.event.name), params: {
-        ...visit.event !== undefined && Object.fromEntries(Object.entries(visit.event.props).slice(0, GA4_PROPS).map(([key, value]) => [ga4Name(key), value])),
+        ...visit.event !== undefined && Object.fromEntries(Object.entries(visit.event.props).slice(0, GA4_PROPS).map(([key, value]) => [ga4Name(key), typeof value === 'string' ? value.slice(0, GA4_VALUE_LENGTH) : value])),
         page_location: visit.page.href,
         page_referrer: visit.referrer,
         page_title: visit.title,
@@ -167,7 +169,7 @@ const PROVIDERS = {
       query.set('e_c', 'Event')
       query.set('e_a', visit.event.name)
 
-      // Matomo's event has a name and a value but no props, so they go as the name, in JSON.
+      // Matomo's event has a category and an action (both required, https://developer.matomo.org/api-reference/tracking-api), an optional name `e_n` and a numeric value `e_v`, but no props, so they go as the name, in JSON.
       if (hasProps(visit.event))
         query.set('e_n', JSON.stringify(visit.event.props))
     }
@@ -227,8 +229,9 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
 
   active = options.provider === 'custom' || options.provider === 'fathom' || options.provider === 'cloudflare' ? undefined : { options, gated }
 
+  const script = trackerFor(options)
   const tracker = new Elysia({ name: 'kay-analytics' })
-    .get(ANALYTICS_SCRIPT_PATH, () => new Response(ANALYTICS_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
+    .get(ANALYTICS_SCRIPT_PATH, () => new Response(script, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
     .get(NOTICE_SCRIPT_PATH, () => new Response(NOTICE_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
 
   if (options.provider === 'custom')

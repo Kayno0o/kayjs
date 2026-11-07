@@ -207,7 +207,9 @@ In the browser, call `window.kayAnalytics.track('signup', { plan: 'pro' })` from
 <button data-analytics-event="signup" data-analytics-prop-plan="pro">Start</button>
 ```
 
-Each `data-analytics-prop-*` is a prop (`data-analytics-prop-seat-count` is `seatCount`). To count clicks without marking anything, turn on `events: { outbound: true, downloads: true }`: a link to another site sends `Outbound Link: Click` and a link to a file, or one with a `download` attribute, sends `File Download`, each with the target's address without its query as the `url` prop. `downloads` also takes a list of extensions, `['pdf', 'zip']`.
+Each `data-analytics-prop-*` is a prop (`data-analytics-prop-seat-count` is `seat-count`). Marked elements need `events: true` in `analytics()`, which keeps their code out of the tracker until you ask.
+
+To count clicks without marking anything, write `events: { outbound: true, downloads: true }` instead: a link to another site sends `Outbound Link: Click` and a link to a file, or one with a `download` attribute, sends `File Download`, each with the target's address without its query as the `url` prop. `downloads` also takes a list of extensions, `['pdf', 'zip']`.
 
 In an action or an endpoint, call `track` with the context:
 
