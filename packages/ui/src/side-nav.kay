@@ -100,18 +100,30 @@ const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | u
 const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
 const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
 
+// The latest load wins, as in Menu.
+let latest = 0
+
 async function load() {
+  const mine = ++latest
+
   failed = false
 
   try {
-    if (waits(links))
-      askedLinks = await (typeof links === 'function' ? links() : links)
+    const nextLinks = waits(links) ? await (typeof links === 'function' ? links() : links) : undefined
+    const nextGroups = waits(groups) ? await (typeof groups === 'function' ? groups() : groups) : undefined
 
-    if (waits(groups))
-      askedGroups = await (typeof groups === 'function' ? groups() : groups)
+    if (mine !== latest)
+      return
+
+    if (nextLinks)
+      askedLinks = nextLinks
+
+    if (nextGroups)
+      askedGroups = nextGroups
   }
   catch {
-    failed = true
+    if (mine === latest)
+      failed = true
   }
 }
 
@@ -166,12 +178,12 @@ snippet inside(entry: NavLink)
   if entry.badge !== undefined
     span(part="badge") {entry.badge}
 // One link; a disabled one is a text, as in TabNav. A rail names it by a tooltip.
-snippet destination(entry: NavLink)
+snippet destination(entry: NavLink, inPanel: boolean)
   if entry.disabled
-    span(part="link" aria-disabled="true" data-hint={folded() ? entry.label : undefined})
+    span(part="link" aria-disabled="true" data-hint={folded() && !inPanel ? entry.label : undefined})
       | {inside(entry)}
   else
-    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)} data-tooltip={folded() ? entry.label : undefined})
+    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)} data-tooltip={folded() && !inPanel ? entry.label : undefined})
       | {inside(entry)}
 snippet lists(inPanel: boolean)
   nav(part="nav" id={inPanel ? `${navId}-panel` : navId} aria-label={label} data-collapsed={folded() && !inPanel ? '' : undefined} data-panel={panel && !inPanel ? '' : undefined})
@@ -194,12 +206,12 @@ snippet lists(inPanel: boolean)
         ul(part="list" aria-labelledby={group.label === undefined ? undefined : `${navId}-${inPanel ? 'p' : 'n'}${index}`})
           for entry of group.links key={entry.href}
             li(part="item")
-              | {destination(entry)}
+              | {destination(entry, inPanel)}
               if entry.children && entry.children.length > 0
                 ul(part="children")
                   for child of entry.children key={child.href}
                     li(part="item")
-                      | {destination(child)}
+                      | {destination(child, inPanel)}
     if footer
       div(part="footer")
         | {footer}
