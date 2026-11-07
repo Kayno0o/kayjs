@@ -32,6 +32,8 @@ function fakeStream() {
     retry: () => undefined,
     onData: () => () => undefined,
     onOpen: () => () => undefined,
+    onError: () => () => undefined,
+    onClose: () => () => undefined,
     on: (listener) => {
       listeners.add(listener)
 

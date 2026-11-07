@@ -1,5 +1,6 @@
 import type { Caller, Settles } from './action-owner'
 import type { Action, ActionStream, CallOptions, CallQueue, Outcome, Refreshable, TrackedCall } from './action-shared'
+import type { TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { ConnectionStatus } from './live'
 import { encodeCall } from './action-encode'
@@ -427,10 +428,10 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
         return field === undefined ? Object.keys(found).length === 0 : found[field] === undefined
       }),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
-      track: read((handle?: { queue?: CallQueue }) => {
+      track: read((handle?: { queue?: CallQueue } & TrackHooks<never>) => {
         const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
 
-        return tracked(async (input, options) => run(lane, input, options), url)
+        return tracked(async (input, options) => run(lane, input, options), url, handle)
       }),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
@@ -438,7 +439,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
 }
 
 // A handle over `call` whose refusals of this action it answers as results.
-function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string): TrackedCall<never, unknown> {
+function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>, url: () => string, hooks?: TrackHooks<never>): TrackedCall<never, unknown> {
   return trackCalls(
     call as (input: unknown, options?: CallOptions) => Promise<unknown>,
     error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data },
@@ -456,7 +457,8 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
       return held
     },
     error => error instanceof ActionRedirectError || superseding.has(error as object),
-  )
+    hooks,
+  ) as unknown as TrackedCall<never, unknown>
 }
 
 async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller, extra?: Record<string, string>): Promise<Output> {

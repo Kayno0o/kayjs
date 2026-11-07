@@ -292,7 +292,7 @@ describe('an action\'s stream', () => {
       const opens: boolean[] = []
 
       acted.on(one => void seen.push(one))
-      acted.onOpen(reconnected => void opens.push(reconnected))
+      acted.onOpen(({ reconnected }) => void opens.push(reconnected))
       await eventually(() => expect(acted.status()).toBe('failed'))
       await expect(acted.ended()).rejects.toBeInstanceOf(ApiError)
       acted.retry()

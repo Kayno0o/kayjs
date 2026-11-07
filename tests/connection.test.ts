@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from 'bun:test'
 import { ApiError } from '../src/runtime/api-error'
-import { connection, listenerSet, retryLater } from '../src/runtime/connection'
+import { connection, retryLater } from '../src/runtime/connection'
+import { listenerSet } from '../src/runtime/listener-set'
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 

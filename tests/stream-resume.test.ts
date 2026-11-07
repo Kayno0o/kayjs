@@ -170,7 +170,7 @@ describe('a stream reconnecting', () => {
     const reader = readEvents<number>(async () => answers.shift()!, true)
     const opened: boolean[] = []
 
-    reader.onOpen(reconnected => opened.push(reconnected))
+    reader.onOpen(({ reconnected }) => opened.push(reconnected))
 
     try {
       reader.start()
@@ -331,7 +331,7 @@ describe('socket() onOpen', () => {
     })
     const opened: boolean[] = []
 
-    room.onOpen(reconnected => opened.push(reconnected))
+    room.onOpen(({ reconnected }) => opened.push(reconnected))
 
     try {
       room.start()
@@ -363,7 +363,7 @@ describe('stream(source) onOpen', () => {
       }))
       const opened: boolean[] = []
 
-      reader.onOpen(reconnected => opened.push(reconnected))
+      reader.onOpen(({ reconnected }) => opened.push(reconnected))
       flush()
       await until(() => reader.status() === 'failed')
       reader.retry()

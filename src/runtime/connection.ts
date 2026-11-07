@@ -1,5 +1,6 @@
 import type { ApiError } from './api-error'
-import type { ConnectionStatus } from './live'
+import type { ConnectionHooks, ConnectionStatus } from './live'
+import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
 
 // The one place a connection is retried and its state kept: the reconnect, the backoff, the listeners and the status of `socket()`, `stream()`, the cached values a page follows and the live values.
@@ -76,29 +77,6 @@ export function retryLater(attempt: number, run: () => void): () => void {
   }
 }
 
-// A set of listeners to call with a value, one throwing leaving the others alone; `on` gives what removes a listener.
-export function listenerSet<T>(): { on: (listener: (value: T) => void) => () => void, emit: (value: T) => void } {
-  const all = new Set<(value: T) => void>()
-
-  return {
-    on: (listener) => {
-      all.add(listener)
-
-      return () => void all.delete(listener)
-    },
-    emit: (value) => {
-      for (const listener of all) {
-        try {
-          listener(value)
-        }
-        catch (error) {
-          console.error(error)
-        }
-      }
-    },
-  }
-}
-
 // `on`, handing each value as `{ value }`, the shape every hook takes.
 export function onData<T>(on: (listener: (value: T) => void) => () => void): (listener: (event: { value: T }) => void) => () => void {
   return listener => on(value => listener({ value }))
@@ -112,6 +90,45 @@ export function ended<T>(link: ReturnType<typeof connection<T>>) {
     else
       reject(final === 'failed' ? untrack(link.error) : new DOMException('The stream was closed before its end', 'AbortError'))
   }))
+}
+
+const finished = (status: ConnectionStatus) => status === 'done' || status === 'failed' || status === 'closed'
+
+// The hooks of a source, as methods and from the options it was given: `onData` and `onOpen` (the listener set `opened` its source keeps), and `onError` and `onClose`, which it installs by wrapping the `set` and `fail` of `link`, so a live value, which has none of them, carries none of this.
+// A run tells `onClose` once: a `close()` after its end, or a second end, is none; `onError` comes first.
+export function connectionHooks<T>(link: ReturnType<typeof connection<T>>, onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void, given?: ConnectionHooks<never>, on = link.on) {
+  const errors = listenerSet<{ error: ApiError }>()
+  const closes = listenerSet<{ status: 'done' | 'failed' | 'closed' }>()
+  const { set, fail } = link
+  const hooks = { onData: onData(on), onOpen, onError: errors.on, onClose: closes.on }
+
+  link.set = (next) => {
+    const was = untrack(link.status)
+
+    set(next)
+
+    if (finished(next) && !finished(was))
+      closes.emit({ status: next })
+  }
+  link.fail = (failure) => {
+    const was = untrack(link.status)
+
+    fail(failure)
+
+    if (!finished(was)) {
+      errors.emit({ error: failure })
+      closes.emit({ status: 'failed' })
+    }
+  }
+
+  if (given) {
+    for (const name of ['onData', 'onOpen', 'onError', 'onClose'] as const) {
+      if (given[name])
+        (hooks[name] as (listener: unknown) => unknown)(given[name])
+    }
+  }
+
+  return hooks
 }
 
 // The state a source that opens, delivers values and drops keeps: the listener set and the last value, the status and the last failure as signals and the backoff of a reconnect.
@@ -159,7 +176,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     flush('failed')
   }
 
-  return {
+  const link = {
     last,
     status,
     pending: () => status() === 'connecting',
@@ -192,7 +209,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     lost: (failure?: ApiError) => {
       if (!reconnect) {
         if (failure)
-          fail(failure)
+          link.fail(failure)
 
         return
       }
@@ -222,4 +239,6 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
       }
     },
   }
+
+  return link
 }

@@ -1,11 +1,12 @@
-import type { CallResult } from './call-result'
+import type { CallResult, TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { Seed } from './live-resource.server'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
-import { connection, ended, listenerSet, onData } from './connection'
+import { connection, connectionHooks, ended } from './connection'
 import { durationSeconds } from './duration'
+import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
 import { pageData } from './page-data'
 import { effect, isHydrating, onCleanup, onMount, ownSignal, untrack } from './reactive'
@@ -109,6 +110,18 @@ export interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | C
 
 export type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
 
+// The callbacks a socket or a stream takes in its options, and as methods of the same names: `onX` after a transition, one object argument. One that throws is logged and leaves the source alone.
+export interface ConnectionHooks<T> {
+  // The connection opened, a reconnect included (`reconnected` is true after the first open), before what was queued goes.
+  onOpen?: ((event: { reconnected: boolean }) => void) | undefined
+  // A value arrived.
+  onData?: ((event: { value: T }) => void) | undefined
+  // It failed (`status` is `failed` then): a refusal, an error event, a close with a code from 4000 to 4999, a source that threw. Not for a drop it reconnects from. Runs before `onClose`.
+  onError?: ((event: { error: ApiError }) => void) | undefined
+  // A run ended, once: it ran to its `done`, `failed`, or `close()` was called (`closed`). A new run (`start(options)`, `retry()`) ends again.
+  onClose?: ((event: { status: 'done' | 'failed' | 'closed' }) => void) | undefined
+}
+
 export interface Socket<Send, Receive> extends Source<SocketStatus> {
   // Sent at once while open, otherwise once the connection opens.
   send: (message: Send) => void
@@ -121,7 +134,11 @@ export interface Socket<Send, Receive> extends Source<SocketStatus> {
   // Called with `{ value }` for every message received, the shape every source hands its data in; returns what stops it.
   onData: (listener: (event: { value: Receive }) => void) => () => void
   // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again, or refetches what it missed (`reconnected` is true after the first open). Returns what stops it.
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
+  // Called with `{ error }` when it fails; returns what stops it.
+  onError: (listener: (event: { error: ApiError }) => void) => () => void
+  // Called with `{ status }` when it ends, `failed` or `closed`, once; returns what stops it.
+  onClose: (listener: (event: { status: 'done' | 'failed' | 'closed' }) => void) => () => void
   // Closes for good: no reconnecting after.
   close: () => void
 }
@@ -137,7 +154,11 @@ export interface Connection<T> extends Source<ConnectionStatus> {
   // Called with `{ value }` for every value received, the shape every source hands its data in; returns what stops it.
   onData: (listener: (event: { value: T }) => void) => () => void
   // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. Returns what stops it.
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
+  // Called with `{ error }` when it fails; returns what stops it.
+  onError: (listener: (event: { error: ApiError }) => void) => () => void
+  // Called with `{ status }` once a run ends, `done`, `failed` or `closed`; returns what stops it.
+  onClose: (listener: (event: { status: 'done' | 'failed' | 'closed' }) => void) => () => void
   close: () => void
   // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ApiError` when it failed, and an `AbortError` when it was closed first.
   ended: () => Promise<T | undefined>
@@ -180,9 +201,9 @@ export function dispatch<Message extends { type: string }, Handlers extends { [T
 }
 
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
-export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
+export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, hooks?: ConnectionHooks<Receive>): Socket<Send, Receive> & { start: () => void } {
   const link = connection<Receive>(start, true)
-  const opened = listenerSet<boolean>()
+  const opened = listenerSet<{ reconnected: boolean }>()
   const queued: string[] = []
   let current: WebSocket | undefined
   let closed = false
@@ -201,7 +222,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     ws.addEventListener('open', () => {
       link.reset()
       link.set('open')
-      opened.emit(opens++ > 0)
+      opened.emit({ reconnected: opens++ > 0 })
 
       for (const message of queued.splice(0))
         ws.send(message)
@@ -249,8 +270,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
         link.retry()
     },
     on: link.on,
-    onData: onData(link.on),
-    onOpen: listener => opened.on(listener),
+    ...connectionHooks(link, opened.on, hooks),
     close: () => {
       closed = true
       queued.length = 0
@@ -283,14 +303,14 @@ export function resumeHeaders(lastEventId: string | undefined): Record<string, s
 
 // An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; a GET stream also waits out a 502, 503 or 504, as a server or proxy restarting answers, and with `retryRefused` any response that is not ok is tried again after the backoff too.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value and its last id.
-// It gives the connection to build `ended()` and `onData()` on, which a caller needing neither, a live value, does not carry.
-export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): Omit<Connection<T>, 'ended' | 'onData'> & { link: ReturnType<typeof connection<T>>, start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
+// It gives the connection to build `ended()` and the hooks on (`connectionHooks()`), which a caller needing neither, a live value, does not carry.
+export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): Omit<Connection<T>, 'ended' | 'onData' | 'onError' | 'onClose'> & { link: ReturnType<typeof connection<T>>, start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
   let run: AbortController | undefined
   let started = false
   let lastId: string | undefined
   let opens = 0
 
-  const opened = listenerSet<boolean>()
+  const opened = listenerSet<{ reconnected: boolean }>()
   const link = connection<T>(() => void read(run!), reconnect, idle)
 
   // An empty id resets it, as the standard says, and so does one the next request could not send.
@@ -362,7 +382,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
       }
       else {
         link.set('open')
-        opened.emit(opens++ > 0)
+        opened.emit({ reconnected: opens++ > 0 })
         ended = await parseEvents(response.body, controller.signal, onEvent, remember)
       }
     }
@@ -489,7 +509,7 @@ function fieldText(value: unknown): string {
   return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
 }
 
-export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>>
+export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>>
 export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Received<SocketRoute<Module, Path>>>
 
 // Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
@@ -507,7 +527,7 @@ export function socket<Module, const Path extends SocketPath<Module>>(module: Mo
     target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:'
 
     return new WebSocket(target)
-  })
+  }, options)
 
   onMount(client.start)
   onCleanup(client.close)
@@ -527,7 +547,7 @@ export function streamRequest(options: unknown): RequestInit & { method: string,
 }
 
 export type StreamOf<Module, Path, M> = Stream<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
-export type StreamOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & Body<MethodRoute<Module, Path, Chosen<M>>>
+export type StreamOptions<Module, Path, M> = MethodOption<NodeAt<Module, Path>, M> & UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & Body<MethodRoute<Module, Path, Chosen<M>>> & ConnectionHooks<StreamValue<MethodRoute<Module, Path, Chosen<M>>>>
 // What each run of a stream opened with `start: false` takes: the URL's params and query, and a body, which may be a `FormData`.
 export type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>
 
@@ -541,9 +561,9 @@ export type EventReader<T> = Connection<T>
 export type StreamRun<T, Options> = Stream<T, Options>
 
 // An async iterable read as it arrives, from the moment the island is in the page.
-function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Stream<unknown> {
+function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>, hooks?: ConnectionHooks<unknown>): Stream<unknown> {
   const link = connection<unknown>(() => void read(), false)
-  const opened = listenerSet<boolean>()
+  const opened = listenerSet<{ reconnected: boolean }>()
   const controller = new AbortController()
   let opens = 0
   let started = false
@@ -553,7 +573,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Strea
       return
 
     link.set('open')
-    opened.emit(opens++ > 0)
+    opened.emit({ reconnected: opens++ > 0 })
 
     try {
       for await (const value of source(controller.signal)) {
@@ -588,20 +608,20 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Strea
   onMount(start)
   onCleanup(close)
 
-  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, onData: onData(link.on), ended: ended(link), onOpen: opened.on, close, start }
+  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; `close()` aborts the request, and a stream closes with the component that opened it.
 // kept: request
-export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> | (MethodOption<NodeAt<Module, Path>, M> & { start: false })>): StreamOf<Module, Path, M>
+export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> | (MethodOption<NodeAt<Module, Path>, M> & ConnectionHooks<StreamValue<MethodRoute<Module, Path, Chosen<M>>>> & { start: false })>): StreamOf<Module, Path, M>
 // Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone, and it has to stop on it, as a source ignoring the signal is not released while it waits for its next value. The stream is `done` once the iterable ends and `failed` when it throws.
-export function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): Stream<T>
-export function stream(module: unknown, path?: string, options?: UrlInput & { method?: string, start?: boolean }): Stream<unknown, never> {
+export function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>, hooks?: ConnectionHooks<T>): Stream<T>
+export function stream(module: unknown, path?: string | ConnectionHooks<unknown>, options?: UrlInput & ConnectionHooks<never> & { method?: string, start?: boolean }): Stream<unknown, never> {
   if (typeof module === 'function')
-    return iterate(module as (signal: AbortSignal) => AsyncIterable<unknown>)
+    return iterate(module as (signal: AbortSignal) => AsyncIterable<unknown>, path as ConnectionHooks<unknown> | undefined)
 
-  if (path === undefined)
+  if (typeof path !== 'string')
     throw new TypeError('kay: stream() takes the default export of a module under src/api and a path, or a function returning an async iterable')
 
   const lazy = options?.start === false
@@ -637,7 +657,7 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
     reader.start(opened(next))
   }
 
-  return { ...reader, onData: onData(link.on), ended: ended(link), start }
+  return { ...reader, ...connectionHooks(link, reader.onOpen, options), ended: ended(link), start }
 }
 
 // What a resource's status can be: it starts loading, so never idle.
@@ -656,6 +676,10 @@ export interface ResourceExtras<T> {
   seed?: boolean | undefined
   // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component.
   revalidate?: Revalidation | readonly Revalidation[] | undefined
+  // Called with `{ value }` each time the route answers, a quiet reload and `mutate()` included, not for `initial` or the value the server rendered.
+  onData?: ((event: { value: T }) => void) | undefined
+  // Called with `{ error }` each time a request fails, not for a quiet reload that keeps the value it has.
+  onError?: ((event: { error: ApiError }) => void) | undefined
 }
 
 export interface Resource<T> extends Source<ResourceState> {
@@ -665,6 +689,10 @@ export interface Resource<T> extends Source<ResourceState> {
   status: () => ResourceState
   // Why the last request failed as an `ApiError`, kept while the route is asked again until it answers. `retry()` asks again after a failure only.
   error: () => ApiError | undefined
+  // Called with `{ value }` each time the route answers, as the `onData` option; returns what stops it.
+  onData: (listener: (event: { value: T }) => void) => () => void
+  // Called with `{ error }` each time a request fails, as the `onError` option; returns what stops it.
+  onError: (listener: (event: { error: ApiError }) => void) => () => void
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
   // Sets the value at once, for every resource sharing its key, and asks the route again to settle it: a request still in flight is dropped, so an older answer never overwrites it. `{ refresh: false }` keeps the value as set. Given a function, it gets the current value.
@@ -918,17 +946,38 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
   let entry: Entry | undefined
   let gone = false
   let shown: { from: Entry, rev: number } | undefined
+  const answers = listenerSet<{ value: unknown }>()
+  const failures = listenerSet<{ error: ApiError }>()
+  // The failure last told to `onError`, and whether the sink is joining an entry, which tells nothing of what the entry already holds.
+  let told: ApiError | undefined
+  let joining = false
+
+  if (first?.onData)
+    answers.on(first.onData)
+
+  if (first?.onError)
+    failures.on(first.onError)
 
   const sink: Sink = {
     apply: (from) => {
       if (from.rev > 0 && (shown?.from !== from || shown.rev !== from.rev)) {
         shown = { from, rev: from.rev }
         setValue(from.value)
+
+        if (!joining)
+          answers.emit({ value: from.value })
       }
 
       setStatus(from.status)
       setError(from.error)
       setBusy(from.busy)
+
+      if (from.error !== told) {
+        told = from.error
+
+        if (told !== undefined && !joining)
+          failures.emit({ error: told })
+      }
     },
   }
 
@@ -958,7 +1007,9 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
   const join = (next: Entry) => {
     entry = next
     next.sinks.add(sink)
+    joining = true
     sink.apply(next)
+    joining = false
   }
 
   // The entry the key names, made if no resource holds it; true when it was made here.
@@ -1037,6 +1088,8 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
     status,
     pending: busy,
     error,
+    onData: answers.on,
+    onError: failures.on,
     refresh: () => entry?.asked === undefined || gone ? undefined : void entry.load(entry.asked),
     retry: () => {
       if (entry?.asked !== undefined && !gone && untrack(status) === 'failed')
@@ -1108,17 +1161,24 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
   return answer as ApiAnswer<Module, Path, M>
 }
 
-// A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes')`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
+// A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes', { onError: ({ error }) => toast.error(error.message) })`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
 export interface TrackedApi<Module, Path> extends Source<LoadStatus> {
   <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
   readonly pending: () => boolean
   readonly settled: () => Promise<void>
+  // Called with `{ data, input }` when a call succeeds, `input` the options it was given; returns what stops it. Hooks given to `call.track()` run first.
+  readonly onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void
+  // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort; returns what stops it.
+  readonly onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 
-function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
+function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path, hooks?: TrackHooks<unknown>): TrackedApi<Module, Path> {
   return trackCalls(
     async (options: unknown) => (callApi as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
     error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data } : undefined,
+    undefined,
+    undefined,
+    hooks as TrackHooks<never> | undefined,
   ) as unknown as TrackedApi<Module, Path>
 }
 

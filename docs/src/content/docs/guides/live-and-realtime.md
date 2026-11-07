@@ -291,7 +291,7 @@ export default api().get('/news', ({ request }) => {
 })
 ```
 
-A route with no ids can still tell the island to catch up. `stream()` and `socket()` have `onOpen`, whose argument is true on every open after the first, so `news.onOpen(reconnected => reconnected && refetch())` loads again what a drop may have lost.
+A route with no ids can still tell the island to catch up. `stream()` and `socket()` have `onOpen`, which is told `{ reconnected }`, true on every open after the first, so `news.onOpen(({ reconnected }) => reconnected && refetch())` loads again what a drop may have lost.
 
 ```kay
 ---
@@ -327,6 +327,21 @@ p {answer.last()}
 ```
 
 `close()` aborts the request, and the route's source stops as it would if the browser went away.
+
+### Reacting to a transition
+
+A stream, a socket, a `resource()` and a `track()` handle tell the page when something happens, so a toast or a refetch needs no effect watching `status()`. Pass the hooks as options, or add them to the handle, which returns what removes one:
+
+```ts
+const news = stream(feed, '/news', {
+  onData: ({ value }) => notify(value),
+  onError: ({ error }) => toast.error(error.message),
+})
+
+news.onClose(({ status }) => console.log(status))
+```
+
+`onOpen({ reconnected })`, `onData({ value })`, `onError({ error })` and `onClose({ status })` run for a stream, a socket and a streaming action's answer. `onError` runs once when the source fails, before `onClose`, and not for a drop it reconnects from. A `resource()` has `onData` and `onError`, and a `track()` handle `onSuccess({ data, input })` and `onError({ error, input })`. A hook that throws is logged and the source carries on.
 
 ### Streaming anything else
 

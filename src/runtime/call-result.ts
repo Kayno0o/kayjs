@@ -1,6 +1,7 @@
 import type { ApiError, ErrorShape } from './api-error'
 import type { LoadStatus, Source } from './live'
 import { apiErrorOf } from './api-error'
+import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
 
 // How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
@@ -10,6 +11,15 @@ export type CallResult<Data, Failed>
     | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
 
 type Refusal = { ok: false } & ErrorShape
+
+// The callbacks a tracked call takes in its options, and as methods of the same names: `onX` after a transition, one object argument, `input` the first argument of the call. One that throws is logged and leaves the call alone.
+// `input` is `unknown`, so an action of any input still passes where another is expected, as `Action<never, unknown>` stands for any.
+export interface TrackHooks<Data> {
+  // A call succeeded; for a streaming action, once the stream is open.
+  onSuccess?: (event: { data: Data, input: unknown }) => void
+  // A call failed, for a refusal and for no answer alike (which still throws); not for an abort or a redirect.
+  onError?: (event: { error: ApiError, input: unknown }) => void
+}
 
 // What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
 export function whenIdle(): { wait: (count: number) => Promise<void>, check: (count: number) => void } {
@@ -39,7 +49,17 @@ export function trackCalls<Args extends unknown[]>(
   holds?: (data: unknown, release: () => void, take: () => void) => boolean,
   // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
   aside?: (error: unknown) => boolean,
-): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Source<LoadStatus> & { settled: () => Promise<void> } {
+  hooks?: TrackHooks<never>,
+): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Source<LoadStatus> & { settled: () => Promise<void> } & { onSuccess: (listener: (event: { data: unknown, input: unknown }) => void) => () => void, onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void } {
+  const successes = listenerSet<{ data: unknown, input: unknown }>()
+  const failures = listenerSet<{ error: ApiError, input: unknown }>()
+
+  if (hooks?.onSuccess)
+    successes.on(hooks.onSuccess as never)
+
+  if (hooks?.onError)
+    failures.on(hooks.onError)
+
   const [inFlight, setInFlight] = ownSignal(0)
   const [outcome, setOutcome] = ownSignal<LoadStatus>('idle')
   const [error, setError] = ownSignal<ApiError | undefined>(undefined)
@@ -61,14 +81,18 @@ export function trackCalls<Args extends unknown[]>(
       streaming = holds?.(data, () => shift(-1), () => shift(1)) ?? false
       setOutcome('ready')
       setError(undefined)
+      successes.emit({ data, input: args[0] })
 
       return { ok: true, data }
     }
     catch (failure) {
       if (aside?.(failure) !== true && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
+        const error = apiErrorOf(failure)
+
         failedWith = args
         setOutcome('failed')
-        setError(apiErrorOf(failure))
+        setError(error)
+        failures.emit({ error, input: args[0] })
       }
 
       const result = refused(failure)
@@ -88,6 +112,8 @@ export function trackCalls<Args extends unknown[]>(
     status: () => inFlight() > 0 ? 'loading' as const : outcome(),
     pending: () => inFlight() > 0,
     error,
+    onSuccess: successes.on,
+    onError: failures.on,
     settled: async () => idle.wait(untrack(inFlight)),
     retry: () => {
       if (untrack(inFlight) > 0 || untrack(outcome) !== 'failed' || failedWith === undefined)

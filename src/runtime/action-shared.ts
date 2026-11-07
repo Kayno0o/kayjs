@@ -3,7 +3,7 @@ import type { BeforeHook, Hook } from '../server/hooks'
 import type { ActionError, FAILURE } from './action-error'
 import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
-import type { CallResult } from './call-result'
+import type { CallResult, TrackHooks } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
@@ -351,6 +351,10 @@ export interface TrackedCall<Input, Result> extends Source<LoadStatus> {
   readonly pending: () => boolean
   // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
   readonly settled: () => Promise<void>
+  // Called with `{ data, input }` when a call succeeds (for a stream, once it is open), `input` what the call was given; returns what stops it. Hooks given to `track()` run first.
+  onSuccess: (listener: (event: { data: Result extends { ok: true, data: infer Data } ? Data : never, input: unknown }) => void) => () => void
+  // Called with `{ error, input }` when a call fails, a refusal or no answer (which still throws), not for an abort or a redirect; returns what stops it.
+  onError: (listener: (event: { error: ApiError, input: unknown }) => void) => () => void
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
@@ -363,8 +367,8 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.
   readonly settled: () => Promise<void>
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
-  // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option.
-  readonly track: (options?: { queue?: CallQueue | undefined }) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
+  // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option; `track({ onSuccess, onError })` takes the callbacks of every call of the handle, which `onSuccess()` and `onError()` of the handle add to.
+  track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.

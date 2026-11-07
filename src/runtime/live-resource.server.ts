@@ -83,6 +83,8 @@ export function serverResource<T>(key: string | undefined, url: string | undefin
     status: () => ready ? 'ready' : 'loading',
     pending: () => !ready,
     error: () => undefined,
+    onData: () => () => undefined,
+    onError: () => () => undefined,
     refresh: () => undefined,
     retry: () => undefined,
     mutate: () => undefined,

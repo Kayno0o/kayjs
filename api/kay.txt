@@ -15,7 +15,9 @@ interface Action<Input, Output, Honeypot extends string = never>
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
   settled: () => Promise<void>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
-  track: (options?: undefined | { queue?: CallQueue | undefined; }) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+  track: (options?: ({
+  queue?: CallQueue | undefined;
+} & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
   validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
@@ -248,11 +250,20 @@ interface Connection<T> extends Source<ConnectionStatus>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
+  onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
+  onOpen: (listener: (event: { reconnected: boolean; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   status: () => ConnectionStatus
+
+[.] ConnectionHooks
+interface ConnectionHooks<T>
+  onClose?: ((event: { status: "closed" | "done" | "failed"; }) => void) | undefined
+  onData?: ((event: { value: T; }) => void) | undefined
+  onError?: ((event: { error: ApiError<unknown>; }) => void) | undefined
+  onOpen?: ((event: { reconnected: boolean; }) => void) | undefined
 
 [.] ConnectionStatus
 type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
@@ -998,6 +1009,8 @@ function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T, options?
 interface Resource<T> extends Source<ResourceState>
   error: () => ApiError<unknown> | undefined
   mutate: (next: ((current: T | undefined) => T) | T, options?: undefined | { refresh?: boolean; }) => void
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   pending: () => boolean
   refresh: () => void
   retry: () => void
@@ -1141,9 +1154,9 @@ interface ServerAction<Schema extends TSchema, Output, Honeypot extends string =
   schema: Schema
   settled: () => Promise<void>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
-  track: (options?: undefined | {
+  track: (options?: ({
   queue?: CallQueue | undefined;
-}) => TrackedCall<Sendable<(Schema & {
+} & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<(Schema & {
   params: [];
 })["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
@@ -1193,8 +1206,10 @@ interface Socket<Send, Receive> extends Source<SocketStatus>
   error: () => ApiError<unknown> | undefined
   last: () => Receive | undefined
   on: (listener: (message: Receive) => void) => () => void
+  onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: Receive; }) => void) => () => void
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
+  onOpen: (listener: (event: { reconnected: boolean; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   send: (message: Send) => void
@@ -1222,10 +1237,10 @@ type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type 
 function store<T extends object>(value: T): T
 
 [.] stream
-function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<(MethodOption<NodeAt<Module, Path>, M> & {
+function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<(MethodOption<NodeAt<Module, Path>, M> & ConnectionHooks<StreamValue<MethodRoute<Module, Path, Chosen<M>>>> & {
   start: false;
 }) | StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
-function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): Stream<T, Record<never, never>>
+function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>, hooks?: ConnectionHooks<T> | undefined): Stream<T, Record<never, never>>
 
 [.] Stream
 interface Stream<T, Options = Record<never, never>> extends Connection<T>
@@ -1234,8 +1249,10 @@ interface Stream<T, Options = Record<never, never>> extends Connection<T>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
+  onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
+  onOpen: (listener: (event: { reconnected: boolean; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   start: (...[options]: Optional<Options>) => void
@@ -1264,6 +1281,8 @@ type TemplateContext = TemplateValues extends { values: infer Values extends obj
 [.] TrackedApi
 interface TrackedApi<Module, Path> extends Source<LoadStatus>
   error: () => ApiError<unknown> | undefined
+  onError: (listener: (event: { error: ApiError<unknown>; input: unknown; }) => void) => () => void
+  onSuccess: (listener: (event: { data: unknown; input: unknown; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   settled: () => Promise<void>
@@ -1272,10 +1291,17 @@ interface TrackedApi<Module, Path> extends Source<LoadStatus>
 [.] TrackedCall
 interface TrackedCall<Input, Result> extends Source<LoadStatus>
   error: () => ApiError<unknown> | undefined
+  onError: (listener: (event: { error: ApiError<unknown>; input: unknown; }) => void) => () => void
+  onSuccess: (listener: (event: { data: Result extends { ok: true; data: infer Data; } ? Data : never; input: unknown; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   settled: () => Promise<void>
   status: () => LoadStatus
+
+[.] TrackHooks
+interface TrackHooks<Data>
+  onError?: (event: { error: ApiError<unknown>; input: unknown; }) => void
+  onSuccess?: (event: { data: Data; input: unknown; }) => void
 
 [.] TransitionClasses
 interface TransitionClasses
@@ -4218,7 +4244,7 @@ interface TestSite
   query: Query;
 } : {
   query?: Record<string, unknown>;
-}) & VisitInit>) => TestSocket<SocketOf<Module, Path>>
+}) & ConnectionHooks<Received<SocketRoute<Module, Path>>> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
   socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
   params: infer Params;
 } ? Record<never, never> extends Params ? {
@@ -4237,7 +4263,7 @@ interface TestSite
   query: Query;
 } : {
   query?: Record<string, unknown>;
-}) & VisitInit>) => Promise<Response>
+}) & ConnectionHooks<Received<SocketRoute<Module, Path>>> & VisitInit>) => Promise<Response>
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends {
   params: infer Params;
 } ? Record<never, never> extends Params ? {
@@ -4256,7 +4282,7 @@ interface TestSite
   query: Query;
 } : {
   query?: Record<string, unknown>;
-}) & Body<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
+}) & Body<MethodRoute<Module, Path, Chosen<M>>> & ConnectionHooks<StreamValue<MethodRoute<Module, Path, Chosen<M>>>> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   submit: {
   <Honeypot extends string = never>(action: NoInputAction<unknown, Honeypot>, fields?: Partial<Record<"kay_since" | Honeypot, FormValue | FormValue[] | undefined>> | undefined, init?: SubmitInit | undefined): Promise<Visit>;
   <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<"kay_since" | Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: SubmitInit | undefined): Promise<Visit>;

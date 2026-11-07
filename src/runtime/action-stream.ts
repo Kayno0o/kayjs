@@ -2,7 +2,8 @@ import type { ActionStream, SETTLED, Settles } from './action'
 import type { ApiError } from './api-error'
 import type { ConnectionStatus } from './live'
 import { apiErrorOf } from './api-error'
-import { connection, ended, listenerSet, onData } from './connection'
+import { connection, connectionHooks, ended } from './connection'
+import { listenerSet } from './listener-set'
 import { decodeServerValue } from './wire'
 
 const DATA = 'data: '
@@ -22,7 +23,7 @@ export interface Retrying<T> {
 // Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes. `failure` is what `ended()` rejects with for a stream that failed, an `ActionError` its caller makes.
 export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error, retrying?: Retrying<T>): ActionStream<T> & Settles {
   const link = connection<T>(() => undefined, false)
-  const opened = listenerSet<boolean>()
+  const opened = listenerSet<{ reconnected: boolean }>()
   let early: T[] | undefined
   let run = 0
 
@@ -76,7 +77,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
       }
 
       reader = open(next)
-      opened.emit(true)
+      opened.emit({ reconnected: true })
       retrying!.begun(stream)
     }
     catch (thrown) {
@@ -116,8 +117,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
       }
     },
     on,
-    onData: onData(on),
-    onOpen: opened.on,
+    ...connectionHooks(link, opened.on, undefined, on),
     close,
     ended: ended(link),
     [settled]: link.settled,
