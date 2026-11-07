@@ -86,7 +86,7 @@ describe('translations', () => {
     try {
       expect(asObject(await translations('pages'))).toEqual({ a: { fr: 'a' } })
 
-      expect(await saveEntry('pages', { slug: 'a', locale: 'en', data: { title: 'A en' } })).toEqual({})
+      expect(await saveEntry('pages', { slug: 'a', locale: 'en', data: { title: 'A en' } })).toEqual({ ok: true })
       expect(asObject(await translations('pages'))).toEqual({ a: { fr: 'a', en: 'a' } })
 
       const loads = counts.loads
@@ -94,7 +94,7 @@ describe('translations', () => {
       await translations('pages')
       expect(counts.loads).toBe(loads)
 
-      expect(await removeEntry('pages', 'a', 'en')).toEqual({})
+      expect(await removeEntry('pages', 'a', 'en')).toEqual({ ok: true })
       expect(asObject(await translations('pages'))).toEqual({ a: { fr: 'a' } })
 
       const afterRemove = counts.loads

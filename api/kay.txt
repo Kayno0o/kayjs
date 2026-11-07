@@ -2037,7 +2037,7 @@ interface Paginated<Item>
 function reference(collection: string, options?: ElysiaStringOptions | undefined): TString
 
 [./content] removeEntry
-function removeEntry(name: string, slug: string, locale?: string | undefined): Promise<{ issues?: DraftIssue[]; }>
+function removeEntry(name: string, slug: string, locale?: string | undefined): Promise<WriteResult>
 
 [./content] renameField
 function renameField(from: string, to: string): Migration
@@ -2069,10 +2069,10 @@ function resolve<Data, Routed extends boolean>(slug: null | string | undefined, 
 type RoutedEntry<Data> = Entry<Data> & { url: string }
 
 [./content] saveEntries
-function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[]; changed?: true; }>
+function saveEntries(name: string, written: WrittenEntry[]): Promise<ChangedResult | WriteResult>
 
 [./content] saveEntry
-function saveEntry(name: string, entry: WrittenEntry, options?: { create?: boolean | undefined; replacing?: string | undefined; }): Promise<{ issues?: DraftIssue[]; }>
+function saveEntry(name: string, entry: WrittenEntry, options?: { create?: boolean | undefined; replacing?: string | undefined; }): Promise<WriteResult>
 
 [./content] setField
 function setField(name: string, value: unknown): Migration
@@ -2167,7 +2167,7 @@ interface EntryRef
   slug: string
 
 [./edit] showDraft
-function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[]; }>
+function showDraft(entries: DraftEntry[]): Promise<WriteResult>
 
 [./edit] Unclickable
 interface Unclickable extends EntryRef
@@ -2176,6 +2176,9 @@ interface Unclickable extends EntryRef
   locale?: string | undefined
   path: string
   slug: string
+
+[./edit] WriteResult
+type WriteResult = { ok: true, error?: undefined, issues?: undefined } | { ok: false, error: ErrorShape, issues: DraftIssue[] }
 
 [./i18n] alternate
 function alternate(target: string): string

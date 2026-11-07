@@ -1,5 +1,7 @@
+import type { WriteResult } from './draft-issues'
 import type { EntryRef, Unclickable } from './fields'
 import { withBase, withoutBase } from './base'
+import { accepted, refusedIssues } from './draft-issues'
 import { navigation } from './navigation'
 import { DRAFT_ROUTE, NAVIGATE_HEADER } from './swap'
 
@@ -27,7 +29,7 @@ export interface DraftIssue {
   message: string
 }
 
-export type { EntryRef, Unclickable }
+export type { EntryRef, Unclickable, WriteResult }
 
 // What an extension's `editor` is given: each entry the page read, by the name the content config exports its collection under, those its head and attributes read included.
 export interface EditorProps {
@@ -39,10 +41,10 @@ export interface EditorProps {
 let latest: AbortController | undefined
 
 // Shows the page with `entries` in place of the saved ones, keeping scroll, focus and every island whose props did not change; an entry failing its schema is left out, showing its saved text, and resolves where it fails.
-// A newer call cancels this one, which then resolves `{}` and shows nothing, as does going to another page before it shows.
-export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[] }> {
+// A newer call cancels this one, which then resolves `{ ok: true }` and shows nothing, as does going to another page before it shows.
+export async function showDraft(entries: DraftEntry[]): Promise<WriteResult> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return {}
+    return accepted()
 
   latest?.abort()
 
@@ -67,7 +69,7 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
   }
   catch (error) {
     if (controller.signal.aborted)
-      return {}
+      return accepted()
 
     throw error
   }
@@ -75,10 +77,10 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
   const { response, text } = answer
 
   if (!isCurrent())
-    return {}
+    return accepted()
 
   if (response.status === 422)
-    return JSON.parse(text) as { issues: DraftIssue[] }
+    return refusedIssues((JSON.parse(text) as { issues: DraftIssue[] }).issues)
 
   if (!response.ok)
     throw new Error(`kay: showDraft was answered ${response.status}: ${text}`)
@@ -90,7 +92,7 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
 
   await show({ url: location.href, type: response.headers.get('content-type') ?? '', html: text }, '', { intent: 'refresh', focused: document.activeElement }, isCurrent)
 
-  return refused.length > 0 ? { issues: refused } : {}
+  return refused.length > 0 ? refusedIssues(refused) : accepted()
 }
 
 interface Answer { response: Response, text: string }

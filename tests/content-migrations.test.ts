@@ -280,7 +280,7 @@ describe('migrations', () => {
       expect((await packs.all()).map(entry => entry.slug)).toEqual(['old'])
       expect(order).toEqual(['save editor'])
       release.resolve()
-      expect(await editing).toEqual({})
+      expect(await editing).toEqual({ ok: true })
 
       // Nothing waited, and the next read writes the entry back.
       packs.invalidate()
@@ -395,7 +395,7 @@ describe('a CMS editing a collection with stored entries the schema refuses', ()
       expect(listed.find(entry => entry.slug === 'old')?.data).toEqual({ title: 'Old', price: 4, visible: true })
       expect(listed.find(entry => entry.slug === 'stale')?.data).toEqual({ title: 'Stale' })
       expect((await packs.all()).map(entry => entry.slug)).toEqual(['good', 'old'])
-      expect(await saveEntry('packs', { slug: 'stale', data: { title: 'Stale', price: 9, visible: false } })).toEqual({})
+      expect(await saveEntry('packs', { slug: 'stale', data: { title: 'Stale', price: 9, visible: false } })).toEqual({ ok: true })
       expect((await packs.all()).map(entry => entry.slug)).toEqual(['good', 'old', 'stale'])
       expect(rows.find(row => row.slug === 'old')?.data).toEqual({ title: 'Old', price: 4, visible: true })
     }
@@ -439,7 +439,7 @@ describe('a unique field', () => {
       expect((await entryIssues('uniques', packs, { slug: 'c', locale: 'fr', data: { code: 'A', name: 'C' } })).issues).toEqual([{ ...at, path: 'code', message: 'is already the code of a' }])
       expect((await entryIssues('uniques', packs, { slug: 'a', locale: 'fr', data: { code: 'A', name: 'A2' } })).issues).toEqual([])
       expect((await entryIssues('uniques', packs, { slug: 'c', locale: 'fr', data: { code: 'C', name: 'C' } })).issues).toEqual([])
-      expect(await saveEntry('uniques', { slug: 'c', locale: 'fr', data: { code: 'B', name: 'C' } })).toMatchObject({ issues: [{ path: 'code' }] })
+      expect(await saveEntry('uniques', { slug: 'c', locale: 'fr', data: { code: 'B', name: 'C' } })).toMatchObject({ ok: false, issues: [{ path: 'code' }] })
     }
     finally {
       registerCollections(before)
@@ -502,7 +502,7 @@ describe('a localized collection pairing entries by translation key', () => {
     const before = registerCollections([['events', events]])
 
     try {
-      expect(await saveEntry('events', { slug: 'launch', data: { at: '2026-10-21T10:00:00.000Z' } })).toEqual({})
+      expect(await saveEntry('events', { slug: 'launch', data: { at: '2026-10-21T10:00:00.000Z' } })).toEqual({ ok: true })
       expect(seen).toEqual(['2026-10-21:10'])
     }
     finally {

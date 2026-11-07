@@ -336,10 +336,10 @@ async function writeEntry(entry: CmsDraftEntry, { create = false, version, requi
         return stale
 
       const trail = await openTrail(entry, create ? undefined : async () => storedState((await entries(collection.name, { slug: entry.slug, locale: entry.locale }))[0]), { fresh: create && !revived })
-      const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
+      const result = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
-      if (issues !== undefined && issues.length > 0)
-        return { issues }
+      if (!result.ok)
+        return { issues: result.issues }
 
       // The entry as the loader holds it now, defaults filled in, which is what the history compares the entry with and the next save names.
       const after = trail || versioned ? await readAfter(entry, collection.name) : undefined
@@ -421,13 +421,11 @@ async function removeOne(ref: EntryRef, author: Identity | undefined, { version,
         throw error
       }
 
-      const { issues } = removal
-
-      if (issues !== undefined && issues.length > 0) {
+      if (!removal.ok) {
         if (id !== undefined)
           await discardTrashed(collection.name, id)
 
-        return { issues }
+        return { issues: removal.issues }
       }
 
       return { saved: true }
@@ -610,12 +608,15 @@ async function moveEntryAnswer(ref: EntryRef, direction: 'up' | 'down', author?:
         return { slug: entry.slug, locale: entry.locale, data: { ...entry.data, [field]: change.value }, body: entry.body, expect: { field, was: orderValue(entry, field) } }
       })
 
-      const { issues, changed } = await saveLoadedMany(collection.name, written)
+      const result = await saveLoadedMany(collection.name, written)
 
-      if (changed)
+      if (result.ok)
+        return { saved: true, moved: written }
+
+      if (result.issues === undefined)
         return refused(ref, wording('cms.store.changed', 'This entry was changed since you opened it, by another editor or by the app'))
 
-      return issues !== undefined && issues.length > 0 ? { issues } : { saved: true, moved: written }
+      return { issues: result.issues }
     })
 
     if ('saved' in moved && moved.moved) {
@@ -909,10 +910,10 @@ async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, t
     if (current === undefined)
       return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
-    const { issues: refusedNew } = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data: renamedData(collection, current.data, ref.slug, target.slug, keepPairing), body: current.body }, { create: true, replacing: ref.slug })
+    const saving = await saveLoaded(collection.name, { slug: target.slug, locale: target.locale, data: renamedData(collection, current.data, ref.slug, target.slug, keepPairing), body: current.body }, { create: true, replacing: ref.slug })
 
-    if (refusedNew !== undefined && refusedNew.length > 0)
-      return { issues: refusedNew }
+    if (!saving.ok)
+      return { issues: saving.issues }
 
     // The entry is not deleted, so it does not go to the trash: it is the same entry under another slug.
     let removal: Awaited<ReturnType<typeof removeEntry>>
@@ -926,7 +927,7 @@ async function renameLoaded(collection: CollectionInfo, existing: StoredEntry, t
       throw error
     }
 
-    if (removal.issues !== undefined && removal.issues.length > 0) {
+    if (!removal.ok) {
       await takeBack(target)
 
       return { issues: removal.issues }

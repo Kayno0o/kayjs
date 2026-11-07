@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.92.0
 
+### `saveEntry`, `saveEntries`, `removeEntry` and `showDraft` resolve `ok`
+
+They resolve `{ ok: true }` where they resolved `{}`, and `{ ok: false, error, issues }` where they resolved `{ issues }` (`saveEntries` also `{ ok: false, error, changed: true }` where it resolved `{ changed: true }`); `issues` and `changed` stay. A test fake or a wrapper that builds one of these by hand needs `ok` and `error`, and code comparing the result to `{}` reads `ok`. No lint can see it: a value read from a promise is not visible to `kay check`.
+
 ### `resource()` asks its route while the page renders
 
 An island's `resource(api, '/path')` is now asked in process, as the visitor, while the server renders the page, and the island hydrates `ready` instead of rendering `loading` and asking from the browser. A route whose read must happen in the browser, because reading it records something or admits the reader as the cms editor's entry read does, takes `{ seed: false }` to keep the old behaviour: [read a route's answer in an island](api-from-islands.md#read-a-routes-answer-in-an-island).

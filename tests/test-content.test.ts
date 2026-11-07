@@ -80,9 +80,9 @@ describe('the content of a test site', () => {
 
     await site.content.seed('news', [{ slug: 'seeded', data: { title: 'Seeded', published: true, tags: [] }, body: 'Hi' }])
     expect((await site.visit('/news')).text('ul.news')).toBe('Seeded')
-    expect((await saveEntry('news', { slug: 'other', data: { title: 'Other', published: true, tags: [] } })).issues).toBeUndefined()
+    expect((await saveEntry('news', { slug: 'other', data: { title: 'Other', published: true, tags: [] } })).ok).toBe(true)
     expect((await site.visit('/news')).text('ul.news')).toContain('Other')
-    expect((await removeEntry('news', 'seeded')).issues).toBeUndefined()
+    expect((await removeEntry('news', 'seeded')).ok).toBe(true)
     expect((await site.visit('/news')).text('ul.news')).toBe('Other')
     expect(cms.entries).toEqual(source)
   })

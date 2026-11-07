@@ -1374,7 +1374,7 @@ test('an editor who opened the screens finds the link on a page they read and la
 }, 60_000)
 
 test('saveEntry stores a null for a required field that allows it, and refuses the field left out', async () => {
-  expect(await saveEntry('ledger', { slug: 'first', data: { name: 'First', note: null } })).toEqual({})
+  expect(await saveEntry('ledger', { slug: 'first', data: { name: 'First', note: null } })).toEqual({ ok: true })
   expect(ledgerRows).toEqual([{ slug: 'first', data: { name: 'First', note: null } }])
   expect(await saveEntry('ledger', { slug: 'second', data: { name: 'Second' } })).toMatchObject({ issues: [{ collection: 'ledger', slug: 'second', path: 'note' }] })
   expect(ledgerRows).toHaveLength(1)

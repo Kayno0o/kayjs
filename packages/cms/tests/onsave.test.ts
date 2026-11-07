@@ -12,7 +12,7 @@ const content: Partial<typeof Content> = {
   collections: async () => [products],
   collectionInfo: async () => products,
   entries: async () => [],
-  saveEntry: async () => ({}),
+  saveEntry: async () => ({ ok: true }),
 }
 
 void mock.module('../src/kay/content', () => content)

@@ -1,3 +1,5 @@
+import type { DraftIssue } from 'kay/edit'
+import type { ErrorShape } from 'kay/library'
 import type { FileChange } from '../src/files'
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
@@ -53,6 +55,11 @@ let expected: unknown[]
 let keeping = false
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
+// What kay's writes resolve for an entry the collection refuses.
+function refusal(issues: DraftIssue[]): { ok: false, error: ErrorShape, issues: DraftIssue[] } {
+  return { ok: false, error: { status: 422, message: issues.map(issue => issue.message).join('; '), errors: {}, data: undefined }, issues }
+}
+
 const content: typeof Content = {
   bodyHtml,
   LOADED_HTML,
@@ -86,7 +93,7 @@ const content: typeof Content = {
     : validSource(collection, slug, data, options?.body),
   saveEntry: async (collection, entry, options) => {
     if (options?.create && stored[collection]?.some(stock => stock.slug === entry.slug))
-      return { issues: [{ collection, slug: entry.slug, path: '', key: 'slug', message: TAKEN }] }
+      return refusal([{ collection, slug: entry.slug, path: '', key: 'slug', message: TAKEN }])
 
     loaded.push(entry)
 
@@ -98,14 +105,14 @@ const content: typeof Content = {
       stored[collection] = row ? rows.map(each => each === row ? kept : each) : [...rows, kept]
     }
 
-    return {}
+    return { ok: true }
   },
   saveEntries: async (_collection, entries) => {
     batches.push(entries.length)
     expected.push(...entries.map(entry => (entry as { expect?: unknown }).expect))
 
     if (orderChanged)
-      return { changed: true }
+      return { ok: false, error: { status: 409, message: 'changed', errors: {}, data: undefined }, changed: true }
 
     loaded.push(...entries)
 
@@ -117,7 +124,7 @@ const content: typeof Content = {
       }
     }
 
-    return {}
+    return { ok: true }
   },
   entryFile: async (collection, slug) => {
     if (collectionList.find(each => each.name === collection)?.kind === 'loaded')
@@ -129,14 +136,14 @@ const content: typeof Content = {
   },
   removeEntry: async (collection, slug) => {
     if (!stored[collection]?.some(entry => entry.slug === slug))
-      return { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] }
+      return refusal([{ collection, slug, path: '', key: 'slug', message: MISSING }])
 
     removed.push(slug)
 
     if (keeping)
       stored[collection] = stored[collection].filter(entry => entry.slug !== slug)
 
-    return {}
+    return { ok: true }
   },
 }
 

@@ -922,7 +922,7 @@ describe('the collections a CMS edits', () => {
   // kayjs-cms's script check leaves a body bodyHtml cannot read to this refusal.
   it.each(['<Callout onclick=alert(1)//}>hi', '<Callout onmouseover=alert(1)//} />'])('refuses a body holding a component tag kay cannot read: %s', async (body) => {
     expect(await entrySource('articles', 'hostile', { title: 'X' }, { locale: 'en', body })).toEqual({ issues: expect.arrayContaining([expect.objectContaining({ collection: 'articles', slug: 'hostile', body: true })]) })
-    expect(await saveEntry('news', { slug: 'hostile', data: { title: 'X', published: '2026-01-01T00:00:00.000Z', tags: [] }, body })).toEqual({ issues: expect.arrayContaining([expect.objectContaining({ collection: 'news', slug: 'hostile', body: true })]) })
+    expect(await saveEntry('news', { slug: 'hostile', data: { title: 'X', published: '2026-01-01T00:00:00.000Z', tags: [] }, body })).toMatchObject({ ok: false, error: { status: 422 }, issues: expect.arrayContaining([expect.objectContaining({ collection: 'news', slug: 'hostile', body: true })]) })
   })
 
   // An entry's data is an object of fields, as `entries()` reads it back.
@@ -932,7 +932,7 @@ describe('the collections a CMS edits', () => {
   ] as const)('refuses data that is %s, not an object of fields', async (kind, call, collection, slug, data) => {
     const result = call === 'entrySource' ? await entrySource(collection, slug, data) : await saveEntry(collection, { slug, data })
 
-    expect(result).toEqual({ issues: [{ collection, slug, path: '', message: `holds a ${kind.slice(2)} as its data, not an object of fields` }] })
+    expect(result).toMatchObject({ issues: [{ collection, slug, path: '', message: `holds a ${kind.slice(2)} as its data, not an object of fields` }] })
   })
 
   // A project whose content root is not the repository's, as a monorepo's: `entries()` gives the repository-relative path, which is the `repoPath` of the file, and the file's `path` stays relative to the project root.
@@ -1090,22 +1090,27 @@ describe('the collections a CMS edits', () => {
   })
 
   it('hands a loaded entry to its loader\'s save and remove, then reads the collection afresh', async () => {
-    expect(await saveEntry('news', { slug: 'later', data: { title: 'Later on', published: true, tags: [] }, body: 'Soon.' })).toEqual({})
+    expect(await saveEntry('news', { slug: 'later', data: { title: 'Later on', published: true, tags: [] }, body: 'Soon.' })).toEqual({ ok: true })
     expect((await news.get('later'))?.data.title).toBe('Later on')
     expect(await saveEntry('news', { slug: 'later', data: { title: 3 } })).toMatchObject({ issues: [{ collection: 'news', slug: 'later', path: 'published' }, { path: 'tags' }, { path: 'title' }] })
-    expect(await removeEntry('news', 'later')).toEqual({})
+    expect(await removeEntry('news', 'later')).toEqual({ ok: true })
     expect(await news.get('later')).toBeUndefined()
     expect(await rejection(saveEntry('articles', { slug: 'hello', locale: 'fr', data: { title: 'T' } }))).toMatchObject({ message: expect.stringContaining('entrySource()') })
   })
 
   it('takes a loaded slug as its loader does, refusing one climbing out, and removes only an entry it has', async () => {
-    expect(await saveEntry('news', { slug: '/about', data: { title: 'About', published: true, tags: [] } })).toEqual({})
-    expect(await removeEntry('news', '/about')).toEqual({})
-    expect(await removeEntry('news', '/about')).toEqual({ issues: [{ collection: 'news', slug: '/about', path: '', key: 'slug', message: 'names no entry of the collection' }] })
+    expect(await saveEntry('news', { slug: '/about', data: { title: 'About', published: true, tags: [] } })).toEqual({ ok: true })
+    expect(await removeEntry('news', '/about')).toEqual({ ok: true })
+    expect(await removeEntry('news', '/about')).toMatchObject({ ok: false, error: { status: 422 }, issues: [{ collection: 'news', slug: '/about', path: '', key: 'slug', message: 'names no entry of the collection' }] })
     expect(await removeEntry('news', '../launch')).toMatchObject({ issues: [{ key: 'slug', message: expect.stringContaining('. or ..') }] })
     expect(await removeEntry('news', '..\\launch')).toMatchObject({ issues: [{ key: 'slug' }] })
     expect(await removeEntry('news', 'launch', 'fr')).toMatchObject({ issues: [{ key: 'locale' }] })
     expect(await saveEntry('news', { slug: 'a/../b', data: { title: 'T', published: true, tags: [] } })).toMatchObject({ issues: [{ key: 'slug' }] })
+
+    // A refusal carries the one failure shape: the first message of each issue by its path, '' for the entry as a whole.
+    const refusal = await removeEntry('news', 'ghost')
+
+    expect(refusal).toMatchObject({ ok: false, error: { status: 422, message: 'names no entry of the collection', errors: { '': 'names no entry of the collection' }, data: undefined } })
     expect(cms.entries.map(entry => entry.slug)).toEqual(['launch', 'roadmap'])
   })
 
@@ -1116,7 +1121,7 @@ describe('the collections a CMS edits', () => {
     } }, { schema: t.Object({ title: t.String() }), localized: true })
 
     await exporting([['tales', tales]], async () => {
-      expect(await removeEntry('tales', 'hello', 'fr')).toEqual({})
+      expect(await removeEntry('tales', 'hello', 'fr')).toEqual({ ok: true })
       expect(held.map(entry => entry.slug)).toEqual(['en/hello'])
       expect(await removeEntry('tales', 'hello', 'fr')).toMatchObject({ issues: [{ key: 'slug', message: 'names no entry of the collection' }] })
     })
@@ -1138,13 +1143,13 @@ describe('the collections a CMS edits', () => {
     } }, { schema: t.Object({ title: t.String() }), localized: true })
 
     await exporting([['tales', tales]], async () => {
-      expect(await saveEntry('tales', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }, { create: true })).toEqual({ issues: [{ collection: 'tales', slug: 'hello', locale: 'en', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }, { create: true })).toMatchObject({ ok: false, error: { status: 422 }, issues: [{ collection: 'tales', slug: 'hello', locale: 'en', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
       expect(loads).toBe(1)
-      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Salut' } }, { create: true })).toEqual({})
-      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } })).toEqual({})
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Salut' } }, { create: true })).toEqual({ ok: true })
+      expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } })).toEqual({ ok: true })
       expect(saved).toEqual([{ slug: 'hello', locale: 'fr', data: { title: 'Salut' }, create: true }, { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } }])
       // Two creates at once run in turn, the second finding the first's entry.
-      expect(await Promise.all(['Un', 'Deux'].map(async title => saveEntry('tales', { slug: 'new', locale: 'fr', data: { title } }, { create: true })))).toEqual([{}, { issues: [expect.objectContaining({ slug: 'new', key: 'slug' })] }])
+      expect(await Promise.all(['Un', 'Deux'].map(async title => saveEntry('tales', { slug: 'new', locale: 'fr', data: { title } }, { create: true })))).toMatchObject([{ ok: true }, { ok: false, issues: [expect.objectContaining({ slug: 'new', key: 'slug' })] }])
       expect(held.find(each => each.slug === 'fr/new')?.data.title).toBe('Un')
     })
 
@@ -1178,15 +1183,15 @@ describe('the collections a CMS edits', () => {
       expect(await saveEntry('refusing', { slug: 'bad', data: { title: 3 } })).toMatchObject({ issues: [{ path: 'title' }] })
       const later = saveEntry('refusing', { slug: 'later', data: { title: 'T' } })
 
-      expect(await saveEntry('other', { slug: 'free', data: { title: 'T' } })).toEqual({})
+      expect(await saveEntry('other', { slug: 'free', data: { title: 'T' } })).toEqual({ ok: true })
       expect(order).toEqual(['save taken'])
       gate.resolve()
 
       // The remove after the save that threw runs, and the next save after it.
       expect(await rejection(thrown)).toMatchObject({ message: 'kept by another editor' })
-      expect(await removed).toEqual({})
-      expect(await next).toEqual({})
-      expect(await later).toEqual({})
+      expect(await removed).toEqual({ ok: true })
+      expect(await next).toEqual({ ok: true })
+      expect(await later).toEqual({ ok: true })
       expect(order).toEqual(['save taken', 'remove kept', 'save taken', 'save later'])
       expect(invalidated).toHaveBeenCalledTimes(3)
     })
@@ -1207,7 +1212,7 @@ describe('the collections a CMS edits', () => {
 
       expect(await rejection(thrown)).toMatchObject({ message: 'kay: flaky\'s load threw: the CMS is down' })
       failing = false
-      expect(await next).toEqual({})
+      expect(await next).toEqual({ ok: true })
     })
   })
 
@@ -1221,7 +1226,7 @@ describe('the collections a CMS edits', () => {
       // The first takes longer to check, its body compiled.
       const saves = [saveEntry('autosaved', { slug: 'draft', data: { title: 'First' }, body: '# First\n\nWith a body.' }), saveEntry('autosaved', { slug: 'draft', data: { title: 'Second' } })]
 
-      expect(await Promise.all(saves)).toEqual([{}, {}])
+      expect(await Promise.all(saves)).toEqual([{ ok: true }, { ok: true }])
       expect(held).toEqual([{ slug: 'draft', data: { title: 'Second' } }])
     })
   })
@@ -1262,11 +1267,11 @@ describe('the collections a CMS edits', () => {
     const bare = collection({ name: 'bare', load: () => [] }, { schema })
 
     await exporting([['batched', batched], ['single', single], ['bare', bare]], async () => {
-      expect(await saveEntries('batched', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
+      expect(await saveEntries('batched', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({ ok: true })
       expect(batches).toEqual([['a', 'b']])
       expect(await saveEntries('batched', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 3 } }])).toMatchObject({ issues: [{ slug: 'b', path: 'title' }] })
       expect(batches).toEqual([['a', 'b']])
-      expect(await saveEntries('single', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({})
+      expect(await saveEntries('single', [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }])).toEqual({ ok: true })
       expect(singles).toEqual(['a', 'b'])
       expect(await rejection(saveEntries('bare', [{ slug: 'a', data: { title: 'A' } }]))).toMatchObject({ message: expect.stringContaining('declares no save') })
     })
@@ -1291,13 +1296,13 @@ describe('the collections a CMS edits', () => {
     await exporting([['swapped', swapped]], async () => {
       const written = [{ slug: 'a', data: { title: 'A', order: 2 }, expect: { field: 'order', was: 1 } }]
 
-      expect(await saveEntries('swapped', written)).toEqual({})
+      expect(await saveEntries('swapped', written)).toEqual({ ok: true })
       expect(given).toEqual([{ field: 'order', was: 1 }])
       moved = true
 
       const before = reads
 
-      expect(await saveEntries('swapped', written)).toEqual({ changed: true })
+      expect(await saveEntries('swapped', written)).toMatchObject({ ok: false, changed: true, error: { status: 409 } })
       await swapped.all()
       expect(reads).toBeGreaterThan(before)
     })
@@ -1346,13 +1351,13 @@ describe('the collections a CMS edits', () => {
 
     await exporting([['sqlposts', posts]], async () => {
       expect((await posts.all()).map(post => post.slug)).toEqual(['a', 'b'])
-      expect(await saveEntries('sqlposts', [{ slug: 'a', data: { title: 'A', order: 2 } }, { slug: 'b', data: { title: 'B', order: 1 } }])).toEqual({})
+      expect(await saveEntries('sqlposts', [{ slug: 'a', data: { title: 'A', order: 2 } }, { slug: 'b', data: { title: 'B', order: 1 } }])).toEqual({ ok: true })
       expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
       expect(await saveEntries('sqlposts', [{ slug: 'a', data: { title: 'A', order: 5 } }, { slug: 'b', data: { title: 3 } }])).toMatchObject({ issues: [{ slug: 'b' }] })
       expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
-      expect(await saveEntry('sqlposts', { slug: 'c', data: { title: 'C' } }, { create: true })).toEqual({})
+      expect(await saveEntry('sqlposts', { slug: 'c', data: { title: 'C' } }, { create: true })).toEqual({ ok: true })
       expect(await saveEntry('sqlposts', { slug: 'c', data: { title: 'C' } }, { create: true })).toMatchObject({ issues: [{ key: 'slug' }] })
-      expect(await removeEntry('sqlposts', 'c')).toEqual({})
+      expect(await removeEntry('sqlposts', 'c')).toEqual({ ok: true })
       expect((await posts.all()).map(post => post.slug)).toEqual(['b', 'a'])
     })
   })
@@ -2296,9 +2301,13 @@ describe('showDraft', () => {
   }
 
   it('resolves where the draft fails, or throws when refused, unless a navigation overtook it', async () => {
-    expect(await drafted(422, false)).toEqual({ issues: [{ collection: 'news', slug: 'launch', path: 'title', message: 'Expected string' }] })
+    expect(await drafted(422, false)).toEqual({ ok: false, error: { status: 422, message: 'Expected string', errors: { title: 'Expected string' }, data: undefined }, issues: [{ collection: 'news', slug: 'launch', path: 'title', message: 'Expected string' }] })
     expect(await drafted(500, false)).toMatchObject({ message: 'kay: showDraft was answered 500: Broken' })
-    expect(await drafted(422, true)).toEqual({})
-    expect(await drafted(500, true)).toEqual({})
+    expect(await drafted(422, true)).toEqual({ ok: true })
+    expect(await drafted(500, true)).toEqual({ ok: true })
+  })
+
+  it('resolves ok where there is no page to show it on', async () => {
+    expect(await showDraft([{ collection: 'news', slug: 'launch', data: {} }])).toEqual({ ok: true })
   })
 })

@@ -1,4 +1,6 @@
 import type { TSchema } from 'elysia'
+import type { ErrorShape } from '../runtime/api-error'
+import type { WriteResult } from '../runtime/draft-issues'
 import type { DraftIssue } from '../runtime/edit'
 import type { CollectionInfo, ContentLoaderOf, DataValue, EntryFile, EntryFilter, EntryPath, JsonSchema, SourceEntry, TranslationIndex, WrittenEntry } from './edit-shared'
 import type { Collection, ContentLoader, Entry } from './index'
@@ -9,6 +11,7 @@ import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { onKeysInvalidated } from '../runtime/cache'
+import { accepted, failureOf, refusedIssues } from '../runtime/draft-issues'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
@@ -393,11 +396,14 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
   return { path: relative(contentPlace().root, sourcePath(absolute)).split(sep).join('/'), absolute, repoPath: inRepo }
 }
 
+// What `saveEntries` resolves when `expect` no longer held: nothing was written.
+export interface ChangedResult { ok: false, error: ErrorShape, changed: true, issues?: undefined }
+
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
 // `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed, whose values do not count as taken for a `unique` field.
 // `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves and removes run in turn, so two creates here never both find the slug free.
 // kept: request
-export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
+export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<WriteResult> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
   const turn = takeTurn(collection.name)
@@ -406,7 +412,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     const { issues } = await entryIssues(name, collection, entry, options.replacing)
 
     if (issues.length > 0)
-      return { issues }
+      return refusedIssues(issues)
 
     await turn.ready
 
@@ -414,12 +420,12 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>, options.replacing)
 
     if (taken.length > 0)
-      return { issues: taken }
+      return refusedIssues(taken)
 
     const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
     if (options.create === true && (await loadedEntries(name, collection, { shared: false })).some(each => each.slug === place))
-      return { issues: [existingIssue(name, entry.slug, entry.locale)] }
+      return refusedIssues([existingIssue(name, entry.slug, entry.locale)])
 
     // A load that began before this write must not be joined by a read during or after it.
     loading.delete(name)
@@ -431,7 +437,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     indexes.delete(collection)
     collection.invalidate()
 
-    return {}
+    return accepted()
   }
   finally {
     turn.done()
@@ -441,7 +447,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 // Hands several entries of a loaded collection to its loader's `saveMany` as one all-or-nothing write, a loader without it getting them one `save` at a time; or resolves the issues of the first entry the collection refuses, saving none.
 // An entry with `expect` is written as a compare-and-swap of that field (see `saveMany`), and `changed` answers that one no longer held the number it was read at, nothing written.
 // kept: request
-export async function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[], changed?: true }> {
+export async function saveEntries(name: string, written: WrittenEntry[]): Promise<WriteResult | ChangedResult> {
   const collection = collectionNamed(name)
   const { loader } = collection
 
@@ -462,7 +468,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       const { issues } = await entryIssues(name, collection, entry, undefined, held, slugs)
 
       if (issues.length > 0)
-        return { issues }
+        return refusedIssues(issues)
 
       checked.push({ ...entry, data: withDefaults(entry.data, collection.options.schema) })
     }
@@ -473,7 +479,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       const taken = await uniqueIssues(name, collection, { collection: name, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale } }, entry.data as Record<string, DataValue>)
 
       if (taken.length > 0)
-        return { issues: taken }
+        return refusedIssues(taken)
     }
 
     loading.delete(name)
@@ -489,7 +495,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
     }
     catch (error) {
       if (error instanceof ContentChangedError || (error instanceof Error && error.name === 'ContentChangedError'))
-        return { changed: true }
+        return { ok: false, error: failureOf([], 409, 'An entry was changed since it was read'), changed: true }
 
       throw error
     }
@@ -499,7 +505,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       collection.invalidate()
     }
 
-    return {}
+    return accepted()
   }
   finally {
     turn.done()
@@ -508,14 +514,14 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
 // kept: request
-export async function removeEntry(name: string, slug: string, locale?: string): Promise<{ issues?: DraftIssue[] }> {
+export async function removeEntry(name: string, slug: string, locale?: string): Promise<WriteResult> {
   const collection = collectionNamed(name)
   const remove = writer(name, collection, 'remove')
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues = placeIssues(collection, at)
 
   if (issues.length > 0)
-    return { issues }
+    return refusedIssues(issues)
 
   const turn = takeTurn(collection.name)
 
@@ -524,7 +530,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     const place = locale === undefined ? slug : `${locale}/${slug}`
 
     if (!(await loadedEntries(name, collection, { shared: false })).some(entry => entry.slug === place))
-      return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
+      return refusedIssues([{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }])
 
     loading.delete(name)
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
@@ -532,7 +538,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     indexes.delete(collection)
     collection.invalidate()
 
-    return {}
+    return accepted()
   }
   finally {
     turn.done()

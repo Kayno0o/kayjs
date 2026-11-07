@@ -81,11 +81,11 @@ describe('a collection a page follows', () => {
     const feed = new Feed(await open('/tales', [TALES]))
 
     await feed.next()
-    expect((await saveEntry('tales', { slug: 'second', data: { title: 'Second' } })).issues).toBeUndefined()
+    expect((await saveEntry('tales', { slug: 'second', data: { title: 'Second' } })).ok).toBe(true)
     expect((await feed.next())[0]![1]).toBe(TALES)
     expect((await site.visit('/tales')).html).toContain('<li>Second</li>')
 
-    expect(await removeEntry('tales', 'second')).toEqual({})
+    expect(await removeEntry('tales', 'second')).toEqual({ ok: true })
     expect((await feed.next())[0]![1]).toBe(TALES)
     expect((await site.visit('/tales')).html).not.toContain('Second')
     await feed.close()
