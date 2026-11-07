@@ -156,7 +156,7 @@ function realCause(cause: IslandCause | undefined, expansion: Expansion | undefi
 function staticPin(comment: boolean, span: Span, cause: IslandCause, island: boolean): Diagnostic {
   const written = comment ? '`// kay-static`' : '`--- static`'
 
-  return { ...span, message: `This component is pinned ${written}, and ${island ? 'is an island' : 'would render as an island'}: ${describeCause(cause)}`, note: island ? 'it needs the browser, so it renders on the server and hydrates there' : 'it passes a component what only an island can send, so it hydrates itself', help: 'take that out of the component, or pin it `--- island`' }
+  return { ...span, code: 'static-pin', message: `This component is pinned ${written}, and ${island ? 'is an island' : 'would render as an island'}: ${describeCause(cause)}`, note: island ? 'it needs the browser, so it hydrates there' : 'it passes a component what only an island can send, so it hydrates itself', help: 'take that out of the component, or pin it `--- island`' }
 }
 
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
@@ -247,9 +247,10 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const site = promotionSite(file, script, imported)
   const pin = islandPin(file)
+  const pinned = pin?.kind === 'static' && site !== undefined ? [staticPin(pin.comment, site.span, site, false)] : []
   const announced = site === undefined || pin !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `--- island` in place of `---` to say so, or pass the island what can be serialized', checkOnly: true }]
 
-  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced]
+  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...pinned]
 }
 
 // The props of a component's script read once into a value a function or the template reads later, for a component the browser runs that compiling it alone cannot tell is one: the project knows which.
@@ -321,7 +322,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
     ...coded(validate(file, script, server, generateOptions), 'template-invalid'),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
-    ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile ? [staticPin(pin.comment, rawCause.span, cause, island !== undefined)] : [], 'static-pin'),
+    ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(pin.comment, rawCause.span, cause, true)] : [], 'static-pin'),
   ]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
@@ -352,7 +353,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   }
 
   if (checked && pin !== undefined)
-    diagnostics.push(...markerMismatch(pin, routeFile))
+    diagnostics.push(...markerMismatch(pin, routeFile || options.page === true))
 
   if (checked && comment !== undefined)
     diagnostics.push(commentLint(file, comment))

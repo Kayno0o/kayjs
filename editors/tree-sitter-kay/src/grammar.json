@@ -176,6 +176,14 @@
         },
         {
           "type": "STRING",
+          "value": "island"
+        },
+        {
+          "type": "STRING",
+          "value": "static"
+        },
+        {
+          "type": "STRING",
           "value": "script"
         },
         {

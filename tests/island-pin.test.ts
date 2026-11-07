@@ -120,11 +120,14 @@ describe('--- static', () => {
 
   it('is an error where a component is promoted, naming what it passes and to which component', () => {
     const source = promoting.replace('---\n', '--- static\n')
-    const found = pins(source)
+    const promoted = (text: string) => promotedChecks(text).filter(diagnostic => diagnostic.code === 'static-pin')
+    const found = promoted(source)
 
     expect(found.map(diagnostic => slice(source, diagnostic))).toEqual(['Picker'])
     expect(found[0]!.message).toContain('`format` passed to Picker, line 5')
-    expect(pins('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n')[0]!.message).toContain('a block taking parameters passed to Picker')
+    expect(found[0]!.checkOnly).toBeUndefined()
+    expect(promoted('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n')[0]!.message).toContain('a block taking parameters passed to Picker')
+    expect(pins(source)).toEqual([])
   })
 
   it('is an error for a live value, and not for a route file, which is never an island', () => {
@@ -168,7 +171,7 @@ describe('island-comment', () => {
       const [lint] = found(source)
 
       expect(slice(source, lint!)).toBe(`// kay-${word}`)
-      expect(lint!.fixes![0]!.safe).toBe(true)
+      expect(lint!.fixes![0]!.safe).toBe(word === 'static')
 
       const fixed = apply(source, lint!)
 
@@ -215,7 +218,7 @@ describe('island-comment', () => {
 
     expect(pins(contradicted).map(diagnostic => slice(contradicted, diagnostic))).toEqual(['onClick'])
     expect(promotedChecks(`---\n// kay-island\n${promoting.slice(4)}`).filter(diagnostic => diagnostic.code === 'promoted-island')).toEqual([])
-    expect(pins(`---\n// kay-static\n${promoting.slice(4)}`)).toHaveLength(1)
+    expect(promotedChecks(`---\n// kay-static\n${promoting.slice(4)}`).filter(diagnostic => diagnostic.code === 'static-pin')).toHaveLength(1)
   })
 })
 
@@ -228,5 +231,27 @@ describe('island-marker', () => {
     expect(marker('--- island\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toHaveLength(1)
     expect(marker('--- static\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toEqual([])
     expect(marker('---\n// kay-static\nconst a = 1\n---\np {a}\n')).toEqual([])
+  })
+})
+
+describe('beside the pin', () => {
+  it('writes the browser-only fix over the pin label, not beside it', () => {
+    for (const word of ['island', 'static']) {
+      const source = `--- ${word}\nconst w = window.innerWidth\n---\np {w}\n`
+      const fix = compileKay(source, part, { check: true }).diagnostics.flatMap(diagnostic => diagnostic.fixes ?? []).find(candidate => candidate.title.includes('--- client'))
+
+      expect(fix).toBeDefined()
+      expect(apply(source, { fixes: [fix!] } as Diagnostic)).toBe('--- client\nconst w = window.innerWidth\n---\np {w}\n')
+    }
+  })
+
+  it('reports a pinned island page without a server fence, which compiles as a page', () => {
+    const found = compileKay('--- island\nconst a = 1\n---\np {a}\n', 'src/routes/index.kay', { check: true, page: true }).diagnostics.filter(diagnostic => diagnostic.code === 'island-marker')
+
+    expect(found).toHaveLength(1)
+  })
+
+  it('does not error on a static pin whose promotion site hands a plain child a function', () => {
+    expect(pins('--- static\nimport Child from \'./plain.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n')).toEqual([])
   })
 })

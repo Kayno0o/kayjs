@@ -53,7 +53,7 @@ module.exports = grammar({
     ),
 
     fence_marker: () => '---',
-    fence_label: () => choice('server', 'client', 'script', 'module'),
+    fence_label: () => choice('server', 'client', 'island', 'static', 'script', 'module'),
     type_parameters: () => /<[^\n]*>/,
     _fence_line_end: () => /\r?\n/,
 

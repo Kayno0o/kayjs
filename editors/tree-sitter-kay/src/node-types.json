@@ -999,6 +999,10 @@
     "named": false
   },
   {
+    "type": "island",
+    "named": false
+  },
+  {
     "type": "key",
     "named": false
   },
@@ -1052,6 +1056,10 @@
   },
   {
     "type": "snippet",
+    "named": false
+  },
+  {
+    "type": "static",
     "named": false
   },
   {

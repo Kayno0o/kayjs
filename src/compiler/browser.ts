@@ -434,7 +434,7 @@ function clientFix(file: KayFile): Fix[] {
 
   SCRIPT_LABEL.lastIndex = opening
 
-  const end = SCRIPT_LABEL.test(file.source) ? SCRIPT_LABEL.lastIndex : opening
+  const end = file.pin?.end ?? (SCRIPT_LABEL.test(file.source) ? SCRIPT_LABEL.lastIndex : opening)
 
   return [{ title, edits: [{ start: opening, end, text: ' client' }] }]
 }

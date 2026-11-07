@@ -89,7 +89,7 @@
       ]
     },
     "fence": {
-      "begin": "^(---)(?:[ \\t]+(server|client|script|module)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
+      "begin": "^(---)(?:[ \\t]+(server|client|island|static|script|module)(?:[ \\t]+(<.*>))?|[ \\t]*(<.*>))?[ \\t]*$",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.fence.kay"

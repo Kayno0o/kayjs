@@ -38,7 +38,7 @@ export function documentSymbols(source: string): DocumentSymbol[] {
   if (file.script) {
     const analysis = analyzeScript(source, file.script)
 
-    fences.push({ label: file.client ? 'client' : 'script', span: file.script, declared: analysis.fence ? declarations(analysis.fence, symbol) : [] })
+    fences.push({ label: file.client ? 'client' : file.pin?.kind ?? 'script', span: file.script, declared: analysis.fence ? declarations(analysis.fence, symbol) : [] })
   }
 
   if (file.module) {

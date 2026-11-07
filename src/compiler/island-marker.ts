@@ -19,7 +19,7 @@ export interface IslandComment extends Span {
   kind: PinKind
 }
 
-// The comment is code only where it opens a comment: the same line inside a template literal or a block comment adds nothing to what `codeOf` keeps.
+// The comment is code only where it opens a comment: `codeOf` leaves one space for each comment, string or template it skips, so the line adds one character after a statement and none inside a template literal or a block comment, which swallow it.
 function opensComment(text: string, slashes: number, end: number): boolean {
   return codeOf(text.slice(0, end)).length === codeOf(text.slice(0, slashes)).length + 1
 }
@@ -73,7 +73,8 @@ function rewrite(file: KayFile, comment: IslandComment): Diagnostic['fixes'] {
   if (named === null)
     return undefined
 
-  return [{ title: `Write \`--- ${comment.kind}\``, edits: [{ start: line.start, end: line.start + named[0].length, text: `--- ${comment.kind}` }, deletion], safe: true }]
+  // `// kay-island` only silenced `promoted-island`: a component whose chunk reaches no island stayed static, and `--- island` hydrates it on every page.
+  return [{ title: `Write \`--- ${comment.kind}\``, edits: [{ start: line.start, end: line.start + named[0].length, text: `--- ${comment.kind}` }, deletion], safe: comment.kind === 'static' }]
 }
 
 export function commentLint(file: KayFile, comment: IslandComment): Diagnostic {
