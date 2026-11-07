@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { approving } from '../routes/tools.kay'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
