@@ -1,7 +1,8 @@
-import type { Connection } from '../runtime/live'
+import type { Connection, ConnectionHooks } from '../runtime/live'
 import type { SiteScope } from './site-scope'
 import type { TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
+import { connectionHooks } from '../runtime/connection'
 import { openSocket, readEvents, resumeHeaders, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { withKept } from './cookies'
@@ -30,13 +31,13 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
   return {
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: upgradeHeaders(url, options?.headers) }))
+      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: upgradeHeaders(url, options?.headers) }), options)
       const tested = Object.assign(client, inbox(client))
 
       connections.add(client)
       client.start()
 
-      return tested as never
+      return tested
     },
     socketRefusal: async (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
@@ -68,7 +69,7 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
       const init = streamRequest(options)
       const reader = readEvents(async (signal, lastEventId) => send(url, { ...init, headers: { ...init.headers, ...resumeHeaders(lastEventId), ...options?.headers }, signal }), init.method === 'GET')
-      const tested = Object.assign(reader, inbox(reader))
+      const tested = Object.assign(reader, connectionHooks(reader.link, reader.onOpen, options as ConnectionHooks<never> | undefined), inbox(reader))
       const finished = new Promise<unknown[]>((resolve) => {
         reactiveRoot(dispose => effect(() => {
           const status = reader.status()

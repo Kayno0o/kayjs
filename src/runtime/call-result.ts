@@ -16,9 +16,9 @@ type Refusal = { ok: false } & ErrorShape
 // `input` is `unknown`, so an action of any input still passes where another is expected, as `Action<never, unknown>` stands for any.
 export interface TrackHooks<Data> {
   // A call succeeded; for a streaming action, once the stream is open.
-  onSuccess?: (event: { data: Data, input: unknown }) => void
+  onSuccess?: ((event: { data: Data, input: unknown }) => void) | undefined
   // A call failed, for a refusal and for no answer alike (which still throws); not for an abort or a redirect.
-  onError?: (event: { error: ApiError, input: unknown }) => void
+  onError?: ((event: { error: ApiError, input: unknown }) => void) | undefined
 }
 
 // What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
@@ -72,6 +72,8 @@ export function trackCalls<Args extends unknown[]>(
 
   const run = async (...args: Args): Promise<CallResult<unknown, unknown>> => {
     let streaming = false
+    // The hook runs once the call is no longer in flight, so `pending()` is false in it and `retry()` works from it.
+    let tell: (() => void) | undefined
 
     shift(1)
 
@@ -81,7 +83,7 @@ export function trackCalls<Args extends unknown[]>(
       streaming = holds?.(data, () => shift(-1), () => shift(1)) ?? false
       setOutcome('ready')
       setError(undefined)
-      successes.emit({ data, input: args[0] })
+      tell = () => successes.emit({ data, input: args[0] })
 
       return { ok: true, data }
     }
@@ -92,7 +94,7 @@ export function trackCalls<Args extends unknown[]>(
         failedWith = args
         setOutcome('failed')
         setError(error)
-        failures.emit({ error, input: args[0] })
+        tell = () => failures.emit({ error, input: args[0] })
       }
 
       const result = refused(failure)
@@ -105,6 +107,8 @@ export function trackCalls<Args extends unknown[]>(
     finally {
       if (!streaming)
         shift(-1)
+
+      tell?.()
     }
   }
 

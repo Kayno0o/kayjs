@@ -8,6 +8,7 @@ import { renamedTypes, scan } from './renamed-exports'
 const SINCE = '1.92'
 const UNTIL = '1.95'
 const ON = /\bon\b/
+const ON_OPEN = /\bonOpen\b/
 const VALUE = /\bvalue\b/
 
 // The types of `kay` renamed when `stream()` came down to one return type and a connection base.
@@ -68,6 +69,85 @@ function bindings(program: Program): Map<string, number> {
   return counts
 }
 
+// The names the file binds once to a call of `stream` or `socket` from `kay`, the only receivers known to be one as `kay check` reads no types.
+function sourceReceivers(ast: Program, names: Map<string, number>): Set<string> {
+  const streams = importsOf(ast, source => source === 'kay', 'stream')
+  const sockets = importsOf(ast, source => source === 'kay', 'socket')
+  const receivers = new Set<string>()
+
+  const opens = (init: Node): boolean => {
+    const call = unwrapped(init)
+
+    if (call.type !== 'CallExpression')
+      return false
+
+    const { callee } = call
+
+    if (callee.type === 'Identifier')
+      return streams.locals.has(callee.name) || sockets.locals.has(callee.name)
+
+    return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && (callee.property.name === 'stream' || callee.property.name === 'socket') && (streams.namespaces.has(callee.object.name) || sockets.namespaces.has(callee.object.name))
+  }
+
+  walk(ast, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init && opens(node.init) && names.get(node.id.name) === 1)
+      receivers.add(node.id.name)
+  })
+
+  return receivers
+}
+
+// `.onOpen(reconnected => ...)` of a stream or a socket, `.onOpen(({ reconnected }) => ...)` since 1.92: the hook is told one object, as every hook is, and the old argument, a boolean, reads as true for the object.
+// An arrow of one plain parameter gets `{ reconnected: parameter }`, a function reference is wrapped, and any other callback is reported with no fix.
+export async function streamOpen(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  if (lintLevel('deprecated-stream-open', options.lints) === 'allow')
+    return []
+
+  return scan(root, options, 'deprecated-stream-open', ON_OPEN, ({ parsed, report }) => {
+    for (const { ast, base, text } of parsed) {
+      const receivers = sourceReceivers(ast, bindings(ast))
+
+      walk(ast, (node) => {
+        if (node.type !== 'CallExpression' || node.optional || node.callee.type !== 'MemberExpression' || node.callee.computed)
+          return
+
+        const { object, property } = node.callee
+
+        if (object.type !== 'Identifier' || !receivers.has(object.name) || property.type !== 'Identifier' || property.name !== 'onOpen' || node.arguments.length !== 1)
+          return
+
+        const [argument] = node.arguments as [Node]
+        const message = '`onOpen` of a stream or a socket is told `{ reconnected }` since 1.92, the one object argument every hook takes; the boolean it was told reads as true for the object, so a callback testing it runs on every open'
+        const help = 'write `.onOpen(({ reconnected }) => ...)`'
+        const { start, end } = argument
+        const here = base + start
+
+        // No parameter, or an object pattern, is the new form already.
+        if (argument.type === 'ArrowFunctionExpression' && (argument.params.length === 0 || argument.params[0]?.type === 'ObjectPattern'))
+          return
+
+        if (argument.type === 'Identifier') {
+          report(here, base + end, message, help, [{ start: here, end: base + end, text: `({ reconnected }) => ${argument.name}(reconnected)` }])
+
+          return
+        }
+
+        const [param] = argument.type === 'ArrowFunctionExpression' ? argument.params : []
+
+        if (argument.type === 'ArrowFunctionExpression' && argument.params.length === 1 && param?.type === 'Identifier' && !annotated(param)) {
+          const parenthesized = text.slice(start, param.start).includes('(')
+
+          report(here, base + end, message, help, [{ start: base + param.start, end: base + param.end, text: parenthesized ? `{ reconnected: ${param.name} }` : `({ reconnected: ${param.name} })` }])
+
+          return
+        }
+
+        report(here, base + end, message, help, null)
+      })
+    }
+  })
+}
+
 // `.on(fn)` of a stream or a socket, `.onData(({ value }) => ...)` since 1.92: the one hook every source hands its data through.
 // Only a receiver the file binds once to a call of `stream` or `socket` from `kay` is known to be one, as `kay check` reads no types; an arrow of one parameter gets `{ value: parameter }`, any other callback is wrapped, and a spread, or a callback naming `value` itself, is reported with no fix.
 export async function streamOn(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
@@ -76,29 +156,7 @@ export async function streamOn(root: string, options: CheckOptions): Promise<Che
 
   return scan(root, options, 'deprecated-stream-on', ON, ({ parsed, report }) => {
     for (const { ast, base, text } of parsed) {
-      const names = bindings(ast)
-      const streams = importsOf(ast, source => source === 'kay', 'stream')
-      const sockets = importsOf(ast, source => source === 'kay', 'socket')
-      const receivers = new Set<string>()
-
-      const opens = (init: Node): boolean => {
-        const call = unwrapped(init)
-
-        if (call.type !== 'CallExpression')
-          return false
-
-        const { callee } = call
-
-        if (callee.type === 'Identifier')
-          return streams.locals.has(callee.name) || sockets.locals.has(callee.name)
-
-        return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && (callee.property.name === 'stream' || callee.property.name === 'socket') && (streams.namespaces.has(callee.object.name) || sockets.namespaces.has(callee.object.name))
-      }
-
-      walk(ast, (node) => {
-        if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init && opens(node.init) && names.get(node.id.name) === 1)
-          receivers.add(node.id.name)
-      })
+      const receivers = sourceReceivers(ast, bindings(ast))
 
       walk(ast, (node) => {
         if (node.type !== 'CallExpression' || node.optional || node.callee.type !== 'MemberExpression' || node.callee.computed)

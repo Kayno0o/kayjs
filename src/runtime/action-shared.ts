@@ -216,7 +216,7 @@ export interface Failure<Data> {
 export type Success<Output> = Exclude<Output, Failure<unknown>>
 
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
-// It never reconnects by itself: `retry()` calls the action again, with the input and options of the call, once the stream failed, and reads the new answer into this same stream (`pending()` while it is sent, `onOpen(true)` once it opens); `ended()` rejects with an `ActionError` when the stream failed.
+// It never reconnects by itself: `retry()` calls the action again, with the input and options of the call, once the stream failed, and reads the new answer into this same stream (`pending()` while it is sent, `onOpen({ reconnected: true })` once it opens); `ended()` rejects with an `ActionError` when the stream failed.
 export type ActionStream<T> = Connection<T>
 
 // What a handler's return settles to: an async iterable stays one even when it is also a thenable, as a model's reply is, which `Awaited` would read as its text.
@@ -368,7 +368,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   readonly settled: () => Promise<void>
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
   // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option; `track({ onSuccess, onError })` takes the callbacks of every call of the handle, which `onSuccess()` and `onError()` of the handle add to.
-  track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
+  readonly track: (options?: { queue?: CallQueue | undefined } & TrackHooks<Answer<Success<Output>>>) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.

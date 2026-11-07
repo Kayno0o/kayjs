@@ -87,7 +87,7 @@ A `[x=slug]` route beside a plain `[y]` route now takes `été` and `a_b`, which
 
 ### `onOpen` of a socket, a stream and an action's stream is told `{ reconnected }`
 
-`feed.onOpen(reconnected => ...)` is `feed.onOpen(({ reconnected }) => ...)`, the one object argument every [hook](hooks.md) takes; a callback taking no argument is unchanged. No lint can recognise the receiver without types, but `kay check` reports the old form as a type error, as the argument is no longer a boolean. A mock of a `stream()`, a `socket()` or an `ActionStream` written out as an object must add `onError` and `onClose`, a mock of a `resource()` `onData` and `onError`, and of a `track()` handle `onSuccess` and `onError`.
+`feed.onOpen(reconnected => ...)` is `feed.onOpen(({ reconnected }) => ...)`, the one object argument every [hook](hooks.md) takes; a callback taking no argument is unchanged. The old form still compiles, as an object is truthy, so `onOpen(reconnected => reconnected && refetch())` now runs on every open, the first included. `kay check` flags it as `deprecated-stream-open` on a name the file binds once to `stream(` or `socket(` from `kay`, with a safe fix for an arrow of one plain parameter and for a function reference; a stream reached through a property, a parameter or an action's answer is changed by hand. A mock of a `stream()`, a `socket()` or an `ActionStream` written out as an object must add `onError` and `onClose`, a mock of a `resource()` `onData` and `onError`, and of a `track()` handle `onSuccess` and `onError`.
 
 ### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
 ### The 404 log functions of `kay/library` return promises, and a `pgData` store gains three tables

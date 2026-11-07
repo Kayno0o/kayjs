@@ -303,17 +303,114 @@ describe('resource hooks', () => {
 
   it('does not run onError for a failure of a run that was superseded', async () => {
     const seen: string[] = []
-    const read = root(() => resource<number>(async (signal) => {
-      await Bun.sleep(5)
+    let asked = 0
+    const read = root(() => resource<number>(async () => {
+      const mine = ++asked
 
-      if (signal.aborted)
+      if (mine === 1) {
+        await Bun.sleep(30)
+
         throw new ApiError(500, 'late')
+      }
 
-      return 1
-    }, { onError: () => void seen.push('error') }))
+      return 2
+    }, { onError: () => void seen.push('error'), onData: ({ value: answer }) => void seen.push(`data ${answer}`) }))
 
+    await Bun.sleep(5)
+    read.refresh()
     await eventually(() => expect(read.status()).toBe('ready'))
+    await Bun.sleep(60)
+    expect(seen).toEqual(['data 2'])
+  })
+
+  it('stays silent while a resource joins an entry that holds a value or a failure, and tells the next answer', async () => {
+    const seen: string[] = []
+    const load = async () => 'one'
+    const first = root(() => resource<string>(load, { key: 'shared-hooks' }))
+
+    await eventually(() => expect(first.status()).toBe('ready'))
+
+    const second = root(() => resource<string>(load, { key: 'shared-hooks', onData: ({ value: answer }) => void seen.push(`data ${answer}`), onError: () => void seen.push('error') }))
+
+    await eventually(() => expect(second.value()).toBe('one'))
     expect(seen).toEqual([])
+    first.mutate('two', { refresh: false })
+    expect(seen).toEqual(['data two'])
+  })
+})
+
+describe('stream() and socket() pass their options on', () => {
+  beforeAll(() => {
+    globalThis.document = { querySelector: () => null } as unknown as Document
+  })
+
+  afterAll(() => {
+    Reflect.deleteProperty(globalThis, 'document')
+  })
+
+  it('stream(module, path, hooks) runs them', async () => {
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => sse(value(1), END)) as unknown as typeof fetch)
+
+    try {
+      const seen: string[] = []
+      const feed = root(() => stream({ [API_MOUNT]: '/api/feed' } as never, '/' as never, {
+        onData: ({ value: next }: { value: unknown }) => void seen.push(`data ${String(next)}`),
+        onClose: ({ status }: { status: string }) => void seen.push(`close ${status}`),
+      } as never))
+
+      ;(feed.start as () => void)()
+      await eventually(() => expect(seen).toEqual(['data 1', 'close done']))
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('reads a body that ends without its end event as a failure when it may not reconnect', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => sse(value(1))) as unknown as typeof fetch)
+
+    try {
+      const seen: string[] = []
+      const feed = root(() => stream({ [API_MOUNT]: '/api/feed' } as never, '/' as never, {
+        method: 'post',
+        onError: ({ error }: { error: ApiError }) => void seen.push(`error ${error.status}`),
+        onClose: ({ status }: { status: string }) => void seen.push(`close ${status}`),
+      } as never))
+
+      ;(feed.start as () => void)()
+      await eventually(() => expect(seen).toEqual(['error 0', 'close failed']))
+    }
+    finally {
+      fetched.mockRestore()
+      logged.mockRestore()
+    }
+  })
+})
+
+describe('track()', () => {
+  it('runs a hook after the call stopped being in flight, so retry() works from onError', async () => {
+    const mounted = { [API_MOUNT]: '/api/notes' }
+    const answers = [new Response('no', { status: 500, headers: { 'content-type': 'text/plain' } }), new Response('"ok"', { headers: { 'content-type': 'application/json' } })]
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => answers.shift()!) as unknown as typeof fetch)
+
+    try {
+      const seen: boolean[] = []
+      const save = call.track(mounted as never, '/' as never, {
+        onError: () => {
+          seen.push(save.pending())
+          save.retry()
+        },
+      }) as unknown as ((options?: unknown) => Promise<unknown>) & { pending: () => boolean, retry: () => void, settled: () => Promise<void>, status: () => string }
+
+      await save({ method: 'post' })
+      await save.settled()
+      await eventually(() => expect(save.status()).toBe('ready'))
+      expect(seen).toEqual([false])
+    }
+    finally {
+      fetched.mockRestore()
+    }
   })
 })
 

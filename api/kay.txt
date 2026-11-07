@@ -1300,8 +1300,8 @@ interface TrackedCall<Input, Result> extends Source<LoadStatus>
 
 [.] TrackHooks
 interface TrackHooks<Data>
-  onError?: (event: { error: ApiError<unknown>; input: unknown; }) => void
-  onSuccess?: (event: { data: Data; input: unknown; }) => void
+  onError?: ((event: { error: ApiError<unknown>; input: unknown; }) => void) | undefined
+  onSuccess?: ((event: { data: Data; input: unknown; }) => void) | undefined
 
 [.] TransitionClasses
 interface TransitionClasses

@@ -153,7 +153,7 @@ export interface Connection<T> extends Source<ConnectionStatus> {
   on: (listener: (value: T) => void) => () => void
   // Called with `{ value }` for every value received, the shape every source hands its data in; returns what stops it.
   onData: (listener: (event: { value: T }) => void) => () => void
-  // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. Returns what stops it.
+  // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. A streaming action's answer is open before a listener can attach, so for it this runs after `retry()` only. Returns what stops it.
   onOpen: (listener: (event: { reconnected: boolean }) => void) => () => void
   // Called with `{ error }` when it fails; returns what stops it.
   onError: (listener: (event: { error: ApiError }) => void) => () => void

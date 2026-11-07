@@ -847,6 +847,15 @@ export const LINTS = {
     wrong: '--- server\nimport { stream } from \'kay\'\nimport * as api from \'./api\'\n\nconst feed = stream(api, \'/feed\')\nfeed.on(item => console.log(item))\n---\np x',
     right: '--- server\nimport { stream } from \'kay\'\nimport * as api from \'./api\'\n\nconst feed = stream(api, \'/feed\')\nfeed.onData(({ value: item }) => console.log(item))\n---\np x',
   },
+  'deprecated-stream-open': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    site: true,
+    summary: '`.onOpen(reconnected => ...)` of a stream or a socket, `.onOpen(({ reconnected }) => ...)` since 1.92: the hook is told one object, as every hook is. The old form still compiles, as an object is truthy, so a callback testing `reconnected` now runs on every open, the first included. Found in the TypeScript files and `.kay` fences of the project, on a name bound once to a call of `stream` or `socket` from `kay`, as `kay check` reads no types: a stream an action answered with, or one reached through a property or a parameter, is not found and changed by hand. The fix gives an arrow of one plain parameter `{ reconnected: parameter }` and wraps a function reference; any other callback is reported with no fix.',
+    wrong: '--- server\nimport { stream } from \'kay\'\nimport * as api from \'./api\'\n\nconst feed = stream(api, \'/feed\')\nfeed.onOpen(again => again && console.log(\'back\'))\n---\np x',
+    right: '--- server\nimport { stream } from \'kay\'\nimport * as api from \'./api\'\n\nconst feed = stream(api, \'/feed\')\nfeed.onOpen(({ reconnected: again }) => again && console.log(\'back\'))\n---\np x',
+  },
   'deprecated-hook-dispatch': {
     level: 'warn',
     group: 'deprecated',
