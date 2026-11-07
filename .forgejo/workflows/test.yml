@@ -58,8 +58,8 @@ jobs:
     # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
     if: needs.latest.outputs.current == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null)
     runs-on: alpine
-    # Past the slowest runs (about 14m45s, runs 3549 and 3556, with the libraries still one at a time), so a hung run frees the queue behind it.
-    timeout-minutes: 15
+    # Past the slowest runs (the Tests step alone reached 713 s in run 5564 and was cut at 720 s in runs 5506, 5522 and 5608 while sessions tested on the same host), so a hung run frees the queue behind it.
+    timeout-minutes: 25
 
     steps:
       # Deep enough to find the last commit these tests passed.
@@ -149,7 +149,7 @@ jobs:
       # Each file's duration here is written into this checkout's .kay/timings.json, which the step below prints, whole on one line for scripts/timings.ts to read back from the log, so a session's runs schedule by the last green run's measurement.
       # A run stuck past its time is interrupted before the job limit, so bun prints the files still running, which the limit cuts off with the log.
       - name: Tests
-        run: timeout -s INT -k 30 720 bun run test --parallel=6 --update-timings
+        run: timeout -s INT -k 30 1020 bun run test --parallel=6 --update-timings
 
       # The files whose point is the browser itself, on full Chrome, which has a browser UI and keeps the renderer of every closed page: a difference from the shell the suite ran on shows here.
       - name: Browser tests on full Chrome
