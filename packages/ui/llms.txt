@@ -19,7 +19,7 @@ The rest by topic, each file read whole with one command:
 - [MarkdownEditor](llms/markdown-editor.md): the markdown textarea with shortcuts, toolbar, preview and image upload
 - [Forms, FormDialog and Steps](llms/forms-and-steps.md): FormField, Form, SaveForm, ContactForm, SubscribeForm, FormDialog, Steps, RecordButton
 - [Table](llms/table.md): Table columns, sort, filter, selection, export, virtual rows, footer, column toggle, caption and scroll region
-- [Tabs, navigation and pagination](llms/tables-navigation-and-layout.md): Segmented, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Toggle, Checkbox, Pagination, QrCode
+- [Tabs, navigation and pagination](llms/tables-navigation-and-layout.md): Segmented, Tabs, TabNav, SiteNav, SideNav, AppHeader, AppSwitcher, Toggle, Checkbox, Pagination, QrCode
 - [Blocks, links and parts of the components](llms/slots-and-links.md): the `@title`, `@heading`, `@tab`, `@link`, `@slide` and `@caption` blocks, `href` on Card, CardRow, Avatar, Badge and Timeline, icons, badges, nesting and dismissal in navigation and Notice
 - [Page layout, command palette and trees](llms/page-layout-palette-and-trees.md): PageHeader, PageSection, CollapsibleSection, Accordion, Widget, CardRow, SidePanel, Toolbar, SplitLayout, CommandPalette, TreeView, Timeline, DescriptionList, Bell
 - [Open state, transitions and data sources](llms/open-state-and-sources.md): onOpenChange and value on CollapsibleSection and Accordion, TreeView lazy children, callbacks on Avatar, CopyButton, AudioPlayer and Pagination, async items and options, `list` on collection components, `@option` on choice controls

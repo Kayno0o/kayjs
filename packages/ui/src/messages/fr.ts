@@ -163,6 +163,7 @@ export default defineMessages({
     },
     scatterChart: { empty: 'Aucune donnée pour le moment.' },
     select: { failure: 'Impossible de charger les options', loading: 'Chargement…' },
+    sideNav: { collapse: 'Réduire le menu', expand: 'Déployer le menu', menu: 'Menu' },
     sidePanel: { close: 'Fermer', resize: 'Redimensionner' },
     siteNav: { expand: 'Afficher les pages de {label}', menu: 'Menu' },
     sparkline: { empty: 'Aucune donnée pour le moment.' },

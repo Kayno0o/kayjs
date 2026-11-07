@@ -1,0 +1,25 @@
+---
+import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+
+// kay-island
+const { onCollapsedChange, onOpenChange } = props<{ onCollapsedChange: (collapsed: boolean) => void, onOpenChange: (open: boolean) => void }>()
+
+const groups = [
+  { label: 'Main', links: [{ href: 'https://example.com/home', label: 'Home', icon: 'success' }, { href: 'https://example.com/inbox', label: 'Inbox', badge: 3 }] },
+  { links: [{ href: 'https://example.com/docs', label: 'Docs', children: [{ href: 'https://example.com/docs/a', label: 'Alpha' }] }, { href: 'https://example.com/locked', label: 'Locked', disabled: true }] },
+] as const
+---
+SideNav#plain(groups={groups} links={[{ href: 'https://example.com/flat', label: 'Flat' }]} current="https://example.com/docs/a" label="Plain" panel={false} onCollapsedChange={onCollapsedChange})
+SideNav#rail(groups={groups} current="https://example.com/home" label="Rail" panel={false} collapsed={true})
+SideNav#block(groups={groups} current="https://example.com/home" label="Block" panel={false} collapsible={false})
+  @link(link)
+    em {link.label}!
+  @heading(group)
+    strong {group.label}!
+  @header
+    p header
+  @footer
+    p footer
+SideNav#panel(groups={groups} current="https://example.com/home" label="Panel" onOpenChange={onOpenChange})
+SiteNav#site(links={[{ href: 'https://example.com/a', label: 'A', badge: 2 }, { href: 'https://example.com/b', label: 'B', disabled: true }]} current="https://example.com/a" label="Site")

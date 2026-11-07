@@ -1,4 +1,5 @@
 import type { IconProps } from 'kay/icons'
+import type { NavItem } from './nav-item'
 import type { NewTab } from './outside'
 import alert from '~icons/tabler/alert-triangle'
 import back from '~icons/tabler/arrow-left'
@@ -28,11 +29,9 @@ import zoomFit from '~icons/tabler/zoom-reset'
 // The icons the library's own components ask for, by what they mean rather than by a name in some set.
 export type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
-// A link of a site's navigation: `icon` is drawn before its label, and `children` are the links under it, one level deep.
-export interface NavLink {
+// A link of a site's navigation: `icon` is drawn before its label, `badge` after it, a `disabled` one is a text with no link, and `children` are the links under it, one level deep.
+export interface NavLink extends NavItem {
   href: string
-  label: string
-  icon?: IconSlot | IconProps | undefined
   children?: readonly NavLink[] | undefined
   // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined

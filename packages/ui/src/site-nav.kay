@@ -5,10 +5,9 @@ import type { NavLink } from './defaults'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SiteNavState from './internal/site-nav-state.kay'
-import { addressHref } from './tab-nav'
+import { navMark } from './nav-current'
 import { wording } from 'kay/words'
 
-const TRAILING_SLASHES = /\/+$/
 
 // 'kui-site-nav' stays as the component's name for an app's CSS. Below lg the links fold behind the toggle, a popover its popovertarget opens, and the open popover's frame is theme.css's; from lg they sit in a row, the toggle hidden.
 const look = recipe({
@@ -19,8 +18,9 @@ const look = recipe({
     closeIcon: 'hidden group-has-[[data-part=list]:popover-open]/nav:inline-block',
     list: 'gap-1 lg:static lg:m-0 lg:flex lg:min-w-0 lg:flex-row lg:items-center lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:text-inherit',
     item: 'lg:flex lg:items-center',
-    link: 'block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current]:text-accent has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
+    link: 'block px-3 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current]:text-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted has-[[data-part=icon]]:flex has-[[data-part=icon]]:items-center has-[[data-part=icon]]:gap-2',
     icon: 'size-4 shrink-0',
+    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
     // The chevron beside a link with `children` opens them from lg; below it they are always shown, nested in the list.
     expand: 'inline-flex items-center px-1 py-2 text-muted hover:text-foreground max-lg:hidden',
     expandIcon: 'size-3.5 shrink-0',
@@ -32,7 +32,7 @@ const look = recipe({
 const { id, links, link, current, label, menuLabel = wording('ui.siteNav.menu', 'Menu'), expandLabel = wording('ui.siteNav.expand', 'Show the pages under {label}'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'id' | 'class' | 'children'> & {
   // The list's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  // `icon` is drawn before the label, for the reader who sees it; the label still names the link. A link with `children` keeps its own page and gains a button that opens them under it from lg, the whole list nested in the menu below.
+  // `icon` is drawn before the label, for the reader who sees it; the label still names the link. `badge` follows it, and a `disabled` link is a text with `aria-disabled`. A link with `children` keeps its own page and gains a button that opens them under it from lg, the whole list nested in the menu below.
   links: readonly NavLink[]
   // Draws the text of each link, children included, in place of its `label`: `@link(link)`, given the link. The icon it names is still drawn before it. A block taking the link makes the SiteNav an island.
   link?: Snippet<[link: NavLink]> | undefined
@@ -53,31 +53,26 @@ const { id, links, link, current, label, menuLabel = wording('ui.siteNav.menu', 
 const listId = id ?? uid()
 const anchor = `--_site-nav-${listId}`
 
-// A path with a trailing slash is the same page as without one.
-const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHES, '') : path
-
 const expanded = (entry: NavLink) => expandLabel.replaceAll('{label}', entry.label)
-
-// The home page holds every path, so only an exact match marks it.
-function marked(href: string) {
-  const own = trimmed(addressHref(href))
-  const here = trimmed(typeof current === 'string' ? current : current.pathname)
-
-  if (own === here)
-    return 'page'
-
-  return own !== '/' && here.startsWith(`${own}/`) ? 'true' : undefined
-}
 ---
-// One link of the list or of a group under one: its icon, then the app's block or the label.
+// The inside of a link: its icon, then the app's block or the label, then the badge.
+snippet inside(entry: NavLink)
+  if entry.icon
+    Icon(icon={entry.icon} part="icon")
+  if link
+    slot link(entry)
+  else
+    | {entry.label}
+  if entry.badge !== undefined
+    span(part="badge") {entry.badge}
+// One link of the list or of a group under one; a disabled one is a text, as in TabNav.
 snippet destination(entry: NavLink)
-  a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={marked(entry.href)})
-    if entry.icon
-      Icon(icon={entry.icon} part="icon")
-    if link
-      slot link(entry)
-    else
-      | {entry.label}
+  if entry.disabled
+    span(part="link" aria-disabled="true")
+      | {inside(entry)}
+  else
+    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)})
+      | {inside(entry)}
 // The list is a popover its toggle opens, so the browser owns showing it, closing it on a press outside or Escape, and giving the focus back; the page swap closes one left open.
 // The toggle is an IconButton's markup with both icons drawn, so CSS shows the close one while the list is open.
 // A link with children is followed by a button opening them as a popover from lg; below it they stay nested and always shown, so the button hides.

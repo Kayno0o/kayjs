@@ -298,8 +298,10 @@ interface MultiSelectOption<Value extends string = string>
   value: Value
 
 [.] NavLink
-interface NavLink
+interface NavLink extends NavItem
+  badge?: number | string | undefined
   children?: readonly NavLink[] | undefined
+  disabled?: boolean | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -418,6 +420,11 @@ interface ScatterPoint
 
 [.] scheme
 function scheme(cookie?: string): "dark" | "light" | undefined
+
+[.] SideNavGroup
+interface SideNavGroup
+  label?: string | undefined
+  links: readonly NavLink[]
 
 [.] SortDirection
 type SortDirection = 'asc' | 'desc'
@@ -654,10 +661,11 @@ component default
   brand?: string | undefined;
   nav?: string | undefined | {
     root?: string | undefined;
-    link?: string | undefined;
     icon?: string | undefined | {
       root?: string | undefined;
     };
+    badge?: string | undefined;
+    link?: string | undefined;
     toggle?: string | undefined;
     menuIcon?: string | undefined | {
       root?: string | undefined;
@@ -2350,6 +2358,51 @@ component default
   submit?: boolean | undefined
   value?: (Empty extends string | true ? "" : never) | Value | undefined
 
+[./side-nav.kay] default
+component default
+  class?: string | undefined | {
+  root?: string | undefined;
+  icon?: string | undefined | {
+    root?: string | undefined;
+  };
+  initial?: string | undefined;
+  text?: string | undefined;
+  badge?: string | undefined;
+  link?: string | undefined;
+  nav?: string | undefined;
+  header?: string | undefined;
+  group?: string | undefined;
+  heading?: string | undefined;
+  list?: string | undefined;
+  item?: string | undefined;
+  children?: string | undefined;
+  footer?: string | undefined;
+  toggle?: string | undefined;
+  toggleIcon?: string | undefined | {
+    root?: string | undefined;
+  };
+  menu?: string | undefined;
+}
+  collapseLabel?: string | undefined
+  collapsed?: boolean | undefined
+  collapsedKey?: string | undefined
+  collapsible?: boolean | undefined
+  current: URL | string
+  expandLabel?: string | undefined
+  footer?: Element
+  groups?: readonly SideNavGroup[] | undefined
+  header?: Element
+  heading?: ((group: SideNavGroup) => Element) | undefined
+  id?: string | undefined
+  label: string
+  link?: ((link: NavLink) => Element) | undefined
+  links?: readonly NavLink[] | undefined
+  menuLabel?: string | undefined
+  onCollapsedChange?: ((collapsed: boolean) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
+  panel?: boolean | undefined
+
 [./side-panel.kay] default
 component default
   | { actions?: Element; children?: Element; class?: string | undefined | {
@@ -2408,10 +2461,11 @@ component default
 component default
   class?: string | undefined | {
   root?: string | undefined;
-  link?: string | undefined;
   icon?: string | undefined | {
     root?: string | undefined;
   };
+  badge?: string | undefined;
+  link?: string | undefined;
   toggle?: string | undefined;
   menuIcon?: string | undefined | {
     root?: string | undefined;

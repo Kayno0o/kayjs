@@ -32,6 +32,7 @@ export type { AxisScale, AxisTick, BarListRow, BarSeries, ChartSeries, ScatterAx
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
+export type { SideNavGroup } from './side-nav'
 export type { RowsSource } from './source'
 export type { SparkTone } from './sparkline'
 export type { StatDelta } from './stat'

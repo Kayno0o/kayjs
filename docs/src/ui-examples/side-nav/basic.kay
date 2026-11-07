@@ -1,0 +1,9 @@
+---
+import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
+
+const groups = [
+  { label: 'Workspace', links: [{ href: '/', label: 'Overview', icon: 'info' }, { href: '/ui/side-nav', label: 'Inbox', badge: 3 }] },
+  { label: 'Admin', links: [{ href: '/ui/tabs', label: 'Users' }, { href: '/ui/billing', label: 'Billing', disabled: true }] },
+] as const
+---
+SideNav(groups={groups} current="/ui/side-nav" label="Main" collapsedKey="docs-side-nav")

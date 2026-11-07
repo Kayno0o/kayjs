@@ -1,0 +1,176 @@
+---
+import type { JSX, Snippet } from 'kay'
+import type { NavLink } from './defaults'
+import type { SideNavGroup } from './side-nav'
+import { persisted, recipe, signal, uid } from 'kay'
+import { navMark } from './nav-current'
+import { tabOf } from './outside'
+import Icon from './icon.kay'
+import SidePanel from './side-panel.kay'
+import { wording } from 'kay/words'
+
+// 'kui-side-nav' stays as the component's name for an app's CSS. From lg the nav is a column, narrowed to a rail of icons when collapsed; below it the nav gives way to a button opening the same lists in a SidePanel.
+const look = recipe({
+  parts: {
+    root: 'kui-side-nav group/side flex flex-col',
+    menu: 'lg:hidden',
+    nav: 'flex min-h-0 flex-1 flex-col gap-4 data-[panel]:max-lg:hidden w-60 data-[collapsed]:w-14 transition-[width] max-lg:w-full',
+    header: 'px-3',
+    group: 'flex flex-col gap-1',
+    heading: 'px-3 text-xs uppercase tracking-label text-muted group-data-[collapsed]/side:sr-only',
+    list: 'flex flex-col gap-1',
+    item: 'flex flex-col',
+    link: 'flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-strong hover:text-foreground aria-[current=page]:bg-surface-strong aria-[current=page]:text-accent aria-[current]:text-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted',
+    icon: 'size-4 shrink-0',
+    initial: 'hidden size-4 shrink-0 text-center group-data-[collapsed]/side:inline-block',
+    text: 'min-w-0 flex-1 truncate group-data-[collapsed]/side:sr-only',
+    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted group-data-[collapsed]/side:hidden',
+    // The links under a link, shown whether or not the link is the page on screen; a rail leaves them out.
+    children: 'flex flex-col gap-1 ps-4 group-data-[collapsed]/side:hidden',
+    footer: 'mt-auto px-3',
+    toggle: 'self-end max-lg:hidden',
+    toggleIcon: 'size-4 shrink-0 rotate-90 transition-transform group-data-[collapsed]/side:-rotate-90',
+  },
+})
+
+const { id, links, groups, link, heading, header, footer, current, label, collapsed, collapsedKey, collapsible = true, onCollapsedChange, collapseLabel = wording('ui.sideNav.collapse', 'Collapse the menu'), expandLabel = wording('ui.sideNav.expand', 'Expand the menu'), panel = true, menuLabel = wording('ui.sideNav.menu', 'Menu'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children'> & {
+  // The id of the nav, unique on the page; one is drawn when none is given.
+  id?: string | undefined
+  // Links with no heading, before the `groups`; a link may hold `children`, one level of links under it.
+  links?: readonly NavLink[] | undefined
+  // Titled runs of links, each with its own heading and list.
+  groups?: readonly SideNavGroup[] | undefined
+  // Draws the text of each link, children included, in place of its `label`: `@link(link)`, given the link. The icon and the badge it names are still drawn around it.
+  link?: Snippet<[link: NavLink]> | undefined
+  // Draws the heading of each group in place of its `label`: `@heading(group)`.
+  heading?: Snippet<[group: SideNavGroup]> | undefined
+  // Above the lists, such as a brand or a switcher.
+  header?: Snippet
+  // Under the lists, pinned to the bottom: a user menu, a version.
+  footer?: Snippet
+  // The path of the page on screen, or its URL, `ctx.url`: its link is marked as the page, and a link to a section holding it as current, as SiteNav does.
+  current: string | URL
+  // Names the navigation for screen readers, and the panel of a narrow screen.
+  label: string
+  // Collapses the nav to a rail of icons when the page sets it; left out, the toggle collapses it on its own.
+  collapsed?: boolean | undefined
+  // The name of the cookie the collapsed state is kept in, from one visit to the next, which the server reads, so the rail is drawn from the first paint. A `collapsed` given wins over it.
+  collapsedKey?: string | undefined
+  // `false` leaves out the toggle that collapses the nav.
+  collapsible?: boolean | undefined
+  // Called with the new state whenever the toggle collapses or expands the nav.
+  onCollapsedChange?: ((collapsed: boolean) => unknown) | undefined
+  // Names the toggle while the nav is expanded.
+  collapseLabel?: string | undefined
+  // Names the toggle while the nav is collapsed.
+  expandLabel?: string | undefined
+  // `false` keeps the nav in place at every width; by default it gives way, below lg, to a button opening it in a SidePanel.
+  panel?: boolean | undefined
+  // Names the button opening the panel.
+  menuLabel?: string | undefined
+  // Shows the panel of a narrow screen when the page sets it; the button, a click on a link, a press outside and Escape open and close it on their own.
+  open?: boolean | undefined
+  // Called with the panel's new state whenever it shows or hides, however it did.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+}>()
+
+const navId = id ?? uid()
+const kept = collapsedKey === undefined ? undefined : persisted<boolean>(collapsedKey, false)
+const own = signal(false)
+const shown = signal(false)
+
+const folded = () => collapsible && (collapsed ?? (kept ? kept() : own()))
+const panelOpen = () => open ?? shown()
+const all = (): SideNavGroup[] => [...links && links.length > 0 ? [{ links }] : [], ...groups ?? []]
+
+function fold() {
+  const next = !folded()
+
+  if (collapsed === undefined) {
+    if (kept)
+      kept = next
+    else
+      own = next
+  }
+
+  onCollapsedChange?.(next)
+}
+
+// The panel reports its own close after a link closed it: each transition is passed on once.
+let reported = false
+
+function setOpen(next: boolean) {
+  if (open === undefined)
+    shown = next
+
+  if (next === reported)
+    return
+
+  reported = next
+  onOpenChange?.(next)
+}
+
+// Following a link of the panel closes it: the page swap keeps the island, so it would stay over the new page.
+function followed(event: MouseEvent) {
+  if ((event.target as Element).closest('a'))
+    setOpen(false)
+}
+---
+// The inside of a link: its icon, or the first letter where the rail has no icon to show, then the app's block or the label, then the badge.
+snippet inside(entry: NavLink)
+  if entry.icon
+    Icon(icon={entry.icon} part="icon")
+  else
+    span(part="initial" aria-hidden="true") {entry.label.slice(0, 1)}
+  span(part="text")
+    if link
+      slot link(entry)
+    else
+      | {entry.label}
+  if entry.badge !== undefined
+    span(part="badge") {entry.badge}
+// One link; a disabled one is a text, as in TabNav. A rail names it by a tooltip.
+snippet destination(entry: NavLink)
+  if entry.disabled
+    span(part="link" aria-disabled="true" data-tooltip={folded() ? entry.label : undefined})
+      | {inside(entry)}
+  else
+    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)} data-tooltip={folded() ? entry.label : undefined})
+      | {inside(entry)}
+snippet lists(inPanel: boolean)
+  nav(part="nav" id={inPanel ? `${navId}-panel` : navId} aria-label={label} data-collapsed={folded() && !inPanel ? '' : undefined} data-panel={panel && !inPanel ? '' : undefined})
+    if header
+      div(part="header")
+        | {header}
+    for group, index of all() key={index}
+      div(part="group")
+        if group.label !== undefined
+          div(part="heading" id={`${navId}-${inPanel ? 'p' : 'n'}${index}`})
+            if heading
+              slot heading(group)
+            else
+              | {group.label}
+        ul(part="list" aria-labelledby={group.label === undefined ? undefined : `${navId}-${inPanel ? 'p' : 'n'}${index}`})
+          for entry of group.links key={entry.href}
+            li(part="item")
+              | {destination(entry)}
+              if entry.children && entry.children.length > 0
+                ul(part="children")
+                  for child of entry.children key={child.href}
+                    li(part="item")
+                      | {destination(child)}
+    if footer
+      div(part="footer")
+        | {footer}
+    if collapsible && !inPanel
+      button.kui-icon-btn(part="toggle" type="button" aria-label={folded() ? expandLabel : collapseLabel} aria-expanded={folded() ? 'false' : 'true'} aria-controls={navId} data-tooltip={folded() ? expandLabel : collapseLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={fold})
+        Icon(icon="chevron" part="toggleIcon")
+// The nav is a column from lg, hidden below it where the button opens the same lists in a panel.
+div(part="root" {...rest} data-collapsed={folded() ? '' : undefined})
+  | {lists(false)}
+  if panel
+    button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
+      Icon(icon="menu")
+    SidePanel(open={panelOpen()} title={label} onOpenChange={setOpen})
+      div(onClick={followed})
+        | {lists(true)}

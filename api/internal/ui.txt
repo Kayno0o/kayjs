@@ -779,8 +779,10 @@ const default: UiSettings
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/defaults] NavLink
-interface NavLink
+interface NavLink extends NavItem
+  badge?: number | string | undefined
   children?: readonly NavLink[] | undefined
+  disabled?: boolean | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -1421,8 +1423,10 @@ interface MultiSelectOption<Value extends string = string>
   value: Value
 
 [./lib/index] NavLink
-interface NavLink
+interface NavLink extends NavItem
+  badge?: number | string | undefined
   children?: readonly NavLink[] | undefined
+  disabled?: boolean | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -1541,6 +1545,11 @@ interface ScatterPoint
 
 [./lib/index] scheme
 function scheme(cookie?: string): "dark" | "light" | undefined
+
+[./lib/index] SideNavGroup
+interface SideNavGroup
+  label?: string | undefined
+  links: readonly NavLink[]
 
 [./lib/index] SortDirection
 type SortDirection = 'asc' | 'desc'
@@ -2109,6 +2118,9 @@ function selectionSummary<Value extends string>(options: readonly MultiSelectOpt
 [./lib/multi-select] toggledValue
 function toggledValue<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
 
+[./lib/nav-current] navMark
+function navMark(href: string, current: URL | string): "page" | "true" | undefined
+
 [./lib/nav-item] NavItem
 interface NavItem
   badge?: number | string | undefined
@@ -2449,6 +2461,11 @@ const default: UiSettings
 
 [./lib/shade] shade
 function shade(color: string, value: number): string | undefined
+
+[./lib/side-nav] SideNavGroup
+interface SideNavGroup
+  label?: string | undefined
+  links: readonly NavLink[]
 
 [./lib/source] asyncRows
 function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks?: AsyncRowsHooks<Row>): AsyncRows<Row>

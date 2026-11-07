@@ -63,6 +63,7 @@ import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
@@ -177,6 +178,7 @@ export const COMPONENTS = {
   'scatter-chart': ScatterChart,
   'segmented': Segmented,
   'select': Select,
+  'side-nav': SideNav,
   'side-panel': SidePanel,
   'site-favicon': SiteFavicon,
   'site-nav': SiteNav,
@@ -274,6 +276,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'scatter-chart': { points: [{ key: 'a', label: 'Hades', x: 1, y: 2 }], label: 'Games' },
   'segmented': { label: 'Range', options, value: 'mars', orientation: 'vertical' },
   'select': { 'aria-label': 'Planet', options, 'value': 'mars' },
+  'side-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Main' },
   'side-panel': { open: false, title: 'Detail', onOpenChange: noop },
   'site-favicon': { name: 'kaynooo.fr' },
   'site-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Main' },
