@@ -738,6 +738,14 @@ export const LINTS = {
     wrong: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" isDisabled={iso => iso.endsWith("-25")})',
     right: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" disabledDay={iso => iso.endsWith("-25")})',
   },
+  'deprecated-menu-danger': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    summary: 'A kayjs-ui Menu entry flagged `danger: true`, which is `tone: \'danger\'` since 1.92, the tone every component names a meaning with. The old flag works until 1.95. Found in the object literals written out in the `items` of a Menu; the fix writes the tone, and an entry that names a `tone` too is reported with no fix, as the tone wins. Items built elsewhere and passed by name are not found.',
+    wrong: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', danger: true }]})',
+    right: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', tone: \'danger\' }]})',
+  },
   'deprecated-open-change': {
     level: 'warn',
     group: 'deprecated',

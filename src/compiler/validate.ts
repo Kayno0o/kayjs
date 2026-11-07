@@ -6,11 +6,14 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { dangerFlags } from './menu-danger'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
 // The `file` key `uiComponents` holds for kayjs-ai's Chat.
 const AI_CHAT = 'ai-chat'
+// Menu's `items` took `danger: true` for a destructive entry until `tone: 'danger'` since 1.92.
+const MENU_TAG = 'menu'
 // The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
 const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
@@ -911,6 +914,13 @@ class Validator {
         continue
 
       const name = this.text(attribute.name)
+
+      if (file === MENU_TAG && name === 'items' && attribute.kind === 'expression') {
+        for (const { property, toned } of dangerFlags(this.text(attribute.expression), attribute.expression.start))
+          this.lint(property, 'deprecated-menu-danger', '`danger: true` in the `items` of a `Menu` is `tone: \'danger\'` since kayjs-ui 1.92, the one way every component names a meaning', toned ? { help: 'Drop `danger: true`, the `tone` beside it wins' } : { help: 'Write `tone: \'danger\'`', fixes: [{ title: 'Write `tone: \'danger\'`', edits: [{ start: property.start, end: property.end, text: 'tone: \'danger\'' }], safe: true }] })
+
+        continue
+      }
 
       const actionRenamed = actionRenames?.[name]
 

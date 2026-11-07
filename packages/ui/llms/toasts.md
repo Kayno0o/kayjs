@@ -9,7 +9,7 @@ toast.success('Saved')
 toast.error('Could not save')
 toast.info('Copied')
 
-// `duration` is a string such as `'3s'` (`'6s'` by default; an error stays until the reader dismisses it, so `'10s'` gives it back a clock); `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does, each call answering its id. Its `tone` is any `Tone`, `danger` for `toast.error` (the icon and colour follow it); `type`, `error` for `danger`, is its deprecated name.
+// `duration` is a string such as `'3s'` (`'6s'` by default; an error stays until the reader dismisses it, so `'10s'` gives it back a clock); `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does, each call answering its id. Its `tone` is any `Tone`, `danger` for `toast.error` (the icon and colour follow it); `type`, `error` for `danger`, is its deprecated name: read `tone`, which 2.0.0 leaves alone in `{ id, message, tone }`.
 const sticky = toast.error('Offline', { duration: false })
 
 // `action` adds one button before the close button, for the obvious next step: it is busy while `run`'s promise is pending, the toast goes once it settles (a rejection is logged), and Alt+t reaches it. An action toast keeps the clock of its tone, none for an error.

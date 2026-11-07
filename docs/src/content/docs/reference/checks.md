@@ -131,6 +131,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
+| `deprecated-menu-danger` | warn | deprecated | A kayjs-ui Menu entry flagged `danger: true`, now `tone: 'danger'` |
 | `deprecated-open-change` | warn | deprecated | `onToggle` on a kayjs-ui Table or TreeView, now `onOpenChange` |
 | `deprecated-ui-failures` | warn | deprecated | A kayjs-ui failure prop under its name before 1.90: `failure` and `errorLabel` are `failureLabel`, and a CopyButton's `onFail` is `onError`, which takes `{ error }`; the old names work until 1.93 |
 | `deprecated-ui-actions` | warn | deprecated | A kayjs-ui block or prop under its name before 1.90: a Card's `@head`, a FormField's `@action`, an AppHeader's `@end`, a TreeView's `@trailing` and a MarkdownEditor's `@toolbarExtra` are `@actions`, and a ConfirmDelete's `trigger` string is `triggerLook`; the old names work until 1.93 |

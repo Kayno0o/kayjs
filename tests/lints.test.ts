@@ -1197,6 +1197,28 @@ describe('deprecated-open-change', () => {
   })
 })
 
+describe('deprecated-menu-danger', () => {
+  const imports = 'import Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport Other from \'./other.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'menu-danger.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-menu-danger').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('writes tone danger for each entry flagged danger in a Menu', () => {
+    expect(found('Menu(label="x" items={[{ label: \'Rename\' }, { label: \'Delete\', danger: true, onSelect: remove }]})')).toEqual([{ at: 'danger: true', fix: ['danger: true->tone: \'danger\''] }])
+    expect(found('Menu(label="x" items={[{ label: "A", "danger": true }, \'separator\', { label: "B", danger: true }]})')).toHaveLength(2)
+  })
+
+  it('reports an entry that names a tone with no fix, and leaves the rest alone', () => {
+    expect(found('Menu(label="x" items={[{ label: \'Delete\', tone: \'warning\', danger: true }]})')).toEqual([{ at: 'danger: true', fix: undefined }])
+    expect(found('Menu(label="x" items={[{ label: \'Delete\', danger: false }, { label: \'B\', tone: \'danger\' }]})')).toEqual([])
+    expect(found('Menu(label="x" items={rows})')).toEqual([])
+    expect(found('Other(items={[{ label: \'Delete\', danger: true }]})')).toEqual([])
+  })
+})
+
 describe('deprecated-ui-props', () => {
   const imports = 'import DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\nimport DateRangeInput from \'@kaynooo/kayjs-ui/date-range-input.kay\'\nimport Other from \'./other.kay\'\n'
   const found = (template: string) => {
