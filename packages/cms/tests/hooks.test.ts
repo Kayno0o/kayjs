@@ -140,6 +140,13 @@ describe('beforeSave', () => {
     expect(await saveEntry({ collection: 'notes', slug: 'one', data: { title: 'One' } }, { create: true })).toMatchObject({ ok: false, error: { status: 500 } })
   })
 
+  test('a body the hook writes gets the script check, even on a publish', async () => {
+    await saveEntry({ collection: 'posts', slug: 'one', data: { title: 'One', draft: true }, body: 'Hi' }, { create: true })
+    configure({ beforeSave: () => ({ body: '<script>alert(1)</script>' }) })
+    expect(await publishEntry({ collection: 'posts', slug: 'one' })).toMatchObject({ ok: false, issues: [{ body: true }] })
+    expect((await entryOf({ collection: 'posts', slug: 'one' }))?.body).toContain('Hi')
+  })
+
   test('does not ask for a reorder', async () => {
     const asked: string[] = []
 

@@ -239,21 +239,26 @@ async function saveEntryAnswer(given: CmsDraftEntry, options: SaveOptions = {}):
   const verb = options.verb ?? (options.create === true ? 'add' : 'update')
   const previous = verb !== 'move' && options.create !== true && hooked() ? await previousOf(given) : undefined
   let entry = given
+  let kept = options
 
   // A reorder is a position, not something an editor wrote.
-  if (verb !== 'move' && settings().beforeSave !== undefined) {
+  if (verb !== 'move' && options.unasked !== true && settings().beforeSave !== undefined) {
     const asked = await askBeforeSave({ collection: given.collection, slug: given.slug, ...given.locale !== undefined && { locale: given.locale }, verb, ...options.author !== undefined && { author: options.author }, data: given.data, ...given.body !== undefined && { body: given.body }, ...previous !== undefined && { previous } })
 
     if ('issues' in asked)
       return asked
 
     entry = { ...given, ...asked.change.data !== undefined && { data: asked.change.data }, ...asked.change.body !== undefined && { body: asked.change.body } }
+
+    // A body the hook wrote is text the editor never read: the script check applies to it whatever the verb.
+    if (entry.body !== given.body)
+      kept = { ...options, bodyKept: false }
   }
 
   let outcome: Answer
 
   try {
-    outcome = await writeEntry(entry, options)
+    outcome = await writeEntry(entry, kept)
   }
   finally {
     forgetCounts()
@@ -285,6 +290,8 @@ interface SaveOptions extends VersionRule {
   verb?: SaveEvent['verb'] | undefined
   author?: Identity | undefined
   bodyKept?: boolean | undefined
+  // A save the library makes on its own, such as pointing an entry at a renamed slug, which `beforeSave` is not asked about.
+  unasked?: boolean | undefined
   heldData?: Record<string, unknown> | undefined
   // A new entry that is an old one coming back, whose history goes on rather than starting over.
   revived?: boolean | undefined
@@ -786,7 +793,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   const unpointed: string[] = []
 
   for (const each of apart) {
-    const outcome = await saveEntry({ ...each.ref, data: each.data, body: each.body }, { version: each.version, verb: 'update', author, bodyKept: true })
+    const outcome = await saveEntry({ ...each.ref, data: each.data, body: each.body }, { version: each.version, verb: 'update', author, bodyKept: true, unasked: true })
 
     if (!('saved' in outcome))
       unpointed.push(each.label)

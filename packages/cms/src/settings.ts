@@ -71,7 +71,7 @@ export interface BeforeSaveEvent {
   // The entry about to be written; for a `delete` or a `rename` the entry as stored.
   data: Record<string, unknown>
   body?: string | undefined
-  // The entry as stored now; none for a new one.
+  // The entry as stored now; none for a new one, a duplicate and a restore from the trash.
   previous?: EntryState | undefined
 }
 
