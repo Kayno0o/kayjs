@@ -1,0 +1,6 @@
+---
+import ScrollingTable from '../components/scrolling-table.kay'
+import '../app.css'
+---
+main
+  ScrollingTable(inBox)

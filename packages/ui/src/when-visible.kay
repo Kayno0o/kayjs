@@ -15,10 +15,10 @@ const { onVisible, margin = 600, ...rest } = props<Omit<JSX.IntrinsicElements['d
 
 let sentinel: HTMLElement | undefined
 
-// The nearest ancestor set to scroll, which is what the sentinel has to come into view in, or the viewport.
+// The nearest ancestor that scrolls, which is what the sentinel has to come into view in, or the viewport. One set to scroll that has no overflow is skipped: a box as tall as its rows, such as a table's `overflow-x: auto` wrapper, would count the sentinel as in view wherever the page is scrolled.
 function scrollBoxOf(el: HTMLElement): HTMLElement | null {
   for (let node = el.parentElement; node; node = node.parentElement) {
-    if (SCROLLING.has(getComputedStyle(node).overflowY))
+    if (SCROLLING.has(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight)
       return node
   }
 
@@ -57,14 +57,30 @@ onMount(() => {
     }
   }
 
-  const intersection = new IntersectionObserver((entries) => {
-    visible = entries.at(-1)?.isIntersecting ?? false
-    void run()
-  }, { root: scrollBoxOf(el), rootMargin: `${margin}px` })
+  let root = scrollBoxOf(el)
 
-  // A list that grew under a sentinel still in view fires no new intersection, so observing it afresh reports where it stands now.
+  function watch(box: HTMLElement | null) {
+    return new IntersectionObserver((entries) => {
+      visible = entries.at(-1)?.isIntersecting ?? false
+      void run()
+    }, { root: box, rootMargin: `${margin}px` })
+  }
+
+  let intersection = watch(root)
+
+  // A list that grew under a sentinel still in view fires no new intersection, so observing it afresh reports where it stands now. A box that started to overflow, or stopped, changes what the sentinel has to come into view in.
   function recheck() {
-    intersection.unobserve(el)
+    const box = scrollBoxOf(el)
+
+    if (box !== root) {
+      intersection.disconnect()
+      root = box
+      intersection = watch(root)
+    }
+    else {
+      intersection.unobserve(el)
+    }
+
     intersection.observe(el)
   }
 

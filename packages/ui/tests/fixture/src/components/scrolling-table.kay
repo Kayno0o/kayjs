@@ -1,0 +1,31 @@
+---
+// kay-island
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+const { first = 100, size = 100, total = 1000, inBox = false, table = true, virtual = false } = props<{ first?: number, size?: number, total?: number, inBox?: boolean, table?: boolean, virtual?: boolean }>()
+
+const rowsOf = (from: number, count: number) => Array.from({ length: Math.max(0, Math.min(count, total - from)) }, (_, index) => ({ id: from + index + 1, name: `Row ${from + index + 1}` }))
+
+// Pages come back after a tick, counted on the window so a test reads how many were asked for.
+const feed = infiniteList(rowsOf(0, first), {
+  pageSize: size,
+  key: row => row.id,
+  load: async ({ offset }) => {
+    const target = window as unknown as { loads: number }
+
+    target.loads = (target.loads ?? 0) + 1
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    return rowsOf(offset, size)
+  },
+})
+---
+#box(style={inBox ? 'height: 20rem; overflow-y: auto' : undefined})
+  if table
+    Table(columns={[{ key: 'name', header: 'Name' }]} list={feed} rowKey="id" virtual={virtual})
+  else
+    for row of feed.rows() key={row.id}
+      p.row {row.name}
+    LoadMore(list={feed})
