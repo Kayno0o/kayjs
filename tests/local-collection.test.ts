@@ -142,6 +142,16 @@ async function expectFaults(page: TestPage, count: number): Promise<void> {
 }
 
 // Queues one write with the page signed out, so the page leaves it be, then lets the server answer 500.
+async function queuedSignedOut(page: TestPage): Promise<void> {
+  await page.evaluate(() => {
+    document.cookie = 'refuse=401; path=/'
+  })
+  await page.offline()
+  await write(page, 'button.add', 'signed out')
+  await page.online()
+  await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
+}
+
 async function queuedFaulty(page: TestPage, title: string): Promise<void> {
   await page.evaluate(() => {
     document.cookie = 'refuse=401; path=/'
@@ -722,6 +732,64 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.text('p.status')).toBe('synced')
     expect(await page.text('p.hooks')).toBe(before)
+  }, 60_000)
+
+  it('sets error() and reads unavailable where the browser keeps no IndexedDB, and retry() does nothing', async () => {
+    const page = await site!.open('/fail')
+
+    await page.initScript(() => {
+      IDBFactory.prototype.open = () => {
+        throw new Error('no storage here')
+      }
+    })
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'unavailable')
+
+    expect(await page.text('p.error')).toBe('no storage here')
+    expect(await page.text('p.errorstatus')).toBe('0')
+    expect((await hooks(page))[2]).toBe('1')
+
+    await page.click('button.retry')
+    await Bun.sleep(300)
+
+    expect(await page.text('p.status')).toBe('unavailable')
+    expect((await hooks(page))[2]).toBe('1')
+  }, 60_000)
+
+  it('does nothing on retry() while signed out, until the visitor is back', async () => {
+    const page = await opened()
+
+    await queuedSignedOut(page)
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+    await page.click('button.retry')
+    await Bun.sleep(400)
+
+    expect(await page.text('p.status')).toBe('signed-out')
+    expect((await server()).saves).toBe(0)
+
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect((await server()).saves).toBe(1)
+  }, 60_000)
+
+  it('sends the queue again on retry() after a write could not be sent', async () => {
+    const page = await opened()
+
+    await page.route('/_kay/action/*', async request => request.abort())
+    await write(page, 'button.add', 'again')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect((await server()).saves).toBe(0)
+
+    await page.unroute()
+    await page.click('button.retry')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'again', rev: 1 }] })
+    expect(await page.text('p.status')).toBe('synced')
   }, 60_000)
 
   it('tells onIssue once for each new issue and none of those kept from an earlier visit, and onSync with the rows', async () => {
