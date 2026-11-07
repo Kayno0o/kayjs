@@ -965,6 +965,22 @@ it('lists in a dry run the files a real kay new --with writes, library features 
   }
 })
 
+it('lists the template files in a dry run when the libraries are not beside kay, with a note', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const notes: string[] = []
+    const files = await createProject(join(root, 'app'), { features: [...PRESETS.server.features, 'ui'], dryRun: true, librariesFrom: root, notes })
+
+    expect(files).toContain('kay.config.ts')
+    expect(notes).toEqual([expect.stringContaining('ui is not installed beside kay')])
+    expect(existsSync(join(root, 'app'))).toBe(false)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 it('says kay new wrote the project and how to finish when the install of a library feature fails', async () => {
   const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
 

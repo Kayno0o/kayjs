@@ -59,6 +59,8 @@ export interface NewOptions {
   install?: boolean | undefined
   // The executable that installs them, `bun` itself unless a test stands in for it.
   bun?: string | undefined
+  // Where a dry run finds the libraries' `add` exports, kay's own folder unless a test points it elsewhere.
+  librariesFrom?: string | undefined
   // Receives what the library features say the author still has to decide, as `kay add` prints it.
   notes?: string[] | undefined
 }
@@ -205,7 +207,7 @@ async function librariesDryRun(files: Record<string, string>, libraries: readonl
   try {
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(scratch, path), content)))
 
-    const planned = await addFeatures(scratch, libraries, { dryRun: true, resolveFrom: KAY_ROOT })
+    const planned = await addFeatures(scratch, libraries, { dryRun: true, resolveFrom: options.librariesFrom ?? KAY_ROOT })
 
     options.notes?.push(...planned.notes)
 
