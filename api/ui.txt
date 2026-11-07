@@ -2408,7 +2408,6 @@ component default
   badge?: string | undefined;
   link?: string | undefined;
   nav?: string | undefined;
-  header?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
   group?: string | undefined;
@@ -2416,13 +2415,14 @@ component default
   list?: string | undefined;
   item?: string | undefined;
   children?: string | undefined;
-  footer?: string | undefined;
   toggle?: string | undefined;
   toggleIcon?: string | undefined | {
     root?: string | undefined;
   };
+  header?: string | undefined;
   menu?: string | undefined;
   panel?: string | undefined;
+  footer?: string | undefined;
 }
   collapseLabel?: string | undefined
   collapsed?: boolean | undefined
