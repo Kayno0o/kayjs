@@ -353,7 +353,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   }
 
   if (checked && pin !== undefined)
-    diagnostics.push(...markerMismatch(pin, routeFile || options.page === true))
+    diagnostics.push(...markerMismatch(pin, routeFile))
 
   if (checked && comment !== undefined)
     diagnostics.push(commentLint(file, comment))

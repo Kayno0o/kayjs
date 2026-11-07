@@ -245,12 +245,6 @@ describe('beside the pin', () => {
     }
   })
 
-  it('reports a pinned island page without a server fence, which compiles as a page', () => {
-    const found = compileKay('--- island\nconst a = 1\n---\np {a}\n', 'src/routes/index.kay', { check: true, page: true }).diagnostics.filter(diagnostic => diagnostic.code === 'island-marker')
-
-    expect(found).toHaveLength(1)
-  })
-
   it('does not error on a static pin whose promotion site hands a plain child a function', () => {
     expect(pins('--- static\nimport Child from \'./plain.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n')).toEqual([])
   })
