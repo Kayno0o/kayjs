@@ -557,6 +557,9 @@ function datedTogether(id: string): void {
   kept.dating.add(id)
 }
 
+// A render opens no connection, so a handle reads `idle`.
+const NO_CONNECTION = { status: () => 'idle', pending: () => false, error: () => undefined, retry: () => undefined }
+
 export function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined, own: boolean): Handle {
   if (own && typeof initial === 'function')
     throw new TypeError(`kay: live(${id}) with \`user: true\` is one value for each user, so its starting value is not a function of a key`)
@@ -675,7 +678,7 @@ export function serverLive(id: string, initial: unknown, name: string | undefine
       set: (key: LiveKey, next: unknown) => write(keyText(key), next),
       delete: remove,
     }
-    : { set: (next: unknown) => write('', next) }) as unknown as Handle
+    : { set: (next: unknown) => write('', next) }, NO_CONNECTION) as unknown as Handle
 }
 
 // A render of a page lists what it read, for its script and the proof of it.

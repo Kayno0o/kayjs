@@ -34,6 +34,19 @@ Declare each one as `export const name = live(...)` at the top of a module. The 
 
 A component that reads a live value is an island. A page that reads none ships no JavaScript and opens no connection. A page that reads some opens one connection, however many it reads, and its HTML already holds the values, so nothing flashes while it loads.
 
+### When the connection fails
+
+Every live value carries the `status()`, `pending()`, `error()` and `retry()` of a `resource`, those of the page's one connection. It is `idle` when no island reads a value, `connecting` while the connection is made or waits to be made again, `open` once it answers and `failed` when the server sends an error. A refused connection keeps retrying behind `error()`, an `ApiError` with the route's status, until it opens.
+
+```kay
+---
+import { visitors } from '../live'
+---
+if visitors.error() as error
+  p {error.message}
+  button(onClick={visitors.retry} disabled={visitors.pending()}) Try now
+```
+
 ### Values per key
 
 Give `live()` a function to get one value per key, a string. Read one with `room(id)`, write it with `room.set(id, value)`, and put it back to what the function gives with `room.delete(id)`.

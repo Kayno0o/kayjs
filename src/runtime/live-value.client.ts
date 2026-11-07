@@ -44,6 +44,8 @@ export const wanted = new Map<string, number>()
 // Set by `presence()`: whether the keys read now hold a connection open in a hidden tab, and what names the tab to the server.
 export const hold: { open?: () => boolean, tab?: string } = {}
 let current: { keys: Set<string>, reader: ReturnType<typeof readEvents<LiveUpdate[]>> } | undefined
+// The connection `status()`, `error()` and `retry()` of every handle read: none while the page follows nothing.
+const [followed, follow] = ownSignal<ReturnType<typeof readEvents<LiveUpdate[]>>['link'] | undefined>(undefined)
 let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
 
@@ -213,6 +215,7 @@ function release(): void {
   renewing = undefined
   current?.reader.close()
   current = undefined
+  follow(undefined)
 }
 
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
@@ -265,6 +268,7 @@ function sync(): void {
 
   reader.on(apply)
   current = { keys, reader }
+  follow(reader.link)
 
   if (renewing === undefined)
     renewLater()
@@ -312,6 +316,14 @@ function warnUnnoted(id: string, key: string): void {
   console.warn(`[kay] the keyed live value ${id} is read for ${key} in the browser, but the page's render never read it, so it is not followed. Read it in the template, such as a \`data-stamp\` attribute, for the page to follow it.`)
 }
 
+// What a handle says of the page's one connection, which every handle shares.
+const connectionOf = {
+  status: () => followed()?.status() ?? 'idle',
+  pending: () => followed()?.pending() ?? false,
+  error: () => followed()?.error(),
+  retry: () => current?.reader.retry(),
+}
+
 export function browserLive(id: string, initial: unknown): Handle {
   const keyed = typeof initial === 'function'
   const known = browserSlots.get(id)
@@ -352,5 +364,5 @@ export function browserLive(id: string, initial: unknown): Handle {
     throw new TypeError(`kay: the live value ${id} is changed on the server, not in a browser`)
   }
 
-  return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }) as unknown as Handle
+  return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }, connectionOf) as unknown as Handle
 }

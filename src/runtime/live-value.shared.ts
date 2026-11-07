@@ -1,6 +1,7 @@
 import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import type { Setter } from './index'
+import type { ConnectionStatus, Source } from './live'
 import type { StoreBase } from './store-base'
 
 // What both halves of `live()` read: its types, the route and script of the connection, and how a key reads.
@@ -8,15 +9,15 @@ import type { StoreBase } from './store-base'
 // What a keyed value is read by.
 export type LiveKey = string
 
-// A value the server changes and every open page shows: read by calling it, as a signal is, and written with `set` on the server only.
-export interface Live<T> {
+// A value the server changes and every open page shows: read by calling it, as a signal is, and written with `set` on the server only. `status()`, `pending()`, `error()` and `retry()` are those of the page's one connection, which every live value shares (`idle` while no island reads one, and on the server).
+export interface Live<T> extends Source<ConnectionStatus> {
   (): T
   // Changes the value for every page showing it; a function gets the current value. Throws in a browser, which only reads.
   set: Setter<T>
 }
 
 // A value of each user, declared `live(initial, { user: true })`: read by calling it, which gives the signed-in visitor's own and `initial` for nobody; the server writes one user's with `set(user, next)`, `user` being the id the library that signs them in names (`userOf` of `kay/library`, which kayjs-auth does).
-export interface LiveOwn<T> {
+export interface LiveOwn<T> extends Source<ConnectionStatus> {
   (): T
   set: (user: string, next: T | ((current: T) => T)) => void
   // Puts a user's value back to `initial`, and frees what is kept for it.
@@ -24,7 +25,7 @@ export interface LiveOwn<T> {
 }
 
 // A live value per key, `room(id)` reading one: what the declaration's function gives a key nothing was set for.
-export interface LiveByKey<K extends LiveKey, T> {
+export interface LiveByKey<K extends LiveKey, T> extends Source<ConnectionStatus> {
   (key: K): T
   set: (key: K, next: T | ((current: T) => T)) => void
   // Puts a key back to what the declaration gives it, and frees what is kept for it.

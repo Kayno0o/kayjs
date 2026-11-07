@@ -539,13 +539,21 @@ function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${
 function live<K extends LiveKey, T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
 
 [.] Live
-interface Live<T>
+interface Live<T> extends Source<ConnectionStatus>
+  error: () => ApiError<unknown> | undefined
+  pending: () => boolean
+  retry: () => void
   set: Setter<T>
+  status: () => ConnectionStatus
 
 [.] LiveByKey
-interface LiveByKey<K extends LiveKey, T>
+interface LiveByKey<K extends LiveKey, T> extends Source<ConnectionStatus>
   delete: (key: K) => void
+  error: () => ApiError<unknown> | undefined
+  pending: () => boolean
+  retry: () => void
   set: (key: K, next: ((current: T) => T) | T) => void
+  status: () => ConnectionStatus
 
 [.] LiveKey
 type LiveKey = string
@@ -556,9 +564,13 @@ interface LiveOptions<Ttl extends Duration = Duration>
   user?: boolean
 
 [.] LiveOwn
-interface LiveOwn<T>
+interface LiveOwn<T> extends Source<ConnectionStatus>
   delete: (user: string) => void
+  error: () => ApiError<unknown> | undefined
+  pending: () => boolean
+  retry: () => void
   set: (user: string, next: ((current: T) => T) | T) => void
+  status: () => ConnectionStatus
 
 [.] LoadStatus
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
