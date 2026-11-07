@@ -24,6 +24,12 @@ describe('the implicit-import lint', () => {
     expect(fixed(source)).toBe('---\nimport { signal } from \'kay\'\n\n// a signal(0) comment\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\n')
   })
 
+  it('writes the file\'s own line endings', () => {
+    expect(fixed('---\r\nconst a = signal(0)\r\n---\r\np {a()}\r\n')).toBe('---\r\nimport { signal } from \'kay\'\r\n\r\nconst a = signal(0)\r\n---\r\np {a()}\r\n')
+    expect(fixed('p {uid()}\r\n')).toBe('---\r\nimport { uid } from \'kay\'\r\n---\r\np {uid()}\r\n')
+    expect(moduleImportEdits('import { x } from \'./x\'\r\n', new Map([['kay', ['signal']]]))[0]!.text).toBe('import { signal } from \'kay\'\r\n')
+  })
+
   it('says nothing of a name already imported, aliased, type-only imported, declared or only written in a string, a comment or a key', () => {
     expect(found('---\nimport { signal } from \'kay\'\nconst a = signal(0)\n---\np {a()}\n')).toEqual([])
     expect(found('---\nimport { signal as sig } from \'kay\'\nconst a = sig(0)\n---\np {a()}\n')).toEqual([])
@@ -134,6 +140,19 @@ describe('imports written for a name a `kay/*` entry exports', () => {
       expect(await Bun.file(join(root, 'src/total.ts')).text()).toBe('import { cached } from \'kay/cache\'\nimport { onMount, memo, signal } from \'kay\'\n\nexport const total = memo(() => 1)\nexport const keep = [onMount, signal(0)]\nexport const where = cached\nexport const own = (files: string) => files\n')
       expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nimport { cached } from \'kay/cache\'\n\nconst all = await cached(\'k\', \'5m\', async () => [1])\n---\nh1 {all.length}\n')
       expect((await check(root)).map(diagnostic => diagnostic.message)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('offers a generic name\'s import without applying it unasked', async () => {
+    const root = await project({ 'src/a.ts': 'export const a = session\n' })
+
+    try {
+      const found = await check(root)
+
+      expect(found.map(diagnostic => [diagnostic.message.slice(0, 28), diagnostic.fixes?.[0]?.safe])).toEqual([['Cannot find name \'session\'.', false]])
     }
     finally {
       await rm(root, { recursive: true, force: true })

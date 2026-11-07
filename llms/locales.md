@@ -60,7 +60,7 @@ export default defineMessages({
 
 ### Show a message
 
-`t` needs no import in a template, a fence or an island, and gives the message in the request's locale:
+`t` of `kay/i18n` is imported by kay until 1.95, and gives the message in the request's locale:
 
 ```kay
 ---

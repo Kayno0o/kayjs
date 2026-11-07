@@ -11,6 +11,8 @@ const FIRST_IMPORT = /^import\b/m
 const SHEBANG = /^#!.*\n/
 const IMPORT_FROM = /^import[^\n]*from\s*(['"])[^\n]*$/m
 const TRAILING_COMMA = /,$/
+// Names common enough in an app that a missing one is as likely a local forgotten as kay's: their import is offered, never applied unasked.
+const GENERIC = new Set(['html', 'image', 'session', 'mount', 'head', 'island', 'cache', 'collection', 'files', 'pages'])
 const STATEMENT_END = /;\s*$/
 const REGEXP_CHARACTERS = /[.*+?^${}()|[\]\\/]/g
 
@@ -40,7 +42,9 @@ export function moduleImportEdits(source: string, wanted: ReadonlyMap<string, st
     const imports = FIRST_IMPORT.exec(source)
     const at = imports?.index ?? SHEBANG.exec(source)?.[0].length ?? 0
 
-    edits.push({ start: at, end: at, text: `${lines.join('\n')}\n${imports ? '' : '\n'}` })
+    const eol = source.includes('\r\n') ? '\r\n' : '\n'
+
+    edits.push({ start: at, end: at, text: `${lines.join(eol)}${eol}${imports ? '' : eol}` })
   }
 
   return edits
@@ -92,7 +96,7 @@ export async function addImportFixes(diagnostics: CheckDiagnostic[]): Promise<vo
       const names = [...wanted.values()].flat().map(name => `\`${name}\``).join(', ')
 
       for (const { diagnostic } of members)
-        diagnostic.fixes = [{ title: `Import ${names}`, edits, safe: true }]
+        diagnostic.fixes = [{ title: `Import ${names}`, edits, safe: [...wanted.values()].flat().every(name => !GENERIC.has(name)) }]
     }
   }
 }

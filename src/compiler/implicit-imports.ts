@@ -91,12 +91,13 @@ export function importEdits(file: KayFile, fence: Span | undefined, imports: rea
   }
 
   if (lines.length > 0) {
+    const eol = file.source.includes('\r\n') ? '\r\n' : '\n'
     const at = fence?.start ?? file.templateStart
     const body = fence === undefined ? '' : file.source.slice(fence.start, fence.end)
     // A blank line sets the imports off from the code that follows.
-    const apart = body.trim() !== '' && !STARTS_WITH_IMPORT.test(body) ? '\n' : ''
+    const apart = body.trim() !== '' && !STARTS_WITH_IMPORT.test(body) ? eol : ''
 
-    edits.push({ start: at, end: at, text: fence ? `${lines.join('\n')}\n${apart}` : `---\n${lines.join('\n')}\n---\n` })
+    edits.push({ start: at, end: at, text: fence ? `${lines.join(eol)}${eol}${apart}` : `---${eol}${lines.join(eol)}${eol}---${eol}` })
   }
 
   return edits
