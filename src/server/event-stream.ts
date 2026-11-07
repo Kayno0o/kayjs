@@ -4,7 +4,7 @@ import { KayError } from '../compiler/errors'
 import { END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
-import { sendableId } from '../runtime/sse'
+import { SENDABLE_ID } from '../runtime/sse'
 import { encodeValue, unsendable } from '../runtime/wire'
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
@@ -181,14 +181,14 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   }, { highWaterMark: 0 })
 }
 
-// The `id:` line of an event, none when the stream gives no ids: a line break would end the field, a NUL makes a browser ignore it, and the client sends back only what `sendableId` accepts.
+// The `id:` line of an event, none when the stream gives no ids: a line break would end the field, a NUL makes a browser ignore it, and the client sends back only what `SENDABLE_ID` accepts.
 function idLine<T>(id: ((value: T) => string | number) | undefined, value: T): string {
   if (!id)
     return ''
 
   const text = String(id(value))
 
-  if (!sendableId(text))
+  if (!SENDABLE_ID.test(text))
     throw new TypeError('kay: an event stream id must be printable ASCII of at most 1 KB with no space at either end')
 
   return `id: ${text}\n`
@@ -198,7 +198,7 @@ function idLine<T>(id: ((value: T) => string | number) | undefined, value: T): s
 export function lastEventId(request: Request): string | undefined {
   const sent = request.headers.get('last-event-id')
 
-  return sent !== null && sendableId(sent) ? sent : undefined
+  return sent !== null && SENDABLE_ID.test(sent) ? sent : undefined
 }
 
 function encodeEvent(value: unknown): string {

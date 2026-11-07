@@ -4,11 +4,7 @@ const LINE_BREAK = /\r\n|\r(?!$)|\n/
 const LEADING_SPACE = /^ /
 
 // An id a browser can send back as `Last-Event-ID`: printable ASCII, no space at either end, at most 1 KB. Shared by the server writing ids and the client sending them, so one never writes what the other would drop.
-const SENDABLE_ID = /^[\x21-\x7E](?:[\x20-\x7E]{0,1022}[\x21-\x7E])?$/
-
-export function sendableId(id: string): boolean {
-  return SENDABLE_ID.test(id)
-}
+export const SENDABLE_ID = /^[\x21-\x7E](?:[\x20-\x7E]{0,1022}[\x21-\x7E])?$/
 
 // Reads `text/event-stream` blocks, a `data` field over several lines joined with line breaks, comments skipped; resolves with what an event returned to end the stream, or undefined when the body ran out first.
 // An event gets the `id` field of its block as a third argument, undefined when it has none, and an `id` holding a NUL is ignored, as the standard asks. A block with an `id` and no event or data goes to `onId` alone, as the standard sets the last id without dispatching.

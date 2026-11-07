@@ -4,7 +4,7 @@ import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { connection, listenerSet } from './connection'
 import { effect, onCleanup, onMount, ownSignal, untrack } from './reactive'
-import { parseEvents, sendableId } from './sse'
+import { parseEvents, SENDABLE_ID } from './sse'
 import { decodeServerValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
@@ -256,17 +256,14 @@ async function refusalOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, message, data, { '': message })
 }
 
-// The header a reconnecting stream sends so its route can continue after the last event it took, which `readEvents` keeps only when `sendableId` accepts it.
+// The header a reconnecting stream sends so its route can continue after the last event it took, which `readEvents` keeps only when `SENDABLE_ID` accepts it.
 export function resumeHeaders(lastEventId: string | undefined): Record<string, string> {
   return lastEventId === undefined ? {} : { 'last-event-id': lastEventId }
 }
 
-// The statuses of a server or a proxy that is restarting (502, 503, 504), which a GET stream waits out where any other refusal ends it.
-export const whileRestarting = (status: number) => status > 501 && status < 505
-
-// An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok (or, given a function, one whose status it accepts) is tried again after the backoff too, as a stream across a restart needs.
+// An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; a GET stream also waits out a 502, 503 or 504, as a server or proxy restarting answers, and with `retryRefused` any response that is not ok is tried again after the backoff too.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value and its last id.
-export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused: boolean | ((status: number) => boolean) = false): EventReader<T> & { start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
+export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
   let run: AbortController | undefined
   let started = false
   let lastId: string | undefined
@@ -277,7 +274,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
 
   // An empty id resets it, as the standard says, and so does one the next request could not send.
   const remember = (id: string) => {
-    lastId = sendableId(id) ? id : undefined
+    lastId = SENDABLE_ID.test(id) ? id : undefined
   }
 
   const onEvent = (event: string, data: string, id?: string): ConnectionStatus | undefined => {
@@ -333,7 +330,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
         if (controller.signal.aborted)
           return
 
-        if (retryRefused === false || (retryRefused !== true && !retryRefused(response.status))) {
+        if (!retryRefused && !(reconnect && response.status > 501 && response.status < 505)) {
           link.fail(refusal)
 
           return
@@ -588,7 +585,7 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
     routeUrl(module, path, options)
 
   const reconnect = (options?.method ?? 'get') === 'get'
-  const reader = readEvents(opened(options), reconnect, lazy, reconnect && whileRestarting)
+  const reader = readEvents(opened(options), reconnect, lazy)
 
   onMount(() => {
     if (!lazy && typeof document !== 'undefined')
