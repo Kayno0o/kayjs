@@ -31,7 +31,7 @@ export interface Refusal {
 
 // What `open` found kept for an entry: when the edits were typed, and whether they came back (`restored`) or were left out because the entry was saved since.
 export interface Recovery {
-  at: number
+  editedAt: Date
   restored: boolean
 }
 
@@ -148,7 +148,7 @@ export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       keep?.remove(key)
 
     if (stale || restored)
-      recoveries.set(new Map(recoveries()).set(key, { at: kept.at, restored }))
+      recoveries.set(new Map(recoveries()).set(key, { editedAt: new Date(kept.at), restored }))
 
     return restored ? kept.entry : entry
   }

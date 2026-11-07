@@ -119,9 +119,9 @@ function jump(event: MouseEvent, issue: Issue): void {
 if form.drafts.recovery(form.entry) as recovery
   p.kcms-entry-notice(role="status")
     if recovery.restored
-      {wording('cms.entry.restored', 'Your unsaved changes from {time} are back. Reset drops them.', { time: sinceText(recovery.at) })}
+      {wording('cms.entry.restored', 'Your unsaved changes from {time} are back. Reset drops them.', { time: sinceText(recovery.editedAt.getTime()) })}
     else
-      {wording('cms.entry.notRestored', 'Unsaved changes from {time} were left out: this entry was saved since.', { time: sinceText(recovery.at) })}
+      {wording('cms.entry.notRestored', 'Unsaved changes from {time} were left out: this entry was saved since.', { time: sinceText(recovery.editedAt.getTime()) })}
 if form.problem as problem
   p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
 if form.drafts.refusal(form.entry) as refusal

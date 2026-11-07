@@ -444,7 +444,7 @@ interface PasswordOptions
 
 [.] Recovery
 interface Recovery
-  at: number
+  editedAt: Date
   restored: boolean
 
 [.] Refusal

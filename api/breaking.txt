@@ -1,5 +1,6 @@
 ai [.] sqliteConversations
 auth [.] lifetime
+cms [.] Recovery
 kay [./server] AsyncRoomStore
 kay [./server] AsyncRooms
 kay [./server] KayConfig

@@ -39,6 +39,7 @@ describe('drafts kept in the browser', () => {
     expect(after.value(post, 'title')).toBe('Hello there')
     expect(after.changed(post)).toBe(true)
     expect(after.recovery(post)?.restored).toBe(true)
+    expect(after.recovery(post)?.editedAt).toBeInstanceOf(Date)
     expect(after.anyChanged()).toBe(true)
   })
 
