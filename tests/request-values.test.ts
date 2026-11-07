@@ -125,6 +125,7 @@ describe('a template reading ctx', () => {
     expect(messages(reactive)).toEqual([expect.stringContaining('`ctx` is read on the server')])
     expect(messages('p {ctx.user?.name}\n', true)).toEqual([expect.stringContaining('`ctx` is read on the server')])
     expect(messages('p {ctx.user?.name}\n')).toEqual([])
+    expect(messages('---\nimport { ctx, signal } from "kay"\nconst count = signal(0)\n---\np {ctx.user?.name} {count()}\n')).toEqual([expect.stringContaining('`ctx` is read on the server')])
   })
 
   it('keeps a script\'s own ctx, and a fence\'s, as they are', () => {

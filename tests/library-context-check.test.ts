@@ -126,3 +126,18 @@ describe('the keys the Bell reads off ctx', () => {
     expect(implicitContextKeys(await Bun.file(resolve('packages/ui/src/bell.kay')).text())).toEqual(['inbox'])
   })
 })
+
+describe('the keys a component reads off a ctx it imports', () => {
+  it('are the members read, the import itself reading none', () => {
+    expect(implicitContextKeys('---\nimport { ctx, signal } from \'kay\'\n\nconst open = signal(false)\n---\nif ctx.impersonator && open()\n  p {ctx.user.name}\n')).toEqual(['impersonator', 'user'])
+  })
+
+  it('are all of them under another name, whose reads no pattern follows', () => {
+    expect(implicitContextKeys('---\nimport { ctx as request } from \'kay\'\n---\np {request.user.name}\n')).toBe('all')
+  })
+
+  it('are none for a type alone, or a ctx of another module', () => {
+    expect(implicitContextKeys('---\nimport type { ctx } from \'kay\'\n---\np Hi\n')).toBeUndefined()
+    expect(implicitContextKeys('---\nimport { ctx } from \'./mine\'\n---\np {ctx.user}\n')).toBeUndefined()
+  })
+})

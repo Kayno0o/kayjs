@@ -7,6 +7,7 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { dangerFlags } from './menu-danger'
+import { kayCtxImport } from './script-shared'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
@@ -272,7 +273,7 @@ class Validator {
     if (query && this.options.special)
       this.error(query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
-    if ((this.options.island !== undefined || this.options.insideIsland === true) && [...script.implicit, ...server?.implicit ?? []].includes('ctx'))
+    if ((this.options.island !== undefined || this.options.insideIsland === true) && ([...script.implicit, ...server?.implicit ?? []].includes('ctx') || kayCtxImport(script.imports) !== undefined))
       this.ctxInIsland()
 
     const head = this.head(this.file.template)

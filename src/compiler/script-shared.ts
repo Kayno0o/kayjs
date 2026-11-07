@@ -48,6 +48,11 @@ export interface ImportBinding {
   declaration: Span
 }
 
+// The import bringing in kay's `ctx` as a value, which reads the request values as the `ctx` kay adds for a file does.
+export function kayCtxImport(imports: readonly ImportBinding[]): ImportBinding | undefined {
+  return imports.find(binding => binding.source === 'kay' && binding.imported === 'ctx' && !binding.typeOnly)
+}
+
 export interface ScriptAnalysis {
   hoisted: Span[]
   imports: ImportBinding[]
