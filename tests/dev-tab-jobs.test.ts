@@ -28,7 +28,8 @@ describe('the Jobs tab', () => {
   const open = (answer: (url: string, init?: RequestInit) => Response) => {
     const calls: [string, string | undefined][] = []
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
-      calls.push([`${init?.method ?? 'GET'} ${url}`, init?.body as string | undefined])
+      if (url.startsWith('/_kay/dev/jobs'))
+        calls.push([`${init?.method ?? 'GET'} ${url}`, init?.body as string | undefined])
 
       return answer(url, init)
     }) as unknown as typeof window.fetch)

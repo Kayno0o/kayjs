@@ -35,7 +35,8 @@ describe('the Data tab', () => {
   const open = (answer: (url: string, init?: RequestInit) => Response) => {
     const calls: string[] = []
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init?: RequestInit) => {
-      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.startsWith('/_kay/dev/data'))
+        calls.push(`${init?.method ?? 'GET'} ${url}`)
 
       return answer(url, init)
     }) as unknown as typeof window.fetch)
