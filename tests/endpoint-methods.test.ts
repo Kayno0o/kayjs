@@ -11,6 +11,7 @@ import { pages } from './shared-pages'
 type App = Awaited<ReturnType<typeof pages>>
 
 const ORIGIN = 'https://app.example.com'
+const html = { accept: 'text/html' }
 const HEADER = 'import type { EndpointContext } from \'kay\'\nimport { s } from \'kay\'\n\n'
 const FILES: Record<string, string> = {
   'routes/index.kay': 'h1 Home\n',
@@ -128,7 +129,9 @@ describe('an endpoint file exporting more than GET', () => {
   })
 
   it('serves no path under a locale prefix, which endpoints leave alone', async () => {
-    expect((await call(localized, '/fr/hook.txt')).status).toBe(404)
+    const prefixed = await call(localized, '/fr/hook.txt', { headers: html })
+
+    expect([prefixed.status, prefixed.body.includes('Custom missing fr')]).toEqual([404, true])
     expect((await call(localized, '/hook.txt')).body).toBe('got')
   })
 
@@ -218,8 +221,6 @@ describe('the settings of an endpoint file', () => {
 })
 
 describe('a 404 from an endpoint file', () => {
-  const html = { accept: 'text/html' }
-
   it('renders `_404.kay` for a request asking HTML and stays plain text otherwise', async () => {
     for (const app of [plain, mounted, localized, dev]) {
       const page = await call(app, '/items/a.csv', { headers: html })
@@ -246,7 +247,10 @@ describe('a 404 from an endpoint file', () => {
     const ordinary = await call(localized, '/nothing-here', { headers })
     const page = await call(localized, '/items/a.csv', { headers })
 
+    const prefixed = await call(localized, '/fr/zzz.csv', { headers })
+
     expect([page.status, page.body]).toEqual([404, ordinary.body])
+    expect([prefixed.status, prefixed.body.includes('Custom missing fr')]).toEqual([404, true])
   })
 
   it('covers a notFound() thrown by the handler too', async () => {
