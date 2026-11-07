@@ -1,5 +1,6 @@
 import { withoutBase } from './base'
 import { controlsOf } from './form-controls'
+import { protectForm } from './form-protect'
 import { busyForms, checkedForms, submitNatively, swappedActionUrl } from './form-submits'
 import { leave, loadAgain, navigation, prefetched, swappable } from './navigation'
 import { pendingBlocks } from './pending'
@@ -131,8 +132,13 @@ export function blurred(event: FocusEvent): void {
     void passes(form, withoutBase(url.pathname), true, control.name)
 }
 
-// A form posting to the action at `action` took focus; one with `proofOfWork`, or holding a `workChallenge` field, starts on its challenge as the visitor fills it in, so its post seldom waits for it.
+// A form posting to the action at `action` took focus; one an island built asks for its honeypot and stamp; one with `proofOfWork`, or holding a `workChallenge` field, starts on its challenge as the visitor fills it in, so its post seldom waits for it.
 export async function preloadChecks(action?: string, form?: HTMLFormElement): Promise<void> {
+  const url = form && swappedActionUrl(form, null)
+
+  if (form && url)
+    void protectForm(form, url)
+
   try {
     // The challenges script and a field both carry the attribute.
     if (document.querySelector(`[${WORK_SCRIPT}]`))
@@ -167,6 +173,9 @@ async function passes(form: HTMLFormElement, action: string, inline = false, onl
 
 // Posts the form as the browser would, multipart unless it says otherwise, then shows the page the action sends the browser back to.
 async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: URL, { go, HTML, show }: Swapper, navigated: number | undefined): Promise<void> {
+  // A form the island built holds its honeypot and stamp before its fields are read.
+  await protectForm(form, url)
+
   const data = new FormData(form, submitter)
   const multipart = (submitter?.getAttribute('formenctype') ?? form.getAttribute('enctype') ?? '').toLowerCase() === 'multipart/form-data'
   const focused = document.activeElement

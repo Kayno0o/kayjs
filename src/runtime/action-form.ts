@@ -255,7 +255,12 @@ export function formProtection(target: unknown, kept = false): string {
   return kept && markup !== '' ? `<!--${KEPT_START}-->${markup}<!--${KEPT_END}-->` : markup
 }
 
-function protectionMarkup(target: unknown): string {
+// The markup of a form built in the browser, which asks the action's own URL for it: a fresh stamp, never the one a refused post sent.
+export function protectionFields(target: unknown): string {
+  return protectionMarkup(target, false)
+}
+
+function protectionMarkup(target: unknown, reuse = true): string {
   if (!isAction(target))
     return ''
 
@@ -266,7 +271,7 @@ function protectionMarkup(target: unknown): string {
     return honeypot
 
   // A refused post keeps the time its form rendered at, so the visitor is not sent back to zero.
-  const sent = untrack((target as FormTarget).failed)?.values[STAMP_FIELD]
+  const sent = reuse ? untrack((target as FormTarget).failed)?.values[STAMP_FIELD] : undefined
 
   return `${honeypot}<input type="hidden" name="${STAMP_FIELD}" value="${escapeAttribute(stamper(target.url, sent, minTimeOf(target.protection)!.maxAge))}">`
 }

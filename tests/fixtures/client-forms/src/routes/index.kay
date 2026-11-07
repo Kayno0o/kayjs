@@ -1,0 +1,22 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const guarded = action(t.Object({ note: t.String({ maxLength: 40 }), website: t.Optional(t.String({ maxLength: 40 })) }), ({ note }) => note.length, { protect: { honeypot: 'website', minTime: '2s' } })
+
+export const trapped = action(t.Object({ website: t.Optional(t.String({ maxLength: 40 })) }), () => 1, { protect: { honeypot: 'website' } })
+
+export const open = action(t.Object({}), () => 1)
+
+--- script
+import Opener from '../components/opener.kay'
+---
+h1 Client forms
+if guarded.succeeded() as done
+  p.sent Sent {done.data}
+if guarded.error() as message
+  p.error {message}
+form.server(action={guarded})
+  input(name="note")
+  button Send
+Opener

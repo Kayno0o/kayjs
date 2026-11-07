@@ -16,7 +16,7 @@ import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
 import type { Unmatched } from './page-routes'
 import { relative } from 'node:path'
-import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
+import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM, protectionFields } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
@@ -185,6 +185,8 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
+      // What a form the browser builds asks for, as the server writes it into the forms it renders: its honeypot and a stamp signed now.
+      app.get(value.url, () => Response.json({ html: protectionFields(value) }, { headers: { 'cache-control': 'no-store' } }))
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }, named))))
         const response = await timedAction(context.request, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))

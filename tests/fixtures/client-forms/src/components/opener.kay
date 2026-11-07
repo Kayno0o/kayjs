@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import { guarded, open, trapped } from '../routes/index.kay'
+
+const shown = signal(false)
+---
+button.show(type="button" onClick={() => shown.set(true)}) Show
+if shown()
+  form.built(action={guarded})
+    input(name="note")
+    button Send
+  form.trap(action={trapped})
+    button Send
+  form.open(action={open})
+    button Send
