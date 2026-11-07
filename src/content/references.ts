@@ -61,6 +61,7 @@ interface Target<Data, Routed extends boolean> {
 }
 
 // A collection's entry for a slug a `reference()` field holds, or undefined when the collection has none or holds it back: a draft in production, an entry not yet published. A list of slugs gives the entries found, in order; a null or undefined gives undefined (or none). In a localized collection the request's locale's entry, else the default locale's, as `get` reads it.
+// kept: request
 export function resolve<Data, Routed extends boolean>(slugs: readonly string[] | null | undefined, target: Target<Data, Routed>): Promise<EntryOf<Data, Routed>[]>
 export function resolve<Data, Routed extends boolean>(slug: string | null | undefined, target: Target<Data, Routed>): Promise<EntryOf<Data, Routed> | undefined>
 export async function resolve<Data, Routed extends boolean>(slug: string | readonly string[] | null | undefined, target: Target<Data, Routed>): Promise<EntryOf<Data, Routed> | EntryOf<Data, Routed>[] | undefined> {

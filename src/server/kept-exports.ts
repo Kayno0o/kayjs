@@ -128,6 +128,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   renameField: 'free',
   renderMarkdown: 'free',
   repositoryRoot: 'request',
+  resolve: 'request',
   saveEntries: 'request',
   saveEntry: 'request',
   setField: 'free',
