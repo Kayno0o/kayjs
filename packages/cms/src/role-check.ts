@@ -2,7 +2,7 @@ import type { GuardContext } from 'kay'
 import type { Doing, Target } from './access'
 import type { CmsAction } from './roles'
 import { READ_METHODS } from 'kay/library'
-import { allows, forbidden, memberOf, ownerStamp } from './access'
+import { allows, forbidden, memberOf, ownerStamps, permits, scoped } from './access'
 import { stamps } from './authors'
 import { leavesPublication, restrain } from './publishing'
 import { referrersWith } from './references'
@@ -55,39 +55,49 @@ interface Check {
   target: Target
 }
 
-// The locale an entry route names: the query's, else a JSON body's.
-async function localeOf(request: Request, url: URL): Promise<string | undefined> {
-  const queried = url.searchParams.get('locale')
+// The locale the route will read, as it reads it: a save, a history's restore or erasure take the body's `locale` and ignore the query's, every other entry route takes the query's. Undefined when it cannot be told, a body that is not JSON or names a locale that is no text, or a query that disagrees with the body's, which the guard and the route could then read differently.
+async function localeOf(request: Request, url: URL, inBody: boolean): Promise<{ locale: string | undefined } | undefined> {
+  const queried = url.searchParams.get('locale') ?? undefined
 
-  if (queried !== null)
-    return queried
-
-  if (request.method === 'GET' || !(request.headers.get('content-type') ?? '').includes('json'))
-    return undefined
+  if (!inBody)
+    return { locale: queried }
 
   try {
     const { locale } = await request.clone().json() as { locale?: unknown }
 
-    return typeof locale === 'string' ? locale : undefined
+    if (locale !== undefined && typeof locale !== 'string')
+      return undefined
+
+    return queried !== undefined && queried !== locale ? undefined : { locale }
   }
   catch {
     return undefined
   }
 }
 
-// The entry as it is stored now; its data is undefined when there is none, or none can be read, which no role limited to its own entries may change.
-async function stored(collection: string, slug: string, locale: string | undefined): Promise<{ data: Record<string, unknown> | undefined }> {
+// The entry as it is stored now: `found` with its data, `absent` when the collection answered and holds none, and `unknown` when that cannot be told: a locale the guard cannot read, a collection that fails to read. Only `absent` is a new entry.
+type Stored = { state: 'found', data: Record<string, unknown> } | { state: 'absent' } | { state: 'unknown' }
+
+async function stored(collection: string, slug: string, read: { locale: string | undefined } | undefined): Promise<Stored> {
+  if (read === undefined)
+    return { state: 'unknown' }
+
   try {
-    return { data: (await entryScreen({ collection, slug, locale }))?.entry?.data }
+    const screen = await entryScreen({ collection, slug, locale: read.locale })
+
+    if (screen === undefined || screen.collection.problem !== undefined)
+      return { state: 'unknown' }
+
+    return screen.entry === undefined ? { state: 'absent' } : { state: 'found', data: screen.entry.data ?? {} }
   }
   catch {
-    return { data: undefined }
+    return { state: 'unknown' }
   }
 }
 
-// Whether a role of the app is limited to some collections or to its own entries.
-function scoped(): boolean {
-  return [...settings().roles?.values() ?? []].some(role => role.collections !== undefined || role.own !== undefined)
+// The entry a check is made against: none for a new one, and data nobody wrote for one that cannot be told, which no role limited to its own entries changes.
+function targetOf(found: Stored): Target['entry'] {
+  return found.state === 'absent' ? undefined : { data: found.state === 'found' ? found.data : undefined }
 }
 
 // The entries a rename would rewrite, those naming the entry in a reference field, as the checks to pass: each must be the person's to change. A reference that cannot be listed fails the rename.
@@ -126,6 +136,11 @@ function placeOf(path: string): Place {
   const [, kind, collection, slug, suffix] = ENTRY_ROUTE.exec(path) ?? []
 
   return { kind: kind ?? '', collection: collection === undefined ? undefined : decoded(collection), slug: slug === undefined ? undefined : decoded(slug), suffix, alone: false }
+}
+
+// Whether the route reads the locale from the body: a save, and a history's restore or erasure.
+function inBody({ kind, suffix }: Place, method: string): boolean {
+  return method === 'POST' && ((kind === 'entries' && suffix === undefined) || kind === 'history')
 }
 
 // What a request needs of the signed-in person's roles, from its method and path as the router reads them (the path below the cms's mount).
@@ -170,10 +185,10 @@ async function needs(ctx: GuardContext, path: string, place: Place): Promise<Che
   if (read)
     return [{ doing: 'read', target: { collection } }]
 
-  const entry = scoped() ? await stored(collection, slug!, await localeOf(ctx.request, ctx.url)) : { data: undefined }
-  // A save of an entry the collection lacks makes it, which a role limited to its own entries may.
-  const creating = suffix === undefined && method === 'POST' && entry.data === undefined
-  const target: Target = { collection, entry: creating ? undefined : entry }
+  const found = scoped() || settings().can !== undefined ? await stored(collection, slug!, await localeOf(ctx.request, ctx.url, inBody(place, method))) : { state: 'unknown' } as const
+  // A save of an entry the collection positively lacks makes it, which a role limited to its own entries may.
+  const creating = suffix === undefined && method === 'POST' && found.state === 'absent'
+  const target: Target = { collection, entry: creating ? undefined : targetOf(found) }
 
   if (suffix === undefined)
     return method === 'DELETE' ? [{ doing: 'edit', target }, { doing: 'delete', target }] : [{ doing: 'edit', target }]
@@ -204,23 +219,25 @@ export async function enforceRoles(ctx: GuardContext, path: string): Promise<voi
   const { kind, collection, slug, suffix } = place
   const limited = scoped()
   // Reading and editing are limited by a scope alone.
-  const checks = (await needs(ctx, path, place)).filter(({ doing }) => limited || (doing !== 'read' && doing !== 'edit' && doing !== 'move'))
+  const asked = settings().can !== undefined
+  const checks = (await needs(ctx, path, place)).filter(({ doing }) => limited || asked || (doing !== 'read' && doing !== 'edit' && doing !== 'move'))
   // A read nothing limits does not look the person up.
   const member = checks.length === 0 && READ_METHODS.has(method) ? undefined : await memberOf(ctx)
 
   for (const { doing, target } of checks) {
-    if (!allows(member, doing, target))
+    if (!await permits(member, doing, target))
       return forbidden(ctx, doing, target)
   }
 
   const saving = method === 'POST' && kind === 'entries' && collection !== undefined && slug !== undefined
 
-  if (saving && suffix === undefined) {
-    const entry = await stored(collection, slug, await localeOf(ctx.request, ctx.url))
-    const stamp = ownerStamp(member, collection, entry.data === undefined ? undefined : entry)
+  // A save writes the person into a new entry and keeps the writer of an existing one; so does a restore of an older version, whose data carries the writer it had then.
+  if ((saving && suffix === undefined) || (method === 'POST' && kind === 'history' && suffix === 'restore' && collection !== undefined && slug !== undefined)) {
+    const found = await stored(collection, slug, await localeOf(ctx.request, ctx.url, true))
+    const list = ownerStamps(member, collection, targetOf(found))
 
-    if (stamp !== undefined)
-      stamps.set(ctx.request, stamp)
+    if (list.length > 0)
+      stamps.set(ctx.request, list)
   }
 
   if (saving && suffix === 'rename' && scoped()) {
@@ -230,7 +247,7 @@ export async function enforceRoles(ctx: GuardContext, path: string): Promise<voi
       return forbidden(ctx, 'edit', { collection })
 
     for (const { doing, target } of touched) {
-      if (!allows(member, doing, target))
+      if (!await permits(member, doing, target))
         return forbidden(ctx, doing, target)
     }
   }

@@ -156,7 +156,12 @@ function admits(role: Role, doing: Doing, target: Target, member: Member | undef
   return target.entry === undefined || written(target.entry.data?.[role.own], ownerKey(member))
 }
 
-// Whether the person may do it, the guard having let them in: everyone may when the app lists no roles; a person none of whose roles is listed only edits and reads; else one of their roles must reach the collection, hold the action and, when it is limited to their own entries, the entry must be theirs.
+// Whether a role of the app is limited to some collections or to its own entries.
+export function scoped(): boolean {
+  return [...settings().roles?.values() ?? []].some(role => role.collections !== undefined || role.own !== undefined)
+}
+
+// Whether the person may do it, the guard having let them in: everyone may when the app lists no roles; a person none of whose roles is listed only edits and reads, unless a role of the app is limited to collections or to its own entries, which makes the list a promise that no one outside it reaches them; else one of their roles must reach the collection, hold the action and, when it is limited to their own entries, the entry must be theirs.
 export function allows(member: Member | undefined, doing: Doing, target: Target = {}): boolean {
   const { roles } = settings()
 
@@ -166,26 +171,45 @@ export function allows(member: Member | undefined, doing: Doing, target: Target 
   const held = (member?.held ?? []).flatMap(name => roles.get(name) ?? [])
 
   if (held.length === 0 && (doing === 'read' || doing === 'edit' || doing === 'move'))
-    return true
+    return !scoped()
 
   return held.some(role => admits(role, doing, target, member))
 }
 
-// The field a new entry of the collection is written with the person in, and the value an existing one keeps: for a person whose roles reach the collection only through an `own` field. None when a role of theirs changes any entry of it.
-export function ownerStamp(member: Member | undefined, collection: string, entry: Target['entry']): { field: string, value: unknown } | undefined {
+// `allows`, then the app's own `cms({ can })`, which only narrows it. A `can` that throws or answers anything but true refuses.
+export async function permits(member: Member | undefined, doing: Doing, target: Target = {}): Promise<boolean> {
+  if (!allows(member, doing, target))
+    return false
+
+  const { can } = settings()
+
+  if (can === undefined)
+    return true
+
+  try {
+    const person = { id: member?.id, name: member?.name ?? '', email: member?.email, roles: member?.held ?? [] }
+
+    return await can({ person, action: doing, collection: target.collection, entry: target.entry }) === true
+  }
+  catch {
+    return false
+  }
+}
+
+// The fields a new entry of the collection is written with the person in, and the values an existing one keeps: for a person whose roles reach the collection only through `own` fields. None when a role of theirs changes any entry of it.
+export function ownerStamps(member: Member | undefined, collection: string, entry: Target['entry']): { field: string, value: unknown }[] {
   const { roles } = settings()
   const reaching = (member?.held ?? []).flatMap(name => roles?.get(name) ?? []).filter(role => reaches(role, collection))
-  const own = reaching.find(role => role.own !== undefined)?.own
   const key = ownerKey(member)
 
-  if (own === undefined)
-    return undefined
-
-  if (entry === undefined)
-    return key === '' ? undefined : { field: own, value: key }
-
   // An existing entry keeps its writer unless a broader role holds it.
-  return reaching.some(role => role.own === undefined) ? undefined : { field: own, value: entry.data?.[own] }
+  if (reaching.some(role => role.own === undefined))
+    return entry === undefined && reaching.some(role => role.own !== undefined) && key !== '' ? [...new Set(reaching.flatMap(role => role.own ?? []))].map(field => ({ field, value: key })) : []
+
+  if (entry === undefined && key === '')
+    return []
+
+  return [...new Set(reaching.flatMap(role => role.own ?? []))].map(field => ({ field, value: entry === undefined ? key : entry.data?.[field] }))
 }
 
 // The things the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles. `edit` is set for what they may not change at all, `move` for reordering a collection.

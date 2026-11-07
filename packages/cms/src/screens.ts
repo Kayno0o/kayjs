@@ -79,7 +79,7 @@ export async function listScreen({ collection: name, q = '', page = 1, status, s
   const rows = listed.rows.map((row) => {
     const entry = read.get(JSON.stringify([row.slug, row.locale]))
 
-    return entry !== undefined && !allows(viewer, 'edit', { collection: collection.name, entry }) ? { ...row, locked: true as const } : row
+    return entry !== undefined && viewer !== undefined && !allows(viewer, 'edit', { collection: collection.name, entry }) ? { ...row, locked: true as const } : row
   })
 
   return { prefix, collection, ...listed, rows: await withReviews(collection, rows) }

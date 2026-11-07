@@ -17,11 +17,14 @@ const stored = new Map<string, Data>()
 // The entries that name each `<collection>/<slug>` in a reference field.
 const referrers = new Map<string, { collection: string, data: Data }[]>()
 const trash = new Map<string, Data>()
+// The collections that fail to read.
+const unreadable = new Set<string>()
 
 function reset(): void {
   stored.clear()
   referrers.clear()
   trash.clear()
+  unreadable.clear()
   stored.set('posts/mine', { title: 'Mine', draft: false, author: 'u1' })
   stored.set('posts/theirs', { title: 'Theirs', draft: false, author: 'u2' })
   stored.set('posts/orphan', { title: 'Orphan', draft: false })
@@ -35,7 +38,7 @@ void mock.module('kay/server', () => ({ ...server, editRequested: () => false, e
 void mock.module('../src/store', () => ({
   collectionNamed: async (name: string) => ({ name, draftField: 'draft', publishField: undefined, unpublishField: undefined }),
   heldDate: () => '9999-12-31T00:00:00.000Z',
-  entryScreen: async ({ collection, slug }: { collection: string, slug: string }) => ({ entry: stored.has(`${collection}/${slug}`) ? { data: stored.get(`${collection}/${slug}`) } : undefined }),
+  entryScreen: async ({ collection, slug, locale }: { collection: string, slug: string, locale?: string }) => ({ collection: { problem: unreadable.has(collection) ? 'failed' : undefined }, entry: (locale === undefined || locale === 'en') && stored.has(`${collection}/${slug}`) ? { data: stored.get(`${collection}/${slug}`) } : undefined }),
 }))
 void mock.module('../src/references', () => ({
   referrersWith: async (collection: string, slugs: string[]) => new Map(slugs.map(slug => [slug, (referrers.get(`${collection}/${slug}`) ?? []).map(({ collection: name, data }) => ({ collection: { name }, entry: { data }, label: '' }))])),
@@ -187,9 +190,22 @@ describe('a role limited to collections', () => {
     expect(await send(both, 'POST', '/entries/posts/theirs/publish')).toBe(200)
   })
 
-  test('a person holding no listed role still edits every collection, as before', async () => {
-    expect(await send({ id: 'u9', roles: ['stranger'] }, 'POST', '/entries/pages/about')).toBe(200)
-    expect(await send({ id: 'u9', roles: ['stranger'] }, 'POST', '/entries/pages/about/publish')).toBe(403)
+  test('a person holding no listed role reaches nothing once a role is limited, as no scope may be walked around', async () => {
+    const stranger = { id: 'u9', roles: ['stranger'] }
+
+    expect(await send(stranger, 'POST', '/entries/pages/about')).toBe(403)
+    expect(await send(stranger, 'POST', '/entries/posts/theirs')).toBe(403)
+    expect(await send(stranger, 'GET', '/entries/posts/theirs')).toBe(403)
+    expect(await send(stranger, 'POST', '/entries/posts/theirs/publish')).toBe(403)
+  })
+
+  test('a person holding no listed role still edits every collection when every role is global', async () => {
+    configureRoles({ editor: [], publisher: ['publish'] })
+
+    const stranger = { id: 'u9', roles: ['stranger'] }
+
+    expect(await send(stranger, 'POST', '/entries/pages/about')).toBe(200)
+    expect(await send(stranger, 'POST', '/entries/pages/about/publish')).toBe(403)
   })
 })
 
@@ -241,18 +257,47 @@ describe('a role limited to its own entries', () => {
     const ctx = ask({ path: '/entries/posts/fresh', user: me, body: { data: { title: 'New', author: 'u2' }, create: true } })
 
     expect(await statusOf(ctx)).toBe(200)
-    expect(stamps.get(ctx.request)).toEqual({ field: 'author', value: 'u1' })
+    expect(stamps.get(ctx.request)).toEqual([{ field: 'author', value: 'u1' }])
   })
 
   test('a save keeps the writer of the entry it changes', async () => {
     const ctx = ask({ path: '/entries/posts/mine', user: me, body: { data: { title: 'Changed', author: 'u2' } } })
 
     expect(await statusOf(ctx)).toBe(200)
-    expect(stamps.get(ctx.request)).toEqual({ field: 'author', value: 'u1' })
+    expect(stamps.get(ctx.request)).toEqual([{ field: 'author', value: 'u1' }])
   })
 
   test('creating over the slug of another person\'s entry is refused', async () => {
     expect(await send(me, 'POST', '/entries/posts/theirs', { data: { title: 'Mine now' }, create: true })).toBe(403)
+  })
+
+  test('a query locale cannot make the entry look absent to the guard while the route saves the body\'s', async () => {
+    expect(await send(me, 'POST', '/entries/posts/theirs?locale=zz', { data: { title: 'Mine now' }, create: true })).toBe(403)
+    expect(await send(me, 'POST', '/entries/posts/theirs?locale=zz', { data: { title: 'Mine now' }, locale: 'en' })).toBe(403)
+    expect(await send(me, 'POST', '/entries/posts/theirs?locale=en', { data: { title: 'Mine now' }, locale: 'zz' })).toBe(403)
+    expect(await send(me, 'POST', '/entries/posts/theirs', { data: { title: 'Mine now' }, locale: 7 })).toBe(403)
+    expect(await send(me, 'POST', '/entries/posts/theirs?locale=zz', { data: { title: 'Mine now' }, locale: 'zz' })).toBe(200)
+  })
+
+  test('the locale of a history restore or erasure is the body\'s, as the route reads it', async () => {
+    expect(await send(me, 'POST', '/history/posts/theirs/restore?locale=zz', { at: 1 })).toBe(403)
+    expect(await send(me, 'POST', '/history/posts/theirs/erase?locale=zz', { locale: 'en' })).toBe(403)
+    expect(await send(me, 'POST', '/history/posts/mine/restore?locale=zz', { at: 1, locale: 'en' })).toBe(403)
+    expect(await send(me, 'POST', '/history/posts/mine/restore', { at: 1, locale: 'en' })).toBe(200)
+  })
+
+  test('a save of an entry that cannot be read is no new entry', async () => {
+    unreadable.add('posts')
+
+    expect(await send(me, 'POST', '/entries/posts/fresh', { data: { title: 'New' }, create: true })).toBe(403)
+    expect(await send(me, 'POST', '/entries/posts/theirs', { data: { title: 'Mine now' }, create: true })).toBe(403)
+  })
+
+  test('a restore keeps the writer the entry has now', async () => {
+    const ctx = ask({ path: '/history/posts/mine/restore', user: me, body: { at: 1 } })
+
+    expect(await statusOf(ctx)).toBe(200)
+    expect(stamps.get(ctx.request)).toEqual([{ field: 'author', value: 'u1' }])
   })
 
   test('a broader role stamps nothing on an entry it changes, and the writer on one it makes', async () => {
@@ -265,7 +310,7 @@ describe('a role limited to its own entries', () => {
     expect(await statusOf(made)).toBe(200)
     expect(await statusOf(both)).toBe(200)
     expect(stamps.get(changed.request)).toBeUndefined()
-    expect(stamps.get(made.request)).toEqual({ field: 'author', value: 'u1' })
+    expect(stamps.get(made.request)).toEqual([{ field: 'author', value: 'u1' }])
     expect(stamps.get(both.request)).toBeUndefined()
   })
 
@@ -443,5 +488,71 @@ describe('what the screens tell a person', () => {
     expect(ownerKey({ id: undefined, name: 'Ann', held: [], email: 'a@b.c' })).toBe('a@b.c')
     expect(ownerKey({ name: 'Ann', held: [] })).toBe('Ann')
     expect(ownerKey(undefined)).toBe('')
+  })
+})
+
+describe('several roles limited to their own entries by different fields', () => {
+  test('a new entry carries the person in each of the fields', async () => {
+    configureRoles({ blogger: { own: 'author', actions: ['publish'] }, editor: { own: 'owner', actions: ['publish'] } })
+
+    const ctx = ask({ path: '/entries/posts/fresh', user: { id: 'u1', roles: ['blogger', 'editor'] }, body: { data: { title: 'New', owner: 'u2' }, create: true } })
+
+    expect(await statusOf(ctx)).toBe(200)
+    expect(stamps.get(ctx.request)).toEqual([{ field: 'author', value: 'u1' }, { field: 'owner', value: 'u1' }])
+  })
+})
+
+describe('cms({ can })', () => {
+  const asked: Record<string, unknown>[] = []
+  let answer: (question: Record<string, unknown>) => boolean | Promise<boolean>
+
+  beforeEach(() => {
+    asked.length = 0
+    answer = () => true
+    configure({ guard: async () => undefined, roles: { blogger: { own: 'author', actions: [...ALL] }, boss: [...ALL] }, can: async (question) => {
+      asked.push(question as unknown as Record<string, unknown>)
+
+      return answer(question as unknown as Record<string, unknown>)
+    } })
+  })
+
+  test('is asked what the roles let through, with the person, the collection and the entry as stored', async () => {
+    expect(await send(me, 'POST', '/entries/posts/mine')).toBe(200)
+    expect(asked).toEqual([{ person: { id: 'u1', name: 'u1', email: undefined, roles: ['blogger'] }, action: 'edit', collection: 'posts', entry: { data: stored.get('posts/mine') } }])
+  })
+
+  test('is not asked what the roles refuse, and cannot widen them', async () => {
+    expect(await send(me, 'POST', '/entries/posts/theirs')).toBe(403)
+    expect(asked).toEqual([])
+  })
+
+  test('is asked of a new entry without one, and of a site-wide act without a collection', async () => {
+    const boss = { id: 'u3', roles: ['boss'] }
+
+    expect(await send(me, 'POST', '/entries/posts/fresh', { data: { title: 'New' }, create: true })).toBe(200)
+    expect(await send(boss, 'POST', '/redirects')).toBe(200)
+    expect(asked.map(({ action, collection, entry }) => [action, collection, entry])).toEqual([['edit', 'posts', undefined], ['redirects', undefined, undefined]])
+  })
+
+  test('refuses a request it answers no to, a read included, and a request it throws on', async () => {
+    answer = ({ action }) => action !== 'edit'
+
+    expect(await send(me, 'POST', '/entries/posts/mine')).toBe(403)
+    expect(await send(me, 'GET', '/entries/posts/mine')).toBe(200)
+
+    answer = ({ action }) => action !== 'read'
+
+    expect(await send(me, 'GET', '/entries/posts/mine')).toBe(403)
+
+    answer = () => {
+      throw new Error('the service is down')
+    }
+
+    expect(await send(me, 'POST', '/entries/posts/mine')).toBe(403)
+    expect(await send(me, 'GET', '/entries/posts/mine')).toBe(403)
+  })
+
+  test('is given with roles only', () => {
+    expect(() => configure({ guard: () => undefined, can: () => true })).toThrow('roles')
   })
 })

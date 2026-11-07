@@ -7,8 +7,8 @@ import { revisionAt } from './revisions'
 import { collectionNamed, entryOf, refused, saveEntry } from './store'
 import { discardTrashed, trashed } from './trash'
 
-// Saves an older version of an entry again, as a new save: the editor's version check, the schema and the hooks all apply. `restrained` is for a role that may not publish, whose restore leaves the draft flag and the dates as the entry has them.
-export async function restoreRevision(ref: EntryRef, at: number, author?: Identity, { version, restrained = false }: { version?: string | undefined, restrained?: boolean | undefined } = {}): Promise<SaveOutcome> {
+// Saves an older version of an entry again, as a new save: the editor's version check, the schema and the hooks all apply. `restrained` is for a role that may not publish, whose restore leaves the draft flag and the dates as the entry has them. `keep` are fields the entry holds now that the old version does not bring back, such as the writer a role limited to its own entries may not change.
+export async function restoreRevision(ref: EntryRef, at: number, author?: Identity, { version, restrained = false, keep }: { version?: string | undefined, restrained?: boolean | undefined, keep?: Record<string, unknown> | undefined } = {}): Promise<SaveOutcome> {
   const revision = await revisionAt(ref, at)
 
   if (!revision)
@@ -24,7 +24,7 @@ export async function restoreRevision(ref: EntryRef, at: number, author?: Identi
   // A move is no save, so a version carries the place the entry had when it was saved, which a restore must not send it back to.
   const placed = collection.orderField === undefined ? data : keepingOrder(collection.orderField, data, existing.data)
 
-  return saveEntry({ ...ref, data: placed, body: revision.body }, { version, required: true, verb: 'restore', author })
+  return saveEntry({ ...ref, data: { ...placed, ...keep }, body: revision.body }, { version, required: true, verb: 'restore', author })
 }
 
 // Writes a deleted entry back under its slug, refused as a new entry is if the slug was taken since. `restrained` is for a role that may not publish, whose restored entry is a draft, or held back by a far publish date, as a new entry of that role is.

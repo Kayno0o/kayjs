@@ -54,6 +54,14 @@ export interface MemberInfo {
   roles: readonly string[]
 }
 
+// What `cms({ can })` is asked: the signed-in person, what they do (`read`, `edit`, `move` or an action of `roles`), the collection and the entry as stored now, none for an entry that is not there yet.
+export interface CanQuestion {
+  person: { id?: string | undefined, name: string, email?: string | undefined, roles: readonly string[] }
+  action: 'read' | 'edit' | 'move' | 'publish' | 'review' | 'delete' | 'upload' | 'redirects'
+  collection?: string | undefined
+  entry?: { data?: Record<string, unknown> | undefined } | undefined
+}
+
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
@@ -78,6 +86,8 @@ export interface CmsOptions {
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
   // A role can also be limited to some collections and to the entries its holder wrote: `{ blogger: { collections: ['posts'], own: 'author', actions: ['publish'] } }`.
   roles?: Record<string, GivenRole> | undefined
+  // A last word on each request `roles` lets through, for what a role cannot say: `can: ({ person, action, collection, entry }) => ...`. It runs on the server for every act, including a read and the site-wide ones, and a refusal, or a throw, is a 403. Needs `roles`.
+  can?: ((question: CanQuestion) => boolean | Promise<boolean>) | undefined
   // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, `email` is where a newsletter test goes, and `roles` are matched against `roles`; without it such a guard holds no role.
   member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
@@ -117,6 +127,7 @@ export interface CmsSettings {
   pageLink: boolean
   // The actions each role may do, or undefined when every editor the guard admits may do all of them.
   roles: ReadonlyMap<string, Role> | undefined
+  can: CmsOptions['can']
   layouts: ReadonlyMap<string, GivenLayout>
   history: HistorySettings | undefined
   newsletter: ReadonlyMap<string, NewsletterOptions>
@@ -144,7 +155,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -156,10 +167,13 @@ export function configure({ prefix = '/admin', guard: own, role, files = working
   if (role !== undefined && (typeof role !== 'string' || role === ''))
     throw configError('cms', 'role', `\`cms({ role })\` is ${JSON.stringify(role)}; it takes the name of a kayjs-auth role, such as 'editor'`)
 
+  if (can !== undefined && (typeof can !== 'function' || roles === undefined))
+    throw configError('cms', 'can', '`cms({ can })` is a function asked after `cms({ roles })`, so it is given with it')
+
   const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
 
   return current
 }

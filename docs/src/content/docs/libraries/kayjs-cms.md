@@ -129,6 +129,22 @@ The server checks both on every route, not just in the screens. A person with se
 
 What belongs to the whole site, the redirects, renaming a file in the media library and the unused uploads, needs a role without these limits. Renaming an entry rewrites the entries that point at it, so it is refused unless the role may change every one of them.
 
+Once any role is limited, a person whose roles are not listed reaches nothing. A save is checked against the entry of the locale its body names, and a collection that fails to read refuses the save rather than counting as empty. A restore from history keeps the writer the entry has now.
+
+Uploads are one store shared by every collection, so `collections` decides who may list and upload there, not which files a page links. The key `own` compares is the one stored: if the id your guard reports changes, the entries written before no longer match.
+
+For a rule a role cannot say, `cms({ can })` has the last word:
+
+```ts
+cms({
+  guard,
+  roles: { staff: [] },
+  can: async ({ person, action, collection, entry }) => action !== 'edit' || (await allowedToday(person.id)),
+})
+```
+
+It is asked on the server for every request the roles let through, reads included, with the person, the action (`read`, `edit`, `move` or one of `roles`), the collection and the entry as stored, none for a new one. It can only refuse, a throw refuses, and the screens do not run it, so their buttons stay enabled. It needs `roles`.
+
 A role without `publish` can still add an entry to a collection that has a publish date and no draft flag. The server holds it back with a far publish date until a publisher sets one.
 
 A key of `roles` written `org:<role>` is a role held in any kayjs-auth organization the person belongs to, and `org:<organization>:<role>` one in that organization. They count with the organization's own hierarchy.

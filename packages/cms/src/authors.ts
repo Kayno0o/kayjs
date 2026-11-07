@@ -18,12 +18,10 @@ export const actors = new WeakMap<Request, Actor>()
 // The requests an edit link's holder made: read through the edit cookie alone, the app's guard having turned them away.
 export const linkReaders = new WeakSet<Request>()
 
-// The field a save must carry the person in, as the API's guard found the roles to need it: a new entry of a role limited to its own entries is written with its writer, and a save never changes the writer of one.
-export const stamps = new WeakMap<Request, { field: string, value: unknown }>()
+// The fields a save must carry the person in, as the API's guard found the roles to need it: a new entry of a role limited to its own entries is written with its writer, and a save never changes the writer of one.
+export const stamps = new WeakMap<Request, { field: string, value: unknown }[]>()
 
 // `data` with the writer a role limited to its own entries requires, whatever the request carried.
 export function stamped(request: Request, data: Record<string, unknown>): Record<string, unknown> {
-  const stamp = stamps.get(request)
-
-  return stamp === undefined ? data : { ...data, [stamp.field]: stamp.value }
+  return { ...data, ...Object.fromEntries((stamps.get(request) ?? []).map(({ field, value }) => [field, value])) }
 }
