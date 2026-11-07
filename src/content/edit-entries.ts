@@ -2,7 +2,7 @@ import type { TSchema } from 'elysia'
 import type { DraftIssue } from '../runtime/edit'
 import type { CollectionInfo, ContentLoaderOf, DataValue, EntryFile, EntryFilter, EntryPath, JsonSchema, SourceEntry, TranslationIndex, WrittenEntry } from './edit-shared'
 import type { Collection, ContentLoader, Entry } from './index'
-import type { CompiledMarkdown } from './markdown'
+import type { CompiledMarkdown, CompileOptions } from './markdown'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
@@ -18,7 +18,7 @@ import { CRLF, DELETE, folderOf, indexes, LEADING_NEWLINE, MARKDOWN, SLASHES, SP
 import { entryPath } from './entry-route'
 import { ContentChangedError, contentKey } from './key'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
-import { boundTransform, compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
+import { compileMarkdown, MarkdownError, markdownHooks, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { referencesIn } from './references'
 import { takeTurn } from './turns'
@@ -829,10 +829,34 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
   return isDraft(draft as ((entry: Entry<unknown>) => boolean) | string, read)
 }
 
+// The options the build compiles an entry's body with, hooks bound to the entry as the build names it: its file from the project root for a folder's, the loader's name and the locale and slug for a loaded one's.
+async function compileOptions(collection: Collection<unknown>, slug: string, locale: string | undefined): Promise<CompileOptions> {
+  const settings = markdownOf(collection.options)
+  let file: string
+
+  if (collection.dir === undefined) {
+    file = `${collection.loader!.name}/${locale === undefined ? slug : `${locale}/${slug}`}`
+  }
+  else {
+    const dir = folderOf(collection.dir)
+    const { existing, place } = await entryPlace(collection.name, dir, slug, locale)
+
+    file = relative(contentPlace().root, sourcePath(join(dir, existing ?? `${place}.md`))).split(sep).join('/')
+  }
+
+  return { highlight: settings.highlight, headingLinks: settings.headingLinks, sanitize: collection.loader !== undefined && collection.options.trusted !== true, ...markdownHooks(settings, { file, slug, locale }) }
+}
+
+// The options a CMS preview renders the body of the collection exported as `name` with, or undefined for a name no collection has.
+export async function previewOptions(name: string, slug: string, locale: string | undefined): Promise<CompileOptions | undefined> {
+  const collection = registeredCollections().find(([exported]) => exported === name)?.[1]
+
+  return collection && { ...await compileOptions(collection, slug, locale), sanitize: false }
+}
+
 async function compiledBody(collection: Collection<unknown>, body: string, at: { collection: string, slug: string, locale?: string | undefined }, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
   try {
-    const { highlight, headingLinks, transform } = markdownOf(collection.options)
-    const compiled = await compileMarkdown(body, 1, highlight, headingLinks, collection.loader !== undefined && collection.options.trusted !== true, boundTransform(transform, { file: `${at.collection}/${at.slug}`, slug: at.slug, locale: at.locale }))
+    const compiled = await compileMarkdown(body, 1, await compileOptions(collection, at.slug, at.locale))
 
     for (const { component, line } of unknownComponents(compiled.segments, collection.components))
       report(`uses <${component}> on line ${line}, which the collection's components do not name`)
@@ -843,7 +867,7 @@ async function compiledBody(collection: Collection<unknown>, body: string, at: {
     if (!(error instanceof MarkdownError))
       throw error
 
-    report(`${error.message} on line ${error.line}`)
+    report(`${error.bare ?? error.message} on line ${error.line}`)
 
     return undefined
   }

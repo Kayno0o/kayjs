@@ -3,7 +3,7 @@ import type { AnyElysia } from 'elysia'
 import type { BudgetConfig } from './build/budget'
 import type { Listed as RouteListing } from './commands/routes'
 import type { LintLevels } from './compiler/lints'
-import type { Highlighter, MarkdownTransform } from './content/markdown'
+import type { Highlighter, MarkdownPreprocess, MarkdownTransform } from './content/markdown'
 import type { ActionHooks, ActionProtect, ProtectionMessages } from './runtime/action'
 import type { ByteSize } from './runtime/byte-size'
 import type { Duration } from './runtime/duration'
@@ -401,6 +401,12 @@ export interface MarkdownConfig {
   highlight?: Highlighter | undefined
   // Rewrites the HTML Markdown renders for each entry, `(html, entry) => html` with `entry` the `{ file, slug, locale }`, once as the entries compile: add `rel` to links, shift headings, turn `:::note` into an admonition. It runs before headings are read and code is highlighted, and a loader's untrusted body is sanitized after it. Leave `<kay-component>` elements as they are.
   transform?: MarkdownTransform | undefined
+  // Rewrites each entry's Markdown before it is read, `(markdown, entry) => markdown`, for syntax of your own; components, headings and the rest keep working on what it gives back.
+  preprocess?: MarkdownPreprocess | undefined
+  // `:::note Title` … `:::` as an `<aside class="admonition note">` whose inside is Markdown; off unless set.
+  containers?: boolean | undefined
+  // `[^id]` references and `[^id]: text` definitions as numbered marks and a closing list with links back; off unless set.
+  footnotes?: boolean | undefined
   // Whether a heading links to its own anchor, on by default; `false` leaves the heading's text plain, with its id.
   headingLinks?: boolean | undefined
   // Words a minute an entry's `readingTime` counts at, 230 by default.

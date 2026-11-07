@@ -1719,9 +1719,11 @@ function collectionLoader(name: string): ContentLoader<unknown> | undefined
 [./content] CollectionOptions
 interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boolean>
   components?: Record<string, Component<never>> | undefined
+  containers?: boolean | undefined
   description?: string | undefined
   draft?: ((entry: Entry<(Schema & { params: []; })["static"]>) => boolean) | BooleanField<(Schema & { params: []; })["static"]> | undefined
   feed?: FeedOptions<(Schema & { params: []; })["static"], Routed> | undefined
+  footnotes?: boolean | undefined
   headingLinks?: boolean | undefined
   highlight?: Highlighter | undefined
   imageSizes?: string | undefined
@@ -1730,6 +1732,7 @@ interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boo
   migrations?: Migration[] | undefined
   modified?: DateField<(Schema & { params: []; })["static"]> | undefined
   order?: NumberField<(Schema & { params: []; })["static"]> | undefined
+  preprocess?: MarkdownPreprocess | undefined
   publishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
   readingSpeed?: number | undefined
   route?: string | undefined
@@ -1981,7 +1984,8 @@ interface LoadedEntry
 
 [./content] MarkdownError
 class MarkdownError
-  new (message: string, line: number): MarkdownError
+  new (message: string, line: number, bare?: string | undefined, cause?: unknown): MarkdownError
+  bare?: string | undefined
   code: "markdown-invalid"
   kind: string
   line: number
@@ -1990,6 +1994,9 @@ class MarkdownError
 
 [./content] markdownField
 function markdownField(options?: ElysiaStringOptions | undefined): TString
+
+[./content] MarkdownPreprocess
+type MarkdownPreprocess = (markdown: string, entry: MarkdownSource) => string | Promise<string>
 
 [./content] MarkdownSource
 interface MarkdownSource
@@ -2043,7 +2050,11 @@ interface RenderedMarkdown
 function renderMarkdown(markdown: string, options?: {
   highlight?: Highlighter | undefined;
   headingLinks?: boolean | undefined;
-  transform?: ((html: string) => Promise<string> | string) | undefined;
+  transform?: MarkdownTransform | undefined;
+  preprocess?: MarkdownPreprocess | undefined;
+  containers?: boolean | undefined;
+  footnotes?: boolean | undefined;
+  entry?: MarkdownSource | undefined;
 }): Promise<RenderedMarkdown>
 
 [./content] repositoryRoot

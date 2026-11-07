@@ -216,7 +216,7 @@ describe('the compile cache of a loader\'s bodies', () => {
   }
 
   async function made(options: Parameters<typeof loadedBodies>[1], sanitize: boolean, bodies: Record<string, string>): Promise<string[]> {
-    const cache = await loadedBodies('things', options, sanitize, false)
+    const cache = await loadedBodies('things', options, { sanitize, preview: false })
     const compiled: string[] = []
 
     for (const [slug, body] of Object.entries(bodies))
@@ -303,10 +303,10 @@ describe('the compile cache of a loader\'s bodies', () => {
 
       try {
         setContentMode({ dev: false, prebuilt: true })
-        expect((await (await loadedBodies('things', plain, false, false)).compile('a', 'x')).segments).toEqual(['<p>x</p>\n'])
+        expect((await (await loadedBodies('things', plain, { sanitize: false, preview: false })).compile('a', 'x')).segments).toEqual(['<p>x</p>\n'])
         setContentMode({ dev: false, prebuilt: false })
 
-        const preview = await loadedBodies('things', plain, false, true)
+        const preview = await loadedBodies('things', plain, { sanitize: false, preview: true })
 
         await preview.compile('a', 'x')
         await preview.save()

@@ -6,7 +6,7 @@ import type { PreviewScope } from '../runtime/preview'
 import type { Html } from '../runtime/rendered'
 import type { FeedFormat, FeedOptions } from './feed'
 import type { RawEntry } from './load'
-import type { Heading, Highlighter, MarkdownTransform, Segment } from './markdown'
+import type { Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
 import type { Carried, Migration } from './migrate'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
@@ -23,14 +23,14 @@ import { entryPath } from './entry-route'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
 import { contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
-import { countWords, MarkdownError, sanitizedHtml } from './markdown'
+import { countWords, MarkdownError, problemMessage, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
 export { blocks, collectionInfo, collectionLoader, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
 export type { FeedFormat, FeedItem, FeedOptions } from './feed'
-export type { Heading, Highlighter, MarkdownSource, MarkdownTransform, RenderedMarkdown } from './markdown'
+export type { Heading, Highlighter, MarkdownPreprocess, MarkdownSource, MarkdownTransform, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, LOADED_HTML, MarkdownError, renderMarkdown } from './markdown'
 export type { Migration } from './migrate'
 export { convertField, renameField, setField } from './migrate'
@@ -143,6 +143,12 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   highlight?: Highlighter | undefined
   // Rewrites the HTML Markdown renders for each entry, `(html, entry) => html` with `entry` the `{ file, slug, locale }`, once as the entries compile: add `rel` to links, shift headings, turn `:::note` into an admonition. It runs before headings are read and code is highlighted, and a loader's untrusted body is sanitized after it. Leave `<kay-component>` elements as they are. `kay.config.ts`'s `markdown.transform` unless set here.
   transform?: MarkdownTransform | undefined
+  // Rewrites each entry's Markdown before it is read, `(markdown, entry) => markdown`, for syntax of your own; components, headings and the rest keep working on what it gives back. `kay.config.ts`'s `markdown.preprocess` unless set here.
+  preprocess?: MarkdownPreprocess | undefined
+  // `:::note Title` … `:::` as an `<aside class="admonition note">` whose inside is Markdown; off unless set. `kay.config.ts`'s `markdown.containers` unless set here.
+  containers?: boolean | undefined
+  // `[^id]` references and `[^id]: text` definitions as numbered marks and a closing list with links back; off unless set. `kay.config.ts`'s `markdown.footnotes` unless set here.
+  footnotes?: boolean | undefined
   // Whether a heading links to itself, `kay.config.ts`'s `markdown.headingLinks` unless set here; on by default.
   headingLinks?: boolean | undefined
   // Words a minute `readingTime` counts at, `kay.config.ts`'s `markdown.readingSpeed` unless set here; 230 by default.
@@ -534,7 +540,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
   const problems: ContentProblem[] = []
   const slugs = new Set<string>()
   const entries: RawEntry[] = []
-  const bodies = await loadedBodies(loader.name, markdown, options.trusted !== true, preview, options.localized === true)
+  const bodies = await loadedBodies(loader.name, markdown, { sanitize: options.trusted !== true, preview, localized: options.localized === true })
 
   for (const [index, item] of (given as unknown[]).entries()) {
     const { slug, data, body, html } = (typeof item === 'object' && item !== null ? item : {}) as Partial<LoadedEntry>
@@ -564,7 +570,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
     }
     catch (error) {
-      problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: error instanceof Error ? error.message : String(error) })
+      problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: problemMessage(error) })
     }
   }
 

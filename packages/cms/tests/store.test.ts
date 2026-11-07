@@ -4,8 +4,10 @@ import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
-import { bodyHtml, LOADED_HTML, MarkdownError } from 'kay/content'
+import { t } from 'elysia'
+import { bodyHtml, collection as kayCollection, LOADED_HTML, MarkdownError } from 'kay/content'
 import { scratchDir } from 'kay/test'
+import { registerCollections } from '../../../src/content/edit'
 import { countEntries } from '../src/counts'
 import { fileVersion, ForgeError, SaveConflictError } from '../src/files'
 import { configure } from '../src/settings'
@@ -228,6 +230,25 @@ describe('saveEntry', () => {
     }
     finally {
       collectionList[index] = products
+    }
+  })
+
+  test('previews a body through the collection\'s transform, named as the build names its entry', async () => {
+    const seen: unknown[] = []
+    const before = registerCollections([['products', kayCollection({ name: 'catalog-rows', load: () => [] }, { schema: t.Object({}), transform: (html, entry) => {
+      seen.push(entry)
+
+      return `${html}<!-- ${entry.file} -->`
+    } })]])
+
+    try {
+      const response = await markdownApi.handle(new Request('http://site.test/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ markdown: 'Hi', collection: 'products', slug: 'mug', locale: 'fr' }) }))
+
+      expect(response.status).toBe(200)
+      expect(seen).toEqual([{ file: 'catalog-rows/fr/mug', slug: 'mug', locale: 'fr' }])
+    }
+    finally {
+      registerCollections(before)
     }
   })
 

@@ -203,7 +203,7 @@ Without a later `>`, a tag such as `<Chart stray` at the end of a body stays tex
 
 ## Highlighting code
 
-You can set `highlight`, `transform`, `headingLinks`, `readingSpeed` and `imageSizes` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
+You can set `highlight`, `transform`, `preprocess`, `containers`, `footnotes`, `headingLinks`, `readingSpeed` and `imageSizes` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
 
 ```ts
 export default defineConfig({
@@ -244,30 +244,51 @@ div(innerHTML={snippet})
 
 A link in an entry's Markdown that leaves your site opens in a new tab, as it does in a template ([Links to other sites](/essentials/templates#links-to-other-sites)).
 
-## Changing the HTML Markdown renders
+## Changing what Markdown renders
 
-Markdown has no admonitions, footnotes or link rewriting of its own. A `transform` gets the HTML an entry renders to and gives it back changed, so you add the step you need. Set it in `markdown` in `kay.config.ts` for every collection, or on one collection, where it wins.
+Three tools add what Markdown lacks, each set in `markdown` in `kay.config.ts` for every collection or on one collection, where it wins.
+
+`containers: true` turns `:::note Title` ... `:::` into an `<aside class="admonition note">` with the title in a `<p class="admonition-title">`. What sits inside stays Markdown, paragraphs, lists and code blocks included, and containers nest. An opener nothing closes, or one inside a code fence, stays text. A container must start at the line's left edge, so one inside a list or a quote is not read.
+
+`footnotes: true` turns `[^id]` into a numbered mark and `[^id]: text` into a list at the end of the entry, each item with a link back. A definition is its line and the indented lines under it, one paragraph. A reference without a definition stays as written, and a definition nothing refers to is dropped. The ids are `fn:1` and `fnref:1`, which no heading can have. Both are off by default, so existing content renders as before.
+
+A `transform` gets the HTML an entry renders to and gives it back changed, for the rest: link, image and heading rewriting. Bun's `HTMLRewriter` edits it by selector:
 
 ```ts
 export const docs = collection('content/docs', {
   schema,
-  transform: (html, entry) => html
+  transform: (html, entry) => new HTMLRewriter()
     // Links to a sibling file become links to its page.
-    .replace(/href="\.\/([^"#]*)\.md"/g, 'href="/docs/$1"')
+    .on('a', { element(link) {
+      const href = link.getAttribute('href')
+
+      if (href?.endsWith('.md'))
+        link.setAttribute('href', `/docs/${href.slice(0, -3)}`)
+    } })
+    .on('img', { element(image) {
+      image.setAttribute('loading', 'lazy')
+    } })
     // A heading one level down, as the page already has its own `h1`.
-    .replace(/<(\/?)h([1-5])/g, (_, close, level) => `<${close}h${Number(level) + 1}`)
-    // `:::note` ... `:::` as an admonition.
-    .replace(/<p>:::(\w+)\n([\s\S]*?)\n:::<\/p>/g, '<aside class="admonition $1">$2</aside>'),
+    .on('h1, h2, h3, h4, h5', { element(heading) {
+      heading.tagName = `h${Number(heading.tagName.slice(1)) + 1}`
+    } })
+    .transform(html),
 })
 ```
 
-It runs once as the entry compiles, so it costs nothing per request. It gets the HTML before the headings are read and code is highlighted: a heading it moves is listed at its new level, and the highlighter has the last word on code blocks, which it sees as `<pre><code class="language-ts">`. A heading is `<h2 id="slug"><a href="#slug">Text</a></h2>`; keep that shape. The `entry` is `{ file, slug, locale }`, the locale set for an entry of a localized collection, so a label can follow it.
+`preprocess(markdown, entry)` does the same on the source, before components are read, for syntax of your own: what it writes can be a component tag or any Markdown.
 
-A component written in the Markdown stands as a `<kay-component>` element in that HTML. Leave them as they are: a transform that drops, adds or moves one fails the entry. A transform that throws, or gives something other than text, fails it too, with an error naming the entry's file.
+Both run once as the entry compiles, so they cost nothing per request. The transform gets the HTML before the headings are read and code is highlighted: a heading it moves is listed at its new level, and the highlighter has the last word on code blocks, which it sees as `<pre><code class="language-ts">`.
 
-The HTML you write is as raw as the Markdown's own. For a collection with a `load` function, whose bodies are sanitized unless it is `trusted`, the transform runs first and the result is sanitized, so an admonition's `class` is dropped there. Links you write to your own pages get the base and the locale like any other.
+A heading is `<h2 id="slug"><a href="#slug">Text</a></h2>`; keep that shape. Both can be async. The `entry` is `{ file, slug, locale }`, with the locale set for an entry of a localized collection. `file` is the entry's path from the project root, or `collection/slug` for a loader's.
 
-Pass the same function to `renderMarkdown(text, { transform })` to render a runtime text the same way. Your CMS's preview applies the collection's transform too.
+A component written in the Markdown stands as a `<kay-component>` element in the transform's HTML. Leave them as they are: a transform that drops, adds or reorders one fails the entry. A hook that throws, or gives something other than text, fails it too, with an error naming the entry's file, and the error it threw as its `cause`.
+
+The HTML you write is as raw as the Markdown's own. For a collection with a `load` function, whose bodies are sanitized unless it is `trusted`, the hooks run first and the result is sanitized, so the `class` of an admonition is dropped there.
+
+An entry a loader gives as `html`, not `body`, skips them. A link you write to your own pages gets the base, as an authored one does. The CMS preview renders with the collection's hooks and switches too, though it sanitizes with its own list of what to keep, so a `class` may differ from the page's.
+
+`renderMarkdown(text, { transform, preprocess, containers, footnotes })` renders a runtime text the same way, and takes the entry as `entry`, `{ file: 'renderMarkdown', slug: '' }` by default.
 
 ## Entry URLs
 
@@ -463,9 +484,11 @@ export const news = collection({
 
 ### Caches
 
-Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter or a `transform`, and a change to the transform's own source does the same. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
+Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module or a JSON file the content config imports recompiles every entry when the collection has a highlighter, a `transform` or a `preprocess`, and so does a change to the hook's own source, to the switches, and, for a hook, to the lockfile, so a dependency upgrade shows.
 
-A highlighter whose output changes with no change to its source needs that folder cleared. That is a new theme passed in, or a `.kay` or JSON file it reads. Only `.ts` and `.js` modules are watched.
+A hook given as a bound function is refused, as its source cannot be read: write an arrow function calling it. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
+
+A highlighter, a `transform` or a `preprocess` whose output changes with no change to its source needs that folder cleared. That includes one reading `process.env` or a file at run time. That is a new theme passed in, or a `.kay` or other file it reads. Only `.ts`, `.js` and `.json` files are watched.
 
 `kay build` compiles every collection into `.kay/client/content`, and production reads that instead of the files.
 

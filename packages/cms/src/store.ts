@@ -310,7 +310,7 @@ async function writeEntry(entry: CmsDraftEntry, { create = false, version, requi
 
   // A loader's body is sanitized on the page unless the collection is `trusted`, so nothing in it runs as the site and there is nothing to refuse.
   if (entry.body !== undefined && !bodyKept && (collection.kind === 'folder' || collection.trusted === true) && !settings().rawHtml.has(collection.name)) {
-    const script = await scriptInBody(entry.body)
+    const script = await scriptInBody(entry.body, { collection: entry.collection, slug: entry.slug, locale: entry.locale })
 
     if (script !== undefined)
       return refused(entry, wording('cms.store.script', 'The text holds {script}, which would run as the site: write it as Markdown, or list {collection} in cms({ rawHtml })', { script, collection: collection.name }), 'body')

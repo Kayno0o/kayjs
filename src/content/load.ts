@@ -1,6 +1,6 @@
 import type { Mode } from '../project'
 import type { LinkedImage } from './images'
-import type { CompiledMarkdown, Heading, Highlighter, MarkdownTransform, Segment } from './markdown'
+import type { CompiledMarkdown, Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
@@ -14,7 +14,7 @@ import { modeOf, cacheDir as projectCache } from '../project'
 import { imageColors } from '../server/image-color'
 import { projectSource } from '../server/source'
 import { linkImages, statOf } from './images'
-import { boundTransform, compileMarkdown, MarkdownError, markdownSource, splitFrontmatter } from './markdown'
+import { compileMarkdown, MarkdownError, markdownHooks, markdownSource, problemMessage, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
 
 type ContentMode = Pick<Mode, 'dev' | 'prebuilt'>
@@ -76,6 +76,11 @@ export interface MarkdownSettings {
   readingSpeed?: number | undefined
   imageSizes?: string | undefined
   transform?: MarkdownTransform | undefined
+  // Rewrites an entry's Markdown before it is read, `(markdown, entry) => markdown`.
+  preprocess?: MarkdownPreprocess | undefined
+  // The built-in `:::kind` admonitions and `[^id]` footnotes, off unless set.
+  containers?: boolean | undefined
+  footnotes?: boolean | undefined
 }
 
 export const DEFAULT_READING_SPEED = 230
@@ -90,13 +95,21 @@ export function setMarkdownDefaults(settings: MarkdownSettings | undefined): voi
 }
 
 // A collection's Markdown settings over the config's.
-export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number, imageSizes: string | undefined, transform: MarkdownTransform | undefined } {
+export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number, imageSizes: string | undefined, transform: MarkdownTransform | undefined, preprocess: MarkdownPreprocess | undefined, containers: boolean, footnotes: boolean } {
   const readingSpeed = options.readingSpeed ?? defaults.readingSpeed ?? DEFAULT_READING_SPEED
 
   if (!(Number.isFinite(readingSpeed) && readingSpeed > 0))
     throw new KayError('content-api-misuse', `kay: readingSpeed is ${readingSpeed}: it is a number of words a minute above 0`)
 
-  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed, imageSizes: options.imageSizes ?? defaults.imageSizes, transform: options.transform ?? defaults.transform }
+  const transform = options.transform ?? defaults.transform
+  const preprocess = options.preprocess ?? defaults.preprocess
+
+  for (const [name, hook] of [['transform', transform], ['preprocess', preprocess]] as const) {
+    if (hook !== undefined && Function.prototype.toString.call(hook).includes('[native code]'))
+      throw new KayError('config-invalid', `kay: markdown.${name} is a bound or native function, whose source the entry cache cannot read to tell when it changes; write an arrow function calling it`)
+  }
+
+  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed, imageSizes: options.imageSizes ?? defaults.imageSizes, transform, preprocess, containers: options.containers ?? defaults.containers ?? false, footnotes: options.footnotes ?? defaults.footnotes ?? false }
 }
 
 let place: { root: string, base: string, config?: string | undefined } | undefined
@@ -186,7 +199,7 @@ export interface LoadOptions extends MarkdownSettings {
 }
 
 // The entries `kay build` compiled ahead when there are some, read from their files otherwise.
-export async function loadEntries(dir: string, { highlight, live = false, localized = false, headingLinks = true, transform }: LoadOptions = {}): Promise<RawEntry[]> {
+export async function loadEntries(dir: string, { live = false, ...markdown }: LoadOptions = {}): Promise<RawEntry[]> {
   if (!live) {
     const built = await builtEntries(dir)
 
@@ -194,7 +207,7 @@ export async function loadEntries(dir: string, { highlight, live = false, locali
       return built
   }
 
-  return compileDirectory(dir, highlight, localized, headingLinks, transform)
+  return compileDirectory(dir, markdown)
 }
 
 export function manifestFile(base: string, dir: string): string {
@@ -219,13 +232,12 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   return undefined
 }
 
-async function compileDirectory(dir: string, highlight: Highlighter | undefined, localized: boolean, headingLinks: boolean, transform: MarkdownTransform | undefined): Promise<RawEntry[]> {
+async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>): Promise<RawEntry[]> {
+  const { localized = false, headingLinks = true } = markdown
   const root = rootOf()
   const absolute = collectionFolder(dir)
   const cacheDir = projectCache(root, 'content')
-  // Bun's Markdown output, the highlighter's and the transform's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
-  const imported = highlight === undefined && transform === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
-  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${compilerFingerprint()}:${highlight?.toString() ?? ''}:${transform?.toString() ?? ''}:${imported}`).toString(36)
+  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${compilerFingerprint()}:${await markdownSalt(root, markdown)}`).toString(36)
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
@@ -273,14 +285,14 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
       }
 
       try {
-        const entry = await compileEntry(name, file, source, highlight, transform, { path, folder: absolute, root, localized, headingLinks })
+        const entry = await compileEntry(name, file, source, { path, folder: absolute, root, localized, markdown })
 
         await writeAtomically(cacheFile, JSON.stringify({ salt, stamp, at: Date.now(), hash, entry } satisfies CachedEntry))
 
         return entry
       }
       catch (error) {
-        problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: error instanceof Error ? error.message : String(error) })
+        problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: problemMessage(error) })
 
         return undefined
       }
@@ -315,16 +327,15 @@ export interface LoadedBodies {
 
 // A loader collection's Markdown bodies, compiled as a folder's entries are and kept in one file per collection under `.kay/cache/content`, while the build is not prebuilt and no draft preview is read.
 // A body is reused while its source, the collection's Markdown settings, the highlighter with the modules the config imports, kay's compiler and Bun's version are as they were; a fresh compile is the fallback for all else.
-export async function loadedBodies(name: string, markdown: { highlight: Highlighter | undefined, headingLinks: boolean, transform?: MarkdownTransform | undefined }, sanitize: boolean, preview: boolean, localized = false): Promise<LoadedBodies> {
-  const compiling = async (slug: string, body: string) => compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize, boundTransform(markdown.transform, markdownSource(`${name}/${slug}`, slug, localized)))
+export async function loadedBodies(name: string, markdown: MarkdownSettings, { sanitize, preview, localized = false }: { sanitize: boolean, preview: boolean, localized?: boolean }): Promise<LoadedBodies> {
+  const compiling = async (slug: string, body: string) => compileMarkdown(body, 1, { highlight: markdown.highlight, headingLinks: markdown.headingLinks, sanitize, ...markdownHooks(markdown, markdownSource(`${name}/${slug}`, slug, localized)) })
 
   if (contentMode().prebuilt || preview)
     return { compile: compiling, save: () => undefined }
 
   const root = rootOf()
   const cacheDir = projectCache(root, 'content')
-  const imported = markdown.highlight === undefined && markdown.transform === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
-  const key = Bun.hash(`${CACHE_VERSION}:${markdown.headingLinks}:${sanitize}:${localized}:${compilerFingerprint()}:${markdown.highlight?.toString() ?? ''}:${markdown.transform?.toString() ?? ''}:${imported}`).toString(36)
+  const key = Bun.hash(`${CACHE_VERSION}:${markdown.headingLinks}:${sanitize}:${localized}:${compilerFingerprint()}:${await markdownSalt(root, markdown)}`).toString(36)
   const slot = { file: join(cacheDir, `${Bun.hash(name).toString(36)}.loaded.json`), key }
   const known = new Map(Object.entries(await readCacheEntry<LoadedCache>(slot) ?? {}))
   const kept = new Map<string, LoadedCache[string]>()
@@ -421,6 +432,25 @@ export function draftCommentLine(name: string, head: string): number | undefined
   return DRAFT_COMMENT_LINE.test(first ?? '') ? 1 : undefined
 }
 
+// What an entry's cache key holds of the Markdown settings: the source of the highlighter and the hooks, the switches, and what they may draw on: the project modules and JSON files the config imports, and the lockfile for a hook, which may call a dependency.
+// A function whose output changes with none of them, such as one reading `process.env` or a file at run time, needs the cache cleared.
+async function lockfileText(root: string): Promise<string> {
+  try {
+    return await Bun.file(join(root, 'bun.lock')).text()
+  }
+  catch {
+    return ''
+  }
+}
+
+async function markdownSalt(root: string, { highlight, transform, preprocess, containers, footnotes }: MarkdownSettings): Promise<string> {
+  const hooked = transform !== undefined || preprocess !== undefined
+  const imported = highlight === undefined && !hooked ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
+  const lockfile = hooked ? Bun.hash(await lockfileText(root)).toString(36) : ''
+
+  return `${highlight?.toString() ?? ''}:${transform?.toString() ?? ''}:${preprocess?.toString() ?? ''}:${containers === true}:${footnotes === true}:${imported}:${lockfile}`
+}
+
 // A hash of the TypeScript and JavaScript modules of the project the content config imports, however deep, and the config itself: a highlighter imports what it draws on from them, and its own source shows none of it.
 async function importedSource(root: string, configs: (string | undefined)[]): Promise<string> {
   const project = root + sep
@@ -436,11 +466,14 @@ async function importedSource(root: string, configs: (string | undefined)[]): Pr
 
       hashes.set(file, Bun.hash(source).toString(36))
 
+      if (file.endsWith('.json'))
+        continue
+
       // Scanned here rather than through build/libraries, which pulls the .kay parser into the production server.
       for (const { path: specifier } of transpilerFor(scriptLoader(file)).scanImports(source)) {
         const target = resolveFrom(specifier, file)
 
-        if (target !== undefined && target.startsWith(project) && !target.includes(`${sep}node_modules${sep}`) && SCRIPT_MODULE.test(target))
+        if (target !== undefined && target.startsWith(project) && !target.includes(`${sep}node_modules${sep}`) && (SCRIPT_MODULE.test(target) || target.endsWith('.json')))
           queue.push(target)
       }
     }
@@ -530,7 +563,7 @@ function fieldsOf(source: string, name: string, body: string | undefined, frontm
   return frontmatter === undefined ? {} : fieldLines(frontmatter, false, 1)
 }
 
-async function compileEntry(name: string, file: string, source: string, highlight: Highlighter | undefined, transform: MarkdownTransform | undefined, where: { path: string, folder: string, root: string, localized: boolean, headingLinks: boolean }): Promise<RawEntry> {
+async function compileEntry(name: string, file: string, source: string, where: { path: string, folder: string, root: string, localized: boolean, markdown: MarkdownSettings }): Promise<RawEntry> {
   const { data, body, bodyLine, frontmatter } = parseEntry(name, source)
   const lines = fieldsOf(source, name, body, frontmatter)
   const slug = entrySlug(name, data, where.localized, lines.slug ?? 1)
@@ -538,7 +571,8 @@ async function compileEntry(name: string, file: string, source: string, highligh
   if (body === undefined)
     return { slug, file, data, lines }
 
-  const compiled = await compileMarkdown(body, bodyLine!, highlight, where.headingLinks, false, boundTransform(transform, markdownSource(file, slug, where.localized)))
+  const { markdown } = where
+  const compiled = await compileMarkdown(body, bodyLine!, { highlight: markdown.highlight, headingLinks: markdown.headingLinks, ...markdownHooks(markdown, markdownSource(file, slug, where.localized)) })
   const { segments, images, missing, unreadable } = await linkImages(compiled.segments, where.path, where.folder, where.root)
 
   return {

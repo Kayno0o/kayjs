@@ -505,9 +505,9 @@ describe('Markdown settings', () => {
     const highlight = (code: string) => `<pre class="mine">${code}</pre>`
 
     try {
-      expect(markdownOf({})).toEqual({ highlight: undefined, headingLinks: true, readingSpeed: 230, imageSizes: undefined, transform: undefined })
+      expect(markdownOf({})).toEqual({ highlight: undefined, headingLinks: true, readingSpeed: 230, imageSizes: undefined, transform: undefined, preprocess: undefined, containers: false, footnotes: false })
       setMarkdownDefaults({ highlight, headingLinks: false, readingSpeed: 460 })
-      expect(markdownOf({})).toEqual({ highlight, headingLinks: false, readingSpeed: 460, imageSizes: undefined, transform: undefined })
+      expect(markdownOf({})).toEqual({ highlight, headingLinks: false, readingSpeed: 460, imageSizes: undefined, transform: undefined, preprocess: undefined, containers: false, footnotes: false })
       expect(markdownOf({ headingLinks: true, readingSpeed: 100 })).toMatchObject({ headingLinks: true, readingSpeed: 100 })
 
       const [fromConfig] = await collection('posts', { schema }).all()
@@ -543,7 +543,7 @@ describe('Markdown settings', () => {
   it('leave headings linked to themselves unless headingLinks is false', async () => {
     expect((await compileMarkdown('## Part\n', 1)).segments[0]).toContain('<h2 id="part"><a href="#part">Part</a></h2>')
 
-    const plain = await compileMarkdown('## Part\n', 1, undefined, false)
+    const plain = await compileMarkdown('## Part\n', 1, { headingLinks: false })
 
     expect(plain.segments[0]).toContain('<h2 id="part">Part</h2>')
     expect(plain.headings).toEqual([{ depth: 2, id: 'part', text: 'Part' }])
@@ -553,7 +553,7 @@ describe('Markdown settings', () => {
     const body = '## Part\n\n<h2 id="raw">Raw</h2>\n\n### Sub\n'
 
     for (const links of [true, false]) {
-      const { segments, headings } = await compileMarkdown(body, 1, undefined, links)
+      const { segments, headings } = await compileMarkdown(body, 1, { headingLinks: links })
 
       expect(headings).toEqual([{ depth: 2, id: 'part', text: 'Part' }, { depth: 3, id: 'sub', text: 'Sub' }])
       expect(segments[0]).toContain('<h2 id="raw">Raw</h2>')
@@ -565,7 +565,7 @@ describe('Markdown settings', () => {
     const body = '## Part\n\n<h2 id="x"><a href="#y">Raw</a></h2>\n'
 
     for (const links of [true, false]) {
-      const { segments, headings } = await compileMarkdown(body, 1, undefined, links)
+      const { segments, headings } = await compileMarkdown(body, 1, { headingLinks: links })
 
       expect(headings).toEqual([{ depth: 2, id: 'part', text: 'Part' }])
       expect(segments[0]).toContain('<h2 id="x"><a href="#y">Raw</a></h2>')

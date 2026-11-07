@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { t } from 'elysia'
+import { collection } from 'kay/content'
+import { registerCollections } from '../../../src/content/edit'
 import { bodyHtml, MarkdownError } from '../src/kay/content'
 import { scriptIn, scriptInBody } from '../src/unsafe'
 
@@ -76,5 +79,20 @@ describe('scriptInBody', () => {
     expect(await scriptInBody('<Callout>\n\n<!-- </Callout> <script>alert(1)</script> -->')).toBe('a component inside a tag')
     expect(await scriptInBody('<kay-body-end>\n\n<div onmouseover=alert(1) title="x')).toBe('a tag left open')
     expect(await scriptInBody('<Callout title="a"><script>alert(1)</script></Callout>')).toBe('a <script> tag')
+  })
+
+  test('reads what the collection\'s transform builds from the editor\'s text, when given the entry', async () => {
+    const embed = (html: string) => html.replace('{{embed}}', '<iframe src="https://evil.example"></iframe>')
+    const before = registerCollections([['notes', collection({ name: 'notes', load: () => [] }, { schema: t.Object({}), transform: embed, trusted: true })], ['scripted', collection({ name: 'scripted', load: () => [] }, { schema: t.Object({}), transform: html => html.replace('{{run}}', '<script>run()</script>') })]])
+
+    try {
+      expect(await scriptInBody('x {{embed}}')).toBeUndefined()
+      expect(await scriptInBody('x {{embed}}', { collection: 'notes', slug: 'a' })).toBe('a <iframe> tag')
+      expect(await scriptInBody('x {{run}}', { collection: 'scripted', slug: 'a', locale: 'fr' })).toBe('a <script> tag')
+      expect(await scriptInBody('x {{run}}', { collection: 'notes', slug: 'a' })).toBeUndefined()
+    }
+    finally {
+      registerCollections(before)
+    }
   })
 })

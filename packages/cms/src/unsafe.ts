@@ -15,11 +15,11 @@ const SCRIPT_URL = /^(?:javascript|vbscript|data):(?!image\/(?:png|jpe?g|gif|web
 
 // What of a Markdown body would run as the site once kay renders it, such as `<script>` or an `onclick` attribute, or undefined when nothing does: read off the HTML kay puts on the page, so components drop out exactly as kay takes them.
 // A body kay cannot read is left to kay's own save, which says why.
-export async function scriptInBody(body: string): Promise<string | undefined> {
+export async function scriptInBody(body: string, entry: { collection?: string | undefined, slug?: string | undefined, locale?: string | undefined } = {}): Promise<string | undefined> {
   let html: string
 
   try {
-    html = await bodyHtml(body)
+    html = await bodyHtml(body, entry)
   }
   catch (error) {
     if (error instanceof MarkdownError)
