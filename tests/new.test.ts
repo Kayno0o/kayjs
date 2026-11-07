@@ -167,7 +167,7 @@ afterAll(async () => {
 
   if (serverPreset)
     await rm(join((await serverPreset).dir, '..'), { recursive: true, force: true })
-})
+}, 60_000)
 
 const LIBRARIES = ['kayjs-auth', 'kayjs-mail', 'kayjs-ui']
 
