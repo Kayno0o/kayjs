@@ -36,6 +36,10 @@ export function provider(handle: (request: Request, seen: Seen) => Response | Pr
   const server = Bun.serve({
     port: 0,
     async fetch(request) {
+      // A probe or a request from another test that reached a reused port is no call of this test's: it is answered and not recorded.
+      if (request.method !== 'POST')
+        return new Response(null, { status: 405 })
+
       const entry = { url: new URL(request.url).pathname, headers: request.headers, body: await request.json() as Record<string, unknown> }
 
       seen.push(entry)

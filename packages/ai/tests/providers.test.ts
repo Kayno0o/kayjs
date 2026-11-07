@@ -194,11 +194,8 @@ describe.each([
   })
 
   it('reports an unreachable server as a network error', async () => {
-    const server = provider(() => new Response())
-
-    await server.stop()
-
-    expect(await failure(asking(server.url))).toMatchObject({ kind: 'network' })
+    // Port 1 is privileged and unassigned, so no server of a parallel test can take it, as it could a stopped server's port.
+    expect(await failure(asking('http://127.0.0.1:1'))).toMatchObject({ kind: 'network' })
   })
 
   it('fails a stream cut mid-reply with what came before it', async () => {
