@@ -1,12 +1,12 @@
 import type { ContentLoader } from 'kay/content'
-import type { SaveEvent } from './settings'
+import type { ActivityVerb, SaveEvent } from './settings'
 import { hiddenOf } from './hidden'
 import { log } from './log'
 
-// One thing an editor did: the verb is a `SaveEvent`'s.
+// One thing an editor did: the verb is a `SaveEvent`'s, or `upload`, whose slug is the storage key.
 export interface Activity {
   at: number
-  verb: SaveEvent['verb']
+  verb: ActivityVerb
   collection: string
   slug: string
   locale?: string | undefined
@@ -59,7 +59,7 @@ export function isEvent(data: unknown): data is Row {
 }
 
 // Keeps what an editor's change went through, in a hidden collection beside the entries: one small row per event, so two saves at once never write over each other. Never throws, as the change is written.
-export async function recordActivity(event: SaveEvent): Promise<void> {
+export async function recordActivity(event: Pick<SaveEvent, 'collection' | 'slug' | 'locale' | 'from' | 'author'> & { verb: ActivityVerb }): Promise<void> {
   // A reorder is a position, not something an editor did to an entry.
   if (event.verb === 'move')
     return

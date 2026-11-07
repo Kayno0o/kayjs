@@ -1,6 +1,8 @@
 import { s } from 'kay'
+import { dispatch } from 'kay/library'
 import { api, files, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
+import { recordActivity } from '../activity'
 import { authors } from '../authors'
 import { collections } from '../kay/content'
 import { MEDIA_FOLDER, mediaIndex, movedKeys, renameUpload, storeUpload } from '../media'
@@ -8,13 +10,26 @@ import { deleteUnusedUploads } from '../orphans'
 import { settings } from '../settings'
 import { collectionNamed, UnknownCollectionError } from '../store'
 import { emptyFile, sizeOfPath, tooLarge } from '../upload-text'
-import { uploadFolder, uploadFolders, uploadMaxSize, uploadRefusal, uploadRules } from '../uploads'
+import { askBeforeUpload, uploadFolder, uploadFolders, uploadMaxSize, uploadRefusal, uploadRules } from '../uploads'
 
 // The most uploads a picker lists, the newest first.
 const PICKABLE = 200
 
 async function ownFolders(): Promise<Set<string>> {
   return new Set([MEDIA_FOLDER, ...(await collections({ counts: false })).map(collection => uploadFolder(collection.name))])
+}
+
+// Why a file is not taken: empty, over the most an upload may weigh, or not a type `uploads` lists.
+async function problemWith(file: File, maxSize: number): Promise<{ status: 400 | 413 | 415, message: string } | undefined> {
+  if (file.size === 0)
+    return { status: 400, message: emptyFile(file.name) }
+
+  if (file.size > maxSize)
+    return { status: 413, message: tooLarge(file.name, file.size, maxSize) }
+
+  const refusal = await uploadRefusal(file)
+
+  return refusal === undefined ? undefined : { status: 415, message: refusal }
 }
 
 // Stores an upload public, in the folder every collection shares and named by its hash, and answers the path a page renders it from, which the field keeps, and the size of an image.
@@ -36,22 +51,33 @@ export default api({ maxSize: uploadMaxSize })
   .post('/:collection', async ({ params, body, status, request }) => {
     await collectionNamed(params.collection)
 
-    if (body.file.size === 0)
-      return status(400, emptyFile(body.file.name))
-
+    const author = authors.get(request)
     // Authoritative: the editor checks the size too, but a client that skips it reaches here.
     const { maxSize } = settings()
 
-    if (body.file.size > maxSize)
-      return status(413, tooLarge(body.file.name, body.file.size, maxSize))
+    const refusedSent = await problemWith(body.file, maxSize)
 
-    const refusal = await uploadRefusal(body.file)
+    if (refusedSent !== undefined)
+      return status(refusedSent.status, refusedSent.message)
 
-    if (refusal !== undefined)
-      return status(415, refusal)
+    const asked = await askBeforeUpload(body.file, { collection: params.collection, author })
 
-    const key = await storeUpload(body.file, authors.get(request)?.name)
+    if ('refused' in asked)
+      // The hook's own status, which the typed answer of the route cannot list.
+      return status(asked.refused.status as 403, asked.refused.message)
+
+    // What `beforeUpload` gave back is held to the same rules as what was sent.
+    const refusedChanged = asked.file === body.file ? undefined : await problemWith(asked.file, maxSize)
+
+    if (refusedChanged !== undefined)
+      return status(refusedChanged.status, refusedChanged.message)
+
+    const { file } = asked
+    const key = await storeUpload(file, author?.name)
     const path = files.url(key)
+
+    await recordActivity({ collection: params.collection, slug: key, verb: 'upload', author })
+    await dispatch('cms.onUpload', [settings().onUpload], { collection: params.collection, key, path, name: file.name, type: file.type, size: file.size, ...author !== undefined && { author } })
 
     return { path, ...sizeOfPath(path) }
   }, { body: s.Object({ file: s.File() }) })

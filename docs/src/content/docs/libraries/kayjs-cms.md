@@ -691,9 +691,31 @@ The Newsletter button opens a preview of the mail. Send me a test mails it to th
 
 <ReadMore href="/llms/kayjs-cms-newsletter">The routes, the errors and the texts of the newsletter button.</ReadMore>
 
+### Before a save
+
+`cms({ beforeSave })` runs before every save, publish, unpublish, duplicate, restore, delete and rename, so you can stamp a field, compute one, or refuse a change the schema cannot judge. It gets the collection, the slug, the locale, what is being done (`verb`), the `data` and `body` about to be written, the entry as stored now (`previous`, none for a new one), the author and kay's hook `context`. It returns nothing, `{ data }` to write that instead, or refuses.
+
+```ts
+import { refuse } from 'kay'
+
+cms({
+  guard,
+  beforeSave: ({ verb, data, author }) => {
+    if (verb === 'publish' && !data.summary)
+      refuse('Write a summary before publishing', { errors: { summary: 'required' } })
+
+    return { data: { ...data, updatedBy: author?.name } }
+  },
+})
+```
+
+A refusal is shown in the entry form like a schema error: the message on the entry and each `errors` key on its field. The entries API answers it with `error.status` 422, or 403 for `false`. `data` replaces the entry's data whole, so spread the one you got. A `delete` and a `rename` can only be refused. Any other error thrown refuses with a 500 and is reported with the source `cms.beforeSave`.
+
+The order for one write is: the roles and `can`, `fourEyes` for an approval, `beforeSave`, then the checks of the entry on what `beforeSave` left (its schema, references, a script in the body), then the version check, which answers 409 when someone saved first. A reorder is not asked.
+
 ### After a save
 
-`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one.
+`cms({ onSave })` runs after every save, publish, duplicate, move and delete that went through. It gets the collection, the slug, the locale, what was done (`add`, `update`, `publish`, `unpublish`, `move`, `duplicate`, `rename` or `delete`), the author and, for a folder entry, the commit. A `rename` gives the new slug, and `from` is the old one. It also gets the entry as written (`data`, and `body`) and the one stored before (`previous`).
 
 ```ts
 cms({
@@ -704,7 +726,26 @@ cms({
 })
 ```
 
-It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is logged and the save stays. A hook still running after 10 seconds is logged and the save answers without it.
+It runs in the server that handled the save, before the editor gets the answer, so keep it short. If it throws, the error is reported with the source `cms.onSave` and the save stays. A hook still running after 10 seconds is reported and the save answers without it.
+
+### Before and after an upload
+
+`cms({ beforeUpload })` runs on each file an editor sends, once its size and type are accepted and before it is stored. It gets `{ collection, name, type, size, bytes, author }`. It can scan the bytes and refuse, or return `{ bytes, name, type }` to store a resized image or a renamed file, which is checked against `uploads` and `maxSize` again.
+
+```ts
+cms({
+  guard,
+  beforeUpload: async ({ bytes }) => {
+    if (await infected(bytes))
+      refuse('The file was refused by the scanner', { status: 451 })
+  },
+  onUpload: async ({ key, path }) => {
+    await purgeCdn(path)
+  },
+})
+```
+
+A refusal answers the upload with its status (403 for `false`) and stores nothing. `cms({ onUpload })` runs after the file is stored with `{ collection, key, path, name, type, size, author }`; a throw is reported with the source `cms.onUpload` and the file stays. The activity log lists each upload as `Uploaded`.
 
 ## Where files are saved
 

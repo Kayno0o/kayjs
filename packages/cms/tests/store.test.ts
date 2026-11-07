@@ -949,11 +949,11 @@ describe('cms({ onSave })', () => {
     await saveEntry({ collection: 'posts', slug: 'new', data: { title: 'New' }, locale: 'fr' }, { create: true })
     await publishEntry({ collection: 'posts', slug: 'hello' })
     await deleteEntry({ collection: 'posts', slug: 'hello' })
-    expect(events).toEqual([
-      { collection: 'posts', slug: 'hello', verb: 'update', author, commit: { sha: 'abc' } },
-      { collection: 'posts', slug: 'new', locale: 'fr', verb: 'add', commit: { sha: 'abc' } },
-      { collection: 'posts', slug: 'hello', verb: 'publish', commit: { sha: 'abc' } },
-      { collection: 'posts', slug: 'hello', verb: 'delete', commit: { sha: 'abc' } },
+    expect(events).toMatchObject([
+      { collection: 'posts', slug: 'hello', verb: 'update', author, commit: { sha: 'abc' }, data: { title: 'Hi' } },
+      { collection: 'posts', slug: 'new', locale: 'fr', verb: 'add', commit: { sha: 'abc' }, data: { title: 'New' } },
+      { collection: 'posts', slug: 'hello', verb: 'publish', commit: { sha: 'abc' }, data: { title: 'Hello', draft: false }, previous: { data: { title: 'Hello', draft: true } } },
+      { collection: 'posts', slug: 'hello', verb: 'delete', commit: { sha: 'abc' }, previous: { data: { title: 'Hello', draft: true } } },
     ])
   })
 
@@ -962,12 +962,13 @@ describe('cms({ onSave })', () => {
     await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' } })
     await deleteEntry({ collection: 'products', slug: 'mug' })
     await moveEntry({ collection: 'catalog', slug: 'b' }, 'up')
-    expect(events).toEqual([
-      { collection: 'products', slug: 'mug', verb: 'update' },
+    expect(events).toMatchObject([
+      { collection: 'products', slug: 'mug', verb: 'update', data: { name: 'Mug' } },
       { collection: 'products', slug: 'mug', verb: 'delete' },
       { collection: 'catalog', slug: 'b', verb: 'move' },
       { collection: 'catalog', slug: 'a', verb: 'move' },
     ])
+    expect(events[2]).not.toHaveProperty('data')
   })
 
   test('hears nothing of a save that was refused, and a throw does not undo the save', async () => {

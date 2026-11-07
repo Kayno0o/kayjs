@@ -1,6 +1,38 @@
 [.] Action
 type Action = CmsAction
 
+[.] BeforeSaveChange
+interface BeforeSaveChange
+  body: string
+  data: Record<string, unknown>
+
+[.] BeforeSaveEvent
+interface BeforeSaveEvent
+  author?: Identity | undefined
+  body?: string | undefined
+  collection: string
+  data: Record<string, unknown>
+  from?: string | undefined
+  locale?: string | undefined
+  previous?: EntryState | undefined
+  slug: string
+  verb: "add" | "delete" | "duplicate" | "publish" | "rename" | "restore" | "unpublish" | "update"
+
+[.] BeforeUploadChange
+interface BeforeUploadChange
+  bytes: ArrayBuffer | Uint8Array<ArrayBuffer>
+  name: string
+  type: string
+
+[.] BeforeUploadEvent
+interface BeforeUploadEvent
+  author?: Identity | undefined
+  bytes: Uint8Array<ArrayBuffer>
+  collection: string
+  name: string
+  size: number
+  type: string
+
 [.] BODY
 const BODY: typeof BODY
 
@@ -72,6 +104,8 @@ function cmsDrafts({
 [.] CmsOptions
 interface CmsOptions
   author?: ((ctx: GuardContext) => Identity | Promise<Identity | undefined> | undefined) | undefined
+  beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
+  beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
   can?: ((question: CanQuestion) => Promise<boolean> | boolean) | undefined
   collections?: Record<string, GivenLayout> | undefined
   files?: FileSaver | undefined
@@ -84,7 +118,8 @@ interface CmsOptions
 }
   member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
   newsletter?: Record<string, NewsletterOptions> | undefined
-  onSave?: ((event: SaveEvent) => Promise<void> | void) | undefined
+  onSave?: Hook<SaveEvent> | undefined
+  onUpload?: Hook<UploadEvent> | undefined
   pageLink?: false | undefined
   pageSize?: number | undefined
   prefix?: string | undefined
@@ -222,6 +257,11 @@ interface EntryScreen
   entry: StoredEntry | undefined
   prefix: string
   review?: ReviewView | undefined
+
+[.] EntryState
+interface EntryState
+  body?: string | undefined
+  data: Record<string, unknown>
 
 [.] eraseHistory
 function eraseHistory(ref: EntryRef): Promise<number>
@@ -473,10 +513,13 @@ class SaveConflictError
 [.] SaveEvent
 interface SaveEvent
   author?: Identity | undefined
+  body?: string | undefined
   collection: string
   commit?: Commit | undefined
+  data?: Record<string, unknown> | undefined
   from?: string | undefined
   locale?: string | undefined
+  previous?: EntryState | undefined
   slug: string
   verb: "add" | "delete" | "duplicate" | "move" | "publish" | "rename" | "restore" | "unpublish" | "update"
 
@@ -492,6 +535,16 @@ interface Settings
 [.] StoredEntry
 interface StoredEntry extends SourceEntry
   version?: string | undefined
+
+[.] UploadEvent
+interface UploadEvent
+  author?: Identity | undefined
+  collection: string
+  key: string
+  name: string
+  path: string
+  size: number
+  type: string
 
 [.] UploadOptions
 interface UploadOptions

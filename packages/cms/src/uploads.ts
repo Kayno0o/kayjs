@@ -1,3 +1,6 @@
+import type { ErrorShape } from 'kay/library'
+import type { Identity } from './files'
+import { decide } from 'kay/library'
 import { holdsType, SNIFFED_BYTES, typeOfName } from 'kay/server'
 import { wording } from 'kay/words'
 import { MEDIA_FOLDER } from './media'
@@ -33,6 +36,28 @@ export async function uploadRefusal(file: File): Promise<string | undefined> {
     return wording('cms.upload.refused', '{name} is {type}, which uploads here do not take: {accepted}', { name, type, accepted: uploads.join(', ') })
 
   return holdsType(await file.slice(0, SNIFFED_BYTES).bytes(), type) ? undefined : wording('cms.upload.notReal', '{name} is not a real {type}', { name, type })
+}
+
+// Asks `cms({ beforeUpload })` about a file whose size and type are accepted: the file to store, which is the same one when the hook changed nothing, or why it was refused.
+export async function askBeforeUpload(file: File, { collection, author }: { collection: string, author: Identity | undefined }): Promise<{ file: File } | { refused: ErrorShape }> {
+  const { beforeUpload } = settings()
+
+  if (beforeUpload === undefined)
+    return { file }
+
+  const name = file.name
+  const type = file.type
+  const answer = await decide('cms.beforeUpload', [beforeUpload], { collection, name, type, size: file.size, bytes: await file.bytes(), ...author !== undefined && { author } })
+
+  if ('refused' in answer)
+    return answer
+
+  const { bytes, name: renamed, type: retyped } = answer.change
+
+  if (bytes === undefined && renamed === undefined && retyped === undefined)
+    return { file }
+
+  return { file: new File([bytes ?? file], renamed ?? name, { type: retyped ?? type }) }
 }
 
 // What the pickers offer, as `accept` attributes: every type `uploads` takes, and for an image field the image ones, else all.

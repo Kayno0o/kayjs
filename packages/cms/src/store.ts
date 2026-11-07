@@ -2,7 +2,7 @@ import type { ErrorShape } from 'kay/library'
 import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CmsDraftEntry, CollectionInfo, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
-import { within } from '@kaynooo/utils/promise'
+
 import { KayError, redirectMovedPage, RedirectRefusedError } from 'kay/library'
 import { previewUrl } from 'kay/server'
 import { wording } from 'kay/words'
@@ -19,6 +19,7 @@ import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { missingReferences, pointReferences, referrersWith, UnreadReferrersError } from './references'
 import { forgetReview, moveReview, readReview, reviewable, settleReview } from './review'
 import { moveRevisions, openTrail } from './revisions'
+import { askBeforeSave, hooked, previousOf, tellOnSave } from './save-hooks'
 import { settings } from './settings'
 import { pairKey } from './translations'
 import { discardTrashed, keepDeleted } from './trash'
@@ -32,7 +33,7 @@ export type SaveOutcome = Settled<Answer>
 
 export type Settled<Result> = Result extends { issues: Issue[] } ? Result & { ok: false, error: ErrorShape } : Result & { ok: true, error?: undefined }
 
-type Answer = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: Commit | undefined, version?: string | undefined }
+type Answer = { issues: Issue[], conflict?: { version: string | null } | undefined, status?: number | undefined } | { saved: true, commit?: Commit | undefined, version?: string | undefined }
 
 // What saving or deleting a folder entry the server holds asks of the editor: an editor sending no version is older than the server, which would write over any save made since it opened the entry.
 export interface VersionRule {
@@ -176,13 +177,13 @@ function settle<Result extends object>(outcome: Result): Settled<Result> {
   if (!('issues' in outcome))
     return { ...outcome, ok: true } as Settled<Result>
 
-  const refusal = outcome as { issues: Issue[], conflict?: unknown }
+  const refusal = outcome as { issues: Issue[], conflict?: unknown, status?: number }
   const errors: Record<string, string> = {}
 
   for (const { path, message } of refusal.issues)
     errors[path] ??= message
 
-  return { ...outcome, ok: false, error: { status: refusal.conflict === undefined ? 422 : 409, message: refusal.issues.map(issue => issue.message).join('; '), errors, data: undefined } } as Settled<Result>
+  return { ...outcome, ok: false, error: { status: refusal.status ?? (refusal.conflict === undefined ? 422 : 409), message: refusal.issues.map(issue => issue.message).join('; '), errors, data: undefined } } as Settled<Result>
 }
 
 export function answering<Args extends unknown[], Result extends object>(run: (...args: Args) => Promise<Result>): (...args: Args) => Promise<Settled<Result>> {
@@ -228,41 +229,27 @@ async function singleRefusal(entry: CmsDraftEntry, collection: CollectionInfo): 
   return entry.slug === SINGLE_SLUG ? undefined : refused(entry, wording('cms.store.singleSlug', '{collection} holds one entry, written as {slug}', { collection: collectionTitle(collection), slug: SINGLE_SLUG }))
 }
 
-// The longest the editor waits for `cms({ onSave })`, which runs before the save answers.
-const SAVE_HOOK_LIMIT_MS = 10_000
-let hookLimit = SAVE_HOOK_LIMIT_MS
-
-// For tests, which cannot wait ten seconds; not for apps. No argument restores the limit.
-export function setSaveHookLimit(ms = SAVE_HOOK_LIMIT_MS): void {
-  hookLimit = ms
-}
-
-// Tells `cms({ onSave })` of a change that went through; its failure or a hook still running past the limit is logged, as the change is written.
+// Tells the activity log and `cms({ onSave })` of a change that went through; the hook is waited for up to ten seconds, and its failure is reported, as the change is written.
 async function saved(event: SaveEvent): Promise<void> {
   await recordActivity(event)
-
-  const hook = settings().onSave
-
-  if (hook === undefined)
-    return
-
-  // A hook given up on may still fail later, which is logged as well.
-  const running = (async () => {
-    try {
-      await hook(event)
-    }
-    catch (error) {
-      log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
-    }
-
-    return 'done' as const
-  })()
-
-  if (await within(running, hookLimit, 'late' as const) === 'late')
-    log.error(`onSave for ${event.collection}/${event.slug} did not finish in ${hookLimit / 1000} s; the save does not wait for it`)
+  await tellOnSave(event)
 }
 
-async function saveEntryAnswer(entry: CmsDraftEntry, options: SaveOptions = {}): Promise<Answer> {
+async function saveEntryAnswer(given: CmsDraftEntry, options: SaveOptions = {}): Promise<Answer> {
+  const verb = options.verb ?? (options.create === true ? 'add' : 'update')
+  const previous = verb !== 'move' && options.create !== true && hooked() ? await previousOf(given) : undefined
+  let entry = given
+
+  // A reorder is a position, not something an editor wrote.
+  if (verb !== 'move' && settings().beforeSave !== undefined) {
+    const asked = await askBeforeSave({ collection: given.collection, slug: given.slug, ...given.locale !== undefined && { locale: given.locale }, verb, ...options.author !== undefined && { author: options.author }, data: given.data, ...given.body !== undefined && { body: given.body }, ...previous !== undefined && { previous } })
+
+    if ('issues' in asked)
+      return asked
+
+    entry = { ...given, ...asked.change.data !== undefined && { data: asked.change.data }, ...asked.change.body !== undefined && { body: asked.change.body } }
+  }
+
   let outcome: Answer
 
   try {
@@ -276,7 +263,7 @@ async function saveEntryAnswer(entry: CmsDraftEntry, options: SaveOptions = {}):
     await settlePublished(entry, options.author)
 
   if ('saved' in outcome)
-    await saved({ collection: entry.collection, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: options.verb ?? (options.create === true ? 'add' : 'update'), ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
+    await saved({ collection: entry.collection, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb, ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit }, ...verb !== 'move' && { data: entry.data, ...entry.body !== undefined && { body: entry.body }, ...previous !== undefined && { previous } } })
 
   return outcome
 }
@@ -376,6 +363,12 @@ async function writeEntry(entry: CmsDraftEntry, { create = false, version, requi
 }
 
 async function deleteEntryAnswer(ref: EntryRef, author?: Identity, options: { version?: string | undefined } & VersionRule = {}): Promise<Answer> {
+  const previous = hooked() ? await previousOf(ref) : undefined
+  const asked = await askBeforeSave({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, data: previous?.data ?? {}, ...previous?.body !== undefined && { body: previous.body }, ...previous !== undefined && { previous } })
+
+  if ('issues' in asked)
+    return asked
+
   let outcome: Answer
 
   try {
@@ -389,7 +382,7 @@ async function deleteEntryAnswer(ref: EntryRef, author?: Identity, options: { ve
     await forgetReview(ref, author)
 
   if ('saved' in outcome)
-    await saved({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
+    await saved({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, ...outcome.commit !== undefined && { commit: outcome.commit }, ...previous !== undefined && { previous } })
 
   return outcome
 }
@@ -751,6 +744,11 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   if (slug === ref.slug)
     return refused(ref, wording('cms.store.sameSlug', '{slug} is the slug already', { slug }), 'slug')
 
+  const asked = await askBeforeSave({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...author !== undefined && { author }, data: existing.data, ...existing.body !== undefined && { body: existing.body }, previous: { data: existing.data, ...existing.body !== undefined && { body: existing.body } } })
+
+  if ('issues' in asked)
+    return asked
+
   const target = { ...ref, slug }
   const keepPairing = await pairingKey(collection, existing)
   const data = renamedData(collection, existing.data, ref.slug, slug, keepPairing)
@@ -781,7 +779,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
   if (!('saved' in moved))
     return moved
 
-  await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...author !== undefined && { author }, ...moved.commit !== undefined && { commit: moved.commit } })
+  await saved({ collection: ref.collection, slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'rename', from: ref.slug, ...author !== undefined && { author }, ...moved.commit !== undefined && { commit: moved.commit }, data, ...existing.body !== undefined && { body: existing.body }, previous: { data: existing.data, ...existing.body !== undefined && { body: existing.body } } })
   const unredirected = await pointRedirect(existing, target, data)
 
   const apart = plan.filter(each => !joined.some(done => done.pointing === each))

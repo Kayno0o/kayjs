@@ -16,13 +16,14 @@ function action(row: ActivityRow): string {
     case 'duplicate': return wording('cms.activity.duplicate', 'Duplicated')
     case 'delete': return wording('cms.activity.delete', 'Deleted')
     case 'restore': return wording('cms.activity.restore', 'Restored')
+    case 'upload': return wording('cms.activity.upload', 'Uploaded')
     case 'rename': return wording('cms.activity.rename', 'Renamed from {from}', { from: row.from ?? '' })
     default: return wording('cms.activity.update', 'Saved')
   }
 }
 ---
 if rows.length === 0
-  EmptyState(title={wording('cms.activity.empty', 'Nothing yet')} description={wording('cms.activity.emptyHint', 'What editors save, publish, delete, restore or rename from now on is listed here.')})
+  EmptyState(title={wording('cms.activity.empty', 'Nothing yet')} description={wording('cms.activity.emptyHint', 'What editors save, publish, delete, restore, rename or upload from now on is listed here.')})
 else
   ol.kcms-history
     for row of rows key={`${row.doneAt.getTime()}/${row.collection}/${row.slug}/${row.locale ?? ''}/${row.verb}`}

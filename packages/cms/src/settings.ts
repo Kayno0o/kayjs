@@ -1,5 +1,5 @@
 import type { Duration, Guard, GuardContext } from 'kay'
-import type { ByteSize, LazyGuard, Logo } from 'kay/library'
+import type { BeforeHook, ByteSize, Hook, LazyGuard, Logo } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout, StoredEntry } from './kay/contract'
 import type { GivenRole, Role } from './roles'
@@ -32,7 +32,13 @@ export interface UploadOptions {
   maxSize?: ByteSize | undefined
 }
 
-// What a save, a deletion or a move of an editor changed, once it is written.
+// An entry as it was stored, or is about to be.
+export interface EntryState {
+  data: Record<string, unknown>
+  body?: string | undefined
+}
+
+// What a save, a deletion or a move of an editor changed, once it is written. `cms({ onSave })` is told it with the `context` of kay's hooks.
 export interface SaveEvent {
   collection: string
   slug: string
@@ -44,6 +50,65 @@ export interface SaveEvent {
   author?: Identity | undefined
   // The commit a folder entry's saver made, such as a forge's.
   commit?: Commit | undefined
+  // The entry as written, as `beforeSave` left it; none for a delete and a move.
+  data?: Record<string, unknown> | undefined
+  body?: string | undefined
+  // The entry as it was stored before; none for a new one and a move.
+  previous?: EntryState | undefined
+}
+
+// What the activity log keeps: what an `onSave` is told, and an upload.
+export type ActivityVerb = SaveEvent['verb'] | 'upload'
+
+// What `cms({ beforeSave })` is asked, before the entry is checked against its schema and written: the verbs that write it (`add`, `update`, `publish`, `unpublish`, `duplicate`, `restore`), a `delete`, and a `rename`, whose `slug` is the new one and `from` the old. A reorder is not asked.
+export interface BeforeSaveEvent {
+  collection: string
+  slug: string
+  locale?: string | undefined
+  verb: Exclude<SaveEvent['verb'], 'move'>
+  from?: string | undefined
+  author?: Identity | undefined
+  // The entry about to be written; for a `delete` or a `rename` the entry as stored.
+  data: Record<string, unknown>
+  body?: string | undefined
+  // The entry as stored now; none for a new one.
+  previous?: EntryState | undefined
+}
+
+// What `beforeSave` may change of a write: the data and the body, for the verbs that write them. A `delete` and a `rename` can only be refused.
+export interface BeforeSaveChange {
+  data: Record<string, unknown>
+  body: string
+}
+
+// A file an editor sends, as `cms({ beforeUpload })` is asked it, once its size and type are accepted.
+export interface BeforeUploadEvent {
+  // The collection whose screen sent it.
+  collection: string
+  name: string
+  type: string
+  size: number
+  bytes: Uint8Array<ArrayBuffer>
+  author?: Identity | undefined
+}
+
+// What `beforeUpload` may change: the bytes, the name the file is shown by, or its type. The result is checked against `uploads` again.
+export interface BeforeUploadChange {
+  bytes: Uint8Array<ArrayBuffer> | ArrayBuffer
+  name: string
+  type: string
+}
+
+// A file that is stored, as `cms({ onUpload })` is told it.
+export interface UploadEvent {
+  collection: string
+  // The storage key, and the path pages render it from.
+  key: string
+  path: string
+  name: string
+  type: string
+  size: number
+  author?: Identity | undefined
 }
 
 // Who the guard let in, as `cms({ member })` reports them.
@@ -92,10 +157,16 @@ export interface CmsOptions {
   member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
-  // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
   // `true` refuses an approval by the person who sent the draft for review, so another person reads it: the Approve button is disabled with the reason, and the server refuses it. Off by default, a reviewer may approve what they sent.
   fourEyes?: boolean | undefined
-  onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
+  // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. It is told the entry's `data` and `previous` too. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is reported with source `cms.onSave` and never undoes the save.
+  onSave?: Hook<SaveEvent> | undefined
+  // Runs before every save, publish, unpublish, duplicate, restore, deletion and rename, after the role and `can` checks (and `fourEyes` for an approval) and before the entry is checked against its schema, so what it changes is checked. Returns nothing, `{ data, body }` to write instead, `false` or throws `refuse(message, { errors })` to refuse: the entry form shows it as it shows a schema refusal, the API answers `error.status` 403 or 422. A throw of any other kind refuses with 500 and is reported with source `cms.beforeSave`.
+  beforeSave?: BeforeHook<BeforeSaveEvent, BeforeSaveChange> | undefined
+  // Runs on each file an editor sends, once its size and type are accepted, to scan it, resize it or rename it: returns nothing, `{ bytes, name, type }` to store that instead (checked against `uploads` and `maxSize` again), or refuses as `beforeSave` does, with the status as the answer.
+  beforeUpload?: BeforeHook<BeforeUploadEvent, BeforeUploadChange> | undefined
+  // Runs after a file is stored: a CDN purge, a media record. A throw is reported with source `cms.onUpload` and the upload stands.
+  onUpload?: Hook<UploadEvent> | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns it all off, and `collections: { name: { history: false } }` for one collection.
   history?: false | { revisions?: number | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined
 }
@@ -121,6 +192,9 @@ export interface CmsSettings {
   author: CmsOptions['author']
   member: CmsOptions['member']
   onSave: CmsOptions['onSave']
+  beforeSave: CmsOptions['beforeSave']
+  beforeUpload: CmsOptions['beforeUpload']
+  onUpload: CmsOptions['onUpload']
   // Whether the person who sent a draft for review may not approve it.
   fourEyes: boolean
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
@@ -155,7 +229,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, beforeSave, beforeUpload, onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
@@ -173,7 +247,7 @@ export function configure({ prefix = '/admin', guard: own, role, files = working
   const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, beforeSave, beforeUpload, onUpload, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
 
   return current
 }

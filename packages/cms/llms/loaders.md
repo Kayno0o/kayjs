@@ -46,9 +46,21 @@ export const posts = collection(pgLoader({ name: 'posts', source: process.env.DA
 
 SQLite stores the JSON as written; Postgres stores `jsonb`, which reorders an object's keys and refuses `\u0000`.
 
+### Before a save
+
+`cms({ beforeSave })` is asked before every save, publish, unpublish, duplicate, restore, deletion and rename (not a reorder), to stamp or compute a field, or to refuse: `beforeSave: ({ collection, slug, locale, verb, data, body, previous, author, from, context }) => ...`. It follows kay's [hook convention](../../../llms/hooks.md) and returns:
+
+- nothing: the write goes on unchanged;
+- `{ data, body }`: written instead, `data` replacing the entry's whole data, so spread the one you were given: `({ data, author }) => ({ data: { ...data, updatedBy: author?.name } })`. Only the verbs that write data take it; a `delete` and a `rename` can only be refused;
+- `false`, or a thrown `refuse(message, { errors, status })` from `kay`, to refuse: `refuse('A summary is needed', { errors: { summary: 'required' } })`. The entry form shows it as it shows a schema refusal, the message on the entry and each `errors` key on its field, and the API answers `{ ok: false, error, issues }` with `error.status` 422 (403 for `false`, or the `status` given). Nothing is written.
+
+`data` is the entry about to be written and `previous` the entry as stored now (`{ data, body }`, none for a new one); for a `delete` `data` is the entry removed, and for a `rename` `slug` is the new slug, `from` the old one and `data` the entry before its references are pointed at the new slug. Any other throw refuses with 500 and `Internal server error`, after it is reported with source `cms.beforeSave`; a hook that does not finish in 10 s does the same. A change that is not `{ data: object, body: string }` is a 500 too.
+
+The order of one write: the role checks of `roles` and `can` (in the API's guard), `fourEyes` (an approval by the person who sent the draft is refused before the publish), then `beforeSave`, then the checks of the entry (a script in the body, dangling references, `single`, its schema) on what `beforeSave` left, then the version check, which refuses a save made over someone else's with 409. So a hook sees a save the version check later refuses, and keeps no side effects of its own. The entries a rename points at the new slug are saved without being asked.
+
 ### After a save
 
-`cms({ onSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `onSave: async ({ collection, slug, locale, verb, author, commit }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore`, `rename` (`slug` is the new one, `from` the old) or `delete`; `commit` is what a folder entry's saver made. A throw is logged and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is logged.
+`cms({ onSave })` runs after each save, publish, duplicate, move, restore and deletion went through, in the process that handled it: `onSave: async ({ collection, slug, locale, verb, author, commit, data, previous, context }) => { await purgeCdn(`/${collection}/${slug}`) }`. `verb` is `add`, `update`, `publish`, `unpublish`, `move` (one call per entry of a reorder), `duplicate`, `restore`, `rename` (`slug` is the new one, `from` the old) or `delete`; `commit` is what a folder entry's saver made; `data` and `body` are the entry as written, `beforeSave`'s changes included (none for a `delete` and a `move`), and `previous` the entry as it was stored (none for a new one and a `move`). A throw is reported with source `cms.onSave` and never undoes the save, and the editor waits for the hook, so keep it short: past 10 s the save answers anyway and the late hook is reported.
 
 What is refreshed before the hook runs, with nothing to call:
 

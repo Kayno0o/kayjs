@@ -1,9 +1,7 @@
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo } from '../src/kay/contract'
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
-import { log } from '../src/log'
+import { afterEach, beforeEach, expect, mock, test } from 'bun:test'
 import { configure } from '../src/settings'
-import { until } from './until'
 
 const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
@@ -17,62 +15,38 @@ const content: Partial<typeof Content> = {
 
 void mock.module('../src/kay/content', () => content)
 
-const { saveEntry, setSaveHookLimit } = await import('../src/store')
+const { saveEntry } = await import('../src/store')
 
 const entry = { collection: 'products', slug: 'mug', data: { name: 'Mug' } }
-let logged: ReturnType<typeof spyOn<typeof log, 'error'>>
+// Where kay sends what it and its libraries log, as the app's `log` setting says.
+const LOG_SINK = Symbol.for('kay.log')
+const global = globalThis as { [LOG_SINK]?: unknown }
+const sink = global[LOG_SINK]
+let logged: unknown[][]
 
 beforeEach(() => {
-  logged = spyOn(log, 'error').mockImplementation(() => undefined)
+  logged = []
+  global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
 })
 
 afterEach(() => {
-  setSaveHookLimit()
-  logged.mockRestore()
+  global[LOG_SINK] = sink
 })
 
-test('logs a hook that throws, and the save stands', async () => {
+test('reports a hook that throws with its source, and the save stands', async () => {
   const failure = new Error('hook down')
 
   configure({ onSave: () => {
     throw failure
   } })
   expect(await saveEntry(entry)).toHaveProperty('saved', true)
-  expect(logged).toHaveBeenCalledWith('onSave failed for products/mug', failure)
+  expect(logged).toContainEqual(['error', 'cms.onSave failed', failure, undefined, 'kay'])
 })
 
-test('logs a hook that rejects', async () => {
+test('reports a hook that rejects, and the save stands', async () => {
   const failure = new Error('webhook refused')
 
   configure({ onSave: async () => Promise.reject(failure) })
   expect(await saveEntry(entry)).toHaveProperty('saved', true)
-  expect(logged).toHaveBeenCalledWith('onSave failed for products/mug', failure)
-})
-
-test('stops waiting for a hook past its time limit, and logs it', async () => {
-  setSaveHookLimit(30)
-  configure({ onSave: async () => new Promise(() => undefined) })
-
-  const started = Date.now()
-
-  expect(await saveEntry(entry)).toHaveProperty('saved', true)
-  expect(Date.now() - started).toBeLessThan(2000)
-  expect(logged).toHaveBeenCalledWith('onSave for products/mug did not finish in 0.03 s; the save does not wait for it')
-})
-
-test('logs a hook that fails after the limit, too', async () => {
-  setSaveHookLimit(10)
-
-  const failure = new Error('late failure')
-  const limitPassed = Promise.withResolvers<void>()
-
-  configure({ onSave: async () => {
-    await limitPassed.promise
-
-    throw failure
-  } })
-  await saveEntry(entry)
-  limitPassed.resolve()
-  await until(() => logged.mock.calls.length > 0)
-  expect(logged).toHaveBeenCalledWith('onSave failed for products/mug', failure)
+  expect(logged).toContainEqual(['error', 'cms.onSave failed', failure, undefined, 'kay'])
 })
