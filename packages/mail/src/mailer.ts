@@ -92,7 +92,7 @@ export interface MailerOptions {
   beforeSend?: BeforeHook<{ mail: Mail }, Mail> | undefined
   // Told once after a mail was handed to the transport, from `send`, from the queue and from a list: not for a mail whose recipients were all suppressed. A throw is reported and never fails the send. Mails of the queue are told outside any request, so `context.request` is undefined.
   onSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
-  // Told once when `send` fails, and when the queue gives a mail up after its last attempt (`queue.onError` is told right after, with the job's own fields).
+  // Told once when `send` fails, and when the queue gives a mail up after its last attempt (`queue.onError` is told right after, with the job's own fields). A queued mail is told as the queue holds it, so a `queue.redact` that drops its body leaves it out here too.
   onError?: Hook<{ mail: Mail, error: Error }> | undefined
   // Told when an address stops being mailed: a bounce or complaint reported by a provider or a mail server (`source` names it), or `mail.suppress()` (`source` is `manual`).
   onSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
