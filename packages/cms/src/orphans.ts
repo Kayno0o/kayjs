@@ -1,3 +1,4 @@
+import type { StoredFile } from 'kay/server'
 import type { CollectionInfo, EntryRef } from './kay/contract'
 import { files } from 'kay/server'
 import { wording } from 'kay/words'
@@ -29,10 +30,7 @@ const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+(?:-[\da-f]{6})?)?\.[a-z\d]{1,10}$/
 // Every window of 20 hex digits, so an id inside a longer run of them is found too.
 const IDS = /(?=([\da-f]{20}))/g
 
-interface Stored {
-  key: string
-  modifiedAt?: Date | undefined
-}
+type Stored = StoredFile
 
 export interface Read {
   stored: Stored[]
