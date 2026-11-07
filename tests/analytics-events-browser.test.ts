@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { analytics } from '../src/server/analytics'
 import { browserPath, testSite } from '../src/test'
 import { fakeProvider, received, restoreEnvironment, visits } from './analytics-browser-support'
+import { scratchStore } from './helpers/scratch-store'
 
 const path = browserPath()
 
@@ -24,6 +25,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     site = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
+      store: await scratchStore(),
       observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, events: { outbound: true, downloads: true } })],
     })
