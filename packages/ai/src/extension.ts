@@ -8,15 +8,16 @@ import { recordedAsks } from './dev-log'
 import { configureHooks } from './hooks'
 import { draftProblems, noModelProblems, startDrafting, writeImageAlts, writeKeptImageAlts } from './image-alt'
 import { configureLimits, limitsInEffect } from './limits'
-import { configureModels } from './models'
+import { configureModels, defaultNamed } from './models'
 import { configureResilience } from './retry'
 
 // The provider and model an ask would use now, or why none can be chosen.
 function providerNow(): { provider: string, model: string | null } | { error: string } {
   try {
-    const { provider, model } = choose()
+    const set = defaultNamed()
+    const { provider, model } = set?.provider === undefined ? choose() : { provider: set.provider, model: undefined }
 
-    return { provider: provider.name, model: model ?? provider.model ?? null }
+    return { provider: provider.name, model: set?.model ?? model ?? provider.model ?? null }
   }
   catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }

@@ -5,7 +5,7 @@ import { configError } from 'kay/library'
 export type NamedModel = string | { model: string, provider?: Provider | undefined }
 
 export interface ModelsOptions {
-  // Models by the name an ask passes as `model`, such as `{ fast: 'claude-haiku-4-5', smart: { model: 'gpt-5', provider: openai({ apiKey }) } }`. The names `imageAlt` and `translate` choose what drafts alt text and what `kay i18n translate` asks.
+  // Models by the name an ask passes as `model`, such as `{ fast: 'claude-haiku-4-5', smart: { model: 'gpt-5', provider: openai({ apiKey }) } }`. The names `imageAlt` and `translate` choose what drafts alt text and what `kay i18n translate` asks. A name shadows a model id spelled the same, and names resolve in `model` of `ask`, `fallback`, `embed`, `transcribe` and `speak`.
   models?: Record<string, NamedModel> | undefined
   // The name in `models` an ask without `model` uses, in place of `AI_MODEL`.
   default?: string | undefined
@@ -65,7 +65,10 @@ export function defaultNamed(): Resolved | undefined {
   return name === undefined ? undefined : named(name)
 }
 
-// `{ model: role }` for a task of the library whose name the app listed in `ai({ models })`, else nothing, so the task asks the default.
-export function roleModel(role: 'imageAlt' | 'translate'): { model?: string } {
+// `{ model: role }` for a task of the library whose name the app listed in `ai({ models })`, else nothing, so the task asks the default; a model the call itself names beats the role.
+export function roleModel(role: 'imageAlt' | 'translate', own?: string): { model?: string } {
+  if (own !== undefined)
+    return { model: own }
+
   return named(role) === undefined ? {} : { model: role }
 }

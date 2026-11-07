@@ -8,6 +8,7 @@ import { defineEnv } from 'kay/server'
 import { anthropicAt } from './anthropic'
 import { AiError } from './errors'
 import { fakeAi } from './fake'
+import { named } from './models'
 import { OPENAI_URL, openaiAt } from './openai'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
@@ -147,8 +148,10 @@ function chooseFor(call: Call): Chosen & { voice: string | undefined } {
 
 // What a `transcribe`, `speak` or `embed` call is sent with: the provider and its method, the model, the voice the environment names, how long it may take and what stops it.
 export function setUp<C extends Call>(call: C, options: CallOptions) {
-  const chosen = options.provider === undefined ? chooseFor(call) : { provider: given(options.provider), model: undefined, voice: undefined }
-  const model = options.model ?? chosen.model
+  const hit = options.model === undefined ? undefined : named(options.model)
+  const handmade = options.provider ?? hit?.provider
+  const chosen = handmade === undefined ? chooseFor(call) : { provider: given(handmade), model: undefined, voice: undefined }
+  const model = hit?.model ?? options.model ?? chosen.model
   const method = chosen.provider[call]
 
   if (model === undefined)

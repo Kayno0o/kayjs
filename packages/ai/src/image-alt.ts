@@ -29,6 +29,8 @@ interface Draft {
 export interface DescribeImageOptions {
   // The language to write in, such as `fr`; the image's own context decides when left out.
   language?: string | undefined
+  // The model for this call, a name from `ai({ models })` or an id, in place of the `imageAlt` one.
+  model?: string | undefined
   signal?: AbortSignal | undefined
 }
 
@@ -39,7 +41,7 @@ function systemPrompt(language: string | undefined): string {
 // One short alt text for an image, over `ask` with a `schema`: the fake answers under `bun test`, and a provider that does not see images fails the call.
 export async function describeImage(image: AiAttachment, options: DescribeImageOptions = {}): Promise<string> {
   const messages: AiMessage[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
-  const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt'), ...options.signal === undefined ? {} : { signal: options.signal } })
+  const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt', options.model), ...options.signal === undefined ? {} : { signal: options.signal } })
 
   return alt.trim()
 }

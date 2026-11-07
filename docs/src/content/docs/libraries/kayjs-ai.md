@@ -49,6 +49,10 @@ ai({
 const title = await ask(`Title for: ${text}`, { model: 'fast' })
 ```
 
+A name shadows a model id spelled the same, and works wherever a model is taken: `ask`, `fallback`, `embed`, `transcribe` and `speak`.
+
+An `ask` that names its own `provider` and no model keeps that provider's model, not the default. A `model` passed to one `describeImage` call beats the `imageAlt` entry.
+
 An entry is a model id, or `{ model, provider }` to use another provider. An `ask` with no `model` uses `default` instead of `AI_MODEL`. Name a model `imageAlt` to draft alt text with it, or `translate` for `kay i18n translate`; without them both use the default. With no `models`, the environment above is all you need.
 
 For Mistral, set `AI_BASE_URL=https://api.mistral.ai/v1`, put its key in `OPENAI_API_KEY` and set `AI_MODEL` to a dated model such as `mistral-small-2603`. Avoid an alias like `mistral-small-latest`: it moves to the next model, and you pay that model's price. Nothing else is needed.

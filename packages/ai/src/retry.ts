@@ -7,6 +7,7 @@ import { given } from './config'
 import { AiError } from './errors'
 import { answersAsFake } from './fake'
 import { tell } from './hooks'
+import { named } from './models'
 
 const SLOT = Symbol.for('kayjs-ai.resilience')
 // What a provider says when it is down, busy or slow: asking again or elsewhere may help, which a refused key or request never does.
@@ -185,7 +186,12 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
 
 // The provider an ask is sent through: the model asked, then each fallback, each retried as the plan says. A request that fails before the first piece of the reply is asked again; one that streamed something never is.
 export function resilient(provider: Provider, model: string, plan: Plan, onError: AskHooks['onError']): Streams {
-  const targets: Target[] = [{ provider, model }, ...plan.fallback.map(entry => ({ provider: entry.provider === undefined ? provider : given(entry.provider), model: entry.model }))]
+  const targets: Target[] = [{ provider, model }, ...plan.fallback.map((entry) => {
+    const chosen = named(entry.model)
+    const own = entry.provider ?? chosen?.provider
+
+    return { provider: own === undefined ? provider : given(own), model: chosen?.model ?? entry.model }
+  })]
 
   return { name: provider.name, stream: (request, signal) => attempting(targets, request, signal, plan.policy, onError) }
 }

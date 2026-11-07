@@ -1,6 +1,6 @@
 import type { Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { ai, ask, describeImage, fakeAi } from '../src'
+import { ai, AiError, ask, describeImage, embed, fakeAi } from '../src'
 import { configureModels } from '../src/models'
 import { translateUnits } from '../src/translation'
 
@@ -38,6 +38,47 @@ describe('ai({ models })', () => {
 
     expect(await ask('a', { model: 'local' })).toBe('ok')
     expect(sent).toEqual(['llama'])
+  })
+
+  it('keeps an explicit provider\'s own model against the default, and the entry\'s model for a named one', async () => {
+    const sent: string[] = []
+    const mine: Provider = { name: 'mine', model: 'own-1', async* stream(request) {
+      sent.push(request.model)
+      yield { text: 'ok' }
+    } }
+
+    ai({ models: { fast: 'small-1' }, default: 'fast' })
+    await ask('a', { provider: mine })
+    await ask('b', { provider: mine, model: 'fast' })
+
+    expect(sent).toEqual(['own-1', 'small-1'])
+  })
+
+  it('resolves names in fallback and embed, and a call\'s own model beats the role', async () => {
+    const sent: string[] = []
+    const down: Provider = { name: 'down', async* stream(request) {
+      sent.push(request.model)
+
+      throw new AiError('unavailable', 'down')
+    } }
+    const up: Provider = { name: 'up', async* stream(request) {
+      sent.push(request.model)
+      yield { text: 'ok' }
+    } }
+
+    ai({ models: { backup: { model: 'backup-1', provider: up }, small: 'embed-small', imageAlt: 'alt-small' } })
+
+    expect(await ask('a', { provider: down, model: 'x', retry: false, fallback: [{ model: 'backup' }] })).toBe('ok')
+    expect(sent).toEqual(['x', 'backup-1'])
+
+    await embed('t', { model: 'small' })
+
+    expect(fakeAi.embedded.at(-1)?.model).toBe('embed-small')
+
+    fakeAi.reply({ data: { alt: 'x' } })
+    await describeImage(Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='), { model: 'mine-1' })
+
+    expect(fakeAi.last()?.model).toBe('mine-1')
   })
 
   it('refuses a default it does not list and an entry without a model', () => {

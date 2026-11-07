@@ -255,6 +255,7 @@ function describeImage(image: AiAttachment, options?: DescribeImageOptions): Pro
 [.] DescribeImageOptions
 interface DescribeImageOptions
   language?: string | undefined
+  model?: string | undefined
   signal?: AbortSignal | undefined
 
 [.] embed

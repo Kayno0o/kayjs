@@ -284,7 +284,8 @@ function remembered(made: AiReply, options: AskOptions, call: ReplyCall | undefi
 
 function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): AiReply {
   const messages = messagesOf(prompt, replayed)
-  const chosen = options.model === undefined ? defaultNamed() : named(options.model)
+  const fallbackName = options.provider === undefined ? defaultNamed() : undefined
+  const chosen = options.model === undefined ? fallbackName : named(options.model)
   const handmade = options.provider ?? chosen?.provider
   const { provider, model: configured } = handmade === undefined ? choose() : { provider: given(handmade), model: handmade.model }
   const model = chosen?.model ?? options.model ?? configured ?? handmade?.model

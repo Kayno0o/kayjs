@@ -23,6 +23,8 @@ export interface Translation {
 export interface TranslateOptions {
   from: string
   into: string
+  // The model for this call, a name from `ai({ models })` or an id, in place of the `translate` one.
+  model?: string | undefined
   signal?: AbortSignal | undefined
 }
 
@@ -91,7 +93,7 @@ export function estimateTokens(units: Unit[], from: string, into: string, reques
 }
 
 // Asks for the units to be translated, never for one whose source the check cannot read, and asks again once for those whose reply failed its checks; a unit still failing is reported and never kept.
-export async function translateUnits(units: Unit[], { from, into, signal }: TranslateOptions): Promise<Translation> {
+export async function translateUnits(units: Unit[], { from, into, model, signal }: TranslateOptions): Promise<Translation> {
   const result: Translation = { done: new Map(), failed: new Map(), inputTokens: 0, outputTokens: 0 }
   let pending: Unit[] = []
 
@@ -105,7 +107,7 @@ export async function translateUnits(units: Unit[], { from, into, signal }: Tran
   let problems: string[] = []
 
   for (let attempt = 0; attempt < ATTEMPTS && pending.length > 0; attempt++) {
-    const reply = ask(JSON.stringify(Object.fromEntries(pending.map(unit => [unit.id, unit.text]))), { system: systemPrompt(from, into, problems, pending), maxTokens: MAX_TOKENS, temperature: 0, signal, ...roleModel('translate') })
+    const reply = ask(JSON.stringify(Object.fromEntries(pending.map(unit => [unit.id, unit.text]))), { system: systemPrompt(from, into, problems, pending), maxTokens: MAX_TOKENS, temperature: 0, signal, ...roleModel('translate', model) })
     const text = await reply
     const [finish, usage] = await Promise.all([reply.finish, reply.usage])
 
