@@ -115,21 +115,21 @@
     "max-lines": 854
   },
   "src/compiler/html.ts": {
-    "max-lines": 780,
-    "max-lines-per-function": 323,
+    "max-lines": 772,
+    "max-lines-per-function": 320,
     "complexity": 89
   },
   "src/compiler/index.ts": {
     "complexity": 112
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 770
+    "max-lines": 761
   },
   "src/compiler/lints.ts": {
     "max-lines": 1243
   },
   "src/compiler/markup.ts": {
-    "max-lines": 648,
+    "max-lines": 629,
     "complexity": 80
   },
   "src/compiler/module-signals.ts": {
