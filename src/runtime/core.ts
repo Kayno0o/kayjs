@@ -347,7 +347,8 @@ export interface CardPageContext<Params extends Record<string, unknown> = Record
 // For an action, `url` and `params` are those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
 // `Own` names locals a guard knows beyond the app's, for a library's own guard to read what its plugin adds with no cast.
 // Its `guard` holds what the guards above it returned.
-export type GuardContext<Own extends object = object, Guarded extends object = object> = Omit<RequestContext<RouteParams, Guarded>, 'locals'> & { locals: Locals & Own }
+// A mapped type, not `Omit<...> & { locals }`: reducing that intersection reads `locals`, which reads the config's own type through `Inferred`, so a callback typed with it in `kay.config.ts` made the config `any` under TypeScript (#3152).
+export type GuardContext<Own extends object = object, Guarded extends object = object> = { [Key in keyof RequestContext<RouteParams, Guarded>]: Key extends 'locals' ? Locals & Own : RequestContext<RouteParams, Guarded>[Key] }
 
 // A guard may return an object, which the guards, layouts, pages and actions below it read as `ctx.guard`.
 export type Guard<Value = unknown> = (ctx: GuardContext) => Value | Promise<Value>

@@ -462,8 +462,8 @@ function guard<Own extends object = object, const Value extends object | void = 
 type Guard<Value = unknown> = (ctx: GuardContext) => Value | Promise<Value>
 
 [.] GuardContext
-type GuardContext<Own extends object = object, Guarded extends object = object> = Omit<RequestContext<RouteParams, Guarded>, 'locals'> & {
-  locals: Locals & Own
+type GuardContext<Own extends object = object, Guarded extends object = object> = {
+  [Key in keyof RequestContext<RouteParams, Guarded>]: Key extends 'locals' ? Locals & Own : RequestContext<RouteParams, Guarded>[Key]
 }
 
 [.] guardLeave
