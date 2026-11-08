@@ -1,5 +1,5 @@
 import { ECOINDEX_VERSION, figuresOf, SWD_VERSION } from '../build/footprint-models'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 
 const HEADER = 'x-kay-dev'
 const NUMBER = /^\d{1,12}(?:\.\d{1,6})?$/

@@ -3,7 +3,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config-loader'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
-import { isCrossSite } from '../src/server/actions'
+import { isCrossSite } from '../src/server/cross-site'
 import { siteOrigin } from '../src/server/seo'
 import { pages } from './shared-pages'
 

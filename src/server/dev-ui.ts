@@ -10,7 +10,7 @@ import { classesOf, componentFile, componentsNamed, exported, forgetNames, isCom
 import { appSpecifier, styleInfo, themeTokens, tokensNamedBy } from '../build/ui-info'
 import { parseProgram } from '../compiler/estree'
 import { unwrapped } from '../compiler/object-literal'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 
 const HEADER = 'x-kay-dev'
 const MAX_CLASSES = 4000

@@ -5,8 +5,8 @@ import type { RouteTable } from './route-table'
 import { stat } from 'node:fs/promises'
 import { Elysia } from 'elysia'
 import { readStoredReport } from '../build/report'
-import { isCrossSite } from './actions'
 import { routerPath } from './base'
+import { isCrossSite } from './cross-site'
 
 const HEADER = 'x-kay-dev'
 

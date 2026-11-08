@@ -1,5 +1,5 @@
 import type { AnyElysia, Elysia } from 'elysia'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 import { clearPushDeviceCookie, MOST_DEVICES, pushDeviceCookie, readSubscription, vapidKeys } from './push'

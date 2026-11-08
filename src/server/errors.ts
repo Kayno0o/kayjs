@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ObserveConfig } from '../config'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
 

@@ -230,9 +230,6 @@
   "src/runtime/validate.ts": {
     "complexity": 41
   },
-  "src/server/actions.ts": {
-    "max-lines": 750
-  },
   "src/server/address.ts": {
     "complexity": 41
   },

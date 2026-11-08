@@ -1,5 +1,5 @@
 import type { JobActionName } from './job-admin'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
 import { maintenanceOverview } from './maintenance'
 

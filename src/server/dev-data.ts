@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { SQL } from 'bun'
 import { openedSqlite } from '../runtime/sqlite.server'
-import { isCrossSite } from './actions'
+import { isCrossSite } from './cross-site'
 
 const HEADER = 'x-kay-dev'
 const PAGE_ROWS = 50
