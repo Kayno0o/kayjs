@@ -2,14 +2,14 @@ import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNo
 import type { CodeBuilder } from './mapping'
 import type { ElementShape } from './plan'
 import type { Sites } from './rewrite'
-import { bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
+import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
 import { PROPS } from './names'
-import { bindingOf, classMergeOf, shapeOf, staticAttributeText, writesAttribute } from './plan'
+import { bindingOf, classMergeOf, fieldNameOf, shapeOf, staticAttributeText } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -36,7 +36,6 @@ export interface JsxOptions {
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
-const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 // Attributes rendered as markup rather than text.
 const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
 const EVENT_HANDLER = /^on[A-Z]/
@@ -741,33 +740,27 @@ export class JsxTemplate {
     if (attribute.kind === 'spread' || element.component)
       return false
 
-    const name = this.text(attribute.name)
-    // The names written in a component's content are not checked against its action's input, while `field` keeps the target: it takes the constraints of the action's schema, which a component's own action carries too.
-    const target = name === 'name' && this.facts.loose.has(element) ? undefined : shape?.target
+    const field = fieldNameOf(element, attribute, this.src, shape?.target, this.facts.loose.has(element), this.options.check)
 
-    if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
+    if (field.kind === 'none')
       return false
 
-    // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
-    if (name === FIELD_ATTRIBUTE) {
-      if (attribute.kind !== 'static' || writesAttribute(element, 'name', this.src)) {
-        b.add('{...{}}')
-
-        return true
-      }
-    }
-
-    if (!this.options.check || !target || attribute.kind !== 'static') {
-      if (name !== FIELD_ATTRIBUTE)
-        return false
-
-      b.wrap(attribute.name, () => b.add('name')).add(`=${JSON.stringify(attribute.kind === 'static' ? attribute.text : '')}`)
+    if (field.kind === 'unchecked') {
+      b.add('{...{}}')
 
       return true
     }
 
-    b.wrap(attribute.name, () => b.add('name')).add('={KayField((').addSource(target).add('), ')
-    b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
+    b.wrap(attribute.name, () => b.add('name'))
+
+    if (field.kind === 'plain') {
+      b.add(`=${JSON.stringify(field.text)}`)
+
+      return true
+    }
+
+    b.add('={KayField((').addSource(field.target).add('), ')
+    b.wrap(field.value, () => b.add(JSON.stringify(field.text)))
     b.add(')}')
 
     return true

@@ -1,6 +1,7 @@
 import type { Attribute, ElementNode, NamedAttribute, Span } from './ast'
 import type { CodeBuilder } from './mapping'
-import { actionOf } from './ast'
+import type { PlannedAttribute } from './markup'
+import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 
 // Whether a group (the signal of a `bind:group`, a string for radios or an array for checkboxes) holds a value, as the checked state of the box reads it.
@@ -205,4 +206,49 @@ export function shapeOf(element: ElementNode, src: string, target: Span | undefi
   const action = actionOf(element, src)
 
   return { classMerge: classMergeOf(element, src), action: action && { expression: action.expression, ...formDefaultsOf(element, src)! }, target, link: linkOf(element, src) }
+}
+
+const NAMED_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
+
+// What a `field` or a `name` of a form control becomes for the type check: nothing (left as written), `field` written out as a plain `name`, or a `name` asserted to be a key of the action's input.
+export type FieldName
+  = | { kind: 'none' }
+    | { kind: 'unchecked' }
+    | { kind: 'plain', text: string }
+    | { kind: 'typed', target: Span, value: Span, text: string }
+
+// `target` is the action of the form the control sits in, `loose` whether it sits in a component's content, whose names are not checked against that action while `field` keeps it: it takes the constraints of the action's schema, which a component's own action carries too.
+export function fieldNameOf(element: ElementNode, attribute: NamedAttribute, src: string, target: Span | undefined, loose: boolean, check: boolean): FieldName {
+  const name = src.slice(attribute.name.start, attribute.name.end)
+
+  if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !NAMED_FIELDS.has(element.name))
+    return { kind: 'none' }
+
+  // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
+  if (name === FIELD_ATTRIBUTE && (attribute.kind !== 'static' || writesAttribute(element, 'name', src)))
+    return { kind: 'unchecked' }
+
+  const checked = name === 'name' && loose ? undefined : target
+
+  if (!check || !checked || attribute.kind !== 'static')
+    return name === FIELD_ATTRIBUTE ? { kind: 'plain', text: attribute.kind === 'static' ? attribute.text : '' } : { kind: 'none' }
+
+  return { kind: 'typed', target: checked, value: attribute.value, text: attribute.text }
+}
+
+// What a field of the server markup is given as `aria-describedby` and `aria-required` beyond what it writes: its `type` and `aria-required`, if any, and whether its type takes no `aria-required`; undefined for an element with no text to describe, as an input of a type that shows none. A type an expression gives is decided as it renders.
+export interface FieldAria {
+  type: PlannedAttribute | undefined
+  required: PlannedAttribute | undefined
+  unrequirable: boolean
+}
+
+export function fieldAriaOf(element: string, type: PlannedAttribute | undefined, attributes: PlannedAttribute[]): FieldAria | undefined {
+  if (!FIELD_ELEMENTS.has(element))
+    return undefined
+
+  if (type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
+    return undefined
+
+  return { type, required: attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required'), unrequirable: type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()) }
 }

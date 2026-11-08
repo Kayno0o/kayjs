@@ -117,13 +117,13 @@
   "src/compiler/html.ts": {
     "max-lines": 772,
     "max-lines-per-function": 320,
-    "complexity": 87
+    "complexity": 82
   },
   "src/compiler/index.ts": {
     "complexity": 112
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 697
+    "max-lines": 692
   },
   "src/compiler/lints.ts": {
     "max-lines": 1243

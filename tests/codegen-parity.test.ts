@@ -223,3 +223,35 @@ describe('a class', () => {
     expect(expression.browser).toContain('KaySetClass(KayN0_0, ["k", (pick())])')
   })
 })
+
+describe('a field of a form posting to an action', () => {
+  const form = (fields: string) => targets(`form(action={rows})\n${fields.split('\n').map(line => `  ${line}`).join('\n')}`)
+
+  it('is named and checked against the action\'s input in the types, and constrained and described by the server', () => {
+    const fields = form('input(field="title")\ninput(name="body" aria-required)')
+
+    expect(fields.check).toContain('name={KayField((__props.rows), "title")}')
+    expect(fields.check).toContain('name={KayField((__props.rows), "body")} aria-required')
+    expect(fields.server).toContain('KayFormConstraints((__props.rows), "title", ["field"])')
+    expect(fields.server).toContain('KayFieldDescribed(undefined, undefined, true)')
+    expect(fields.hydrating).toContain('KayFieldDescribed(undefined, undefined, true)')
+  })
+
+  it('of a type with no text or no `aria-required` is left out of the description or the requirement', () => {
+    const typed = form('input(type="hidden" name="x")\ninput(type="radio" name="r")')
+
+    expect(typed.server).toContain('<input type=\\"hidden\\" name=\\"x\\">')
+    expect(typed.server).toMatch(/type=\\"radio\\" name=\\"r\\".*KayFieldDescribed\(undefined, undefined, true\)/)
+  })
+
+  it('written with `field` beside a `name`, or as an expression, is left as written in the types', () => {
+    const own = form('input(field="a" name="b")\ninput(field={href})')
+
+    expect(own.check).toContain('{...{}}')
+    expect(own.check).toContain('name={KayField((__props.rows), "b")}')
+  })
+
+  it('outside a form is written as a plain name by the types', () => {
+    expect(targets('input(field="title")').check).toContain('name="title"')
+  })
+})

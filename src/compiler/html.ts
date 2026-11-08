@@ -5,12 +5,12 @@ import type { ElementPlan } from './markup'
 import type { LinkPlan } from './plan'
 import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
-import { actionOf, failedBlockOf, FIELD_ELEMENTS, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
+import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addStyleArguments, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
-import { addGroupChecked, BEHAVIOUR, groupValue, staticAttributeText } from './plan'
+import { addGroupChecked, BEHAVIOUR, fieldAriaOf, groupValue, staticAttributeText } from './plan'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
@@ -513,12 +513,12 @@ export class HtmlTemplate extends TemplateWriter {
     let checkboxValue: (() => void) | undefined
     // A field takes the ids a component around it hands it, beside its own, unless its type shows no text to describe; a type an expression gives is decided as it renders, the expression read a second time for it.
     const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
-    const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
+    const fieldAria = fieldAriaOf(name, type, plan.attributes)
+    const describable = fieldAria !== undefined
     let ownDescribed: (() => void) | undefined
     // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks; an expression for it is read a second time, as the type's is, and counts once it gives a value.
-    const required = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required')
-    const unrequirable = type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase())
     const fieldDescribed = (own: (() => void) | undefined) => {
+      const { required, unrequirable } = fieldAria!
       const typed = type?.kind === 'value' ? () => b.add('(').addSource(type.expression).add(')') : undefined
       const written = required?.kind === 'value' ? () => b.add('(').addSource(required.expression).add(')') : undefined
       const args = [own, typed, written ?? (required || unrequirable ? () => b.add('true') : undefined)]
