@@ -101,6 +101,8 @@ A page fills it with a `@sidebar` block at the top of its template. The block ca
 
 ```kay
 --- server
+import { ctx } from 'kay'
+
 const branches = await listBranches(ctx.params.project)
 ---
 @sidebar

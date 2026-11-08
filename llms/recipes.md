@@ -48,7 +48,7 @@ export default defineConfig({ db, migrationsDir: 'migrations' })
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { db } from '../db'
 import { Todo } from '../db/todo'
 
@@ -83,7 +83,7 @@ A page per row edits it, `src/routes/todos/[id=integer].kay`. A missing row is a
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { db } from '../../db'
 import { Todo } from '../../db/todo'
 

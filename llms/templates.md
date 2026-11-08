@@ -91,6 +91,8 @@ li.todo(class={{ done }}) Buy milk
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const name = signal('')
 ---
 input(type="text" bind:value={name} placeholder="Your name")
@@ -248,6 +250,7 @@ Each line is one of the following; deeper indentation nests children under the l
 
 ```kay
 ---
+import { signal, memo } from 'kay'
 import type { Todo } from './todo'
 import TodoItem from './todo-item.kay'
 

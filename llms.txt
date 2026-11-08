@@ -11,16 +11,16 @@
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'` (`Duration` from `kay`); a bare number is a type error; `durationMs` gives milliseconds.
+- Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'`; a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
-- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, throwing requests, islands' browser errors): read it, not the browser.
+- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met: read it, not the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; each is reported with what kay writes instead.
 
 ## Libraries
 
-kay's own libraries are released with kay, and each ships its `llms.txt` and `llms/` in its package: open the one a task needs.
+Each of kay's own libraries ships its `llms.txt` and `llms/`: open the one a task needs.
 
-- [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys, admin pages, organizations
+- [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys
 - [kayjs-ui](packages/ui/llms.txt): components styled by one theme: buttons, dialogs, toasts, tables, forms, charts, layouts
 - [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, sending through the queue
 - [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collection screens, history, uploads
@@ -59,8 +59,10 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Loaded collections and preview mode](llms/content-cms.md): CMS or database loaders, preview mode
 - [Edit mode and the CMS editor](llms/content-edit.md): edit markers, the editor
 - [Locales](llms/locales.md): locale prefixes, typed messages, formatting
+- [Texts of kay](llms/locales-texts.md): the `kay.*` keys
 - [Caching and streaming](llms/rendering.md): caching, streaming with `await`, `renderToString`
 - [Actions](llms/actions.md): form posts typed by a schema: errors, files, redirects
+- [Refused fields](llms/actions-refused-fields.md): refilled forms, `aria-invalid`
 - [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming, optimistic changes
 - [Schemas](llms/schemas.md): one schema for the server, its type read by islands
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, honeypot, proof of work
@@ -68,6 +70,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Stored files](llms/files.md): uploads on disk or in S3, links, resizing, progress
 - [Stores](llms/stores.md): every store's contract, ping, close
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions, `_guard.ts` guards
+- [Guards](llms/guards.md): `_guard.ts`, `once`, public routes
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, MCP
 - [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events
@@ -83,9 +86,9 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Lints and warnings](llms/lints.md): every lint at its default level, allowing one, its fix
 - [SEO lints](llms/seo-lints.md): the `seo` group and what each lint reads
 - [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
-- [Errors](llms/errors.md): error codes and fixes, throw or return a Result
+- [Errors](llms/errors.md): error codes and fixes, `Result`
 - [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, migrating from Astro
-- [kay new and kay add](llms/project-new-and-add.md): presets, features, adding one, `kay generate`
+- [kay new and kay add](llms/project-new-and-add.md): presets, features, `kay generate`
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, static export, `kay start`
@@ -105,4 +108,4 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Privacy and personal data](llms/privacy.md): what kay keeps, for how long, erasing a person
 - [Notifications](llms/notifications.md): `notify()`, the Bell
 - [Analytics and Web Vitals](llms/analytics.md): visits and load times, consent
-- [Eco-design](llms/eco-design.md): the RGESN criteria kay meets
+- [Eco-design](llms/eco-design.md): the RGESN criteria met

@@ -138,6 +138,8 @@ img(src={logo} alt="Logo")
 
 ```kay
 ---
+import { signal, onMount, onCleanup } from 'kay'
+
 const result = signal('')
 
 onMount(() => {

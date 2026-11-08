@@ -139,7 +139,7 @@ Use `enqueue` in an action. It renders the mail now and queues it, so a mail ser
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 
@@ -293,7 +293,7 @@ The same transports exist as `resend({ apiKey })`, `postmark({ token })`, `sendg
 ```kay
 --- server
 import { contactForm } from '@kaynooo/kayjs-mail'
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { mail } from '../mail'
 
 export const contact = action(...contactForm(mail, {
@@ -337,6 +337,7 @@ The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`m
 
 ```kay
 --- server
+import { action } from 'kay'
 import { mail } from '../mail'
 import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
 

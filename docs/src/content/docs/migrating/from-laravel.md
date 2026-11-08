@@ -81,7 +81,7 @@ A form request class becomes the schema of an action. kay checks the input again
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { createPost } from '../posts'
 
 const newPost = s.Object({

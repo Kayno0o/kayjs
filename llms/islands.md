@@ -8,6 +8,8 @@ A handler, a `bind:`, a `ref` or a signal makes it an island: it renders on the 
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 button(onClick={() => count++}) Clicked {count()} times
@@ -79,6 +81,8 @@ Comments(postId={postId} hydrate="visible")
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const open = signal(false)
 ---
 button(onClick={() => open = !open()}) Toggle
@@ -142,7 +146,7 @@ p(class={theme}) Themed
 
 ```kay
 ---
-import { uid } from 'kay'
+import { uid, signal } from 'kay'
 
 const id = uid()
 const open = signal(false)

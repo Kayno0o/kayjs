@@ -166,6 +166,8 @@ A block written without its parameters, `@row`, is markup and not a function, so
 
 ```kay
 ---
+import { signal, memo } from 'kay'
+
 const count = signal(0)
 const double = memo(() => count() * 2)
 ---
@@ -224,6 +226,8 @@ table
 
 ```kay
 ---
+import { store, every } from 'kay'
+
 const game = store({ coins: 0, miners: [{ id: 1, ore: 0 }] })
 
 every('50ms', () => game.miners[0].ore += 1)

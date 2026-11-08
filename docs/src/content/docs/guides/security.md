@@ -148,6 +148,8 @@ A rate limit answers 429 once a client has posted too often. Set it under `prote
 
 ```kay
 --- server
+import { action } from 'kay'
+
 export const contact = action(schema, send, {
   protect: { rateLimit: { max: 5, window: '1m' } },
 })

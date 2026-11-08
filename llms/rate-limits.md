@@ -10,7 +10,7 @@ How many times a client may do something in a window, on actions, in guards and 
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const subscribe = action(
   s.Object({ email: s.String({ format: 'email' }) }),

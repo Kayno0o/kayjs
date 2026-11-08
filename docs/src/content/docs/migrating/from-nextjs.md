@@ -63,7 +63,7 @@ In kay it is one file.
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
 const newTodo = s.Object({
@@ -104,6 +104,8 @@ export function Counter() {
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 button(onClick={() => count++}) Clicked {count()} times

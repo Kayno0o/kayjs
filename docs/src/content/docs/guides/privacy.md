@@ -330,7 +330,7 @@ Refusing after agreeing clears the script's cookie and reloads, so the visitor c
 
 ```kay
 ---
-import { persisted } from 'kay'
+import { persisted, effect } from 'kay'
 
 const consent = persisted('consent', '')
 

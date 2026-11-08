@@ -79,7 +79,7 @@ h1 Todo {id}
 - `redirect(location, status?)`, `notFound()` and `deny(status?, message?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
-- `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](server.md#guards)).
+- `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](guards.md)).
 
 ### Show an error page
 
@@ -121,6 +121,8 @@ And in `src/routes/p/[project].kay`:
 
 ```kay
 --- server
+import { ctx } from 'kay'
+
 const branches = await listBranches(ctx.params.project)
 ---
 @sidebar
@@ -188,7 +190,7 @@ Pages live in `src/routes/`:
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 | `_card.kay` | Only in the routes directory: lays out the 1200x630 share card `shareCard()` links, reading `ctx.card`; see [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself). |
-| `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](server.md#guards). |
+| `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](guards.md). |
 
 - Where two pages match a URL, the first segment telling them apart decides: static wins over a param, a param over a catch-all, so `/docs/intro` goes to `docs/[...path].kay` before `[section]/[page].kay`, and `/_kay/` stays kay's own files.
 - That holds over a listening server as through `app.handle()`, and the same goes for every route ending in `*`, a redirect's, an API module's or the app's own, against a page of params.
@@ -273,7 +275,7 @@ The fence's `ctx`:
 #### Loads and timing
 
 - Layout and page loads run in parallel; when several fail, the outermost one decides the response.
-- A layout cannot read its page's data, so a value they both need is returned by a guard (`ctx.guard`) or shared with `ctx.once(key, load)`, which runs the load once for the request ([Guards](server.md#guards)).
+- A layout cannot read its page's data, so a value they both need is returned by a guard (`ctx.guard`) or shared with `ctx.once(key, load)`, which runs the load once for the request ([Guards](guards.md)).
 - In development each response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel.
 - `observe: { serverTiming: true }` in kay.config.ts sends it in production too (see [Tracing and timing](tracing.md#tracing-and-timing)).
 

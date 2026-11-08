@@ -66,7 +66,7 @@ Answer a plain object, an array or a `Response`. Returning `null` answers the JS
 
 ```kay
 ---
-import { call } from 'kay'
+import { call, signal } from 'kay'
 import notes from '../api/notes'
 
 const title = signal('')
@@ -209,7 +209,7 @@ An action is a tool only when you say so, with `tool` in its third argument. Set
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const addNote = action(
   s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
@@ -228,7 +228,7 @@ An agent reads an action's answer as JSON, and as `structuredContent` too when i
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const search = action(
   s.Object({ query: s.String() }),

@@ -91,7 +91,7 @@ export default defineConfig({ mcp: true })
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const addNote = action(
   s.Object({ title: s.String({ minLength: 3, maxLength: 80 }) }),
@@ -153,17 +153,17 @@ export default api()
 - A class instance without its own `toString`, or a `Map`, passed to `status()` answers 500 the same way.
 - On an `api()` chain, a `.ws()` route's refused `body` message is dropped, not answered (see [API from islands](live-values.md#chat-over-a-websocket)).
 - A `.ws()` route takes 1 MB a message and 100 messages a second from one socket; a socket over either is closed, with 1009 for a message too big and 1008 for too many. `detail: { messages: { maxSize: '4mb', rateLimit: { max: 30, window: '10s' } } }` sets the route's own, counted per socket in memory. Bun's own 16 MB frame cap holds over `maxSize`.
-- `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` ([Locals](server.md#locals)): `({ user })`, `ws.data.user`, `guard`, `once` ([Guards](server.md#guards)).
+- `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` ([Locals](server.md#locals)): `({ user })`, `ws.data.user`, `guard`, `once` ([Guards](guards.md)).
 - A plain `new Elysia()` is mounted the same way.
 - A handler, and the `onError` of its module or route, runs in the request's locale as the guards do, so `t()`, `wording()` and `locale()` read it: the locale of the page the call came from by its `Referer`, else the browser's `Accept-Language`, the site's one language without `i18n`. An `eventStream` source is read in it too; your own `Response` stream and a websocket's `open` and `message` are not.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions.
-- A body, query or params the route's schema refuses, or a file of the wrong type, meets the guards first, as an action's input does ([Guards](server.md#guards)): a caller they refuse gets their answer, never the validation error.
+- A body, query or params the route's schema refuses, or a file of the wrong type, meets the guards first, as an action's input does ([Guards](guards.md)): a caller they refuse gets their answer, never the validation error.
 - A guard's redirect or denial answers the request; the cookies and headers it sets go out with the route's response.
 - A route serving, by its method or `all`, the path of a page, a public file, an endpoint, a redirect or a feed stops the server.
 - `kay check` leaves that to the boot, which `kay build` runs, since listing the routes takes running the modules.
 - Cookies get the `security.cookies` defaults ([Sessions](server.md#sessions)).
 - `api({ guards: false })` runs none of the guards above the module, as a public webhook under a guarded directory needs.
-- On a site with `requireGuards`, a module no guard covers answers 403 unless it sets `guards: false` ([Guards](server.md#guards)).
+- On a site with `requireGuards`, a module no guard covers answers 403 unless it sets `guards: false` ([Guards](guards.md)).
 - A library's API modules, laid over `src/api` under a prefix by its extension, serve as if they were the app's, behind its guards, an app module at the same path replacing one (see [Extensions](component-libraries.md#extensions)).
 - A websocket upgrade, or a request other than GET, HEAD and OPTIONS, another site's page sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket or post a form to any host with the user's cookies.
 - A request carrying neither header, such as a webhook, goes through.

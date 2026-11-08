@@ -231,6 +231,7 @@ A `.wasm` file is imported for its URL as well, then loaded from it.
 
 ```kay
 ---
+import { onMount } from 'kay'
 import add from '../add.wasm'
 
 onMount(async () => {

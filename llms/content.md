@@ -177,6 +177,7 @@ p {author?.data.name}
 
 ```kay
 ---
+import { signal } from 'kay'
 import { markdownHtml } from 'kay/markdown'
 
 const text = signal('')

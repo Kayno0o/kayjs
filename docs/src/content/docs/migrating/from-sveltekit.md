@@ -80,7 +80,7 @@ A SvelteKit action reads `FormData` by hand, returns `fail(400, ...)` for a refu
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { addTodo, listTodos } from '../data'
 
 const newTodo = s.Object({

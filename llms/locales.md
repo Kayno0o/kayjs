@@ -64,6 +64,8 @@ export default defineMessages({
 
 ```kay
 ---
+import { t } from 'kay/i18n'
+
 const { name, count } = props<{ name: string, count: number }>()
 ---
 nav
@@ -202,27 +204,6 @@ export default defineMessages({
 - The app needs no file of its own for a locale the library translates.
 - Without `i18n`, a site is in its one language, its `lang` (`en` without one): `t()` reads its libraries' catalogs for it, with the app's `src/messages/<lang>.ts` laid over them when it has one, and `kay check` types the keys of both.
 - Without `i18n`, `locale()` is that language, `localize()` gives a path back as written, and no page gets `hreflang` links, so a library's pages read their texts in any app.
-
-### Texts from kay and its libraries
-
-- What a visitor reads that kay or a library wrote, not the app, is looked up in the app's catalogs under `kay.*`, `ui.*` (kayjs-ui), `cms.*`, `auth.*` (kayjs-auth), `mail.*` (kayjs-mail) and `ai.*` (kayjs-ai) keys before its English, so one block of `src/messages/<locale>.ts` words them all for the site; a site without the keys reads the English it did, except where a library ships a catalog for the locale: kayjs-ui, kayjs-mail and kayjs-cms ship French, read after the app's own.
-- `wording(key, english, params?)` from `kay/words` is that lookup for a library: the message at `key` when a catalog has it, else `english`, `{placeholders}` filled either way, with no failing on a missing key and no request needed; an island's source naming the key as a literal, `wording('ui.close', 'Close')`, sends the message to the browser as `t('key')` does, and a key no catalog has sends nothing. A `Date` param is written as the page's locale writes it (`4 oct. 2026`), in the English too, while a number in the English is written plain (`1024`) and only a catalog groups it (`1,024`, `1 024`), so a site that words a count or a limit puts the key in its catalog. `pageLocale()` from it gives the locale to format a date in, and `sizeText(bytes, locale?)` writes a size in it (`1.5 MB`, `1,5 Mo`), the page's locale by default.
-- `kay/words` is its own small module, about 0.3 KB gzipped in the browser, so a library's islands do not load all of `kay/i18n` for a label; it reads the page's messages as `t` does, and takes strings, `{placeholders}` and plural forms.
-- A locale may give a `kay.*`, `ui.*`, `cms.*`, `auth.*`, `mail.*` or `ai.*` key the default locale does not, so a French block needs no English twin: `kay check` compares such a key's `{placeholders}` with the English the code holds (kay's table, or the library's installed sources) and reports one dropped or invented, but not the key's absence from the default locale.
-- A per-action `messages`, a schema's `error` and a component's label prop stay the overrides, and win over the catalog.
-- A schema refusal without an `error` reads `kay.invalid.<kind>`, Elysia's own wording when the site gives none: `required` (nothing sent), `tooShort` (`{min}`), `tooLong` (`{max}`), `pattern`, `tooSmall` (`{min}`), `tooBig` (`{max}`), `format` (`{format}`, the schema's format such as `email`), `tooFewItems` (`{min}`) and `tooManyItems` (`{max}`) for an array out of its `minItems` and `maxItems`, and `type` for anything else, such as a wrong type, an exclusive bound or a union no branch fits. The browser's form check before a post reads the same keys with the same params in the page's locale, a page with a checked form sending them (only those the catalogs word, so a site without them sends nothing and reads Elysia's English), and a schema's own `error` still wins.
-- A field of an entry the schema refuses (a CMS save or draft, `kay build`, `kay check`) reads as a sentence naming the field by its label, its schema `title` else its key worded (`publishedAt` gives `Published at`), under `kay.entry.*` with the kinds above, each holding `{field}` as well as its limit: `entry.required` (`{field} is required`), `entry.tooShort` (`{min}`), `entry.tooLong` (`{max}`), `entry.pattern`, `entry.format` (`{format}`), `entry.tooFewItems` (`{min}`), `entry.tooManyItems` (`{max}`), `entry.tooSmall` (`{min}`), `entry.tooBig` (`{max}`) and `entry.type` (`{field} is not valid`); `entry.item` (`{field}, item {n}`) names an item of a list and `entry.data` (`The data`) an entry that is no object. A schema's own `error` on the field still wins. The issue sits on the nested field it concerns (`networks.youtube`), on the line of its top-level field in a build. The editor words them in the request's locale; `kay build` and `kay check` read no request, so they word them in the site's default locale from its catalogs, the English where it gives none.
-- The other `kay.*` keys, with their English: `action.serverError` (Something went wrong on our side; try again later), `action.timeout` (This took too long; try again later), `action.invalidFile` (Invalid file type), `action.bodyLimit` (Too large to send; {size} at most, the size written in the page's locale: `1 Mo`, `200 octets`), `link.newTab` ((opens in a new tab), said to screen readers after a link kay opens in a new tab), `offline.title` (Offline) and `offline.text` (This page needs a connection, and none is open.), the page the service worker gives offline for a page it did not keep, in the default locale, `protection.honeypot` (Leave this field empty), `protection.minTime.early` (Sent too fast; take a moment, then send it again), `protection.minTime.expired` and `protection.proofOfWork.expired` (This form has expired; send it again), `protection.proofOfWork.missing` (Turn JavaScript on to send this form), `protection.proofOfWork.wrong` (This form could not be checked; send it again), `protection.rateLimit` (Too many attempts; try again in {seconds} s).
-- kayjs-ui's `ui.*` keys are listed in its `llms.txt`. kayjs-ai has one, `ai.chat.disclosure`, the line `Chat` shows that the visitor talks to an AI.
-
-```ts
-export default defineMessages({
-  kay: {
-    invalid: { required: 'Champ requis', tooShort: 'Au moins {min} caractères' },
-    protection: { rateLimit: 'Trop d\'essais, réessayez dans {seconds} s' },
-  },
-})
-```
 
 ### Helpers
 

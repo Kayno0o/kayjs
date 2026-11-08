@@ -500,6 +500,7 @@ A highlighter, a `transform` or a `preprocess` whose output changes with no chan
 
 ```kay
 ---
+import { signal } from 'kay'
 import { markdownHtml } from 'kay/markdown'
 
 const text = signal('')

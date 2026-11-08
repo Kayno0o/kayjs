@@ -8,6 +8,7 @@
 
 ```kay
 --- client
+import { onMount } from 'kay'
 import { drawMap } from './map'
 
 const { center } = props<{ center: [number, number] }>()

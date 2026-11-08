@@ -39,7 +39,7 @@ For a script that needs the visitor's browser, such as a tracker that sets cooki
 
 ```kay
 ---
-import { persisted } from 'kay'
+import { persisted, effect } from 'kay'
 
 const consent = persisted('consent', '')
 

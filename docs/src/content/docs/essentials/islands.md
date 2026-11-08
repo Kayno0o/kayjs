@@ -7,6 +7,8 @@ An island is an interactive component. kay renders it on the server, then hydrat
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 button(onClick={() => count++}) Clicked {count()} times
@@ -26,6 +28,8 @@ Read a signal by calling it, `count()`. Write it by assigning it, `count++` or `
 
 ```kay
 ---
+import { signal, memo, effect } from 'kay'
+
 const names = ['Ada', 'Grace']
 const query = signal('')
 const matches = memo(() => names.filter(n => n.includes(query())))
@@ -98,6 +102,8 @@ Children render on the server with the page. The island shows them where its tem
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const { title } = props<{ title: string }>()
 const open = signal(false)
 ---
@@ -181,6 +187,8 @@ Outside a component, write a signal with `cart.set(...)`. A component assigns it
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const open = signal(false)
 ---
 button(onClick={() => open = !open()}) Toggle
@@ -257,7 +265,7 @@ An island reads nothing its page's static components provide. Provide inside the
 
 ```kay
 ---
-import { uid } from 'kay'
+import { uid, signal } from 'kay'
 
 const id = uid()
 const open = signal(false)
@@ -297,6 +305,9 @@ A path goes where the same `href` would: your `base` and the current locale's pr
 To link to the current page with one param changed, use `withQuery`. It works in a server fence, a template and an island, and follows the same rules as `navigate({ query })`.
 
 ```kay
+---
+import { withQuery } from 'kay'
+---
 a(href={withQuery({ page: 2 })}) Next
 ```
 
@@ -343,7 +354,7 @@ A form with `method="get"` swaps the page in place as a link does, with its fiel
 
 ```kay
 ---
-import { guardLeave } from 'kay'
+import { guardLeave, signal } from 'kay'
 
 const draft = signal('')
 
@@ -389,6 +400,8 @@ kayjs-ui's popovers and site nav menu need Chrome and Edge 114, Firefox 125 or S
 
 ```kay
 ---
+import { signal, onMount } from 'kay'
+
 const width = signal(0)
 
 onMount(() => {
@@ -402,6 +415,7 @@ A component that cannot render on the server at all, such as one wrapping a map 
 
 ```kay
 --- client
+import { onMount } from 'kay'
 import { drawMap } from './map'
 
 const { center } = props<{ center: [number, number] }>()
@@ -417,6 +431,7 @@ A component's own fallback is static markup: it cannot read the script's values,
 
 ```kay
 --- client
+import { onMount } from 'kay'
 import { drawMap } from './map'
 
 const { center } = props<{ center: [number, number] }>()

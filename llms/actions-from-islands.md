@@ -12,7 +12,7 @@ An island imports the action from the page and calls it, catching `ActionError` 
 
 ```kay
 ---
-import { ActionError } from 'kay'
+import { ActionError, signal } from 'kay'
 import { add } from '../routes/index.kay'
 
 const title = signal('')
@@ -71,7 +71,7 @@ An action whose handler is an `async function*`, or returns any async iterable, 
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { complete } from '../data'
 
 export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
@@ -91,6 +91,7 @@ An island reads it from the call's `ActionStream`:
 
 ```kay
 ---
+import { signal } from 'kay'
 import type { ActionStream } from 'kay'
 import { count } from '../routes/index.kay'
 
@@ -106,6 +107,7 @@ p {answer()?.last()}
 
 ```kay
 ---
+import { signal } from 'kay'
 import { move } from '../routes/board.kay'
 
 const { id } = props<{ id: number }>()

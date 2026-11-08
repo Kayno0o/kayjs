@@ -89,6 +89,8 @@ A page hands an island plain values as props, and the island keeps the query in 
 
 ```kay
 ---
+import { signal, memo } from 'kay'
+
 const { items } = props<{ items: string[] }>()
 const query = signal('')
 const shown = memo(() => items.filter(item => item.includes(query())))
@@ -115,7 +117,7 @@ A page's server fence exports an action, and `form(action={comment})` posts to i
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const comment = action(
   s.Object({ text: s.String({ minLength: 10, maxLength: 2000 }) }),
@@ -255,6 +257,8 @@ PostFilter(posts={list})
 
 ```kay
 ---
+import { signal, memo } from 'kay'
+
 const { posts } = props<{ posts: { slug: string, title: string }[] }>()
 const query = signal('')
 const shown = memo(() =>
@@ -319,7 +323,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { checkComment } from '../comment'
 import CommentForm from '../components/comment-form.kay'
 
@@ -348,6 +352,7 @@ CommentForm
 
 ```kay
 ---
+import { signal } from 'kay'
 import { comment } from '../routes/guestbook.kay'
 import { checkComment } from '../comment'
 import type { CommentErrors } from '../comment'

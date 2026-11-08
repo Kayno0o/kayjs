@@ -26,6 +26,8 @@ A component that reacts to the user is an island. This one has an `onClick` and 
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times

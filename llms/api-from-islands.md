@@ -8,7 +8,7 @@
 
 ```kay
 ---
-import { resource } from 'kay'
+import { resource, signal } from 'kay'
 import rooms from '../api/chat'
 
 const search = signal('')
@@ -24,7 +24,7 @@ p {list.status()}
 
 ```kay
 ---
-import { call, ApiError } from 'kay'
+import { call, ApiError, signal } from 'kay'
 import notes from '../api/notes'
 
 const title = signal('')
@@ -95,7 +95,7 @@ An island imports a module for its routes:
 
 ```kay
 ---
-import { socket, stream } from 'kay'
+import { socket, stream, signal } from 'kay'
 import chat from '../api/chat'
 
 const { room } = props<{ room: string }>()

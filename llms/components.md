@@ -43,6 +43,8 @@ A signal holds it, read by calling it and written by assigning it, in the templa
 
 ```kay
 ---
+import { signal, memo } from 'kay'
+
 const count = signal(0)
 const double = memo(() => count() * 2)
 ---
@@ -64,6 +66,7 @@ button(onClick={() => open = !open}) {open ? 'Hide' : 'Show'}
 
 ```kay
 ---
+import { signal } from 'kay'
 import Toggle from './toggle.kay'
 
 const open = signal(false)
@@ -79,6 +82,8 @@ if open()
 
 ```kay
 ---
+import { signal, effect } from 'kay'
+
 const query = signal('')
 
 effect(() => {
@@ -94,7 +99,7 @@ input(bind:value={query} aria-label="Search")
 
 ```kay
 ---
-import { debounced, watch } from 'kay'
+import { debounced, watch, signal, onCleanup } from 'kay'
 
 const typed = signal('')
 const found = signal<string[]>([])
@@ -123,7 +128,7 @@ ul
 
 ```kay
 ---
-import { every, listen } from 'kay'
+import { every, listen, signal } from 'kay'
 
 const seconds = signal(0)
 const key = signal('')
@@ -142,6 +147,8 @@ A page or a layout reads it in a `--- server` fence, which never reaches the bro
 --- server
 const greeting = 'Hello'
 --- script
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 p {greeting}
@@ -243,6 +250,8 @@ ul
 
 ```kay
 ---
+import { store, every } from 'kay'
+
 const game = store({ coins: 0, miners: [{ id: 1, ore: 0 }] })
 
 every('50ms', () => game.miners[0].ore += 1)

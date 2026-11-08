@@ -220,6 +220,8 @@ Handlers are camelCase attributes. A component with one becomes an [island](/ess
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const name = signal('')
 const agree = signal(false)
 ---
@@ -236,6 +238,8 @@ More of the same on an element:
 
 ```kay
 ---
+import { signal } from 'kay'
+
 const plan = signal('free')
 const topics = signal<string[]>([])
 const more = signal(false)

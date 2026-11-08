@@ -257,7 +257,7 @@ Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`. `err
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const signIn = action(s.Object({
   identifier: s.String({ maxLength: 254 }),
@@ -295,6 +295,8 @@ Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'`
 
 ```kay
 --- server
+import { action } from 'kay'
+
 export const start = action(async ctx => {
   await ctx.locals.auth.signInAsGuest()
 
@@ -351,7 +353,7 @@ Two-factor asks for a code from an authenticator app after the password. It take
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), async ({ code }, ctx) => {
   const result = await ctx.locals.auth.twoFactor.enable(code)
@@ -461,7 +463,7 @@ The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const register = action(s.Object({
   email: s.String({ maxLength: 254 }),

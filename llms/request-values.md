@@ -7,6 +7,9 @@
 A template reads `ctx.<key>` for the request values an extension gives it, with no `--- server` fence and no import. kayjs-auth gives `ctx.user`, `ctx.can(role)` and `ctx.impersonator`:
 
 ```kay
+---
+import { ctx } from 'kay'
+---
 nav
   if ctx.user as user
     p Signed in as {user.username}
@@ -55,6 +58,9 @@ export default defineContext({
 ```
 
 ```kay
+---
+import { ctx } from 'kay'
+---
 // a component reading only ctx.cartCount loads only that
 a(href="/cart") Cart ({ctx.cartCount})
 ```

@@ -186,7 +186,7 @@ Call `regenerate()` right after signing in, and `destroy()` to sign out. Both re
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 const credentials = s.Object({
   email: s.String({ maxLength: 254 }),
@@ -257,7 +257,7 @@ Only what the app derives is in `ctx.locals` at that point. Read the user from w
 
 To slow a client down inside a guard, count its attempts with `rateLimit`, see [Rate limit a guard or an API route](/guides/security#rate-limit-a-guard-or-an-api-route).
 
-<ReadMore href="/llms/server#guards">Which refusals answer before any guard runs, trailing slashes, translated paths and API module params are in the full server reference.</ReadMore>
+<ReadMore href="/llms/guards">Which refusals answer before any guard runs, trailing slashes, translated paths and API module params are in the full server reference.</ReadMore>
 
 ### Public routes
 

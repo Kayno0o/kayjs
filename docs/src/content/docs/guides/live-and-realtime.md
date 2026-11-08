@@ -194,7 +194,7 @@ An island imports an API module and reads its GET routes with `resource`. The ro
 
 ```kay
 ---
-import { resource } from 'kay'
+import { resource, signal } from 'kay'
 import notes from '../api/notes'
 
 const search = signal('')
@@ -331,7 +331,7 @@ Pass `start: false` to wait. The stream stays `idle` until a handler calls `star
 
 ```kay
 ---
-import { stream } from 'kay'
+import { stream, signal } from 'kay'
 import chat from '../api/chat'
 
 const prompt = signal('')
@@ -386,7 +386,7 @@ An island opens it with `socket()`. `send` takes the route's `body`, and `last()
 
 ```kay
 ---
-import { socket } from 'kay'
+import { socket, signal } from 'kay'
 import chat from '../api/chat'
 
 const { room } = props<{ room: string }>()

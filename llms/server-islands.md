@@ -10,6 +10,7 @@ A component rendered per request inside an otherwise prerendered page ([prerende
 
 ```kay
 --- server
+import { action } from 'kay'
 import { issueToken } from '../contact'
 
 export const contact = action(schema, send)
@@ -40,6 +41,7 @@ Section(title="Contact")
 
 ```kay
 --- server
+import { action } from 'kay'
 import { issueToken } from '../contact'
 
 export const contact = action(schema, send)

@@ -87,7 +87,7 @@ An island cannot call `ask`, because the key must stay on the server. Importing 
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
@@ -386,7 +386,7 @@ A user message can hold `attachments` beside its text. An attachment is a `File`
 ```kay
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 const bill = s.Object({ supplier: s.String(), total: s.Number() })
 
@@ -437,7 +437,7 @@ Give `ask` some of your actions as tools, and the model can use them. Passing an
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })

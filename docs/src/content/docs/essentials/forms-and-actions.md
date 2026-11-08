@@ -8,7 +8,7 @@ An action is a schema and a handler exported from a page's server fence. It beco
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { addTodo } from '../data'
 
 const newTodo = s.Object({
@@ -42,7 +42,7 @@ Like `s.UnionEnum(values)`, it has no default: leave the field out and an option
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { sendMessage } from '../mail'
 
 const TOPICS = { billing: 'Billing', support: 'Support' }
@@ -73,6 +73,8 @@ An action that takes nothing, such as a sign-out, leaves the schema out and give
 
 ```kay
 --- server
+import { action } from 'kay'
+
 export const signOut = action(async (ctx) => {
   await ctx.locals.session.destroy()
   ctx.redirect('/')
@@ -90,7 +92,7 @@ An action that a page and a component both use lives in a file called `_actions.
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const deleteTissue = action(s.Object({ id: s.Integer() }), async ({ id }) => {
   await removeTissue(id)
@@ -198,6 +200,7 @@ A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` wi
 
 ```kay
 --- server
+import { action } from 'kay'
 import { addTodo, exists } from '../data'
 import { schema } from '../schema'
 
@@ -233,6 +236,7 @@ The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does.
 
 ```kay
 --- server
+import { action } from 'kay'
 import { createUser } from '../data'
 import { schema } from '../schema'
 
@@ -250,6 +254,7 @@ An action reads the params of the page it was posted from in `ctx.params`. This 
 
 ```kay
 --- server
+import { action, s } from 'kay'
 import { projects } from '../../../db'
 
 export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), async ({ id }, ctx) => {
@@ -270,6 +275,7 @@ A refused call throws an `ActionError`, and `add.error('title')` shows the messa
 
 ```kay
 ---
+import { signal } from 'kay'
 import { add } from '../routes/index.kay'
 
 const title = signal('')
@@ -326,6 +332,7 @@ So an action suits a frequent write from an island, a vote or an undo, as well a
 
 ```kay
 ---
+import { signal } from 'kay'
 import { move } from '../routes/board.kay'
 
 const { id } = props<{ id: number }>()
@@ -343,7 +350,7 @@ A form posting in place, `form(action={add})`, tells an island how it went throu
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const add = action(s.Object({ title: s.String({ minLength: 1 }) }), async ({ title }) => title)
 --- script
@@ -424,7 +431,7 @@ A handler can send its answer in parts, such as a model's reply as it is written
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { complete } from '../data'
 
 export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }), async function* ({ prompt }) {
@@ -444,6 +451,7 @@ An island calling it gets a stream once the first value is there. `last()` reads
 
 ```kay
 ---
+import { signal } from 'kay'
 import type { ActionStream } from 'kay'
 import { reply } from '../routes/chat.kay'
 
@@ -503,6 +511,7 @@ To wait for writes you did not await, `await add.settled()` resolves once no cal
 
 ```kay
 ---
+import { signal } from 'kay'
 import { remove } from '../routes/index.kay'
 
 const { id } = props<{ id: string }>()
@@ -571,6 +580,7 @@ For spam that still gets through, `proofOfWork: true` makes each post cost the s
 
 ```kay
 --- server
+import { action } from 'kay'
 import { send } from '../mail'
 import { schema } from '../schema'
 

@@ -126,7 +126,7 @@ In the server fence of `src/routes/index.kay`, import `addBook` beside `listBook
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { addBook, listBooks } from '../books'
 
 const books = await listBooks()

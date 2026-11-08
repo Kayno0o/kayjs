@@ -67,7 +67,7 @@ unread.set(user.id, n => n + 1)
 
 ```kay
 ---
-import { socket } from 'kay'
+import { socket, signal } from 'kay'
 import chat from '../api/chat'
 
 const { room } = props<{ room: string }>()
