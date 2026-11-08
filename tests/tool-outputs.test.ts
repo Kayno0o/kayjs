@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from 'node:fs'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { cp, mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
@@ -121,6 +121,64 @@ describe('the emit kept between runs', () => {
     expect(await spawns(async () => derive(dir))).toBe(1)
     expect(await spawns(async () => derive(dir))).toBe(0)
     await Bun.write(join(linked, 'index.ts'), 'export const y = 2\n')
+    expect(await spawns(async () => derive(dir))).toBe(1)
+  })
+
+  it('emits again for a package linked from a folder above, a lockfile above and a tsconfig extended from outside, and not for a dependency the installer linked', async () => {
+    const above = await scratchDir('stamp-above-')
+    const dir = join(above, 'apps/web')
+    const workspace = join(above, 'packages/shared')
+    const store = join(above, 'node_modules/.bun/dep@1.0.0/node_modules/dep')
+    const base = join(above, 'tsconfig.base.json')
+
+    await cp(join(process.cwd(), await fixtureCopy('tool-outputs')), dir, { recursive: true })
+
+    const own = JSON.parse(await Bun.file(join(dir, 'tsconfig.json')).text()) as { compilerOptions: object }
+
+    await Bun.write(join(workspace, 'index.ts'), 'export const a = 1\n')
+    await Bun.write(join(store, 'index.ts'), 'export const b = 1\n')
+    await Bun.write(base, JSON.stringify({ compilerOptions: own.compilerOptions }))
+    await mkdir(join(above, 'node_modules/@scope'), { recursive: true })
+    await symlink(workspace, join(above, 'node_modules/@scope/shared'))
+    await symlink(store, join(above, 'node_modules/dep'))
+    await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: '../../tsconfig.base.json', include: ['src', '.kay/types'] }))
+
+    await derive(dir)
+    expect(await spawns(async () => derive(dir))).toBe(0)
+
+    await Bun.write(join(store, 'index.ts'), 'export const b = 2\n')
+    expect(await spawns(async () => derive(dir))).toBe(0)
+
+    await Bun.write(join(workspace, 'index.ts'), 'export const a = 2\n')
+    expect(await spawns(async () => derive(dir))).toBe(1)
+
+    await Bun.write(base, JSON.stringify({ compilerOptions: own.compilerOptions, extra: 1 }))
+    expect(await spawns(async () => derive(dir))).toBe(1)
+
+    await Bun.write(join(above, 'bun.lock'), '{}')
+    expect(await spawns(async () => derive(dir))).toBe(1)
+    expect(await spawns(async () => derive(dir))).toBe(0)
+  })
+
+  it('keeps the emit of a project with a type error, and reads the return type changed after it', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+    const file = join(dir, 'src/routes/index.kay')
+
+    await Bun.write(file, (await Bun.file(file).text()).replace('---\nh1', 'export const broken: number = \'no\'\n---\nh1'))
+    expect(await derive(dir)).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
+    expect(await spawns(async () => derive(dir))).toBe(0)
+
+    await Bun.write(file, (await Bun.file(file).text()).replace('count: 2, at', 'count: \'two\', at'))
+
+    expect(((await derive(dir))!['src/routes/index.kay#summary'] as { properties: { count: unknown } }).properties.count).toEqual({ type: 'string' })
+  })
+
+  it('reads the types again with the declarations cache emptied, as --no-cache does', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+
+    await derive(dir)
+    expect(await spawns(async () => derive(dir))).toBe(0)
+    await rm(join(dir, '.kay/cache'), { recursive: true, force: true })
     expect(await spawns(async () => derive(dir))).toBe(1)
   })
 

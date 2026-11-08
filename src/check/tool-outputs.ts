@@ -18,7 +18,7 @@ import { typingStamp } from './typing-stamp'
 // A run that does not end by then is stopped, and the tools list none: the build goes on.
 const EMIT_TIMEOUT = 2 * 60_000
 const PROBE_DIR = 'tool-probe'
-// Under `.kay`: the declarations of the last emit, with the stamp of the files they were read from.
+// Under `.kay/cache`, which `kay build --no-cache` empties: the declarations of the last emit, with the stamp of the files they were read from.
 const DECLARATIONS_CACHE = 'tool-declarations.json'
 
 const running = new Map<string, Promise<void>>()
@@ -165,7 +165,7 @@ async function emitDeclarations(root: string, probes: Probe[], tsconfig: string)
 // The declarations of the last emit, when the files they were read from are the ones of `stamp`.
 async function keptDeclarations(root: string, stamp: string): Promise<string | undefined> {
   try {
-    const kept = await Bun.file(join(root, KAY_DIR, DECLARATIONS_CACHE)).json() as { stamp?: string, declarations?: string }
+    const kept = await Bun.file(join(projectPaths(root).cache, DECLARATIONS_CACHE)).json() as { stamp?: string, declarations?: string }
 
     return kept.stamp === stamp ? kept.declarations : undefined
   }
@@ -175,11 +175,11 @@ async function keptDeclarations(root: string, stamp: string): Promise<string | u
 }
 
 async function keepDeclarations(root: string, stamp: string, declarations: string): Promise<void> {
-  const file = join(root, KAY_DIR, DECLARATIONS_CACHE)
+  const file = join(projectPaths(root).cache, DECLARATIONS_CACHE)
   const aside = `${file}.${process.pid}`
 
   try {
-    await mkdir(join(root, KAY_DIR), { recursive: true })
+    await mkdir(projectPaths(root).cache, { recursive: true })
     await Bun.write(aside, JSON.stringify({ stamp, declarations }))
     await rename(aside, file)
   }
