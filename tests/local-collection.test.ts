@@ -703,10 +703,14 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.text('p.error')).toBe('read broke')
     expect(await page.text('p.errorstatus')).toBe('0')
-    expect((await hooks(page))[2]).toBe('1')
+
+    // A failed read is tried again after 5 s on its own, which a loaded run can reach before the count is read.
+    const failures = Number((await hooks(page))[2])
+
+    expect(failures).toBeGreaterThanOrEqual(1)
 
     await page.click('button.sync')
-    await page.waitUntil(() => document.querySelector('.hooks')?.textContent?.split(' ')[2] === '2')
+    await eventually(async () => expect(Number((await hooks(page))[2])).toBeGreaterThan(failures))
 
     expect(await page.text('p.error')).toBe('read broke')
 
