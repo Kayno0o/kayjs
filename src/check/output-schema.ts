@@ -12,7 +12,7 @@ export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends bigint | Date ? string
   : T extends (...args: never[]) => unknown ? undefined
   : T extends Map<unknown, infer V> ? { [key: string]: Wire<V> }
-  : T extends { toJSON: () => infer R } ? Wire<R>
+  : T extends { toJSON: (...args: never[]) => infer R } ? Wire<R>
   : T extends Set<infer V> | readonly (infer V)[] ? Wire<V>[]
   : T extends object ? { [K in keyof T as [T[K]] extends [(...args: never[]) => unknown] ? never : K]: Wire<T[K]> }
   : never
