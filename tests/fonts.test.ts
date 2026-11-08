@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
 import { sourceHash } from '../src/server/csp'
 import { builtFonts, prepareFonts } from '../src/server/fonts'
+import { pages } from './shared-pages'
 
 const FONTS = [
   { family: 'Display "One"', src: resolve('tests/fixtures/seo/src/fonts/display.woff2'), weight: '100 900', preload: true },

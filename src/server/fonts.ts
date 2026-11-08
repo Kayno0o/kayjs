@@ -25,8 +25,8 @@ const NORMAL_STYLE = /-normal$/
 // A rule of a Fontsource stylesheet: its woff2 file and its range.
 const FACE_RANGE = /url\(([^)]+?\.woff2)\)[^}]*?unicode-range:([^;}]+)/g
 
-// Writes each font as a content-named asset, and records the rules declaring them beside the client build for a server that only reads it.
-export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string): Promise<FontAssets> {
+// Writes each font as a content-named asset into `dist`, the client folder of the build the server serves, and records the rules declaring them beside the client build for a server that only reads it.
+export async function prepareFonts(root: string, fonts: (FontConfig | FontsourceConfig)[], dir: string, dist?: string): Promise<FontAssets> {
   const rules: string[] = []
   const preload: FontAssets['preload'] = []
   const faces: NonNullable<FontAssets['faces']> = []
@@ -38,7 +38,7 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
     if (format === undefined)
       throw new KayError('font-invalid', `kay: the font ${font.src} is no .woff2, .woff, .ttf or .otf file`)
 
-    const url = await writeAsset(file, root)
+    const url = await writeAsset(file, root, dist)
     const declarations = [
       `font-family:"${font.family.replace(QUOTE, '\\$&')}"`,
       `src:url("${url}") format("${format}")`,

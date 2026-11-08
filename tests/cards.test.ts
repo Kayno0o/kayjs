@@ -10,7 +10,6 @@ import { clientDir, writeAsset } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { runInLocale } from '../src/runtime/locale-state'
-import { pages } from '../src/server'
 import { serveCards, setupCards, writeCards } from '../src/server/card'
 import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
 import { decodePng } from '../src/server/crop'
@@ -18,6 +17,7 @@ import { readFace } from '../src/server/face'
 import { prepareFonts } from '../src/server/fonts'
 import { fillOutline } from '../src/server/raster'
 import { svgCover, svgIcon } from '../src/server/svg-icon'
+import { pages } from './shared-pages'
 
 const FIXTURE = resolve('tests/fixtures/cards')
 const FONTS = join(FIXTURE, 'src/fonts')

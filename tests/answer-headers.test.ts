@@ -3,9 +3,10 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { files, memoryFiles, pages } from '../src/server'
+import { files, memoryFiles } from '../src/server'
 import { serveBuildFiles } from '../src/server/build-files'
 import { fixtureCopy, scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 const ORIGIN = 'http://localhost'
 const REQUEST_ID = /^[\w-]{22}$/
@@ -197,7 +198,8 @@ describe('the headers of every kind of answer', () => {
     expect((await sent('/api/items/headed')).same).toBe(true)
     expect((await sent('/api/items/response')).same).toBe(true)
     expect((await sent('/api/items/reused')).same).toBe(true)
-    expect((await sent(asset)).same).toBe(true)
+    // This server's own build, which names the file it serves.
+    expect((await sent((/\/_kay\/nav-[^"]+\.js/).exec(await (await inner.handle(new Request(`${ORIGIN}/`))).text())![0])).same).toBe(true)
     expect((await sent(files.url(stored))).same).toBe(true)
 
     const own = (/<form[^>]*action="([^"]+)"/).exec(await (await sent('/')).response.text())![1]!.replaceAll('&amp;', '&')

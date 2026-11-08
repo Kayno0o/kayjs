@@ -38,7 +38,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   let fonts: FontAssets | undefined
 
   if (config.fonts !== undefined && config.fonts.length > 0) {
-    fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir)
+    fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir, clientDir)
 
     if (!fonts)
       throw new KayError('executable-incomplete', 'kay: this executable holds no fonts; build it again with kay build --compile')

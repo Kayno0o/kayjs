@@ -4,8 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { files, memoryFiles, pages } from '../src/server'
-import { readClient } from '../src/server/client'
+import { files, memoryFiles } from '../src/server'
 import { loadGuards } from '../src/server/guards'
 import { localeSettings } from '../src/server/i18n'
 import { countWrites } from '../src/server/kept-pages'
@@ -15,6 +14,7 @@ import { routeMatch, routeTable } from '../src/server/route-table'
 import { routeOf, scanRoutes } from '../src/server/routes'
 import { configHead } from '../src/server/seo'
 import { scratchDir } from './scratch'
+import { builtClient, pages } from './shared-pages'
 
 describe('routeTable', () => {
   const served = (file: string) => ({ ...routeOf('/r', `/r/${file}`)!, layouts: [], special: {}, guards: [] })
@@ -67,10 +67,10 @@ describe('pageResponder', () => {
   const built = (path: string): Map<string, ServedPage> => new Map([[path, { html: '<p>Built</p>', encoded: {}, headers: [], status: 200, etag: '"built"', renderedAt: Date.now() }]])
 
   it('serves the copy kay build rendered, and renders afresh for a visitor coming back from a form post, kept by no cache', async () => {
-    // Boots the site, which builds the browser bundle the responder reads.
-    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
+    // The site boots, which builds the browser bundle the responder reads.
+    const client = await builtClient({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const respond = pageResponder({ client, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
     const visit = async (path: string, headers: Record<string, string> = {}) => {
       const response = await respond(about, {}, { request: new Request(`http://localhost${path}`, { headers }) }, new URL(`http://localhost${path}`))
 
@@ -85,11 +85,10 @@ describe('pageResponder', () => {
   })
 
   it('answers a page with a shared cache-control to everyone, and keeps it from a guarded page, a visitor with a flash cookie and one saving data', async () => {
-    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
+    const client = await builtClient({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const shared = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=3600'
     const timedWith = (headers: [string, string][]) => new Map([['/about', new Map([['/about', { ...built('/about').get('/about')!, cacheControl: shared, headers }]])]])
-    const client = (await readClient(root))!
     const visit = async (route: typeof about, headers: Record<string, string> = {}, stored: [string, string][] = []) => {
       const respond = pageResponder({ client, renderOptions: {}, prerendered: timedWith(stored), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
       const response = await respond(route, {}, { request: new Request('http://localhost/about', { headers }) }, new URL('http://localhost/about'))
@@ -106,7 +105,7 @@ describe('pageResponder', () => {
   })
 
   it('runs the served-page hooks on a page rendered per request alone, HTML only, and leaves the prerendered copy to transformPage', async () => {
-    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
+    const client = await builtClient({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const seen: string[] = []
     const hook = ({ path, html }: { path: string, html: string }) => {
@@ -114,21 +113,21 @@ describe('pageResponder', () => {
 
       return html.replace('<h1>', '<h1 data-hooked>')
     }
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const respond = pageResponder({ client, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
     const visit = async (path: string) => respond(about, {}, { request: new Request(`http://localhost${path}`) }, new URL(`http://localhost${path}`))
 
     expect(await (await visit('/about')).text()).toBe('<p>Built</p>')
     expect(await (await visit('/elsewhere')).text()).toContain('<h1 data-hooked>About</h1>')
     expect(seen).toEqual(['/elsewhere'])
 
-    const based = pageResponder({ client: (await readClient(root))!, renderOptions: { base: '/b' }, prerendered: new Map(), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const based = pageResponder({ client, renderOptions: { base: '/b' }, prerendered: new Map(), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
 
     await based(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))
     expect(seen).toEqual(['/elsewhere', '/about'])
   })
 
   it('keeps a kept page after a refused write and renders it live after one that went through', async () => {
-    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
+    const client = await builtClient({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const copies = built('/about')
     const page = copies.get('/about')!
@@ -146,7 +145,7 @@ describe('pageResponder', () => {
     })
     app.post('/saved', () => 'ok')
 
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes })
+    const respond = pageResponder({ client, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes })
     const visit = async () => (await respond(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))).text()
     const post = async (path: string) => app.handle(new Request(`http://localhost${path}`, { method: 'POST' }))
 
@@ -172,9 +171,8 @@ describe('pageResponder', () => {
       Bun.write(join(dir, 'gone/_guard.ts'), guard('({ notFound }) => notFound()')),
       Bun.write(join(dir, '_error.kay'), '--- server\nconst { status } = ctx.error\n---\nh1 Error {status}\na(href="/home") Home\n'),
     ])
-    await pages({ dirs: { routes: dir }, prebuilt: false })
+    const client = await builtClient({ dirs: { routes: dir }, prebuilt: false })
 
-    const client = (await readClient(root))!
     const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
     const { head } = await configHead(root, {}, client.dir)
     const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
@@ -207,8 +205,9 @@ describe('over a listening server', () => {
       Bun.write(join(dir, 'api/files.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/*\', ({ params }) => \'<p class="api">\' + params[\'*\'])\n'),
     ])
 
-    const app = new Elysia().use(await pages({ dirs: { routes, api: join(dir, 'api') }, redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: storage } }))
-    const client = (await readClient(process.cwd()))!
+    const wanted = { dirs: { routes, api: join(dir, 'api') }, redirects: { '/old/*': '/new/*' }, prebuilt: false as const, store: { files: storage } }
+    const app = new Elysia().use(await pages(wanted))
+    const client = await builtClient(wanted)
     const asset = (await readdir(client.dir)).find(file => file.endsWith('.js'))!
     const key = await files.put(new File(['hello'], 'hello.txt'))
 
