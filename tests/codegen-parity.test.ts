@@ -53,7 +53,7 @@ describe('a link', () => {
     expect(written.browser).not.toContain('import \'kay/i18n-links\'')
   })
 
-  it('that is a component or brings a spread is no link of the template: the spread decides at render', () => {
+  it('that brings a spread is no link of the template: the spread decides at render', () => {
     const spread = targets('a(href="https://x.dev" {...rows}) x')
 
     expect(spread.server).not.toContain('KayOutsideLink')
