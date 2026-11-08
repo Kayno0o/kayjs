@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { afterAll, expect, test } from 'bun:test'
+import { afterAll, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
 import { passwordGuard } from '../../../src/password'
@@ -22,14 +22,15 @@ test('signing out forgets the drafts the browser kept, and a draft is kept under
   await page.press('Enter')
   await page.waitUntil(() => document.querySelector('.kcms-admin-who') !== null, { timeout: '15s' })
 
-  // The admin names the person it let in, which the editor keys its drafts by.
-  expect(await page.evaluate(() => (/(?:^|; )kay_editor_who=[\w-]{22}/).test(document.cookie))).toBe(true)
-  await page.evaluate(() => {
+  // The admin names the person it let in, which the editor keys its drafts by. Signing in and out navigate, and a page.evaluate the navigation cuts off throws, where a wait tries again.
+  await page.waitUntil(() => (/(?:^|; )kay_editor_who=[\w-]{22}/).test(document.cookie), { timeout: '15s' })
+  await page.waitUntil(() => {
     localStorage.setItem('kcms:draft:somebody:posts:hello', '{}')
+
+    return true
   })
   await page.click('.kcms-admin-who button')
   await page.waitUntil(() => localStorage.length === 0, { timeout: '15s' })
   // The browser clears the drafts on submit and the server's Set-Cookie arrives with the response, so the cookie goes after them.
   await page.waitUntil(() => !document.cookie.includes('kay_editor_who'), { timeout: '15s' })
-  expect(await page.evaluate(() => document.cookie.includes('kay_editor_who'))).toBe(false)
 }, 60_000)
