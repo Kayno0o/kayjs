@@ -8,7 +8,7 @@ An action signs a visitor in with `password.signIn` and redirects to where they 
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const signIn = action(s.Object({ identifier: s.String({ maxLength: 254 }), password: s.String() }), async (input, ctx) => {
   const result = await ctx.locals.auth.password.signIn(input, { redirect: ctx.url.searchParams.get('redirect') ?? '/' })
@@ -45,7 +45,7 @@ The page a mailed link opens shows a button posting the token to an action, so o
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const query = s.Object({ token: s.Optional(s.String()) })
 
