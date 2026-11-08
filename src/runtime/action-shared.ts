@@ -95,7 +95,7 @@ export interface ProofOfWorkOptions {
 export type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
 
 // How an action is offered to an agent as an MCP tool.
-export interface ActionTool<Output = never> {
+export interface ActionTool<Output = never, Shape extends TSchema = TSchema> {
   // Its name, in place of the export's in snake case: `addNote` is `add_note`.
   name?: string | undefined
   // What the agent reads of it to choose it.
@@ -109,6 +109,9 @@ export interface ActionTool<Output = never> {
   // A method, so an `ActionProtection` built apart from the action it goes to still fits it.
   // eslint-disable-next-line ts/method-signature-style
   text?(value: Output): string
+  // What the action answers an agent, as a schema of the same `t` kind as its input: `/mcp` lists it as the tool's `outputSchema`, so a client knows the shape before it calls. It describes the JSON the agent receives, so a `Date` is `t.String()`, and `kay check` refuses one the handler's return value does not fit.
+  // The answer is then always sent as `structuredContent`, beside the `text` when there is one. Under `kay dev` an answer that does not match logs one warning naming the tool and the first path that differs; production checks nothing.
+  output?: Shape & (Wire<Output> extends Static<Shape> ? unknown : never) | undefined
 }
 
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.
@@ -157,9 +160,12 @@ export interface ActionHooks {
 }
 
 // What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents, `maxSize` for the body, and the hooks.
-export interface ActionProtection<Field extends string = never, Output = never> extends ActionHooks {
+// What an agent receives of a value, once `/mcp` has written it as JSON: a Date or a bigint as text, a Map as an object and a Set as an array.
+export type Wire<Value> = Value extends Date | bigint ? string : Value extends Map<infer Key, infer Item> ? Record<Key & string, Wire<Item>> : Value extends Set<infer Item> ? Wire<Item>[] : Value extends readonly (infer Item)[] ? Wire<Item>[] : Value extends (...args: never) => unknown ? never : Value extends object ? { [Key in keyof Value]: Wire<Value[Key]> } : Value
+
+export interface ActionProtection<Field extends string = never, Output = never, Shape extends TSchema = TSchema> extends ActionHooks {
   // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that the `honeypot`, `minTime` and `proofOfWork` of `protect` are skipped, as they only make sense for a form a person filled in.
-  tool?: boolean | string | ActionTool<Output> | undefined
+  tool?: boolean | string | ActionTool<Output, Shape> | undefined
   // The checks, over the app's `actions.protect` key by key: one named here replaces the app's, and `false` takes none of the app's defaults for this action.
   protect?: ActionProtect<Field> | false | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.

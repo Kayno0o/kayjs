@@ -12,6 +12,7 @@ export interface Tool {
   title: string
   description: string
   inputSchema: object
+  outputSchema?: object | undefined
   annotations: { readOnlyHint: boolean, destructiveHint: boolean, idempotentHint: boolean, openWorldHint: boolean }
   run: (args: Record<string, unknown>) => Promise<ToolResult>
 }

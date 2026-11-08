@@ -66,7 +66,7 @@ const NO_BODY = new Set(['get', 'delete'])
 const ANSWER = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
 
 // A tool per operation of the document that opted in and that a JSON call can make: an action that set `tool`, or an API route that did and whose body, if any, is a JSON object.
-export function documentedTools(document: Schema): AppTool[] {
+export function documentedTools(document: Schema, dev = false): AppTool[] {
   const tools: AppTool[] = []
 
   // Made safe as names and told apart here, as a route's own `operationId` is kept as written in the document.
@@ -74,7 +74,7 @@ export function documentedTools(document: Schema): AppTool[] {
 
   for (const [path, methods] of Object.entries(document.paths as Record<string, Record<string, Operation>>)) {
     for (const [method, operation] of Object.entries(methods)) {
-      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined && isTool(operation) ? toolOf(path, method, operation, operation.operationId, taken) : undefined
+      const tool = HTTP_METHODS.has(method) && operation.operationId !== undefined && isTool(operation) ? toolOf(path, method, operation, operation.operationId, taken, dev) : undefined
 
       if (tool)
         tools.push(tool)
@@ -89,7 +89,14 @@ function isTool(operation: Operation): boolean {
   return operation['x-kay-action'] === true || operation['x-kay-tool'] !== undefined
 }
 
-function toolOf(path: string, method: string, operation: Operation, id: string, taken: Set<string>): AppTool | undefined {
+// The object schema a tool's answer is described by: the 200 of its operation, which an action sets with `tool.output` and a route with `response`. None for another kind of answer, which a tool result cannot describe as structured content.
+function outputOf(operation: Operation): Schema | undefined {
+  const schema = (operation.responses[200] as { content?: Record<string, { schema?: Schema }> } | undefined)?.content?.['application/json']?.schema
+
+  return schema?.type === 'object' ? schema : undefined
+}
+
+function toolOf(path: string, method: string, operation: Operation, id: string, taken: Set<string>, dev = false): AppTool | undefined {
   const tool = operation['x-kay-tool']
   const description = tool?.description ?? ([operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`)
   const body = operation.requestBody?.content['application/json']?.schema as Schema | undefined
@@ -122,6 +129,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
 
   const reads = method === 'get' || operation['x-kay-read-only'] === true
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }
+  const outputSchema = outputOf(operation)
 
   const name = toolName(tool?.name ?? id, taken)
 
@@ -130,6 +138,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
     title: name,
     description,
     inputSchema,
+    ...outputSchema && { outputSchema },
     annotations: { readOnlyHint: reads, destructiveHint: method === 'delete', idempotentHint: reads || method === 'put' || method === 'delete', openWorldHint: false },
     call: async (args, context) => {
       const url = urlFor(path, operation.parameters ?? [], args, places)
@@ -148,7 +157,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, name, operation['x-kay-text'])
+      return dispatch(context, url, init, action, name, { text: operation['x-kay-text'], output: outputSchema !== undefined, check: dev ? operation['x-kay-output'] : undefined })
     },
   }
 }
@@ -190,7 +199,7 @@ function refusal(text: string): ToolResult {
 }
 
 // Sends the call through the whole app as a fetch would, so its guards, rate limits and `ctx.locals` are the web path's, and words what came back for the agent.
-async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, tool: string, text: ToolText | undefined): Promise<ToolResult> {
+async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, tool: string, how: Wording): Promise<ToolResult> {
   const { request, server, fallback } = context
   const headers = new Headers(init.headers)
 
@@ -215,11 +224,11 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual', signal: request.signal })
   const response = await visitAs(request, visit, server, fallback)
 
-  return result(context, visit, response, action, text)
+  return result(context, visit, response, action, how, tool)
 }
 
 // Words what the app answered for the agent: the result, or why there is none, which it may correct and call again.
-async function result(context: CallContext, visit: Request, response: Response, action: boolean, render: ToolText | undefined): Promise<ToolResult> {
+async function result(context: CallContext, visit: Request, response: Response, action: boolean, how: Wording, tool: string): Promise<ToolResult> {
   const type = response.headers.get('content-type') ?? ''
   const location = response.headers.get(REDIRECT_HEADER) ?? response.headers.get('location')
 
@@ -250,7 +259,7 @@ async function result(context: CallContext, visit: Request, response: Response, 
   if (action) {
     const value = text === '' ? undefined : decodeServerValue(text)
 
-    return value === undefined ? { content: [{ type: 'text', text: 'Done' }] } : sent(value, render)
+    return value === undefined ? { content: [{ type: 'text', text: 'Done' }] } : sent(value, how, tool)
   }
 
   if (!JSON_TYPE.test(type))
@@ -258,8 +267,8 @@ async function result(context: CallContext, visit: Request, response: Response, 
 
   const parsed = parseJson(text)
 
-  if (render && parsed !== undefined)
-    return written(parsed, render)
+  if (parsed !== undefined && (how.text || how.check))
+    return sent(parsed, how, tool)
 
   return { content: [{ type: 'text', text }], ...isRecord(parsed) && { structuredContent: parsed } }
 }
@@ -277,25 +286,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype
 }
 
-// What an action returned, as the text a model reads and as structured data when it is an object.
-function sent(value: unknown, render?: ToolText): ToolResult {
-  if (render)
-    return written(value, render)
-
-  const text = typeof value === 'string' ? value : json(value)
-
-  return { content: [{ type: 'text', text }], ...isRecord(value) && { structuredContent: JSON.parse(text) as object } }
+// How a tool words its answer: its `text`, whether a schema is listed for it, and in dev the check that the answer fits it.
+interface Wording {
+  text?: ToolText | undefined
+  output: boolean
+  check?: ((value: unknown) => string | undefined) | undefined
 }
 
-// What the tool's `text` made of the value, alone: the agent reads no JSON beside it. A renderer that throws is the agent's refusal.
-function written(value: unknown, render: ToolText): ToolResult {
+// The tools whose answer was found not to match their output, each warned of once.
+const warned = new Set<string>()
+
+// What an action returned, as the text a model reads and as structured data when it is an object. A tool with `text` sends that alone, unless a schema is listed for it, which its structured content must always accompany.
+function sent(value: unknown, how: Wording, tool: string): ToolResult {
+  const plain = typeof value === 'string' ? value : json(value)
+  const structured = isRecord(value) ? JSON.parse(plain) as object : undefined
+  const where = structured === undefined ? undefined : how.check?.(structured)
+
+  if (where !== undefined && !warned.has(tool)) {
+    warned.add(tool)
+    console.warn(`kay: the tool ${tool} answered a value its output does not describe, at ${where || 'the root'}`)
+  }
+
+  if (!how.text)
+    return { content: [{ type: 'text', text: plain }], ...structured && { structuredContent: structured } }
+
+  const text = worded(value, how.text)
+
+  return typeof text === 'string' ? { content: [{ type: 'text', text }], ...how.output && structured && { structuredContent: structured } } : text
+}
+
+// What the tool's `text` made of the value, or the agent's refusal when it threw or returned no string.
+function worded(value: unknown, render: ToolText): string | ToolResult {
   try {
     const text: unknown = render(value as never)
 
     if (typeof text !== 'string')
       throw new TypeError(`the tool's text returned ${typeof text}, not a string`)
 
-    return { content: [{ type: 'text', text }] }
+    return text
   }
   catch (error) {
     // The agent is told it failed, and the app's logs see why.
@@ -337,6 +365,8 @@ export interface McpOptions {
   perMinute: number | undefined
   // Set with `mcp.key`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
   key?: string | false | undefined
+  // Under `kay dev`: an answer that does not match the tool's `output` logs one warning.
+  dev?: boolean | undefined
 }
 
 // A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
@@ -484,7 +514,7 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpo
 // Serves the tools of `document` at `/mcp` over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
-  const tools = documentedTools(document).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
+  const tools = documentedTools(document, options.dev === true).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
   const known = new Set(tools.map(tool => tool.name))
   const mcp = new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } })
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
@@ -593,7 +623,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
   const settings = toolSettings(action.protection?.tool) ?? {}
   const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
   // eslint-disable-next-line ts/unbound-method -- a function the author wrote, never called on the settings object
-  const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...settings.text && { text: settings.text } }, guards: [] }, new Set())
+  const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...settings.text && { text: settings.text }, ...settings.output !== undefined && { output: settings.output } }, guards: [] }, new Set())
   const tool = operation && toolOf(url, 'post', operation, operation.operationId!, new Set())
 
   if (!tool)

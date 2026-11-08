@@ -241,6 +241,10 @@ h1 Notes
 
 The agent gets that text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the notes. An error thrown by `text` is the agent's refusal. A route's `detail.tool` takes `text` the same way, from its parsed JSON answer.
 
+To tell a client what a tool answers before it calls, give the action an `output` schema: `tool: { output: s.Object({ id: s.Integer(), title: s.String() }) }`. `/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
+
+A tool with an `output` always sends its answer as `structuredContent`, beside the `text` when it has one. Under `kay dev` an answer that does not match the schema logs one warning naming the tool and the first path that differs; production checks nothing. An API route lists the object schema of its `response` the same way, with nothing more to declare.
+
 An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool. A call names no page to read the params from. Routes with a file in their body, and actions with a file in their schema, are not offered either, as an agent sends JSON.
 
 ### Guards and limits

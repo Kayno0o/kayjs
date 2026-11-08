@@ -1,4 +1,4 @@
-import type { Elysia } from 'elysia'
+import type { Elysia, TSchema } from 'elysia'
 import type { ActionTool } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
@@ -11,6 +11,7 @@ import { inLocale, passGuards } from './actions'
 import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
+import { compiledCheck, refusals } from './schema-check'
 import { markPrivate } from './scope'
 import { snakeCase } from './snake-case'
 import { toolSettings } from './tool-settings'
@@ -42,6 +43,14 @@ type Schema = Record<string, unknown>
 // The `text` of a tool's settings, which turns what the action returned into the agent's answer.
 export type ToolText = (value: never) => string
 
+function firstMismatch(schema: unknown): (value: unknown) => string | undefined {
+  return (value) => {
+    const [found] = refusals(compiledCheck(schema as TSchema), value, pointer => pointer, () => '', 1).keys()
+
+    return found
+  }
+}
+
 // A tool action as the document lists it.
 export interface DocumentedAction {
   // The name it is exported under, `addNote`.
@@ -49,7 +58,7 @@ export interface DocumentedAction {
   url: string
   schema: unknown
   // What `tool` on the action sets, by itself or beside its description.
-  tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined, text?: ToolText | undefined }
+  tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined, text?: ToolText | undefined, output?: unknown }
   // The files of the guards covering it.
   guards: string[]
 }
@@ -81,6 +90,8 @@ export interface Operation {
   'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
   // The tool's `text`, a function the JSON of the document leaves out.
   'x-kay-text'?: ToolText | undefined
+  // Where an answer first differs from the tool's `output`, as a JSON pointer, or undefined when it fits: kept for `kay dev`, which warns of a mismatch.
+  'x-kay-output'?: ((value: unknown) => string | undefined) | undefined
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
   // Set on an action tool that only reads (`tool: { readOnly: true }`), which `tools/list` annotates as such.
@@ -300,11 +311,12 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>): O
     'tags': ['actions'],
     ...action.tool.description !== undefined && { summary: action.tool.description },
     'requestBody': { required: true, content: content(action.schema, 'application/json') },
-    'responses': { 200: { description: 'OK' } },
+    'responses': { 200: { description: 'OK', ...action.tool.output !== undefined && { content: content(action.tool.output, 'application/json') } } },
     ...action.guards.length > 0 && { 'x-kay-guarded': true },
     'x-kay-action': true,
     ...action.tool.readOnly === true && { 'x-kay-read-only': true },
     ...action.tool.text && { 'x-kay-text': action.tool.text },
+    ...action.tool.output !== undefined && { 'x-kay-output': firstMismatch(action.tool.output) },
   }
 }
 

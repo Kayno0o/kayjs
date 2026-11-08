@@ -79,7 +79,7 @@ interface BroadcastStatus extends BroadcastProgress
   waiting: number
 
 [.] contactForm
-function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot, never>]
+function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot, never, TSchema>]
 
 [.] ContactInput
 type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = {
@@ -107,7 +107,7 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
   maxLength?: number | undefined
   maxLinks?: number | undefined
   onSend?: Hook<{ input: ContactInput<Extra, Consent>; id: string; }> | undefined
-  protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never, never>, "maxSize" | "tool">) | undefined
+  protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never, never, TSchema>, "maxSize" | "tool">) | undefined
   reach?: string | undefined
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
   to?: ((input: ContactInput<Extra, Consent>) => Address | Address[]) | Address | Address[] | undefined
@@ -188,7 +188,7 @@ interface ListOptions
   onUnsubscribe?: Hook<ListEvent> | undefined
   pace?: undefined | { batch?: number | undefined; every?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   privacy?: string | undefined
-  protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never, never>, "maxSize" | "tool">) | undefined
+  protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never, never, TSchema>, "maxSize" | "tool">) | undefined
   store?: ListStore | undefined
   title?: string | undefined
   view?: ((props: ListConfirmProps) => Element) | undefined
@@ -322,7 +322,7 @@ interface MailingList
   form: () => [schema: SubscribeSchema, handler: (input: {
   email: string;
   wording?: string | undefined;
-}, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string, never>]
+}, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string, never, TSchema>]
   name: string
   preview: <P extends object>(message: ListMessage<P>) => Promise<{ subject: string; html: string | undefined; text: string; }>
   send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string; recipients: number; }>

@@ -47,6 +47,12 @@ export const solve = action(t.Object({}), () => 'solved', { tool: true, protect:
 
 export const digest = action(t.Object({}), () => ({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) }), { tool: { text: ({ notes }) => notes.map(note => note.title).join('\n') } })
 
+export const report = action(t.Object({}), () => ({ count: 2, at: new Date(0) }), { tool: { readOnly: true, output: t.Object({ count: t.Number(), at: t.String() }) } })
+
+export const reportWorded = action(t.Object({}), () => ({ count: 2, at: new Date(0) }), { tool: { output: t.Object({ count: t.Number(), at: t.String() }), text: ({ count }) => `${count} things` } })
+
+export const lies = action(t.Object({}), () => ({ count: 'two' as unknown as number }), { tool: { output: t.Object({ count: t.Number() }) } })
+
 export const mute = action(t.Object({}), () => ({ notes: [] }), { tool: { text: () => { throw new Error('no words') } } })
 
 export const peek = action(t.Object({}), () => 'peeked', { tool: { readOnly: true } })

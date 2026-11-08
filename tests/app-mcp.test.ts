@@ -18,6 +18,7 @@ const BEARER = { authorization: 'Bearer open' }
 const locals = (request: Request) => ({ key: request.headers.get('authorization') === 'Bearer open' ? 'open' : undefined })
 
 const site = await testSite({ dirs: { routes, api }, mcp: true, islands: false, locals })
+const dev = await testSite({ dirs: { routes, api }, mcp: true, islands: false, dev: true })
 const off = await testSite({ dirs: { routes, api }, islands: false })
 const throttled = await testSite({ dirs: { routes, api }, mcp: { rateLimit: 3 }, islands: false })
 const unthrottled = await testSite({ dirs: { routes, api }, mcp: { rateLimit: false }, islands: false })
@@ -47,7 +48,7 @@ delete process.env.KAY_PROXY_KEY
 const localized = await testSite({ dirs: { routes, api }, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([throttled.close(), unthrottled.close(), site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
+  await Promise.all([dev.close(), throttled.close(), unthrottled.close(), site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -219,12 +220,16 @@ describe('the tools', () => {
       'get_notes_listed',
       'get_notes_paged',
       'get_notes_search',
+      'get_notes_shaped',
       'get_notes_who',
       'get_notes_words',
       'get_private',
       'language',
+      'lies',
       'listing',
       'refuses',
+      'report',
+      'report_worded',
       'sends_away',
       'signup',
       'solve',
@@ -351,11 +356,60 @@ describe('calling an action', () => {
     expect(await site.mcp.call('anyway_post')).toMatchObject({ text: 'x' })
   })
 
-  it('leaves the text function out of the OpenAPI document', async () => {
-    const document = await (await openapi.fetch('/api/openapi.json')).text()
+  it('lists an outputSchema for a tool that declares an output or a route that declares a response, and sends the structured content with it', async () => {
+    const tools = await site.mcp.tools()
+    const schema = (name: string) => (tools.find(tool => tool.name === name) as { outputSchema?: object } | undefined)?.outputSchema
 
-    expect(document).toContain('digest')
+    expect(schema('report')).toMatchObject({ type: 'object', required: ['count', 'at'], properties: { count: { type: 'number' }, at: { type: 'string' } } })
+    expect(schema('get_notes_shaped')).toMatchObject({ type: 'object', required: ['n'] })
+    expect(schema('digest')).toBeUndefined()
+    expect(schema('bare')).toBeUndefined()
+    expect(await site.mcp.call('report')).toMatchObject({ data: { count: 2, at: '1970-01-01T00:00:00.000Z' } })
+    // The text is the agent's words, and the schema's structured content comes with it.
+    expect(await site.mcp.call('report_worded')).toMatchObject({ text: '2 things', data: { count: 2 } })
+  })
+
+  it('warns once under kay dev of an answer its output does not describe, and never in production', async () => {
+    const warn = console.warn
+    const warnings: string[] = []
+
+    console.warn = (message: string) => warnings.push(message)
+
+    try {
+      await dev.mcp.call('lies')
+      await dev.mcp.call('lies')
+      await dev.mcp.call('report')
+      await site.mcp.call('lies')
+    }
+    finally {
+      console.warn = warn
+    }
+
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('lies')
+    expect(warnings[0]).toContain('/count')
+  })
+
+  it('leaves the functions out of the OpenAPI document and lists the output as the 200', async () => {
+    const document = await (await openapi.fetch('/api/openapi.json')).text()
+    const operations = (JSON.parse(document) as { paths: Record<string, { post: { 'x-kay-tool'?: object, 'responses': Record<string, { content?: Record<string, { schema: object }> }> } }> }).paths
+    const digest = operations['/_kay/action/tests/fixtures/mcp/src/routes/index.kay/digest']!.post
+    const report = operations['/_kay/action/tests/fixtures/mcp/src/routes/index.kay/report']!.post
+
+    expect(digest['x-kay-tool']).toBeUndefined()
+    expect(report.responses[200]!.content!['application/json']!.schema).toMatchObject({ type: 'object' })
     expect(document).not.toContain('x-kay-text')
+    expect(document).not.toContain('x-kay-output')
+  })
+
+  it('takes an output the handler\'s value fits, in the wire form', () => {
+    const wire = t.Object({ n: t.Number(), at: t.String() })
+
+    expect(() => action(() => ({ n: 1, at: new Date(0) }), { tool: { output: wire } })).not.toThrow()
+    // @ts-expect-error a Date is not what the agent receives it as
+    expect(() => action(() => ({ at: new Date(0) }), { tool: { output: t.Object({ at: t.Date() }) } })).not.toThrow()
+    // @ts-expect-error the handler returns a number where the schema says string
+    expect(() => action(() => ({ n: 1 }), { tool: { output: t.Object({ n: t.String() }) } })).not.toThrow()
   })
 
   it('takes a protection built apart from the action, or typed for a text', () => {
