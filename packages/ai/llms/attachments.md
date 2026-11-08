@@ -20,7 +20,7 @@ The scan goes with a `schema`, and `await` gives the checked object:
 ```kay
 --- server
 import { ask, storedFile } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 const bill = s.Object({ supplier: s.String(), total: s.Number(), due: s.Optional(s.String()) })
 

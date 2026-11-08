@@ -73,7 +73,7 @@ The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `sou
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { ask, chatMessages, embed, ground, lastChatMessage } from '@kaynooo/kayjs-ai'
 import { db } from '../db'
 import { Passage } from '../db/passage'

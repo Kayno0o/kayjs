@@ -60,7 +60,7 @@ An action returning the reply streams it to the island calling it, with the acti
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'You answer for the shop' }))

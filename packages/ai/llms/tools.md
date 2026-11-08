@@ -8,7 +8,7 @@ Pass actions in `tools` and the model can call them:
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })

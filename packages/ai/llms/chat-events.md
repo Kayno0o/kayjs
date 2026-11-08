@@ -20,6 +20,7 @@ Chat(action={reply} label="Assistant" onSend={({ messages }) => track('ask', mes
 
 ```kay
 ---
+import { signal } from 'kay'
 import { reply } from '../routes/chat.kay'
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 

@@ -9,7 +9,7 @@
 ```kay
 --- server
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
 --- script
