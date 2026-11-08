@@ -204,13 +204,14 @@ describe('forgejo timeout', () => {
 
       // The first read is quick, the commit takes most of the timeout, and the read after the conflict would not fit in what is left.
       const firstRead = !posting && reads++ === 0
-      const delay = firstRead ? 2 : 30
+      // Far from the timeout's edges, as a loaded runner's timers fire late.
+      const delay = firstRead ? 20 : 500
 
-      await wait(init?.signal, posting ? 40 : delay)
+      await wait(init?.signal, posting ? 600 : delay)
 
       return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
     }
-    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '60ms', fetch: request as typeof fetch })
+    const saver = forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: '1s', fetch: request as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'mine', base: 'f00d' })).rejects.toMatchObject({ current: 'f00d' })
   })
