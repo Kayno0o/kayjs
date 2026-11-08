@@ -1,16 +1,15 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import type { ElementPlan } from './markup'
-import type { BindingPlan } from './plan'
+import type { ElementShape } from './plan'
 import type { Sites } from './rewrite'
 import { bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
-import { addBindWrite, bindRead, helperName, TemplateWriter } from './markup'
+import { addBindWrite, bindRead, helperName } from './markup'
 import { PROPS } from './names'
-import { bindingOf, classMergeOf, staticAttributeText, writesAttribute } from './plan'
+import { bindingOf, classMergeOf, shapeOf, staticAttributeText, writesAttribute } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -44,24 +43,10 @@ const EVENT_HANDLER = /^on[A-Z]/
 const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
-export class JsxTemplate extends TemplateWriter {
+export class JsxTemplate {
   private rowKey: { key: Span, index: Span | undefined } | undefined
 
-  // The plan of the element whose attributes are being written, which a component has none of.
-  private planned: ElementPlan | undefined
-
-  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {
-    super(b, src, facts)
-  }
-
-  // Nothing here renders: a loop's rows and a component's slots are written as the JSX they are.
-  protected rendered(nodes: Node[]): void {
-    this.emitRoot(nodes)
-  }
-
-  protected skips(): boolean {
-    return false
-  }
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
 
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
@@ -687,15 +672,13 @@ export class JsxTemplate extends TemplateWriter {
   private emitAttributes(element: ElementNode) {
     const serverIsland = serverIslandOf(element, this.src)
     const { b } = this
-    const plan = element.component ? undefined : this.plan(element, undefined)
-
-    this.planned = plan
+    const shape = element.component ? undefined : shapeOf(element, this.src, this.facts.forms.get(element))
 
     if (element.id)
       b.add(' id="').addSource(element.id).add('"')
 
     // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
-    const merge = plan?.classMerge ?? classMergeOf(element, this.src)
+    const merge = shape?.classMerge ?? classMergeOf(element, this.src)
 
     if (merge.inline)
       addShorthandClass(b, element, merge, this.src, attribute => this.attributeName(attribute))
@@ -730,26 +713,26 @@ export class JsxTemplate extends TemplateWriter {
 
       b.add(' ')
 
-      if (!this.emitFormAttribute(element, attribute))
-        this.emitAttribute(element, attribute)
+      if (!this.emitFormAttribute(element, attribute, shape))
+        this.emitAttribute(element, attribute, shape)
     }
 
     if (merge.last)
       addMergedClass(b, element, merge, this.src)
 
-    if (plan?.action?.method)
+    if (shape?.action?.method)
       b.add(' method="post"')
 
     // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
-    if (plan?.action?.enctype)
+    if (shape?.action?.enctype)
       b.add(' enctype="multipart/form-data"')
   }
 
   // `form(action={add})` posts to the action's URL, and each field `name` inside it must be a key of the action's input.
-  private emitFormAttribute(element: ElementNode, attribute: Attribute): boolean {
+  private emitFormAttribute(element: ElementNode, attribute: Attribute, shape: ElementShape | undefined): boolean {
     const { b } = this
 
-    if (attribute.kind === 'expression' && attribute.expression === this.planned?.action?.expression) {
+    if (attribute.kind === 'expression' && attribute.expression === shape?.action?.expression) {
       this.attributeName(attribute).add(`={${helperName('formAction')}((`).addSource(attribute.expression).add('))}')
 
       return true
@@ -760,7 +743,7 @@ export class JsxTemplate extends TemplateWriter {
 
     const name = this.text(attribute.name)
     // The names written in a component's content are not checked against its action's input, while `field` keeps the target: it takes the constraints of the action's schema, which a component's own action carries too.
-    const target = name === 'name' && this.facts.loose.has(element) ? undefined : this.planned?.target
+    const target = name === 'name' && this.facts.loose.has(element) ? undefined : shape?.target
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
       return false
@@ -790,10 +773,10 @@ export class JsxTemplate extends TemplateWriter {
     return true
   }
 
-  private emitAttribute(element: ElementNode, attribute: Attribute) {
+  private emitAttribute(element: ElementNode, attribute: Attribute, shape: ElementShape | undefined) {
     const { b } = this
 
-    if (this.options.check && this.emitCheckedAttribute(element, attribute))
+    if (this.options.check && this.emitCheckedAttribute(element, attribute, shape))
       return
 
     switch (attribute.kind) {
@@ -819,7 +802,7 @@ export class JsxTemplate extends TemplateWriter {
       case 'expression': {
         const name = this.text(attribute.name)
 
-        const binding = this.bindingOf(attribute, name)
+        const binding = bindingOf(name, attribute)
 
         if (binding?.kind === 'bind') {
           this.emitBind(element, attribute, binding.property)
@@ -847,7 +830,7 @@ export class JsxTemplate extends TemplateWriter {
   }
 
   // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
-  private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
+  private emitCheckedAttribute(element: ElementNode, attribute: Attribute, shape: ElementShape | undefined): boolean {
     const { b } = this
 
     if (attribute.kind === 'boolean')
@@ -865,7 +848,7 @@ export class JsxTemplate extends TemplateWriter {
 
     const name = this.text(attribute.name)
 
-    if (this.planned?.link.checked.includes(attribute)) {
+    if (shape?.link.checked.includes(attribute)) {
       this.attributeName(attribute).add('={KayHref(')
 
       if (attribute.kind === 'static')
@@ -886,7 +869,7 @@ export class JsxTemplate extends TemplateWriter {
       return true
     }
 
-    if (!element.component || !this.options.sendsIslandProps || attribute.kind !== 'expression' || this.bindingOf(attribute, name)?.kind === 'bind')
+    if (!element.component || !this.options.sendsIslandProps || attribute.kind !== 'expression' || bindingOf(name, attribute)?.kind === 'bind')
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
@@ -923,16 +906,6 @@ export class JsxTemplate extends TemplateWriter {
     b.addSource({ start: at, end }).add('}')
 
     return true
-  }
-
-  // What an attribute binds or attaches, as the plan of its element has it; a component's attributes have no plan.
-  private bindingOf(attribute: Attribute, name: string): BindingPlan | undefined {
-    if (!this.planned)
-      return bindingOf(name, attribute)
-
-    const planned = this.planned.attributes.find(candidate => candidate.source === attribute)
-
-    return planned?.kind === 'binding' ? planned.binding : undefined
   }
 
   // The name of an attribute as written, which a bare `{name}` shares with its value, so the rewrites of that value leave it alone.

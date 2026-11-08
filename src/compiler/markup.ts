@@ -1,7 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import type { BindingPlan, ClassMerge, LinkPlan } from './plan'
+import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
@@ -9,7 +9,7 @@ import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE
 import { decodeEntities, isFunctionAt } from './expression'
 import { contentOf } from './items'
 import { PROPS } from './names'
-import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, linkOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
+import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
@@ -148,12 +148,11 @@ export type PlannedKind
     | { kind: 'value', name: string, expression: Span, action: boolean }
 
 // What an element without spreads renders, decided once for the server's markup and the browser's template.
-export interface ElementPlan {
+export interface ElementPlan extends ElementShape {
   id: string | undefined
   // The class shorthand, merged with a static `class`, or beside an expression one; `pieces` are the shorthand and the static `class` apart, which the server merges while rendering where the browser merged them while compiling.
   classes: { text: string, expression?: Span | undefined, parts?: string[], pieces?: string[] } | undefined
   attributes: PlannedAttribute[]
-  classMerge: ClassMerge
   // The `sizes` an image source caps, left out of the attributes.
   sizes: NamedAttribute | undefined
   // Markup written as the content; a textarea's static `value` is also kept as its text.
@@ -162,14 +161,10 @@ export interface ElementPlan {
   // An expression setting the content, read off its signal when `bound`.
   content: { expression: Span, property: string, raw: boolean, bound: boolean } | undefined
   selected: { expression: Span, bound: boolean } | undefined
-  action: { expression: Span, method: boolean, enctype: boolean } | undefined
-  // The action of the form the element sits in, and the field it is of that form.
-  target: Span | undefined
+  // The field the element is of the form it sits in.
   field: FormField | undefined
   // The `aria-describedby` a refused field or form takes.
   described: { id: string, own?: string } | undefined
-  // What an `a` may do with its `href`, as the server and the browser both write it.
-  link: LinkPlan
 }
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
@@ -205,28 +200,25 @@ export abstract class TemplateWriter {
 
   protected plan(element: ElementNode, errors: ErrorMessages | undefined): ElementPlan {
     const name = element.name
-    const target = this.formOf(element)
+    const shape = shapeOf(element, this.src, this.formOf(element))
+    const { target } = shape
     const classAttribute = this.classAttribute(element)
     const sizes = this.imageSizes(element)
     const field = target && formFieldOf(element, this.src)
-    const action = actionOf(element, this.src)
     const fieldDescribed = target && field?.invalid ? describedByOf(element, this.src, errors, target, field.name) : undefined
-    const described = field ? fieldDescribed : action && describedByOf(element, this.src, errors, action.expression, '')
+    const described = field ? fieldDescribed : shape.action && describedByOf(element, this.src, errors, shape.action.expression, '')
     const plan: ElementPlan = {
+      ...shape,
       id: element.id ? this.source(element.id) : errors?.ids.get(element),
       classes: undefined,
       attributes: [],
-      classMerge: classMergeOf(element, this.src),
       sizes,
       staticContent: undefined,
       valueText: undefined,
       content: undefined,
       selected: undefined,
-      action: action && { expression: action.expression, ...formDefaultsOf(element, this.src)! },
-      target,
       field,
       described,
-      link: linkOf(element, this.src),
     }
 
     const styleProps: StyleProp[] = []
@@ -325,7 +317,7 @@ export abstract class TemplateWriter {
         add({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: !this.named(element, 'style') && !this.named(element, NO_PLACEHOLDER) })
       }
       else {
-        add({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
+        add({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute.expression === shape.action?.expression })
       }
     }
 

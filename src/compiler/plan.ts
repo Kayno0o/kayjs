@@ -131,6 +131,16 @@ export function classMergeOf(element: ElementNode, src: string): ClassMerge {
   return { attribute, shorthand, spreads, written: shorthand !== undefined || (spreads && attribute !== undefined), inline: shorthand !== undefined && !spreads, last: spreads && (shorthand !== undefined || attribute !== undefined) }
 }
 
+// What an element is for the type check and the markup alike: how its classes merge, the action it posts to, the form it sits in and the URLs it names; a spread leaves these as they are.
+export interface ElementShape {
+  classMerge: ClassMerge
+  action: { expression: Span, method: boolean, enctype: boolean } | undefined
+  // The action of the form the element sits in.
+  target: Span | undefined
+  // What an `a` may do with its `href`, as the server and the browser both write it.
+  link: LinkPlan
+}
+
 const LINK_ELEMENTS = new Set(['a', 'area'])
 // The attribute of an element that names a URL the site's pages may serve, which `kay check` matches against them.
 const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
@@ -188,4 +198,11 @@ export function linkOf(element: ElementNode, src: string): LinkPlan {
   const hreflang = writesAttribute(element, 'hreflang', src)
 
   return { leaving: !writesAttribute(element, 'target', src), local: !hreflang, written: hreflang, rel: writesAttribute(element, 'rel', src), checked }
+}
+
+// The shape of an element sitting in the form that posts to `target`, if any.
+export function shapeOf(element: ElementNode, src: string, target: Span | undefined): ElementShape {
+  const action = actionOf(element, src)
+
+  return { classMerge: classMergeOf(element, src), action: action && { expression: action.expression, ...formDefaultsOf(element, src)! }, target, link: linkOf(element, src) }
 }

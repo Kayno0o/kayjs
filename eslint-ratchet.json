@@ -123,13 +123,13 @@
     "complexity": 112
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 714
+    "max-lines": 697
   },
   "src/compiler/lints.ts": {
     "max-lines": 1243
   },
   "src/compiler/markup.ts": {
-    "max-lines": 628,
+    "max-lines": 621,
     "complexity": 75
   },
   "src/compiler/module-signals.ts": {
