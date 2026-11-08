@@ -772,16 +772,22 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
   it('does nothing on retry() while signed out, until the visitor is back', async () => {
     const page = await opened()
 
+    let sent = 0
+
     await queuedSignedOut(page)
-    await page.evaluate(() => {
-      document.cookie = 'refuse=; path=/; max-age=0'
-    })
+    // The refusal stays while retry() is checked, so a send from an automatic path (the browser coming back online, the tab showing) that lands late cannot turn the status to synced: what retry() does is read off the requests it makes.
+    await page.route('/_kay/action/*', async () => void sent++)
     await page.click('button.retry')
     await Bun.sleep(400)
 
+    expect(sent).toBe(0)
     expect(await page.text('p.status')).toBe('signed-out')
     expect((await server()).saves).toBe(0)
 
+    await page.unroute()
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
     await page.click('button.sync')
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
 
