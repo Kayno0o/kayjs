@@ -1,14 +1,16 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import type { ElementPlan, LinkPlan } from './markup'
+import type { ElementPlan } from './markup'
+import type { LinkPlan } from './plan'
 import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, FIELD_ELEMENTS, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addGroupChecked, addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, groupValue, helperName, RAW_ELEMENTS, START_MARKER, staticAttributeText, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
+import { addGroupChecked, groupValue, staticAttributeText } from './plan'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const

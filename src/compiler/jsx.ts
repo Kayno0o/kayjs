@@ -5,8 +5,9 @@ import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS,
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
-import { addBindWrite, bindRead, formDefaultsOf, helperName, shorthandClass, staticAttributeText, writesAttribute } from './markup'
+import { addBindWrite, bindRead, helperName } from './markup'
 import { PROPS } from './names'
+import { formDefaultsOf, shorthandClass, staticAttributeText, writesAttribute } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
