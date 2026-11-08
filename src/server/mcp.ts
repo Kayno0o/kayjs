@@ -686,8 +686,14 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
       let used = tool
 
       if (devApps.has(app)) {
-        used = checked.get(app) ?? build(true)!
-        checked.set(app, used)
+        let variant = checked.get(app)
+
+        if (!variant) {
+          variant = build(true)!
+          checked.set(app, variant)
+        }
+
+        used = variant
       }
 
       return used.call(args, { request, server: requestServer(request) ?? null, fallback: async visit => app.handle(visit), challenged: false, page: postedFrom(request) ?? (answeredAsPage(request) ? requestUrl(request).href : undefined) })
