@@ -40,6 +40,7 @@ import { resourcesUsed, resourcesWanted, withSeeds } from '../runtime/live-resou
 import { unansweredLoads } from '../runtime/load-scope'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { STREAMED_HEADER } from '../runtime/markers'
 import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
 import { editing } from '../runtime/preview'
 import { currentServerScope } from '../runtime/reactive'
@@ -940,8 +941,10 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
   const unwrapped = output instanceof Rebased ? output.body : output
   const body = unwrapped instanceof Pieced ? unwrapped.text : unwrapped
 
-  if (body instanceof ReadableStream)
+  if (body instanceof ReadableStream) {
     requestRecord(rendering.ctx.request).streamed = true
+    rendering.headers.set(STREAMED_HEADER, '1')
+  }
 
   const response = bodyResponse(unwrapped, { status: rendering.status, headers: rendering.headers })
 

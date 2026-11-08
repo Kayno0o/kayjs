@@ -1,5 +1,5 @@
 import type { FetchedPage, LateParts } from './navigation'
-import { LATE_PART_END, SHELL_END } from './markers'
+import { LATE_PART_END, SHELL_END, STREAMED_HEADER } from './markers'
 import { pageKey, prefetched } from './navigation'
 import { LOADS_HEADER, NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { bounded, inFlight, LATE } from './swap-flight'
@@ -46,15 +46,18 @@ export function prefetch(url: URL, link: Element): void {
   setTimeout(() => void discard(key, page), PREFETCH_TTL_MS)
 }
 
+// The prefetched pages a navigation took, whose stream is its to read or stop.
+const claimed = new WeakSet<Promise<FetchedPage>>()
+
 async function discard(key: string, page: Promise<FetchedPage>): Promise<void> {
   if (prefetched.get(key)?.page === page)
     prefetched.delete(key)
 
-  try {
-    const { late } = await page
+  if (claimed.has(page))
+    return
 
-    if (!late?.followed)
-      late?.stop()
+  try {
+    (await page).late?.stop()
   }
   catch {}
 }
@@ -92,13 +95,18 @@ export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly
     return { url: response.url, type, html: '' }
   }
 
-  if (streaming && response.body) {
+  // Only a response that says it streams is searched for the end of its shell.
+  const streamed = response.headers.has(STREAMED_HEADER)
+
+  if (streaming && streamed && response.body) {
     const { html, late } = await shellOf(response.body.getReader())
 
     return { url: response.url, type, html, ...late && { late }, ...full && { full } }
   }
 
-  return { url: response.url, type, html: await response.text(), ...full && { full } }
+  const text = await response.text()
+
+  return { url: response.url, type, html: streamed ? text.replace(SHELL_END, '') : text, ...full && { full } }
 }
 
 async function cancelled(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
@@ -116,13 +124,18 @@ async function shellOf(reader: ReadableStreamDefaultReader<Uint8Array>): Promise
 
   for (;;) {
     const chunk = await reader.read()
+    const before = text.length
 
     text += decoder.decode(chunk.value, { stream: !chunk.done })
 
-    const end = text.indexOf(SHELL_END)
+    const end = text.indexOf(SHELL_END, Math.max(0, before - SHELL_END.length))
 
     if (end !== -1) {
-      let rest = text.slice(end + SHELL_END.length)
+      const after = text.slice(end + SHELL_END.length)
+      // The parts that came with the shell are part of the page shown, folded in before its first paint.
+      const done = after.lastIndexOf(LATE_PART_END)
+      const cut = done === -1 ? 0 : done + LATE_PART_END.length
+      let rest = after.slice(cut)
       const late: LateParts = {
         stopped: false,
         followed: false,
@@ -156,7 +169,7 @@ async function shellOf(reader: ReadableStreamDefaultReader<Uint8Array>): Promise
         },
       }
 
-      return { html: text.slice(0, end), late }
+      return { html: text.slice(0, end) + after.slice(0, cut), late }
     }
 
     if (chunk.done)
@@ -186,6 +199,8 @@ export async function pageFor(url: URL, signal: AbortSignal, loads?: readonly st
   prefetched.delete(key)
 
   if (held && Date.now() - held.at < PREFETCH_TTL_MS) {
+    claimed.add(held.page)
+
     try {
       return await held.page
     }

@@ -165,6 +165,30 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('restores the scroll Back saved below a block once the block has landed', async () => {
+    await using page = await (await ready()).open('/')
+
+    await page.click('a.slow')
+    await page.waitFor('p.pending')
+    release('a', 'A')
+    release('b', 'B')
+    await page.waitFor('p.done-b')
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+
+    const saved = await page.evaluate(() => Math.round(window.scrollY))
+
+    expect(saved).toBeGreaterThan(4000)
+    await page.evaluate(() => (document.querySelector('a.home') as HTMLElement).click())
+    await page.waitFor('h1', { text: 'Home' })
+    await page.back()
+    await page.waitFor('p.pending')
+    release('a', 'A')
+    release('b', 'B')
+    await page.waitFor('p.done-b')
+    await page.waitUntil(() => window.scrollY > 4000)
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(saved)
+  }, 60_000)
+
   it('swaps a page with no await block as before, in one request', async () => {
     await using page = await (await ready()).open('/')
 

@@ -131,7 +131,7 @@ describe('fetching a page that streams', () => {
         controller.close()
       },
     })
-    const response = new Response(body, { headers: { 'content-type': 'text/html' } })
+    const response = new Response(body, { headers: { 'content-type': 'text/html', 'x-kay-streamed': '1' } })
 
     Object.defineProperty(response, 'url', { value: 'http://localhost/shop' })
 
@@ -157,6 +157,30 @@ describe('fetching a page that streams', () => {
     expect(await fetched.late!.read()).toBeUndefined()
   })
 
+  it('folds the parts that came with the shell into it, leaving the rest to stream', async () => {
+    answer(() => streamed([`<body><p>shell</p><!--kay-shell-->${part('0', 'x')}${part('1', 'y').slice(0, 30)}`, part('1', 'y').slice(30)]))
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'), undefined, undefined, true)
+
+    expect(fetched.html).toBe(`<body><p>shell</p>${part('0', 'x')}`)
+    expect(await fetched.late!.read()).toBe(part('1', 'y'))
+  })
+
+  it('leaves a page that does not say it streams whole, a mark in its markup included', async () => {
+    answer(() => {
+      const response = streamed(['<body><p>raw <!--kay-shell--> html</p>', '<p>after</p>'])
+
+      response.headers.delete('x-kay-streamed')
+
+      return response
+    })
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'), undefined, undefined, true)
+
+    expect(fetched.html).toBe('<body><p>raw <!--kay-shell--> html</p><p>after</p>')
+    expect(fetched.late).toBeUndefined()
+  })
+
   it('reads a page with no mark whole, with nothing left to stream', async () => {
     answer(() => streamed(['<body>', '<p>plain</p>']))
 
@@ -179,7 +203,7 @@ describe('fetching a page that streams', () => {
     const encoder = new TextEncoder()
 
     answer(() => {
-      const response = new Response(new ReadableStream<Uint8Array>({ start: controller => controller.enqueue(encoder.encode('<body>a<!--kay-shell-->')) }), { headers: { 'content-type': 'text/html' } })
+      const response = new Response(new ReadableStream<Uint8Array>({ start: controller => controller.enqueue(encoder.encode('<body>a<!--kay-shell-->')) }), { headers: { 'content-type': 'text/html', 'x-kay-streamed': '1' } })
 
       Object.defineProperty(response, 'url', { value: 'http://localhost/shop' })
 

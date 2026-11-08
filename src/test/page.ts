@@ -1,3 +1,4 @@
+import { SHELL_END } from '../runtime/markers'
 import { SWAP_CALL, SWAP_SCRIPT } from '../server/swap'
 
 export interface Found {
@@ -287,6 +288,8 @@ function templateEnd(html: string, from: number): number {
 
 // The page as a visitor ends up seeing it: each streamed `<template data-kay-await>` put in place of the block it answers, as the page's inline script does, and that script left out.
 export function settledHtml(html: string): string {
+  html = html.replace(SHELL_END, '')
+
   const parts: { id: string, content: string }[] = []
   let page = ''
   let at = 0

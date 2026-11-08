@@ -142,11 +142,8 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   // A refresh is no navigation: the page stays where it is.
   const navigating = swap.intent !== 'refresh'
 
-  if (navigating) {
-    // The blocks of the page being left land on no other.
-    inFlight.late?.stop()
+  if (navigating)
     began(url)
-  }
 
   try {
     let page: FetchedPage
@@ -189,8 +186,11 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     if (inFlight.fetch === flight)
       inFlight.fetch = undefined
 
-    if (!isCurrent())
+    if (!isCurrent()) {
+      page.late?.stop()
+
       return
+    }
 
     if (navigating)
       navigation.phase?.('swapping', url)
@@ -396,9 +396,19 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     // For plain scripts, which no island tells of the swap.
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: target.href } }))
 
-    // The shell is the page now; its blocks land as they arrive.
-    if (page.late)
-      void streamed!.followLate(page.late, { inFlight, entry: ENTRY_SCRIPT, runnable, scriptMarkup })
+    // The shell is the page now; its blocks land as they arrive. A position restored or a fragment scrolled to may lie below them, so it is applied again as they land, until the visitor scrolls.
+    if (page.late) {
+      let at = scrollY
+
+      void streamed!.followLate(page.late, { inFlight, entry: ENTRY_SCRIPT, runnable, scriptMarkup, placed: policy.scroll === 'saved' || hash !== ''
+        ? () => {
+          if (scrollY === at) {
+            restoreScroll(swap.saved, hash)
+            at = scrollY
+          }
+        }
+        : undefined })
+    }
   }
 
   if (policy.transition && viewTransitions())

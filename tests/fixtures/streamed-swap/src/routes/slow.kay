@@ -15,6 +15,7 @@ await a
   p.pending Loading A
 then value
   p.done-a {value}
+  div.tail(style="height: 3000px")
 // kay-allow uncaught-await
 await b
   p.pending Loading B

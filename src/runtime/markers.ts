@@ -16,4 +16,6 @@ export const KEPT_END = '/kay-kept'
 
 // What a streamed page writes right after its shell, so a swap shows the shell before any block arrived, and what ends each part sent after it (the call of `server/swap`).
 export const SHELL_END = '<!--kay-shell-->'
+// The header of a response that streams, so the swap looks for `SHELL_END` in those alone.
+export const STREAMED_HEADER = 'x-kay-streamed'
 export const LATE_PART_END = '<script>$kayAwait()</script>'

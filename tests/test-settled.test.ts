@@ -63,6 +63,10 @@ describe('settledHtml on a stream that ended early', () => {
     expect(settledHtml(html)).toBe(html)
   })
 
+  it('leaves out the mark the stream put after the shell', () => {
+    expect(settledHtml(`<body><p>one</p><!--kay-shell-->`)).toBe('<body><p>one</p>')
+  })
+
   it('reads a template of the page\'s own inside a block, whole, before the cut', () => {
     const html = `<body>${pending('a')}<template data-kay-await="a"><p>done</p><template><i>kept</i></template></template>`
 

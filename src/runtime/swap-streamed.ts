@@ -7,6 +7,8 @@ export interface Swapper {
   entry: string
   runnable: (script: HTMLScriptElement, markup: string) => HTMLScriptElement
   scriptMarkup: (script: HTMLScriptElement) => string
+  // Called after each part is placed.
+  placed?: (() => void) | undefined
 }
 
 const SWAP_PATTERN = /\$kayAwait/
@@ -66,6 +68,8 @@ export async function followLate(late: LateParts, swapper: Swapper): Promise<voi
 
         return
       }
+
+      swapper.placed?.()
     }
   }
   catch (error) {
@@ -131,8 +135,14 @@ function placeLate(part: string, { entry, runnable, scriptMarkup }: Swapper): bo
     document.body.append(script)
 
   for (const node of old) {
-    if (node instanceof Element)
-      navigation.hooks!.dispose(node)
+    try {
+      if (node instanceof Element)
+        navigation.hooks!.dispose(node)
+    }
+    catch (error) {
+      // A cleanup that throws must not leave the part half placed.
+      reportError(error)
+    }
 
     node.remove()
   }
