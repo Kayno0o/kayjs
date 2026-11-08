@@ -323,7 +323,7 @@ Each swap fires a `kay:navigate` event on `document`, with the page's address in
 
 A page streaming `await` blocks is swapped in as soon as its first part is, each block showing its `pending` branch, so `kay:navigate` fires then, once, and `navigation.status()` is `'idle'` while blocks may still be arriving.
 
-Each block replaces its branch in place as it lands, keeping the focus and the scroll, and its islands hydrate. Another navigation ends the stream,.
+Each block replaces its branch in place as it lands, keeping the focus and the scroll, and its islands hydrate. Another navigation ends the stream.
 
 A stream that sends nothing for `client.pageTimeout` leaves the pending branches as they are and fires `kay:navigate-stall` on `document`, with `event.detail.url`. `kay:navigate-start` fires when a swap begins, and `kay:navigate-error` when it gives up and the browser loads the page in full, with `event.detail.url` and, for the error, `event.detail.error`.
 
