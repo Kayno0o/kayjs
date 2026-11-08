@@ -14,6 +14,7 @@ import { encodePng } from '../src/server/png'
 import { browserPath } from '../src/test'
 import { releaseIdleBrowser } from '../src/test/browser'
 import { freePort } from './free-port'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -21,7 +22,7 @@ const PNG = [137, 80, 78, 71]
 // Bun's client, which sends the headers a proxied page's would.
 const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 // CI installs Chromium for these: there, a missing browser fails rather than skips.

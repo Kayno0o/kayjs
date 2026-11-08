@@ -6,6 +6,7 @@ import { applySafeFixes, check } from '../src/check'
 import { moduleImportEdits } from '../src/check/missing-imports'
 import { compileKay } from '../src/compiler'
 import { parseExpanded } from '../src/compiler/markdown-block'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const page = 'src/routes/page.kay'
@@ -146,7 +147,7 @@ describe('imports written for a name a `kay/*` entry exports', () => {
 
   async function project(files: Record<string, string>): Promise<string> {
     const root = await scratchDir('implicit-import-')
-    const tsconfig = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
+    const tsconfig = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] })
 
     await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 

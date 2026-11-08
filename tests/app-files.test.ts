@@ -5,10 +5,11 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { appModules, buildingTestSite, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config-extensions'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
-const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
+const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] })
 
 // An extension of the app's own config naming two optional files, and answering with what it found in them and the root it was given; its API module serves one of them to another site, the app writing no module of its own.
 const CONFIG = `import { Elysia } from 'elysia'

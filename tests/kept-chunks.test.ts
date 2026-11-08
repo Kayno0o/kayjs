@@ -9,12 +9,13 @@ import { buildClient } from '../src/build/client'
 import { KEPT_BUILDS, keptDir, restoreKept, setAsideKept } from '../src/build/kept'
 import { serveBuildFiles } from '../src/server/build-files'
 import { MANIFEST, readClient } from '../src/server/client'
+import { kayTypes } from './kay-types'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
 const COUNTER = 'src/components/counter.kay'
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 const ISLAND_CHUNK = /^counter-[\da-z]+\.js$/

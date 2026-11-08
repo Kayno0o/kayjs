@@ -11,6 +11,7 @@ import { classTokens, unusedLibraryClasses } from '../src/build/prune'
 import { mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
 import { stylesOnly, watchProject } from '../src/dev/sources'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const projects: string[] = []
@@ -168,7 +169,7 @@ const LIBRARY: Record<string, string> = {
 function project(css: string): Record<string, string> {
   return {
     'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
-    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
     'src/app.css': css,
     'src/content.config.ts': 'import { collection } from \'kay/content\'\nimport Callout from \'ui-lib/callout.kay\'\n\nexport const notes = collection(\'content/notes\', { components: { Callout } })\n',
     'src/content/notes/first.md': '---\ntitle: First\n---\n\n<Callout>\n\nHi\n\n</Callout>\n',

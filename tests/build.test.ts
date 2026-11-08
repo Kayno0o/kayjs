@@ -38,6 +38,7 @@ import { browserStackMapper } from '../src/server/error-maps'
 import { compileErrorPage } from '../src/server/overlay'
 import { encodePng } from '../src/server/png'
 import { kayBuild, kayBuildSpawned } from './check-helper'
+import { kayTypes } from './kay-types'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -962,7 +963,7 @@ describe('kay build without the server environment', () => {
 })
 
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 

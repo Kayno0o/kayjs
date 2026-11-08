@@ -10,6 +10,7 @@ import { countWrites } from '../src/server/kept-pages'
 import { ownPostPaths } from '../src/server/plumbing'
 import { keptScan } from '../src/server/pure-page'
 import { kayBuild } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 type Route = Parameters<typeof keptScan>[0]
@@ -19,7 +20,7 @@ const readsNothing = async (route: Route) => await keptStop(route) === undefined
 
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 const PACKAGE_WITH_TABLER = '{ "devDependencies": { "@iconify-json/tabler": "*" } }\n'

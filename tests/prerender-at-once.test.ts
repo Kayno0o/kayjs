@@ -3,12 +3,13 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { kayBuild } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 // The pages of a route render several at once, each finishing in the reverse of its order: what the build says of each page is still its own, and a failure is the first in order.
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 // Each page waits longer than the next, so the last listed finishes first.

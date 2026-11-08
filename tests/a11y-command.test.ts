@@ -8,13 +8,14 @@ import { declaration, failed, formatReport, reportOf } from '../src/a11y/report'
 import { RGAA_CRITERIA, WCAG_CRITERIA } from '../src/a11y/rgaa-criteria'
 import { judge, RGAA_DECIDED, RGAA_FAILS } from '../src/a11y/standards'
 import { browserPath } from '../src/test'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 // CI installs Chromium for these: there, a missing browser fails rather than skips.
 const skipBrowser = browserPath() === undefined && (process.env.CI ?? '') === ''
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 

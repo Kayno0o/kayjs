@@ -15,6 +15,7 @@ import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
 import { rooms, sqliteRooms } from '../src/server/rooms'
 import { cookieJar, testSite } from '../src/test'
+import { kayTypes } from './kay-types'
 import { fixtureCopy } from './scratch'
 
 // Written into a copy, for this file only: any other test building the repository's root as one project would bundle the island's server imports, missing the fixture's API directory.
@@ -1196,7 +1197,7 @@ describe('kay check, API modules', () => {
 
     const project = await mkdtemp(join(scratch, 'check-api-'))
     const files = {
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'src/api/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'ok\')\n',
       'src/api/files.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/:name\', () => \'file\').ws(\'/live\', { message() {} })\n',
       'src/routes/index.kay': '--- server\nif (ctx.url.search)\n  ctx.redirect(\'/api/files/moved\')\n---\na(href="/api") a\na(href="/api/files/report.pdf") b\na(href="/api/files") c\na(href="/api/nope/deeper") d\n',

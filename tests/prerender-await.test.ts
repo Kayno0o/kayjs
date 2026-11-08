@@ -3,12 +3,13 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { kayBuild } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 // An `await` block on a prerendered page resolves at build, so its pending content never reaches a visitor: the build says so, and names a page that spent its render waiting.
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 const roots: string[] = []

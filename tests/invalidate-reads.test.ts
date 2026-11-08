@@ -3,11 +3,12 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { kayBuild } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 // Two pages share a value built from a collection: neither runs its load again once the first has.

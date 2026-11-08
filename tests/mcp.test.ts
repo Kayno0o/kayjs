@@ -6,12 +6,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { missingStore } from '../src/server/not-found'
 import { alive } from './alive'
 import { eventually } from './helpers/eventually'
+import { kayTypes } from './kay-types'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 

@@ -9,6 +9,7 @@ import { inParseScope, SourceParses } from '../src/build/source-parses'
 import { readKeptSource } from '../src/server/kept-source'
 import { keptScan } from '../src/server/pure-page'
 import { kayBuild } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const readOf = (file: string, source: string) => readKeptSource(file, source).read?.what
@@ -190,7 +191,7 @@ describe('a page the scan reads from its parse', () => {
   it('takes up in `kay build` the parses the class index made of a page', async () => {
     const root = await scratchDir('kept-source-')
     const files = {
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n',
       'src/routes/index.kay': '---\nconst tone = [\'mt-1\', \'mt-2\'][0]\n---\np(class={tone}) Hi\n',
     }

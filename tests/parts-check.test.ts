@@ -2,11 +2,12 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { check } from '../src/check'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
 
-const compilerOptions = { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }
+const compilerOptions = { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }
 const tsconfig = JSON.stringify({ compilerOptions, include: ['src', '.kay/types'] })
 const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
 const COMPONENTS = {

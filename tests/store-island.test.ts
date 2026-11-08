@@ -4,6 +4,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const path = browserPath()
@@ -25,7 +26,7 @@ describe('store in an island', () => {
     try {
       await cp(join(import.meta.dir, 'fixtures/store'), root, { recursive: true })
       await Bun.write(join(root, 'tsconfig.json'), JSON.stringify({
-        compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+        compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
         include: ['src', '.kay/types'],
       }))
 

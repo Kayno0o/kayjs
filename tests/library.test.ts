@@ -7,6 +7,7 @@ import { outOfStore, throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
 import { testSite } from '../src/test'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
@@ -30,7 +31,7 @@ const LIBRARY: Record<string, string> = {
 
 const PROJECT: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '1.0.0' } }),
-  'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+  'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
   'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
   // The app extends the defaults, keeping their tone.
   'src/ui-settings.ts': 'import type { Settings } from \'kay-lib\'\nimport { defaults } from \'kay-lib\'\n\nconst settings: Settings = { ...defaults, icon: name => `app:${name}` }\n\nexport default settings\n',

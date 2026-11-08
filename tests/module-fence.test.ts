@@ -6,6 +6,7 @@ import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { child } from '../src/runtime/html'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 await plugin(kay())
@@ -68,7 +69,7 @@ describe('kay check on a module fence', () => {
 
     try {
       await Promise.all(Object.entries({
-        'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+        'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
         'src/counter.kay': files['counter.kay']!,
         'src/routes/index.kay': '---\nimport { label, visits } from \'../counter.kay\'\nconst text: number = label(visits())\n---\np {text}\n',
       }).map(async ([path, content]) => Bun.write(join(root, path), content)))

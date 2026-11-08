@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
+import { kayTypes } from './kay-types'
 
 const CLI = resolve('src/cli.ts')
 const KEY = { 'x-key': 'open' }
@@ -95,7 +96,7 @@ describe('the OpenAPI document', () => {
     projects.push(dir)
     await Promise.all(Object.entries({
       'package.json': JSON.stringify({ name: 'app' }),
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ openapi: { reference: true } })\n',
       'src/routes/index.kay': 'a(href="/api/reference") API\na(href="/api/openapi.json") Spec\n',
     }).map(async ([path, content]) => Bun.write(join(dir, path), content)))

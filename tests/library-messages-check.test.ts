@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const TIMEOUT = 120_000
@@ -17,7 +18,7 @@ async function project(libraries: string[], config: string, own: Record<string, 
 
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'app', private: true, dependencies: Object.fromEntries(libraries.map(name => [`@kaynooo/kayjs-${name}`, '*'])) }),
-    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
     'kay.config.ts': config,
     'src/routes/index.kay': '---\nimport ContactMail from \'@kaynooo/kayjs-mail/contact-mail.kay\'\n---\nContactMail(subject="Hello" name="Ada" email="ada@example.com" message="Hi" fields={[]} site="https://example.com")\n',
     ...own,

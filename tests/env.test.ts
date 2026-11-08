@@ -13,6 +13,7 @@ import { publicEnvFiles } from '../src/server/env-state'
 import { overrideEnv } from '../src/test'
 import { kayInProject } from './check-helper'
 import { freePort } from './free-port'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 // Many cases spawn the CLI, which a loaded host runs slowly.
@@ -399,7 +400,7 @@ describe('kay env', () => {
 describe('a compiled server', () => {
   it('refuses a variable required in production only, and boots with it set', async () => {
     const root = await project({
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'export default { favicon: false }\n',
       'src/routes/index.kay': 'p Home\n',
       'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { defineEnv, pages } from \'kay/server\'\nimport { s } from \'kay\'\n\nconst env = defineEnv(s.Object({ SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }) }))\nawait new Elysia().use(await pages({ security: false })).handle(new Request(\'http://localhost/\'))\nconsole.log(env.SESSION_SECRET)\nprocess.exit(0)\n',
@@ -425,7 +426,7 @@ describe('a compiled server', () => {
 
   describe('with s.Public', () => {
     const files = {
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'export default { favicon: false }\n',
       'src/public-env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SITE_NAME: s.Public(s.String({ default: \'built\' })) }))\n\nconst counted = globalThis as { loads?: number }\n\ncounted.loads = (counted.loads ?? 0) + 1\n',
       'src/routes/index.kay': '---\nimport { publicEnv } from \'kay\'\nimport Picker from \'../picker.kay\'\n---\np#name {publicEnv.SITE_NAME}\nPicker\n',

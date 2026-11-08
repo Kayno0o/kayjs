@@ -3,10 +3,11 @@ import { basename, join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { serverExtensions } from '../src/config-extensions'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
-const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
+const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] })
 
 // An app with no kay.config.ts and no src/server.ts: two plugins in src/plugins, the second reading what the first derives, a helper and a test the folder leaves out.
 const APP: Record<string, string> = {

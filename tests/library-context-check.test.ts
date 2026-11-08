@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { implicitContextKeys } from '../src/server/context-reads'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const TIMEOUT = 120_000
@@ -18,7 +19,7 @@ async function project(config: string, component: string): Promise<string> {
 
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { ctxlib: '*' } }),
-    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
     'kay.config.ts': config,
     'src/routes/index.kay': '---\nimport Bell from \'ctxlib/bell.kay\'\n---\nBell()\n',
     'node_modules/ctxlib/package.json': JSON.stringify({ name: 'ctxlib', version: '1.0.0', peerDependencies: { kay: '*' }, kay: { context: './context.ts' }, exports: { './*.kay': './bell.kay', './extension': './extension.ts' } }),

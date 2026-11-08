@@ -5,6 +5,7 @@ import { stringify } from 'devalue'
 import { shutdown } from '../src/server/lifecycle'
 import { forgetOnces, onceForRequest } from '../src/server/request-scope'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -182,7 +183,7 @@ describe('kay check on ctx.guard', () => {
     projects.push(root)
     await Promise.all(Object.entries({
       'package.json': JSON.stringify({ name: 'app', private: true }),
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'export default {}\n',
       ...files,
     }).map(async ([path, text]) => Bun.write(join(root, path), text)))

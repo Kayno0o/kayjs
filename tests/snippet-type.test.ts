@@ -3,13 +3,14 @@ import { join } from 'node:path'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { check } from '../src/check'
 import { limiter } from '../src/server/limit'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
 
 const turn = limiter(2)
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 

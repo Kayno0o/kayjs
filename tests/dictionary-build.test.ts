@@ -10,6 +10,7 @@ import { outputDir } from '../src/build/assets'
 import { browse, browserPath } from '../src/test'
 import { kayBuild } from './check-helper'
 import { freePort } from './free-port'
+import { kayTypes } from './kay-types'
 import { listeningPort } from './listening'
 import { pages } from './shared-pages'
 
@@ -20,7 +21,7 @@ const ACCEPT = 'gzip, deflate, br, zstd, dcb, dcz'
 const path = browserPath()
 
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 

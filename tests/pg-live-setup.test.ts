@@ -11,11 +11,12 @@ import { pgHandle } from '../src/server/pg-data'
 import { eventually } from './helpers/eventually'
 import { restoreClock, virtualClock } from './helpers/virtual-clock'
 import { pgDescribe, pgIt, url } from './job-stores'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const TSCONFIG = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 const CONFIG = 'import { defineConfig, pgData } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, store: pgData(process.env.PG_LIVE_SETUP_URL!) })\n'

@@ -10,6 +10,7 @@ import { installClassTable } from '../src/runtime/class-table'
 import { child } from '../src/runtime/html'
 import { recipe } from '../src/runtime/recipe'
 import { settle } from '../src/test'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -265,7 +266,7 @@ describe('compiling a recipe', () => {
 })
 
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, noUnusedLocals: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, noUnusedLocals: true, skipLibCheck: true, paths: kayTypes() },
   include: ['src', '.kay/types'],
 })
 const CARD_IMPORT = '---\nimport Card from \'../card.kay\'\n---\n'

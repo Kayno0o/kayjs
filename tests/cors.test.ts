@@ -8,6 +8,7 @@ import { configuredSite, setSite } from '../src/runtime/site'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse, postedFrom } from '../src/server/actions'
 import { corsRule, preflight } from '../src/server/cors'
 import { testSite } from '../src/test'
+import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 const APP = 'https://app.example.com'
@@ -177,7 +178,7 @@ describe('an API module opening its routes to other sites', () => {
     try {
       await Promise.all(Object.entries({
         'package.json': JSON.stringify({ name: 'app' }),
-        'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+        'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
         'src/routes/index.kay': 'h1 Home\n',
         'src/api/open.ts': 'import { api } from \'kay/server\'\n\nexport default api({ cors: { origins: \'*\', credentials: true } }).get(\'/\', () => ({ open: true }))\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
