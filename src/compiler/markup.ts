@@ -86,6 +86,11 @@ export function writesAttribute(element: ElementNode, name: string, src: string)
   return element.attributes.some(attribute => attribute.kind !== 'spread' && src.slice(attribute.name.start, attribute.name.end) === name)
 }
 
+// The classes of the `.class` shorthand, as one `class` value.
+export function shorthandClass(element: ElementNode, src: string): string {
+  return element.classes.map(span => src.slice(span.start, span.end)).join(' ')
+}
+
 // The text of an attribute written as a quoted string.
 export function staticAttributeText(element: ElementNode, name: string, src: string): string | undefined {
   for (const attribute of element.attributes) {
@@ -893,7 +898,7 @@ export abstract class TemplateWriter {
   }
 
   protected shorthand(element: ElementNode): string {
-    return element.classes.map(span => this.source(span)).join(' ')
+    return shorthandClass(element, this.src)
   }
 
   // The shorthand merged with a static `class` into one string, a later class dropping an earlier one it overrides when the table is known.

@@ -5,7 +5,7 @@ import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS,
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
-import { addBindWrite, bindRead, formDefaultsOf, helperName, staticAttributeText, writesAttribute } from './markup'
+import { addBindWrite, bindRead, formDefaultsOf, helperName, shorthandClass, staticAttributeText, writesAttribute } from './markup'
 import { PROPS } from './names'
 import { bindEvent, bindProblem } from './validate'
 
@@ -780,7 +780,7 @@ export class JsxTemplate {
 
   private emitShorthandClass(element: ElementNode, attribute: NamedAttribute | undefined) {
     const { b } = this
-    const shorthand = element.classes.map(span => this.text(span)).join(' ')
+    const shorthand = shorthandClass(element, this.src)
     const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
 
     b.add(' ')
@@ -819,7 +819,7 @@ export class JsxTemplate {
     b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(open))
 
     if (shorthand)
-      b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))
+      b.add(JSON.stringify(shorthandClass(element, this.src)))
 
     let separator = shorthand ? ', ' : ''
 
