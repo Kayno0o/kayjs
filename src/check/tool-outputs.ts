@@ -13,10 +13,13 @@ import { routeMounts, scanRoutes } from '../server/routes'
 import { TOOL_OUTPUTS_RECORD, toolOutputKey } from '../server/tool-outputs'
 import { outputSchemasOf, WIRE_PRELUDE } from './output-schema'
 import { writeShadowTypes } from './shadow-types'
+import { typingStamp } from './typing-stamp'
 
 // A run that does not end by then is stopped, and the tools list none: the build goes on.
 const EMIT_TIMEOUT = 2 * 60_000
 const PROBE_DIR = 'tool-probe'
+// Under `.kay`: the declarations of the last emit, with the stamp of the files they were read from.
+const DECLARATIONS_CACHE = 'tool-declarations.json'
 
 const running = new Map<string, Promise<void>>()
 
@@ -100,6 +103,38 @@ async function emitted(root: string, options: CheckOptions, probes: Probe[], tsc
   if (!shadowed)
     await writeShadowTypes(root, { ...options, typesOnly: true })
 
+  const stamp = async () => typingStamp(root, resolve(root, tsconfig), [WIRE_PRELUDE, ...probes.map(({ key }) => key)])
+  const before = await stamp()
+  const kept = await keptDeclarations(root, before)
+  const declarations = kept ?? await emitDeclarations(root, probes, tsconfig)
+
+  // A run that gave nothing to read says nothing of the types.
+  if (declarations === undefined)
+    return undefined
+
+  if (kept === undefined) {
+    // A file or the shadow tree written while it ran may have been read in half: nothing is kept, and the next run emits again.
+    if (await stamp() !== before)
+      return undefined
+
+    await keepDeclarations(root, before, declarations)
+  }
+
+  const schemas = outputSchemasOf(declarations)
+  const outputs: Record<string, Record<string, unknown>> = {}
+
+  for (const [at, { key }] of probes.entries()) {
+    const schema = schemas.get(`t${at}`)
+
+    if (schema !== undefined)
+      outputs[key] = schema
+  }
+
+  return outputs
+}
+
+// The declarations tsgo emitted for the probes, which the schemas are read from.
+async function emitDeclarations(root: string, probes: Probe[], tsconfig: string): Promise<string | undefined> {
   await mkdir(join(root, KAY_DIR), { recursive: true })
 
   // A folder of its own, as a build and a dev server of the project may both run.
@@ -120,23 +155,39 @@ async function emitted(root: string, options: CheckOptions, probes: Probe[], tsc
     // Laid out under the root of the file system, as `rootDir` says.
     const declarations = Bun.file(join(dir, 'out', relative(parse(real).root, real), 'probe.d.ts'))
 
-    if (!await declarations.exists())
-      return undefined
-
-    const schemas = outputSchemasOf(await declarations.text())
-    const outputs: Record<string, Record<string, unknown>> = {}
-
-    for (const [at, { key }] of probes.entries()) {
-      const schema = schemas.get(`t${at}`)
-
-      if (schema !== undefined)
-        outputs[key] = schema
-    }
-
-    return outputs
+    return await declarations.exists() ? await declarations.text() : undefined
   }
   finally {
     await rm(dir, { recursive: true, force: true })
+  }
+}
+
+// The declarations of the last emit, when the files they were read from are the ones of `stamp`.
+async function keptDeclarations(root: string, stamp: string): Promise<string | undefined> {
+  try {
+    const kept = await Bun.file(join(root, KAY_DIR, DECLARATIONS_CACHE)).json() as { stamp?: string, declarations?: string }
+
+    return kept.stamp === stamp ? kept.declarations : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function keepDeclarations(root: string, stamp: string, declarations: string): Promise<void> {
+  const file = join(root, KAY_DIR, DECLARATIONS_CACHE)
+  const aside = `${file}.${process.pid}`
+
+  try {
+    await mkdir(join(root, KAY_DIR), { recursive: true })
+    await Bun.write(aside, JSON.stringify({ stamp, declarations }))
+    await rename(aside, file)
+  }
+  catch {
+    // Only the next run is slower.
+  }
+  finally {
+    await rm(aside, { force: true })
   }
 }
 

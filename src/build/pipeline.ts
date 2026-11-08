@@ -278,7 +278,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   // The answers of the tool actions that declare no `output`, read from their types for the server to list; a build that cannot read them lists none.
   if (!exported)
-    await deriveToolOutputs(root, { ...configCheckOptions(project.config), entry: project.config.entry }, project.paths.output, { tsconfig: checkWith?.tsconfig, shadowed: checking })
+    await deriveToolOutputs(root, { ...configCheckOptions(project.config), entry: serverEntry(project, checkWith?.entry) }, project.paths.output, { tsconfig: checkWith?.tsconfig, shadowed: checking })
 
   if (options.compile) {
     const stage = performance.now()
@@ -348,8 +348,13 @@ function withoutModules(report: SizeReport | undefined): SizeReport | undefined 
   return report && { entry: report.entry && { ...report.entry, modules: undefined }, islands: report.islands.map(island => ({ ...island, modules: undefined })) }
 }
 
+// The server entry the check types, relative to the root: the one the build was given, else the config's.
+function serverEntry(project: Project, entry: string | undefined): string | undefined {
+  return entry === undefined ? project.config.entry : relative(project.root, resolve(project.root, entry))
+}
+
 async function checkStage(project: Project, { tsconfig = 'tsconfig.json', entry }: { tsconfig?: string | undefined, entry?: string | undefined }, exported: boolean): Promise<CheckDiagnostic[]> {
-  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: entry === undefined ? project.config.entry : relative(project.root, resolve(project.root, entry)), launch: true, exported })
+  return check(project.root, { ...configCheckOptions(project.config), tsconfig, entry: serverEntry(project, entry), launch: true, exported })
 }
 
 // An output set aside earlier is the last good build of a run that was interrupted, and what is in its place now is that run's partial one.

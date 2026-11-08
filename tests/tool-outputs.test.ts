@@ -1,12 +1,14 @@
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
+import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { buildProject } from '../src/build/pipeline'
 import { deriveToolOutputs } from '../src/check/tool-outputs'
+import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config-loader'
 import { readToolOutputs, recordedToolOutputs, TOOL_OUTPUTS_RECORD } from '../src/server/tool-outputs'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const SUMMARY = {
   type: 'object',
@@ -66,6 +68,81 @@ describe('the output schemas derived for tool actions', () => {
     await Bun.write(file, (await Bun.file(file).text()).replace(', note: undefined as string | undefined }), { tool: true })', ' }), {})'))
 
     expect(Object.keys((await derive(dir))!)).toEqual(['src/routes/index.kay#worded'])
+  })
+})
+
+describe('the emit kept between runs', () => {
+  // How many times tsgo was started while `run` ran.
+  async function spawns(run: () => Promise<unknown>): Promise<number> {
+    const spy = spyOn(Bun, 'spawn')
+
+    try {
+      await run()
+
+      return spy.mock.calls.filter(([command]) => Array.isArray(command) && command[0] === nativeExe()).length
+    }
+    finally {
+      spy.mockRestore()
+    }
+  }
+
+  it('starts no tsgo for a project that did not change, in a build or beside kay dev, and still records', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+    const config = await loadConfig(dir)
+    const recorded = join(outputDir(dir), TOOL_OUTPUTS_RECORD)
+
+    expect(await spawns(async () => derive(dir))).toBe(1)
+    expect(await spawns(async () => derive(dir))).toBe(0)
+
+    await rm(recorded, { force: true })
+    expect(await spawns(async () => buildProject(dir, config, { check: false }))).toBe(0)
+    expect((await Bun.file(recorded).json() as { outputs: object }).outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
+    expect(await spawns(async () => deriveToolOutputs(dir, {}, join(dir, '.kay', 'dev'), { shadowed: true }))).toBe(0)
+  })
+
+  it('emits again when a source, a config or a linked package changed, and not for a file that types nothing', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+
+    await derive(dir)
+    await Bun.write(join(dir, 'notes.md'), 'x')
+    expect(await spawns(async () => derive(dir))).toBe(0)
+
+    await Bun.write(join(dir, 'src/helper.ts'), 'export const x = 1\n')
+    expect(await spawns(async () => derive(dir))).toBe(1)
+
+    await Bun.write(join(dir, 'tsconfig.json'), `${await Bun.file(join(dir, 'tsconfig.json')).text()}\n`)
+    expect(await spawns(async () => derive(dir))).toBe(1)
+
+    const linked = await scratchDir('linked-package-')
+
+    await Bun.write(join(linked, 'index.ts'), 'export const y = 1\n')
+    await mkdir(join(dir, 'node_modules/@scope'), { recursive: true })
+    await symlink(linked, join(dir, 'node_modules/@scope/linked'))
+    expect(await spawns(async () => derive(dir))).toBe(1)
+    expect(await spawns(async () => derive(dir))).toBe(0)
+    await Bun.write(join(linked, 'index.ts'), 'export const y = 2\n')
+    expect(await spawns(async () => derive(dir))).toBe(1)
+  })
+
+  it('keeps nothing of an emit that a write overlapped, and records nothing from it', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+    const real = Bun.spawn.bind(Bun)
+    const spy = spyOn(Bun, 'spawn').mockImplementation(((...args: Parameters<typeof Bun.spawn>) => {
+      // An edit lands while tsgo runs.
+      writeFileSync(join(dir, 'src/helper.ts'), `export const at = ${Date.now()}\n`)
+
+      return real(...args)
+    }) as typeof Bun.spawn)
+
+    try {
+      expect(await derive(dir)).toBeUndefined()
+    }
+    finally {
+      spy.mockRestore()
+    }
+
+    expect(await spawns(async () => derive(dir))).toBe(1)
+    expect(await derive(dir)).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
   })
 })
 
