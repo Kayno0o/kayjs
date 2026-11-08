@@ -157,8 +157,9 @@ describe('the shared event poller', () => {
     slow.cancel = () => ++sent > 1 ? cancel() : slow
 
     await expect(timeLimited(async () => Promise.all([slow, sql`SELECT 1/0`]), 5000, 'the read')).rejects.toThrow()
+    // The division fails before the sleep reaches the server, which then has nothing running to count: the cancel sent again 250 ms later is what this waits for.
+    await eventually(() => expect(sent).toBeGreaterThan(1))
     expect(await activeAfterCancel(sql, 'SELECT pg_sleep(15)')).toBe(0)
-    expect(sent).toBeGreaterThan(1)
   })
 
   it('does not run a task again before its last run ended', async () => {
