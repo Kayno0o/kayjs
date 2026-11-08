@@ -25,7 +25,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fields at 
 
       return {
         page: { scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth },
-        boxes: ['#row select.kui-field-input', '#row #compact-select', '#row .kui-multi-select', '#row .kui-combobox', '#block select.kui-field-input', '#block #block-compact-select'].map(box),
+        boxes: ['#row select.kui-field-input', '#row #compact-select', '#row .kui-multi-select', '#row .kui-combobox', '#row .kui-combobox input', '#row [data-compact]', '#block [data-compact]', '#block select.kui-field-input', '#block #block-compact-select'].map(box),
       }
     })
 
