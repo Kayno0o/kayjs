@@ -1,0 +1,22 @@
+---
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+
+const long = 'A user name that is far longer than any phone is wide, in a filter row of a history page'
+const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: long }]
+---
+main#page
+  form#row.flex.flex-wrap.gap-2
+    Select#flex(aria-label="User" options={options} value="b")
+    FormField#compact(label="Compact" size="sm")
+      select#compact-select(name="compact")
+        option(value="b") {long}
+    MultiSelect#multi(label="Users" options={options} value={['b']})
+    Combobox#combo(label="Combo" options={options} value="b")
+  form#block
+    Select#block-select(aria-label="User" options={options} value="b")
+    FormField#block-compact(label="Compact" size="sm")
+      select#block-compact-select(name="compact")
+        option(value="b") {long}

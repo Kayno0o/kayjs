@@ -580,9 +580,10 @@
     @apply w-full;
   }
 
-  /* A select draws its text a little lower than a text box does, so it takes the height of one. */
+  /* A select draws its text a little lower than a text box does, so it takes the height of one. It is as wide as its longest option, which a narrow container, a phone's flex row above all, cannot hold: it stops at the container and cuts the shown option. */
   select.kui-field-input,
   .kui-form-field :where(select) {
+    @apply max-w-full min-w-0;
     min-height: var(--_field-height);
   }
 
