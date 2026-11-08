@@ -465,6 +465,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     await page.press('Enter')
     await page.waitFor('.kai-chat-turn[data-role="assistant"]')
+    // The assistant's turn shows as soon as the text is sent, before the model is asked.
+    await replied(page)
 
     expect(fakeAi.last()?.messages.map(message => message.content)).toEqual(['line one\nline two'])
   })
