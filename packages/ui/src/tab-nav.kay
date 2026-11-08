@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
 import type { TabEntry, TabLink } from './tab-nav'
-import { onMount, recipe, withQuery } from 'kay'
+import { effect, recipe, withQuery } from 'kay'
 import Icon from './icon.kay'
 import { tabOf } from './outside'
 import { currentTab, keptHref } from './tab-nav'
@@ -63,8 +63,10 @@ const items = (): { key: string, to: string, entry: TabEntry & Pick<TabLink, 'ne
   return tabs.map(entry => ({ key: String(entry.value), to: pick(entry.value), entry, on: String(entry.value) === String(shown) && !entry.disabled, scrolls: false }))
 }
 
-// A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen. Only the bar scrolls: `scrollIntoView` would also move the page to it.
-onMount(() => {
+// A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen, again when the links arrive after the first render. Only the bar scrolls: `scrollIntoView` would also move the page to it.
+effect(() => {
+  items()
+
   const link = nav?.querySelector('[aria-current="page"]')
 
   if (!nav || !link)

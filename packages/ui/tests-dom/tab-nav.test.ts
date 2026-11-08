@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mountComponent } from 'kay/test'
+import { mountComponent, settle } from 'kay/test'
+import TabsLater from '../tests/fixture/src/components/tabs-later.kay'
 import Tabs from '../tests/fixture/src/components/tabs.kay'
 
 // eslint-disable-next-line ts/unbound-method -- only put back on the prototype they were taken from
@@ -38,6 +39,26 @@ test('carries the params it keeps from the current URL onto each link, marking t
 
     expect(links.map(link => link.getAttribute('href'))).toEqual(['/settings/profile?period=7d', '/settings/keys?period=7d', '/settings/billing?period=7d', '/settings/danger?period=7d'])
     expect(links.map(link => link.getAttribute('aria-current'))).toEqual([null, 'page', null, null])
+  }
+  finally {
+    mounted.unmount()
+  }
+})
+
+test('centres the current tab once links that arrive after the first render are drawn', async () => {
+  Object.assign(HTMLElement.prototype, {
+    getBoundingClientRect(this: HTMLElement) {
+      return this.getAttribute('aria-current') === 'page' ? new DOMRect(250, 0, 50, 20) : new DOMRect(0, 0, 100, 20)
+    },
+  })
+
+  const mounted = await mountComponent(TabsLater)
+
+  try {
+    expect(mounted.root.querySelector('.kui-tab-nav')).toBeNull()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await settle()
+    expect(mounted.root.querySelector('.kui-tab-nav')?.scrollLeft).toBe(225)
   }
   finally {
     mounted.unmount()

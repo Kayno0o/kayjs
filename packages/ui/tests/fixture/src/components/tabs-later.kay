@@ -1,0 +1,12 @@
+--- island
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import { signal } from 'kay'
+
+// The links arrive after the first render, as from an async source.
+const links = signal<{ href: string, label: string }[]>([])
+
+setTimeout(() => {
+  links = ['profile', 'keys', 'billing', 'danger'].map(name => ({ href: `/settings/${name}`, label: name }))
+}, 50)
+---
+TabNav#later(links={links()} current="/settings/billing" label="Later")
