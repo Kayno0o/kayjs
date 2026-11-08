@@ -39,7 +39,14 @@ test('SideNav with no links, given or loaded, draws no menu button and no landma
   const root = await page()
 
   expect(root.querySelector('.kui-side-nav [data-part="menu"]')).not.toBeNull()
-  expect(root.querySelectorAll('.kui-side-nav')).toHaveLength(3)
-  expect(root.querySelectorAll('.kui-side-nav [data-part="menu"]')).toHaveLength(1)
-  expect(root.querySelectorAll('.kui-side-nav nav')).toHaveLength(1)
+  expect(root.querySelectorAll('.kui-side-nav')).toHaveLength(4)
+  expect(root.querySelectorAll('.kui-side-nav [data-part="menu"]')).toHaveLength(2)
+  expect(root.querySelectorAll('.kui-side-nav nav')).toHaveLength(2)
+})
+
+test('a SideNav whose load failed keeps its alert and retry', async () => {
+  const root = await page()
+
+  expect(root.querySelector('.kui-side-nav [role="alert"]')).not.toBeNull()
+  expect(root.querySelector('.kui-side-nav [data-part="retry"]')).not.toBeNull()
 })
