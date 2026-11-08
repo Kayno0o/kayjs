@@ -53,9 +53,12 @@ async function discard(key: string, page: Promise<FetchedPage>): Promise<void> {
   if (prefetched.get(key)?.page === page)
     prefetched.delete(key)
 
-  if (claimed.has(page))
-    return
+  if (!claimed.has(page))
+    await abandon(page)
+}
 
+// Stops the stream of a page nobody is going to show.
+export async function abandon(page: Promise<FetchedPage>): Promise<void> {
   try {
     (await page).late?.stop()
   }

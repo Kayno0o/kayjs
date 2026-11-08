@@ -5,7 +5,7 @@ import { TITLED } from './markers'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
-import { HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
+import { abandon, HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, ENTRY_SCRIPT, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
 import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
@@ -157,6 +157,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
         // A traversal sharing the fetch has its own time to wait.
         if (inFlight.fetch === flight)
           controller.abort()
+
+        // A prefetched page has no signal of this swap's, so its stream is stopped once it comes.
+        void abandon(pending)
 
         if (isCurrent()) {
           if (navigating)
