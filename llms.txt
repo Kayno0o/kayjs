@@ -11,7 +11,7 @@
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'` (`Duration` from `kay`); a bare number is a type error; `durationMs` converts.
+- Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'` (`Duration` from `kay`); a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, throwing requests, islands' browser errors): read it, not the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; each is reported with what kay writes instead.
@@ -71,7 +71,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, MCP
 - [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events
-- [Island sources](llms/island-sources.md): `status()`, `error()`, `retry()`, hooks
+- [Island sources](llms/island-sources.md): status, error, retry, hooks
 - [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Local collections](llms/local-collections.md): `local()`, offline rows
 - [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
