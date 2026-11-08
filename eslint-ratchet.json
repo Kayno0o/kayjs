@@ -276,9 +276,11 @@
     "max-lines": 781,
     "max-lines-per-function": 322
   },
-  "src/server/render.ts": {
-    "max-lines": 1057,
+  "src/server/render-document.ts": {
     "complexity": 97
+  },
+  "src/server/render.ts": {
+    "max-lines": 731
   },
   "src/server/rooms.ts": {
     "max-lines-per-function": 196

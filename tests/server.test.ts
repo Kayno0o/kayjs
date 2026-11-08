@@ -354,7 +354,7 @@ describe('pages', () => {
 
   it('cuts a page into pieces that put together are its text, around the inline stylesheets it holds', async () => {
     const { fixedTexts } = await import('../src/server/compress')
-    const { piecesOf } = await import('../src/server/render')
+    const { piecesOf } = await import('../src/server/render-document')
     const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`
     const b = `<style>.b{color:blue}${'.y{margin:0}'.repeat(40)}</style>`
     const fixed = fixedTexts([a, b])
