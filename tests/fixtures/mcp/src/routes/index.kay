@@ -53,6 +53,13 @@ export const reportWorded = action(t.Object({}), () => ({ count: 2, at: new Date
 
 export const lies = action(t.Object({}), () => ({ count: 'two' as unknown as number }), { tool: { output: t.Object({ count: t.Number() }) } })
 
+export const mapped = action(t.Object({}), () => new Map([['a', 1]]), { tool: { output: t.Record(t.String(), t.Number()) } })
+
+export const strict = action(t.Object({ n: t.Number() }), ({ n }) => ({ n }), { tool: { output: t.Object({ n: t.Number() }) } })
+
+// An action answering nothing under an output only a library's `Output = never` lets through.
+export const silent = action(t.Object({}), () => undefined as never, { tool: { output: t.Object({ n: t.Number() }) } })
+
 export const mute = action(t.Object({}), () => ({ notes: [] }), { tool: { text: () => { throw new Error('no words') } } })
 
 export const peek = action(t.Object({}), () => 'peeked', { tool: { readOnly: true } })

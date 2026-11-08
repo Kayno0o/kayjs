@@ -132,6 +132,20 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   const outputSchema = outputOf(operation)
 
   const name = toolName(tool?.name ?? id, taken)
+  let told = false
+  // Under `kay dev` only, and once for this tool: a reload builds the tool again, so it tells again.
+  const warn = dev
+    ? (what: string) => {
+      if (told)
+        return
+
+      told = true
+      console.warn(`kay: the tool ${name} ${what}`)
+    }
+    : undefined
+
+  if (dev && operation['x-kay-output'] !== undefined && outputSchema === undefined)
+    warn?.('has an output that is not an object schema, so it is not listed as an outputSchema')
 
   return {
     name,
@@ -157,7 +171,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, name, { text: operation['x-kay-text'], output: outputSchema !== undefined, check: dev ? operation['x-kay-output'] : undefined })
+      return dispatch(context, url, init, action, name, { text: operation['x-kay-text'], output: outputSchema !== undefined, check: dev ? operation['x-kay-output'] : undefined, warn })
     },
   }
 }
@@ -224,11 +238,11 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual', signal: request.signal })
   const response = await visitAs(request, visit, server, fallback)
 
-  return result(context, visit, response, action, how, tool)
+  return result(context, visit, response, action, how)
 }
 
 // Words what the app answered for the agent: the result, or why there is none, which it may correct and call again.
-async function result(context: CallContext, visit: Request, response: Response, action: boolean, how: Wording, tool: string): Promise<ToolResult> {
+async function result(context: CallContext, visit: Request, response: Response, action: boolean, how: Wording): Promise<ToolResult> {
   const type = response.headers.get('content-type') ?? ''
   const location = response.headers.get(REDIRECT_HEADER) ?? response.headers.get('location')
 
@@ -259,7 +273,14 @@ async function result(context: CallContext, visit: Request, response: Response, 
   if (action) {
     const value = text === '' ? undefined : decodeServerValue(text)
 
-    return value === undefined ? { content: [{ type: 'text', text: 'Done' }] } : sent(value, how, tool)
+    if (value === undefined) {
+      if (how.output)
+        how.warn?.('listed an outputSchema and answered nothing')
+
+      return { content: [{ type: 'text', text: 'Done' }] }
+    }
+
+    return sent(value, how)
   }
 
   if (!JSON_TYPE.test(type))
@@ -267,8 +288,8 @@ async function result(context: CallContext, visit: Request, response: Response, 
 
   const parsed = parseJson(text)
 
-  if (parsed !== undefined && (how.text || how.check))
-    return sent(parsed, how, tool)
+  if (parsed !== undefined && how.text)
+    return sent(parsed, how)
 
   return { content: [{ type: 'text', text }], ...isRecord(parsed) && { structuredContent: parsed } }
 }
@@ -291,21 +312,20 @@ interface Wording {
   text?: ToolText | undefined
   output: boolean
   check?: ((value: unknown) => string | undefined) | undefined
+  // Under `kay dev`: tells the app's logs, once for the tool.
+  warn?: ((what: string) => void) | undefined
 }
 
-// The tools whose answer was found not to match their output, each warned of once.
-const warned = new Set<string>()
-
 // What an action returned, as the text a model reads and as structured data when it is an object. A tool with `text` sends that alone, unless a schema is listed for it, which its structured content must always accompany.
-function sent(value: unknown, how: Wording, tool: string): ToolResult {
+function sent(value: unknown, how: Wording): ToolResult {
   const plain = typeof value === 'string' ? value : json(value)
-  const structured = isRecord(value) ? JSON.parse(plain) as object : undefined
-  const where = structured === undefined ? undefined : how.check?.(structured)
+  // What the client receives is the JSON, so a root `Map` or class instance is the object it serialises to.
+  const parsed = typeof value === 'string' ? undefined : parseJson(plain)
+  const structured = isRecord(parsed) ? parsed : undefined
+  const where = how.check && (structured ? mismatch(how.check, structured) : 'the root, which is not an object')
 
-  if (where !== undefined && !warned.has(tool)) {
-    warned.add(tool)
-    console.warn(`kay: the tool ${tool} answered a value its output does not describe, at ${where || 'the root'}`)
-  }
+  if (where !== undefined)
+    how.warn?.(`answered a value its output does not describe, at ${where || 'the root'}`)
 
   if (!how.text)
     return { content: [{ type: 'text', text: plain }], ...structured && { structuredContent: structured } }
@@ -313,6 +333,16 @@ function sent(value: unknown, how: Wording, tool: string): ToolResult {
   const text = worded(value, how.text)
 
   return typeof text === 'string' ? { content: [{ type: 'text', text }], ...how.output && structured && { structuredContent: structured } } : text
+}
+
+// The first path an answer differs at, none when it fits or the check itself fails: a schema too exotic to compile must not turn the dev warning into an error.
+function mismatch(check: (value: unknown) => string | undefined, value: unknown): string | undefined {
+  try {
+    return check(value)
+  }
+  catch {
+    return undefined
+  }
 }
 
 // What the tool's `text` made of the value, or the agent's refusal when it threw or returned no string.

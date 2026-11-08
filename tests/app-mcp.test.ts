@@ -207,6 +207,16 @@ describe('the tools', () => {
       'anyway_post',
       'anyway_put',
       'digest',
+      'everywhere_delete',
+      'everywhere_get',
+      'everywhere_patch',
+      'everywhere_post',
+      'everywhere_put',
+      'mapped',
+      'silent',
+      'strict',
+      'get_notes_count',
+      'get_notes_rows',
       'mute',
       'peek',
       'bare',
@@ -369,6 +379,55 @@ describe('calling an action', () => {
     expect(await site.mcp.call('report_worded')).toMatchObject({ text: '2 things', data: { count: 2 } })
   })
 
+  it('sends the structured content of a root Map or an unrefused call under its output, and none for a refused one', async () => {
+    const tools = await site.mcp.tools()
+    const listed = (name: string) => (tools.find(tool => tool.name === name) as { outputSchema?: object } | undefined)?.outputSchema
+
+    expect(listed('mapped')).toMatchObject({ type: 'object' })
+    expect(await site.mcp.call('mapped')).toMatchObject({ data: { a: 1 } })
+    expect(await site.mcp.call('strict', { n: 4 })).toMatchObject({ data: { n: 4 } })
+
+    const refused = await site.mcp.call('strict', {})
+
+    expect(refused.isError).toBe(true)
+    expect(refused.data).toBeUndefined()
+  })
+
+  it('lists no outputSchema for a route answering an array or a primitive, and lists one for an any-method route', async () => {
+    const tools = await site.mcp.tools()
+    const listed = (name: string) => (tools.find(tool => tool.name === name) as { outputSchema?: object } | undefined)?.outputSchema
+
+    expect(tools.some(tool => tool.name === 'get_notes_rows')).toBe(true)
+    expect(listed('get_notes_rows')).toBeUndefined()
+    expect(listed('get_notes_count')).toBeUndefined()
+    expect(listed('everywhere_get')).toMatchObject({ type: 'object', required: ['n'] })
+    expect(await site.mcp.call('get_notes_rows')).toMatchObject({ isError: false })
+  })
+
+  it('warns under kay dev of an action that lists an outputSchema and answers nothing, and again after a reload', async () => {
+    const warn = console.warn
+    const warnings: string[] = []
+
+    console.warn = (message: string) => warnings.push(message)
+
+    try {
+      await dev.mcp.call('silent')
+      await dev.mcp.call('silent')
+      await site.mcp.call('silent')
+
+      const reloaded = await testSite({ dirs: { routes, api }, mcp: true, islands: false, dev: true })
+
+      await reloaded.mcp.call('silent')
+    }
+    finally {
+      console.warn = warn
+    }
+
+    expect(warnings).toHaveLength(2)
+    expect(warnings[0]).toContain('silent')
+    expect(warnings[0]).toContain('answered nothing')
+  })
+
   it('warns once under kay dev of an answer its output does not describe, and never in production', async () => {
     const warn = console.warn
     const warnings: string[] = []
@@ -410,6 +469,11 @@ describe('calling an action', () => {
     expect(() => action(() => ({ at: new Date(0) }), { tool: { output: t.Object({ at: t.Date() }) } })).not.toThrow()
     // @ts-expect-error the handler returns a number where the schema says string
     expect(() => action(() => ({ n: 1 }), { tool: { output: t.Object({ n: t.String() }) } })).not.toThrow()
+    // @ts-expect-error structured content is an object, so an array schema is no output
+    expect(() => action(() => [1], { tool: { output: t.Array(t.Number()) } })).not.toThrow()
+    // @ts-expect-error nor is a union
+    expect(() => action(() => ({ n: 1 }), { tool: { output: t.Union([t.Object({ n: t.Number() }), t.Null()]) } })).not.toThrow()
+    expect(() => action(() => new Map([['a', 1]]), { tool: { output: t.Record(t.String(), t.Number()) } })).not.toThrow()
   })
 
   it('takes a protection built apart from the action, or typed for a text', () => {

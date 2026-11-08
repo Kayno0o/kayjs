@@ -1,5 +1,5 @@
 import type { Static, t, TSchema } from 'elysia'
-import type { ActionContext, ActionProtection, Answer, CallOptions, ServerAction, Settled, Success } from './action-shared'
+import type { ActionContext, ActionProtection, Answer, CallOptions, OutputSchema, ServerAction, Settled, Success } from './action-shared'
 import type { RouteParams } from './checks'
 import { callable } from './action-call'
 import { minTimeOf, resolveProtection, workOf } from './action-protection'
@@ -17,7 +17,7 @@ export { SETTLED } from './action-owner'
 export type { Caller, Settles } from './action-owner'
 export { honeypotField, minTimeOf, resolveProtection, workOf } from './action-protection'
 export { isAction } from './action-shared'
-export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
+export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, OutputSchema, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
 export type { TrackHooks } from './call-result'
 
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
@@ -39,15 +39,15 @@ const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'obje
 
 // `action` as `kay check` reads it in a page's server fence, whose `ctx.params` are those of the page's route: not something to write.
 export interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object> {
-  <Output, const Honeypot extends string = never, Shape extends TSchema = TSchema>(handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
-  <Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends TSchema = TSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params, Extract<keyof Static<Schema>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
+  <Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
+  <Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params, Extract<keyof Static<Schema>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
 }
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
 // kept: free, it registers a route answering a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
-export function action<Output, const Honeypot extends string = never, Shape extends TSchema = TSchema>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
-export function action<Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends TSchema = TSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<RouteParams, Extract<keyof Static<Schema>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
+export function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
+export function action<Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<RouteParams, Extract<keyof Static<Schema>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
 export function action(first: unknown, second?: unknown, third?: ActionProtection<string>): unknown {
   if (typeof first === 'function') {
     const handler = first as (ctx: ActionContext) => unknown
