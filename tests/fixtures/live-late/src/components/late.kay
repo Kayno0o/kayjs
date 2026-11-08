@@ -4,6 +4,6 @@ import { visitors } from '../live'
 
 const open = signal(false)
 ---
-button.toggle(onClick={() => open.set(!open())}) Show
+button.toggle(onClick={() => open = !open()}) Show
 if open()
   p.late {visitors()} late

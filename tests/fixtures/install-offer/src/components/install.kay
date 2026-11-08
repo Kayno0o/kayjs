@@ -1,4 +1,6 @@
 ---
+import { installPrompt } from 'kay'
+
 async function install() {
   await installPrompt.show()
 }

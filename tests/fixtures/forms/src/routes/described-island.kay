@@ -35,6 +35,6 @@ form.described(action={choose})
   if choose.error('last') as message
     p {message}
   button.choose(formnovalidate) Choose
-button.bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
+button.bump(type="button" onClick={() => bumped = 1}) {bumped()}
 button.accept(type="button" onClick={() => void send('abcd', 'abcd')}) Accept
 button.refuse(type="button" onClick={() => void send('ab', 'ab')}) Refuse

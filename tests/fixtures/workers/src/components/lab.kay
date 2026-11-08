@@ -1,4 +1,5 @@
 ---
+import { signal, onMount } from 'kay'
 import wasm from '../add.wasm'
 import { add } from '../threads.js'
 

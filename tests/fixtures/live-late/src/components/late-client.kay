@@ -4,6 +4,6 @@ import { visitors } from '../live'
 
 const shown = signal(false)
 ---
-button.reveal(onClick={() => shown.set(true)}) Reveal
+button.reveal(onClick={() => shown = true}) Reveal
 if shown()
   p.revealed {visitors()} revealed

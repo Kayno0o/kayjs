@@ -1,4 +1,6 @@
 ---
+import { signal, onMount } from 'kay'
+
 const { label = 'Room' } = props<{ label?: string }>()
 const name = signal(label)
 

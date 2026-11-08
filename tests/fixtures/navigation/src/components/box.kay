@@ -1,6 +1,8 @@
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 section.box
-  button.box-count(onClick={() => count.set(count() + 1)}) Box {count()}
+  button.box-count(onClick={() => count = count() + 1}) Box {count()}
   slot

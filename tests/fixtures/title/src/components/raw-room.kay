@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const name = signal('Raw room')
 ---
 head

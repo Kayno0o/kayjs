@@ -1,4 +1,6 @@
 ---
+import { webPush } from 'kay'
+
 async function join() {
   await webPush.subscribe()
 }

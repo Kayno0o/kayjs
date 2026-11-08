@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const { label = 'Failing' } = props<{ label?: string }>()
 const name = signal(label)
 

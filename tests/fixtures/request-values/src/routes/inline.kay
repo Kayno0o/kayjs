@@ -1,3 +1,6 @@
+---
+import { ctx } from 'kay'
+---
 if ctx.user
   p#name {ctx.user.name}
 else

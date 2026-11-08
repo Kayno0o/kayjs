@@ -1,4 +1,5 @@
 ---
+import { ctx } from 'kay'
 import Show from '../../lib/show.kay'
 ---
 Show({...ctx})

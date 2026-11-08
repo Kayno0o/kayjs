@@ -1,3 +1,6 @@
+---
+import { ctx } from 'kay'
+---
 nav
   a#cart(href="/cart") Cart ({ctx.cartCount})
 main

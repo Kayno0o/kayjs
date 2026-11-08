@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Room from './room.kay'
 
 const count = signal(0)

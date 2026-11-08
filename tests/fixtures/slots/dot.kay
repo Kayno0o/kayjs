@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { Point } from './point'
 
 const { at } = props<{ at: Point }>()

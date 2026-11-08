@@ -1,4 +1,6 @@
 --- server
+import { logFrom } from 'kay'
+
 const reply = logFrom('reply')
 
 reply.info('answered 12 tokens')

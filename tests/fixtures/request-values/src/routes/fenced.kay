@@ -1,4 +1,6 @@
 --- server
+import { ctx } from 'kay'
+
 const shown = ctx.url.pathname
 ---
 p#path {shown}

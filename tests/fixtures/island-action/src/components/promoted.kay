@@ -1,4 +1,4 @@
----
+--- island
 import type { Action } from 'kay'
 import Clicker from './clicker.kay'
 

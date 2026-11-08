@@ -1,1 +1,4 @@
+---
+import { ctx } from 'kay'
+---
 p#plan {ctx.plan}

@@ -8,7 +8,7 @@ const { mode } = props<{ mode: 'setup' | 'click' | 'window' | 'await' }>()
 const answer = signal<ActionStream<number> | undefined>(undefined)
 
 async function start() {
-  answer.set(await quiet())
+  answer = await quiet()
 }
 
 onMount(() => {

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import { t } from 'kay/i18n'
 
 const count = signal(0)

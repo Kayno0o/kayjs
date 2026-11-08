@@ -1,3 +1,6 @@
+---
+import { ctx } from 'kay'
+---
 if ctx.can('admin')
   nav#admin-nav Admin menu
 slot

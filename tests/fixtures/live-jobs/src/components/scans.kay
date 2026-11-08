@@ -1,5 +1,5 @@
 ---
-import { jobs } from 'kay'
+import { jobs, memo } from 'kay'
 
 const { queue = 'scans' } = props<{ queue?: string }>()
 const listed = memo(() => jobs<{ target: string }>(queue))

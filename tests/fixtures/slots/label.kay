@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const { children } = props<{ children?: string }>()
 const shown = signal(true)
 ---

@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const { label = 'Flaky', fail = false } = props<{ label?: string, fail?: boolean }>()
 const count = signal(0)
 

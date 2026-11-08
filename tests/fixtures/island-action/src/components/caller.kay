@@ -7,13 +7,13 @@ const answer = signal('')
 
 async function go() {
   try {
-    answer.set(await run({ name: label }))
+    answer = await run({ name: label })
   }
   catch (error) {
     if (!(error instanceof ActionError))
       throw error
 
-    answer.set(`refused: ${error.errors.name}`)
+    answer = `refused: ${error.errors.name}`
   }
 }
 ---

@@ -29,7 +29,7 @@ async function go(to: string) {
 }
 ---
 p.state {navigation.status()}
-button.block(onClick={() => blocking.set(true)}) Block
+button.block(onClick={() => blocking = true}) Block
 button.go(onClick={() => go('/watched-two')}) Go
 button.hash(onClick={() => go('#section')}) Hash
 button.same(onClick={() => go(location.pathname)}) Same

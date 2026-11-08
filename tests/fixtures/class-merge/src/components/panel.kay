@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Box from './box.kay'
 const open = signal(false)
 ---

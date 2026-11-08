@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---

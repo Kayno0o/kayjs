@@ -4,5 +4,5 @@ import { registry } from './registry'
 
 const shown = signal(registry.clicks)
 ---
-button.bump(onClick={() => { registry.clicks += 1; shown.set(registry.clicks) }}) Bump
+button.bump(onClick={() => { registry.clicks += 1; shown = registry.clicks }}) Bump
 p.clicks {shown()}

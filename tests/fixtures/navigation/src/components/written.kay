@@ -10,4 +10,4 @@ onMount(() => {
     field.value = text()
 })
 ---
-input.written(aria-label="Written" ref={element => field = element} onInput={event => text.set(event.currentTarget.value)})
+input.written(aria-label="Written" ref={element => field = element} onInput={event => text = event.currentTarget.value})

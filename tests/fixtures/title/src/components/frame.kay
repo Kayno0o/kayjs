@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { Snippet } from 'kay'
 
 const { children } = props<{ children?: Snippet }>()

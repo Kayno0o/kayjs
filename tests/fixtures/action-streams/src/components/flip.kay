@@ -10,8 +10,8 @@ const waiting = new Promise<never>(() => undefined)
 const ready = signal<Promise<unknown>>(Promise.resolve(1))
 
 async function open() {
-  answer.set(await quiet())
-  ready.set(waiting)
+  answer = await quiet()
+  ready = waiting
 }
 ---
 if mode === 'if'

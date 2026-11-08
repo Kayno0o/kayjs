@@ -7,8 +7,8 @@ const shown = signal(true)
 ---
 head
   title Size
-button.widen(type="button" onClick={() => wide.set(!wide())}) widen
-button.swap(type="button" onClick={() => shown.set(!shown())}) swap
+button.widen(type="button" onClick={() => wide = !wide()}) widen
+button.swap(type="button" onClick={() => shown = !shown()}) swap
 p.read {box.width()} x {box.height()}
 if shown()
   .box(ref={box.ref} style={`width: ${wide() ? 300 : 120}px; height: 40px; padding: 10px; box-sizing: content-box`}) box

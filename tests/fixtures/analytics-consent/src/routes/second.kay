@@ -3,4 +3,4 @@ import { consent } from 'kay/analytics'
 ---
 h1 Second
 p.second-state {consent() || 'asking'}
-button.second-yes(onClick={() => consent.set('yes')}) Yes here
+button.second-yes(onClick={() => consent = 'yes'}) Yes here

@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const { format } = props<{ format: (value: string) => string }>()
 const picked = signal('')
 ---

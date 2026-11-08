@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 // The wording is async and reads the error and the page's locale, as one loading an address kept in a collection would.
 export const loud = action(s.Object({}), () => {

@@ -1,2 +1,5 @@
+---
+import { ctx } from 'kay'
+---
 if ctx.user as user
   p#who {user.name}

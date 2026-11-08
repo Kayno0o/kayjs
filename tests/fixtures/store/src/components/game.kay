@@ -1,4 +1,5 @@
 ---
+import { store } from 'kay'
 import Readout from './readout.kay'
 
 const game = store({ coins: 0, ticks: 0, miners: [{ id: 1, ore: 0 }] })

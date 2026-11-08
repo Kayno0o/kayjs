@@ -1,4 +1,6 @@
 ---
+import { signal } from 'kay'
+
 const count = signal(0)
 ---
 button.toc(onClick={() => count = count() + 1}) toc {count()}

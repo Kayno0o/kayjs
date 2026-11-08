@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { Snippet } from 'kay'
 
 const { open: initial = true, actions } = props<{ open?: boolean, actions?: Snippet, children?: Snippet }>()

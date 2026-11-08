@@ -1,4 +1,5 @@
 --- server
+import { ctx } from 'kay'
 import { partners } from '../../partners'
 
 export const page = { sitemap: partners }

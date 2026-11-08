@@ -1,5 +1,5 @@
 ---
-import { focusInvalid } from 'kay'
+import { focusInvalid, signal } from 'kay'
 
 const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
 const tab = signal('site')

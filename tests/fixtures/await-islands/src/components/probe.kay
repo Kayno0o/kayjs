@@ -1,4 +1,6 @@
 ---
+import { onMount, onCleanup } from 'kay'
+
 const { text } = props<{ text: string }>()
 
 // Counted on the body, which a test reads: how many probes mounted, how many were cleaned up and how many of those still had their button in the document.

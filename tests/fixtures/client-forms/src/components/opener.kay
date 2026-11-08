@@ -4,7 +4,7 @@ import { guarded, limited, open, trapped } from '../routes/index.kay'
 
 const shown = signal(false)
 ---
-button.show(type="button" onClick={() => shown.set(true)}) Show
+button.show(type="button" onClick={() => shown = true}) Show
 form.hydrated(action={trapped})
   button Send
 if shown()

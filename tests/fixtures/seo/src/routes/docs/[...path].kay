@@ -1,4 +1,6 @@
 --- server
+import { ctx } from 'kay'
+
 export const page = {
   prerender: async () => {
     return [{ path: 'guide/start' }]

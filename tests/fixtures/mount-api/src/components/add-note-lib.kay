@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import { addNote } from '../lib/notes-client'
 
 const added = signal('')

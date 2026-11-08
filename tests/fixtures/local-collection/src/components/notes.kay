@@ -1,5 +1,5 @@
 ---
-import { call, local } from 'kay'
+import { call, local, signal } from 'kay'
 import { drop, save } from '../routes/index.kay'
 import notesApi from '../api/notes'
 
@@ -20,7 +20,7 @@ const notes = local({
   onIssue: () => issued++,
   onSync: ({ rows }) => {
     synced++
-    kept.set(rows.map(row => row.title).join(','))
+    kept = rows.map(row => row.title).join(',')
   },
   conflict: theirs ? () => undefined : both ? ({ mine, theirs: held }) => ({ ...held, title: `${mine?.title}+${held.title}` }) : undefined,
 })

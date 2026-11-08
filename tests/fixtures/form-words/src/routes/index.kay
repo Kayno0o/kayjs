@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { t } from 'kay/i18n'
 
 export const rename = action(s.Object({

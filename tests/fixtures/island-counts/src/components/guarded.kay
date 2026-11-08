@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Flaky from './flaky.kay'
 
 const open = signal(true)
