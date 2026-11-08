@@ -224,14 +224,17 @@ export function fieldNameOf(element: ElementNode, attribute: NamedAttribute, src
   if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !NAMED_FIELDS.has(element.name))
     return { kind: 'none' }
 
+  if (attribute.kind !== 'static')
+    return name === FIELD_ATTRIBUTE ? { kind: 'unchecked' } : { kind: 'none' }
+
   // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
-  if (name === FIELD_ATTRIBUTE && (attribute.kind !== 'static' || writesAttribute(element, 'name', src)))
+  if (name === FIELD_ATTRIBUTE && writesAttribute(element, 'name', src))
     return { kind: 'unchecked' }
 
   const checked = name === 'name' && loose ? undefined : target
 
-  if (!check || !checked || attribute.kind !== 'static')
-    return name === FIELD_ATTRIBUTE ? { kind: 'plain', text: attribute.kind === 'static' ? attribute.text : '' } : { kind: 'none' }
+  if (!check || !checked)
+    return name === FIELD_ATTRIBUTE ? { kind: 'plain', text: attribute.text } : { kind: 'none' }
 
   return { kind: 'typed', target: checked, value: attribute.value, text: attribute.text }
 }

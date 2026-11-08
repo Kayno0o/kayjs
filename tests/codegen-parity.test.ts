@@ -255,3 +255,19 @@ describe('a field of a form posting to an action', () => {
     expect(targets('input(field="title")').check).toContain('name="title"')
   })
 })
+
+describe('a field in the content of a component given an action', () => {
+  const source = (fields: string) => `---\nimport Card from './card.kay'\nimport { action } from 'kay'\nconst save = action(async () => {})\n---\nCard(action={save})\n  ${fields}`
+
+  it('keeps `field` typed against the action and leaves `name` unchecked, for every control', () => {
+    const check = compileKay(source('textarea(field="a")\n  select(name="b")\n  button(name="c")'), 'test.kay', { check: true }).tsx
+
+    expect(check).toContain('name={KayField((save), "a")}')
+    expect(check).toContain('<select name="b"')
+    expect(check).toContain('<button name="c"')
+  })
+
+  it('writes `field` as a plain name when nothing is checked', () => {
+    expect(compileKay(source('input(field="a")'), 'test.kay', { check: false }).tsx).toContain('name="a"')
+  })
+})

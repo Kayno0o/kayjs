@@ -518,10 +518,10 @@ export class HtmlTemplate extends TemplateWriter {
     let ownDescribed: (() => void) | undefined
     // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks; an expression for it is read a second time, as the type's is, and counts once it gives a value.
     const fieldDescribed = (own: (() => void) | undefined) => {
-      const { required, unrequirable } = fieldAria!
+      const required = fieldAria?.required
       const typed = type?.kind === 'value' ? () => b.add('(').addSource(type.expression).add(')') : undefined
       const written = required?.kind === 'value' ? () => b.add('(').addSource(required.expression).add(')') : undefined
-      const args = [own, typed, written ?? (required || unrequirable ? () => b.add('true') : undefined)]
+      const args = [own, typed, written ?? (required || fieldAria?.unrequirable ? () => b.add('true') : undefined)]
 
       while (args.length > 0 && args.at(-1) === undefined)
         args.pop()
