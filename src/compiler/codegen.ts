@@ -22,7 +22,6 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
-import { shorthandClass } from './plan'
 import { codeOf, reactiveValue } from './script'
 import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
@@ -1098,7 +1097,7 @@ class ModuleShell {
         b.add('"island": true, ')
 
       if (element.classes.length > 0)
-        b.add(`"class": ${JSON.stringify(shorthandClass(element, this.src))}, `)
+        b.add(`"class": ${JSON.stringify(element.classes.map(span => this.text(span)).join(' '))}, `)
 
       if (element.id)
         b.add(`"id": ${JSON.stringify(this.text(element.id))}, `)
