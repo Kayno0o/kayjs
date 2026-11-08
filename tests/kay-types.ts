@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 
@@ -10,13 +10,13 @@ const SOURCE = /\.tsx?$/
 
 let built: Record<string, string[]> | undefined
 
-// What decides the declarations: the sources, the configs they build with and Bun, whose tsgo emits them.
+// What decides the declarations: the sources, the configs they build with, the dependencies they read types from and Bun, whose tsgo emits them.
 function sourceKey(): string {
   const hasher = new Bun.CryptoHasher('sha1')
 
   hasher.update(Bun.version)
 
-  for (const file of ['package.json', 'tsconfig.json', 'tsconfig.build.json'])
+  for (const file of ['package.json', 'bun.lock', 'tsconfig.base.json', 'tsconfig.json', 'tsconfig.build.json'])
     hasher.update(`\0${file}\0`).update(readFileSync(join(ROOT, file)))
 
   const sources = readdirSync(join(ROOT, 'src'), { recursive: true, withFileTypes: true }).filter(entry => entry.isFile() && SOURCE.test(entry.name)).map(entry => join(entry.parentPath, entry.name)).sort()
@@ -42,12 +42,16 @@ function buildDeclarations(dir: string): void {
   try {
     renameSync(building, dir)
   }
-  catch {
+  catch (error) {
     rmSync(building, { recursive: true, force: true })
+
+    // Another worker moving its build in first is the one failure that leaves the declarations in place.
+    if (!existsSync(dir))
+      throw error
   }
 }
 
-// Builds a day old, of sources since changed, go.
+// Builds unused for a day, of sources since changed, go.
 function pruneOthers(keep: string): void {
   for (const entry of existsSync(CACHE) ? readdirSync(CACHE) : []) {
     const path = join(CACHE, entry)
@@ -61,7 +65,9 @@ function declarationPaths(): Record<string, string[]> {
   const key = sourceKey()
   const dir = join(CACHE, key)
 
-  if (!existsSync(dir))
+  if (existsSync(dir))
+    utimesSync(dir, new Date(), new Date())
+  else
     buildDeclarations(dir)
 
   pruneOthers(key)
