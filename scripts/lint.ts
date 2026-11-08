@@ -9,7 +9,8 @@ const rest = ['.', '--ignore-pattern', 'packages/**', ...typeAwareSlices.flat().
 // Each process caches in a file of its own: ESLint drops from a cache the files its run did not lint.
 const flags = process.argv.slice(2)
 // Files named on the command line are one pass, not one in each group.
-const passes = flags.some(flag => !flag.startsWith('-')) ? [[]] : [...typeAwareSlices, null]
+const named = flags.some(flag => !flag.startsWith('-'))
+const passes = named ? [[]] : [...typeAwareSlices, null]
 let status = 0
 
 // A dependency install changes the types a file's lint reads, so results cached before it are dropped.
@@ -27,5 +28,9 @@ for (const [index, slice] of passes.entries()) {
 
   status = Math.max(status, child.exitCode ?? 1)
 }
+
+// The size baseline (eslint-ratchet.json) follows the files: the lint above stops a file from growing, this stops a baseline that kept the old size of one that shrank.
+if (!named && !flags.includes('--fix'))
+  status = Math.max(status, Bun.spawnSync([process.execPath, join(import.meta.dir, 'ratchet.ts')], { stdio: ['inherit', 'inherit', 'inherit'] }).exitCode ?? 1)
 
 process.exit(status)

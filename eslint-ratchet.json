@@ -1,0 +1,297 @@
+{
+  "packages/ai/src/anthropic.ts": {
+    "complexity": 70
+  },
+  "packages/ai/src/chat-session.ts": {
+    "max-lines-per-function": 507,
+    "complexity": 41
+  },
+  "packages/ai/src/loop.ts": {
+    "complexity": 46
+  },
+  "packages/ai/src/openai.ts": {
+    "complexity": 65
+  },
+  "packages/ai/src/partial-json.ts": {
+    "max-lines-per-function": 254
+  },
+  "packages/ai/src/reply.ts": {
+    "max-lines-per-function": 264
+  },
+  "packages/auth/src/createUserCommand.ts": {
+    "complexity": 43
+  },
+  "packages/auth/src/events.ts": {
+    "complexity": 49
+  },
+  "packages/auth/src/memoryStore.ts": {
+    "max-lines-per-function": 460
+  },
+  "packages/auth/src/password.ts": {
+    "complexity": 52
+  },
+  "packages/auth/src/pg.ts": {
+    "max-lines-per-function": 283
+  },
+  "packages/auth/src/setup.ts": {
+    "complexity": 58
+  },
+  "packages/cms/src/drafts.ts": {
+    "max-lines-per-function": 295
+  },
+  "packages/cms/src/editor/inline.ts": {
+    "max-lines-per-function": 151
+  },
+  "packages/cms/src/fields.ts": {
+    "complexity": 51
+  },
+  "packages/cms/src/form.ts": {
+    "max-lines-per-function": 197
+  },
+  "packages/cms/src/messages/fr.ts": {
+    "max-lines": 645
+  },
+  "packages/cms/src/store.ts": {
+    "max-lines": 710
+  },
+  "packages/mail/src/devTool.ts": {
+    "max-lines-per-function": 248
+  },
+  "packages/mail/src/list.ts": {
+    "max-lines-per-function": 334
+  },
+  "packages/mail/src/mailer.ts": {
+    "max-lines-per-function": 245
+  },
+  "packages/mail/src/text.ts": {
+    "complexity": 41
+  },
+  "packages/ui/src/infinite-list.ts": {
+    "max-lines-per-function": 187
+  },
+  "src/build/client.ts": {
+    "complexity": 63
+  },
+  "src/build/dynamic-classes.ts": {
+    "complexity": 54
+  },
+  "src/build/style-uses.ts": {
+    "max-lines-per-function": 203
+  },
+  "src/check/page-heads.ts": {
+    "complexity": 56
+  },
+  "src/check/site-seo.ts": {
+    "complexity": 42
+  },
+  "src/commands/env-compare.ts": {
+    "complexity": 48
+  },
+  "src/commands/new.ts": {
+    "complexity": 42
+  },
+  "src/commands/not-found.ts": {
+    "complexity": 44
+  },
+  "src/compiler/a11y.ts": {
+    "max-lines-per-function": 421,
+    "complexity": 115
+  },
+  "src/compiler/ast.ts": {
+    "max-lines": 652
+  },
+  "src/compiler/codegen.ts": {
+    "max-lines": 923,
+    "complexity": 98
+  },
+  "src/compiler/dom.ts": {
+    "max-lines-per-function": 171,
+    "complexity": 58
+  },
+  "src/compiler/expression.ts": {
+    "complexity": 47
+  },
+  "src/compiler/fence-checks.ts": {
+    "max-lines": 854
+  },
+  "src/compiler/html.ts": {
+    "max-lines": 780,
+    "max-lines-per-function": 323,
+    "complexity": 89
+  },
+  "src/compiler/index.ts": {
+    "complexity": 112
+  },
+  "src/compiler/jsx.ts": {
+    "max-lines": 770
+  },
+  "src/compiler/lints.ts": {
+    "max-lines": 1243
+  },
+  "src/compiler/markup.ts": {
+    "max-lines": 648,
+    "complexity": 80
+  },
+  "src/compiler/module-signals.ts": {
+    "complexity": 45
+  },
+  "src/compiler/parser.ts": {
+    "max-lines": 1097
+  },
+  "src/compiler/rewrite.ts": {
+    "max-lines": 952
+  },
+  "src/compiler/validate.ts": {
+    "max-lines": 756,
+    "complexity": 89
+  },
+  "src/content/edit-entries.ts": {
+    "max-lines": 630
+  },
+  "src/content/index.ts": {
+    "max-lines-per-function": 215
+  },
+  "src/content/markdown.ts": {
+    "max-lines": 625
+  },
+  "src/dev/index.ts": {
+    "max-lines-per-function": 260
+  },
+  "src/mcp/tools.ts": {
+    "max-lines": 670,
+    "max-lines-per-function": 382
+  },
+  "src/migrate/astro.ts": {
+    "complexity": 43
+  },
+  "src/migrate/content.ts": {
+    "complexity": 42
+  },
+  "src/migrate/markup.ts": {
+    "complexity": 42
+  },
+  "src/migrate/project.ts": {
+    "complexity": 59
+  },
+  "src/runtime/action-call.ts": {
+    "max-lines-per-function": 188,
+    "complexity": 57
+  },
+  "src/runtime/cache.ts": {
+    "max-lines": 627
+  },
+  "src/runtime/dev-inspector.ts": {
+    "max-lines-per-function": 190
+  },
+  "src/runtime/dev-tab-head.ts": {
+    "max-lines-per-function": 170,
+    "complexity": 53
+  },
+  "src/runtime/dev-tab-performance.ts": {
+    "max-lines-per-function": 152
+  },
+  "src/runtime/dev-tool.ts": {
+    "max-lines": 2215,
+    "max-lines-per-function": 484,
+    "complexity": 41
+  },
+  "src/runtime/dom.ts": {
+    "max-lines": 684
+  },
+  "src/runtime/head.ts": {
+    "complexity": 55
+  },
+  "src/runtime/html.ts": {
+    "complexity": 50
+  },
+  "src/runtime/live.ts": {
+    "max-lines": 826
+  },
+  "src/runtime/local.ts": {
+    "max-lines": 677
+  },
+  "src/runtime/page-swap.ts": {
+    "complexity": 51
+  },
+  "src/runtime/reactive.ts": {
+    "max-lines": 616
+  },
+  "src/runtime/swap-kept.ts": {
+    "complexity": 46
+  },
+  "src/runtime/validate.ts": {
+    "complexity": 41
+  },
+  "src/server/actions.ts": {
+    "max-lines": 750
+  },
+  "src/server/address.ts": {
+    "complexity": 41
+  },
+  "src/server/analytics.ts": {
+    "complexity": 59
+  },
+  "src/server/api.ts": {
+    "max-lines-per-function": 162
+  },
+  "src/server/compress.ts": {
+    "max-lines": 684
+  },
+  "src/server/image.ts": {
+    "max-lines-per-function": 196,
+    "complexity": 63
+  },
+  "src/server/literal-writes.ts": {
+    "complexity": 41
+  },
+  "src/server/openapi.ts": {
+    "complexity": 54
+  },
+  "src/server/pg-live.ts": {
+    "max-lines-per-function": 195
+  },
+  "src/server/pg-not-found.ts": {
+    "max-lines-per-function": 201
+  },
+  "src/server/pg-rooms.ts": {
+    "max-lines-per-function": 308
+  },
+  "src/server/prerender.ts": {
+    "max-lines-per-function": 268,
+    "complexity": 111
+  },
+  "src/server/protection.ts": {
+    "max-lines": 756,
+    "complexity": 54
+  },
+  "src/server/queue.ts": {
+    "max-lines": 781,
+    "max-lines-per-function": 322
+  },
+  "src/server/render.ts": {
+    "max-lines": 1057,
+    "complexity": 97
+  },
+  "src/server/rooms.ts": {
+    "max-lines-per-function": 196
+  },
+  "src/server/setup.ts": {
+    "complexity": 44
+  },
+  "src/server/workflow.ts": {
+    "max-lines-per-function": 189
+  },
+  "src/test/browser.ts": {
+    "max-lines": 958,
+    "max-lines-per-function": 513
+  },
+  "src/test/content.ts": {
+    "max-lines-per-function": 178
+  },
+  "src/test/index.ts": {
+    "max-lines-per-function": 251
+  },
+  "src/test/network.ts": {
+    "max-lines-per-function": 365
+  }
+}
