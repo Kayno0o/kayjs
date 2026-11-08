@@ -222,6 +222,25 @@ h1 Notes
 
 Here `addNote` is the tool `add_note`, and its description is the text you gave. `tool: true` uses the export name alone, and `tool: { name, description }` sets both.
 
+`tool: { readOnly: true }` tells the agent's client the action only reads, so it can run it without asking, and `/mcp` lists it with `readOnlyHint: true`.
+
+An agent reads an action's answer as JSON, and as `structuredContent` too when it is an object, so a client reading either one finds it. That is a lot of keys and quotes for an agent's context. `tool: { text }` words the answer instead, from what the action returned:
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const search = action(
+  s.Object({ query: s.String() }),
+  async ({ query }) => [{ id: 1, title: query }],
+  { tool: { readOnly: true, text: notes => notes.map(note => `${note.id} ${note.title}`).join('\n') } },
+)
+---
+h1 Notes
+```
+
+The agent gets that text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the notes. An error thrown by `text` is the agent's refusal. A route's `detail.tool` takes `text` the same way, from its parsed JSON answer.
+
 An action in a file whose pages have route params, such as `/notes/[id]`, is not a tool. A call names no page to read the params from. Routes with a file in their body, and actions with a file in their schema, are not offered either, as an agent sends JSON.
 
 ### Guards and limits

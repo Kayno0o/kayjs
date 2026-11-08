@@ -1,10 +1,10 @@
 [.] action
-function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
+function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>> | undefined): NoInputAction<Settled<Output>, Honeypot>
 function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & {
   params: [];
 })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof (Schema & {
   params: [];
-})["static"], string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
+})["static"], string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
@@ -92,7 +92,7 @@ interface ActionProtect<Field extends string = never>
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
 
 [.] ActionProtection
-interface ActionProtection<Field extends string = never> extends ActionHooks
+interface ActionProtection<Field extends string = never, Output = never> extends ActionHooks
   beforeRun?: BeforeHook<ActionRun, never> | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
@@ -100,7 +100,7 @@ interface ActionProtection<Field extends string = never> extends ActionHooks
   onSuccess?: Hook<ActionDone> | undefined
   protect?: ActionProtect<Field> | false | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  tool?: ActionTool | boolean | string | undefined
+  tool?: ActionTool<Output> | boolean | string | undefined
 
 [.] ActionRateLimit
 interface ActionRateLimit extends RateLimit
@@ -1030,7 +1030,7 @@ interface ResolvedProtection extends ActionHooks
   proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  tool?: ActionTool | boolean | string | undefined
+  tool?: ActionTool<never> | boolean | string | undefined
 
 [.] resource
 function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<(() => ResourceOptions<Module, Path>) | ResourceOptions<Module, Path>>): ResourceOf<Module, Path>

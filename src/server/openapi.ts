@@ -39,6 +39,9 @@ export interface MountedApi {
 
 type Schema = Record<string, unknown>
 
+// The `text` of a tool's settings, which turns what the action returned into the agent's answer.
+export type ToolText = (value: never) => string
+
 // A tool action as the document lists it.
 export interface DocumentedAction {
   // The name it is exported under, `addNote`.
@@ -46,7 +49,7 @@ export interface DocumentedAction {
   url: string
   schema: unknown
   // What `tool` on the action sets, by itself or beside its description.
-  tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined }
+  tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined, text?: ToolText | undefined }
   // The files of the guards covering it.
   guards: string[]
 }
@@ -74,8 +77,9 @@ export interface Operation {
   'responses': Record<string, Schema>
   // Set on a route behind a guard, which the file names of are not shared.
   'x-kay-guarded'?: true
-  // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's.
-  'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
+  // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's, and its `text`, a function the JSON of the document leaves out.
+  // An action sets it only with a `text`.
+  'x-kay-tool'?: { name?: string | undefined, description?: string | undefined, text?: ToolText | undefined }
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
   // Set on an action tool that only reads (`tool: { readOnly: true }`), which `tools/list` annotates as such.
@@ -297,6 +301,7 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>): O
     ...action.guards.length > 0 && { 'x-kay-guarded': true },
     'x-kay-action': true,
     ...action.tool.readOnly === true && { 'x-kay-read-only': true },
+    ...action.tool.text && { 'x-kay-tool': { text: action.tool.text } },
   }
 }
 

@@ -45,6 +45,10 @@ export const listing = action(t.Object({
 
 export const solve = action(t.Object({}), () => 'solved', { tool: true, protect: { proofOfWork: true } })
 
+export const digest = action(t.Object({}), () => ({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) }), { tool: { text: ({ notes }) => notes.map(note => note.title).join('\n') } })
+
+export const mute = action(t.Object({}), () => ({ notes: [] }), { tool: { text: () => { throw new Error('no words') } } })
+
 export const peek = action(t.Object({}), () => 'peeked', { tool: { readOnly: true } })
 
 export const long = action(t.Object({}), () => 'long', { tool: { name: 'a'.repeat(100) } })

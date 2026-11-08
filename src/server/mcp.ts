@@ -5,7 +5,7 @@ import type { ServerAction } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
 import type { LoadedGuard } from './guards'
-import type { Operation } from './openapi'
+import type { Operation, ToolText } from './openapi'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { INVALID_REQUEST, McpServer, PARSE_ERROR } from '../mcp/protocol'
 import { joinBase } from '../runtime/base'
@@ -148,7 +148,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, name)
+      return dispatch(context, url, init, action, name, tool?.text)
     },
   }
 }
@@ -190,7 +190,7 @@ function refusal(text: string): ToolResult {
 }
 
 // Sends the call through the whole app as a fetch would, so its guards, rate limits and `ctx.locals` are the web path's, and words what came back for the agent.
-async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, tool: string): Promise<ToolResult> {
+async function dispatch(context: CallContext, url: string, init: RequestInit, action: boolean, tool: string, text: ToolText | undefined): Promise<ToolResult> {
   const { request, server, fallback } = context
   const headers = new Headers(init.headers)
 
@@ -215,11 +215,11 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   const visit = new Request(new URL(url, request.url), { ...init, headers, redirect: 'manual', signal: request.signal })
   const response = await visitAs(request, visit, server, fallback)
 
-  return result(context, visit, response, action)
+  return result(context, visit, response, action, text)
 }
 
 // Words what the app answered for the agent: the result, or why there is none, which it may correct and call again.
-async function result(context: CallContext, visit: Request, response: Response, action: boolean): Promise<ToolResult> {
+async function result(context: CallContext, visit: Request, response: Response, action: boolean, render: ToolText | undefined): Promise<ToolResult> {
   const type = response.headers.get('content-type') ?? ''
   const location = response.headers.get(REDIRECT_HEADER) ?? response.headers.get('location')
 
@@ -250,13 +250,16 @@ async function result(context: CallContext, visit: Request, response: Response, 
   if (action) {
     const value = text === '' ? undefined : decodeServerValue(text)
 
-    return value === undefined ? { content: [{ type: 'text', text: 'Done' }] } : sent(value)
+    return value === undefined ? { content: [{ type: 'text', text: 'Done' }] } : sent(value, render)
   }
 
   if (!JSON_TYPE.test(type))
     return { content: [{ type: 'text', text }] }
 
   const parsed = parseJson(text)
+
+  if (render && parsed !== undefined)
+    return written(parsed, render)
 
   return { content: [{ type: 'text', text }], ...isRecord(parsed) && { structuredContent: parsed } }
 }
@@ -275,10 +278,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // What an action returned, as the text a model reads and as structured data when it is an object.
-function sent(value: unknown): ToolResult {
+function sent(value: unknown, render?: ToolText): ToolResult {
+  if (render)
+    return written(value, render)
+
   const text = typeof value === 'string' ? value : json(value)
 
   return { content: [{ type: 'text', text }], ...isRecord(value) && { structuredContent: JSON.parse(text) as object } }
+}
+
+// What the tool's `text` made of the value, alone: the agent reads no JSON beside it. A renderer that throws is the agent's refusal.
+function written(value: unknown, render: ToolText): ToolResult {
+  try {
+    return { content: [{ type: 'text', text: render(value as never) }] }
+  }
+  catch (error) {
+    return refusal(error instanceof Error ? error.message : String(error))
+  }
 }
 
 // JSON for what devalue carried, whose Dates are their text, bigints digits, Maps objects and Sets arrays.
@@ -568,7 +584,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
   const name = url.slice(url.lastIndexOf('/') + 1)
   const settings = toolSettings(action.protection?.tool) ?? {}
   const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
-  const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}` }, guards: [] }, new Set())
+  const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...settings.text && { text: settings.text } }, guards: [] }, new Set())
   const tool = operation && toolOf(url, 'post', operation, operation.operationId!, new Set())
 
   if (!tool)

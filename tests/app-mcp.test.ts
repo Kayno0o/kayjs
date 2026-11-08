@@ -4,7 +4,7 @@ import { Elysia } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
 import { configuredSite, setSite } from '../src/runtime/site'
-import { encodeValue } from '../src/runtime/wire'
+import { decodeServerValue, encodeValue } from '../src/runtime/wire'
 import { toolCall } from '../src/server'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
@@ -198,6 +198,8 @@ describe('the tools', () => {
       'a'.repeat(64),
       'add_note',
       'add_note_2',
+      'digest',
+      'mute',
       'peek',
       'bare',
       'breaks',
@@ -321,6 +323,28 @@ describe('calling an action', () => {
 
     expect(result).toMatchObject({ isError: false, status: 200, data: { id: 1, title: 'Milk', at: '1970-01-01T00:00:00.000Z' } })
     expect(JSON.parse(result.text)).toEqual(result.data!)
+  })
+
+  it('answers with the tool\'s text alone, the page still getting the object', async () => {
+    const result = await site.mcp.call('digest')
+
+    expect(result).toMatchObject({ isError: false, text: 'a\nb' })
+    expect(result.data).toBeUndefined()
+
+    const posted = await site.fetch('/_kay/action/tests/fixtures/mcp/src/routes/index.kay/digest', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: encodeValue({}) })
+
+    expect(decodeServerValue(await posted.text())).toEqual({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) })
+  })
+
+  it('keeps the JSON and the structured content of a tool without text', async () => {
+    const result = await site.mcp.call('add_note', { title: 'Milk' })
+
+    expect(result.data).toBeDefined()
+    expect(JSON.parse(result.text)).toEqual(result.data!)
+  })
+
+  it('refuses the call when the text throws', async () => {
+    expect(await site.mcp.call('mute')).toMatchObject({ isError: true, text: 'no words' })
   })
 
   it('tells an action of the same name in another file apart', async () => {

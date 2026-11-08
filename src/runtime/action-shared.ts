@@ -95,7 +95,7 @@ export interface ProofOfWorkOptions {
 export type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
 
 // How an action is offered to an agent as an MCP tool.
-export interface ActionTool {
+export interface ActionTool<Output = never> {
   // Its name, in place of the export's in snake case: `addNote` is `add_note`.
   name?: string | undefined
   // What the agent reads of it to choose it.
@@ -104,6 +104,9 @@ export interface ActionTool {
   label?: string | undefined
   // The action only reads: an agent may run it without asking anyone. Left out, a library asking the visitor before it runs a model's tool call, as kayjs-ai's `Chat` does, asks for this one.
   readOnly?: boolean | undefined
+  // The agent's answer as text, from what the action returned: `text: ({ notes }) => notes.map(note => note.title).join('\n')`. A tool answering with it sends this text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the object.
+  // A thrown error is the agent's refusal. Without it an object is sent as JSON in the text and again as `structuredContent`, and a string as itself.
+  text?: ((value: Output) => string) | undefined
 }
 
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.
@@ -152,9 +155,9 @@ export interface ActionHooks {
 }
 
 // What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents, `maxSize` for the body, and the hooks.
-export interface ActionProtection<Field extends string = never> extends ActionHooks {
+export interface ActionProtection<Field extends string = never, Output = never> extends ActionHooks {
   // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that the `honeypot`, `minTime` and `proofOfWork` of `protect` are skipped, as they only make sense for a form a person filled in.
-  tool?: boolean | string | ActionTool | undefined
+  tool?: boolean | string | ActionTool<Output> | undefined
   // The checks, over the app's `actions.protect` key by key: one named here replaces the app's, and `false` takes none of the app's defaults for this action.
   protect?: ActionProtect<Field> | false | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.
