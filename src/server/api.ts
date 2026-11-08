@@ -716,8 +716,8 @@ declare module 'elysia' {
     timeout?: Duration | false | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
     rateLimit?: RateLimit | RateLimit[] | undefined
-    // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
-    tool?: boolean | string | ActionTool | undefined
+    // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description, text }`, as an action's `tool` is, `text` taking the route's parsed JSON answer. A route without it is in the OpenAPI document and never offered.
+    tool?: boolean | string | ActionTool<unknown> | undefined
     // On a websocket route: the most one message may weigh (`maxSize`, 1 MB by default) and how many a socket may send in a window (`rateLimit`, 100 a second by default). A socket over either is closed, with 1009 or 1008.
     messages?: SocketLimits | undefined
   }

@@ -42,6 +42,14 @@ describe('an action as a tool', () => {
     })
   })
 
+  it('answers with its text alone when the tool sets text', async () => {
+    const result = await call('worded')
+
+    expect(result.structuredContent).toBeUndefined()
+    expect(text(result)).toBe('a b')
+    expect(await call('addNote', { title: 'Milk' })).toHaveProperty('structuredContent')
+  })
+
   it('takes the name and description its tool option sets', async () => {
     expect(await site.call(shape, { name: 'described' })).toMatchObject({ name: 'described', description: 'Says it was described' })
     expect(await site.call(shape, { name: 'named' })).toMatchObject({ name: 'Say_Hello', description: 'Says hello' })

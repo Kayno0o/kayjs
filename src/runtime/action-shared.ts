@@ -106,7 +106,9 @@ export interface ActionTool<Output = never> {
   readOnly?: boolean | undefined
   // The agent's answer as text, from what the action returned: `text: ({ notes }) => notes.map(note => note.title).join('\n')`. A tool answering with it sends this text alone, with no JSON and no `structuredContent`, while the page and any other caller still get the object.
   // A thrown error is the agent's refusal. Without it an object is sent as JSON in the text and again as `structuredContent`, and a string as itself.
-  text?: ((value: Output) => string) | undefined
+  // A method, so an `ActionProtection` built apart from the action it goes to still fits it.
+  // eslint-disable-next-line ts/method-signature-style
+  text?(value: Output): string
 }
 
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.

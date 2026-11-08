@@ -77,9 +77,10 @@ export interface Operation {
   'responses': Record<string, Schema>
   // Set on a route behind a guard, which the file names of are not shared.
   'x-kay-guarded'?: true
-  // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's, and its `text`, a function the JSON of the document leaves out.
-  // An action sets it only with a `text`.
-  'x-kay-tool'?: { name?: string | undefined, description?: string | undefined, text?: ToolText | undefined }
+  // Set on a route that opted in to being an MCP tool, with what its `detail.tool` sets: the name and description the tool takes in place of the operation's.
+  'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
+  // The tool's `text`, a function the JSON of the document leaves out.
+  'x-kay-text'?: ToolText | undefined
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
   // Set on an action tool that only reads (`tool: { readOnly: true }`), which `tools/list` annotates as such.
@@ -212,7 +213,9 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
           responses: withRefusal(responses(hooks.response), hooks),
           ...module.guards.length > 0 && { 'x-kay-guarded': true },
-          ...tool && { 'x-kay-tool': tool },
+          ...tool && { 'x-kay-tool': { ...tool.name !== undefined && { name: tool.name }, ...tool.description !== undefined && { description: tool.description } } },
+          // eslint-disable-next-line ts/unbound-method -- a function the author wrote, never called on the settings object
+          ...tool?.text && { 'x-kay-text': tool.text },
         }
 
         // A route that sets no id takes its tool's name, as an action's id is.
@@ -301,7 +304,7 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>): O
     ...action.guards.length > 0 && { 'x-kay-guarded': true },
     'x-kay-action': true,
     ...action.tool.readOnly === true && { 'x-kay-read-only': true },
-    ...action.tool.text && { 'x-kay-tool': { text: action.tool.text } },
+    ...action.tool.text && { 'x-kay-text': action.tool.text },
   }
 }
 

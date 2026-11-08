@@ -148,7 +148,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
         init.body = JSON.stringify(Object.fromEntries(Object.entries(args).filter(([name]) => places.get(name)?.has('body'))))
       }
 
-      return dispatch(context, url, init, action, name, tool?.text)
+      return dispatch(context, url, init, action, name, operation['x-kay-text'])
     },
   }
 }
@@ -290,9 +290,17 @@ function sent(value: unknown, render?: ToolText): ToolResult {
 // What the tool's `text` made of the value, alone: the agent reads no JSON beside it. A renderer that throws is the agent's refusal.
 function written(value: unknown, render: ToolText): ToolResult {
   try {
-    return { content: [{ type: 'text', text: render(value as never) }] }
+    const text: unknown = render(value as never)
+
+    if (typeof text !== 'string')
+      throw new TypeError(`the tool's text returned ${typeof text}, not a string`)
+
+    return { content: [{ type: 'text', text }] }
   }
   catch (error) {
+    // The agent is told it failed, and the app's logs see why.
+    console.error('kay: a tool\'s `text` threw', error)
+
     return refusal(error instanceof Error ? error.message : String(error))
   }
 }
@@ -584,6 +592,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
   const name = url.slice(url.lastIndexOf('/') + 1)
   const settings = toolSettings(action.protection?.tool) ?? {}
   const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
+  // eslint-disable-next-line ts/unbound-method -- a function the author wrote, never called on the settings object
   const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...settings.text && { text: settings.text } }, guards: [] }, new Set())
   const tool = operation && toolOf(url, 'post', operation, operation.operationId!, new Set())
 

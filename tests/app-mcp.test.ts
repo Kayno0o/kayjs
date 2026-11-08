@@ -1,8 +1,10 @@
+import type { ActionProtection } from '../src/runtime/action'
 import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
+import { action } from '../src/runtime/action'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { decodeServerValue, encodeValue } from '../src/runtime/wire'
 import { toolCall } from '../src/server'
@@ -198,6 +200,11 @@ describe('the tools', () => {
       'a'.repeat(64),
       'add_note',
       'add_note_2',
+      'anyway_delete',
+      'anyway_get',
+      'anyway_patch',
+      'anyway_post',
+      'anyway_put',
       'digest',
       'mute',
       'peek',
@@ -209,6 +216,7 @@ describe('the tools', () => {
       'get_notes_binary',
       'get_notes_described',
       'get_notes_id',
+      'get_notes_listed',
       'get_notes_paged',
       'get_notes_search',
       'get_notes_who',
@@ -334,6 +342,27 @@ describe('calling an action', () => {
     const posted = await site.fetch('/_kay/action/tests/fixtures/mcp/src/routes/index.kay/digest', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: encodeValue({}) })
 
     expect(decodeServerValue(await posted.text())).toEqual({ notes: [{ title: 'a' }, { title: 'b' }], at: new Date(0) })
+  })
+
+  it('words a route\'s answer too, an .all() route in each of its methods', async () => {
+    expect(await site.mcp.call('get_notes_listed')).toMatchObject({ isError: false, text: 'a,b' })
+    expect((await site.mcp.call('get_notes_listed')).data).toBeUndefined()
+    expect(await site.mcp.call('anyway_get')).toMatchObject({ text: 'x' })
+    expect(await site.mcp.call('anyway_post')).toMatchObject({ text: 'x' })
+  })
+
+  it('leaves the text function out of the OpenAPI document', async () => {
+    const document = await (await openapi.fetch('/api/openapi.json')).text()
+
+    expect(document).toContain('digest')
+    expect(document).not.toContain('x-kay-text')
+  })
+
+  it('takes a protection built apart from the action, or typed for a text', () => {
+    const apart: ActionProtection<'website'> = { tool: { name: 'apart' }, protect: { honeypot: 'website' } }
+
+    expect(() => action(t.Object({}), () => ({ a: 1 }), apart)).not.toThrow()
+    expect(() => action(() => ({ a: 1 }), { tool: { text: ({ a }) => String(a.toFixed(0)) } })).not.toThrow()
   })
 
   it('keeps the JSON and the structured content of a tool without text', async () => {

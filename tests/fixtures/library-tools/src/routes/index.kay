@@ -4,9 +4,9 @@ import { action, s } from 'kay'
 import { actionTool, currentRequest } from 'kay/library'
 import { wipe } from './admin/_actions.kay'
 import { rename } from './items/[id].kay'
-import { addNote, breaks, described, language, named, refuses, sendsAway, limited, signup, solve, upload, vetoed } from './targets/_actions.kay'
+import { addNote, breaks, described, language, named, refuses, sendsAway, limited, signup, solve, upload, vetoed, worded } from './targets/_actions.kay'
 
-const offered = { addNote, breaks, described, language, limited, named, refuses, rename, sendsAway, signup, solve, upload, vetoed, wipe }
+const offered = { addNote, breaks, described, language, limited, named, refuses, rename, sendsAway, signup, solve, upload, vetoed, wipe, worded }
 
 type Offered = keyof typeof offered
 

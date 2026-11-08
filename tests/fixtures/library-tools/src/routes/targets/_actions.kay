@@ -6,6 +6,8 @@ export const addNote = action(s.Object({
   pinned: s.Optional(s.Boolean()),
 }), ({ title }) => ({ id: 1, title, at: new Date(0) }))
 
+export const worded = action(s.Object({}), () => ({ items: ['a', 'b'] }), { tool: { text: ({ items }) => items.join(' ') } })
+
 export const described = action(s.Object({}), () => 'described', { tool: 'Says it was described' })
 
 export const named = action(() => 'named', { tool: { name: 'Say-Hello', description: 'Says hello' } })
