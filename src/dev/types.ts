@@ -2,9 +2,11 @@ import type { ProbeMemory } from '../check'
 import type { KayConfig } from '../config'
 import type { TypeProblem } from './refuse'
 import { readFileSync, realpathSync } from 'node:fs'
-import { relative, sep } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import process from 'node:process'
+import { KAY_DIR, testWorker } from '../build/assets'
 import { check, configCheckOptions, formatCheckDiagnostic, writeShadowTypes } from '../check'
+import { deriveToolOutputs } from '../check/tool-outputs'
 import { loadConfig } from '../config-loader'
 import { projectPaths } from '../project'
 import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE } from './refuse'
@@ -94,7 +96,8 @@ async function typecheck(): Promise<number> {
     if (loaded === undefined || refused)
       return CHECK_SKIPPED
 
-    const found = (await check(root!, { ...configCheckOptions(config), entry: entry === '' ? config.entry : entry }, probes)).filter(({ code }) => code === undefined || TYPE_CODE.test(code) || TYPE_LINTS.has(code))
+    const options = { ...configCheckOptions(config), entry: entry === '' ? config.entry : entry }
+    const found = (await check(root!, options, probes)).filter(({ code }) => code === undefined || TYPE_CODE.test(code) || TYPE_LINTS.has(code))
     const problems = found.map((diagnostic): TypeProblem => {
       const source = readText(diagnostic.file)
 
@@ -102,6 +105,8 @@ async function typecheck(): Promise<number> {
     })
 
     process.stdout.write(`\n${PROBLEMS}${JSON.stringify(problems)}\n`)
+    // The schemas of the tool actions without an `output` come in the background, the dev server's tool list reading them when they do.
+    void deriveToolOutputs(root!, options, join(root!, KAY_DIR, `dev${testWorker()}`), { shadowed: true })
 
     return Number(problems.length > 0)
   }

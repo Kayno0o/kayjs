@@ -1,0 +1,19 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const summary = action(t.Object({}), () => ({ count: 2, at: new Date(0), tags: ['a'] as string[], note: undefined as string | undefined }), { tool: true })
+
+export const declared = action(t.Object({}), () => ({ count: 2, extra: 'x' }), { tool: { output: t.Object({ count: t.Number() }) } })
+
+export const plain = action(() => 'plain', { tool: true })
+
+export const refuses = action(t.Object({}), (_input, ctx) => ctx.fail(409, { reason: 'full' }), { tool: true })
+
+export const hidden = action(t.Object({}), () => ({ secret: true }))
+
+export const stream = action(async function* () {
+  yield { n: 1 }
+}, { tool: true })
+---
+h1 Tools

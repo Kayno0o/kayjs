@@ -5,9 +5,11 @@ import { parseSync } from 'oxc-parser'
 type Schema = Record<string, unknown>
 
 // What a probe file starts with: `probe(handler)` has the wire form of what the handler answers.
+// A stream, a handler's async iterable or the connection a call to a streaming action answers with, is no JSON answer.
 // A Date and a bigint are strings, a Map an object and a Set an array, as `json()` writes them, an object with `toJSON` is what that returns, a function is `undefined` (no property, `null` in an array), and `unknown` stays `unknown`.
 // A number that is NaN or Infinity is written as `null` and described as a number: the type cannot tell.
 export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
+  : T extends AsyncIterable<unknown> | { ended: () => Promise<unknown>, onClose: (...args: never[]) => unknown } ? never
   : T extends string | number | boolean | null | undefined ? T
   : T extends bigint | Date ? string
   : T extends (...args: never[]) => unknown ? undefined
@@ -16,7 +18,9 @@ export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends Set<infer V> | readonly (infer V)[] ? Wire<V>[]
   : T extends object ? { [K in keyof T as [T[K]] extends [(...args: never[]) => unknown] ? never : K]: Wire<T[K]> }
   : never
-declare function probe<T>(handler: (...args: never[]) => T): Wire<Awaited<T>>`
+declare function probe<T>(handler: (...args: never[]) => T): Wire<Awaited<T>>
+type Answered<A> = A extends (...args: never[]) => Promise<infer R> ? R : never
+declare function answer<A>(action: A): Wire<Answered<A>>`
 
 // Raised for a type no schema describes, which the object around it turns into `{}` and the root into no schema.
 const UNTOLD = Symbol('untold')

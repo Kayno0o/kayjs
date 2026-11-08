@@ -6,6 +6,7 @@ import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
 import type { LoadedGuard } from './guards'
 import type { Operation, ToolText } from './openapi'
+import type { ToolOutputs } from './tool-outputs'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { INVALID_REQUEST, McpServer, PARSE_ERROR } from '../mcp/protocol'
 import { joinBase } from '../runtime/base'
@@ -97,6 +98,13 @@ function outputOf(operation: Operation): Schema | undefined {
   return schema?.type === 'object' ? schema : undefined
 }
 
+// The schema recorded from an action's handler, which it lists when the action declares no `output`.
+function derivedOf(operation: Operation): Schema | undefined {
+  const schema = operation['x-kay-derived']?.()
+
+  return schema?.type === 'object' ? schema : undefined
+}
+
 function toolOf(path: string, method: string, operation: Operation, id: string, taken: Set<string>, dev = false): AppTool | undefined {
   const tool = operation['x-kay-tool']
   const description = tool?.description ?? ([operation.summary, operation.description].filter(text => text !== undefined).join('\n\n') || `${method.toUpperCase()} ${path}`)
@@ -130,7 +138,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
 
   const reads = method === 'get' || operation['x-kay-read-only'] === true
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }
-  const outputSchema = outputOf(operation)
+  const outputSchema = outputOf(operation) ?? derivedOf(operation)
 
   const name = toolName(tool?.name ?? id, taken)
   let told = false
@@ -398,6 +406,8 @@ export interface McpOptions {
   key?: string | false | undefined
   // Under `kay dev`: an answer that does not match the tool's `output` logs one warning.
   dev?: boolean | undefined
+  // The schemas recorded for the actions without an `output`, which `kay dev` rereads as they change.
+  outputs?: ToolOutputs | undefined
 }
 
 // A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
@@ -550,9 +560,22 @@ function serveResourceMetadata(app: Elysia, name: string, paths: string[], endpo
 // Serves the tools of `document` at `/mcp` over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
-  const tools = documentedTools(document, options.dev === true).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
-  const known = new Set(tools.map(tool => tool.name))
-  const mcp = new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } })
+  const build = () => {
+    const tools = documentedTools(document, options.dev === true).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
+
+    return { known: new Set(tools.map(tool => tool.name)), mcp: new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } }) }
+  }
+  let serving = build()
+  let recorded = options.outputs?.stamp()
+  // Under `kay dev` the schemas `kay build` would record come in the background, after the server started: the tools are made again once they change.
+  const current = () => {
+    if (options.dev === true && options.outputs !== undefined && options.outputs.stamp() !== recorded) {
+      recorded = options.outputs.stamp()
+      serving = build()
+    }
+
+    return serving
+  }
   const notAllowed = () => new Response(null, { status: 405, headers: { allow: 'POST' } })
 
   app.post(options.path, async (served) => {
@@ -573,6 +596,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
 
     const text = await request.text()
     const message = parseJson(text)
+    const { known, mcp } = current()
     const guarded = guardedMessage(message, known)
 
     // The list names every tool and the guarded routes behind them, so it is as private as the document is.

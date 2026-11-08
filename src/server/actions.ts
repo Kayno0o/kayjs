@@ -15,6 +15,7 @@ import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
 import type { Unmatched } from './page-routes'
+import type { ToolOutputs } from './tool-outputs'
 import { relative } from 'node:path'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, protectionFields } from '../runtime/action'
 import { joinBase } from '../runtime/base'
@@ -108,6 +109,8 @@ export interface ActionOptions {
   cors?: CorsOptions | undefined
   // A page or layout that does not compile serves no action instead of failing the whole app, as a test site does so the tests of other pages go on; the visit of that page fails with its error.
   skipBroken?: boolean | undefined
+  // The schemas `kay build` recorded for the tool actions that declare no `output`.
+  toolOutputs?: ToolOutputs | undefined
   // The app's `actions` defaults and hooks, which every action starts from.
   actions?: ActionsConfig | undefined
   // The answer for a path no page serves, known once the page routes exist, which an endpoint answering 404 to a request asking HTML renders.
@@ -174,7 +177,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       const ownTimeout = value.protection?.timeout === undefined ? undefined : timeoutMs(value.protection.timeout, `the timeout of ${value.url}`) ?? false
 
       if (tool && page.params.length === 0)
-        tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
+        tools.push({ name, url: value.url, schema: value.schema, tool, derived: options.toolOutputs && (() => options.toolOutputs!.of(file, name)), guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // What a form the browser builds asks for, as the server writes it into the forms it renders: its honeypot and a stamp signed now.

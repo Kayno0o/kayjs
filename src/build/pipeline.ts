@@ -16,6 +16,7 @@ import { check, configCheckOptions } from '../check'
 import { pageStructureLints } from '../check/page-structure'
 import { pageSeoLints, unkeptPageLints } from '../check/seo'
 import { hasUnseenPages, siteSeoLints } from '../check/site-seo'
+import { deriveToolOutputs } from '../check/tool-outputs'
 import { lintLevel } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
 import { pageHooks } from '../config-extensions'
@@ -274,6 +275,10 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       console.warn(`kay build could not record the server modules, so a server on disk compiles them as they load: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
+
+  // The answers of the tool actions that declare no `output`, read from their types for the server to list; a build that cannot read them lists none.
+  if (!exported)
+    await deriveToolOutputs(root, { ...configCheckOptions(project.config), entry: project.config.entry }, project.paths.output, { tsconfig: checkWith?.tsconfig, shadowed: checking })
 
   if (options.compile) {
     const stage = performance.now()

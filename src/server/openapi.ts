@@ -61,6 +61,8 @@ export interface DocumentedAction {
   tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined, text?: ToolText | undefined, output?: unknown }
   // The files of the guards covering it.
   guards: string[]
+  // The schema of its answer read from the handler's return type, asked when the tool is listed: used when `tool.output` declares none.
+  derived?: (() => Schema | undefined) | undefined
 }
 
 interface Parameter {
@@ -92,6 +94,8 @@ export interface Operation {
   'x-kay-text'?: ToolText | undefined
   // Where an answer first differs from the tool's `output`, as a JSON pointer, or undefined when it fits: kept for `kay dev`, which warns of a mismatch.
   'x-kay-output'?: ((value: unknown) => string | undefined) | undefined
+  // The schema of an action's answer recorded at build time from its handler's type, which a tool lists as its `outputSchema` when the action declares no `output`; a function, so the document holds none.
+  'x-kay-derived'?: (() => Schema | undefined) | undefined
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
   // Set on an action tool that only reads (`tool: { readOnly: true }`), which `tools/list` annotates as such.
@@ -317,6 +321,7 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>): O
     ...action.tool.readOnly === true && { 'x-kay-read-only': true },
     ...action.tool.text && { 'x-kay-text': action.tool.text },
     ...action.tool.output !== undefined && { 'x-kay-output': firstMismatch(action.tool.output) },
+    ...action.tool.output === undefined && action.derived !== undefined && { 'x-kay-derived': action.derived },
   }
 }
 
