@@ -23,6 +23,9 @@ export const SOURCE_READERS = [
 // What marks a test as scanning sources: a quoted glob of `src/` or `packages/<library>/src/`, or a scan of the `SRC` folder.
 export const SOURCE_SCAN = /[`'"]\{?(?:src\/|packages\/[^`'"]*\/src\/)[^`'"]*\*[*.]|\.scan(?:Sync)?\(SRC\)/
 
+// What marks a test as globbing the topic files: a quoted glob under `llms/` or `packages/*/llms/`, which a topic file no test names yet reaches.
+export const LLMS_SCAN = /[`'"](?:packages\/\*\/)?llms\/[^`'"]*\*/
+
 // Tests reading one source file through a fixed path, which neither an import graph nor `SOURCE_READERS` shows: a stylesheet or a component read as text, or loaded by a library's extension (`tests/land.test.ts` derives the `theme.css` list from `UI_THEME_USE`). Each runs only for a change to its file, as the slow and browser tests stay out.
 export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
   [/^packages\/ui\/src\/theme\.css$/, ['tests/apply-theme.test.ts', 'tests/format-tailwind.test.ts', 'tests/prune-styles.test.ts', 'tests/inbox.test.ts', 'tests/command-options.test.ts']],
@@ -48,9 +51,10 @@ export const FIXTURE_WALK = /[`'"]tests\/fixtures(?:\/\*[^`'"]*)?[`'"]|findKayFi
 
 // Tests reading these folders as files, which an import graph does not show.
 export const READERS: [RegExp, string[]][] = [
-  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts']],
+  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts', 'tests/api.test.ts', 'tests/packages.test.ts', 'tests/pack-links.test.ts', 'tests/privacy-storage.test.ts', 'tests/ui.test.ts']],
   [/^docs\//, ['tests/docs.test.ts', 'tests/examples.test.ts']],
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
+  [/^packages\/[^/]+\/llms(?:\/|\.txt$)/, ['tests/api.test.ts', 'tests/pack-links.test.ts']],
   [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
   // Tests globbing the kay and library sources.
   [SOURCE_CHANGE, SOURCE_READERS],

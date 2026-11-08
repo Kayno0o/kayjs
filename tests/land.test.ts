@@ -8,7 +8,7 @@ import { dependenciesOnly } from '../scripts/dependency-change'
 import { hostEnv } from '../scripts/host-env'
 import { librariesToTest, libraryDependencies } from '../scripts/library-dependents'
 import { addedMarkers } from '../scripts/merge-markers'
-import { FIXTURE_WALK, FIXTURE_WALKERS, READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
+import { FIXTURE_WALK, FIXTURE_WALKERS, LLMS_SCAN, READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { nicedCommand, slotPrefix } from '../scripts/step-command'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
@@ -578,6 +578,19 @@ describe('tests scanning the sources as files', () => {
     }
 
     expect(scanning.toSorted()).toEqual([...SOURCE_READERS].toSorted())
+  })
+
+  it('run every test globbing the topic files for a new one, which no test names', async () => {
+    const globbing: string[] = []
+
+    for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
+      if (LLMS_SCAN.test(await Bun.file(join(ROOT, test)).text()))
+        globbing.push(test)
+    }
+
+    expect(globbing).toContain('tests/packages.test.ts')
+    expect(globbing.filter(test => !readersOf('llms/a-new-topic.md').includes(test))).toEqual([])
+    expect(globbing.filter(test => !readersOf('packages/ui/llms/a-new-topic.md').includes(test))).toEqual([])
   })
 
   it('are run for a source file another test reads through a fixed path', async () => {
