@@ -97,7 +97,7 @@ function handles(count: number): PgHandle[] {
 afterEach(async () => {
   setupStore(undefined)
   await Promise.all(opened.splice(0).map(async handle => handle.close()))
-})
+}, 40_000)
 
 pgDescribe('pgData', () => {
   pgIt('gives each kind the SQLite one gives', async () => {

@@ -65,6 +65,7 @@ const dirs: string[] = []
 
 // Called at the top of a test file that takes these stores: its scratch files and its database go with it, so two files in one process never share them.
 export function cleanUpAfterFile(): void {
+  // DROP DATABASE waits for a checkpoint, which queues behind every other file's on a loaded host (CI shares it with landings): past Bun's 20 s hook default, so the hook has a minute.
   afterAll(async () => {
     await Promise.all(dirs.splice(0).map(async dir => rm(dir, { recursive: true, force: true })))
     // Each client closed once, its queries given two seconds; a connection the server killed never settles its close (Bun 1.4), so it is left after three.
@@ -74,11 +75,11 @@ export function cleanUpAfterFile(): void {
       const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
 
       await admin.unsafe(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`)
-      await admin.close()
+      await Promise.race([admin.close({ timeout: 2 }), Bun.sleep(3000)])
       databaseUrl = undefined
       shared = undefined
     }
-  })
+  }, 60_000)
 }
 
 export async function sqlitePath(): Promise<string> {
