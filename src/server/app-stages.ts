@@ -419,7 +419,7 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   app.get(DEV_PATCH, () => devPatch())
   const modules = devToolFiles(root, options.extensions)
 
-  app.get(DEV_TOOL, () => devTool(modules))
+  app.get(DEV_TOOL, async () => devTool(modules))
 
   for (const { url, file } of modules)
     app.get(url, async () => devToolFile(file))

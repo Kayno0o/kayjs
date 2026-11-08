@@ -190,10 +190,18 @@
   "src/runtime/dev-tab-performance.ts": {
     "max-lines-per-function": 152
   },
-  "src/runtime/dev-tool.ts": {
-    "max-lines": 2215,
-    "max-lines-per-function": 484,
+  "src/runtime/dev-tool-markdown.ts": {
     "complexity": 41
+  },
+  "src/runtime/dev-tool-problems.ts": {
+    "max-lines-per-function": 162
+  },
+  "src/runtime/dev-tool-tab-order.ts": {
+    "max-lines-per-function": 169
+  },
+  "src/runtime/dev-tool.ts": {
+    "max-lines": 657,
+    "max-lines-per-function": 484
   },
   "src/runtime/dom.ts": {
     "max-lines": 684

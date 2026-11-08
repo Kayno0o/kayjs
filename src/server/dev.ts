@@ -188,8 +188,18 @@ export function devPatch(): Response {
 }
 
 // The bar and drawer every dev page shows, which the inspector then joins under `kay dev`.
-export function devTool(modules: DevToolFile[] = []): Response {
+// The tool is split by feature into the `dev-tool-*.ts` modules it imports, bundled here into one module so a page fetches it in one request: a browser holds six connections to a host, which the dev pages of a site keep open for their live reload.
+export async function devTool(modules: DevToolFile[] = []): Promise<Response> {
   const loading = modules.length === 0 ? '' : `if (window.$kayDev) loadDevModules(window.$kayDev, ${JSON.stringify(modules.map(({ name, url }) => ({ name, url })))})\n`
+
+  if (!devModules.has(TOOL_SOURCE)) {
+    const { success, logs, outputs } = await Bun.build({ entrypoints: [TOOL_SOURCE], target: 'browser', format: 'esm' })
+
+    if (!success)
+      throw new AggregateError(logs, 'the dev tool could not be bundled')
+
+    devModules.set(TOOL_SOURCE, await outputs[0]!.text())
+  }
 
   return devModule(TOOL_SOURCE, `\nwindow.$kayDev = startDevTool()\n${loading}`)
 }
@@ -614,7 +624,7 @@ export function bootFailure(error: unknown, root: string, tools = true): Elysia 
   if (tools) {
     refuseRemoteDevTools(app)
     app.get(DEV_EVENTS, () => devEvents(true))
-    app.get(DEV_TOOL, () => devTool())
+    app.get(DEV_TOOL, async () => devTool())
   }
 
   if (tools && underKayDev()) {

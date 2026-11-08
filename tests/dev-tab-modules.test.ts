@@ -32,7 +32,8 @@ describe('the dev tool tab modules', () => {
 
   it('keeps each constant a tab module copies the same as the one it is copied from', async () => {
     const constants = async (file: string) => new Map([...(await Bun.file(join(SRC, file)).text()).matchAll(CONSTANT)].map(match => [match[1]!, match[2]!]))
-    const sources = [await constants('dev-tool.ts'), await constants('server-islands.ts')]
+    const parts = await Promise.all([...new Bun.Glob('dev-tool-*.ts').scanSync({ cwd: SRC })].map(async file => constants(file)))
+    const sources = [new Map([...await constants('dev-tool.ts'), ...parts.flatMap(part => [...part])]), await constants('server-islands.ts')]
     const compared = new Set<string>()
 
     for (const file of new Bun.Glob('dev-tab-*.ts').scanSync({ cwd: SRC })) {
@@ -49,5 +50,17 @@ describe('the dev tool tab modules', () => {
 
     // The copies this guards, so a renamed constant does not leave the test comparing nothing.
     expect([...compared].sort()).toEqual(expect.arrayContaining(['ACTION_PATH', 'DEV_PATH', 'HEAD_HEADER', 'HOST', 'ISLAND_PARAM']))
+  })
+})
+
+describe('the dev tool module', () => {
+  it('is one module with the parts it imports bundled in, so a page fetches it in one request', async () => {
+    const app = await pages({ prebuilt: false, security: false, dev: true })
+    const text = await (await app.handle(new Request('http://localhost/_kay/dev/tool.js'))).text()
+
+    expect(text).not.toMatch(/\bfrom\s*["']\./)
+    expect(text).toContain('function startTabOrder')
+    expect(text).toContain('function problemsTab')
+    expect(text).toMatch(/\nwindow\.\$kayDev = startDevTool\(\)\n/)
   })
 })
