@@ -14,7 +14,7 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`.
+A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, or a `--- island` or `--- client` fence line. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
 
 The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
 
@@ -124,7 +124,7 @@ Collapsible(title="Details")
   Counter
 ```
 
-A function or a class instance cannot be sent. A component passing one to an island becomes an island itself.
+A function or a class instance cannot be sent. A static component passing one to an island is the error `island-prop`: write `--- island` on it. Until 1.95 the build still promotes such a component on its own, which `promoted-island` reports.
 
 A page or a layout cannot become an island, so `kay check` reports it there. Move that part to a component.
 

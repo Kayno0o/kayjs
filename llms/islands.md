@@ -1,5 +1,7 @@
 # Islands
 
+A component is an island when its own code needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script (a `live` value a module exports included), or a `--- island` or `--- client` fence line; what an island renders is part of it, and nothing a component passes makes it one. It is decided at compile time, from the file and its imports.
+
 ## Common tasks
 
 ### Make a component interactive
@@ -197,7 +199,7 @@ The server and the island's first render read the fallback, `false` unless given
 
 ### Islands
 
-- A component is interactive when any element in it has an `on*` handler, a `bind:` (on an element or a component) or a `ref`, or when its script uses a value from `kay`, such as `signal`, imported or not.
+- A component is interactive when any element in it has an `on*` handler, a `bind:` (on an element or a component) or a `ref`, or when its script uses a value from `kay`, such as `signal`; the rule is at the top.
 - `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` from `kay` compute the same on both sides and keep a component static; every other value of `kay` needs the browser (state, effects, lifecycle, browser readings, navigation: `navigate`, `refresh`, `call` and `logFrom` among them), and so does `relativeTime` of `kay/i18n`.
 - A namespace or default import of `kay` or `kay/i18n` (`import * as i18n from 'kay/i18n'`) always makes an island, as the compiler cannot tell which names the component reads through it: import the names (`import { formatDate } from 'kay/i18n'`) to keep a component static that only formats.
 - An interactive component renders on the server and hydrates in the browser as an island.
