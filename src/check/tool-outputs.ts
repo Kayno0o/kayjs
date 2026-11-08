@@ -1,6 +1,6 @@
 // The build step that gives a tool action's `outputSchema` to the server: the handler's return type, read through tsgo's declaration emit (output-schema.ts), recorded in the output folder under the action's file and name.
 import type { CheckOptions } from '.'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { join, parse, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -82,8 +82,13 @@ async function writeRecord(root: string, options: CheckOptions, output: string, 
     if (!existsSync(record) || await Bun.file(record).text() !== text) {
       const aside = `${record}.${process.pid}`
 
-      await Bun.write(aside, text)
-      await rename(aside, record)
+      try {
+        await Bun.write(aside, text)
+        await rename(aside, record)
+      }
+      finally {
+        await rm(aside, { force: true })
+      }
     }
   }
   catch {
@@ -99,6 +104,8 @@ async function emitted(root: string, options: CheckOptions, probes: Probe[], tsc
 
   // A folder of its own, as a build and a dev server of the project may both run.
   const dir = await mkdtemp(join(root, KAY_DIR, `${PROBE_DIR}-`))
+  // Where tsgo lays the output out, which it resolves links for.
+  const real = realpathSync(dir)
   const lines = probes.map(({ file, name }, at) => `export const t${at} = answer(null as unknown as typeof import(${JSON.stringify(specifier(dir, file))})[${JSON.stringify(name)}])`)
 
   await Bun.write(join(dir, 'probe.ts'), `${WIRE_PRELUDE}\n${lines.join('\n')}\n`)
@@ -111,7 +118,7 @@ async function emitted(root: string, options: CheckOptions, probes: Probe[], tsc
     await child.exited.finally(() => clearTimeout(stop))
 
     // Laid out under the root of the file system, as `rootDir` says.
-    const declarations = Bun.file(join(dir, 'out', relative(parse(dir).root, dir), 'probe.d.ts'))
+    const declarations = Bun.file(join(dir, 'out', relative(parse(real).root, real), 'probe.d.ts'))
 
     if (!await declarations.exists())
       return undefined
