@@ -371,7 +371,7 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
     if (build !== undefined)
       set.headers[BUILD_HEADER] = build
   })
-  serveToolCallsThrough(app)
+  serveToolCallsThrough(app, env.dev)
 
   if (env.base !== '')
     rebaseRedirects(app, env.base)

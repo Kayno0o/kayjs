@@ -421,10 +421,15 @@ export function toolCall(request: Request): ToolCall | undefined {
 
 // The app `pages()` built last answers a request no app recorded, such as one a hook of another plugin rebuilt.
 let fallbackApp: WeakRef<Elysia> | undefined
+// The apps serving under `kay dev`, whose library tools check their answers against their output.
+const devApps = new WeakSet<Elysia>()
 
 // The app that received a request serves the actions a library calls as tools when no server does, as under `app.handle()`, so several apps built in one process each run their own calls.
-export function serveToolCallsThrough(app: Elysia): void {
+export function serveToolCallsThrough(app: Elysia, dev = false): void {
   const held = new WeakRef(app)
+
+  if (dev)
+    devApps.add(app)
 
   fallbackApp = held
   app.onRequest(({ request }) => {
@@ -654,10 +659,14 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
   const sentence = name.replace(WORD_START, '$1 $2').toLowerCase()
   // eslint-disable-next-line ts/unbound-method -- a function the author wrote, never called on the settings object
   const operation = actionOperation({ name, url, schema: action.schema, tool: { name: settings.name, description: settings.description ?? `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...settings.text && { text: settings.text }, ...settings.output !== undefined && { output: settings.output } }, guards: [] }, new Set())
-  const tool = operation && toolOf(url, 'post', operation, operation.operationId!, new Set())
+  const build = (dev: boolean) => operation && toolOf(url, 'post', operation, operation.operationId!, new Set(), dev)
+  const tool = build(false)
 
   if (!tool)
     return undefined
+
+  // Built on the first call an app under `kay dev` receives, one per app, so a reload warns again and production pays nothing.
+  const checked = new WeakMap<Elysia, AppTool>()
 
   return {
     name: tool.name,
@@ -674,7 +683,14 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
       if (unadmittedCrossSite(request))
         return refusal('Cross-site request refused')
 
-      return tool.call(args, { request, server: requestServer(request) ?? null, fallback: async visit => app.handle(visit), challenged: false, page: postedFrom(request) ?? (answeredAsPage(request) ? requestUrl(request).href : undefined) })
+      let used = tool
+
+      if (devApps.has(app)) {
+        used = checked.get(app) ?? build(true)!
+        checked.set(app, used)
+      }
+
+      return used.call(args, { request, server: requestServer(request) ?? null, fallback: async visit => app.handle(visit), challenged: false, page: postedFrom(request) ?? (answeredAsPage(request) ? requestUrl(request).href : undefined) })
     },
   }
 }

@@ -33,4 +33,13 @@ export const vetoed = action(s.Object({}), () => 'vetoed', { tool: false })
 export const limited = action(s.Object({}), () => 'counted', { protect: { rateLimit: { max: 2, window: '1m' } } })
 
 export const solve = action(s.Object({}), () => 'solved', { protect: { proofOfWork: true } })
+
+// Actions with an `output`, for the dev check of a library's tool: one lying, one fitting, one answering nothing, one whose output is no object schema.
+export const lies = action(s.Object({}), () => ({ count: 'two' as unknown as number }), { tool: { output: s.Object({ count: s.Number() }) } })
+
+export const honest = action(s.Object({}), () => ({ count: 2 }), { tool: { output: s.Object({ count: s.Number() }) } })
+
+export const silent = action(s.Object({}), () => undefined as never, { tool: { output: s.Object({ n: s.Number() }) } })
+
+export const unlisted = action(s.Object({}), () => ({ count: 2 }), { tool: { output: s.Array(s.Number()) as never } })
 ---

@@ -208,3 +208,127 @@ describe('a tool call with no server, as under app.handle()', () => {
     expect(inEnglish).toEqual({ locale: 'en' })
   })
 })
+
+describe('a library tool under kay dev', () => {
+  async function warned(run: () => Promise<unknown>): Promise<string[]> {
+    const warn = console.warn
+    const warnings: string[] = []
+
+    console.warn = (message: string) => warnings.push(message)
+
+    try {
+      await run()
+    }
+    finally {
+      console.warn = warn
+    }
+
+    return warnings
+  }
+
+  const devSite = async () => testSite({ root: 'tests/fixtures/library-tools', islands: false, dev: true })
+
+  it('warns once of an answer its output does not describe, and never in production', async () => {
+    const dev = await devSite()
+
+    try {
+      const warnings = await warned(async () => {
+        await call('lies', {}, dev)
+        await call('lies', {}, dev)
+        await call('lies', {}, site)
+      })
+
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain('lies')
+      expect(warnings[0]).toContain('/count')
+    }
+    finally {
+      await dev.close()
+    }
+  })
+
+  it('warns of a tool that lists an output and answers nothing', async () => {
+    const dev = await devSite()
+
+    try {
+      const warnings = await warned(async () => {
+        await call('silent', {}, dev)
+        await call('silent', {}, dev)
+        await call('silent', {}, site)
+      })
+
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain('answered nothing')
+    }
+    finally {
+      await dev.close()
+    }
+  })
+
+  it('warns of an output that is no object schema', async () => {
+    const dev = await devSite()
+
+    try {
+      const warnings = await warned(async () => {
+        await call('unlisted', {}, dev)
+        await call('unlisted', {}, dev)
+        await call('unlisted', {}, site)
+      })
+
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain('not an object schema')
+    }
+    finally {
+      await dev.close()
+    }
+  })
+
+  it('stays quiet for an answer its output describes and a tool with no output', async () => {
+    const dev = await devSite()
+
+    try {
+      expect(await warned(async () => {
+        await call('honest', {}, dev)
+        await call('addNote', { title: 'Milk' }, dev)
+      })).toEqual([])
+    }
+    finally {
+      await dev.close()
+    }
+  })
+
+  it('checks the app under dev only, with two apps in one process', async () => {
+    const dev = await devSite()
+
+    try {
+      const warnings = await warned(async () => {
+        await call('lies', {}, site)
+        await call('lies', {}, dev)
+        await call('lies', {}, site)
+      })
+
+      expect(warnings).toHaveLength(1)
+    }
+    finally {
+      await dev.close()
+    }
+  })
+
+  it('warns again for an app built again, as a reload does', async () => {
+    const first = await devSite()
+    const second = await devSite()
+
+    try {
+      const warnings = await warned(async () => {
+        await call('lies', {}, first)
+        await call('lies', {}, second)
+        await call('lies', {}, first)
+      })
+
+      expect(warnings).toHaveLength(2)
+    }
+    finally {
+      await Promise.all([first.close(), second.close()])
+    }
+  })
+})

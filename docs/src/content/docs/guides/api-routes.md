@@ -243,7 +243,7 @@ The agent gets that text alone, with no JSON and no `structuredContent`, while t
 
 To tell a client what a tool answers before it calls, give the action an `output` object schema (`s.Object` or `s.Record`; the types refuse a union, an array or a primitive): `tool: { output: s.Object({ id: s.Integer(), title: s.String() }) }`. `/mcp` lists it as the tool's `outputSchema`, and `kay check` refuses one the handler's return value does not fit. The schema describes the JSON the agent receives, so a `Date` is a string, a bigint a string, a `Map` an object and a `Set` an array.
 
-A tool with an `output` always sends its answer as `structuredContent`, beside the `text` when it has one. Under `kay dev` an action's answer that does not match the schema, or an action with an `output` that answers nothing, logs one warning naming the tool and the first path that differs; production checks nothing.
+A tool with an `output` always sends its answer as `structuredContent`, beside the `text` when it has one. Under `kay dev` an action's answer that does not match the schema, or an action with an `output` that answers nothing, logs one warning naming the tool and the first path that differs, a library's tool included; production checks nothing.
 
 An API route lists the object schema of its `response` the same way, with nothing more to declare: its `detail.tool` takes no `output`, and Elysia validates `response` as it always did.
 
