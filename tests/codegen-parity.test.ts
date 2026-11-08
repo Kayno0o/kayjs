@@ -53,6 +53,25 @@ describe('a link', () => {
     expect(written.browser).not.toContain('import \'kay/i18n-links\'')
   })
 
+  it('that is a component or brings a spread is no link of the template: the spread decides at render', () => {
+    const spread = targets('a(href="https://x.dev" {...rows}) x')
+
+    expect(spread.server).not.toContain('KayOutsideLink')
+    expect(spread.browser).not.toContain('KayOutside(')
+  })
+
+  it('whose `rel` is an expression still keeps it in both', () => {
+    const expression = targets('a(href="https://x.dev" rel={href}) x')
+
+    expect(expression.server).toContain('KayOutsideLink("https://x.dev", true)')
+    expect(expression.browser).toContain('KayOutside(KayN0_0, "https://x.dev", true)')
+  })
+
+  it('is checked as a site link by the types whatever it leaves', () => {
+    expect(targets('a(href="/p" hreflang="fr") x').check).toContain('href={KayHref("/p")}')
+    expect(targets('a(href={href}) x').check).toContain('href={KayHref((__props.href))}')
+  })
+
   it('read from an expression tells the server and the browser whether it may leave and stay on a locale', () => {
     const read = targets('a(href={href} rel="me") x')
     const own = targets('a(href={href} hreflang="fr" target="_blank") x')
@@ -72,6 +91,7 @@ describe('a loop', () => {
     expect(positional.hydrating).toContain('"positional")')
     expect(positional.browser).toContain('() => (__props.rows), false, (row, i)')
     expect(positional.check).toContain('keyed={false}')
+    expect(positional.check).toContain('void (i)')
   })
 
   it('keyed by an expression or by nothing is not positional in any of them', () => {
@@ -98,6 +118,15 @@ describe('a form posting to an action', () => {
       expect(defaults).toMatch(MULTIPART)
       expect(own).not.toMatch(POST)
       expect(own).not.toMatch(MULTIPART)
+    }
+  })
+
+  it('leaves a `method` written as an expression to the template', () => {
+    for (const output of [{ output: 'html' }, { output: 'dom' }, { check: true }] as const) {
+      const written = compileKay(source(' method={href}'), 'test.kay', output).tsx
+
+      expect(written).not.toMatch(POST)
+      expect(written).toMatch(MULTIPART)
     }
   })
 })

@@ -232,13 +232,15 @@ export interface ElementPlan {
   link: LinkPlan
 }
 
-// Whether an `a` may leave the site (it then opens in a new tab unless it sets its own `target`, and `rel` is kept when written), goes to the page's locale's copy of what it names, or keeps its `href` as written because it carries `hreflang`.
+// Whether an `a` may leave the site (it then opens in a new tab unless it sets its own `target`, and `rel` is kept when written), goes to the page's locale's copy of what it names, or keeps its `href` as written because it carries `hreflang`: `local` and `written` are each other's opposite for an `a`, both false for any other element.
 export interface LinkPlan {
   leaving: boolean
   local: boolean
   written: boolean
   rel: boolean
 }
+
+const NO_LINK: LinkPlan = { leaving: false, local: false, written: false, rel: false }
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
@@ -293,7 +295,7 @@ export abstract class TemplateWriter {
       target,
       field,
       described,
-      link: { leaving: name === 'a' && !this.named(element, 'target'), local: name === 'a' && !this.named(element, 'hreflang'), written: name === 'a' && this.named(element, 'hreflang'), rel: this.named(element, 'rel') },
+      link: name === 'a' ? { leaving: !this.named(element, 'target'), local: !this.named(element, 'hreflang'), written: this.named(element, 'hreflang'), rel: this.named(element, 'rel') } : NO_LINK,
     }
 
     const styleProps: StyleProp[] = []
@@ -763,7 +765,13 @@ export abstract class TemplateWriter {
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.
   protected formDefaults(element: ElementNode): void {
     const wanted = formDefaultsOf(element, this.src)
-    const defaults = [...wanted?.method ? [['method', 'post']] : [], ...wanted?.enctype ? [['enctype', 'multipart/form-data']] : []]
+    const defaults: string[][] = []
+
+    if (wanted?.method)
+      defaults.push(['method', 'post'])
+
+    if (wanted?.enctype)
+      defaults.push(['enctype', 'multipart/form-data'])
 
     if (defaults.length > 0)
       this.b.add(`, { ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }`)

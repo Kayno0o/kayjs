@@ -198,13 +198,13 @@ export function soleDynamic(items: Item[]): boolean {
 
 // How a loop matches its rows to their elements, decided once for every target: by position when its `key` names the index, by the `key` expression, else by the row itself (the browser's `rowKey`, a type check's constant).
 export type RowKeying
-  = | { kind: 'positional', key: Span, index: Span }
+  = | { kind: 'positional', key: Span }
     | { kind: 'expression', key: Span }
     | { kind: 'implicit' }
 
 export function rowKeying(node: ForNode, src: string): RowKeying {
   if (keyedByPosition(node, src))
-    return { kind: 'positional', key: node.key, index: node.index }
+    return { kind: 'positional', key: node.key }
 
   return node.key ? { kind: 'expression', key: node.key } : { kind: 'implicit' }
 }
