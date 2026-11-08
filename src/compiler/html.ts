@@ -8,9 +8,9 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, FIELD_ELEMENTS, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addStyleArguments, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
-import { addGroupChecked, groupValue, staticAttributeText } from './plan'
+import { addGroupChecked, BEHAVIOUR, groupValue, staticAttributeText } from './plan'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
@@ -579,30 +579,30 @@ export class HtmlTemplate extends TemplateWriter {
     }
 
     for (const attribute of plan.attributes) {
-      // A file input is never given a value, and a textarea's value is its content.
-      if (attribute.kind === 'behaviour' || (attribute.kind === 'bind' && ((name === 'textarea' && attribute.property === 'value') || attribute.property === 'files')))
-        continue
+      if (attribute.kind === 'binding') {
+        const { binding } = attribute
 
-      // A box of a group is checked when the group holds its value.
-      if (attribute.kind === 'bind' && attribute.property === 'group') {
-        const value = groupValue(element, span => this.source(span))
+        // Handlers, refs and transitions are the browser's; a file input is never given a value, and a textarea's value is its content.
+        if (binding.kind !== 'bind' || binding.property === 'files' || (binding.property === 'value' && name === 'textarea'))
+          continue
 
+        // A box of a group is checked when the group holds its value.
+        if (binding.property === 'group') {
+          const value = groupValue(element, span => this.source(span))
+
+          markup.dynamic(() => {
+            b.add(`${helperName('attribute')}("checked", `)
+            addGroupChecked(b, binding.expression, value)
+            b.add(')')
+          })
+
+          continue
+        }
+
+        // A bound value renders as the property it binds, read off its signal.
         markup.dynamic(() => {
-          b.add(`${helperName('attribute')}("checked", `)
-          addGroupChecked(b, attribute.expression, value)
-          b.add(')')
-        })
-
-        continue
-      }
-
-      // A bound value renders as the property it binds, read off its signal.
-      if (attribute.kind === 'bind') {
-        const value = read(attribute.expression, true)
-
-        markup.dynamic(() => {
-          b.add(`${helperName('attribute')}(${JSON.stringify(attribute.property)}, `)
-          value()
+          b.add(`${helperName('attribute')}(${JSON.stringify(binding.property)}, `)
+          read(binding.expression, true)()
           b.add(')')
         })
 

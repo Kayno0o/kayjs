@@ -1,7 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import type { LinkPlan } from './plan'
+import type { BindingPlan, ClassMerge, LinkPlan } from './plan'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
@@ -9,15 +9,13 @@ import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE
 import { decodeEntities, isFunctionAt } from './expression'
 import { contentOf } from './items'
 import { PROPS } from './names'
-import { addGroupChecked, formDefaultsOf, groupValue, linkOf, shorthandClass, staticAttributeText, writesAttribute } from './plan'
+import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, linkOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
 // Properties that set an element's content rather than an attribute.
 export const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
-// Handlers, refs, bindings and transitions, which only an island attaches.
-export const BEHAVIOUR = /^(?:on|ref$|bind:|transition(?::|$))/
 const LESS_THAN = /</g
 const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
@@ -132,7 +130,9 @@ export function addStyleArguments(b: CodeBuilder, attribute: Extract<PlannedAttr
 }
 
 // An attribute of an element without spreads, as both templates read it; a static text is decoded.
-export type PlannedAttribute
+export type PlannedAttribute = PlannedKind & { source: Attribute | undefined }
+
+export type PlannedKind
   = | { kind: 'boolean', name: string }
     | { kind: 'text', name: string, text: string, bare: boolean }
   // A static path from the site's root, which goes under its base and, for a link, to the page's locale's copy.
@@ -144,8 +144,7 @@ export type PlannedAttribute
     | { kind: 'image', expression: Span, sized: boolean, placeholder: boolean }
   // A `select`'s value, which picks its option.
     | { kind: 'selected', expression: Span }
-    | { kind: 'bind', name: string, property: string, expression: Span }
-    | { kind: 'behaviour', name: string, attribute: Attribute }
+    | { kind: 'binding', binding: BindingPlan }
     | { kind: 'value', name: string, expression: Span, action: boolean }
 
 // What an element without spreads renders, decided once for the server's markup and the browser's template.
@@ -154,6 +153,7 @@ export interface ElementPlan {
   // The class shorthand, merged with a static `class`, or beside an expression one; `pieces` are the shorthand and the static `class` apart, which the server merges while rendering where the browser merged them while compiling.
   classes: { text: string, expression?: Span | undefined, parts?: string[], pieces?: string[] } | undefined
   attributes: PlannedAttribute[]
+  classMerge: ClassMerge
   // The `sizes` an image source caps, left out of the attributes.
   sizes: NamedAttribute | undefined
   // Markup written as the content; a textarea's static `value` is also kept as its text.
@@ -216,6 +216,7 @@ export abstract class TemplateWriter {
       id: element.id ? this.source(element.id) : errors?.ids.get(element),
       classes: undefined,
       attributes: [],
+      classMerge: classMergeOf(element, this.src),
       sizes,
       staticContent: undefined,
       valueText: undefined,
@@ -246,14 +247,19 @@ export abstract class TemplateWriter {
 
     const section = name === 'a' ? sectionOf(element, this.src) : undefined
 
+    let current: Attribute | undefined
+    const add = (planned: PlannedKind) => void plan.attributes.push({ ...planned, source: current })
+
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread' || (plan.classes && attribute === classAttribute) || attribute === sizes)
         continue
 
+      current = attribute
+
       const attributeName = this.source(attribute.name)
 
       if (attribute === partAttr) {
-        plan.attributes.push({ kind: 'text', name: 'data-part', text: decodeEntities(partNames(element, this.src)[0] ?? ''), bare: false })
+        add({ kind: 'text', name: 'data-part', text: decodeEntities(partNames(element, this.src)[0] ?? ''), bare: false })
 
         continue
       }
@@ -266,33 +272,26 @@ export abstract class TemplateWriter {
       if (section !== undefined && attributeName === 'section' && (attribute.kind === 'boolean' || attribute.kind === 'expression'))
         continue
 
+      const binding = bindingOf(attributeName, attribute)
+
       if (attributeName.startsWith('style:') && attribute.kind === 'expression') {
         styleProps.push({ property: attributeName.slice('style:'.length), expression: attribute.expression })
       }
-      else if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
-        const property = attributeName.slice(5)
-
-        if (name === 'textarea' && property === 'value')
-          plan.content = { expression: attribute.expression, property, raw: false, bound: true }
-        else if (name === 'select' && property === 'value')
-          plan.selected = { expression: attribute.expression, bound: true }
-
-        plan.attributes.push({ kind: 'bind', name: attributeName, property, expression: attribute.expression })
-      }
-      else if (BEHAVIOUR.test(attributeName)) {
-        plan.attributes.push({ kind: 'behaviour', name: attributeName, attribute })
+      else if (binding) {
+        Object.assign(plan, valueBoundBy(name, binding))
+        add({ kind: 'binding', binding })
       }
       else if (described?.own !== undefined && attributeName === 'aria-describedby') {
         continue
       }
       else if (attribute.kind === 'boolean') {
-        plan.attributes.push({ kind: 'boolean', name: attributeName })
+        add({ kind: 'boolean', name: attributeName })
       }
       else if (attribute.kind === 'static') {
         const text = decodeEntities(attribute.text)
 
         if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name)) {
-          plan.attributes.push({ kind: 'text', name: 'name', text, bare: false })
+          add({ kind: 'text', name: 'name', text, bare: false })
         }
         else if (attributeName === 'innerHTML') {
           plan.staticContent = attribute.text
@@ -302,10 +301,10 @@ export abstract class TemplateWriter {
           plan.valueText = attributeName === 'value' ? text : undefined
         }
         else if (BASED.has(attributeName) && (attributeName === 'srcset' ? SRCSET_ROOT_PATH.test(text) : fromRoot(text))) {
-          plan.attributes.push({ kind: 'rooted', name: attributeName, text })
+          add({ kind: 'rooted', name: attributeName, text })
         }
         else {
-          plan.attributes.push({ kind: 'text', name: attributeName, text, bare: attribute.text === '' })
+          add({ kind: 'text', name: attributeName, text, bare: attribute.text === '' })
         }
       }
       else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
@@ -313,27 +312,27 @@ export abstract class TemplateWriter {
       }
       else if (name === 'select' && attributeName === 'value') {
         plan.selected = { expression: attribute.expression, bound: false }
-        plan.attributes.push({ kind: 'selected', expression: attribute.expression })
+        add({ kind: 'selected', expression: attribute.expression })
       }
       else if (attributeName === 'class') {
-        plan.attributes.push({ kind: 'class', name: attributeName, expression: attribute.expression })
+        add({ kind: 'class', name: attributeName, expression: attribute.expression })
       }
       else if (attributeName === 'style') {
-        plan.attributes.push({ kind: 'style', expression: attribute.expression, text: undefined, props: [] })
+        add({ kind: 'style', expression: attribute.expression, text: undefined, props: [] })
       }
       // An imported image loads the size it shows at, unless the template writes its own `srcset`.
       else if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
-        plan.attributes.push({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: !this.named(element, 'style') && !this.named(element, NO_PLACEHOLDER) })
+        add({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: !this.named(element, 'style') && !this.named(element, NO_PLACEHOLDER) })
       }
       else {
-        plan.attributes.push({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
+        add({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
       }
     }
 
     if (styleProps.length > 0) {
       const written = plan.attributes.findIndex(planned => planned.kind === 'style' || (planned.kind === 'text' && planned.name === 'style'))
       const own = plan.attributes[written]
-      const merged: PlannedAttribute = { kind: 'style', expression: own?.kind === 'style' ? own.expression : undefined, text: own?.kind === 'text' ? own.text : undefined, props: styleProps }
+      const merged: PlannedAttribute = { kind: 'style', expression: own?.kind === 'style' ? own.expression : undefined, text: own?.kind === 'text' ? own.text : undefined, props: styleProps, source: own?.source }
 
       if (written === -1)
         plan.attributes.push(merged)
@@ -342,7 +341,7 @@ export abstract class TemplateWriter {
     }
 
     for (const [attributeName, text] of this.imageDefaults(element))
-      plan.attributes.push({ kind: 'text', name: attributeName, text, bare: false })
+      plan.attributes.push({ kind: 'text', name: attributeName, text, bare: false, source: undefined })
 
     return plan
   }
@@ -439,7 +438,7 @@ export abstract class TemplateWriter {
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
     const parts = partsOf(element, this.src, this.facts.parts)
     const partAttr = partAttribute(element, this.src)
-    const mergedClass = element.classes.length > 0 || (spreads && classAttribute !== undefined) || parts.length > 0
+    const mergedClass = classMergeOf(element, this.src).written || parts.length > 0
     let open = false
     let entries = 0
     let objects = 0
@@ -635,9 +634,12 @@ export abstract class TemplateWriter {
   // The sources of an element with a spread, with its `style:prop` pairs and `bind:` bindings laid over what the spreads bring, so they merge into the props object as they do on an element without one.
   protected spreadOver(element: ElementNode, sources: () => void): void {
     const { b } = this
-    const named = (prefix: string) => element.attributes.filter((attribute): attribute is Extract<NamedAttribute, { kind: 'expression' }> => attribute.kind === 'expression' && this.source(attribute.name).startsWith(prefix))
-    const styles = named('style:')
-    const binds = named('bind:')
+    const styles = element.attributes.filter((attribute): attribute is Extract<NamedAttribute, { kind: 'expression' }> => attribute.kind === 'expression' && this.source(attribute.name).startsWith('style:'))
+    const binds = element.attributes.flatMap((attribute) => {
+      const binding = attribute.kind === 'spread' ? undefined : bindingOf(this.source(attribute.name), attribute)
+
+      return binding?.kind === 'bind' ? [binding] : []
+    })
 
     if (styles.length === 0 && binds.length === 0) {
       b.add('[')
@@ -668,21 +670,19 @@ export abstract class TemplateWriter {
     if (binds.length > 0) {
       b.add(', [')
 
-      for (const [index, attribute] of binds.entries()) {
-        const property = this.source(attribute.name).slice(5)
-
+      for (const [index, { property, expression }] of binds.entries()) {
         b.add(index > 0 ? ', [' : '[')
         b.add(property === 'files' ? 'undefined' : JSON.stringify(property === 'group' ? 'checked' : property)).add(', () => ')
 
         if (property === 'group') {
-          addGroupChecked(b, attribute.expression, groupValue(element, span => this.source(span)))
+          addGroupChecked(b, expression, groupValue(element, span => this.source(span)))
         }
         else {
-          b.add('(').addSource(attribute.expression).add(')()')
+          b.add('(').addSource(expression).add(')()')
         }
 
         b.add(`, ${JSON.stringify(bindEvent(element, property))}, (kayEvent) => `)
-        addBindWrite(b, attribute.expression, bindRead(property, type))
+        addBindWrite(b, expression, bindRead(property, type))
         b.add(']')
       }
 

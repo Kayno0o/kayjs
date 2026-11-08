@@ -143,3 +143,83 @@ describe('a group of boxes', () => {
     expect(spread.browser).toContain(holds)
   })
 })
+
+describe('a binding', () => {
+  it('is attached by the browser alone: a handler, a ref and a transition leave the server markup and stay props to the types', () => {
+    const bound = targets('button(onClick={rows} ref={pick} transition="fade") x')
+
+    for (const server of [bound.server, bound.hydrating]) {
+      expect(server).toContain('"<button>x</button>"')
+      expect(server).not.toMatch(/onClick|KayRef|KayTransition/)
+    }
+
+    expect(bound.browser).toContain('KayListen(KayN0_0, "onClick"')
+    expect(bound.browser).toContain('KayRef(KayN0_0, (pick()))')
+    expect(bound.browser).toContain('KayTransition(KayN0_0, "name", "fade")')
+    expect(bound.check).toContain('onClick={__props.rows}')
+    expect(bound.check).toContain('transition="fade"')
+  })
+
+  it('written without an expression, or as `on:`, attaches nothing in any of them', () => {
+    const inert = targets('button(ref="x" on:foo={rows}) x')
+
+    expect(inert.server).toContain('"<button>x</button>"')
+    expect(inert.browser).not.toMatch(/KayRef|KayListen/)
+    expect(inert.check).toContain('ref="x" on:foo=')
+  })
+
+  it('names a transition part by its suffix in the browser', () => {
+    expect(targets('div(transition:enter="slide") x').browser).toContain('KayTransition(KayN0_0, "enter", "slide")')
+  })
+
+  it('of `bind:value` is read as the value by the server, the browser and the types, and written back by the last two', () => {
+    const bound = targets('input(bind:value={pick})')
+
+    expect(bound.server).toContain('KayAttribute("value", (pick)())')
+    expect(bound.hydrating).toContain('KayAttribute("value", (pick)())')
+    expect(bound.browser).toContain('KayProperty(KayN0_0, "value", (pick)())')
+    expect(bound.browser).toContain('(pick).set(kayEvent.currentTarget.value)')
+    expect(bound.check).toContain('value={(pick)()}')
+    expect(bound.check).toContain('(pick).set(kayEvent.currentTarget.value)')
+  })
+
+  it('of `bind:value` on a textarea is its content on the server and a property in the browser', () => {
+    const area = targets('textarea(bind:value={pick})')
+
+    expect(area.server).toContain('(pick)()')
+    expect(area.server).not.toContain('KayAttribute("value"')
+    expect(area.browser).toContain('KayProperty(KayN0_0, "value", (pick)())')
+  })
+})
+
+describe('a URL the pages serve', () => {
+  it('is checked as a site link when it is a link\'s `href` or a written `src`, `href` or `action`', () => {
+    const urls = targets('area(href="/z")\nimg(src="/a.png")\nform(action="/y" method="get")\n  button x')
+
+    expect(urls.check).toContain('<area href={KayHref("/z")}')
+    expect(urls.check).toContain('src={KayHref("/a.png")}')
+    expect(urls.check).toContain('action={KayHref("/y")}')
+  })
+
+  it('is left alone for a feed, a form posting to a route and an expression that is no URL', () => {
+    const served = targets('link(rel="alternate" href="/feed")\nform(action="/x" method="post")\n  button x\nimg(src={href})')
+
+    expect(served.check).toContain('<link rel="alternate" href="/feed" />')
+    expect(served.check).toContain('<form action="/x" method="post">')
+    expect(served.check).toContain('src={__props.href}')
+  })
+})
+
+describe('a class', () => {
+  it('merged with a spread\'s goes after every attribute in the types, and beside an expression it merges where it stands', () => {
+    const spread = targets('a.one(class="two" {...rows}) x')
+    const expression = targets('div.k(class={pick}) y')
+
+    expect(spread.check).toContain('<a {...__props.rows} class={["one", "two", ((__props.rows) as unknown as { class?: string }).class]}>')
+    expect(spread.server).toContain('"class": ["one", "two", ((__props.rows) as unknown as { class?: string }).class]')
+    expect(spread.browser).toContain('"class": ["one", "two", ((__props.rows) as unknown as { class?: string }).class]')
+    expect(expression.check).toContain('class={["k", ')
+    expect(expression.server).toContain('KayClassName(["k", (pick())])')
+    expect(expression.browser).toContain('KaySetClass(KayN0_0, ["k", (pick())])')
+  })
+})

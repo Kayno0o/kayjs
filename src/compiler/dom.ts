@@ -2,8 +2,7 @@ import type { ClassTable } from '../runtime/class-table'
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import type { PlannedAttribute } from './markup'
-import type { LinkPlan } from './plan'
+import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
@@ -17,7 +16,6 @@ import { bindEvent } from './validate'
 const DOM_HELPERS = ['append', 'attribute', 'branches', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 // The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
 const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
-const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
   const named = (helpers: readonly string[]) => helpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')
@@ -459,9 +457,8 @@ export class DomTemplate extends TemplateWriter {
 
       for (const attribute of plan.attributes) {
         switch (attribute.kind) {
-          case 'bind':
-          case 'behaviour': {
-            const binding = this.behaviour(element, attribute, node)
+          case 'binding': {
+            const binding = this.behaviour(element, attribute.binding, node)
 
             if (binding)
               own.push(binding)
@@ -636,49 +633,43 @@ export class DomTemplate extends TemplateWriter {
   }
 
   // A handler, a ref, a binding or a transition: what only the browser attaches.
-  private behaviour(element: ElementNode, planned: Extract<PlannedAttribute, { kind: 'bind' | 'behaviour' }>, node: TemplateNode): Binding | undefined {
+  private behaviour(element: ElementNode, planned: BindingPlan, node: TemplateNode): Binding | undefined {
     const { b } = this
-    const { name } = planned
 
-    if (planned.kind === 'bind')
-      return variable => this.bind(element, planned.expression, planned.property, variable(node))
+    switch (planned.kind) {
+      case 'bind':
+        return variable => this.bind(element, planned.expression, planned.property, variable(node))
+      case 'transition': {
+        const { attribute, part } = planned
 
-    const { attribute } = planned
+        return (variable) => {
+          b.add(`KayTransition(${variable(node)}, ${JSON.stringify(part)}, `)
 
-    if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
-      const part = name === 'transition' ? 'name' : name.slice(TRANSITION_PART.length)
+          if (attribute.kind === 'expression')
+            b.add('(').addSource(attribute.expression).add(')')
+          else
+            b.add(JSON.stringify(attribute.kind === 'static' ? decodeEntities(attribute.text) : ''))
 
-      return (variable) => {
-        b.add(`KayTransition(${variable(node)}, ${JSON.stringify(part)}, `)
-
-        if (attribute.kind === 'expression')
-          b.add('(').addSource(attribute.expression).add(')')
-        else
-          b.add(JSON.stringify(attribute.kind === 'static' ? decodeEntities(attribute.text) : ''))
-
-        b.add(');')
+          b.add(');')
+        }
       }
-    }
+      case 'ref':
+        return variable => b.add(`KayRef(${variable(node)}, (`).addSource(planned.expression).add('));')
+      case 'handler': {
+        const { attribute, name } = planned
 
-    if (attribute.kind !== 'expression')
-      return undefined
+        // Read at each event rather than once, so a handler a prop, a signal or a loop item holds stays current.
+        return (variable) => {
+          // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
+          b.add(`${helperName(name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen')}(${variable(node)}, ${JSON.stringify(name)}, `)
 
-    const expression = attribute.expression
+          addHandler(b, attribute.expression, modifiersOf(attribute, this.src), isFunctionAt(this.src, attribute.expression, this.facts.functions))
 
-    if (name === 'ref')
-      return variable => b.add(`KayRef(${variable(node)}, (`).addSource(expression).add('));')
-
-    if (!name.startsWith('on') || name.startsWith('on:'))
-      return undefined
-
-    // Read at each event rather than once, so a handler a prop, a signal or a loop item holds stays current.
-    return (variable) => {
-      // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
-      b.add(`${helperName(name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen')}(${variable(node)}, ${JSON.stringify(name)}, `)
-
-      addHandler(b, expression, modifiersOf(attribute, this.src), isFunctionAt(this.src, expression, this.facts.functions))
-
-      b.add(');')
+          b.add(');')
+        }
+      }
+      case 'inert':
+        return undefined
     }
   }
 

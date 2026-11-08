@@ -105,8 +105,8 @@
     "complexity": 98
   },
   "src/compiler/dom.ts": {
-    "max-lines-per-function": 171,
-    "complexity": 58
+    "max-lines-per-function": 170,
+    "complexity": 57
   },
   "src/compiler/expression.ts": {
     "complexity": 47
@@ -117,20 +117,20 @@
   "src/compiler/html.ts": {
     "max-lines": 772,
     "max-lines-per-function": 320,
-    "complexity": 89
+    "complexity": 87
   },
   "src/compiler/index.ts": {
     "complexity": 112
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 761
+    "max-lines": 714
   },
   "src/compiler/lints.ts": {
     "max-lines": 1243
   },
   "src/compiler/markup.ts": {
-    "max-lines": 629,
-    "complexity": 80
+    "max-lines": 628,
+    "complexity": 75
   },
   "src/compiler/module-signals.ts": {
     "complexity": 45

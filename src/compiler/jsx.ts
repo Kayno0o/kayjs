@@ -1,13 +1,16 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import type { ElementPlan } from './markup'
+import type { BindingPlan } from './plan'
 import type { Sites } from './rewrite'
-import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
+import { bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
+import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
-import { addBindWrite, bindRead, helperName } from './markup'
+import { addBindWrite, bindRead, helperName, TemplateWriter } from './markup'
 import { PROPS } from './names'
-import { formDefaultsOf, shorthandClass, staticAttributeText, writesAttribute } from './plan'
+import { bindingOf, classMergeOf, staticAttributeText, writesAttribute } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -35,20 +38,30 @@ export interface JsxOptions {
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
-const LINK_ELEMENTS = new Set(['a', 'area'])
 // Attributes rendered as markup rather than text.
 const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
-// URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
-const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
-const WHITESPACE = /\s+/
 const EVENT_HANDLER = /^on[A-Z]/
 const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
-export class JsxTemplate {
+export class JsxTemplate extends TemplateWriter {
   private rowKey: { key: Span, index: Span | undefined } | undefined
 
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
+  // The plan of the element whose attributes are being written, which a component has none of.
+  private planned: ElementPlan | undefined
+
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {
+    super(b, src, facts)
+  }
+
+  // Nothing here renders: a loop's rows and a component's slots are written as the JSX they are.
+  protected rendered(nodes: Node[]): void {
+    this.emitRoot(nodes)
+  }
+
+  protected skips(): boolean {
+    return false
+  }
 
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
@@ -674,23 +687,23 @@ export class JsxTemplate {
   private emitAttributes(element: ElementNode) {
     const serverIsland = serverIslandOf(element, this.src)
     const { b } = this
+    const plan = element.component ? undefined : this.plan(element, undefined)
+
+    this.planned = plan
 
     if (element.id)
       b.add(' id="').addSource(element.id).add('"')
 
-    const classAttributes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
-
     // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const merged = spreads && (element.classes.length > 0 || classAttributes.length > 0)
+    const merge = plan?.classMerge ?? classMergeOf(element, this.src)
 
-    if (element.classes.length > 0 && !spreads)
-      this.emitShorthandClass(element, classAttributes[0])
+    if (merge.inline)
+      addShorthandClass(b, element, merge, this.src, attribute => this.attributeName(attribute))
 
     const part = partAttribute(element, this.src)
 
     for (const attribute of element.attributes) {
-      if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
+      if ((merge.shorthand || merge.last) && attribute === merge.attribute)
         continue
 
       // Not a prop of the element or the component: it names a part, whose class the component's own `class` type takes.
@@ -721,16 +734,14 @@ export class JsxTemplate {
         this.emitAttribute(element, attribute)
     }
 
-    if (merged)
-      this.emitMergedClass(element, classAttributes[0])
+    if (merge.last)
+      addMergedClass(b, element, merge, this.src)
 
-    const defaults = formDefaultsOf(element, this.src)
-
-    if (defaults?.method)
+    if (plan?.action?.method)
       b.add(' method="post"')
 
     // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
-    if (defaults?.enctype)
+    if (plan?.action?.enctype)
       b.add(' enctype="multipart/form-data"')
   }
 
@@ -738,7 +749,7 @@ export class JsxTemplate {
   private emitFormAttribute(element: ElementNode, attribute: Attribute): boolean {
     const { b } = this
 
-    if (attribute.kind === 'expression' && attribute === actionOf(element, this.src)) {
+    if (attribute.kind === 'expression' && attribute.expression === this.planned?.action?.expression) {
       this.attributeName(attribute).add(`={${helperName('formAction')}((`).addSource(attribute.expression).add('))}')
 
       return true
@@ -749,7 +760,7 @@ export class JsxTemplate {
 
     const name = this.text(attribute.name)
     // The names written in a component's content are not checked against its action's input, while `field` keeps the target: it takes the constraints of the action's schema, which a component's own action carries too.
-    const target = name === 'name' && this.facts.loose.has(element) ? undefined : this.facts.forms.get(element)
+    const target = name === 'name' && this.facts.loose.has(element) ? undefined : this.planned?.target
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
       return false
@@ -777,73 +788,6 @@ export class JsxTemplate {
     b.add(')}')
 
     return true
-  }
-
-  private emitShorthandClass(element: ElementNode, attribute: NamedAttribute | undefined) {
-    const { b } = this
-    const shorthand = shorthandClass(element, this.src)
-    const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
-
-    b.add(' ')
-
-    if (!attribute) {
-      b.wrap(source, () => b.add(`class=${quoteAttribute(shorthand)}`))
-
-      return
-    }
-
-    if (attribute.kind === 'static') {
-      b.wrap(source, () => b.add(`class=${quoteAttribute(`${shorthand} ${attribute.text}`)}`))
-
-      return
-    }
-
-    if (attribute.kind === 'expression') {
-      // A shorthand makes the merge a non-empty string, so the `class` attribute carries it and its errors land there.
-      const [open, close] = element.component ? [`${helperName('componentClass')}([`, ']).class'] : ['[', ']']
-
-      this.attributeName(attribute).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
-    }
-  }
-
-  // The shorthand, the `class` attribute and the `class` each spread brings, in the order they were written.
-  private emitMergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined) {
-    const { b } = this
-    const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
-
-    // A merge with a shorthand or a non-empty class string is always a string: it goes as the `class` attribute, where its errors are reported. One that can be empty goes as a spread, an optional property.
-    const asProperty = element.component && !shorthand && !(classAttribute?.kind === 'static' && classAttribute.text.trim() !== '')
-
-    const [open, close] = mergedClassBrackets(element.component, asProperty)
-
-    b.add(' ')
-    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(open))
-
-    if (shorthand)
-      b.add(JSON.stringify(shorthandClass(element, this.src)))
-
-    let separator = shorthand ? ', ' : ''
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread') {
-        b.add(`${separator}((`).addSource(attribute.expression).add(') as unknown as { class?: string }).class')
-        separator = ', '
-
-        continue
-      }
-
-      if (attribute !== classAttribute)
-        continue
-
-      if (attribute.kind === 'static')
-        b.add(`${separator}${JSON.stringify(attribute.text)}`)
-      else if (attribute.kind === 'expression')
-        b.add(`${separator}(`).addSource(attribute.expression).add(')')
-
-      separator = ', '
-    }
-
-    b.add(close)
   }
 
   private emitAttribute(element: ElementNode, attribute: Attribute) {
@@ -875,8 +819,10 @@ export class JsxTemplate {
       case 'expression': {
         const name = this.text(attribute.name)
 
-        if (name.startsWith('bind:')) {
-          this.emitBind(element, attribute, name.slice(5))
+        const binding = this.bindingOf(attribute, name)
+
+        if (binding?.kind === 'bind') {
+          this.emitBind(element, attribute, binding.property)
 
           return
         }
@@ -889,7 +835,7 @@ export class JsxTemplate {
         }
 
         // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
-        if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
+        if (binding?.kind === 'handler' && !element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
           this.attributeName(attribute).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
 
           return
@@ -919,7 +865,7 @@ export class JsxTemplate {
 
     const name = this.text(attribute.name)
 
-    if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.servedOtherwise(element)))) {
+    if (this.planned?.link.checked.includes(attribute)) {
       this.attributeName(attribute).add('={KayHref(')
 
       if (attribute.kind === 'static')
@@ -940,7 +886,7 @@ export class JsxTemplate {
       return true
     }
 
-    if (!element.component || !this.options.sendsIslandProps || attribute.kind !== 'expression' || name.startsWith('bind:'))
+    if (!element.component || !this.options.sendsIslandProps || attribute.kind !== 'expression' || this.bindingOf(attribute, name)?.kind === 'bind')
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
@@ -979,16 +925,14 @@ export class JsxTemplate {
     return true
   }
 
-  // A feed or a translation, served by what kay check does not list as pages, or a form posting to a route that may take its method only.
-  private servedOtherwise(element: ElementNode): boolean {
-    const value = (name: string) => element.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
-    const rel = value('rel')
-    const method = value('method')
+  // What an attribute binds or attaches, as the plan of its element has it; a component's attributes have no plan.
+  private bindingOf(attribute: Attribute, name: string): BindingPlan | undefined {
+    if (!this.planned)
+      return bindingOf(name, attribute)
 
-    if (element.name === 'form')
-      return method !== undefined && (method.kind !== 'static' || method.text.toLowerCase() !== 'get')
+    const planned = this.planned.attributes.find(candidate => candidate.source === attribute)
 
-    return element.name === 'link' && rel?.kind === 'static' && rel.text.split(WHITESPACE).includes('alternate')
+    return planned?.kind === 'binding' ? planned.binding : undefined
   }
 
   // The name of an attribute as written, which a bare `{name}` shares with its value, so the rewrites of that value leave it alone.
@@ -1083,20 +1027,4 @@ export class JsxTemplate {
   private text(span: Span): string {
     return this.src.slice(span.start, span.end)
   }
-}
-
-// What wraps a merged class list: an array on an element, the class of `componentClass` on a component, or its spread when the merge can be empty.
-function mergedClassBrackets(component: boolean, asProperty: boolean): [string, string] {
-  if (!component)
-    return ['class={[', ']}']
-
-  return asProperty ? [`{...${helperName('componentClass')}([`, '])}'] : [`class={${helperName('componentClass')}([`, ']).class}']
-}
-
-// JSX attribute strings have no escapes, so pick a quote the value does not contain, or fall back to an expression.
-function quoteAttribute(value: string): string {
-  if (!value.includes('"'))
-    return `"${value}"`
-
-  return !value.includes('\'') ? `'${value}'` : `{${JSON.stringify(value)}}`
 }
