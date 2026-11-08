@@ -84,10 +84,10 @@ inBrowser('navigation recipes in the browser', () => {
     expect(plain.previous.width).toBe('1px')
     expect(plain.previous.opacity).toBe('0.5')
     expect(plain.next.opacity).toBe('1')
-    // Both steps draw the space skin's field border, which the skin also holds at 1px whatever --border-width says.
+    // Both steps draw the space skin's field border, at the skin's --border-width.
     expect(plain.previous.colour).toBe(plain.next.colour)
     expect(plain.next.colour).toBe(plain.field)
-    expect((await read('--border-width: 3px')).next.width).toBe('1px')
+    expect((await read('--border-width: 3px')).next.width).toBe('3px')
 
     // Hovering the link lights its text, and a span keeps the text colour it has.
     const before = await read('')
