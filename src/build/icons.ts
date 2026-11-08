@@ -31,7 +31,7 @@ function manifestOf(root: string): string | undefined {
 
 interface Manifest { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
 
-// The last package.json of each path that parsed: a dev reload that meets one an editor or `bun add` is still writing keeps to it, as the write ends with another reload.
+// The last package.json of each path that parsed: a dev reload that meets one an editor or `bun add` is still writing keeps to it, where the write is watched. One that never parsed in this process still fails, as a build must not drop its icon sets and their licenses silently.
 const readable = new Map<string, Manifest>()
 
 function readManifest(file: string): Manifest {
@@ -43,10 +43,12 @@ function readManifest(file: string): Manifest {
     return parsed
   }
   catch (error) {
-    if (!(error instanceof SyntaxError))
+    const kept = readable.get(file)
+
+    if (!(error instanceof SyntaxError) || kept === undefined)
       throw error
 
-    return readable.get(file) ?? {}
+    return kept
   }
 }
 

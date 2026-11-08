@@ -37,7 +37,7 @@ describe('icons', () => {
     expect(installedIconSets(scratch).size).toBe(0)
   })
 
-  it('keeps the sets it last read while the package.json does not parse, as an editor saving in place leaves it', async () => {
+  it('keeps the sets it last read while the package.json does not parse, and fails for one that never did', async () => {
     const root = await scratchDir('icons-manifest-')
     const manifest = join(root, 'package.json')
 
@@ -50,7 +50,7 @@ describe('icons', () => {
     const fresh = await scratchDir('icons-manifest-')
 
     await Bun.write(join(fresh, 'package.json'), '{')
-    expect(installedIconSets(fresh).size).toBe(0)
+    expect(() => installedIconSets(fresh)).toThrow(SyntaxError)
   })
 
   it('draws a folder without a package.json from the nearest one above it', () => {
