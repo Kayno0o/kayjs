@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { buildProject } from '../src/build/pipeline'
 import { deriveToolOutputs } from '../src/check/tool-outputs'
 import { loadConfig } from '../src/config-loader'
-import { TOOL_OUTPUTS_RECORD } from '../src/server/tool-outputs'
+import { readToolOutputs, recordedToolOutputs, TOOL_OUTPUTS_RECORD } from '../src/server/tool-outputs'
 import { fixtureCopy } from './scratch'
 
 const SUMMARY = {
@@ -13,6 +13,8 @@ const SUMMARY = {
   properties: { count: { type: 'number' }, at: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } }, note: { type: 'string' } },
   required: ['count', 'at', 'tags'],
 }
+
+const WORDED = { type: 'object', properties: { count: { type: 'number' } }, required: ['count'] }
 
 async function derive(dir: string): Promise<Record<string, unknown> | undefined> {
   const output = join(dir, '.kay', 'client')
@@ -29,15 +31,18 @@ describe('the output schemas derived for tool actions', () => {
     const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
     const outputs = await derive(dir)
 
-    expect(outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY })
+    expect(outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
   })
 
   it('runs no tsgo for a project with no tool action, and leaves no record', async () => {
     const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
 
     await Bun.write(join(dir, 'src/routes/index.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const hidden = action(t.Object({}), () => 1)\n---\nh1 Hi\n')
+    const spawned = spyOn(Bun, 'spawn')
+
     expect(await derive(dir)).toBeUndefined()
-    expect(existsSync(join(dir, '.kay', 'tool-probe'))).toBe(false)
+    expect(spawned).not.toHaveBeenCalled()
+    spawned.mockRestore()
   })
 
   it('goes on past a type error in the app, and keeps the tool whose type it can read', async () => {
@@ -46,7 +51,7 @@ describe('the output schemas derived for tool actions', () => {
 
     await Bun.write(file, (await Bun.file(file).text()).replace('---\nh1', 'export const broken: number = \'no\'\n---\nh1'))
 
-    expect(await derive(dir)).toEqual({ 'src/routes/index.kay#summary': SUMMARY })
+    expect(await derive(dir)).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
   })
 
   it('reads the new return type after it changed, and drops a tool that stopped being one', async () => {
@@ -60,7 +65,7 @@ describe('the output schemas derived for tool actions', () => {
 
     await Bun.write(file, (await Bun.file(file).text()).replace(', note: undefined as string | undefined }), { tool: true })', ' }), {})'))
 
-    expect(await derive(dir)).toBeUndefined()
+    expect(Object.keys((await derive(dir))!)).toEqual(['src/routes/index.kay#worded'])
   })
 })
 
@@ -71,11 +76,23 @@ describe('kay build', () => {
     const recorded = join(outputDir(dir), TOOL_OUTPUTS_RECORD)
 
     expect((await buildProject(dir, config, { check: false })).failed).toBeUndefined()
-    expect((await Bun.file(recorded).json() as { outputs: object }).outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY })
+    expect((await Bun.file(recorded).json() as { outputs: object }).outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
 
     await Bun.write(join(dir, 'src/routes/index.kay'), 'h1 Hi\n')
     expect((await buildProject(dir, config, { check: false })).failed).toBeUndefined()
     expect(existsSync(recorded)).toBe(false)
-    expect(existsSync(join(dir, '.kay', 'tool-probe'))).toBe(false)
+  })
+
+  it('goes on with a type error in the app, and an executable holds the record', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+    const file = join(dir, 'src/routes/index.kay')
+
+    await Bun.write(file, (await Bun.file(file).text()).replace('---\nh1', 'export const broken: number = \'no\'\n---\nh1'))
+    expect((await buildProject(dir, await loadConfig(dir), { check: false })).failed).toBeUndefined()
+
+    const outputs = recordedToolOutputs(dir, readToolOutputs(outputDir(dir))!)
+
+    expect(outputs.of(file, 'summary')).toEqual(SUMMARY)
+    expect(outputs.of(file, 'declared')).toBeUndefined()
   })
 })

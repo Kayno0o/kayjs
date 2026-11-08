@@ -92,7 +92,7 @@ import { serveSitemap } from './sitemap'
 import { markPageStale, trackPrerendered } from './stale-pages'
 import { refuseProcessKey } from './stamp'
 import { serveFiles } from './storage'
-import { toolOutputsIn } from './tool-outputs'
+
 import { answerUncaught } from './uncaught'
 import { serveViolationReports } from './violations'
 import { receiveInternal } from './visit'
@@ -516,7 +516,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late, project }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, toolOutputs: toolOutputsIn(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
+  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.

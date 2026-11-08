@@ -10,6 +10,7 @@ type Schema = Record<string, unknown>
 // A number that is NaN or Infinity is written as `null` and described as a number: the type cannot tell.
 export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends AsyncIterable<unknown> | { ended: () => Promise<unknown>, onClose: (...args: never[]) => unknown } ? never
+  : T extends ArrayBufferView | ArrayBuffer ? never
   : T extends string | number | boolean | null | undefined ? T
   : T extends bigint | Date ? string
   : T extends (...args: never[]) => unknown ? undefined

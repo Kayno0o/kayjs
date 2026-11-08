@@ -98,9 +98,10 @@ function outputOf(operation: Operation): Schema | undefined {
   return schema?.type === 'object' ? schema : undefined
 }
 
-// The schema recorded from an action's handler, which it lists when the action declares no `output`.
+// The schema recorded from an action's handler, which it lists when the action declares no `output` and words no answer of its own.
 function derivedOf(operation: Operation): Schema | undefined {
-  const schema = operation['x-kay-derived']?.()
+  // A tool that words its answer sends that text alone, which listing a schema, and with it the structured content, would change.
+  const schema = operation['x-kay-text'] === undefined ? operation['x-kay-derived']?.() : undefined
 
   return schema?.type === 'object' ? schema : undefined
 }
@@ -565,8 +566,8 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
 
     return { known: new Set(tools.map(tool => tool.name)), mcp: new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } }) }
   }
-  let serving = build()
   let recorded = options.outputs?.stamp()
+  let serving = build()
   // Under `kay dev` the schemas `kay build` would record come in the background, after the server started: the tools are made again once they change.
   const current = () => {
     if (options.dev === true && options.outputs !== undefined && options.outputs.stamp() !== recorded) {

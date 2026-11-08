@@ -4,6 +4,7 @@ import type { ApiModule } from './api-modules'
 import type { Bundle } from './bundle'
 import type { ClientBuild } from './client'
 import type { Endpoint, Route, RouteMount, SpecialPages } from './routes'
+import type { ToolOutputs } from './tool-outputs'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -18,6 +19,7 @@ import { bundled } from './bundle'
 import { readClient } from './client'
 import { readContextRecord } from './context-record'
 import { extensionEditor, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from './routes'
+import { recordedToolOutputs, toolOutputsIn } from './tool-outputs'
 
 // Where a project's config, routes, modules and built files come from: the files on disk, compiled as they load, or what `kay build --compile` embedded in the executable.
 export interface ProjectSource {
@@ -47,6 +49,8 @@ export interface ProjectSource {
   imageCache: (root: string) => string
   // The client build the content manifests were written into, if any is read.
   contentBuild: (root: string, prebuilt: boolean, output?: string) => string | undefined
+  // The schemas of the tool actions without an `output`: the record of the output folder, or the one an executable holds.
+  toolOutputs: (root: string, output: string) => ToolOutputs
 }
 
 const DISK: ProjectSource = {
@@ -98,6 +102,7 @@ const DISK: ProjectSource = {
   runtimeRoot: root => root,
   imageCache: root => cacheDir(root, `images${testWorker()}`),
   contentBuild: (root, prebuilt, output) => prebuilt ? output ?? outputDir(root) : undefined,
+  toolOutputs: toolOutputsIn,
 }
 
 export function embeddedSource(bundle: Bundle): ProjectSource {
@@ -144,6 +149,7 @@ export function embeddedSource(bundle: Bundle): ProjectSource {
     // Per user and per executable, in a folder only that user can enter.
     imageCache: () => join(tmpdir(), `kay-images-${process.getuid?.() ?? 'user'}-${Bun.hash(process.execPath).toString(36)}`),
     contentBuild: () => bundle.clientDir,
+    toolOutputs: root => recordedToolOutputs(root, bundle.toolOutputs ?? {}),
   }
 }
 

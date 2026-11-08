@@ -17,6 +17,8 @@ const [root, entry, refuse] = process.argv.slice(2)
 let loaded: KayConfig | undefined
 // The `load` before this write reported why the config does not load, so the write that tries again stays quiet about it.
 let reported = false
+// The writes of the shadow tree in flight.
+let writes = 0
 
 // A config that fails to load, halfway through an edit say, is reported and the tree written with the defaults, so the components keep their types; the server reports it too.
 // It is tried again on the next write rather than kept.
@@ -57,6 +59,8 @@ async function load(): Promise<number> {
 }
 
 async function write(): Promise<number> {
+  writes++
+
   try {
     const quiet = reported
 
@@ -77,6 +81,9 @@ async function write(): Promise<number> {
     console.error(error)
 
     return 1
+  }
+  finally {
+    writes--
   }
 }
 
@@ -105,8 +112,11 @@ async function typecheck(): Promise<number> {
     })
 
     process.stdout.write(`\n${PROBLEMS}${JSON.stringify(problems)}\n`)
+
     // The schemas of the tool actions without an `output` come in the background, the dev server's tool list reading them when they do.
-    void deriveToolOutputs(root!, options, join(root!, KAY_DIR, `dev${testWorker()}`), { shadowed: true })
+    // Not while the shadow tree is being written, which it reads.
+    if (writes === 0)
+      void deriveToolOutputs(root!, options, join(root!, KAY_DIR, `dev${testWorker()}`), { shadowed: true })
 
     return Number(problems.length > 0)
   }

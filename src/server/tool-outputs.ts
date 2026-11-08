@@ -18,6 +18,21 @@ export interface ToolOutputs {
   stamp: () => string
 }
 
+// What an executable holds of the record: fixed, as no build writes beside it.
+export function recordedToolOutputs(root: string, outputs: Record<string, Schema>): ToolOutputs {
+  return { of: (file, name) => outputs[toolOutputKey(root, file, name)], stamp: () => '' }
+}
+
+// The record of `output` as it is on disk, which an executable embeds.
+export function readToolOutputs(output: string): Record<string, Schema> | undefined {
+  try {
+    return (JSON.parse(readFileSync(join(output, TOOL_OUTPUTS_RECORD), 'utf8')) as { outputs?: Record<string, Schema> }).outputs
+  }
+  catch {
+    return undefined
+  }
+}
+
 // The record of `output`, read again when the file changed: a server started from a build reads it once, and one under `kay dev` meets a newer one after an edit.
 export function toolOutputsIn(root: string, output: string): ToolOutputs {
   const file = join(output, TOOL_OUTPUTS_RECORD)

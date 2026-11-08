@@ -17,6 +17,7 @@ import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
 import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
+import { readToolOutputs } from '../server/tool-outputs'
 import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
 import { pageDirs } from './page-dirs'
 import { kay } from './plugin'
@@ -144,6 +145,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `  root: ${JSON.stringify(root)},`,
     `  name: ${JSON.stringify(packageName(root))},`,
     `  routes: ${JSON.stringify(routes)},`,
+    `  toolOutputs: ${JSON.stringify(readToolOutputs(clientBase) ?? {})},`,
     `  fallback: ${JSON.stringify(fallback)},`,
     `  api: ${JSON.stringify(api)},`,
     `  endpoints: ${JSON.stringify(endpoints)},`,

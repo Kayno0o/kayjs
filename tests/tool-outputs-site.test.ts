@@ -44,6 +44,9 @@ describe('the tools a server lists with a derived schema', () => {
     expect(await schemaOf(site, 'summary')).toEqual(SUMMARY)
     expect(Object.keys(((await schemaOf(site, 'declared')) as { properties: object }).properties)).toEqual(['count'])
     expect(await schemaOf(site, 'plain')).toBeUndefined()
+    // A tool wording its answer sends that text alone.
+    expect(await schemaOf(site, 'worded')).toBeUndefined()
+    expect(await site.mcp.call('worded')).toMatchObject({ text: '2 things', data: undefined })
     expect(await schemaOf(site, 'stream')).toBeUndefined()
     expect(await schemaOf(site, 'refuses')).toBeUndefined()
     expect(await site.mcp.call('summary')).toMatchObject({ isError: false, data: { count: 2, at: '1970-01-01T00:00:00.000Z', tags: ['a'] } })

@@ -724,6 +724,7 @@ interface Bundle
   publicModules?: string[]
   root: string
   routes: Route[]
+  toolOutputs?: Record<string, Record<string, unknown>> | undefined
 
 [./internal/server] listenIdleApps
 function listenIdleApps(): void

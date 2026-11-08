@@ -10,6 +10,8 @@ export interface Bundle {
   // The package.json name of the project at build time, which names the app to the databases it claims.
   name?: string | undefined
   routes: Route[]
+  // The schemas of the tool actions without an `output`, as the build recorded them (src/server/tool-outputs.ts).
+  toolOutputs?: Record<string, Record<string, unknown>> | undefined
   // The routes directory's own special pages, answering URLs no page serves.
   fallback: SpecialPages
   // The modules under the API directory, mounted under `/api` or the config's `apiPath`.

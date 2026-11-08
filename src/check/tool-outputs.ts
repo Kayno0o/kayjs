@@ -1,8 +1,9 @@
 // The build step that gives a tool action's `outputSchema` to the server: the handler's return type, read through tsgo's declaration emit (output-schema.ts), recorded in the output folder under the action's file and name.
 import type { CheckOptions } from '.'
 import { existsSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { join, parse, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
 import { KAY_DIR } from '../build/assets'
 import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
@@ -65,6 +66,10 @@ async function writeRecord(root: string, options: CheckOptions, output: string, 
     const probes = await probesOf(root, options)
     const outputs = probes.length === 0 ? {} : await emitted(root, options, probes, tsconfig, shadowed)
 
+    // A run that gave nothing to read says nothing of the types.
+    if (outputs === undefined)
+      return
+
     if (Object.keys(outputs).length === 0) {
       await rm(record, { force: true })
 
@@ -73,25 +78,31 @@ async function writeRecord(root: string, options: CheckOptions, output: string, 
 
     const text = JSON.stringify({ outputs })
 
-    if (!existsSync(record) || await Bun.file(record).text() !== text)
-      await Bun.write(record, text)
+    // Written aside and moved in place, so a server reading it meanwhile never meets half of it.
+    if (!existsSync(record) || await Bun.file(record).text() !== text) {
+      const aside = `${record}.${process.pid}`
+
+      await Bun.write(aside, text)
+      await rename(aside, record)
+    }
   }
   catch {
-    await rm(record, { force: true })
+    // The last record stays: a run that failed says nothing of the types, and a server listing the schemas should not lose them to one.
   }
 }
 
-async function emitted(root: string, options: CheckOptions, probes: Probe[], tsconfig: string, shadowed: boolean): Promise<Record<string, Record<string, unknown>>> {
+async function emitted(root: string, options: CheckOptions, probes: Probe[], tsconfig: string, shadowed: boolean): Promise<Record<string, Record<string, unknown>> | undefined> {
   if (!shadowed)
     await writeShadowTypes(root, { ...options, typesOnly: true })
 
-  const dir = join(root, KAY_DIR, PROBE_DIR)
+  await mkdir(join(root, KAY_DIR), { recursive: true })
+
+  // A folder of its own, as a build and a dev server of the project may both run.
+  const dir = await mkdtemp(join(root, KAY_DIR, `${PROBE_DIR}-`))
   const lines = probes.map(({ file, name }, at) => `export const t${at} = answer(null as unknown as typeof import(${JSON.stringify(specifier(dir, file))})[${JSON.stringify(name)}])`)
 
-  await rm(dir, { recursive: true, force: true })
-  await mkdir(dir, { recursive: true })
   await Bun.write(join(dir, 'probe.ts'), `${WIRE_PRELUDE}\n${lines.join('\n')}\n`)
-  await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: resolve(root, tsconfig), compilerOptions: { noEmit: false, declaration: true, emitDeclarationOnly: true, composite: false, incremental: false, declarationMap: false, sourceMap: false, outDir: 'out', rootDir: parse(root).root }, include: ['probe.ts'] }))
+  await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ extends: resolve(root, tsconfig), compilerOptions: { noEmit: false, declaration: true, emitDeclarationOnly: true, composite: false, incremental: false, declarationMap: false, sourceMap: false, noEmitOnError: false, outDir: 'out', rootDir: parse(root).root }, files: ['probe.ts'], include: [] }))
 
   try {
     const child = Bun.spawn([nativeExe(), '-p', join(dir, 'tsconfig.json')], { cwd: root, stdout: 'ignore', stderr: 'ignore' })
@@ -99,12 +110,13 @@ async function emitted(root: string, options: CheckOptions, probes: Probe[], tsc
 
     await child.exited.finally(() => clearTimeout(stop))
 
-    const emittedFile = [...new Bun.Glob('**/probe.d.ts').scanSync({ cwd: join(dir, 'out'), dot: true })][0]
+    // Laid out under the root of the file system, as `rootDir` says.
+    const declarations = Bun.file(join(dir, 'out', relative(parse(dir).root, dir), 'probe.d.ts'))
 
-    if (emittedFile === undefined)
-      return {}
+    if (!await declarations.exists())
+      return undefined
 
-    const schemas = outputSchemasOf(await Bun.file(join(dir, 'out', emittedFile)).text())
+    const schemas = outputSchemasOf(await declarations.text())
     const outputs: Record<string, Record<string, unknown>> = {}
 
     for (const [at, { key }] of probes.entries()) {
