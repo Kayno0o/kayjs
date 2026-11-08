@@ -824,7 +824,7 @@ describe('charts', () => {
 
     expect([...bars.matchAll(/aria-label="([^"]+)" data-tooltip="[^"]+"/g)].map(match => match[1])).toEqual(['Mon: Minutes 4', 'Tue: Minutes 0', 'Wed: Minutes 8; Timed out'])
     expect([...bars.matchAll(/style="height: ([\d.]+)%; background-color: (\w+)"/g)].map(match => match.slice(1))).toEqual([['50', 'green'], ['100', 'red']])
-    expect([...bars.matchAll(/data-part="axisLabel">([^<]*)</g)].map(match => match[1])).toEqual(['Mon', 'Tue', 'Wed'])
+    expect([...bars.matchAll(/data-part="axisLabel"[^>]*>([^<]*)</g)].map(match => match[1])).toEqual(['Mon', 'Tue', 'Wed'])
     expect([...bars.matchAll(/role="img" tabindex="(-?\d)"/g)].map(match => match[1])).toEqual(['-1', '-1', '0'])
     expect(bars).toContain('data-part="axis" aria-hidden="true"')
     expect([...bars.matchAll(/data-part="tick">([^<]*)</g)].map(match => match[1])).toEqual(['0', '4', '8'])

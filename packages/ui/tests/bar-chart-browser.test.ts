@@ -13,6 +13,7 @@ async function reach(id: string) {
   const found = await page.evaluate((id) => {
     const figure = document.querySelector<HTMLElement>(`#${id} figure`)!.getBoundingClientRect()
     const columns = [...document.querySelectorAll<HTMLElement>(`#${id} [data-part="column"]`)].map(item => item.getBoundingClientRect())
+    const bars = [...document.querySelectorAll<HTMLElement>(`#${id} [data-part="bar"]`)].map(item => item.getBoundingClientRect())
     const labels = [...document.querySelectorAll<HTMLElement>(`#${id} [data-part="axisLabel"]`)].filter(item => (item.textContent ?? '') !== '').map((item) => {
       const range = document.createRange()
 
@@ -25,6 +26,7 @@ async function reach(id: string) {
       left: figure.left,
       right: figure.right,
       columnsRight: Math.max(...columns.map(box => box.right)),
+      barsRight: Math.max(...bars.map(box => box.right)),
       labelsLeft: Math.min(...labels.map(box => box.left)),
       labelsRight: Math.max(...labels.map(box => box.right)),
       gap: columns.length > 1 ? columns[1]!.left - columns[0]!.right : 0,
@@ -41,6 +43,7 @@ describe('BarChart at phone width', () => {
 
     expect(found.count).toBe(365)
     expect(found.columnsRight).toBeLessThanOrEqual(found.right + 0.5)
+    expect(found.barsRight).toBeLessThanOrEqual(found.right + 0.5)
   })
 
   it.each(['year', 'month'])('keeps the axis labels of %s inside the figure', async (id) => {
