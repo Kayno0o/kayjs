@@ -29,6 +29,8 @@ button(onClick={() => todos.put({ id: crypto.randomUUID(), title: 'New', rev: 0 
 
 When a read of the server fails, `todos.error()` holds the `ApiError` until a read succeeds and `todos.retry()` tries again at once. `onSync`, `onIssue` and `onError` take a callback as options or as methods, for example `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`. `pending()` and `status()` of earlier releases still work until 2.0; `kay upgrade` renames them.
 
+<ReadMore href="/llms/island-sources">`status()`, `error()`, `retry()` and the hooks are shared by every source an island reads.</ReadMore>
+
 ## What happens to a write
 
 Each write is queued and sent in order through the action you named. The action's guards, its schema and its rate limits all apply, as for any call. kay adds an id to every write, and the server runs an action only once per id, so a write whose answer was lost is never applied twice.

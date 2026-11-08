@@ -210,7 +210,9 @@ ul
 
 Options given as a function are reactive. When `search` changes, the route is asked again. Call `refresh()` to ask again by hand.
 
-Every source an island reads, a resource, a stream, a socket and the handle `track()` gives, answers the same four questions. `status()` says where it stands, `pending()` whether it is loading or connecting, `error()` gives the last failure as an `ApiError` until the next success, and `retry()` tries again now, skipping any wait. `retry()` does nothing unless the source failed or waits to reconnect, where `refresh()` asks again even when the resource is ready.
+### One shape for every source
+
+Every source an island reads, a resource, a stream, a socket, a live value and the handle `track()` gives, answers the same four questions. `status()` says where it stands, `pending()` whether it is loading or connecting, `error()` gives the last failure as an `ApiError` until the next success, and `retry()` tries again now, skipping any wait. `retry()` does nothing unless the source failed or waits to reconnect, where `refresh()` asks again even when the resource is ready.
 
 ```kay
 ---
@@ -223,6 +225,8 @@ if list.error() as error
   p {error.message}
   button(onClick={list.retry} disabled={list.pending()}) Retry
 ```
+
+<ReadMore href="/llms/island-sources">Which source has which status values and hooks, the one failure shape, and how kayjs-ui's Notice and LoadMore take any of them.</ReadMore>
 
 A page that renders a resource shows the value at once. The server asks the route in process as the visitor, with their cookies, so the route's guards run, and the island arrives `ready` and hydrates without a request. If the route refuses, fails or takes more than five seconds, the island renders as `loading` and the browser asks the route itself, so a refusal never reaches the page's HTML.
 

@@ -497,7 +497,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it, `status()` is `idle` before the first call, `error()` is the last failure as an `ApiError`, and `retry()` sends the call that failed again with the same arguments, as they were.
 
-A retry gives no result back until the hooks of a later release; read `status()`. A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
+A retry gives no result back; read `status()`, or add `onSuccess` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
 
 To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects stays running while the page goes away, unless a leave guard keeps the visitor on it.
 

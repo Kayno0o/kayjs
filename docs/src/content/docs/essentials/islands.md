@@ -320,6 +320,8 @@ if navigation.pending()
   .top-bar
 ```
 
+`navigation` answers `status()`, `pending()` and `error()` as every other source an island reads does: see [island sources](/llms/island-sources).
+
 `onBeforeNavigate` asks before a link, `navigate()`, Back or Forward leaves the page, and keeps the page when it returns `false`. `onNavigate` runs after each page is shown. Both get one object, end with the island, and return a function that removes them sooner. A handler that throws is logged and the navigation goes on.
 
 ```ts
