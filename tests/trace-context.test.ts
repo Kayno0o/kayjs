@@ -1,9 +1,9 @@
 import type { Span, SpanOptions, Tracer } from '../src/server/trace'
 import type { SpanIds, TraceContext } from '../src/server/trace-context'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
-import { pages } from '../src/server'
 import { setTracer } from '../src/server/trace'
 import { parseTraceparent } from '../src/server/trace-context'
+import { pages } from './shared-pages'
 
 const TRACE = '0af7651916cd43dd8448eb211c80319c'
 const PARENT = 'b7ad6b7169203331'
