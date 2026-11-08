@@ -111,9 +111,6 @@
   "src/compiler/expression.ts": {
     "complexity": 47
   },
-  "src/compiler/fence-checks.ts": {
-    "max-lines": 854
-  },
   "src/compiler/html.ts": {
     "max-lines": 772,
     "max-lines-per-function": 320,
