@@ -805,6 +805,9 @@ describe('theme.css', () => {
     expect(skin).not.toContain('--border-width: 0')
     expect(skin).not.toMatch(/box-shadow:\s*[^n;\s]/)
     expect(skin).toMatch(/:is\(\.kui-dialog, \.kui-command-palette, [^{]*\{\s*border-color: var\(--color-border-strong\);\s*box-shadow: none;/)
+    // The nav popover's utility would otherwise keep its weaker line over the skin's rule, which sits in a lower layer.
+    expect(sourceOf('site-nav')).toContain('lg:border-border-strong')
+    expect(sourceOf('site-nav')).not.toMatch(/lg:border-border[\s']/)
     expect(sourceOf('card')).toMatch(/border-\[length:var\(--border-width\)\]/)
   })
 

@@ -1333,7 +1333,7 @@
   :where(.kui-site-nav > [data-part='list']:popover-open) {
     position-area: block-end span-inline-end;
     position-try-fallbacks: flip-inline;
-    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--border-width)] border-border bg-popover p-2 text-foreground;
+    @apply m-0 mt-2 flex min-w-56 flex-col items-stretch border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-2 text-foreground;
     inset: auto;
   }
 
