@@ -28,15 +28,14 @@ export async function sharedClient(root: string, clientOptions: ClientOptions): 
 }
 
 // `pages()` for the tests that bundle the islands as the server boots: the build is made once per root and client options for the whole file, each into an output of its own so a later build never rewrites the files an earlier server serves.
-// A test reading the default output (`clientDir(root)`, `readClient(root)`), serving assets or fonts the server writes there (a request for `/_kay/assets/...`, a social card drawn with a font) or changing the fixture between two servers keeps `pages()` from `src/server`.
-// A development server and a prebuilt one (the mode `NODE_ENV` and the options give, a test's being not prebuilt unless it says so) go through `pages()` itself, and the key ignores function-valued options such as `plugins`, which no test here passes; the Bun check and boot-failure recording of `pages()` are skipped too.
+// A test reading the default output (`clientDir(root)`, `readClient(root)`, a manifest), serving assets or fonts the server writes there (a request for `/_kay/assets/...`, a social card drawn with a font) or changing the fixture between two servers keeps `pages()` from `src/server`, or leaves `prebuilt` unset.
+// A development server and a prebuilt one go through `pages()` itself, and the key ignores function-valued options such as `plugins`, which no test here passes; the Bun check and boot-failure recording of `pages()` are skipped too.
 export async function pages(options: PagesOptions = {}): Promise<Awaited<ReturnType<typeof bundlingPages>>> {
-  const source = projectSource()
-  const mode = source.mode(options)
-
-  if (mode.dev || mode.prebuilt)
+  if (options.dev || options.prebuilt !== false)
     return bundlingPages(options)
 
+  const source = projectSource()
+  const mode = source.mode(options)
   const root = source.root(options.root ?? process.cwd())
   const project = resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
 
