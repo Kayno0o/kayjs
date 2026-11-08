@@ -1,5 +1,12 @@
 # Regenerating and editing
 
+## Common tasks
+
+- Put a chat on a page and choose what it shows: the tasks of [Chat](chat.md#common-tasks).
+
+## Reference
+
+### Regenerating and editing
 
 `regenerate` adds a button under the last reply that asks again for it, and `editable` one on each message of the visitor that turns it into a field to change and send again. Both are off by default.
 

@@ -245,7 +245,7 @@ describe('wording', () => {
 describe('the kay.* keys in llms', () => {
   it('lists every text kay words and every kind of schema refusal', async () => {
     const source = await Bun.file(join(import.meta.dir, '../src/server/words.ts')).text()
-    const doc = await Bun.file(join(import.meta.dir, '../llms/locales.md')).text()
+    const doc = await Bun.file(join(import.meta.dir, '../llms/locales-texts.md')).text()
     const keys = [...source.matchAll(/'kay\.([\w.]+)'/g)].map(match => match[1]!)
 
     expect(keys.length).toBeGreaterThan(15)
