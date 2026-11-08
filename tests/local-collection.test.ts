@@ -777,10 +777,19 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await queuedSignedOut(page)
     // The refusal stays while retry() is checked, so a send from an automatic path (the browser coming back online, the tab showing) that lands late cannot turn the status to synced: what retry() does is read off the requests it makes.
     await page.route('/_kay/action/*', async () => void sent++)
+
+    // A run queued behind the refused one (the page opening, the browser coming online) still sends once the status shows: retry() is read once those stopped.
+    let before = -1
+
+    while (before !== sent) {
+      before = sent
+      await Bun.sleep(400)
+    }
+
     await page.click('button.retry')
     await Bun.sleep(400)
 
-    expect(sent).toBe(0)
+    expect(sent).toBe(before)
     expect(await page.text('p.status')).toBe('signed-out')
     expect((await server()).saves).toBe(0)
 
