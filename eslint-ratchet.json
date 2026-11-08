@@ -199,10 +199,6 @@
   "src/runtime/dev-tool-tab-order.ts": {
     "max-lines-per-function": 169
   },
-  "src/runtime/dev-tool.ts": {
-    "max-lines": 657,
-    "max-lines-per-function": 484
-  },
   "src/runtime/dom.ts": {
     "max-lines": 684
   },

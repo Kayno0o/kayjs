@@ -142,7 +142,7 @@ describe('the Routes tab module', () => {
     const dev = await pages({ prebuilt: false, security: false, dev: true })
     const response = await dev.handle(new Request(`http://localhost${DEV_TAB}routes.js`))
     const text = await response.text()
-    const tool = await Bun.file(join(import.meta.dir, '../src/runtime/dev-tool.ts')).text()
+    const tool = await Bun.file(join(import.meta.dir, '../src/runtime/dev-tool-tabs.ts')).text()
 
     expect(response.status).toBe(200)
     expect(text).toContain('export default')

@@ -24,7 +24,7 @@ interface Box {
 }
 
 // Where the tool sits and how large, kept for the browser rather than the tab.
-interface DevLayout {
+export interface DevLayout {
   dock: Dock
   // The corner of the bar, which a drawer left where it opens follows.
   corner: Corner
