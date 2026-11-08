@@ -134,7 +134,7 @@ export default defineMessages({
       search: 'Rechercher',
       selected: { one: '{count} sélectionné', other: '{count} sélectionnés' },
     },
-    notice: { dismiss: 'Fermer' },
+    notice: { dismiss: 'Fermer', retry: 'Réessayer' },
     pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
     radioGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
     rangeInput: { from: '{label} de', to: '{label} à' },

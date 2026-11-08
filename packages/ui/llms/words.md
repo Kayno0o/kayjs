@@ -63,7 +63,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.mediaGallery.*`: `close` (`Close`), `empty` (`No media.`), `item` (`Media {n}`), `next` (`Next`), `open` (`Open full size`), `previous` (`Previous`)
 - `ui.menu.*`: `failure` (`Could not load.`, when a menu's entries function fails), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)
-- `ui.notice.*`: `dismiss` (`Dismiss`)
+- `ui.notice.*`: `dismiss` (`Dismiss`), `retry` (`Try again`)
 - `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
 - `ui.radioGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
