@@ -45,6 +45,8 @@ export const listing = action(t.Object({
 
 export const solve = action(t.Object({}), () => 'solved', { tool: true, protect: { proofOfWork: true } })
 
+export const peek = action(t.Object({}), () => 'peeked', { tool: { readOnly: true } })
+
 export const long = action(t.Object({}), () => 'long', { tool: { name: 'a'.repeat(100) } })
 ---
 h1 Notes

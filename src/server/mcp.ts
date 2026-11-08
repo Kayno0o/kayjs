@@ -120,7 +120,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
   for (const [name, schema] of Object.entries((body?.properties ?? {}) as Record<string, unknown>))
     place(name, 'body', schema, ((body?.required ?? []) as string[]).includes(name))
 
-  const get = method === 'get'
+  const reads = method === 'get' || operation['x-kay-read-only'] === true
   const inputSchema = { type: 'object', properties, ...required.size > 0 && { required: [...required] } }
 
   const name = toolName(tool?.name ?? id, taken)
@@ -130,7 +130,7 @@ function toolOf(path: string, method: string, operation: Operation, id: string, 
     title: name,
     description,
     inputSchema,
-    annotations: { readOnlyHint: get, destructiveHint: method === 'delete', idempotentHint: get || method === 'put' || method === 'delete', openWorldHint: false },
+    annotations: { readOnlyHint: reads, destructiveHint: method === 'delete', idempotentHint: reads || method === 'put' || method === 'delete', openWorldHint: false },
     call: async (args, context) => {
       const url = urlFor(path, operation.parameters ?? [], args, places)
 

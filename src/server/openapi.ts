@@ -46,7 +46,7 @@ export interface DocumentedAction {
   url: string
   schema: unknown
   // What `tool` on the action sets, by itself or beside its description.
-  tool: { name?: string | undefined, description?: string | undefined }
+  tool: { name?: string | undefined, description?: string | undefined, readOnly?: boolean | undefined }
   // The files of the guards covering it.
   guards: string[]
 }
@@ -78,6 +78,8 @@ export interface Operation {
   'x-kay-tool'?: { name?: string | undefined, description?: string | undefined }
   // Called as kay's `action()` calls are, which an MCP tool does, rather than as a plain JSON `POST`.
   'x-kay-action'?: true
+  // Set on an action tool that only reads (`tool: { readOnly: true }`), which `tools/list` annotates as such.
+  'x-kay-read-only'?: true
 }
 
 export function openApiSettings(value: boolean | OpenApiConfig | undefined): OpenApiConfig | undefined {
@@ -294,6 +296,7 @@ export function actionOperation(action: DocumentedAction, taken: Set<string>): O
     'responses': { 200: { description: 'OK' } },
     ...action.guards.length > 0 && { 'x-kay-guarded': true },
     'x-kay-action': true,
+    ...action.tool.readOnly === true && { 'x-kay-read-only': true },
   }
 }
 

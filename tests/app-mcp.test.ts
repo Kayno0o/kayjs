@@ -94,6 +94,15 @@ describe('the endpoint', () => {
     expect((await rpc(site, 'ping')).body.result).toEqual({})
   })
 
+  it('lists an action with readOnly as a read and the others as writes', async () => {
+    const { body } = await rpc(site, 'tools/list')
+    const tools = body.result?.tools as { name: string, annotations: object }[]
+    const annotations = (name: string) => tools.find(tool => tool.name === name)?.annotations
+
+    expect(annotations('peek')).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false })
+    expect(annotations('bare')).toEqual({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false })
+  })
+
   it('says how long a client of the revision without a handshake keeps its tool list, as Claude Code requires', async () => {
     const { body } = await rpc(site, 'tools/list', { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } })
 
@@ -189,6 +198,7 @@ describe('the tools', () => {
       'a'.repeat(64),
       'add_note',
       'add_note_2',
+      'peek',
       'bare',
       'breaks',
       'create_note',
