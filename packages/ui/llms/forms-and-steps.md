@@ -8,7 +8,7 @@ FormField frames a control with its label, hint and messages; inside an island a
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 
 export const rename = action(s.Object({ id: s.String({ maxLength: 64 }), title: s.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
 ---

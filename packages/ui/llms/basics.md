@@ -27,6 +27,9 @@ Each component spreads the other attributes it is given onto its root element, `
 ### Dialog, ConfirmDelete
 
 ```kay
+---
+import { editing } from 'kay'
+---
 Dialog(open={editing()} title="Rename" onOpenChange={() => editing = false})
   @footer
     Button(label="Cancel" onClick={() => editing = false})
