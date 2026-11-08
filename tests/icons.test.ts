@@ -37,6 +37,22 @@ describe('icons', () => {
     expect(installedIconSets(scratch).size).toBe(0)
   })
 
+  it('keeps the sets it last read while the package.json does not parse, as an editor saving in place leaves it', async () => {
+    const root = await scratchDir('icons-manifest-')
+    const manifest = join(root, 'package.json')
+
+    await Bun.write(manifest, JSON.stringify({ devDependencies: { '@iconify-json/tabler': '*' } }))
+    expect([...installedIconSets(root).keys()]).toEqual(['tabler'])
+
+    await Bun.write(manifest, '{"devDependencies": {"@iconify-json/tab')
+    expect([...installedIconSets(root).keys()]).toEqual(['tabler'])
+
+    const fresh = await scratchDir('icons-manifest-')
+
+    await Bun.write(join(fresh, 'package.json'), '{')
+    expect(installedIconSets(fresh).size).toBe(0)
+  })
+
   it('draws a folder without a package.json from the nearest one above it', () => {
     expect([...installedIconSets(join(FIXTURE, 'src')).keys()]).toEqual(['tabler'])
   })

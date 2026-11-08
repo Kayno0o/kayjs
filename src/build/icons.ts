@@ -29,6 +29,27 @@ function manifestOf(root: string): string | undefined {
   }
 }
 
+interface Manifest { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
+
+// The last package.json of each path that parsed: a dev reload that meets one an editor or `bun add` is still writing keeps to it, as the write ends with another reload.
+const readable = new Map<string, Manifest>()
+
+function readManifest(file: string): Manifest {
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as Manifest
+
+    readable.set(file, parsed)
+
+    return parsed
+  }
+  catch (error) {
+    if (!(error instanceof SyntaxError))
+      throw error
+
+    return readable.get(file) ?? {}
+  }
+}
+
 // The `@iconify-json/*` packages the project depends on, by prefix, with the file holding each set.
 export function installedIconSets(root: string): Map<string, string> {
   const found = new Map<string, string>()
@@ -37,7 +58,7 @@ export function installedIconSets(root: string): Map<string, string> {
   if (manifest === undefined)
     return found
 
-  const { dependencies = {}, devDependencies = {} } = JSON.parse(readFileSync(manifest, 'utf8')) as { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
+  const { dependencies = {}, devDependencies = {} } = readManifest(manifest)
 
   for (const name of Object.keys({ ...dependencies, ...devDependencies })) {
     if (!name.startsWith(ICONIFY_PACKAGE))
