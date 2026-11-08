@@ -22,6 +22,7 @@ import { NOT_FOUND_FILE } from '../src/server/not-found'
 import { addRuntimeRedirect } from '../src/server/runtime-redirect-api'
 import { alive } from './alive'
 import { kayCheck } from './check-helper'
+import { kayTypes } from './kay-types'
 import { drainOutput } from './listening'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -264,7 +265,7 @@ describe('kay check', () => {
 // What `kay check --watch` writes to a terminal before each check: the screen and its scrollback erased.
 const CLEAR = '\x1B[2J\x1B[3J\x1B[H'
 const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
+  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: await kayTypes() },
   include: ['src', '.kay/types'],
 })
 
