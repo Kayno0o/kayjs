@@ -68,8 +68,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('advancing 
 
     const ticks = await page.evaluate(async () => {
       const at: number[] = []
-      const id = setInterval(() => at.push(performance.now()), 100)
-      const end = performance.now() + 450
+      const start = performance.now()
+      const id = setInterval(() => at.push(performance.now() - start), 100)
+      const end = start + 450
 
       while (performance.now() < end) {
         // The page's main thread is busy past four ticks.
@@ -82,8 +83,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('advancing 
     })
 
     expect(ticks.length).toBeGreaterThanOrEqual(2)
-    // Caught up at once, the second tick would follow the first within a millisecond; kept on its cadence, it comes at the next 100 ms mark, about 50 ms on, less what a loaded runner takes to run the late one.
-    expect(ticks[1]! - ticks[0]!).toBeGreaterThan(15)
+    // Caught up at once, the second tick would follow the first within a millisecond; kept on its cadence, it comes at the first 100 ms mark after the late one ran, whatever a loaded runner made that one wait.
+    expect(ticks[1]!).toBeGreaterThanOrEqual((Math.floor(ticks[0]! / 100) + 1) * 100 - 2)
   })
 
   it('pauses every() in a hidden tab and catches up as it shows', async () => {
