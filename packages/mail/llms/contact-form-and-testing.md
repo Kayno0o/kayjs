@@ -9,7 +9,7 @@
 ```kay
 --- server
 import { contactForm } from '@kaynooo/kayjs-mail'
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { mail } from '../mail'
 
 export const contact = action(...contactForm(mail, { fields: { phone: s.Optional(s.String({ maxLength: 30 })) }, reach: 'hello@example.com' }))
@@ -133,6 +133,8 @@ authMailer(mail.enqueue, { views: { 'reset-password': () => import('./mails/auth
 
 ```kay
 ---
+import { t } from 'kay/i18n'
+
 // src/mails/auth/reset-password.kay
 import type { AuthMail } from '@kaynooo/kayjs-mail'
 import AuthLink from '@kaynooo/kayjs-mail/auth-link.kay'

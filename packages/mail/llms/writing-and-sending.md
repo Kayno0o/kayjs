@@ -134,7 +134,7 @@ It goes out with `replyTo: { name, address: email }`, so replying reaches the vi
 
 ```kay
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { mail } from '../mail'
 import Welcome from '../mails/welcome.kay'
 

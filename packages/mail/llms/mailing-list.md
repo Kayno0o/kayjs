@@ -8,6 +8,7 @@
 
 ```kay
 --- server
+import { action } from 'kay'
 import { mail } from '../mail'
 import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
 
