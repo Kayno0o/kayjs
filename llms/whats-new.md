@@ -4,6 +4,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui `AppHeader`, `SiteNav`, `TabNav` and `SideNav` given no links draw nothing to navigate with: no nav landmark, no menu toggle opening an empty popover, no menu button, so the `class={{ nav: links.length === 0 ? 'hidden' : '' }}` workaround goes ([navigation](../packages/ui/llms/tables-navigation-and-layout.md)).
+
 - An action tool that declares no `tool: { output }` is listed with the `outputSchema` of its handler's return type, read from the types by `kay build` (and in the background by `kay dev`): nothing to declare, and a declared `output` still wins ([action protection](action-protection.md#offering-an-action-to-agents)).
 - kayjs-ui's `Select`, and the select of a compact `FormField`, never grows past its container: a long option is cut in the closed select instead of pushing a phone page sideways, so the `[&_select]:max-w-full` workaround on a filter form goes ([forms](../packages/ui/llms/forms-and-steps.md)).
 - A `kay.config.ts` setting `images.resolve` or `images.guard` inline no longer makes the config `any` under TypeScript (`error TS7022`, then every `ctx.locals` unresolved in the lint), with nothing to annotate. A callback that returns something read off `ctx.locals` still needs its return type written, as the config's type depends on it ([images from the app's own lookup](images-runtime-and-remote.md)).

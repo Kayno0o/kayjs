@@ -100,6 +100,9 @@ const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | u
 const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
 const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
 
+// With nothing to list, and nothing loading or failed, the nav draws no landmark, no collapse toggle and no menu button.
+const empty = () => !pending() && !failed() && all().length === 0
+
 // The latest load wins, as in Menu.
 let latest = 0
 
@@ -218,8 +221,9 @@ div(part="root" {...rest})
   if header
     div(part="header")
       | {header}
-  | {lists(false)}
-  if panel
+  if !empty()
+    | {lists(false)}
+  if panel && !empty()
     button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} aria-haspopup="dialog" data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
       Icon(icon="menu")
     SidePanel(open={panelOpen()} title={label} onOpenChange={setOpen})

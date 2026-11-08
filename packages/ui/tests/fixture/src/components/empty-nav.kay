@@ -1,0 +1,19 @@
+--- island
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+const links = [{ href: '/', label: 'Home' }]
+const none: { href: string, label: string }[] = []
+---
+AppHeader#header-none(links={none} current="/" label="None")
+  @brand
+    span Brand
+AppHeader#header-some(links={links} current="/" label="Some")
+SiteNav#site-none(links={none} current="/" label="None")
+SiteNav#site-some(links={links} current="/" label="Some")
+TabNav#tabs-none(links={none} current="/" label="None")
+SideNav#side-none(links={none} current="/" label="None")
+SideNav#side-none-async(links={async () => none} current="/" label="None async")
+SideNav#side-some(links={links} current="/" label="Some")

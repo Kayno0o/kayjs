@@ -87,11 +87,13 @@ snippet inside(item: { entry: TabEntry })
   if item.entry.badge !== undefined
     span(part="badge") {item.entry.badge}
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll` on the link), except a link to a `#section`, which scrolls to it.
-nav(part="root" {...rest} ref={element => nav = element} aria-label={label})
-  for item of items() key={item.key}
-    if item.entry.disabled
-      span(part="link" aria-disabled="true")
-        | {inside(item)}
-    else
-      a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} {...tabOf(item.to, item.entry.newTab)} aria-current={item.on ? 'page' : undefined})
-        | {inside(item)}
+// With no tabs there is no empty landmark.
+if items().length > 0
+  nav(part="root" {...rest} ref={element => nav = element} aria-label={label})
+    for item of items() key={item.key}
+      if item.entry.disabled
+        span(part="link" aria-disabled="true")
+          | {inside(item)}
+      else
+        a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} {...tabOf(item.to, item.entry.newTab)} aria-current={item.on ? 'page' : undefined})
+          | {inside(item)}

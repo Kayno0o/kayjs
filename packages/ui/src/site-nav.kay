@@ -76,20 +76,22 @@ snippet destination(entry: NavLink)
 // The list is a popover its toggle opens, so the browser owns showing it, closing it on a press outside or Escape, and giving the focus back; the page swap closes one left open.
 // The toggle is an IconButton's markup with both icons drawn, so CSS shows the close one while the list is open.
 // A link with children is followed by a button opening them as a popover from lg; below it they stay nested and always shown, so the button hides.
-nav(part="root" {...rest} aria-label={label})
-  button.kui-icon-btn(part="toggle" type="button" aria-label={menuLabel} data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" popovertarget={listId} style={`anchor-name: ${anchor}`})
-    Icon(icon="menu" part="menuIcon")
-    Icon(icon="close" part="closeIcon")
-  ul(part="list" id={listId} popover style={`position-anchor: ${anchor}`})
-    for entry, position of links key={entry.href}
-      li(part="item")
-        | {destination(entry)}
-        if entry.children && entry.children.length > 0
-          button(part="expand" type="button" aria-label={expanded(entry)} data-tooltip={expanded(entry)} popovertarget={`${listId}-${position}`} style={`anchor-name: ${anchor}-${position}`})
-            Icon(icon="chevron" part="expandIcon")
-          ul(part="children" id={`${listId}-${position}`} popover style={`position-anchor: ${anchor}-${position}`})
-            for child of entry.children key={child.href}
-              li(part="item")
-                | {destination(child)}
-  if open !== undefined || onOpenChange
-    SiteNavState(listId={listId} open={open} onOpenChange={onOpenChange})
+// With no links there is nothing to fold: no nav, no toggle and no empty landmark.
+if links.length > 0
+  nav(part="root" {...rest} aria-label={label})
+    button.kui-icon-btn(part="toggle" type="button" aria-label={menuLabel} data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" popovertarget={listId} style={`anchor-name: ${anchor}`})
+      Icon(icon="menu" part="menuIcon")
+      Icon(icon="close" part="closeIcon")
+    ul(part="list" id={listId} popover style={`position-anchor: ${anchor}`})
+      for entry, position of links key={entry.href}
+        li(part="item")
+          | {destination(entry)}
+          if entry.children && entry.children.length > 0
+            button(part="expand" type="button" aria-label={expanded(entry)} data-tooltip={expanded(entry)} popovertarget={`${listId}-${position}`} style={`anchor-name: ${anchor}-${position}`})
+              Icon(icon="chevron" part="expandIcon")
+            ul(part="children" id={`${listId}-${position}`} popover style={`position-anchor: ${anchor}-${position}`})
+              for child of entry.children key={child.href}
+                li(part="item")
+                  | {destination(child)}
+    if open !== undefined || onOpenChange
+      SiteNavState(listId={listId} open={open} onOpenChange={onOpenChange})
