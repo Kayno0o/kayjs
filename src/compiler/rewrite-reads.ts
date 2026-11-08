@@ -7,7 +7,7 @@ import type { PropsBinding } from './script'
 import { DEFAULTED, defaultName, PROPS } from './names'
 
 // The names the compiler gives its own helpers and tags, `KayRow` or `KayLoopFor`.
-export const COMPILER_NAME = /^Kay[A-Z]/
+const COMPILER_NAME = /^Kay[A-Z]/
 
 // The types whose parameters a `typeof` inside them can name.
 const SIGNATURES = new Set(['TSFunctionType', 'TSConstructorType', 'TSMethodSignature', 'TSCallSignatureDeclaration', 'TSConstructSignatureDeclaration'])
