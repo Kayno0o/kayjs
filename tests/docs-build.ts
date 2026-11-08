@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR, RENDER_OUTPUT } from '../src/build/assets'
+import { MANIFEST } from '../src/server/client'
 
 const LOCK = join(import.meta.dir, '../docs/.kay/build.lock')
 const HOLDER = join(LOCK, 'pid')
@@ -68,9 +69,9 @@ function stampFile(): string {
   return join(LOCK, '..', 'built.json')
 }
 
-// What the build reads, by size and modification time, and the run asking: a build of these sources from this run is still the one on disk.
+// What the build reads, by size and modification time, and the Bun building it: a build of these sources is still the one on disk, whichever run made it.
 async function stampOfSources(): Promise<string> {
-  const parts: string[] = [String(process.env.BUN_TEST_WORKER_ID === undefined ? process.pid : process.ppid)]
+  const parts: string[] = [Bun.version]
 
   for await (const file of new Bun.Glob(SOURCES).scan({ cwd: ROOT, onlyFiles: true })) {
     if (IGNORED.test(file))
@@ -93,7 +94,7 @@ async function readStamp(): Promise<string> {
   }
 }
 
-// `takeDocsBuild` for a test reading the build `kay build docs --no-check` writes: it builds unless this run already built the same sources, which a file holding the turn since then has not touched.
+// `takeDocsBuild` for a test reading the build `kay build docs --no-check` writes: it builds unless the same sources were built already, by this run or an earlier one, and the output is still there.
 export async function takeDocsBuilt(): Promise<() => Promise<void>> {
   const release = await takeDocsBuild()
 
@@ -101,7 +102,7 @@ export async function takeDocsBuilt(): Promise<() => Promise<void>> {
     const stamp = await stampOfSources()
     const kept = await readStamp()
 
-    if (kept === stamp)
+    if (kept === stamp && await Bun.file(join(DOCS_BUILT, MANIFEST)).exists())
       return release
 
     const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { cwd: ROOT, env: { ...process.env, ...DOCS_BUILT_ENV }, stdout: 'ignore', stderr: 'pipe' })
