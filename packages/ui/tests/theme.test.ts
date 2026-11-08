@@ -776,7 +776,7 @@ describe('theme.css', () => {
     expect(css).toContain('appearance: base-select')
     expect(css).toContain('linear-gradient(45deg')
     expect(css).toContain('clip-path: polygon(14% 44%')
-    expect(css).toMatch(/--border-width: 0px/)
+    expect(css).not.toMatch(/--border-width: 0px/)
     // Every class its selectors name exists in the theme, and the mantle is a step under the canvas so boxes on it keep an edge.
     for (const [, name = ''] of skin.matchAll(/\.(kui-[\w-]+)/g))
       expect(classes.has(name) || HOOKS.has(name), name).toBe(true)
@@ -787,6 +787,25 @@ describe('theme.css', () => {
     expect(css).toContain(':not([multiple], [size])')
     // The skin sets one colour scheme, so it never asks for light.
     expect(skin).not.toContain('light-dark(')
+  })
+
+  test('frames the boxes and overlays of the space skin by a line that stands off the canvas, and draws no shadow', async () => {
+    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
+    const tokens = withSkin(skin)
+    const canvas = colour('background', 1, undefined, tokens)
+    const ratio = (name: string, ground: number[]) => contrast(colour(name, 1, ground, tokens), ground)
+
+    // A box on the canvas: its fill and its hairline, and a hairline on its own fill.
+    expect(ratio('surface', canvas)).toBeGreaterThanOrEqual(1.09)
+    expect(ratio('border', canvas)).toBeGreaterThanOrEqual(1.2)
+    expect(ratio('border', colour('surface', 1, undefined, tokens))).toBeGreaterThanOrEqual(1.2)
+    // An overlay's edge on the canvas it floats over, over its own fill.
+    expect(ratio('border-strong', canvas)).toBeGreaterThanOrEqual(1.5)
+    expect(ratio('border-strong', colour('popover', 1, undefined, tokens))).toBeGreaterThanOrEqual(1.4)
+    expect(skin).not.toContain('--border-width: 0')
+    expect(skin).not.toMatch(/box-shadow:\s*[^n;\s]/)
+    expect(skin).toMatch(/:is\(\.kui-dialog, \.kui-command-palette, [^{]*\{\s*border-color: var\(--color-border-strong\);\s*box-shadow: none;/)
+    expect(sourceOf('card')).toMatch(/border-\[length:var\(--border-width\)\]/)
   })
 
   test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed attachment and its checkbox a hover', async () => {

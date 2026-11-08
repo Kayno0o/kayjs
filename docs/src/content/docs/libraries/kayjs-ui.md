@@ -66,15 +66,14 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
 
-The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
+The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and every box framed by a 1px hairline over a lifted fill, with no shadows. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
 Besides its colours, the space skin sets these, so an override of yours knows what it changes:
 
 - The sans font, `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` and `--color-border-strong`.
-- `--border-width` to `0`, put back to `1px` on buttons, fields, chips, toggles, badges, notices, avatars, segmented controls, file drops and pagination steps.
 - `--label-case` to `none`, `--tracking-label` and `color-scheme: dark`.
 - The line of Segmented and FileDrop, and of pagination steps and unchecked chips, in `--color-input`.
-- A shadow under overlays, and drawn checkboxes that outline in the accent on hover.
+- Overlays (dialog, popover, toast, tooltip, palette, combobox list, select picker, side panel, chart tooltip, nav popover) framed by `--color-border-strong` with `box-shadow: none`, and drawn checkboxes that outline in the accent on hover.
 - Themed selects: a chevron, and where the browser allows it the open list and its options.
 - The key look of buttons and framed icon buttons: a hairline, lit in the accent on hover. Tone, ghost, inline, pressed and disabled buttons keep the theme's look, and a focused button shows the theme's focus line.
 
