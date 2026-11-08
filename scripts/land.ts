@@ -8,7 +8,7 @@ import { dependenciesOnly } from './dependency-change'
 import { hostEnv } from './host-env'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
-import { describeSamples, describeScope, sampleScope, scopeMemory } from './scope-memory'
+import { describeSamples, describeScope, sampleScope, scopeLimit, scopeMemory, sizeForScope } from './scope-memory'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { nicedCommand, slotPrefix } from './step-command'
 import { subprocessTests } from './subprocess-tests'
@@ -31,10 +31,12 @@ const TAIL = 30
 const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const MANIFEST = /(?:^|\/)(?:package\.json|bun\.lock)$/
+// A session's scope under 16 GB sizes the test runs itself, as measured: 3 workers and 4 runs in 8 GB.
+const SIZED = sizeForScope(scopeLimit())
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
-const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
+const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || (SIZED?.workers ?? 6)}`
 // The whole suite as that many runs one after another, each balanced by the timings: a worker keeps the global of every file that loaded a native addon (oven-sh/bun#46561), so a run in a few GB of memory ends each run before its workers outgrow it.
-const SHARDS = Number(process.env.KAY_LAND_SHARDS) || 1
+const SHARDS = Number(process.env.KAY_LAND_SHARDS) || (SIZED?.shards ?? 1)
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
@@ -159,7 +161,7 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
   await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n${sampled === undefined ? '' : `(${describeSamples(sampled)})\n`}\n`)
 
   const seconds = Math.round((performance.now() - started) / 1000)
-  const peak = sampled === undefined ? '' : `, peak ${Math.round(sampled.peak / 1024 / 1024)} MB`
+  const peak = sampled === undefined ? '' : `, peak ${Math.round(sampled.peak / 1024 / 1024)} MB with the cache, ${Math.round(sampled.held / 1024 / 1024)} MB held`
 
   if (exitCode === 0 && !hung) {
     console.log(`ok, ${seconds} s${peak}`)

@@ -179,7 +179,8 @@ async function landings(...names: string[]) {
   }
 
   // The environment of this run without the landing's own knobs, which a landing running this test sets for itself.
-  const outerEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'KAY_LAND_SHARDS'))
+  // One run, as a scope without a limit has it, whatever limit this one runs in.
+  const outerEnv = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'KAY_LAND_WORKERS')), KAY_LAND_SHARDS: '1' }
 
   // Runs a landing in a clone, its output and exit code once it ends; its rebase commits, so it gets an identity CI's git has none of.
   const land = (name: string, env: Record<string, string> = {}) => {
@@ -471,8 +472,8 @@ describe('landing a change to a library', () => {
     const trace = (await Bun.file(join(dir, 'trace')).text()).split('\n').filter(line => line === 'lib' || line.startsWith('test '))
 
     expect(code).toBe(0)
-    expect(out).toMatch(/^tests the changes reach: ok, \d+ s(, peak \d+ MB)?$/m)
-    expect(out).toMatch(/^packages\/lib tests: ok, \d+ s(, peak \d+ MB)?$/m)
+    expect(out).toMatch(/^tests the changes reach: ok, \d+ s(, peak \d+ MB with the cache, \d+ MB held)?$/m)
+    expect(out).toMatch(/^packages\/lib tests: ok, \d+ s(, peak \d+ MB with the cache, \d+ MB held)?$/m)
     expect(trace.at(-1)).toBe('lib')
     expect(trace.length).toBeGreaterThan(1)
     expect(await tree()).toContain('packages')
