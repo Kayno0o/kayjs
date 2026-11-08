@@ -1,12 +1,17 @@
-import type { FetchedPage } from './navigation'
+import type { FetchedPage, LateParts } from './navigation'
+import { LATE_PART_END, SHELL_END } from './markers'
 import { pageKey, prefetched } from './navigation'
 import { LOADS_HEADER, NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
-import { inFlight } from './swap-flight'
+import { bounded, inFlight, LATE } from './swap-flight'
 
 const PREFETCH_TTL_MS = 30_000
 
-// A page not answered after this long is loaded by the browser, which shows its own progress or error.
+// A page not answered after this long is loaded by the browser, which shows its own progress or error; a streamed page not sending a byte this long stops being read. `client.pageTimeout` sets it.
 export const PAGE_TIMEOUT_MS = 10_000
+
+export function pageTimeout(): number {
+  return Number(document.querySelector<HTMLMetaElement>('meta[name="kay-page-timeout"]')?.content) || PAGE_TIMEOUT_MS
+}
 
 export const HTML = /^text\/html\b/
 const ISOLATING_EMBEDDERS = new Set(['require-corp', 'credentialless'])
@@ -33,10 +38,25 @@ export function prefetch(url: URL, link: Element): void {
       prefetched.delete(other)
   }
 
-  const page = fetchPage(url)
+  const page = fetchPage(url, undefined, undefined, true)
 
   prefetched.set(key, { at: Date.now(), page })
   void forgetFailed(key, page)
+  // A streamed page nobody followed is not read on.
+  setTimeout(() => void discard(key, page), PREFETCH_TTL_MS)
+}
+
+async function discard(key: string, page: Promise<FetchedPage>): Promise<void> {
+  if (prefetched.get(key)?.page === page)
+    prefetched.delete(key)
+
+  try {
+    const { late } = await page
+
+    if (!late?.followed)
+      late?.stop()
+  }
+  catch {}
 }
 
 // A prefetch that fails is fetched again by the navigation that wants it.
@@ -50,7 +70,8 @@ async function forgetFailed(key: string, page: Promise<FetchedPage>): Promise<vo
   }
 }
 
-export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string[]): Promise<FetchedPage> {
+// A page asked to stream ends at its shell, with the rest left to `late`; otherwise it is read whole.
+export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string[], streaming = false): Promise<FetchedPage> {
   // The page asked for some of its loads is not the page: the browser's cache neither serves nor keeps it.
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', ...loads && { [LOADS_HEADER]: loads.join(',') } }, signal: signal ?? null, ...loads && { cache: 'no-store' } })
   const type = response.headers.get('content-type') ?? ''
@@ -59,7 +80,7 @@ export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly
   if (loads && (!response.ok || response.redirected || (response.url !== '' && pageKey(new URL(response.url)) !== pageKey(url)))) {
     void response.body?.cancel()
 
-    return fetchPage(url, signal)
+    return fetchPage(url, signal, undefined, streaming)
   }
 
   const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
@@ -71,7 +92,76 @@ export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly
     return { url: response.url, type, html: '' }
   }
 
+  if (streaming && response.body) {
+    const { html, late } = await shellOf(response.body.getReader())
+
+    return { url: response.url, type, html, ...late && { late }, ...full && { full } }
+  }
+
   return { url: response.url, type, html: await response.text(), ...full && { full } }
+}
+
+async function cancelled(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel()
+  }
+  catch {}
+}
+
+// Reads the body up to the end of the shell, which a page streaming `await` blocks marks right after it: what follows is read part by part, as the swap asks.
+// A page without the mark is read to its end.
+async function shellOf(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<{ html: string, late?: LateParts }> {
+  const decoder = new TextDecoder()
+  let text = ''
+
+  for (;;) {
+    const chunk = await reader.read()
+
+    text += decoder.decode(chunk.value, { stream: !chunk.done })
+
+    const end = text.indexOf(SHELL_END)
+
+    if (end !== -1) {
+      let rest = text.slice(end + SHELL_END.length)
+      const late: LateParts = {
+        stopped: false,
+        followed: false,
+        async read() {
+          for (;;) {
+            const at = rest.indexOf(LATE_PART_END)
+
+            if (at !== -1) {
+              const part = rest.slice(0, at + LATE_PART_END.length)
+
+              rest = rest.slice(at + LATE_PART_END.length)
+
+              return part
+            }
+
+            const limit = pageTimeout()
+            const next = await bounded(reader.read(), limit)
+
+            if (next === LATE)
+              throw new Error(`kay: the page stopped streaming for ${limit} ms`)
+
+            if (next.done)
+              return undefined
+
+            rest += decoder.decode(next.value, { stream: true })
+          }
+        },
+        stop() {
+          late.stopped = true
+          void cancelled(reader)
+        },
+      }
+
+      return { html: text.slice(0, end), late }
+    }
+
+    if (chunk.done)
+      return { html: text }
+  }
 }
 
 export function ownOrigin(url: string): boolean {
@@ -102,5 +192,5 @@ export async function pageFor(url: URL, signal: AbortSignal, loads?: readonly st
     catch {}
   }
 
-  return fetchPage(url, signal)
+  return fetchPage(url, signal, undefined, true)
 }

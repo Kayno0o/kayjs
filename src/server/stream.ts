@@ -7,12 +7,13 @@ import { collectForms } from '../runtime/action'
 import { collectDeferred, rejectedAt } from '../runtime/await.server'
 import { child } from '../runtime/html'
 import { collectIslands, unrevivableAction } from '../runtime/island.server'
+import { LATE_PART_END, SHELL_END } from '../runtime/markers'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
 import { islandChunks } from './client'
 import { formsScript } from './forms'
 import { hydrationScript } from './hydration'
 import { invalidKeys, messagesScript } from './i18n'
-import { SWAP_CALL, SWAP_SCRIPT } from './swap'
+import { SWAP_SCRIPT } from './swap'
 import { workScript } from './work'
 
 const encoder = new TextEncoder()
@@ -96,7 +97,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
   return new ReadableStream({
     async start(controller) {
-      controller.enqueue(encoder.encode(shell))
+      controller.enqueue(encoder.encode(shell + SHELL_END))
       keepAlive = setInterval(() => controller.enqueue(KEEP_ALIVE), KEEP_ALIVE_MS)
 
       // A part sent while more may come keeps its markers around it, for the next part to replace.
@@ -156,7 +157,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         const markup = sent.polish ? sent.polish(rendered.html) : rendered.html
         const html = more ? `<!--kay-await:${id}-->${markup}<!--/kay-await:${id}-->` : markup
 
-        controller.enqueue(encoder.encode(`<template data-kay-await="${id}">${html}</template>${scripts}<script>${SWAP_CALL}</script>`))
+        controller.enqueue(encoder.encode(`<template data-kay-await="${id}">${html}</template>${scripts}${LATE_PART_END}`))
 
         return true
       }

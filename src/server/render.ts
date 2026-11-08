@@ -27,6 +27,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
+import { durationMs } from '../runtime/duration'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, entriesInPageOrder, placeFieldMarks, unclickableFields, withFieldMarks } from '../runtime/fields'
 import { filledBy, inFillChain, newFillChain } from '../runtime/fills'
@@ -1293,7 +1294,7 @@ function headStart(head: RenderedHead): string {
 
 // What the islands read off the page: the mount point, where the API is when `apiPath` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.serve?.apiPath !== undefined && options.serve?.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.serve?.apiPath)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
+  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.serve?.apiPath !== undefined && options.serve?.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.serve?.apiPath)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.client?.pageTimeout === undefined ? '' : `<meta name="kay-page-timeout" content="${durationMs(options.client.pageTimeout)}">`) + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
 
   if (!hasIslands)
     return base

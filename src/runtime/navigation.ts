@@ -11,10 +11,24 @@ export interface NavigationHooks {
   arrive?: (search: string, from: number) => unknown
 }
 
+// The parts a streamed page goes on sending after its shell, each a template with the scripts it needs, as the server wrote it.
+export interface LateParts {
+  // The next whole part, or `undefined` once the stream ended; rejects when it stalls or breaks.
+  read: () => Promise<string | undefined>
+  // Stops reading and cancels the request; safe to call again.
+  stop: () => void
+  stopped: boolean
+  // Whether the swap took over reading, which then stops it itself.
+  followed: boolean
+}
+
 export interface FetchedPage {
   url: string
   type: string
+  // The page up to the first streamed `await` block's template, or all of it when none follows.
   html: string
+  // What the server goes on streaming after `html`, read by the swap once the page is shown.
+  late?: LateParts
   // A page the browser loads itself from another one: one asking for it, or one whose cross-origin isolation differs from this document's, which cannot change in place.
   full?: true
 }

@@ -1,0 +1,10 @@
+--- server
+import { gate } from '../gates'
+
+gate('plain')
+---
+head
+  title Plain
+h1 Plain
+a.home(href="/") Home
+p.plain Plain page

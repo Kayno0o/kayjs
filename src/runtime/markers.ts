@@ -13,3 +13,7 @@ export const TITLED = `slot[${TITLED_ATTRIBUTE}]`
 // The comments around the markup a form posting to an action carries for the server alone, as its honeypot: the browser sets it aside while it claims the form's content and puts it back.
 export const KEPT_START = 'kay-kept'
 export const KEPT_END = '/kay-kept'
+
+// What a streamed page writes right after its shell, so a swap shows the shell before any block arrived, and what ends each part sent after it (the call of `server/swap`).
+export const SHELL_END = '<!--kay-shell-->'
+export const LATE_PART_END = '<script>$kayAwait()</script>'

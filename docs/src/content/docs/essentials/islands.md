@@ -315,11 +315,15 @@ In an island it follows the address, so the link changes with each `navigate({ q
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 
-A page the server has not fully sent after 10 seconds, for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed.
+A page the server has not started sending after 10 seconds (`client.pageTimeout` changes it), for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed.
 
 The code a swap loads for a streamed page, or to keep a deferred server island already fetched on screen, is waited for 4.5 seconds at most once the page arrived: past that the streamed page is loaded by the browser, and the island shows its inert copy until fetched again.
 
-Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none. `kay:navigate-start` fires when a swap begins, and `kay:navigate-error` when it gives up and the browser loads the page in full, with `event.detail.url` and, for the error, `event.detail.error`.
+Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none.
+
+A page streaming `await` blocks is swapped in as soon as its first part is, each block showing its `pending` branch, so `kay:navigate` fires then, once, and `navigation.status()` is `'idle'` while blocks may still be arriving.
+
+Each block replaces its branch in place as it lands, keeping the focus and the scroll, and its islands hydrate. Another navigation ends the stream, and one that sends nothing for `client.pageTimeout` leaves the pending branches as they are. `kay:navigate-start` fires when a swap begins, and `kay:navigate-error` when it gives up and the browser loads the page in full, with `event.detail.url` and, for the error, `event.detail.error`.
 
 An island can follow a navigation without listening to events. `navigation.status()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `navigation.pending()` says whether one is under way, `navigation.to()` is the address being navigated to and `navigation.error()` is an `ApiError` (status 0, since no page answered) for why the last swap gave up. That is enough for a loading bar:
 

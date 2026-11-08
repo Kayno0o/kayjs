@@ -5,10 +5,10 @@ import { TITLED } from './markers'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
-import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
-import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flight'
+import { HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
+import { bounded, CHUNK_TIMEOUT_MS, ENTRY_SCRIPT, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
-import { mergeHead, swapRoot } from './swap-head'
+import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
 import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
 import { transitioned, viewTransitions } from './swap-transition'
@@ -23,7 +23,6 @@ export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 // Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, each head element's own `_$s` for the head, and none for `<body>`, which the server writes bare.
 // Its parts: the fetch in `./swap-fetch`, `<html>` and the head in `./swap-head`, the body's islands and what they keep in `./swap-kept` (a deferred server island's render in the lazy `./swap-held`), the morph in `./swap-morph`, the focus in `./swap-focus`, view transitions in `./swap-transition`, and the policy and what the swaps under way share in `./swap-flight`.
 
-const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 const STREAMED_TEMPLATE = 'template[data-kay-await]'
 // `BUILD_META` of `./swap` written out, as importing it would have the islands' entry export it to this chunk.
 const BUILD_TAG = 'meta[name="kay-build"]'
@@ -143,15 +142,18 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   // A refresh is no navigation: the page stays where it is.
   const navigating = swap.intent !== 'refresh'
 
-  if (navigating)
+  if (navigating) {
+    // The blocks of the page being left land on no other.
+    inFlight.late?.stop()
     began(url)
+  }
 
   try {
     let page: FetchedPage
 
     try {
       // A refresh runs in the background and may be slow: only a visit is given up on.
-      const fetched = swap.intent === 'refresh' ? await pending : await bounded(pending, PAGE_TIMEOUT_MS)
+      const fetched = swap.intent === 'refresh' ? await pending : await bounded(pending, pageTimeout())
 
       // A page that never answered is loaded by the browser.
       if (fetched === LATE) {
@@ -249,6 +251,17 @@ function failed(url: URL, message: string, cause?: unknown): void {
 
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
 export async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
+  try {
+    await showPage(page, hash, swap, isCurrent)
+  }
+  finally {
+    // A stream the swap never took over is not read on.
+    if (!page.late?.followed)
+      page.late?.stop()
+  }
+}
+
+async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean): Promise<void> {
   const target = new URL(page.url)
   const policy = policyOf(swap)
   // A page loaded fully in place of a swap that takes no history entry replaces the current one, as going back made one already.
@@ -272,17 +285,20 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     return
   }
 
-  // Only a page the server streamed carries the templates, so the code putting them in place loads for those alone.
-  if (next.querySelector(STREAMED_TEMPLATE)) {
-    let streamed: typeof import('./swap-streamed') | typeof LATE = LATE
+  // Only a page the server streamed carries the templates, or has some still to come, so the code putting them in place loads for those alone.
+  const whole = next.querySelector(STREAMED_TEMPLATE) !== null
+  let streamed: typeof import('./swap-streamed') | undefined
+
+  if (whole || page.late) {
+    let loaded: typeof import('./swap-streamed') | typeof LATE = LATE
 
     try {
-      streamed = await bounded(import('./swap-streamed'), CHUNK_TIMEOUT_MS)
+      loaded = await bounded(import('./swap-streamed'), CHUNK_TIMEOUT_MS)
     }
     catch {}
 
     // A chunk a deploy replaced is gone, or its request never answers: the page loads in full, unless another navigation took over.
-    if (streamed === LATE) {
+    if (loaded === LATE) {
       if (isCurrent())
         leave(target, replaces)
 
@@ -292,7 +308,10 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     if (!isCurrent())
       return
 
-    streamed.applyStreamed(next)
+    streamed = loaded
+
+    if (whole)
+      streamed.applyStreamed(next)
   }
 
   // Before anything of the page changes: a refresh of some loads whose placeholders the page cannot take has the whole page asked for.
@@ -329,6 +348,10 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
       return
     }
+
+    // The page's own blocks are gone with it, unless only some of its elements are swapped.
+    if (swap.loads === undefined)
+      inFlight.late?.stop()
 
     if (navigation.shown === '' || new URL(navigation.shown).pathname !== target.pathname) {
       navigation.arrivals = (navigation.arrivals ?? 0) + 1
@@ -372,6 +395,10 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     navigation.phase?.('idle')
     // For plain scripts, which no island tells of the swap.
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: target.href } }))
+
+    // The shell is the page now; its blocks land as they arrive.
+    if (page.late)
+      void streamed!.followLate(page.late, { inFlight, entry: ENTRY_SCRIPT, runnable, scriptMarkup })
   }
 
   if (policy.transition && viewTransitions())

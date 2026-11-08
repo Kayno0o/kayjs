@@ -117,3 +117,125 @@ describe('the names a refresh asks for', () => {
     }
   })
 })
+
+describe('fetching a page that streams', () => {
+  const part = (id: string, content: string) => `<template data-kay-await="${id}">${content}</template><script>$kayAwait()</script>`
+
+  function streamed(chunks: string[]): Response {
+    const encoder = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks)
+          controller.enqueue(encoder.encode(chunk))
+
+        controller.close()
+      },
+    })
+    const response = new Response(body, { headers: { 'content-type': 'text/html' } })
+
+    Object.defineProperty(response, 'url', { value: 'http://localhost/shop' })
+
+    return response
+  }
+
+  it('ends at the shell mark, however the network cut the text, and hands each part over whole', async () => {
+    const { SHELL_END } = await import('../src/runtime/markers')
+
+    answer(() => streamed(['<body><p>shell</p><!--kay-', 'shell-->', '<!---->', part('0', '<b>a</b>').slice(0, 20), part('0', '<b>a</b>').slice(20), part('1', '<b>é</b>')]))
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'), undefined, undefined, true)
+
+    expect(fetched.html).toBe('<body><p>shell</p>')
+    const { SWAP_CALL } = await import('../src/server/swap')
+    const { LATE_PART_END } = await import('../src/runtime/markers')
+
+    expect(SHELL_END).toBe('<!--kay-shell-->')
+    // What the server ends each part with, which the browser cuts the stream at.
+    expect(LATE_PART_END).toBe(`<script>${SWAP_CALL}</script>`)
+    expect(await fetched.late!.read()).toBe(`<!---->${part('0', '<b>a</b>')}`)
+    expect(await fetched.late!.read()).toBe(part('1', '<b>é</b>'))
+    expect(await fetched.late!.read()).toBeUndefined()
+  })
+
+  it('reads a page with no mark whole, with nothing left to stream', async () => {
+    answer(() => streamed(['<body>', '<p>plain</p>']))
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'), undefined, undefined, true)
+
+    expect(fetched.html).toBe('<body><p>plain</p>')
+    expect(fetched.late).toBeUndefined()
+  })
+
+  it('reads the whole text when asked for loads or not asked to stream', async () => {
+    answer(() => streamed(['<body>a<!--kay-shell-->', part('0', 'x')]))
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'))
+
+    expect(fetched.late).toBeUndefined()
+    expect(fetched.html).toContain('<template data-kay-await="0">')
+  })
+
+  it('gives up on a stream that sends nothing for the page limit, without a second request', async () => {
+    const encoder = new TextEncoder()
+
+    answer(() => {
+      const response = new Response(new ReadableStream<Uint8Array>({ start: controller => controller.enqueue(encoder.encode('<body>a<!--kay-shell-->')) }), { headers: { 'content-type': 'text/html' } })
+
+      Object.defineProperty(response, 'url', { value: 'http://localhost/shop' })
+
+      return response
+    })
+    document.head.innerHTML = '<meta name="kay-page-timeout" content="50">'
+
+    const fetched = await fetchPage(new URL('http://localhost/shop'), undefined, undefined, true)
+
+    await expect(fetched.late!.read()).rejects.toThrow('stopped streaming')
+    expect(asked).toHaveLength(1)
+    document.head.innerHTML = ''
+  })
+})
+
+describe('placing the parts of a streamed page', () => {
+  const swapper = async () => {
+    const { runnable, scriptMarkup } = await import('../src/runtime/swap-head')
+
+    return { inFlight: {}, entry: 'script[type="module"][src]', runnable, scriptMarkup }
+  }
+
+  it('drops a part answering a block the page does not hold, and replaces the one it does', async () => {
+    const { followLate } = await import('../src/runtime/swap-streamed')
+    const { navigation } = await import('../src/runtime/navigation')
+
+    navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
+    document.body.innerHTML = '<p>top</p><!--kay-await:0--><i>waiting</i><!--/kay-await:0--><p>end</p>'
+
+    const parts = [
+      '<template data-kay-await="9"><b>forged</b></template><script>$kayAwait()</script>',
+      '<template data-kay-await="0/../x"><b>forged</b></template><script>$kayAwait()</script>',
+      '<template data-kay-await="0"><b>done</b></template><script>$kayAwait()</script>',
+    ]
+    const late = { stopped: false, followed: false, read: async () => parts.shift(), stop() {
+      late.stopped = true
+    } }
+
+    await followLate(late, await swapper())
+
+    expect(document.body.innerHTML).toBe('<p>top</p><b>done</b><p>end</p>')
+  })
+
+  it('lands nothing once stopped', async () => {
+    const { followLate } = await import('../src/runtime/swap-streamed')
+
+    document.body.innerHTML = '<!--kay-await:0--><i>waiting</i><!--/kay-await:0-->'
+
+    const late = { stopped: false, followed: false, read: async () => {
+      late.stopped = true
+
+      return '<template data-kay-await="0"><b>late</b></template><script>$kayAwait()</script>'
+    }, stop() { late.stopped = true } }
+
+    await followLate(late, await swapper())
+
+    expect(document.body.innerHTML).toBe('<!--kay-await:0--><i>waiting</i><!--/kay-await:0-->')
+  })
+})

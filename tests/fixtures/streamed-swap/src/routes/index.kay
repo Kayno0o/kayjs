@@ -1,0 +1,14 @@
+--- script
+import Counter from '../components/counter.kay'
+---
+head
+  title Home
+h1 Home
+nav
+  a.slow(href="/slow") Slow
+  a.rejects(href="/rejects") Rejects
+  a.island(href="/island") Island
+  a.stuck(href="/stuck") Stuck
+  a.hang(href="/hang") Hang
+  a.plain(href="/plain") Plain
+Counter(label="Home")

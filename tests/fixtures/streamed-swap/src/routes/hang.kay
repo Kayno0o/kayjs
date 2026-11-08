@@ -1,0 +1,8 @@
+--- server
+import { gate } from '../gates'
+
+await gate('hang')
+---
+head
+  title Hang
+h1 Hang

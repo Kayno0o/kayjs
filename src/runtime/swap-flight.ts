@@ -1,4 +1,4 @@
-import type { FetchedPage, Intent, Swap } from './navigation'
+import type { FetchedPage, Intent, LateParts, Swap } from './navigation'
 
 // How a swap goes, read off its intent: the one place a swap decides it.
 export interface Policy {
@@ -32,6 +32,8 @@ export const inFlight: {
   owed?: { key: string, loads: readonly string[] | undefined } | undefined
   // The swap a link, a query change or a traversal has under way, which a refresh waits for rather than supersedes: the visitor asked for it, and the refresh's page would be the one being left.
   asked?: Promise<void> | undefined
+  // The streamed page shown whose blocks are still arriving, which a navigation or a page replacing it stops.
+  late?: LateParts | undefined
   // The click listener of the view transition running, at most one.
   transition?: ((event: MouseEvent) => void) | undefined
   // Whether the commit under way keeps what was typed into the fields the next page renders as they were, which `kay dev` asks of a refresh for an edit.
@@ -39,6 +41,9 @@ export const inFlight: {
   // The selects the commit under way found renamed, whose options show what the next page renders.
   renamed: Set<Element>
 } = { typing: false, renamed: new Set() }
+
+// The script loading a page's entry; the dev tool's scripts lead a page with no islands under `kay dev`, and are no build's entry.
+export const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 
 export const LATE = Symbol('late')
 

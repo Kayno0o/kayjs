@@ -199,6 +199,8 @@ export interface ClientConfig {
   prefetch?: Prefetch | undefined
   // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
   saveData?: boolean | undefined
+  // The longest the browser waits for a page it swaps in place, a string such as '10s' (the default): past it the browser loads the page itself, which shows its own progress or error. A page streaming `await` blocks is shown with their pending branches once its first part is in, and this is then the longest the stream may go without a byte before the blocks still pending are left as they are; the server keeps a stream alive every 5 s, so keep it above that.
+  pageTimeout?: Duration | undefined
 }
 
 // A problem an app's own check reports; `level` is `'error'` unless it says `'warning'`, `file` is relative to the project and defaults to kay.config.ts, and `line` and `column` default to 1.

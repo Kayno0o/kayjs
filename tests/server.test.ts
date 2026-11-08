@@ -1043,7 +1043,7 @@ describe('await blocks', () => {
     for await (const chunk of stream)
       chunks.push(new TextDecoder().decode(chunk))
 
-    expect(chunks[0]).toBe('<html><body>')
+    expect(chunks[0]).toBe('<html><body><!--kay-shell-->')
     expect(chunks[1]).toBe('<!---->')
     expect(chunks[2]).toStartWith('<template data-kay-await="k1">late</template>')
     expect(chunks.at(-1)).toBe('</body></html>')

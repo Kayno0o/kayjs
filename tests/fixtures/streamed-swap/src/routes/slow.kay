@@ -1,0 +1,22 @@
+--- server
+import { gate } from '../gates'
+
+const a = gate('a')
+const b = gate('b')
+---
+head
+  title Slow
+h1 Slow
+a.home(href="/") Home
+input.field
+div.spacer(style="height: 2000px")
+// kay-allow uncaught-await
+await a
+  p.pending Loading A
+then value
+  p.done-a {value}
+// kay-allow uncaught-await
+await b
+  p.pending Loading B
+then value
+  p.done-b {value}

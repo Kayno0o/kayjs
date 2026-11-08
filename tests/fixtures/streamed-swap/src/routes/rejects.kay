@@ -1,0 +1,15 @@
+--- server
+import { gate } from '../gates'
+
+const r = gate('r')
+---
+head
+  title Rejects
+h1 Rejects
+// kay-allow uncaught-await
+await r
+  p.pending Loading R
+then value
+  p.done {value}
+catch
+  p.failed Unavailable
