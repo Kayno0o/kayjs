@@ -4,7 +4,7 @@ import type { Node, NodeOfType } from './estree'
 import type { Path } from './scope'
 import { buildProgram, templateExpressions } from './browser'
 import { parseProgram } from './estree'
-import { importedFromKay } from './rewrite'
+import { importedFromKay } from './rewrite-reads'
 import { walkScope } from './walk'
 
 // What lives until its owner goes: a call with none, or one made when the owner is long done, is never stopped, and `onCleanup` drops its function.

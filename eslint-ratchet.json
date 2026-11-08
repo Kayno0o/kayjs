@@ -139,7 +139,7 @@
     "max-lines": 1097
   },
   "src/compiler/rewrite.ts": {
-    "max-lines": 952
+    "max-lines": 646
   },
   "src/compiler/validate.ts": {
     "max-lines": 756,

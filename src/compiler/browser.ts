@@ -5,7 +5,7 @@ import { visitNodes } from './ast'
 import { isPlainProperty, parseProgram } from './estree'
 import { browserGlobals } from './host'
 import { parameterNames } from './items'
-import { importedFromKay } from './rewrite'
+import { importedFromKay } from './rewrite-reads'
 import { walkScope } from './walk'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
