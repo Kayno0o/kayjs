@@ -68,7 +68,7 @@ function distribution(measured: Map<string, Record<Rule, number>>): void {
   }
 }
 
-// Whether a file is new since the last commit: code split out of a file past a limit lands in new files, which may enter the baseline at the value they have, as the file it left shrank by as much.
+// Whether a file is new since the last commit: code split out of a file past a limit lands in new files, which may enter the baseline at the value they have, as the file it left shrank by as much. Nothing checks that it did (a function moved keeps its size), so the diff of eslint-ratchet.json is what a reviewer reads.
 function isNew(file: string): boolean {
   return Bun.spawnSync(['git', 'cat-file', '-e', `HEAD:${file}`], { cwd: ROOT, stderr: 'ignore' }).exitCode !== 0
 }

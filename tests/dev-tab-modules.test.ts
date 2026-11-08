@@ -59,6 +59,8 @@ describe('the dev tool module', () => {
     const text = await (await app.handle(new Request('http://localhost/_kay/dev/tool.js'))).text()
 
     expect(text).not.toMatch(/\bfrom\s*["']\./)
+    // The start it appends names the entry's own function, which a bundler renames when another module declares the same name.
+    expect(text).toContain('function startDevTool(')
     expect(text).toContain('function startTabOrder')
     expect(text).toContain('function problemsTab')
     expect(text).toMatch(/\nwindow\.\$kayDev = startDevTool\(\)\n/)
