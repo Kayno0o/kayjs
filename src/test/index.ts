@@ -11,7 +11,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeEach, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
-import { clientDir, inOutput, KAY_DIR, testWorker } from '../build/assets'
+import { clientDir, inOutput, KAY_DIR, outputDir, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
 import { KayCompileError } from '../build/transform'
 import { buildingTestSite } from '../config-extensions'
@@ -26,7 +26,7 @@ import { solveWork } from '../runtime/work'
 import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
-import { clientOptionsKey, readManifest } from '../server/client'
+import { clientOptionsKey, readClient, readManifest } from '../server/client'
 import { scheduledOf } from '../server/jobs'
 import { memoryKv } from '../server/kv'
 import { runStopHooks, shutdown } from '../server/lifecycle'
@@ -159,7 +159,8 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
     touchOutput(root, output)
   }
 
-  const stamps = inBrowser ? new BuildStamps(root) : new BuildStamps(root, { output: join(root, KAY_DIR, output), options: recordKey(root, key), testRecord: true })
+  // A site in a browser keeps its record in the default output, where `clientDir(root)` reads the files, with every source stamped as `kay dev` does; a check keeps one of its own, with the stamps of what it read.
+  const stamps = inBrowser ? new BuildStamps(root, { output: outputDir(root), options: recordKey(root, key) }) : new BuildStamps(root, { output: join(root, KAY_DIR, output), options: recordKey(root, key), testRecord: true })
   let running = true
   const build = (async () => {
     try {
@@ -168,7 +169,10 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
     catch {}
 
     try {
-      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(output, async () => await recordFresh(stamps) ? checked(root, output) : buildClient(root, options, stamps)))
+      if (inBrowser)
+        return await recordFresh(stamps) ? await readClient(root) ?? await buildClient(root, options, stamps) : await buildClient(root, options, stamps)
+
+      return await inOutput(output, async () => await recordFresh(stamps) ? checked(root, output) : buildClient(root, options, stamps))
     }
     finally {
       running = false
