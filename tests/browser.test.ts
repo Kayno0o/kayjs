@@ -484,13 +484,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('clicks an element of a page with JavaScript off that draws a declarative shadow root, and names what covers it', async () => {
-    const plain = await site.open('/', { javaScript: false, timeout: '500ms' })
+    // The load keeps the default budget: only the wait for the cover to clear is cut short.
+    const plain = await site.open('/', { javaScript: false })
 
     try {
       await plain.evaluate(() => {
         document.body.setHTMLUnsafe('<span id="host" style="display:block"><template shadowrootmode="open"><a href="#inside" style="display:block">inside</a></template></span><span id="over" style="display:block;position:fixed;inset:0;background:#fff"></span>')
       })
-      await expect(plain.click('#host')).rejects.toThrow('kay: #host is covered by span#over')
+      await expect(plain.click('#host', { timeout: '500ms' })).rejects.toThrow('kay: #host is covered by span#over')
       await plain.evaluate(() => {
         document.getElementById('over')!.remove()
       })
