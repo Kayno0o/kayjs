@@ -73,8 +73,11 @@ export async function followLate(late: LateParts, swapper: Swapper): Promise<voi
     }
   }
   catch (error) {
-    if (!late.stopped)
+    if (!late.stopped) {
       console.warn(error instanceof Error ? error.message : error)
+      // The pending branches stay; an app may offer a retry.
+      document.dispatchEvent(new CustomEvent('kay:navigate-stall', { detail: { url: location.href } }))
+    }
   }
   finally {
     late.stop()

@@ -34,6 +34,7 @@ async function listen(page: TestPage): Promise<void> {
     Object.assign(window, { seen })
     document.addEventListener('kay:navigate', () => seen.navigate++)
     document.addEventListener('kay:navigate-error', () => seen.error++)
+    document.addEventListener('kay:navigate-stall', () => Object.assign(window, { stalled: ((window as unknown as { stalled?: number }).stalled ?? 0) + 1 }))
   })
 }
 
@@ -81,6 +82,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
     release('a', 'A')
     await page.waitFor('p.done-a', { text: 'A' })
     expect(await page.count('p.pending')).toBe(0)
+    expect(await page.evaluate(() => (window as unknown as { stalled?: number }).stalled ?? 0)).toBe(0)
     expect(await seen(page)).toEqual({ navigate: 1, error: 0 })
     expect(hits.a).toBe(1)
     expect(page.errors).toEqual([])
@@ -218,6 +220,10 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
     await using page = await (await site({ client: { pageTimeout: '1s' } })).open('/')
 
     await listen(page)
+    await page.evaluate(() => {
+      (window as unknown as { stalls: string[] }).stalls = []
+      document.addEventListener('kay:navigate-stall', event => (window as unknown as { stalls: string[] }).stalls.push((event as CustomEvent<{ url: string }>).detail.url))
+    })
     await page.click('a.stuck')
     await page.waitFor('p.pending')
     await Bun.sleep(2500)
@@ -226,6 +232,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
     expect(hits.s).toBe(1)
     expect((await seen(page)).error).toBe(0)
     expect(page.warnings.some(warning => warning.includes('stopped streaming'))).toBe(true)
+    expect(await page.evaluate(() => (window as unknown as { stalls: string[] }).stalls.map(url => new URL(url).pathname))).toEqual(['/stuck'])
 
     await page.click('a.home')
     await page.waitFor('h1', { text: 'Home' })
