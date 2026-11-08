@@ -41,12 +41,22 @@ async function linkedIn(modules: string, root: string, walked: Set<string>, into
 
       const target = await resolved(join(folder, entry.name))
 
-      if (target === undefined || walked.has(target) || target.split(sep).includes('node_modules') || contains(target, root) || contains(root, target) || !(await statted(target))?.isDirectory())
+      if (target === undefined || walked.has(target) || target.split(sep).includes('node_modules') || contains(target, root) || contains(root, target) || !(await statted(target))?.isDirectory() || await isKay(target))
         continue
 
       walked.add(target)
       await walk(target, into)
     }
+  }
+}
+
+// A link to kay itself, whose version the stamp holds: its sources, tests and libraries are not the project's types.
+async function isKay(folder: string): Promise<boolean> {
+  try {
+    return (await Bun.file(join(folder, 'package.json')).json() as { name?: unknown }).name === 'kay'
+  }
+  catch {
+    return false
   }
 }
 
