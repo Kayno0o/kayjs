@@ -5,14 +5,16 @@ import { parseSync } from 'oxc-parser'
 type Schema = Record<string, unknown>
 
 // What a probe file starts with: `probe(handler)` has the wire form of what the handler answers.
-// A Date and a bigint are strings, a Map an object and a Set an array, as `json()` writes them, a function is no property, and `unknown` stays `unknown`.
+// A Date and a bigint are strings, a Map an object and a Set an array, as `json()` writes them, an object with `toJSON` is what that returns, a function is `undefined` (no property, `null` in an array), and `unknown` stays `unknown`.
+// A number that is NaN or Infinity is written as `null` and described as a number: the type cannot tell.
 export const WIRE_PRELUDE = `type Wire<T> = unknown extends T ? unknown
   : T extends string | number | boolean | null | undefined ? T
   : T extends bigint | Date ? string
-  : T extends (...args: never[]) => unknown ? never
+  : T extends (...args: never[]) => unknown ? undefined
   : T extends Map<unknown, infer V> ? { [key: string]: Wire<V> }
+  : T extends { toJSON: () => infer R } ? Wire<R>
   : T extends Set<infer V> | readonly (infer V)[] ? Wire<V>[]
-  : T extends object ? { [K in keyof T as T[K] extends (...args: never[]) => unknown ? never : K]: Wire<T[K]> }
+  : T extends object ? { [K in keyof T as [T[K]] extends [(...args: never[]) => unknown] ? never : K]: Wire<T[K]> }
   : never
 declare function probe<T>(handler: (...args: never[]) => T): Wire<Awaited<T>>`
 
@@ -46,7 +48,8 @@ export function outputSchemasOf(declarations: string): Map<string, Schema | unde
 
 const KEYWORDS: Record<string, Schema | undefined> = { TSStringKeyword: { type: 'string' }, TSNumberKeyword: { type: 'number' }, TSBooleanKeyword: { type: 'boolean' }, TSNullKeyword: { type: 'null' } }
 
-function schemaOf(type: TSType): Told {
+// `inArray`: JSON writes `undefined` as `null` in an array, and drops it from an object.
+function schemaOf(type: TSType, inArray = false): Told {
   const keyword = KEYWORDS[type.type]
 
   if (keyword)
@@ -56,7 +59,7 @@ function schemaOf(type: TSType): Told {
     return literalOf(type.literal)
 
   if (type.type === 'TSArrayType')
-    return { type: 'array', items: valueOf(type.elementType) }
+    return { type: 'array', items: valueOf(type.elementType, true) }
 
   if (type.type === 'TSTypeOperator' && type.operator === 'readonly')
     return schemaOf(type.typeAnnotation)
@@ -64,15 +67,18 @@ function schemaOf(type: TSType): Told {
   if (type.type === 'TSTypeLiteral')
     return objectOf(type.members)
 
-  if (type.type === 'TSUnionType')
-    return unionOf(type.types)
+  if (type.type === 'TSUndefinedKeyword' && inArray)
+    return { type: 'null' }
 
-  return type.type === 'TSParenthesizedType' ? schemaOf(type.typeAnnotation) : UNTOLD
+  if (type.type === 'TSUnionType')
+    return unionOf(type.types, inArray)
+
+  return type.type === 'TSParenthesizedType' ? schemaOf(type.typeAnnotation, inArray) : UNTOLD
 }
 
 // Any value where the type is not told.
-function valueOf(type: TSType | undefined): Schema {
-  const told = type ? schemaOf(type) : UNTOLD
+function valueOf(type: TSType | undefined, inArray = false): Schema {
+  const told = type ? schemaOf(type, inArray) : UNTOLD
 
   return told === UNTOLD ? {} : told
 }
@@ -105,10 +111,13 @@ function objectOf(members: Extract<TSType, { type: 'TSTypeLiteral' }>['members']
 
     const name = member.key.type === 'Identifier' ? member.key.name : String(member.key.value)
 
-    properties[name] = valueOf(member.typeAnnotation?.typeAnnotation)
+    const type = member.typeAnnotation?.typeAnnotation
+    const told = type ? schemaOf(type) : UNTOLD
 
-    // JSON drops `undefined`, so a property that may be one may be missing.
-    if (!member.optional && !mayBeUndefined(member.typeAnnotation?.typeAnnotation))
+    properties[name] = told === UNTOLD ? {} : told
+
+    // JSON drops `undefined`, so a property that may be one, as one of a type not told may be, may be missing.
+    if (!member.optional && !mayBeUndefined(type) && told !== UNTOLD)
       required.push(name)
   }
 
@@ -123,13 +132,15 @@ function mayBeUndefined(type: TSType | undefined): boolean {
 }
 
 // `undefined` is what JSON drops, so it leaves the union; a union of constants is an enum.
-function unionOf(types: TSType[]): Told {
-  const told = types.filter(type => type.type !== 'TSUndefinedKeyword').map(schemaOf)
+function unionOf(types: TSType[], inArray: boolean): Told {
+  const told = types.filter(type => inArray || type.type !== 'TSUndefinedKeyword').map(type => schemaOf(type, inArray))
+  const described = told.filter(schema => schema !== UNTOLD)
 
-  if (told.includes(UNTOLD) || told.length === 0)
+  if (described.length < told.length || told.length === 0)
     return UNTOLD
 
-  const schemas = told as Schema[]
+  // `undefined` and `null` in an array are one `null`.
+  const schemas = described.filter((schema, at) => described.findIndex(other => JSON.stringify(other) === JSON.stringify(schema)) === at)
 
   if (schemas.length === 1)
     return schemas[0]!

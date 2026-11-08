@@ -41,7 +41,24 @@ describe('the output schema read from a handler', () => {
         by: { type: 'object', additionalProperties: { type: 'boolean' } },
         any: {},
       },
-      required: ['id', 'at', 'big', 'tags', 'kind', 'next', 'nested', 'seen', 'by', 'any'],
+      required: ['id', 'at', 'big', 'tags', 'kind', 'next', 'nested', 'seen', 'by'],
+    })
+  })
+
+  it('describes what JSON.stringify writes of undefined, functions and toJSON', async () => {
+    const schemas = outputSchemasOf(await emit({
+      odd: '() => ({ holes: [1, undefined] as (number | undefined)[], run: (() => 1) as string | (() => void), money: new Money(), items: [() => 1] })',
+    }, 'class Money { toJSON(): { cents: number } { return { cents: 1 } } }'))
+
+    expect(schemas.get('odd')).toEqual({
+      type: 'object',
+      properties: {
+        holes: { type: 'array', items: { anyOf: [{ type: 'number' }, { type: 'null' }] } },
+        run: { type: 'string' },
+        money: { type: 'object', properties: { cents: { type: 'number' } }, required: ['cents'] },
+        items: { type: 'array', items: { type: 'null' } },
+      },
+      required: ['holes', 'money', 'items'],
     })
   })
 
