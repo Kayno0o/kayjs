@@ -6,6 +6,7 @@ import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
+import { contentOf } from './items'
 import { PROPS } from './names'
 import { bindEvent } from './validate'
 
@@ -66,6 +67,41 @@ export function groupValue(element: ElementNode, text: (span: Span) => string): 
   }
 
   return { text: 'on' }
+}
+
+// Whether the box of a `bind:group` is checked: its group's signal holds the value the box stands for.
+export function addGroupChecked(b: CodeBuilder, group: Span, value: ReturnType<typeof groupValue>): void {
+  b.add(`${GROUP_HAS}((`).addSource(group).add(')(), ')
+
+  if ('text' in value)
+    b.add(JSON.stringify(value.text))
+  else
+    b.add('(').addSource(value.expression).add(')')
+
+  b.add(')')
+}
+
+// Whether the element writes an attribute of that name; a spread may bring one this cannot see.
+export function writesAttribute(element: ElementNode, name: string, src: string): boolean {
+  return element.attributes.some(attribute => attribute.kind !== 'spread' && src.slice(attribute.name.start, attribute.name.end) === name)
+}
+
+// The text of an attribute written as a quoted string.
+export function staticAttributeText(element: ElementNode, name: string, src: string): string | undefined {
+  for (const attribute of element.attributes) {
+    if (attribute.kind === 'static' && src.slice(attribute.name.start, attribute.name.end) === name)
+      return attribute.text
+  }
+
+  return undefined
+}
+
+// The `method` and `enctype` a form posting to an action takes unless it sets its own; multipart whatever the schema, so file inputs post too.
+export function formDefaultsOf(element: ElementNode, src: string): { method: boolean, enctype: boolean } | undefined {
+  if (!actionOf(element, src))
+    return undefined
+
+  return { method: !writesAttribute(element, 'method', src), enctype: !writesAttribute(element, 'enctype', src) }
 }
 
 export type BindRead = 'checked' | 'valueAsNumber' | 'value' | 'open' | 'files' | 'radio' | 'checkbox'
@@ -187,6 +223,16 @@ export interface ElementPlan {
   field: FormField | undefined
   // The `aria-describedby` a refused field or form takes.
   described: { id: string, own?: string } | undefined
+  // What an `a` may do with its `href`, as the server and the browser both write it.
+  link: LinkPlan
+}
+
+// Whether an `a` may leave the site (it then opens in a new tab unless it sets its own `target`, and `rel` is kept when written), goes to the page's locale's copy of what it names, or keeps its `href` as written because it carries `hreflang`.
+export interface LinkPlan {
+  leaving: boolean
+  local: boolean
+  written: boolean
+  rel: boolean
 }
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
@@ -238,10 +284,11 @@ export abstract class TemplateWriter {
       valueText: undefined,
       content: undefined,
       selected: undefined,
-      action: action && { expression: action.expression, method: !this.named(element, 'method'), enctype: !this.named(element, 'enctype') },
+      action: action && { expression: action.expression, ...formDefaultsOf(element, this.src)! },
       target,
       field,
       described,
+      link: { leaving: name === 'a' && !this.named(element, 'target'), local: name === 'a' && !this.named(element, 'hreflang'), written: name === 'a' && this.named(element, 'hreflang'), rel: this.named(element, 'rel') },
     }
 
     const styleProps: StyleProp[] = []
@@ -432,7 +479,7 @@ export abstract class TemplateWriter {
       }
     }
 
-    const children = element.children.filter(child => child.kind !== 'slot')
+    const children = contentOf(element)
 
     if (children.length > 0) {
       props.separate()
@@ -648,15 +695,6 @@ export abstract class TemplateWriter {
     return items
   }
 
-  protected staticAttribute(element: ElementNode, name: string): string | undefined {
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'static' && this.source(attribute.name) === name)
-        return attribute.text
-    }
-
-    return undefined
-  }
-
   // The sources of an element with a spread, with its `style:prop` pairs and `bind:` bindings laid over what the spreads bring, so they merge into the props object as they do on an element without one.
   protected spreadOver(element: ElementNode, sources: () => void): void {
     const { b } = this
@@ -672,7 +710,7 @@ export abstract class TemplateWriter {
       return
     }
 
-    const type = this.staticAttribute(element, 'type') ?? 'text'
+    const type = staticAttributeText(element, 'type', this.src) ?? 'text'
 
     b.add(`${helperName('spreadWith')}([`)
     sources()
@@ -700,16 +738,7 @@ export abstract class TemplateWriter {
         b.add(property === 'files' ? 'undefined' : JSON.stringify(property === 'group' ? 'checked' : property)).add(', () => ')
 
         if (property === 'group') {
-          const value = groupValue(element, span => this.source(span))
-
-          b.add(`${GROUP_HAS}((`).addSource(attribute.expression).add(')(), ')
-
-          if ('text' in value)
-            b.add(JSON.stringify(value.text))
-          else
-            b.add('(').addSource(value.expression).add(')')
-
-          b.add(')')
+          addGroupChecked(b, attribute.expression, groupValue(element, span => this.source(span)))
         }
         else {
           b.add('(').addSource(attribute.expression).add(')()')
@@ -728,10 +757,8 @@ export abstract class TemplateWriter {
 
   // The `method` and `enctype` a form posting to an action takes unless it sets its own, as one more props object.
   protected formDefaults(element: ElementNode): void {
-    if (!actionOf(element, this.src))
-      return
-
-    const defaults = [['method', 'post'], ['enctype', 'multipart/form-data']].filter(([name]) => !this.named(element, name!))
+    const wanted = formDefaultsOf(element, this.src)
+    const defaults = [...wanted?.method ? [['method', 'post']] : [], ...wanted?.enctype ? [['enctype', 'multipart/form-data']] : []]
 
     if (defaults.length > 0)
       this.b.add(`, { ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }`)
@@ -901,7 +928,7 @@ export abstract class TemplateWriter {
   }
 
   protected named(element: ElementNode, name: string): boolean {
-    return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
+    return writesAttribute(element, name, this.src)
   }
 
   protected source(span: Span): string {

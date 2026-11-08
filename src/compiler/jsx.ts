@@ -1,11 +1,11 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
-import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
+import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
-import { addConstValue, addRowItem, slotValue } from './items'
+import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
-import { addBindWrite, bindRead, helperName } from './markup'
+import { addBindWrite, bindRead, formDefaultsOf, helperName, staticAttributeText, writesAttribute } from './markup'
 import { PROPS } from './names'
 import { bindEvent, bindProblem } from './validate'
 
@@ -393,7 +393,7 @@ export class JsxTemplate {
     }
 
     const tag = 'KayLoopFor'
-    const positional = keyedByPosition(node, this.src)
+    const keying = rowKeying(node, this.src)
 
     b.wrap(node, () => {
       b.add(`<${tag} each={`)
@@ -402,10 +402,10 @@ export class JsxTemplate {
 
       b.add('} keyed={')
 
-      if (positional)
+      if (keying.kind === 'positional')
         b.add('false')
-      else if (node.key)
-        b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
+      else if (keying.kind === 'expression')
+        b.add('(').addSource(node.item).add(') => (').addSource(keying.key).add(')')
       // Rows keyed by the item's `id` or the item itself, which any item has.
       else
         b.add('() => 0')
@@ -428,7 +428,7 @@ export class JsxTemplate {
       if (node.index) {
         b.add(', ')
 
-        if (!positional)
+        if (keying.kind !== 'positional')
           this.sites.rows.add(b.code.length)
 
         b.addSource(node.index)
@@ -437,8 +437,8 @@ export class JsxTemplate {
       b.add(') => ')
 
       // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
-      if (positional && this.options.check) {
-        b.add('(void (').addSource(node.key).add('), ')
+      if (keying.kind === 'positional' && this.options.check) {
+        b.add('(void (').addSource(keying.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')
       }
@@ -454,7 +454,7 @@ export class JsxTemplate {
   private emitCheckedFor(node: ForNode) {
     const { b } = this
     const staticLoop = this.options.staticLoops === true
-    const positional = keyedByPosition(node, this.src)
+    const positional = rowKeying(node, this.src).kind === 'positional'
 
     b.wrap(node, () => {
       b.add('{(() => { const kayEach = KayList(')
@@ -613,7 +613,7 @@ export class JsxTemplate {
 
       this.emitAttributes(element)
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
-      const children = element.children.filter(child => child.kind !== 'slot')
+      const children = contentOf(element)
 
       const failed = failedBlockOf(element, this.src)
 
@@ -723,16 +723,14 @@ export class JsxTemplate {
     if (merged)
       this.emitMergedClass(element, classAttributes[0])
 
-    if (actionOf(element, this.src)) {
-      const named = (name: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
+    const defaults = formDefaultsOf(element, this.src)
 
-      if (!named('method'))
-        b.add(' method="post"')
+    if (defaults?.method)
+      b.add(' method="post"')
 
-      // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
-      if (!named('enctype'))
-        b.add(' enctype="multipart/form-data"')
-    }
+    // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
+    if (defaults?.enctype)
+      b.add(' enctype="multipart/form-data"')
   }
 
   // `form(action={add})` posts to the action's URL, and each field `name` inside it must be a key of the action's input.
@@ -757,9 +755,7 @@ export class JsxTemplate {
 
     // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
     if (name === FIELD_ATTRIBUTE) {
-      const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'name')
-
-      if (attribute.kind !== 'static' || named) {
+      if (attribute.kind !== 'static' || writesAttribute(element, 'name', this.src)) {
         b.add('{...{}}')
 
         return true
@@ -903,16 +899,6 @@ export class JsxTemplate {
     }
   }
 
-  // The text of an attribute written as a quoted string.
-  private staticAttribute(element: ElementNode, name: string): string | undefined {
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'static' && this.text(attribute.name) === name)
-        return attribute.text
-    }
-
-    return undefined
-  }
-
   // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
   private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
     const { b } = this
@@ -1031,7 +1017,7 @@ export class JsxTemplate {
       return
     }
 
-    const inputType = this.staticAttribute(element, 'type')
+    const inputType = staticAttributeText(element, 'type', this.src)
 
     if (bindProblem(element, property, inputType))
       return

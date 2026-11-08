@@ -1,6 +1,6 @@
-import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, TextExpression, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, PendingNode, SnippetNode, Span, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import { isHead, isSlot } from './ast'
+import { isHead, isSlot, keyedByPosition } from './ast'
 import { PROPS } from './names'
 import { parsedBindingNames } from './pattern-names'
 
@@ -194,6 +194,24 @@ export function soleDynamic(items: Item[]): boolean {
   const rendered = items.filter(item => !isDeclaration(item))
 
   return rendered.length === 1 && isDynamic(rendered[0]!)
+}
+
+// How a loop matches its rows to their elements, decided once for every target: by position when its `key` names the index, by the `key` expression, else by the row itself (the browser's `rowKey`, a type check's constant).
+export type RowKeying
+  = | { kind: 'positional', key: Span, index: Span }
+    | { kind: 'expression', key: Span }
+    | { kind: 'implicit' }
+
+export function rowKeying(node: ForNode, src: string): RowKeying {
+  if (keyedByPosition(node, src))
+    return { kind: 'positional', key: node.key, index: node.index }
+
+  return node.key ? { kind: 'expression', key: node.key } : { kind: 'implicit' }
+}
+
+// An element's content: its children but the slots, which fill a component's blocks and are no markup of the element.
+export function contentOf(element: ElementNode): Node[] {
+  return element.children.filter(child => child.kind !== 'slot')
 }
 
 // The parameter a loop's block takes for its row: the item as written, or the row's own name when the item is a pattern.

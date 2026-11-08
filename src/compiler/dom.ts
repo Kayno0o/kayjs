@@ -2,12 +2,12 @@ import type { ClassTable } from '../runtime/class-table'
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { Declaration, DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import type { PlannedAttribute } from './markup'
+import type { LinkPlan, PlannedAttribute } from './markup'
 import { mayLeaveSite } from '../runtime/outside'
-import { keyedByPosition, marksServerIsland, modifiersOf } from './ast'
+import { marksServerIsland, modifiersOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
-import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addBindWrite, addGroupChecked, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, groupValue, helperName, RAW_ELEMENTS, START_MARKER, staticAttributeText, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
@@ -261,14 +261,14 @@ export class DomTemplate extends TemplateWriter {
   private for(node: ForNode, at: string): void {
     const { b } = this
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = keyedByPosition(node, this.src)
+    const keying = rowKeying(node, this.src)
 
     b.add(`KayLoop(${at}, () => (`).addSource(node.each).add('), ')
 
-    if (positional)
+    if (keying.kind === 'positional')
       b.add('false')
-    else if (node.key)
-      b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
+    else if (keying.kind === 'expression')
+      b.add('(').addSource(node.item).add(') => (').addSource(keying.key).add(')')
     else
       b.add(helperName('rowKey'))
 
@@ -419,7 +419,7 @@ export class DomTemplate extends TemplateWriter {
     const { b } = this
     const name = element.name
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const children = element.children.filter(child => child.kind !== 'slot')
+    const children = contentOf(element)
     const own: Binding[] = []
     let html = `<${name}${element.fixed ?? ''}`
     let content: string | undefined
@@ -432,7 +432,7 @@ export class DomTemplate extends TemplateWriter {
     }
     else {
       const plan = this.plan(element, this.errors)
-      const { target, field, action, described } = plan
+      const { target, field, action, described, link } = plan
       const followed = element.pendingOf && this.formOf(element.pendingOf)
 
       // An island's block shows while a call of its form's action is in flight, however the handler made it.
@@ -473,16 +473,16 @@ export class DomTemplate extends TemplateWriter {
           case 'text':
             html += attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`
 
-            if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
-              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''});`))
+            if (attribute.name === 'href' && link.leaving && mayLeaveSite(attribute.text))
+              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${link.rel ? ', true' : ''});`))
 
             break
           case 'rooted':
-            this.notesLink(element, attribute.name)
-            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attribute.name)}, ${JSON.stringify(attribute.text)}${this.writtenLink(element, attribute.name) ? ', true' : ''});`))
+            this.notesLink(link, attribute.name)
+            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attribute.name)}, ${JSON.stringify(attribute.text)}${link.written && attribute.name === 'href' ? ', true' : ''});`))
 
-            if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
-              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''});`))
+            if (attribute.name === 'href' && link.leaving && mayLeaveSite(attribute.text))
+              own.push(variable => b.add(`KayOutside(${variable(node)}, ${JSON.stringify(attribute.text)}${link.rel ? ', true' : ''});`))
 
             break
           case 'class':
@@ -511,18 +511,18 @@ export class DomTemplate extends TemplateWriter {
 
             break
           case 'value':
-            this.notesLink(element, attribute.name)
+            this.notesLink(link, attribute.name)
             own.push((variable) => {
               b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(attribute.name)}, `)
 
               if (attribute.action)
                 b.add('KayFormAction((').addSource(attribute.expression).add('))')
-              else if (attribute.name === 'href' && this.leavingLink(element))
-                b.add(`KayOutside(${variable(node)}, (`).addSource(attribute.expression).add(`)${this.named(element, 'rel') ? ', true' : ''})`)
+              else if (attribute.name === 'href' && link.leaving)
+                b.add(`KayOutside(${variable(node)}, (`).addSource(attribute.expression).add(`)${link.rel ? ', true' : ''})`)
               else
                 b.add('(').addSource(attribute.expression).add(')')
 
-              b.add(`${this.writtenLink(element, attribute.name) ? ', true' : ''}));`)
+              b.add(`${link.written && attribute.name === 'href' ? ', true' : ''}));`)
             })
 
             break
@@ -683,20 +683,15 @@ export class DomTemplate extends TemplateWriter {
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
   private bind(element: ElementNode, expression: Span, property: string, variable: string): void {
     const { b } = this
-    const inputType = this.staticAttribute(element, 'type') ?? 'text'
+    const inputType = staticAttributeText(element, 'type', this.src) ?? 'text'
     const event = bindEvent(element, property)
 
     if (property === 'group') {
       const value = groupValue(element, span => this.source(span))
 
-      b.add(`KayEffect(() => KayProperty(${variable}, "checked", ${GROUP_HAS}((`).addSource(expression).add(')(), ')
-
-      if ('text' in value)
-        b.add(JSON.stringify(value.text))
-      else
-        b.add('(').addSource(value.expression).add(')')
-
-      b.add('))); ')
+      b.add(`KayEffect(() => KayProperty(${variable}, "checked", `)
+      addGroupChecked(b, expression, value)
+      b.add(')); ')
     }
     else if (property === 'files') {
       this.bindFiles(expression, variable)
@@ -775,17 +770,8 @@ export class DomTemplate extends TemplateWriter {
     return marksServerIsland(element, name, this.src)
   }
 
-  // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.
-  private leavingLink(element: ElementNode): boolean {
-    return element.name === 'a' && !this.named(element, 'target')
-  }
-
-  private notesLink(element: ElementNode, attribute: string): void {
-    this.writesLinks ||= element.name === 'a' && attribute === 'href' && !this.writtenLink(element, attribute)
-  }
-
-  // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.
-  private writtenLink(element: ElementNode, attribute: string): boolean {
-    return element.name === 'a' && attribute === 'href' && this.named(element, 'hreflang')
+  // A link going to the page's locale's copy of what it names makes the template write links.
+  private notesLink({ local }: LinkPlan, attribute: string): void {
+    this.writesLinks ||= local && attribute === 'href'
   }
 }

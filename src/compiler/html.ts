@@ -1,13 +1,13 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import type { ElementPlan } from './markup'
+import type { ElementPlan, LinkPlan } from './markup'
 import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
-import { actionOf, failedBlockOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
+import { actionOf, failedBlockOf, FIELD_ELEMENTS, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
-import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
-import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addGroupChecked, addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, groupValue, helperName, RAW_ELEMENTS, START_MARKER, staticAttributeText, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
@@ -375,7 +375,7 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (this.options.accessorLoops)
-        b.add(keyedByPosition(node, this.src) ? ', "positional"' : ', "keyed"')
+        b.add(rowKeying(node, this.src).kind === 'positional' ? ', "positional"' : ', "keyed"')
 
       b.add(')')
     })
@@ -498,10 +498,10 @@ export class HtmlTemplate extends TemplateWriter {
   private plainElement(element: ElementNode, markup: Markup): void {
     const { b } = this
     const name = element.name
-    const children = element.children.filter(child => child.kind !== 'slot')
+    const children = contentOf(element)
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
     const plan = this.plan(element, this.options.errors)
-    const { target, field, action, described } = plan
+    const { target, field, action, described, link } = plan
     // What writes the content or the selected value: a bound one reads its signal.
     let content = plan.content && read(plan.content.expression, plan.content.bound)
     const selected = plan.selected && read(plan.selected.expression, plan.selected.bound)
@@ -586,14 +586,9 @@ export class HtmlTemplate extends TemplateWriter {
         const value = groupValue(element, span => this.source(span))
 
         markup.dynamic(() => {
-          b.add(`${helperName('attribute')}("checked", ${GROUP_HAS}((`).addSource(attribute.expression).add(')(), ')
-
-          if ('text' in value)
-            b.add(JSON.stringify(value.text))
-          else
-            b.add('(').addSource(value.expression).add(')')
-
-          b.add('))')
+          b.add(`${helperName('attribute')}("checked", `)
+          addGroupChecked(b, attribute.expression, value)
+          b.add(')')
         })
 
         continue
@@ -659,18 +654,18 @@ export class HtmlTemplate extends TemplateWriter {
         case 'text':
           markup.text(attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
 
-          if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
-            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''})`))
+          if (attribute.name === 'href' && link.leaving && mayLeaveSite(attribute.text))
+            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${link.rel ? ', true' : ''})`))
 
           break
         case 'rooted':
-          if (attribute.name === 'href' && this.localLink(element))
+          if (attribute.name === 'href' && link.local)
             markup.dynamic(() => b.add(`${helperName('attribute')}("href", ${helperName('localHref')}(${JSON.stringify(attribute.text)}))`))
           else
             markup.text(` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
 
-          if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
-            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${this.named(element, 'rel') ? ', true' : ''})`))
+          if (attribute.name === 'href' && link.leaving && mayLeaveSite(attribute.text))
+            markup.dynamic(() => b.add(`${helperName('outsideLink')}(${JSON.stringify(attribute.text)}${link.rel ? ', true' : ''})`))
 
           break
         case 'class':
@@ -691,9 +686,9 @@ export class HtmlTemplate extends TemplateWriter {
           break
         case 'selected':
         case 'value':
-          if (written === 'href' && this.leavingLink(element)) {
+          if (written === 'href' && link.leaving) {
             markup.dynamic(() => {
-              b.add(`${helperName('linkHref')}((`).addSource(attribute.expression).add(`), ${this.localLink(element)}, ${this.named(element, 'rel')})`)
+              b.add(`${helperName('linkHref')}((`).addSource(attribute.expression).add(`), ${link.local}, ${link.rel})`)
             })
 
             break
@@ -704,7 +699,7 @@ export class HtmlTemplate extends TemplateWriter {
 
             if (attribute.kind === 'value' && attribute.action)
               b.add('KayFormAction((').addSource(attribute.expression).add('))')
-            else if (written === 'href' && this.localLink(element))
+            else if (written === 'href' && link.local)
               b.add(`${helperName('localHref')}((`).addSource(attribute.expression).add('))')
             else
               b.add('(').addSource(attribute.expression).add(NUMBER_LITERAL.test(this.source(attribute.expression)) ? '), true' : ')')
@@ -716,7 +711,7 @@ export class HtmlTemplate extends TemplateWriter {
       }
     }
 
-    this.currentLink(element, markup)
+    this.currentLink(element, markup, link)
 
     if (field && target) {
       const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
@@ -916,7 +911,7 @@ export class HtmlTemplate extends TemplateWriter {
   }
 
   // A link to the page being rendered says so, unless it says itself; an island's links are left to it, its markup claimed as the server wrote it.
-  private currentLink(element: ElementNode, markup: Markup): void {
+  private currentLink(element: ElementNode, markup: Markup, { local }: LinkPlan): void {
     if (element.name !== 'a' || this.options.hydratable || this.named(element, 'aria-current'))
       return
 
@@ -925,7 +920,6 @@ export class HtmlTemplate extends TemplateWriter {
     if (!(href?.kind === 'expression' || (href?.kind === 'static' && fromRoot(decodeEntities(href.text)))))
       return
 
-    const local = this.localLink(element)
     // `section` also marks the link on the pages below it.
     const section = sectionOf(element, this.src)
 
@@ -949,16 +943,6 @@ export class HtmlTemplate extends TemplateWriter {
     })
   }
 
-  // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.
-  private leavingLink(element: ElementNode): boolean {
-    return element.name === 'a' && !this.named(element, 'target')
-  }
-
-  // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.
-  private localLink(element: ElementNode): boolean {
-    return element.name === 'a' && !this.named(element, 'hreflang')
-  }
-
   // A form posting to an action renders the action's honeypot field first; an island's sits between comments, as the browser sets it aside while it claims the form's content and puts it back.
   private honeypot(element: ElementNode, emit: () => void): void {
     if (actionOf(element, this.src))
@@ -972,7 +956,7 @@ export class HtmlTemplate extends TemplateWriter {
   // An element with a spread renders through `element`, which reads every attribute the spread brings at render time.
   private spreadElement(element: ElementNode): void {
     const { b } = this
-    const children = element.children.filter(child => child.kind !== 'slot')
+    const children = contentOf(element)
 
     b.add(`${helperName('element')}(${JSON.stringify(element.name)}, `)
     this.spreadOver(element, () => {
@@ -1058,6 +1042,6 @@ export class HtmlTemplate extends TemplateWriter {
   }
 
   private isRadio(element: ElementNode): boolean {
-    return element.attributes.some(attribute => attribute.kind === 'static' && this.source(attribute.name) === 'type' && attribute.text.toLowerCase() === 'radio')
+    return staticAttributeText(element, 'type', this.src)?.toLowerCase() === 'radio'
   }
 }
