@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 import { describeSamples, heldBytes, sampleScope, scopeLimit, sizeForScope } from '../scripts/scope-memory'
@@ -25,7 +25,8 @@ test('the sampler keeps the highest memory.current it saw and every sample', asy
   expect(samples.length).toBeGreaterThan(2)
   expect(samples[0]![1]).toBe(100 * MB)
   expect(samples.at(-1)![1]).toBe(200 * MB)
-  expect(describeSamples({ peak, held: 0, samples })).toStartWith('memory.current by second: 0s=100 ')
+  expect(describeSamples({ peak, held: 0, samples })[0]).toStartWith('memory.current by second: 0s=100 ')
+  expect(describeSamples({ peak, held: 0, samples })[1]).toStartWith('held memory by second: 0s=0 ')
 })
 
 test('the sampler is off where memory.current is not readable', async () => {
@@ -63,8 +64,17 @@ test('a scope under 16 GB gets fewer workers and four runs, a larger or unlimite
   expect(sizeForScope(undefined)).toBeUndefined()
 
   await writeFile(join(folder, 'memory.max'), `${8 * GB}\n`)
-  expect(scopeLimit(folder)).toBe(8 * GB)
+  expect(scopeLimit(folder, folder)).toBe(8 * GB)
   await writeFile(join(folder, 'memory.max'), 'max\n')
-  expect(scopeLimit(folder)).toBeUndefined()
-  expect(scopeLimit(join(folder, 'missing'))).toBeUndefined()
+  expect(scopeLimit(folder, folder)).toBeUndefined()
+  expect(scopeLimit(join(folder, 'missing'), folder)).toBeUndefined()
+
+  const child = join(folder, 'child')
+
+  await mkdir(child)
+  await writeFile(join(child, 'memory.max'), 'max\n')
+  await writeFile(join(folder, 'memory.max'), `${8 * GB}\n`)
+  expect(scopeLimit(child, folder)).toBe(8 * GB)
+  await writeFile(join(child, 'memory.max'), `${4 * GB}\n`)
+  expect(scopeLimit(child, folder)).toBe(4 * GB)
 })

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 // The memory of the cgroup this process runs in, as cgroup v2 keeps it: what a session's scope has peaked at since it started, and how many of its processes the kernel killed for the limit.
 export interface ScopeMemory {
@@ -59,7 +60,7 @@ function scopeFolder(): string | undefined {
 
 const HELD_KEYS = new Set(['anon', 'shmem', 'kernel'])
 
-// The bytes memory.stat lists as held, none where the file is unreadable.
+// The bytes memory.stat lists as held, none where the file is unreadable. `kernel` is listed from Linux 5.19 and counts reclaimable slab too, so it is a slight overestimate.
 export function heldBytes(stat: string | undefined): number | undefined {
   if (stat === undefined)
     return undefined
@@ -118,10 +119,10 @@ export function sampleScope(intervalMs = 1000, folder = scopeFolder()): { stop: 
 }
 
 // The samples as two log lines, memory.current then the held memory: seconds then MB, in order.
-export function describeSamples({ samples }: ScopeSamples): string {
+export function describeSamples({ samples }: ScopeSamples): string[] {
   const series = (label: string, at: 1 | 2) => `${label} by second: ${samples.map(sample => `${sample[0]}s=${Math.round(sample[at] / MB)}`).join(' ')}`
 
-  return `${series('memory.current', 1)})\n(${series('held memory', 2)}`
+  return [series('memory.current', 1), series('held memory', 2)]
 }
 
 const GB = 1024 * MB
@@ -131,11 +132,18 @@ const UNCONSTRAINED = 16 * GB
 const RESERVED = 2 * GB
 const PER_WORKER = 2 * GB
 
-// The memory limit of this process's cgroup in bytes, none where there is none (`max`) or the cgroup is not v2.
-export function scopeLimit(folder = scopeFolder()): number | undefined {
-  const limit = Number(read(`${folder}/memory.max`))
+// The lowest memory limit in bytes of this process's cgroup and its parents, none where there is none (`max`) or the cgroup is not v2: a step run in a child cgroup is held by its parent's limit too.
+export function scopeLimit(folder = scopeFolder(), root = '/sys/fs/cgroup'): number | undefined {
+  let lowest: number | undefined
 
-  return folder === undefined || Number.isNaN(limit) || limit <= 0 ? undefined : limit
+  for (let current = folder; current !== undefined && current.startsWith(root); current = current === root ? undefined : dirname(current)) {
+    const limit = Number(read(`${current}/memory.max`))
+
+    if (!Number.isNaN(limit) && limit > 0)
+      lowest = Math.min(lowest ?? limit, limit)
+  }
+
+  return lowest
 }
 
 // The workers and shards a landing runs the tests with inside `limit` bytes: none where the scope is large or unlimited, so the caller keeps its own defaults. A worker keeps the global of each file that loaded a native addon (oven-sh/bun#46561), so a limited scope gets fewer workers and the suite in four runs.

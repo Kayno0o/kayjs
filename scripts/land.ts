@@ -31,7 +31,7 @@ const TAIL = 30
 const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const MANIFEST = /(?:^|\/)(?:package\.json|bun\.lock)$/
-// A session's scope under 16 GB sizes the test runs itself, as measured: 3 workers and 4 runs in 8 GB.
+// `just land` runs on a dev host and in a session's scope, not in CI, so a memory limit under 16 GB on it sizes the test runs itself, as measured: 3 workers and 4 runs in 8 GB.
 const SIZED = sizeForScope(scopeLimit())
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
 const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || (SIZED?.workers ?? 6)}`
@@ -158,7 +158,7 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
   await reader.cancel()
   const sampled = sampler?.stop()
 
-  await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n${sampled === undefined ? '' : `(${describeSamples(sampled)})\n`}\n`)
+  await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n${sampled === undefined ? '' : describeSamples(sampled).map(line => `(${line})\n`).join('')}\n`)
 
   const seconds = Math.round((performance.now() - started) / 1000)
   const peak = sampled === undefined ? '' : `, peak ${Math.round(sampled.peak / 1024 / 1024)} MB with the cache, ${Math.round(sampled.held / 1024 / 1024)} MB held`
