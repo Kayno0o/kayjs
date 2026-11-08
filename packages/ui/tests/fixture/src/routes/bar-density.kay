@@ -1,0 +1,17 @@
+---
+import '../app.css'
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+
+const days = Array.from({ length: 365 }, (_, index) => new Date(Date.UTC(2025, 0, 1 + index)).toISOString().slice(0, 10))
+const month = Array.from({ length: 30 }, (_, index) => `${25 + index % 6} Oct`)
+const values = (seed: number) => days.map((_, index) => (index * seed) % 7 + 1)
+---
+main(style="width: 100%; padding: 0")
+  article#year
+    BarChart(label="Watch time" labels={days} xLabels stacked series={[{ name: 'Movies', values: values(3) }, { name: 'Shows', values: values(5) }, { name: 'Music', values: values(2) }]})
+  article#side-by-side
+    BarChart(label="Watch time" labels={days} series={[{ name: 'Movies', values: values(3) }, { name: 'Shows', values: values(5) }]})
+  article#month
+    BarChart(label="Days" labels={month} xLabels series={[{ name: 'Runs', values: month.map((_, index) => index + 1) }]})
+  article#week
+    BarChart(label="Days" labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']} xLabels series={[{ name: 'Runs', values: [1, 2, 3, 4, 5, 6, 7] }]})

@@ -8,6 +8,8 @@ A series has a `name` and one value per label, and the bars draw in plain HTML o
 
 `xLabels` draws up to five labels under the bars. `formatValue` formats the y-axis, the tooltips and what screen readers hear, `formatLabel(label, context)` the x-axis labels and the tooltip headings, as LineChart's does, and `legend` names the series under the chart, by default once there is more than one.
 
+The gap between the columns is `--bar-gap` (`0.25rem`) and shrinks as the columns get narrow, so any number of labels fits the figure; set `--bar-gap` on the chart to change it. The first and the last x-axis label line up with the plot's edges and stay inside the figure.
+
 The value axis spans the highest reading rounded up to 1, 2, 4, 6, 8 or 10 times a power of ten, so its three ticks are round numbers: 31 reads 0, 20 and 40.
 
 ## Colour and notes per bar

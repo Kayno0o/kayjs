@@ -18,12 +18,14 @@ const look = recipe({
     plot: 'relative ml-10 h-[var(--chart-height,12rem)] border-solid border-[length:var(--border-width)] border-border border-t-transparent border-r-transparent border-l-transparent',
     grid: 'absolute inset-x-0 h-px bg-border',
     tick: 'absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums',
-    columns: 'absolute inset-0 flex gap-1',
+    // The gap is `--bar-gap` (4px), shrunk so that all the gaps take 40% of the width at most: a year of columns still fits its plot, and an app sets `--bar-gap` on the figure.
+    columns: 'absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-lit:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
-    axis: 'ml-10 flex gap-1',
-    axisLabel: 'flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    axis: 'ml-10 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
+    // The first and the last label line up with the plot's edges, so a label wider than its slot spills inward and not out of the figure.
+    axisLabel: 'flex min-w-0 flex-1 justify-center data-[edge=start]:justify-start data-[edge=end]:justify-end text-2xs whitespace-nowrap text-[var(--color-muted)]',
     tooltip: TOOLTIP_LOOK,
     legend: 'm-0 flex list-none flex-wrap gap-4 p-0 pl-1',
     legendItem: 'flex items-center gap-1.5 text-xs text-muted',
@@ -72,6 +74,8 @@ const times = memo(() => labelTimes(labels))
 const shown = memo(() => new Set(xLabels ? tickIndices(labels.length) : []))
 const axisTexts = memo(() => tickTexts(labels, times(), formatLabel))
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
+const gaps = () => `--bar-gaps: ${Math.max(labels.length - 1, 1)}`
+const edge = (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
 
 // The bar the keyboard stands at, the latest one until it moves.
@@ -159,7 +163,7 @@ else
       for tick of ticks() key={tick.ratio}
         span(part="grid" aria-hidden="true" style={`bottom: ${tick.ratio * 100}%`})
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
-      div(part="columns")
+      div(part="columns" style={gaps()})
         for _, at of labels key={at}
           if markKind(link(at)?.href, onSelect !== undefined) === 'link'
             a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
@@ -174,9 +178,9 @@ else
       div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}
     if xLabels
-      div(part="axis" aria-hidden="true")
+      div(part="axis" aria-hidden="true" style={gaps()})
         for _, at of labels key={at}
-          span(part="axisLabel") {shown().has(at) ? axisTexts()[at] : ''}
+          span(part="axisLabel" data-edge={edge(at)}) {shown().has(at) ? axisTexts()[at] : ''}
     if legend ?? series.length > 1
       ul(part="legend")
         for item, index of series key={item.name}
