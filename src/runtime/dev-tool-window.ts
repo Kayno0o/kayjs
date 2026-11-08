@@ -5,14 +5,24 @@ import { ARROWS, BAR_HEIGHT, boxOf, clamp, DRAG_START, fitBox, follow, KEY_GRIPS
 
 // Where the bar and the drawer sit in the window and how they move: the corner, the dock, the size, dragging the bar and the head, resizing from an edge. Split from dev-tool.ts, which opens and closes them.
 
-export interface Placement {
+interface Placement {
   // Lays the bar and drawer out as the layout says, within the window as it is now.
   place: () => void
   // Whether the press that just ended dragged the bar, so its click opens nothing.
   dragged: () => boolean
 }
 
-export function startPlacement(doc: Document, win: Window, state: DevState, layout: DevLayout, saveLayout: () => void, shell: Shell, pageSheet: CSSStyleSheet): Placement {
+interface PlacementParts {
+  doc: Document
+  win: Window
+  state: DevState
+  layout: DevLayout
+  saveLayout: () => void
+  shell: Shell
+  pageSheet: CSSStyleSheet
+}
+
+export function startPlacement({ doc, win, state, layout, saveLayout, shell, pageSheet }: PlacementParts): Placement {
   const { ui, bar, mark, drawer, head, size, docks, grips } = shell
   // The window less its scrollbars, which a fixed element's edges stop at.
   const room = (): Room => ({ width: doc.documentElement.clientWidth || win.innerWidth, height: doc.documentElement.clientHeight || win.innerHeight })

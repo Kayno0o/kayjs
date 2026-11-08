@@ -135,9 +135,6 @@
   "src/compiler/parser.ts": {
     "max-lines": 1097
   },
-  "src/compiler/rewrite.ts": {
-    "max-lines": 646
-  },
   "src/compiler/validate.ts": {
     "max-lines": 756,
     "complexity": 89
@@ -267,7 +264,7 @@
     "max-lines-per-function": 322
   },
   "src/server/render-document.ts": {
-    "complexity": 97
+    "complexity": 94
   },
   "src/server/render.ts": {
     "max-lines": 731

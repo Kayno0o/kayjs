@@ -219,7 +219,6 @@ export interface Rendering {
   prerender?: DevRequest['prerender']
 }
 
-// Per set of islands and per chain of layouts: few exist, and they never change for a build. The stylesheets go by their map, which a server under `kay dev` swaps whole for a stylesheet edit.
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g

@@ -35,7 +35,7 @@ import { routerPath } from './base'
 import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
-import { BACK_PARAMETER, crossSiteResponse, isCrossSite, postedFrom } from './cross-site'
+import { BACK_PARAMETER, crossSiteResponse, isCrossSite, postedFrom, TEXT } from './cross-site'
 import { fieldMessage, refusedFields, validated } from './field-errors'
 import { fileBodyLimit } from './file-limit'
 import { handOver, submittedValues, writeSuccess } from './flash'
@@ -80,8 +80,6 @@ function refusalMessage(action: ServerAction<TSchema, unknown>, { status, retryA
 
   return typeof words === 'string' ? words : words(retryAfter)
 }
-
-const TEXT = 'text/plain; charset=utf-8'
 
 // What describes the post's body, or would have the page come back compressed or as a call.
 const POST_HEADERS = ['content-type', 'content-length', 'transfer-encoding', 'accept-encoding', 'x-kay-action', PAGE_HEADER, 'origin']

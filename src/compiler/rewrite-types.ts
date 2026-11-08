@@ -42,7 +42,7 @@ export interface RewriteInput {
 }
 
 // What the final pass applies.
-export interface RewritePlan {
+interface RewritePlan {
   rewrites: Rewrites
   // True when the component reads a `t` nothing declares or imports: the translation function, which the compiler imports.
   translates: boolean

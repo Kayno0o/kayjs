@@ -31,7 +31,7 @@ export interface TabEntry {
   badge: HTMLButtonElement
 }
 
-export interface TabParts {
+interface TabParts {
   doc: Document
   make: DevTool['make']
   shell: Shell

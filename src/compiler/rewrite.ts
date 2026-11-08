@@ -8,7 +8,8 @@ import type { ConstantSignal, FoundRewrites, RewriteInput, Rewrites } from './re
 import type { Binding, Path, Scope } from './scope'
 import { parseProgram } from './estree'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
-import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, signatureNames, sourceSpan, SPACE, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { Scanner } from './rewrite-scan'
 import { analyze } from './scope'
 
 type ArrowFunctionExpression = NodeOfType<'ArrowFunctionExpression'>
@@ -50,7 +51,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
     return { plan: { rewrites: new Map(), translates: false, values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
   }
 
-  return new RewriteFinder(input, comments).run(ast)
+  return new RewriteFinder(input, new Scanner(input.code, comments)).run(ast)
 }
 
 // One walk over the analysis pass, each concern of it in a method of its own: signals, props, rows, template `const`s, `listen` targets and `load`'s reads.
@@ -79,77 +80,8 @@ class RewriteFinder {
   // The root names of every `typeof` query: one inside a function type's parameter or a type literal's member is no reference of its binding to Babel.
   private readonly typeQueries: Path<Identifier>[] = []
 
-  // Where each comment of the generated code begins and ends, which the text between a node and its parentheses may hold.
-  private readonly commentEnds = new Map<number, number>()
-  private readonly commentStarts = new Map<number, number>()
-
-  constructor(private readonly input: RewriteInput, comments: readonly Comment[]) {
-    for (const comment of comments) {
-      this.commentEnds.set(comment.end, comment.start)
-      this.commentStarts.set(comment.start, comment.end)
-    }
-  }
-
-  // The offsets of the opening parentheses just before `at`, the nearest first and none before `floor`: oxc leaves the parentheses of an expression out of its span, as `@babel/parser`'s `extra.parenStart` did.
-  private parensBefore(at: number, floor: number): number[] {
-    const { code } = this.input
-    const found: number[] = []
-    let index = at
-
-    while (true) {
-      let moved = true
-
-      while (moved) {
-        moved = false
-
-        while (index > floor && SPACE.test(code[index - 1]!))
-          index--
-
-        const start = this.commentEnds.get(index)
-
-        if (start !== undefined && start >= floor) {
-          index = start
-          moved = true
-        }
-      }
-
-      if (index - 1 < floor || code[index - 1] !== '(')
-        return found
-
-      found.push(index - 1)
-      index--
-    }
-  }
-
-  // Whether the parentheses around a node are written, as an assignment's target or an update's operand may be.
-  private parenthesized(node: Node): boolean {
-    const { code } = this.input
-    const before = this.parensBefore(node.start, 0)[0]
-
-    if (before === undefined)
-      return false
-
-    let index = node.end
-
-    while (index < code.length && (SPACE.test(code[index]!) || this.commentStarts.has(index)))
-      index = this.commentStarts.get(index) ?? index + 1
-
-    return code[index] === ')'
-  }
-
-  // Whether a comma stands between two offsets outside the comments, as before the closing parenthesis of a call.
-  private trailingComma(from: number, to: number): boolean {
-    for (let index = from; index < to; index++) {
-      const end = this.commentStarts.get(index)
-
-      if (end !== undefined)
-        index = end - 1
-      else if (this.input.code[index] === ',')
-        return true
-    }
-
-    return false
-  }
+  // `scan` reads the parentheses and commas the generated code holds around a node.
+  constructor(private readonly input: RewriteInput, private readonly scan: Scanner) {}
 
   run(ast: Program): FoundRewrites {
     for (const path of analyze(ast).events)
@@ -382,14 +314,14 @@ class RewriteFinder {
     const [value] = call.node.arguments as [Node]
     const holder = call.parent
 
-    if (value.type === 'SpreadElement' || value.type === 'ArrowFunctionExpression' || value.type === 'FunctionExpression' || this.trailingComma(value.end, call.node.end - 1))
+    if (value.type === 'SpreadElement' || value.type === 'ArrowFunctionExpression' || value.type === 'FunctionExpression' || this.scan.trailingComma(value.end, call.node.end - 1))
       return
 
     if (holder.type !== 'ExpressionStatement' && !(holder.type === 'ArrowFunctionExpression' && holder.body === call.node))
       return
 
     // A parenthesized argument's span leaves its parentheses out, so the value runs from the first one to the call's closing parenthesis; the nearest opening parenthesis before the farthest is the call's own.
-    const valueFrom = this.parensBefore(value.start, member.node.end).at(-2) ?? value.start
+    const valueFrom = this.scan.parensBefore(value.start, member.node.end).at(-2) ?? value.start
     const { code } = this.input
 
     // The fix rewrites the text from the name to the value, so a parenthesized callee, a type argument or a comment there leaves the call alone.
@@ -436,7 +368,7 @@ class RewriteFinder {
     const right = assignment?.right
     const start = map.isExact(node.start) ? map.toSource(node.start) : undefined
     // A parenthesized right side's span leaves its parentheses out, so the span runs from the first one to the assignment's end, keeping them.
-    const rightFrom = assignment && right && (this.parensBefore(right.start, assignment.left.end).at(-1) ?? right.start)
+    const rightFrom = assignment && right && (this.scan.parensBefore(right.start, assignment.left.end).at(-1) ?? right.start)
     const rightStart = rightFrom !== undefined && map.isExact(rightFrom) ? map.toSource(rightFrom) : undefined
     const rightEnd = right && map.isExact(node.end - 1) ? map.toSource(node.end - 1) : undefined
 
@@ -785,7 +717,7 @@ class RewriteFinder {
     const { map } = this.input
     const assignment = node.type === 'AssignmentExpression' ? node : undefined
     const right = assignment?.right
-    const rightFrom = assignment && right && (this.parensBefore(right.start, assignment.left.end).at(-1) ?? right.start)
+    const rightFrom = assignment && right && (this.scan.parensBefore(right.start, assignment.left.end).at(-1) ?? right.start)
     const at = (offset: number | undefined) => offset !== undefined && map.isExact(offset) ? map.toSource(offset) : undefined
 
     return { start: at(node.start), last: at(node.end - 1), rightFrom: at(rightFrom) }
@@ -796,11 +728,11 @@ class RewriteFinder {
     const { code } = this.input
     const { rewrites, writes } = this
 
-    if (this.parenthesized(target) || object.type === 'Super' || object.type === 'ThisExpression' || property.type === 'PrivateIdentifier' || holdsNoSignalRoot(path, object))
+    if (this.scan.parenthesized(target) || object.type === 'Super' || object.type === 'ThisExpression' || property.type === 'PrivateIdentifier' || holdsNoSignalRoot(path, object))
       return
 
     // Where the property is reached: the `.` before its name, or the `[` and `]` around its key.
-    const keyFrom = this.parensBefore(property.start, object.end).at(-1) ?? property.start
+    const keyFrom = this.scan.parensBefore(property.start, object.end).at(-1) ?? property.start
     const open = lastNonSpace(code, keyFrom)
     const close = computed ? nextNonSpace(code, property.end, ')') : -1
 
@@ -808,7 +740,7 @@ class RewriteFinder {
       return
 
     const { map } = this.input
-    const objectFrom = this.parensBefore(object.start, target.start).at(-1) ?? object.start
+    const objectFrom = this.scan.parensBefore(object.start, target.start).at(-1) ?? object.start
     const pieces = [objectFrom, open, ...computed ? [close] : []]
 
     if (!pieces.every(piece => map.isExact(piece)))

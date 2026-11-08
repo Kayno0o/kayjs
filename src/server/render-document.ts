@@ -2,8 +2,9 @@ import type { ErrorPageContext } from '../runtime'
 import type { Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
-import type { EntryRef } from '../runtime/fields'
+import type { EntryRef, FieldMarks } from '../runtime/fields'
 import type { HeadOptions, HeadTag, RenderedHead } from '../runtime/head'
+import type { Seed } from '../runtime/live-resource.server'
 import type { QueryRules } from '../runtime/query-param'
 import type { ClientBuild } from './client'
 import type { BodyPieces, FixedText } from './compress'
@@ -63,17 +64,17 @@ export function projectPath(file: string): string {
   return relative(process.cwd(), file)
 }
 
-export function htmlOpen(lang: string, attributes: string): string {
+function htmlOpen(lang: string, attributes: string): string {
   return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}${attributes}>`
 }
 
 // The charset and viewport kay gives a page that sets neither, around what must come first in the head.
-export function headStart(head: RenderedHead): string {
+function headStart(head: RenderedHead): string {
   return `${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}`
 }
 
 // What the islands read off the page: the mount point, where the API is when `apiPath` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
-export function kayMetas(options: RenderOptions, hasIslands: boolean): string {
+function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.serve?.apiPath !== undefined && options.serve?.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.serve?.apiPath)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.client?.pageTimeout === undefined ? '' : `<meta name="kay-page-timeout" content="${durationMs(options.client.pageTimeout)}">`) + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
 
   if (!hasIslands)
@@ -82,7 +83,7 @@ export function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
 }
 
-export function devScripts(client: ClientBuild, files: string[], late: boolean): string {
+function devScripts(client: ClientBuild, files: string[], late: boolean): string {
   return problemsBlock(client.problems) + typeProblemsBlock() + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT + (late ? '' : pageClassesBlock(client, files) + STYLES_SCRIPT)
 }
 
@@ -110,7 +111,7 @@ function pageClassesBlock(client: ClientBuild, files: string[]): string {
 }
 
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.
-export function requestBlock(files: string[], rendering: Rendering, base: string): string {
+function requestBlock(files: string[], rendering: Rendering, base: string): string {
   const { loads } = rendering
   const state = localeState()
   // A host of its own is a protocol-relative address, which the base does not prefix.
@@ -143,7 +144,7 @@ export function requestBlock(files: string[], rendering: Rendering, base: string
 
 // The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.
 // What the post sent stays out: a field the server cannot tell is a secret, such as a password field named `confirm`, or the honeypot's text, would show in the page's source.
-export function outcomeScript(outcome: Outcome | null): string {
+function outcomeScript(outcome: Outcome | null): string {
   if (!outcome)
     return ''
 
@@ -214,7 +215,7 @@ export function piecesOf(fixed: FixedText[] | undefined, files: string[], sheets
 }
 
 // The stylesheets of the layouts, outermost first, then the page's.
-export function stylesheets(client: ClientBuild, files: string[]): string {
+function stylesheets(client: ClientBuild, files: string[]): string {
   if (client.styles.size === 0)
     return ''
 
@@ -237,7 +238,7 @@ export function stylesheets(client: ClientBuild, files: string[]): string {
 }
 
 // Marked, so a page running the islands' entry that swaps this page in neither runs nor preloads it.
-export function navigationScripts(client: ClientBuild): string {
+function navigationScripts(client: ClientBuild): string {
   return `${client.navEntryImports!.map(chunk => `<link rel="modulepreload" href="${chunk}" ${NAVIGATION_ENTRY}>`).join('')}<script type="module" src="${client.navEntry}" ${NAVIGATION_ENTRY}></script>`
 }
 
@@ -245,7 +246,7 @@ export function navigationScripts(client: ClientBuild): string {
 // A page without islands needs no hydration script, only the entry swapping pages.
 // `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
 // One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
-export function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
+function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
   const immediate = saving?.immediate
   const waiting = saving?.waiting
 
@@ -278,6 +279,7 @@ export function islandScripts(client: ClientBuild, islands: Set<string>, streame
 }
 
 // One text per key and owner, made the first time it is asked for.
+// Per set of islands and per chain of layouts: few exist, and they never change for a build. The stylesheets go by their map, which a server under `kay dev` swaps whole for a stylesheet edit.
 function perOwner<Owner extends object>(): (owner: Owner, key: string, make: () => string) => string {
   const caches = new WeakMap<Owner, Map<string, string>>()
 
@@ -305,7 +307,7 @@ export interface EditorModule {
 export const editors = new Map<string, EditorModule>()
 
 // The head a page starts from, a page or a layout above it saying `noindex` asking search engines to leave it out; a layout or the page may still set its own `robots`.
-export function pageHead(modules: PageModule[], head: HeadOptions | undefined): HeadOptions | undefined {
+function pageHead(modules: PageModule[], head: HeadOptions | undefined): HeadOptions | undefined {
   if (chainSetting(modules, 'noindex') !== true)
     return head
 
@@ -383,6 +385,33 @@ function noted(request: Request, entries: EntryRef[]): EntryRef[] {
   return entries
 }
 
+// The page the editor renders once the page did, given each entry the page read.
+function withEditor(view: () => unknown, marks: FieldMarks, editor: EditorModule, request: Request): () => unknown {
+  return () => {
+    const page = child(view())
+    const entries = noted(request, entriesInPageOrder(marks, page))
+    // Placed here for the editor to be told what the markers left out; the page is placed again with the head, finding nothing more to place in this part.
+    const placed = placeFieldMarks(page, marks)
+
+    return html(placed + child(editor.default({ entries, unclickable: unclickableFields(marks, placed), persist: true })))
+  }
+}
+
+// Each deferred block reads the values the page's resources held, as the pass it was made in is gone when it settles.
+function seedBlocks(deferred: PendingBlock[], seeds: ReadonlyMap<string, Seed>): void {
+  for (const block of deferred) {
+    const { ready, failed, fallback } = block
+
+    block.ready = value => withSeeds(seeds, () => ready(value))
+
+    if (failed)
+      block.failed = error => withSeeds(seeds, () => failed(error))
+
+    if (fallback)
+      block.fallback = error => withSeeds(seeds, () => fallback(error))
+  }
+}
+
 function documentOf(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions, rules: QueryRules | undefined, entry?: HeadTag[]): string | Pieced | ReadableStream<Uint8Array> {
   const view = viewOf(modules, data, entry)
   const chunks = islandChunks(client)
@@ -393,16 +422,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const file = marks === undefined ? undefined : options.editor
   const editor = file === undefined ? undefined : editors.get(file)
   // The editor renders once the page did, given each entry the page read, kept alive by the page swap, which hands it the next page's.
-  const shown = marks === undefined || editor === undefined
-    ? view
-    : () => {
-      const page = child(view())
-      const entries = noted(rendering.ctx.request, entriesInPageOrder(marks, page))
-      // Placed here for the editor to be told what the markers left out; the page is placed again with the head, finding nothing more to place in this part.
-      const placed = placeFieldMarks(page, marks)
-
-      return html(placed + child(editor.default({ entries, unclickable: unclickableFields(marks, placed), persist: true })))
-    }
+  const shown = marks === undefined || editor === undefined ? view : withEditor(view, marks, editor, rendering.ctx.request)
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: markup, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
@@ -418,21 +438,8 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 
   const seeded = resourcesUsed()
 
-  if (seeded !== undefined && seeded.size > 0) {
-    const seeds = new Map(seeded)
-
-    for (const block of deferred) {
-      const { ready, failed, fallback } = block
-
-      block.ready = value => withSeeds(seeds, () => ready(value))
-
-      if (failed)
-        block.failed = error => withSeeds(seeds, () => failed(error))
-
-      if (fallback)
-        block.fallback = error => withSeeds(seeds, () => fallback(error))
-    }
-  }
+  if (seeded !== undefined && seeded.size > 0)
+    seedBlocks(deferred, new Map(seeded))
 
   const streamed = deferred.length > 0
 
@@ -491,7 +498,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 }
 
 // Takes the rejection of a promise whose render was dropped.
-export async function held(value: PendingBlock['value']): Promise<void> {
+async function held(value: PendingBlock['value']): Promise<void> {
   if (!(value instanceof Promise))
     return
 

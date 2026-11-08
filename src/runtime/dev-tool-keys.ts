@@ -4,7 +4,18 @@ import type { TabEntry } from './dev-tool-tabs'
 
 // The keyboard of the drawer: the arrows between the tabs, and the shortcut that opens and closes it. Split from dev-tool.ts.
 
-export function startKeys(win: Window, host: HTMLElement, root: ShadowRoot, tabList: Shell['tabList'], state: DevState, tabs: TabEntry[], openTab: (id: string | undefined, focus?: boolean) => void, closeDrawer: (focus?: boolean) => void): () => void {
+interface KeyParts {
+  win: Window
+  host: HTMLElement
+  root: ShadowRoot
+  tabList: Shell['tabList']
+  state: DevState
+  tabs: TabEntry[]
+  openTab: (id: string | undefined, focus?: boolean) => void
+  closeDrawer: (focus?: boolean) => void
+}
+
+export function startKeys({ win, host, root, tabList, state, tabs, openTab, closeDrawer }: KeyParts): () => void {
   // Up and Down, Home and End move between the tabs, as a vertical tab list's do.
   tabList.onkeydown = (event) => {
     const index = tabs.findIndex(tab => tab.button === root.activeElement)

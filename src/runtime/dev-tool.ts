@@ -164,7 +164,7 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
   const showWhere = () => {
     where.textContent = `${win.location.pathname}${win.location.search}`
   }
-  const { place, dragged } = startPlacement(doc, win, state, layout, saveLayout, shell, pageSheet)
+  const { place, dragged } = startPlacement({ doc, win, state, layout, saveLayout, shell, pageSheet })
   const render = () => {
     const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
 
@@ -243,7 +243,7 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
       openTab(undefined)
   }
   close.onclick = () => closeDrawer(true)
-  const stopKeys = startKeys(win, host, root, tabList, state, tabs, openTab, closeDrawer)
+  const stopKeys = startKeys({ win, host, root, tabList, state, tabs, openTab, closeDrawer })
 
   let opener: ((source: string) => Promise<string | undefined>) | undefined
   let problems: { stop: () => void } | undefined

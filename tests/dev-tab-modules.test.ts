@@ -33,7 +33,7 @@ describe('the dev tool tab modules', () => {
   it('keeps each constant a tab module copies the same as the one it is copied from', async () => {
     const constants = async (file: string) => new Map([...(await Bun.file(join(SRC, file)).text()).matchAll(CONSTANT)].map(match => [match[1]!, match[2]!]))
     const parts = await Promise.all([...new Bun.Glob('dev-tool-*.ts').scanSync({ cwd: SRC })].map(async file => constants(file)))
-    const sources = [new Map([...await constants('dev-tool.ts'), ...parts.flatMap(part => [...part])]), await constants('server-islands.ts')]
+    const sources = [new Map(parts.flatMap(part => [...part])), await constants('server-islands.ts')]
     const compared = new Set<string>()
 
     for (const file of new Bun.Glob('dev-tab-*.ts').scanSync({ cwd: SRC })) {

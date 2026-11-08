@@ -27,7 +27,7 @@ function shown(value: string): string {
   return `${text.slice(0, cut)}...`
 }
 
-const TEXT = 'text/plain; charset=utf-8'
+export const TEXT = 'text/plain; charset=utf-8'
 
 // The 403 for a request `isCrossSite` refused, saying what it sent and what kay took for the site, so a proxy changing the host is fixed in one step.
 export function crossSiteResponse(request: Request, what: 'action' | 'request', site?: string): Response {
