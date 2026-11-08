@@ -1,5 +1,5 @@
 import type { Piece, Provider, Step } from '../src'
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { s } from 'kay'
 import { ai, AiError, ask, fakeAi, tool } from '../src'
 
@@ -109,10 +109,24 @@ describe('retry', () => {
 
   it('never waits past maxWait for a Retry-After just under it', async () => {
     const provider = scripted(call => call === 1 ? new AiError('rate-limited', 'slow', { retryAfter: 0.2 }) : says('ok'))
-    const began = performance.now()
+    // The jitter at its largest, read off the timer the retry sleeps on rather than the clock, which a loaded runner stretches.
+    const random = spyOn(Math, 'random').mockReturnValue(0.999)
+    const timer = spyOn(globalThis, 'setTimeout')
+    let waits: number[]
 
-    expect(await ask('hi', { provider, retry: { backoff: '1ms', maxWait: '201ms' } })).toBe('ok')
-    expect(performance.now() - began).toBeLessThan(260)
+    // Restoring a spy forgets its calls, so they are read first.
+    try {
+      expect(await ask('hi', { provider, retry: { backoff: '1ms', maxWait: '201ms' } })).toBe('ok')
+    }
+    finally {
+      waits = timer.mock.calls.map(([, ms]) => ms ?? 0).filter(ms => ms >= 100)
+      random.mockRestore()
+      timer.mockRestore()
+    }
+
+    expect(waits).toHaveLength(1)
+    expect(waits[0]).toBeGreaterThanOrEqual(200)
+    expect(waits[0]).toBeLessThanOrEqual(201)
   })
 
   it('stops after attempts requests with the last error', async () => {
