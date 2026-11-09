@@ -1,0 +1,4 @@
+--- server
+const count = await Promise.resolve(3)
+---
+p Loaded {count}

@@ -2,6 +2,7 @@ import type { Elysia as App } from 'elysia'
 import type { ObserveConfig } from '../config'
 import type { RequestContext } from './render'
 import { kayLog } from '../runtime/log'
+import { restoreStartedHeaders } from './own-headers'
 import { describeError, sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { RequestTimeoutError, timedOutResponse } from './request-timeout'
@@ -26,6 +27,8 @@ export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean,
 
     if (!isUncaught(error, code))
       return undefined
+
+    restoreStartedHeaders(request, locals.set)
 
     reportServerError(error, request, onError)
 

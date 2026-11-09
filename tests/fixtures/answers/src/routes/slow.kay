@@ -1,0 +1,4 @@
+--- server
+const count = await new Promise<number>(() => undefined)
+---
+p Never {count}

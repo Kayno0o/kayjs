@@ -91,7 +91,7 @@ export function pageHeaderCopies(security: Record<string, string> | undefined): 
 function startingPageHeaders(context: RequestContext, copies: HeaderCopies | undefined): Headers {
   const set = (context as { set?: Context['set'] }).set
 
-  return (copies && set ? startingHeaders(set, copies) : undefined) ?? new Headers(HTML_HEADERS)
+  return (copies && set ? startingHeaders(set, copies, context.request) : undefined) ?? new Headers(HTML_HEADERS)
 }
 
 // The refreshed loads development already warned of, by route, so a button asking for one does not fill the log.
@@ -778,7 +778,7 @@ export async function renderUncaught(error: unknown, special: SpecialPages, cont
   return renderForViewer('<error>', context, options, async rendering => renderFailure(error, special, rendering, new Map(), client, options))
 }
 
-function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts }: RenderOptions, contextKeys?: readonly string[]): Rendering {
+function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts, pageHeaders }: RenderOptions, contextKeys?: readonly string[]): Rendering {
   const { request } = context
 
   if (contexts !== undefined && contexts.length > 0)
@@ -802,7 +802,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return readOnce()
   }
-  const headers = new Headers(HTML_HEADERS)
+  const headers = startingPageHeaders(context, pageHeaders)
   const url = new URL(request.url)
 
   withoutShareToken(url)

@@ -1,0 +1,4 @@
+--- server
+const count = await Promise.reject<number>(new Error('load down'))
+---
+p Never {count}

@@ -88,6 +88,31 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get('/nothing'), 404, {})
   })
 
+  it('a page with a load carries them, and so does the error page a failed load renders after it', async () => {
+    const loaded = await get('/loaded')
+
+    expect(await loaded.text()).toContain('Loaded 3')
+    await expectAnswer(loaded, 200, { 'content-type': 'text/html; charset=utf-8', 'vary': 'Save-Data, accept-encoding' })
+
+    const failed = await get('/failing')
+    const { 'content-security-policy': policy, ...seen } = shape(failed)
+
+    expect(failed.status).toBe(500)
+    expect(policy).toBeDefined()
+    expect(seen).toMatchObject(SECURITY)
+  })
+
+  it('a page keeps a header the app set on the context beside them', async () => {
+    const outer = new Elysia().onRequest(({ set }) => {
+      set.headers['x-app'] = 'mine'
+    }).use(app)
+    const response = await outer.handle(new Request(`${ORIGIN}/loaded`))
+
+    expect(response.headers.get('x-app')).toBe('mine')
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response.headers.get('x-request-id')).toMatch(REQUEST_ID)
+  })
+
   it('a HEAD answer carries the same', async () => {
     const response = await get('/', {}, { method: 'HEAD' })
     const { 'content-length': length, 'content-security-policy': policy, ...seen } = shape(response)
@@ -220,6 +245,19 @@ describe('the headers of every kind of answer', () => {
     expect(response.headers.get('content-security-policy')).toBe(page)
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('x-request-id')).toMatch(REQUEST_ID)
+  })
+
+  it('a page that runs out of time is answered with them, as text and as the error page', async () => {
+    const slow = await pages({ root: dir, prebuilt: false, observe: { log: false }, serve: { timeout: '50ms' }, store: { files: memoryFiles() } })
+
+    for (const accept of ['*/*', 'text/html']) {
+      const response = await slow.handle(new Request(`${ORIGIN}/slow`, { headers: { accept } }))
+      const { 'content-security-policy': policy, ...seen } = shape(response)
+
+      expect(response.status).toBeGreaterThanOrEqual(500)
+      expect(policy).toBeDefined()
+      expect(seen).toMatchObject(SECURITY)
+    }
   })
 })
 

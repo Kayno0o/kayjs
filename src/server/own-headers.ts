@@ -62,12 +62,18 @@ export function ownHeadersInit(set: Context['set'], copies: HeaderCopies, hooked
   return copies.plain
 }
 
+// What `startingHeaders` took off a request's context, so another response made for the same request (a render run again for the viewer) starts from them too, and an answer to an error thrown after it gets them back.
+const started = new WeakMap<Request, { own: Record<string, string>, hooked: Record<string, string> }>()
+
 // The headers a response made by kay itself starts with when the context holds nothing but what the request hooks put there: the security headers, the request id and the build, taken off it so Elysia has nothing to copy the response for. Undefined when the app or an extension set a header on the context too, for the caller to build its headers as before.
-export function startingHeaders(set: Context['set'], copies: HeaderCopies): Headers | undefined {
-  const own = takeOwnHeaders(set, copies.hooked)
+export function startingHeaders(set: Context['set'], copies: HeaderCopies, request?: Request): Headers | undefined {
+  const own = (request && started.get(request)?.own) ?? takeOwnHeaders(set, copies.hooked)
 
   if (own === undefined)
     return undefined
+
+  if (request)
+    started.set(request, { own, hooked: copies.hooked })
 
   const headers = new Headers(copies.securedHeaders)
 
@@ -193,4 +199,18 @@ function takeOwnHeaders(set: Context['set'], hooked?: Record<string, string>): R
     delete set.headers[name]
 
   return own
+}
+
+// Puts back on the context what `startingHeaders` took off it for a request, for an answer made after it by Elysia or an error hook to carry them.
+export function restoreStartedHeaders(request: Request, set: Context['set'] | undefined): void {
+  const taken = started.get(request)
+
+  if (taken === undefined || set === undefined)
+    return
+
+  for (const name in taken.hooked)
+    set.headers[name] ??= taken.hooked[name]!
+
+  for (const name in taken.own)
+    set.headers[name] ??= taken.own[name]!
 }
