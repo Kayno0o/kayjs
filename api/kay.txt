@@ -4199,6 +4199,7 @@ interface TestPage
   reload: () => Promise<void>
   responses: PageResponse[]
   route: (match: RouteMatch, handler: RouteHandler) => Promise<void>
+  tap: (selector: string, options?: PointerOptions | undefined) => Promise<void>
   text: (selector: string) => Promise<null | string>
   type: (text: string) => Promise<void>
   unroute: (match?: RouteMatch | undefined) => Promise<void>

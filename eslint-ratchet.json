@@ -279,8 +279,8 @@
     "max-lines-per-function": 189
   },
   "src/test/browser.ts": {
-    "max-lines": 958,
-    "max-lines-per-function": 513
+    "max-lines": 882,
+    "max-lines-per-function": 471
   },
   "src/test/content.ts": {
     "max-lines-per-function": 178

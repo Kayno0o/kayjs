@@ -430,6 +430,7 @@ The page clicks and types as a user does.
 | --- | --- |
 | `click(selector, { modifiers })` | Scrolls to the element once the page finished loading, waits until it is visible, still and not covered, and clicks, holding the keys in `modifiers` such as `['Alt']`. Covered at the middle of the view, by a fixed bar for instance, it is scrolled to the other alignments and aimed at the first point of its box nothing covers, once it keeps still (up to about a second); covered everywhere, it fails naming what covers it |
 | `hover(selector, { at })` | Scrolls to the element once the page finished loading and moves the pointer onto its middle, where it stays; `at: { x, y }` aims at a point in CSS pixels from its top-left corner instead, such as a spot of a canvas, and `click` takes `at` too |
+| `tap(selector, { at })` | Touches the element once the page finished loading and lifts the finger, as a tap on a touch screen: the page gets pointer events whose `pointerType` is `touch`, then a click |
 | `drag(from, to, { steps, at, to, hold })` | Presses the pointer on `from`, moves it to `to` in `steps` moves (8 by default) and releases it, so a test of a sortable list or a board needs no raw DevTools mouse events; `at` and `to` in the options aim at a point of the source and of the target instead of its middle, and `hold` in milliseconds rests on `from` first and drags with touch events |
 | `fill(selector, text)` | Replaces a field's text, as typing does, once the field's island hydrated |
 | `type(text)`, `press(key)` | Type or press a key in the focused element |

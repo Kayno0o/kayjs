@@ -4,9 +4,9 @@ import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { LogEntry } from '../server/log'
-import type { BrowserOptions, TestPage } from './browser'
 import type { TestContent } from './content'
 import type { PageReading } from './page'
+import type { BrowserOptions, TestPage } from './page-types'
 
 export interface TestOptions extends PagesOptions {
   // Headers every request of the site sends unless the call gives one of the same name, such as an `authorization` bearer token; `site.as()` adds to them.

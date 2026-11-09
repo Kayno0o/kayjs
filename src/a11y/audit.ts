@@ -1,5 +1,5 @@
 import type { KayConfig } from '../config'
-import type { TestPage } from '../test/browser'
+import type { TestPage } from '../test/page-types'
 import type { Skipped, Target } from './targets'
 import process from 'node:process'
 import { mountedAt } from '../dev/base-proxy'
