@@ -164,7 +164,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (cors)
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
 
-      const guarded = group
+      const guarded = group.onTransform(plainParams)
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted, set }) => {
           // The module a request matched, as the first hook of its group saw it.
@@ -510,6 +510,14 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 
   // Left on the context, Elysia merges it into the copy, which no earlier request's headers are on.
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
+}
+
+// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation.
+function plainParams(context: { params?: Record<string, unknown> }): void {
+  const { params } = context
+
+  if (params !== undefined && Object.getPrototypeOf(params) !== Object.prototype)
+    context.params = { ...params }
 }
 
 // Input the route's `body`, `query`, `params` or `headers` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.
