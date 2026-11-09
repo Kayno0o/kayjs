@@ -254,7 +254,7 @@
   .kui-btn {
     --shell-line: var(--color-input);
     --shell-fill: var(--color-background);
-    @apply inline-flex cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
+    @apply inline-flex cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-[calc(150ms*var(--motion-scale))];
   }
 
   /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
