@@ -148,13 +148,13 @@ export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesCo
 const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
 const HOST_LIKE = /^(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?|[\w.-]+:\d+)$/
 
-// The origin and the display name the options give: `site` is the origin, which has a scheme.
 // The keys are derived as `auth()` is made when it has a secret of its own, or a session that cannot derive one, so a bad one fails there; the session's is derived on first use.
 function checkKeys(core: Core, options: { secret?: string | string[] | undefined, sessions: { deriveSecret?: unknown } }): void {
   if (options.secret !== undefined || options.sessions.deriveSecret === undefined)
     void core.keys
 }
 
+// The origin and the display name the options give: `site` is the origin, which has a scheme.
 function siteOptions(options: { site?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
   const site = options.site
 
