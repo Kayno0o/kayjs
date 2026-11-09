@@ -12,7 +12,6 @@ The confirmation view of a list got the origin, its footer got the host: both no
 
 `for x, i of xs` with `i` read nowhere is reported by `unread-name`, as an unused `const` is, whatever `noUnusedParameters` says. `kay upgrade` (or `kay check --fix`) drops the `, i` and keeps the item and the `key`; to keep an index nothing reads, write it `_i`.
 
-
 ## 1.93.0
 
 ### The kayjs-ui prop names 1.89 deprecated are gone

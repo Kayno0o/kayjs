@@ -11,6 +11,7 @@ export default api()
   .get('/tags/:tag', ({ params }) => ({ tag: params.tag }), { params: s.Object({ tag: s.String({ minLength: 2 }) }) })
   .get('/rest/:id/*', ({ params }) => ({ id: params.id, rest: params['*'] }))
   .get('/free/:id', ({ params }) => ({ id: params.id }))
+  .get('/opt/:id/:other?', ({ params }) => ({ id: params.id, other: params.other ?? null }))
 `
 
 let dir = ''
@@ -48,6 +49,8 @@ describe('an api route with a params schema over real HTTP', () => {
 
       expect(await (await fetch(`${origin}/api/temtem/tags/a%2Fb/`)).json()).toEqual({ tag: 'a/b' })
       expect(await (await fetch(`${origin}/api/temtem/rest/a%2Fb/c%2Fd`)).json()).toMatchObject({ id: 'a/b' })
+      expect(await (await fetch(`${origin}/api/temtem/opt/a%2Fb`)).json()).toEqual({ id: 'a/b', other: null })
+      expect(await (await fetch(`${origin}/api/temtem/opt/a%2Fb/c%2Fd`)).json()).toEqual({ id: 'a/b', other: 'c/d' })
       // A malformed escape keeps the value Bun decoded, as before.
       expect(await (await fetch(`${origin}/api/temtem/free/%E0%A4%A`)).json()).toEqual({ id: '��A' })
     }

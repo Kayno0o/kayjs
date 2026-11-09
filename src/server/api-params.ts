@@ -12,9 +12,9 @@ export function decodedRoute(path: string): { transform?: typeof decodedParams }
 
 // The hooks of a route Elysia registered itself, with the decoding in front of its `transform` ones.
 export function withDecodedParams(route: { method: string, path?: string, hooks?: unknown }): unknown {
-  const hooks = route.hooks as { transform?: unknown } | undefined
+  const hooks = route.hooks as { params?: unknown, transform?: unknown } | undefined
 
-  if (hooks && route.method !== 'WS' && NAMED_SEGMENT.test(route.path ?? ''))
+  if (hooks && route.method !== 'WS' && (hooks.params !== undefined || NAMED_SEGMENT.test(route.path ?? '')))
     hooks.transform = [decodedParams, ...[hooks.transform ?? []].flat()]
 
   return hooks
@@ -38,10 +38,24 @@ function reread(params: Record<string, unknown>, pattern: string, url: string): 
   const end = url.search(QUERY_OR_HASH)
   const given = url.slice(start, end === -1 ? undefined : end).split('/')
   const names = pattern.split('/')
-  const found: Record<string, string> = {}
+  const slashed = given.at(-1) === '' && names.at(-1) !== ''
+  let best: Record<string, string> = {}
 
-  // A pattern without a wildcard ends where the path does, whatever a base puts before it, and a trailing slash is one segment more.
-  const offset = names.includes('*') ? 0 : given.length - names.length - (given.at(-1) === '' && names.at(-1) !== '' ? 1 : 0)
+  // A pattern without a wildcard ends where the path does, whatever a base puts before it, less the optional params left out and the trailing slash; the spelling recovering the most values is the one the path has.
+  const ends = names.includes('*') ? [0] : Array.from({ length: names.length - names.findLastIndex(name => !name.endsWith('?')) }, (_, left) => given.length - names.length + left - (slashed ? 1 : 0))
+
+  for (const offset of ends) {
+    const found = values(params, names, given, offset)
+
+    if (Object.keys(found).length > Object.keys(best).length)
+      best = found
+  }
+
+  return best
+}
+
+function values(params: Record<string, unknown>, names: string[], given: string[], offset: number): Record<string, string> {
+  const found: Record<string, string> = {}
 
   for (const [index, name] of names.entries()) {
     const raw = given[index + offset]
