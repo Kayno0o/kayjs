@@ -650,15 +650,15 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     if (this.ended)
       return
 
+    clearTimeout(this.timer)
+
     if ((this.count[0]() === 0 && !this.unread) || this.paused) {
-      clearTimeout(this.timer)
       this.failures = 0
 
       return
     }
 
     if (this.offline) {
-      clearTimeout(this.timer)
       this.timer = setTimeout(() => void this.sync(), RETRY_MS[Math.min(this.failures++, RETRY_MS.length - 1)])
     }
   }
