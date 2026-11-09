@@ -78,6 +78,11 @@ export function appSecrets(): string[] | undefined {
   return mode === 'development' || mode === 'test' ? [devSecret('KAY_SECRET', mode)] : undefined
 }
 
+// Whether the config's secret was read already, as a `session()` made before it cannot take it.
+export function appSecretsRead(): boolean {
+  return configuredSecrets !== undefined
+}
+
 // A script or a job that signs before any server set the secret up takes the app's own (`KAY_SECRET`, or the checkout's in development and tests) instead of the key of its process, which no other process shares. Does nothing once a secret is set.
 export function useScriptSecret(): void {
   if (secret.from !== 'process')

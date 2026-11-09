@@ -15,6 +15,7 @@ import { setupPreview, previewUrl } from '${ROOT}/src/server/preview'
 Date.now = () => 1_000_000
 const signature = (secret) => { setupPreview(secret === undefined ? {} : { secret }, ''); return previewUrl('/') }
 const build = (secret) => new Elysia().use(session(secret === undefined ? { store: false } : { secret, store: false })).get('/set', async ({ session }) => { await session.set('n', 1); return 'ok' }).get('/get', async ({ session }) => String(await session.get('n') ?? 'none'))
+const booted = async (app) => { try { app.listen({ port: 0, hostname: '127.0.0.1' }) } finally { await app.stop(true) } return app }
 const cookieOf = async (app) => (await app.handle(new Request('http://localhost/set'))).headers.getSetCookie().find(c => c.startsWith('kay_session=')).split(';')[0]
 const read = async (app, cookie) => (await (await app.handle(new Request('http://localhost/get', { headers: { cookie } }))).text())
 `
@@ -39,6 +40,49 @@ console.log(JSON.stringify([await read(build(), sealed), await read(build('${FIR
 
     expect(err).not.toContain('error')
     expect(out).toEqual(['1', '1', 'none'])
+  })
+
+  it('reads the config secret and its rotation list for a session() made before the config, as a module loads', async () => {
+    const { out, err } = await isolated(`
+const early = build()
+const sealedByFirst = await cookieOf(build('${FIRST}'))
+const sealedBySecond = await cookieOf(build('${SECOND}'))
+
+setupStampSecret(['${SECOND}', '${FIRST}'])
+const fresh = await cookieOf(early)
+console.log(JSON.stringify([await read(early, sealedByFirst), await read(early, sealedBySecond), await read(build('${SECOND}'), fresh), await read(build('${FIRST}'), fresh)]))
+`, { NODE_ENV: 'production' })
+
+    expect(err).not.toContain('error')
+    expect(out).toEqual(['1', '1', '1', 'none'])
+  })
+
+  it('reads KAY_SECRET for a session() made first when the config sets none, and a config secret wins over it', async () => {
+    const early = async (config: string) => isolated(`
+const early = build()
+${config}
+const sealed = await cookieOf(early)
+console.log(JSON.stringify([await read(build('${FIRST}'), sealed), await read(build('${SECOND}'), sealed)]))
+`, { KAY_SECRET: FIRST, NODE_ENV: 'production' })
+
+    expect((await early('')).out).toEqual(['1', 'none'])
+    expect((await early(`setupStampSecret('${SECOND}')`)).out).toEqual(['none', '1'])
+  })
+
+  it('still refuses a session() with no secret anywhere as the server starts, not at the first request', async () => {
+    const { out } = await isolated(`
+const app = build()
+try {
+  app.listen({ port: 0, hostname: '127.0.0.1' })
+  console.log(JSON.stringify('started'))
+}
+catch (error) {
+  console.log(JSON.stringify(error.message))
+}
+process.exit(0)
+`, { NODE_ENV: 'production' })
+
+    expect(String(out)).toContain('session() has no secret')
   })
 
   it('warns in production of a secret long enough but of few different characters, in a session and in the config, and not of a random one', async () => {
@@ -136,7 +180,7 @@ console.log(JSON.stringify([await read(build('${SECOND}'), sealed), await read(b
   it('refuses a session with no secret anywhere in production, naming where it goes', async () => {
     const { out, err, code } = await isolated(`
 try {
-  build()
+  await booted(build())
 }
 catch (error) {
   console.log(JSON.stringify(error.message))
@@ -150,10 +194,10 @@ catch (error) {
   })
 
   it.each([
-    ['KAY_SECRET', 'KAY_SECRET', { KAY_SECRET: 'too-short' }, 'build()'],
+    ['KAY_SECRET', 'KAY_SECRET', { KAY_SECRET: 'too-short' }, 'await booted(build())'],
     ['KAY_SECRET read by setup', 'KAY_SECRET', { KAY_SECRET: 'too-short' }, 'setupStampSecret(undefined)'],
     ['`secret` in the config', 'kay.config.ts', {}, 'setupStampSecret(\'too-short\')'],
-    ['a secret in the list', 'at least 32', { KAY_SECRET: `${FIRST},too-short` }, 'build()'],
+    ['a secret in the list', 'at least 32', { KAY_SECRET: `${FIRST},too-short` }, 'await booted(build())'],
   ])('refuses a short %s', async (_name, message, env, call) => {
     const { out } = await isolated(`
 try {
@@ -171,7 +215,7 @@ catch (error) {
   it('treats an empty KAY_SECRET as none', async () => {
     const { out } = await isolated(`
 try {
-  build()
+  await booted(build())
 }
 catch (error) {
   console.log(JSON.stringify(error.message))
@@ -235,7 +279,7 @@ console.log(JSON.stringify([own, child.stdout.toString()]))
   it('derives none outside development and test, so a script of no mode asks for the secret', async () => {
     const { out } = await isolated(`
 try {
-  build()
+  await booted(build())
 }
 catch (error) {
   console.log(JSON.stringify(error.message))

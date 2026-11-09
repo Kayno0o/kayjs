@@ -126,7 +126,7 @@ kay has one secret, `KAY_SECRET` (or `secret` in `kay.config.ts`, which wins), a
 
 Development and tests derive one for the checkout, so a fresh clone runs with nothing set. A production site without it refuses `session()` and `preview`, naming `KAY_SECRET`, and refuses to start at all. `KAY_EPHEMERAL_SECRET=1` starts a single throwaway server anyway. A secret of fewer than 10 different characters warns in production.
 
-`session()` reads it from the environment when it is called. Keep the secret in `KAY_SECRET`, or give `session({ secret })` yourself.
+`session()` reads it on first use, or as the server starts, so a `session()` made as a module loads follows `secret` in `kay.config.ts` and its rotation list as well as `KAY_SECRET`. Give `session({ secret })` to keep the session's own.
 
 ### Signing your own links
 

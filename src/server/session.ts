@@ -23,7 +23,7 @@ import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, warnLowEntropy, weakSecrets } from './seal'
 import { keepCookiesPrivate } from './security'
-import { appSecrets, noAppSecret, useStampSecret } from './stamp'
+import { appSecrets, appSecretsRead, noAppSecret, useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
 
@@ -161,30 +161,45 @@ function openDefaultSessions(): SessionStore {
   return defaultSessions
 }
 
-const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
+interface SessionSecrets {
+  texts: string[]
+  keys: Buffer[]
+}
 
-// Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
-// The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
-export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
+// The secret the cookie is sealed with, the session's own or the app's, checked and handed to what signs stamps.
+function sessionSecrets(options: SessionOptions): SessionSecrets {
   const fallback = options.secret === undefined ? appSecrets() : undefined
 
   if (options.secret === undefined && fallback === undefined)
     throw noAppSecret('session()')
 
-  const secrets = [options.secret ?? fallback!].flat()
+  const texts = [options.secret ?? fallback!].flat()
 
-  if (weakSecrets(secrets))
+  if (weakSecrets(texts))
     throw new KayError('config-invalid', `kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
 
-  if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
+  if (texts.some(secret => PUBLISHED_SECRETS.has(secret)))
     throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
-  warnLowEntropy(secrets, 'a session secret')
+  warnLowEntropy(texts, 'a session secret')
+  useStampSecret(texts, 'session')
 
   // The key of each secret is derived for the cookie.
-  const keys = secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay session cookie', 32)))
+  return { texts, keys: texts.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay session cookie', 32))) }
+}
 
-  useStampSecret(secrets, 'session')
+const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
+
+// Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
+// The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
+export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
+  // A secret of its own, or the config's once it is read, is settled now; a `session()` made as a module loads comes before the config, so the app's secret is read on first use, or as the server starts.
+  let sealing: SessionSecrets | undefined
+  const secrets = (): SessionSecrets => sealing ??= sessionSecrets(options)
+
+  if (options.secret !== undefined || appSecretsRead())
+    secrets()
+
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
 
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
@@ -193,10 +208,14 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), keys, onCreate: options.onCreate, onDestroy: options.onDestroy, revokedElsewhere: false }
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), get keys() {
+    return secrets().keys
+  }, onCreate: options.onCreate, onDestroy: options.onDestroy, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .onStart(() => {
+      secrets()
+
       if (process.env.NODE_ENV === 'production')
         config.store()
     })
@@ -224,7 +243,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     })
 
   // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; a list of 43-character texts in the order of the secrets, one for a single secret.
-  const deriveSecret = (purpose: string): string[] => secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
+  const deriveSecret = (purpose: string): string[] => secrets().texts.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
 
   // A library keeping its own record of each session, kayjs-auth, tells the plugin it refuses a cookie whose session it ended, so the plugin has no revoking left to warn about.
   const endsSessionsElsewhere = (): void => {
