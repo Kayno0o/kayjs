@@ -151,7 +151,8 @@ function extendedConfig(dir: string, name: string): string | undefined {
 export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = '', timeout = CHECK_TIMEOUT): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
   const state = join(cache, 'check', program)
-  const args = ['check', '--no-pretty', '--all', '--noUnusedLocals', '--listFiles', '-p', tsconfig]
+  // Two threads: one per core held 20% more memory and spent more CPU on docs, for half the wall time.
+  const args = ['check', '--no-pretty', '--all', '--noUnusedLocals', '--listFiles', '--threads=2', '-p', tsconfig]
   // The resolved config lists the root files, so one added or removed changes it as an edited option does.
   const slot = shown === undefined ? undefined : { file: join(state, 'clean.json'), key: JSON.stringify([Bun.revision, args, shown]) }
   const last = slot && await readCacheEntry<CleanRun>(slot)
