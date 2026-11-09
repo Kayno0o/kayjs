@@ -1,6 +1,10 @@
+---
+import Crumbs from '../components/crumbs.kay'
+---
 head
   title Sections
 main
+  Crumbs(persist)
   h1 Sections
   section#install
     h2 Install

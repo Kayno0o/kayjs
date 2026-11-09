@@ -129,6 +129,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
     const live = old.querySelector<KeptIsland>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)
 
     if (live && live.dataset.component === placeholder.dataset.component) {
+      markCurrent(live, placeholder)
       keep(placeholder, live)
 
       const props = placeholder.dataset.props
@@ -218,6 +219,28 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   if (policy.scroll === 'top') {
     for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
       parent.scrollTo(0, 0)
+  }
+}
+
+// The marks of the next page's copy of an island kept, a link to the page now shown, `aria-current`, carried over to the links of the one that lives on, found by their place and address: those that differ are left, as the island renders them itself.
+function markCurrent(live: Element, next: Element): void {
+  const links = live.querySelectorAll('a[href]')
+  const fresh = next.querySelectorAll('a[href]')
+
+  if (links.length !== fresh.length)
+    return
+
+  for (const [index, link] of links.entries()) {
+    const copy = fresh[index]!
+    const mark = copy.getAttribute('aria-current')
+
+    if (link.getAttribute('href') !== copy.getAttribute('href') || link.getAttribute('aria-current') === mark)
+      continue
+
+    if (mark === null)
+      link.removeAttribute('aria-current')
+    else
+      link.setAttribute('aria-current', mark)
   }
 }
 

@@ -3033,6 +3033,33 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
   })
 
+  it('marks the links of an island in the server HTML, and carries the next page\'s marks over to one a swap keeps', async () => {
+    const mark = async (link: string) => page.evaluate((selector: string) => document.querySelector(selector)!.getAttribute('aria-current'), `a.${link}`)
+
+    await page.goto(`${origin}/sections`)
+    await page.waitFor('button.crumbs-toggle', { text: 'Closed' })
+
+    // As the server wrote them, claimed by the hydrated island.
+    expect([await mark('c-one'), await mark('c-two')]).toEqual(['page', null])
+
+    await page.evaluate(() => {
+      (document.querySelector('nav.crumbs') as HTMLElement & { kayMark?: string }).kayMark = 'kept'
+    })
+    await page.click('a.c-two')
+    await page.waitFor('h1', { text: 'Sections two' })
+
+    expect(await page.evaluate(() => (document.querySelector('nav.crumbs') as HTMLElement & { kayMark?: string }).kayMark)).toBe('kept')
+    expect([await mark('c-one'), await mark('c-two')]).toEqual([null, 'page'])
+
+    await page.back()
+    await page.waitFor('h1', { text: 'Sections' })
+
+    expect([await mark('c-one'), await mark('c-two')]).toEqual(['page', null])
+    // Still the island that hydrated: it answers a click.
+    await page.click('button.crumbs-toggle')
+    await page.waitFor('button.crumbs-toggle', { text: 'Open' })
+  })
+
   it('announces the title when focus goes to a hash target', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

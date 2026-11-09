@@ -118,7 +118,7 @@ With nested layouts, the block goes to the nearest layout above the page that de
 
 A link to the page being shown gets `aria-current="page"`. Add `section` to a link to a section, `a(href="/blog" section)`, and it also gets `aria-current="true"` on the pages below it, `/blog/hello` included, so a header can light it with no path passed down. `section={open}` takes a boolean, for a link that is a section only sometimes.
 
-The home link is never marked that way, and a link without `section`, such as a pagination `prev`, is lit on its own page only. Style them with `aria-[current=page]:font-bold` and `aria-[current=true]:font-bold` in Tailwind, or `[aria-current]` in CSS.
+Links inside an island are marked too, and one that stays across a page swap (`persist`) follows the page. The home link is never marked that way, and a link without `section`, such as a pagination `prev`, is lit on its own page only. Style them with `aria-[current=page]:font-bold` and `aria-[current=true]:font-bold` in Tailwind, or `[aria-current]` in CSS.
 
 ## Page settings
 

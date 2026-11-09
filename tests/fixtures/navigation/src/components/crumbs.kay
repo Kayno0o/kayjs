@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+
+const open = signal(false)
+---
+nav.crumbs
+  button.crumbs-toggle(onClick={() => open.set(!open())}) {open() ? 'Open' : 'Closed'}
+  a.c-one(href="/sections") One
+  a.c-two(href="/sections-two" section) Two

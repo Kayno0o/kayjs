@@ -1,0 +1,8 @@
+---
+import Crumbs from '../components/crumbs.kay'
+---
+head
+  title Sections two
+main
+  Crumbs(persist)
+  h1 Sections two

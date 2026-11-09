@@ -1,0 +1,12 @@
+---
+import { signal } from 'kay'
+
+const open = signal(false)
+---
+nav.menu
+  button(onClick={() => open.set(!open())}) Menu
+  a.m-home(href="/" section) Home
+  a.m-docs(href="/docs" section) Docs
+  a.m-guide(href="/docs/guide") Guide
+  a.m-own(href="/docs" aria-current="false") Own
+  a.m-query(href="/docs?x=1") Query

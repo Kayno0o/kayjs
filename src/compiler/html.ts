@@ -912,9 +912,9 @@ export class HtmlTemplate extends TemplateWriter {
     markup.text(`</${name}>`)
   }
 
-  // A link to the page being rendered says so, unless it says itself; an island's links are left to it, its markup claimed as the server wrote it.
+  // A link to the page being rendered says so, unless it says itself; an island's too, its markup claimed as the server wrote it, and the swap of a page keeping the island carries the next page's marks over.
   private currentLink(element: ElementNode, markup: Markup, { local }: LinkPlan): void {
-    if (element.name !== 'a' || this.options.hydratable || this.named(element, 'aria-current'))
+    if (element.name !== 'a' || this.named(element, 'aria-current'))
       return
 
     const href = element.attributes.find(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'href')
