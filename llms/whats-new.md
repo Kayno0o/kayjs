@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- A hover that was still waiting when a link was pressed or clicked no longer fetches its page a second time once the navigation took the prefetched one, which on a loaded machine left a streamed page on a request nothing answered ([navigation](navigation-from-code.md)).
+- A link pressed or clicked while its hover prefetch was still waiting no longer fetches its page a second time, so a page is requested once per visit on a slow machine too ([navigation](navigation-from-code.md)).
 
 ## 1.93.0
 
