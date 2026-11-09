@@ -12,9 +12,6 @@ The confirmation view of a list got the origin, its footer got the host: both no
 
 `for x, i of xs` with `i` read nowhere is reported by `unread-name`, as an unused `const` is, whatever `noUnusedParameters` says. `kay upgrade` (or `kay check --fix`) drops the `, i` and keeps the item and the `key`; to keep an index nothing reads, write it `_i`.
 
-### A path value holding an encoded slash keeps it encoded
-
-kay needs Elysia 1.4.31, which keeps a `%2F` in a path as one segment and hands it on encoded: `/api/notes/a%2Fb` gives `params.id` the value `a%2Fb`, where it used to be `a/b`. A handler that wants the slash decodes it, `decodeURIComponent(params.id)`; a `..` written in the path never reaches it.
 
 ## 1.93.0
 

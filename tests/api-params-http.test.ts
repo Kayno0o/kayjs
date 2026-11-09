@@ -9,6 +9,8 @@ const DEX = `import { api, s } from 'kay/server'
 export default api()
   .get('/dex/:number', ({ params }) => ({ number: params.number, kind: typeof params.number }), { params: s.Object({ number: s.Integer({ minimum: 1 }) }) })
   .get('/tags/:tag', ({ params }) => ({ tag: params.tag }), { params: s.Object({ tag: s.String({ minLength: 2 }) }) })
+  .get('/rest/:id/*', ({ params }) => ({ id: params.id, rest: params['*'] }))
+  .get('/free/:id', ({ params }) => ({ id: params.id }))
 `
 
 let dir = ''
@@ -40,9 +42,14 @@ describe('an api route with a params schema over real HTTP', () => {
       expect((await fetch(`${origin}/api/temtem/dex/x`)).status).toBe(422)
       expect((await fetch(`${origin}/api/temtem/dex/%E0%A4%A`)).status).toBeLessThan(500)
       expect(await (await fetch(`${origin}/api/temtem/tags/ab`)).json()).toEqual({ tag: 'ab' })
-      // Elysia 1.4.31 hands a decoded slash as `%2F`, so an encoded slash stays one segment and never reads as a path.
-      expect(await (await fetch(`${origin}/api/temtem/tags/a%2Fb`)).json()).toEqual({ tag: 'a%2Fb' })
-      expect(await (await fetch(`${origin}/api/temtem/tags/%2E%2E%2Fx`)).json()).toEqual({ tag: '..%2Fx' })
+      // A value is decoded once, whatever slash it holds (Elysia 1.4.31 writes each as `%2F`).
+      for (const [path, tag] of [['a%2Fb', 'a/b'], ['%2Fabout', '/about'], ['%252F', '%2F'], ['%2E%2E%2Fx', '../x'], ['a%252Fb%2Fc', 'a%2Fb/c']])
+        expect(await (await fetch(`${origin}/api/temtem/tags/${path}`)).json()).toEqual({ tag })
+
+      expect(await (await fetch(`${origin}/api/temtem/tags/a%2Fb/`)).json()).toEqual({ tag: 'a/b' })
+      expect(await (await fetch(`${origin}/api/temtem/rest/a%2Fb/c%2Fd`)).json()).toMatchObject({ id: 'a/b' })
+      // A malformed escape keeps the value Bun decoded, as before.
+      expect(await (await fetch(`${origin}/api/temtem/free/%E0%A4%A`)).json()).toEqual({ id: '��A' })
     }
     finally {
       await served.stop(true)

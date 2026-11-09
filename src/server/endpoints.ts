@@ -14,6 +14,7 @@ import type { Endpoint } from './routes'
 import { basename, relative } from 'node:path'
 import { exportProblem, KayError } from '../compiler/errors'
 import { contextLocale, passGuards, stopped } from './actions'
+import { decodedRoute } from './api-params'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsRule, grantedByKay, preflight, withCors } from './cors'
@@ -96,7 +97,7 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
 
     // Each method the files serve, and GET always, so the page for a path nothing serves, a wildcard on GET, never takes a path whose files export no GET from the 405; `all` answers the rest.
     for (const verb of new Set(['GET', ...served.flatMap(({ handlers }) => [...handlers.keys()])]))
-      app.route(verb, served[0]!.pattern, handle)
+      app.route(verb, served[0]!.pattern, handle, decodedRoute(served[0]!.pattern))
 
     app.all(served[0]!.pattern, handle)
   }

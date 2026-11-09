@@ -21,6 +21,7 @@ import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { withDefaultBounds } from '../runtime/schema-bounds'
 import { contextLocale, guardsFirst, passGuards, requestState } from './actions'
+import { withDecodedParams } from './api-params'
 import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
@@ -134,7 +135,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         route.handler = route.method === 'WS' ? located : timedHandler(located, routeTimeout, options)
       }
 
-      const hooks = withPlainParams(route) as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
+      const hooks = withDecodedParams(route) as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
 
       // A string in a route's body takes the default bound an action's does; a model named by a string, another library's validator and a websocket's messages, which have limits of their own, are left as written.
       if (hooks && route.method !== 'WS' && typeof hooks.body === 'object' && hooks.body !== null && !('~standard' in hooks.body))
@@ -510,23 +511,6 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 
   // Left on the context, Elysia merges it into the copy, which no earlier request's headers are on.
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
-}
-
-// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation. Only a route with a `params` schema gets it, on its own hooks, and a plain object is left as it is.
-function withPlainParams(route: { method: string, hooks?: unknown }): unknown {
-  const hooks = route.hooks as { params?: unknown, transform?: unknown } | undefined
-
-  if (hooks?.params !== undefined && route.method !== 'WS')
-    hooks.transform = [plainParams, ...[hooks.transform ?? []].flat()]
-
-  return hooks
-}
-
-function plainParams(context: { params?: Record<string, unknown> }): void {
-  const { params } = context
-
-  if (params !== undefined && Object.getPrototypeOf(params) !== Object.prototype)
-    context.params = { ...params }
 }
 
 // Input the route's `body`, `query`, `params` or `headers` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.

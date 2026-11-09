@@ -17,6 +17,7 @@ import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { requestedLoads } from '../runtime/load-scope'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { LOADS_HEADER } from '../runtime/swap'
+import { decodedRoute } from './api-params'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, filesUnder } from './compress'
 import { noteRedirect } from './dev-notes'
@@ -319,7 +320,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       pageRequested(given.request)
 
       return carryContext(given.set, await handle(sharedContext(given.request, () => ({ ...given }))))
-    })
+    }, decodedRoute(path))
   }
 
   // A path no page serves, or an error met before one was chosen, rendered by the routes directory's own special pages in the locale the path or the visitor names.
