@@ -150,4 +150,14 @@ describe('the island a module fence exports', () => {
     expect(slots[1]).toContain('data-persist="mine"')
     expect(slots[1]).toContain('data-hydrate="load"')
   })
+
+  it('is handed to the server island and to no other output', () => {
+    const generic = '--- module\nexport const island = { hydrate: \'idle\' } as const\n--- island <T>\nconst { rows } = props<{ rows: T[] }>()\n---\np {rows.length}\n'
+    const plain = files['asks.kay']!
+
+    for (const source of [plain, generic]) {
+      expect(compileKay(source, 'asks.kay', { output: 'html', root: scratch }).tsx).toMatch(/, island\)/)
+      expect(compileKay(source, 'asks.kay', { output: 'dom', root: scratch }).tsx).not.toMatch(/, island\)/)
+    }
+  })
 })

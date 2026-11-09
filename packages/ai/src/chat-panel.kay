@@ -82,7 +82,7 @@ effect(() => {
   })
 })
 
-// The chat inside is told to start over; it hears the event once hydrated, which the first opening does.
+// The chat inside is told to start over; it hears the event once the launcher hydrated.
 function startOver() {
   panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-new'))
   queueMicrotask(() => panel?.querySelector('textarea')?.focus())
@@ -113,7 +113,7 @@ let disposed = false
 const RETRY_MS = 50
 const RETRY_LIMIT = 200
 
-// Hands the text to the chat once it is there to hear it: the chat loads when the panel first opens, and a listener cancels the event it takes.
+// Hands the text to the chat once it is there to hear it: the launcher hydrates when the browser is idle, and a listener cancels the event it takes.
 function forward(type: string, text: unknown, tries = 0) {
   const chat = panel?.querySelector('.kai-chat')
   const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: text, cancelable: true }))
