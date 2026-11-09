@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import EmptyIssues from '../tests/fixture/src/components/empty-issues.kay'
 import MarkedGroup from '../tests/fixture/src/components/marked-group.kay'
 import RequiredFields from '../tests/fixture/src/components/required-fields.kay'
 import { click } from './dom'
@@ -71,4 +72,23 @@ test('each field of a required group is announced as required, a FormField neste
   const required = (id: string) => mounted!.root.querySelector(`#${id}`)!.getAttribute('aria-required')
 
   expect([required('read'), required('write'), required('code')]).toEqual(['true', 'true', null])
+})
+
+test('a FormField with no message holds an empty live region that leaves no row gap, in both sizes and in a group, and a message fills it', async () => {
+  mounted = await mountComponent(EmptyIssues, {})
+
+  const { root } = mounted
+  const lines = () => ['#medium', '#small', '#set'].map(id => root.querySelector(`${id} [data-part="issues"]`)!)
+
+  for (const line of lines()) {
+    expect(line.childElementCount).toBe(0)
+    expect(line.textContent).toBe('')
+    expect(line.getAttribute('aria-live')).toBe('polite')
+    expect(line.className).toContain('empty:absolute')
+  }
+
+  click(root.querySelector('#refuse'))
+  await settle()
+
+  expect(lines().map(line => line.textContent)).toEqual(['Too short', 'Too short', 'Too short'])
 })

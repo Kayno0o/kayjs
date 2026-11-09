@@ -10,7 +10,8 @@ export const CHECKBOX = {
 
 export const FIELD_MESSAGE = {
   hint: 'text-xs text-muted',
-  issues: 'flex flex-col',
+  // An empty line takes no space, not even a row gap, yet stays in the page for a screen reader to announce the message that fills it.
+  issues: 'flex flex-col empty:absolute empty:size-0',
   issue: 'text-xs text-danger',
 }
 

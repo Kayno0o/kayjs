@@ -22,7 +22,7 @@ test('the field look is written once, in field-look.ts', async () => {
 test('the stylesheet colours an invalid field and sizes a small and a large one', async () => {
   const css = await Bun.file(join(SRC, 'theme.css')).text()
 
-  expect(css).toContain('.kui-field-input:is([aria-invalid=\'true\'], [data-refused=\'true\'])')
+  expect(css).toContain('.kui-field-input[aria-invalid=\'true\']')
   expect(css).toContain('.kui-form-field :where(input, select, textarea)[aria-invalid=\'true\']')
   expect(css).toContain('.kui-field-input:where([data-size=\'sm\'])')
   expect(css).toContain('.kui-field-input:where([data-size=\'lg\'])')
@@ -60,4 +60,9 @@ test('the sizes of the field utilities are the numbers of the stylesheet rules',
     expect(utilities).toContain(`text-${size === 'sm' ? 'xs' : 'base'}`)
     expect(rule).toContain(`var(--text-${size === 'sm' ? 'xs' : 'base'})`)
   }
+})
+
+test('an empty message line leaves the layout, so no row gap is left under the control', () => {
+  expect(look.FIELD_MESSAGE.issues).toContain('empty:absolute')
+  expect(look.FIELD_MESSAGE.issues).toContain('empty:size-0')
 })

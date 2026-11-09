@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+const issue = signal<string>()
+---
+button#refuse(type="button" onClick={() => issue = 'Too short'}) Refuse
+FormField#medium(label="Title" name="title" issue={issue()})
+  input(name="title")
+FormField#small(label="Slug" name="slug" size="sm" issue={issue()})
+  input(name="slug")
+FormField#set(label="Access" name="access" group issue={issue()})
+  input(name="access" type="checkbox")
