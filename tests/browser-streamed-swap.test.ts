@@ -105,6 +105,22 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a stream
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('fetches the page of a clicked link once, however slow the swap is to move the pointer off it', async () => {
+    await using page = await (await ready()).open('/')
+
+    // A pointer that stays over the link through the swap, as a loaded machine's does past the hover delay.
+    await page.evaluate(() => {
+      const link = document.querySelector('a.slow') as HTMLElement
+
+      link.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+      link.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      link.click()
+    })
+    await page.waitFor('input.field')
+    await Bun.sleep(600)
+    expect(hits.a).toBe(1)
+  }, 60_000)
+
   it('hydrates an island in a block once placed', async () => {
     await using page = await (await ready()).open('/')
 

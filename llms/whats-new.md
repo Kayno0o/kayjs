@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A hover that was still waiting when a link was pressed or clicked no longer fetches its page a second time once the navigation took the prefetched one, which on a loaded machine left a streamed page on a request nothing answered ([navigation](navigation-from-code.md)).
+
 ## 1.93.0
 
 - A `local()` collection signed out stays so until the visitor is back: `retry()` and a retry armed while the server was unreachable no longer send the queue again, nor turn the status to `offline` ([local collections](local-collections.md)).

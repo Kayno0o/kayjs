@@ -32,7 +32,7 @@ export function startPrefetch(given: string | undefined): void {
   eagerness = savesDataInBrowser() || !EAGERNESS.has(given) ? false : given as Eagerness
 
   if (eagerness !== false) {
-    Object.assign(handlers, { pointerover: onHover, focusin: onPrefetchHint, pointerdown: onPrefetchHint })
+    Object.assign(handlers, { pointerover: onHover, focusin: onPrefetchHint, pointerdown: onPrefetchHint, click: stopHover })
     document.addEventListener('kay:navigate', watchEager)
     watchEager()
   }
@@ -66,7 +66,15 @@ function onHover(event: Event): void {
     hoverTimer = setTimeout((target: HTMLAnchorElement) => void prefetch(target), level === 'eager' ? 0 : HOVER_DELAY_MS, link)
 }
 
+// A press or click is the visit itself: a hover still waiting would fetch the page again once the navigation took the one prefetched.
+function stopHover(): void {
+  clearTimeout(hoverTimer)
+}
+
 function onPrefetchHint(event: Event): void {
+  if (event.type === 'pointerdown')
+    stopHover()
+
   const link = linkOf(event)
   const level = link && levelOf(link)
 
