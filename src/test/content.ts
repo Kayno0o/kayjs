@@ -200,7 +200,13 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const seed = async (name: string, entries: SeedEntry[]) => {
+    const mine = epoch
+
     await isolateAll()
+
+    // A reset that came meanwhile ended this test's content, so the seed lands nowhere.
+    if (mine !== epoch)
+      return
 
     const found = named.find(([exported]) => exported === name)
 
@@ -218,6 +224,8 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const write = async (name: string, file: string, text: string) => {
+    const mine = epoch
+
     await isolateAll()
 
     const folder = folders.find(([exported]) => exported === name)
@@ -227,7 +235,12 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
 
     const real = resolve(contentPlace().base, folder[1].dir)
 
-    await isolate(real)
+    if (mine === epoch)
+      await isolate(real)
+
+    // A reset that came meanwhile ended this test's content, so the write lands nowhere.
+    if (mine !== epoch)
+      return
 
     const target = resolve(copies.get(real)!, file)
 
@@ -239,21 +252,23 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const reset = async (given: ContentSeed = {}) => {
-    // A copy under way ends first, and its epoch is over, so it lands nowhere.
+    // A copy under way ends first, and its epoch is over, so it lands nowhere; one asked for from here on copies into a scratch folder of its own, not the one being removed.
     epoch++
-    await Promise.allSettled(isolating.values())
 
-    for (const [, collection] of named)
-      restoreLoader(collection)
+    const under = [...isolating.values()]
+    const removed = scratch
 
     copies.clear()
     isolating.clear()
     started = undefined
-
-    if (scratch !== undefined)
-      await rm(await scratch, { recursive: true, force: true })
-
     scratch = undefined
+    await Promise.allSettled(under)
+
+    for (const [, collection] of named)
+      restoreLoader(collection)
+
+    if (removed !== undefined)
+      await rm(await removed, { recursive: true, force: true })
 
     for (const [, collection] of named)
       collection.invalidate()

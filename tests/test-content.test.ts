@@ -112,10 +112,12 @@ describe('the content of a test site', () => {
     await Bun.write(direct, '---\ntitle: Raced\n---\n')
 
     try {
-      const writing = site.content.write('pages', 'raw.json', '{}')
+      // Settled from the start, as a write a reset overtook must not reject before the test reads it.
+      const writing = Promise.allSettled([site.content.write('pages', 'raw.json', '{}')])
 
       await site.content.reset()
-      await Promise.allSettled([writing])
+      // The reset ends the write, which lands nowhere rather than failing on the copy it removed.
+      expect((await writing).map(result => result.status)).toEqual(['fulfilled'])
       expect((await site.visit('/articles/raced')).status).toBe(200)
     }
     finally {
