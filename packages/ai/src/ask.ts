@@ -46,9 +46,9 @@ function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[]
     if (attachments.length > 0 && message.role !== 'user')
       throw new AiError('unsupported', 'only a user message holds attachments')
 
-    const { calls, results, thinking } = message as ProviderMessage
+    const { calls, results, thinking, thinkingBy } = message as ProviderMessage
 
-    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments }, ...replayed && calls !== undefined && { calls }, ...replayed && results !== undefined && { results }, ...replayed && thinking !== undefined && { thinking } }
+    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments }, ...replayed && calls !== undefined && { calls }, ...replayed && results !== undefined && { results }, ...replayed && thinking !== undefined && { thinking, thinkingBy } }
   })
 }
 

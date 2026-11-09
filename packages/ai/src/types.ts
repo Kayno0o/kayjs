@@ -110,6 +110,8 @@ export type Thinking = { text: string, signature: string } | { redacted: string 
 export interface ProviderMessage extends Omit<AiMessage, 'attachments'> {
   // The thinking that came before the calls, which Anthropic requires back unchanged in the turn that called tools.
   thinking?: Thinking[] | undefined
+  // The `provider/model` that thought it: a signature binds the block to that model, so a request to another one leaves `thinking` out. Absent, the blocks are sent to whichever answers.
+  thinkingBy?: string | undefined
   attachments?: Media[] | undefined
   calls?: ToolUse[] | undefined
   results?: ToolOutcome[] | undefined

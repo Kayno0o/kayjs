@@ -21,6 +21,8 @@ export interface StoredTurn {
   steps?: StoredCall[][] | undefined
   // The thinking blocks of each of those requests, signatures included, which Anthropic wants back with the calls of a turn when it thinks; an entry per step, empty for a request that thought nothing.
   thinking?: Thinking[][] | undefined
+  // The `provider/model` that thought each of those requests, an entry per step, which the thinking is replayed to alone: its signatures are that model's.
+  thinkingBy?: string[] | undefined
   sources?: Source[] | undefined
   stopped?: boolean | undefined
   // The id of the Chat's reply whose write added it, which a store keeps with the turn: a tab whose write lost to another's is then refused its next send.
@@ -86,7 +88,7 @@ export function withinResultCap(turns: StoredTurn[]): StoredTurn[] {
       return turn
 
     const before = size(turn)
-    const shortened: StoredTurn = { ...turn, thinking: undefined, steps: turn.steps.map(calls => calls.map(call => call.result.length > LEFT_OUT.length ? { ...call, result: LEFT_OUT } : call)) }
+    const shortened: StoredTurn = { ...turn, thinking: undefined, thinkingBy: undefined, steps: turn.steps.map(calls => calls.map(call => call.result.length > LEFT_OUT.length ? { ...call, result: LEFT_OUT } : call)) }
 
     total -= before - size(shortened)
 

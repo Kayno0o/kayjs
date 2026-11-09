@@ -123,7 +123,7 @@
     "max-lines": 692
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1235
+    "max-lines": 1221
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,

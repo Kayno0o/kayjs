@@ -543,23 +543,33 @@ describe('a conversation held on the server', () => {
     expect((await conversationStore().get({ owner: 'ann', scope: '/_kay/action/chat', id: ID }))!.turns[1]!.thinking).toEqual([[thinking]])
   })
 
-  it('sends the stored thinking of an earlier tool turn to Anthropic first in the turn that called, signature unchanged, redacted blocks too', async () => {
+  // The assistant message and the tool result Anthropic is sent for a stored tool turn whose thinking model `m` made, when `model` answers the next ask.
+  const sentFor = async (model?: string) => {
     const server = provider(() => stream(anthropicEvents('ok')).response)
     const steps = [[{ id: 'a', name: 'look_up', arguments: '{"title":"Moon"}', result: 'About Moon', ok: true }]]
     const thinking = [[{ text: 'The Moon.', signature: 'sig-moon' }, { redacted: 'opaque' }]]
 
     try {
-      await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: 'About Moon', steps, thinking }], title: '' })
-      await visit(said('so?'), { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'high' }, { header: `send:${ID}:1` })
+      await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: 'About Moon', steps, thinking, thinkingBy: ['anthropic/m'] }], title: '' })
+      await visit(said('so?'), { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'high', ...model !== undefined && { model } }, { header: `send:${ID}:1` })
 
       const sent = server.seen[0]!.body.messages as { role: string, content: unknown }[]
 
-      expect(sent[1]).toEqual({ role: 'assistant', content: [{ type: 'thinking', thinking: 'The Moon.', signature: 'sig-moon' }, { type: 'redacted_thinking', data: 'opaque' }, { type: 'tool_use', id: 't1_a', name: 'look_up', input: { title: 'Moon' } }] })
-      expect(sent[2]!.content).toEqual([{ type: 'tool_result', tool_use_id: 't1_a', content: 'About Moon' }])
+      return [sent[1], sent[2]!.content]
     }
     finally {
       await server.stop()
     }
+  }
+  const called = { type: 'tool_use', id: 't1_a', name: 'look_up', input: { title: 'Moon' } }
+  const resulted = [{ type: 'tool_result', tool_use_id: 't1_a', content: 'About Moon' }]
+
+  it('sends the stored thinking of an earlier tool turn to Anthropic first in the turn that called, signature unchanged, redacted blocks too', async () => {
+    expect(await sentFor()).toEqual([{ role: 'assistant', content: [{ type: 'thinking', thinking: 'The Moon.', signature: 'sig-moon' }, { type: 'redacted_thinking', data: 'opaque' }, called] }, resulted])
+  })
+
+  it('leaves the stored thinking out when another model answers, as its signature is the model\'s that thought', async () => {
+    expect(await sentFor('other')).toEqual([{ role: 'assistant', content: [called] }, resulted])
   })
 
   it('replays a turn that only called tools, with a stand-in for its missing text', async () => {

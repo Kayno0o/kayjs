@@ -365,6 +365,6 @@ export async function* converse(provider: Streams, base: ProviderRequest, offere
     yield { step: stepped(made) }
 
     // What goes back is the arguments as an object, so a provider that parses them never meets the text a model garbled.
-    messages.push({ role: 'assistant', content: text, ...thinking.length > 0 && { thinking }, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })
+    messages.push({ role: 'assistant', content: text, ...thinking.length > 0 && { thinking, thinkingBy: `${served.provider}/${served.model}` }, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })
   }
 }

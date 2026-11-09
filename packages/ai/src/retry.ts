@@ -1,7 +1,7 @@
 import type { AiErrorKind } from './errors'
 import type { Hooks } from './hooks'
 import type { Streams } from './loop'
-import type { FallbackModel, Inner, Provider, ProviderRequest, Resilience, RetryOptions, Step } from './types'
+import type { FallbackModel, Inner, Provider, ProviderMessage, ProviderRequest, Resilience, RetryOptions, Step } from './types'
 import { sleep } from '@kaynooo/utils'
 import { configError, durationSeconds } from 'kay/library'
 import { given } from './config'
@@ -109,6 +109,14 @@ function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): nu
 }
 
 // What the model said or did that the reply shows or the loop acts on: a request that sent any is never asked again.
+// Thinking is signed for the model that thought it, which Anthropic checks, so a request to another model, as a fallback or a later ask on another model is, leaves out the blocks of the turns that model did not think.
+function thinkingFor(messages: ProviderMessage[], by: string): ProviderMessage[] {
+  if (!messages.some(message => message.thinking !== undefined && message.thinkingBy !== undefined && message.thinkingBy !== by))
+    return messages
+
+  return messages.map(({ thinking, thinkingBy, ...message }) => thinkingBy === undefined || thinkingBy === by ? { ...message, ...thinking !== undefined && { thinking }, thinkingBy } : message)
+}
+
 function streamed(piece: Inner): boolean {
   return 'text' in piece || 'reasoning' in piece || 'thinking' in piece || 'toolUse' in piece
 }
@@ -126,7 +134,7 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
       made++
 
       const began = performance.now()
-      const stream = target.provider.stream({ ...request, model: target.model }, signal)[Symbol.asyncIterator]()
+      const stream = target.provider.stream({ ...request, messages: thinkingFor(request.messages, `${target.provider.name}/${target.model}`), model: target.model }, signal)[Symbol.asyncIterator]()
       const held: Inner[] = []
       let failure: AiError | undefined
 

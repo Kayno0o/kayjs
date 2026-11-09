@@ -5,6 +5,7 @@ import type { ServedProject } from './shadow-types'
 import { join, resolve } from 'node:path'
 import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
+import { lintLevel } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
 import { claimFeed, isRouteOf, servesRoute, unservedRoutes } from '../content/claims'
 import { projectPaths } from '../project'
@@ -98,8 +99,10 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   if (settings) {
     refused(config, () => refuseLocaleClashes(settings, routes))
 
-    for (const { pattern, path } of defaultLocaleTranslations(settings))
-      diagnostics.push({ file: config, line: 1, column: 1, severity: 'warning', message: `kay: i18n.paths translates ${pattern} for ${settings.defaultLocale}, the default locale, as ${path}: the default locale's path is the pattern, so name the page ${path} and translate it for the other locales, as links to ${path} would not localize` })
+    const level = lintLevel('default-locale-path', options.lints)
+
+    for (const { pattern, path } of level === 'allow' ? [] : defaultLocaleTranslations(settings))
+      diagnostics.push({ file: config, line: 1, column: 1, code: 'default-locale-path', severity: level === 'deny' ? 'error' : 'warning', message: `kay: i18n.paths translates ${pattern} for ${settings.defaultLocale}, the default locale, as ${path}: the default locale's path is the pattern, so name the page ${path} and translate it for the other locales, as links to ${path} would not localize` })
   }
 
   // Claimed in the order the server claims them, in `refuseScanned` (src/server/app.ts), which this keeps in step with.

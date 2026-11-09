@@ -474,6 +474,7 @@ interface ProviderMessage extends Omit<AiMessage, 'attachments'>
   role: "assistant" | "user"
   sources?: readonly Source[] | undefined
   thinking?: Thinking[] | undefined
+  thinkingBy?: string | undefined
 
 [.] ProviderRequest
 interface ProviderRequest
@@ -605,6 +606,7 @@ interface StoredTurn
   steps?: StoredCall[][] | undefined
   stopped?: boolean | undefined
   thinking?: Thinking[][] | undefined
+  thinkingBy?: string[] | undefined
 
 [.] StructuredAskOptions
 interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions

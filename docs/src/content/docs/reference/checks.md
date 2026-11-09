@@ -108,6 +108,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
+| `default-locale-path` | warn | i18n | An `i18n.paths` entry translating a pattern for the default locale, whose links never localize |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
 | `old-bun-image` | deny | code | A Dockerfile building from a Bun older than the one kay needs |
