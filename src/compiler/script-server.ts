@@ -57,7 +57,7 @@ export interface ServerAnalysis {
   actionNames: string[]
   // The `action` of each of those calls, which `kay check` types `ctx.params` through for a page.
   actionCallees: Span[]
-  // The actions among them that set `tool`, with whether they also set `honeypot`, `minTime` or `proofOfWork`.
+  // The actions among them that set `tool` or may, their options being out of reach, with whether they also set `honeypot`, `minTime` or `proofOfWork` and whether they declare an `output`.
   toolActions: { name: string, botProtected: boolean, output: boolean }[]
   page?: PageSettings | undefined
   // Statements that run per request, inside `load(ctx)`.
@@ -249,8 +249,12 @@ function readsItself(ast: Program, declaration: NodeOfType<'FunctionDeclaration'
 
 const BOT_PROTECTIONS = new Set(['honeypot', 'minTime', 'proofOfWork'])
 
-// What an `action(...)` call's options say, when one of its arguments is an object literal setting `tool`.
+// What an `action(...)` call's options say, when one of its arguments is an object literal setting `tool`. Options it cannot read, a variable or an object spreading the `tool`, may make a tool: `output` is then false, so the type of its handler is probed, and `botProtected` false.
 function toolOptions(args: NodeOfType<'CallExpression'>['arguments']): { botProtected: boolean, output: boolean } | undefined {
+  // The options follow the handler, which is the first argument of an action with no schema.
+  const options = args[0]?.type === 'ArrowFunctionExpression' || args[0]?.type === 'FunctionExpression' ? args[1] : args[2]
+  let unreadable = options !== undefined && options.type !== 'ObjectExpression'
+
   for (const arg of args.slice(1)) {
     if (arg.type !== 'ObjectExpression')
       continue
@@ -258,23 +262,19 @@ function toolOptions(args: NodeOfType<'CallExpression'>['arguments']): { botProt
     const keys = new Map(arg.properties.flatMap(property => isPlainProperty(property) && !property.computed ? [[keyName(property.key), property.value] as const] : []))
     const tool = keys.get('tool')
 
-    // A spread may bring any of them, so it counts as one; options that are not an object literal cannot be read, and the action is not taken for a tool.
+    // A spread may bring any of them, so it counts as one.
     if (tool !== undefined && !(tool.type === 'Literal' && tool.value === false))
       return { botProtected: arg.properties.some(property => property.type === 'SpreadElement') || [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) || protectsBots(keys.get('protect')), output: declaresOutput(tool) }
+
+    unreadable ||= tool === undefined && arg === options && arg.properties.some(property => property.type === 'SpreadElement')
   }
 
-  return undefined
+  return unreadable ? { botProtected: false, output: false } : undefined
 }
 
-// Whether `tool` declares an `output`; one that is not an object literal, or that spreads, cannot be read and does, as the server settles it.
+// Whether `tool` writes an `output` itself; one it does not, whatever a variable or a spread brings, is probed, and the server prefers a declared one.
 function declaresOutput(tool: Node): boolean {
-  if (tool.type === 'Literal')
-    return false
-
-  if (tool.type !== 'ObjectExpression')
-    return true
-
-  return tool.properties.some(property => property.type === 'SpreadElement' || (isPlainProperty(property) && !property.computed && keyName(property.key) === 'output'))
+  return tool.type === 'ObjectExpression' && tool.properties.some(property => isPlainProperty(property) && !property.computed && keyName(property.key) === 'output')
 }
 
 // Whether the `protect` group sets one of the bot protections; one that is not an object literal cannot be read, so it counts as setting one.

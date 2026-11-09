@@ -36,6 +36,25 @@ describe('the output schemas derived for tool actions', () => {
     expect(outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED })
   })
 
+  it('records the schema of an action whose options are a variable or whose tool is spread, as of an inline one', async () => {
+    const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
+    const file = join(dir, 'src/routes/index.kay')
+    const extra = [
+      'const options = { tool: true as const }',
+      'const shared = { text: ({ count }: { count: number }) => `${count} things` }',
+      'export const viaVariable = action(t.Object({}), () => ({ count: 1 }), options)',
+      'export const viaSpread = action(t.Object({}), () => ({ count: 2 }), { tool: { ...shared } })',
+      'export const viaSpreadOptions = action(() => ({ count: 3 }), { ...options })',
+      '',
+    ].join('\n')
+
+    await Bun.write(file, (await Bun.file(file).text()).replace('---\nh1', `${extra}---\nh1`))
+
+    const outputs = await derive(dir)
+
+    expect(outputs).toEqual({ 'src/routes/index.kay#summary': SUMMARY, 'src/routes/index.kay#worded': WORDED, 'src/routes/index.kay#viaVariable': WORDED, 'src/routes/index.kay#viaSpread': WORDED, 'src/routes/index.kay#viaSpreadOptions': WORDED })
+  })
+
   it('runs no tsgo for a project with no tool action, and leaves no record', async () => {
     const dir = join(process.cwd(), await fixtureCopy('tool-outputs'))
 
