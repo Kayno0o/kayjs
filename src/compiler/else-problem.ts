@@ -1,12 +1,14 @@
 import type { Details, Node } from './ast'
 
-function elseStart(src: string, node: Node | undefined) {
+function elseStart(src: string, node: Node | undefined): number | undefined {
   if (node?.kind === 'if')
     return node.fallback?.start
 
   // A `for` keeps no span for its `else`, which sits on the line before the first node under it.
   if (node?.kind === 'for' && node.fallback)
     return src.lastIndexOf('else', node.fallback[0]?.start ?? node.end)
+
+  return undefined
 }
 
 // Why an `else` has nothing to attach to: a second `else`, a line between it and its `if` or `for`, or no `if` at all.
