@@ -95,7 +95,7 @@ export interface Local<Row, Key extends keyof Row> {
   syncStatus: () => LocalSyncStatus
   // The last failure to read the server, or that the browser keeps no IndexedDB, kept until a read succeeds. A write waiting for the server is no error: it shows in `syncStatus()`, and a refused one in `issues()`.
   error: () => ApiError | undefined
-  // Reads the server and sends the queue now, skipping the wait; does nothing unless the last read failed or the server could not be reached.
+  // Reads the server and sends the queue now, skipping the wait; does nothing unless the last read failed or the server could not be reached, nor while the server asks for a sign-in.
   retry: () => void
   // Called after a sync, with the rows held; returns what stops it.
   onSync: (listener: (event: { rows: readonly Row[] }) => void) => () => void
@@ -632,9 +632,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       this.synced.emit({ rows: this.view[0]().list })
   }
 
-  // Reads the server and sends the queue at once, when the last read failed or the server could not be reached.
+  // Reads the server and sends the queue at once, when the last read failed or the server could not be reached; signed out, it waits for the visitor to be back, as `schedule` drops a retry armed before the refusal.
   private again(): void {
-    if (this.ended || this.state[0]() === 'unavailable' || !(this.unread || this.offline))
+    if (this.ended || this.paused || this.state[0]() === 'unavailable' || !(this.unread || this.offline))
       return
 
     void this.sync()
@@ -651,6 +651,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       return
 
     if ((this.count[0]() === 0 && !this.unread) || this.paused) {
+      clearTimeout(this.timer)
       this.failures = 0
 
       return

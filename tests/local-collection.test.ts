@@ -778,10 +778,10 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     // The refusal stays while retry() is checked, so a send from an automatic path (the browser coming back online, the tab showing) that lands late cannot turn the status to synced: what retry() does is read off the requests it makes.
     await page.route('/_kay/action/*', async () => void sent++)
 
-    // A run queued behind the refused one (the page opening, the browser coming online) still sends once the status shows: retry() is read once those stopped.
+    // A run queued behind the refused one (the page opening, the browser coming online) still sends once the status shows, and one that met the network changing turns it offline until its retry is refused again: retry() is read once those stopped on signed-out.
     let before = -1
 
-    while (before !== sent) {
+    while (before !== sent || await page.text('p.status') !== 'signed-out') {
       before = sent
       await Bun.sleep(400)
     }
@@ -801,6 +801,20 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
 
     expect((await server()).saves).toBe(1)
+  }, 60_000)
+
+  it('stays signed out on retry() while the browser is offline too', async () => {
+    const page = await opened()
+
+    await queuedSignedOut(page)
+    await page.offline()
+    await page.click('button.retry')
+    await Bun.sleep(400)
+
+    // Signed out, retry() waits for the visitor: it neither sends nor lets the failed send show as offline.
+    expect(await page.text('p.status')).toBe('signed-out')
+
+    await page.online()
   }, 60_000)
 
   it('sends the queue again on retry() after a write could not be sent', async () => {
