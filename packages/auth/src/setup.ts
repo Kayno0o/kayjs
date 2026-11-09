@@ -149,6 +149,12 @@ const HAS_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i
 const HOST_LIKE = /^(?:[\w-]+(?:\.[\w-]+)+(?::\d+)?|[\w.-]+:\d+)$/
 
 // The origin and the display name the options give: `site` is the origin, which has a scheme.
+// The keys are derived as `auth()` is made when it has a secret of its own, or a session that cannot derive one, so a bad one fails there; the session's is derived on first use.
+function checkKeys(core: Core, options: { secret?: string | string[] | undefined, sessions: { deriveSecret?: unknown } }): void {
+  if (options.secret !== undefined || options.sessions.deriveSecret === undefined)
+    void core.keys
+}
+
 function siteOptions(options: { site?: string | undefined, name?: string | undefined }): { origin: string | undefined, name: string | undefined } {
   const site = options.site
 
@@ -234,10 +240,14 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   if (process.env.NODE_ENV === 'production' && (options.signUp ?? true) && options.password !== false && !(options.email?.requireVerified ?? options.email !== undefined))
     log.warn('password sign-up is open with no `email` option or with `requireVerified` off, so `password.register` answers `taken` for an address that has an account and tells a guest which addresses exist: set `email` with a mailer (and `requireVerified` on), or `signUp: false`')
 
+  let keys: Core['keys'] | undefined
   const core: Core = {
     store: options.store,
     rates: authLimiters(options.store),
-    keys: deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret()),
+    // On first use, as the session's secret may be the config's, which is not read while a module loads.
+    get keys() {
+      return keys ??= deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret())
+    },
     get url() {
       return bind().url
     },
@@ -306,6 +316,8 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
     rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
   }
+
+  checkKeys(core, options)
 
   function refreshersFor(made: SiteBound): void {
     for (const [name, { client }] of made.oauth) {

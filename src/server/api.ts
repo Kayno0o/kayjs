@@ -512,7 +512,7 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
-// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation.
+// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation. Every route of the module gets it, as the hook cannot know which carry a schema; a plain object is left as it is.
 function plainParams(context: { params?: Record<string, unknown> }): void {
   const { params } = context
 

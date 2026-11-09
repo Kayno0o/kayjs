@@ -46,6 +46,27 @@ describe('one secret for the session and kayjs-auth', () => {
     expect(await (await browser.fetch('/me')).json()).toMatchObject({ id: 'u1' })
   })
 
+  test('auth asks the session for its secret on first use, not as it is made', async () => {
+    const sessions = session<AuthSessionData>({ secret: SECRET })
+    const asked: string[] = []
+    const derive = sessions.deriveSecret
+
+    sessions.deriveSecret = (purpose: string) => {
+      asked.push(purpose)
+
+      return derive(purpose)
+    }
+
+    const app = testApp({ sessions, secret: undefined })
+
+    expect(asked).toEqual([])
+
+    await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    await app.browser().fetch('/sign-in/u1', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+
+    expect(asked).toEqual(['kayjs-auth'])
+  })
+
   test('the derived secret keeps sealed values readable after the session rotates', () => {
     const before = deriveKeys(session({ secret: OLD }).deriveSecret('kayjs-auth'))
     const sealed = before.encrypt('totp', 'row')

@@ -222,7 +222,9 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined,
   }
 }
 
-// The marks of the next page's copy of an island kept, a link to the page now shown, `aria-current`, carried over to the links of the one that lives on, found by their place and address: those that differ are left, as the island renders them itself.
+const KAY_MARKS = new Set<string | null>([null, 'page', 'true'])
+
+// The marks of the next page's copy of an island kept, a link to the page now shown, `aria-current`, carried over to the links of the one that lives on, found by their place and address: those that differ are left, as the island renders them itself, and so is a value kay never writes (`step`, `false`), which an island setting its own holds.
 function markCurrent(live: Element, next: Element): void {
   const links = live.querySelectorAll('a[href]')
   const fresh = next.querySelectorAll('a[href]')
@@ -233,8 +235,9 @@ function markCurrent(live: Element, next: Element): void {
   for (const [index, link] of links.entries()) {
     const copy = fresh[index]!
     const mark = copy.getAttribute('aria-current')
+    const own = link.getAttribute('aria-current')
 
-    if (link.getAttribute('href') !== copy.getAttribute('href') || link.getAttribute('aria-current') === mark)
+    if (link.getAttribute('href') !== copy.getAttribute('href') || own === mark || !KAY_MARKS.has(own) || !KAY_MARKS.has(mark))
       continue
 
     if (mark === null)
