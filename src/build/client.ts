@@ -32,6 +32,7 @@ import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
+import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
@@ -44,7 +45,7 @@ import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { refuseBuiltinImports, refuseServerOnlyReads } from './server-only'
 import { inSignalsScope } from './signals'
-import { forgetBundleMaps, keepBundleMap } from './sourcemap'
+import { forgetBundleMaps } from './sourcemap'
 import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
@@ -279,15 +280,16 @@ function sourcemapOf(option: ClientOptions['sourcemap']): 'linked' | 'external' 
   return option === true ? 'linked' : 'none'
 }
 
-// A map that cannot be pointed at `.kay` lines is removed: the report then keeps its minified frames.
+// A map that cannot be pointed at `.kay` lines is removed: the report then keeps its minified frames. One the last build kept as it is now is copied from the cache.
 export async function keepMaps(root: string, maps: string[]): Promise<void> {
   const dir = join(outputDir(root), MAPS_DIR)
+  const { cache } = projectPaths(root)
 
   await rm(dir, { recursive: true, force: true })
 
   for (const map of maps) {
     try {
-      await keepBundleMap(map, root, dir)
+      await keepBundleMapCached(map, root, dir, cache)
     }
     catch (error) {
       kayLog('warn', `the source map of ${basename(map)} could not be kept, so island errors from it report minified frames`, error)
@@ -301,6 +303,8 @@ export async function keepMaps(root: string, maps: string[]): Promise<void> {
       }
     }
   }
+
+  await pruneKeptMaps(cache)
 }
 
 // Fails on either only once both stopped, so neither goes on writing into the output of the build after; failing both, it reports what each logged.

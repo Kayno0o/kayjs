@@ -28,7 +28,7 @@ import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
 import * as serverRecord from '../src/build/server-record'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
-import { decodeBundleMappings, describeThrown, embeddedMap, hasSourceMapOf, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
+import { decodeBundleMappings, describeThrown, embeddedMap, forgetBundleMaps, hasSourceMapOf, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
 import { analyzeKayCached, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config-loader'
 import { devBuilder } from '../src/dev/builder'
@@ -491,6 +491,45 @@ describe('kay build', () => {
 
       expect(await Bun.file(broken).exists()).toBe(false)
       expect(await readdir(served)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps a source map from the cache while its bundle map and .kay sources are unchanged, pointing it again only when one changes', async () => {
+    const dir = await scratchDir('kept-maps-cache-')
+    const served = join(dir, '.kay', 'client')
+    const raw = join(served, 'chunk-aaaaaaaa.js.map')
+    const kay = join(dir, 'src', 'cached.kay')
+    const text = JSON.stringify({ version: 3, sources: ['../../src/cached.kay'], sourcesContent: ['compiled'], mappings: '' })
+    let pointed = 0
+    const keep = async () => {
+      await Bun.write(raw, text)
+      forgetBundleMaps()
+      registerSourceMap(kay, () => {
+        pointed++
+
+        return { source: 'p cached\n', tsx: 'compiled', map: undefined as never }
+      }, true)
+      await keepMaps(dir, [raw])
+
+      return Bun.file(join(outputDir(dir), MAPS_DIR, 'chunk-aaaaaaaa.js.map.zst')).bytes()
+    }
+
+    try {
+      await Bun.write(kay, 'p cached\n')
+
+      const first = await keep()
+
+      expect(pointed).toBe(1)
+      expect(await keep()).toEqual(first)
+      expect(pointed).toBe(1)
+      expect(await Bun.file(raw).exists()).toBe(false)
+
+      await Bun.write(kay, 'p changed\n')
+      await keep()
+      expect(pointed).toBe(2)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
