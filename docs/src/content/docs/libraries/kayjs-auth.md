@@ -419,7 +419,7 @@ A page of your own calls `auth.account.profile(locale)` and `auth.account.savePr
 
 ## Switching features off
 
-`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `authCore` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` works until 1.93 and `kay upgrade` drops it. The same holds for `signUp`, and for `pages` of `auth()`.
+`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `authCore` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` is a type error, as it is for `signUp` and for `pages` of `auth()`.
 
 A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: { code: 'off' } }`, and `auth.features()` says `false` for it, so your own pages can follow.
 
