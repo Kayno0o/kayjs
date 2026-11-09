@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.93.0
 
 - A `local()` collection signed out stays so until the visitor is back: `retry()` and a retry armed while the server was unreachable no longer send the queue again, nor turn the status to `offline` ([local collections](local-collections.md)).
 - kayjs-ui drops the prop names 1.89 deprecated: `isDisabled` on the date inputs and Widget's `isEmpty` and `@empty` are gone with their `deprecated-ui-props` lint ([upgrading](upgrading.md)).

@@ -1,3 +1,0 @@
-ui [./date-input.kay] default
-ui [./date-range-input.kay] default
-ui [./widget.kay] default
