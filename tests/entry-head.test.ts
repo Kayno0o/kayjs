@@ -1,4 +1,10 @@
+import type { PageContext } from '../src/runtime/core'
+import type { ServedRoute } from '../src/server/guards'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { t } from 'elysia'
+import { collection } from '../src/content'
+import { registerCollections } from '../src/content/edit'
+import { entryHeadOf } from '../src/server/entry-head'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/entry-head/src'
@@ -78,5 +84,29 @@ describe('the head of a page showing one entry', () => {
     expect(missing.status).toBe(404)
     expect(none.status).toBe(404)
     expect(missing.meta('article:published_time')).toBeUndefined()
+  })
+})
+
+describe('the entry head of a page whose collection is registered later', () => {
+  it('reads the entry once a content config run again routes a collection to the page', async () => {
+    const page = {}
+    const route = { pattern: '/later/:slug', params: ['slug'], file: 'later/[slug].kay' } as unknown as ServedRoute
+    const ctx = { params: { slug: 'hello' } } as unknown as PageContext<Record<string, unknown>>
+    const before = registerCollections([])
+
+    try {
+      expect(await entryHeadOf(page, route, ctx)).toBeUndefined()
+
+      const later = collection({ name: 'entry-head-later', load: () => [{ slug: 'hello', data: { title: 'Hello later' } }] }, { schema: t.Object({ title: t.String() }), route: '/later/:slug' })
+
+      registerCollections([['later', later]])
+
+      const tags = await entryHeadOf(page, route, ctx)
+
+      expect(tags?.some(tag => tag.tag === 'title')).toBe(true)
+    }
+    finally {
+      registerCollections(before)
+    }
   })
 })

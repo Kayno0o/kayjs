@@ -37,7 +37,7 @@ import { withPageTimeout } from './request-timeout'
 import { overHttps, requestUrl } from './request-url'
 import { revalidateStale } from './revalidate'
 import { canonicalPath, withoutSlash } from './routes'
-import { carryContext } from './security'
+import { carryContext, restoreStartedHeaders } from './security'
 import { serveServerIslands } from './server-islands'
 import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
 
@@ -251,7 +251,17 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
         pageRoutes.set(context.request, route.pattern)
 
         return traced(() => `${method} ${route.pattern}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }), async (span) => {
-          const response = await withPageTimeout(context.request, timeout, async () => respond(route, params, context, url), error => reportServerError(error, context.request, onError))
+          let response: Response
+
+          try {
+            response = await withPageTimeout(context.request, timeout, async () => respond(route, params, context, url), error => reportServerError(error, context.request, onError))
+          }
+          catch (error) {
+            // An `onError` of the app's, registered before kay's, answers with the context's headers, which the page's rendering took off it.
+            restoreStartedHeaders(context.request, (context as { set?: Context['set'] }).set)
+
+            throw error
+          }
 
           if (span)
             answered(span, response.status)

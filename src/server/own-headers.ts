@@ -65,15 +65,20 @@ export function ownHeadersInit(set: Context['set'], copies: HeaderCopies, hooked
 // What `startingHeaders` took off a request's context, so another response made for the same request (a render run again for the viewer) starts from them too, and an answer to an error thrown after it gets them back.
 const started = new WeakMap<Request, { own: Record<string, string>, hooked: Record<string, string> }>()
 
+// The requests whose context got its headers back for an error answer: a render the page's timeout left running takes nothing off it again.
+const restored = new WeakSet<Request>()
+
 // The headers a response made by kay itself starts with when the context holds nothing but what the request hooks put there: the security headers, the request id and the build, taken off it so Elysia has nothing to copy the response for. Undefined when the app or an extension set a header on the context too, for the caller to build its headers as before.
-export function startingHeaders(set: Context['set'], copies: HeaderCopies, request?: Request): Headers | undefined {
-  const own = (request && started.get(request)?.own) ?? takeOwnHeaders(set, copies.hooked)
+export function startingHeaders(set: Context['set'], copies: HeaderCopies, request: Request): Headers | undefined {
+  if (restored.has(request))
+    return undefined
+
+  const own = started.get(request)?.own ?? takeOwnHeaders(set, copies.hooked)
 
   if (own === undefined)
     return undefined
 
-  if (request)
-    started.set(request, { own, hooked: copies.hooked })
+  started.set(request, { own, hooked: copies.hooked })
 
   const headers = new Headers(copies.securedHeaders)
 
@@ -201,12 +206,14 @@ function takeOwnHeaders(set: Context['set'], hooked?: Record<string, string>): R
   return own
 }
 
-// Puts back on the context what `startingHeaders` took off it for a request, for an answer made after it by Elysia or an error hook to carry them.
+// Puts back on the context what `startingHeaders` took off it for a request, for an answer made after it by Elysia or an error hook, the app's own included, to carry them.
 export function restoreStartedHeaders(request: Request, set: Context['set'] | undefined): void {
   const taken = started.get(request)
 
   if (taken === undefined || set === undefined)
     return
+
+  restored.add(request)
 
   for (const name in taken.hooked)
     set.headers[name] ??= taken.hooked[name]!

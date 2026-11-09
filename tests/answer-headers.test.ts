@@ -258,6 +258,15 @@ describe('the headers of every kind of answer', () => {
       expect(policy).toBeDefined()
       expect(seen).toMatchObject(SECURITY)
     }
+
+    // An `onError` of the app's, registered before kay's, answers first, with the context's headers.
+    const outer = new Elysia().onError(() => new Response('mine', { status: 503 })).use(slow)
+    const answered = await outer.handle(new Request(`${ORIGIN}/slow`))
+
+    expect(answered.status).toBe(503)
+    expect(await answered.text()).toBe('mine')
+    expect(shape(answered)).toMatchObject(SECURITY)
+    expect(answered.headers.get('x-request-id')).toMatch(REQUEST_ID)
   })
 })
 

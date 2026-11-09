@@ -161,7 +161,7 @@ function withHeaders(headers: Record<string, string>, layers: Record<string, str
   return headers
 }
 
-export { carriedNames, carryContext, headerCopies, keepCookiesPrivate, ownedHeaders, ownHeaders, ownHeadersInit, setSecurityHeaders, startingHeaders } from './own-headers'
+export { carriedNames, carryContext, headerCopies, keepCookiesPrivate, ownedHeaders, ownHeaders, ownHeadersInit, restoreStartedHeaders, setSecurityHeaders, startingHeaders } from './own-headers'
 export type { HeaderCopies } from './own-headers'
 
 const HASH_OR_NONCE = /^'(?:nonce-|sha(?:256|384|512)-)/i

@@ -270,11 +270,12 @@ function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, 
 
     return tag !== undefined && defaults.includes(tag)
   }
-  const fill = (key: 'name' | 'property', name: string, value: string | undefined) => {
+  // `shared` for a value most pages fill alike, kept with its markup; a page's own title, description or URL is made per render.
+  const fill = (key: 'name' | 'property', name: string, value: string | undefined, shared = false) => {
     const identity = `meta:${key}:${name}`
 
     if (value !== undefined && !winners.has(identity))
-      winners.set(identity, [filledTag(key, name, value)])
+      winners.set(identity, [shared ? filledTag(key, name, value) : { tag: 'meta', props: { [key]: name, content: value } }])
   }
 
   const absolute = (identity: string, attribute: 'content' | 'href') => {
@@ -296,9 +297,9 @@ function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, 
 
   const size = image !== undefined && ABSOLUTE_PATH.test(image) && !winners.has('meta:property:og:image:width') ? sizeOf?.(image) : undefined
 
-  fill('property', 'og:image:width', size && String(size.width))
-  fill('property', 'og:image:height', size && String(size.height))
-  fill('name', 'twitter:image:alt', content('meta:property:og:image:alt'))
+  fill('property', 'og:image:width', size && String(size.width), true)
+  fill('property', 'og:image:height', size && String(size.height), true)
+  fill('name', 'twitter:image:alt', content('meta:property:og:image:alt'), true)
 
   absolute('link:canonical', 'href')
   absolute('meta:property:og:image', 'content')
@@ -309,7 +310,7 @@ function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, 
   fill('property', 'og:url', winners.get('link:canonical')?.[0]?.props.href as string | undefined)
 
   if (winners.has('meta:property:og:image') || winners.has('meta:name:twitter:image'))
-    fill('name', 'twitter:card', 'summary_large_image')
+    fill('name', 'twitter:card', 'summary_large_image', true)
 }
 
 function isResource({ tag, props }: HeadTag): boolean {
@@ -376,9 +377,10 @@ function identityOf(tag: HeadTag): string | undefined {
   return keptIdentity.has(tag) ? keptIdentity.get(tag) : replaceableIdentity(tag)
 }
 
-// The social tags `fillSocial` makes, by name and value, kept with their markup: most pages fill the same few from the site's defaults. A value that differs per page, such as `og:url`, empties it once it holds `FILLED_MAX`.
+// The social tags `fillSocial` fills alike on most pages (an image's size and alt text, the card type), by name and value, kept with their markup. A site whose pages set many images empties it once it holds `FILLED_MAX`, and a long alt text is never kept.
 const filled = new Map<string, HeadTag>()
 const FILLED_MAX = 256
+const FILLED_LENGTH = 200
 
 function filledTag(key: 'name' | 'property', name: string, value: string): HeadTag {
   const id = `${key}:${name}\n${value}`
@@ -387,10 +389,13 @@ function filledTag(key: 'name' | 'property', name: string, value: string): HeadT
   if (known)
     return known
 
+  const tag = { tag: 'meta', props: { [key]: name, content: value } }
+
+  if (value.length > FILLED_LENGTH)
+    return tag
+
   if (filled.size >= FILLED_MAX)
     filled.clear()
-
-  const tag = { tag: 'meta', props: { [key]: name, content: value } }
 
   keepHeadMarkup([tag])
   filled.set(id, tag)

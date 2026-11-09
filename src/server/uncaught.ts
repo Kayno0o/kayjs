@@ -2,10 +2,10 @@ import type { Elysia as App } from 'elysia'
 import type { ObserveConfig } from '../config'
 import type { RequestContext } from './render'
 import { kayLog } from '../runtime/log'
-import { restoreStartedHeaders } from './own-headers'
 import { describeError, sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { RequestTimeoutError, timedOutResponse } from './request-timeout'
+import { restoreStartedHeaders } from './security'
 import { replyTrace } from './trace'
 
 const TEXT = 'text/plain; charset=utf-8'
@@ -22,13 +22,13 @@ function asksForPage(request: Request): boolean {
 // The handler destructures what it reads: Elysia takes one handed the whole context for a reader of the body and parses every body for it. The rest is what the app's derive hooks added, which the error page reads as `ctx.locals`; the spread stays last and outside any call, since Elysia reads `locals,` or `locals)` in the source as the whole context being handed on.
 export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean, onError: ObserveConfig['onError'], page: (error: unknown, context: RequestContext) => Promise<Response> }): void {
   app.onError({ as: 'global' }, async ({ request, error, code, ...locals }) => {
+    restoreStartedHeaders(request, locals.set)
+
     if (error instanceof Response)
       return error
 
     if (!isUncaught(error, code))
       return undefined
-
-    restoreStartedHeaders(request, locals.set)
 
     reportServerError(error, request, onError)
 

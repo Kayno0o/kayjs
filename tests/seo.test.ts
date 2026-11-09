@@ -1,7 +1,9 @@
+import type { HeadTag } from '../src/runtime/head'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config-loader'
+import { collectHead, head, keepHeadMarkup } from '../src/runtime/head'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { isCrossSite } from '../src/server/cross-site'
 import { siteOrigin } from '../src/server/seo'
@@ -332,5 +334,34 @@ describe('sitemap and robots', () => {
     expect((await own.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(200)
     expect((await plain.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(404)
     expect((await plain.handle(new Request('http://localhost/robots.txt'))).status).toBe(404)
+  })
+})
+
+describe('the social tags a render fills', () => {
+  const defaults = [{ tag: 'meta', props: { property: 'og:image', content: '/card.png' } }, { tag: 'meta', props: { property: 'og:image:alt', content: 'The site' } }]
+
+  keepHeadMarkup(defaults)
+
+  const render = (tags: HeadTag[], origin = 'https://a.example') => collectHead(() => head(tags), { defaults, social: { origin, sizeOf: () => ({ width: 1200, height: 630 }) } }).head.html
+
+  it('gives each origin its own absolute URL of a default image', () => {
+    expect(render([])).toContain('<meta property="og:image" content="https://a.example/card.png">')
+    expect(render([], 'https://b.example')).toContain('<meta property="og:image" content="https://b.example/card.png">')
+    expect(render([])).toContain('<meta property="og:image" content="https://a.example/card.png">')
+  })
+
+  it('fills each page\'s own title, and each image\'s alt text, past as many as are kept and however long', () => {
+    const long = 'x'.repeat(300)
+
+    for (let index = 0; index < 300; index++) {
+      const html = render([{ tag: 'title', props: { children: `Page ${index}` } }, { tag: 'meta', props: { property: 'og:image:alt', content: `Alt ${index}` } }])
+
+      expect(html).toContain(`<meta property="og:title" content="Page ${index}">`)
+      expect(html).toContain(`<meta name="twitter:image:alt" content="Alt ${index}">`)
+    }
+
+    expect(render([{ tag: 'meta', props: { property: 'og:image:alt', content: long } }])).toContain(`<meta name="twitter:image:alt" content="${long}">`)
+    expect(render([])).toContain('<meta name="twitter:image:alt" content="The site">')
+    expect(render([])).toContain('<meta property="og:image:width" content="1200">')
   })
 })

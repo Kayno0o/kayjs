@@ -3,18 +3,19 @@ import type { PageContext } from '../runtime/core'
 import type { HeadTag } from '../runtime/head'
 import type { ServedRoute } from './guards'
 import { isCollection } from '../content'
+import { registeredCollections } from '../content/edit-registry'
 import { entryHead } from '../content/entry-head'
 import { FEED_TYPES, feedPaths, resolvedFeed } from '../content/feed'
 import { localHref } from '../runtime/html'
 import { pagePrerender, pageSetting } from './page-settings'
 
-// The page modules that list no collection and name no feed, which have no entry head on any request.
-const headless = new WeakSet<object>()
+// The page modules that list no collection and name no feed, which have no entry head on any request, with the collections registered when that was found: a content config run again may route one to the page.
+const headless = new WeakMap<object, unknown>()
 
 // The head of a page showing one entry of the collection its `prerender` or `sitemap` lists, written from the entry's data: the collection fills a route of one param with the slugs, so the entry is the one `get()` finds for it.
 // With the discovery links of the feeds of that collection and of those the page's `feed` setting names, unless it says `false`. Settled at once when there is no entry to read.
 export function entryHeadOf(page: object, route: ServedRoute, ctx: PageContext<Record<string, unknown>>): Promise<HeadTag[] | undefined> | HeadTag[] | undefined {
-  if (headless.has(page))
+  if (headless.get(page) === registeredCollections())
     return undefined
 
   const listed = pagePrerender(page, route)
@@ -25,7 +26,7 @@ export function entryHeadOf(page: object, route: ServedRoute, ctx: PageContext<R
   const links = feeds.flatMap(feedLinks)
 
   if (!isCollection(collection) && links.length === 0)
-    headless.add(page)
+    headless.set(page, registeredCollections())
 
   if (!isCollection(collection) || route.params.length !== 1)
     return links.length > 0 ? links : undefined

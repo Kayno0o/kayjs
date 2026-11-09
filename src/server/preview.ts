@@ -515,6 +515,10 @@ export function sharedEntry(request: Request): PreviewScope | undefined {
     return undefined
 
   const url = requestUrl(request)
+
+  if (url.search === '')
+    return undefined
+
   const [until, entry, sig, ...extra] = url.searchParams.get(SHARE_PARAM)?.split('.') ?? []
 
   if (until === undefined || entry === undefined || sig === undefined || extra.length > 0 || !(Number(until) > Date.now() / 1000) || !signed(settings, shareText(until, entry, sharedPath(url.pathname)), sig))
