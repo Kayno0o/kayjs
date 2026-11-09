@@ -1,6 +1,126 @@
 # Upgrading, older releases
 
-What each minor release before 1.92 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.93 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.92.0
+
+### `saveEntry`, `saveEntries`, `removeEntry` and `showDraft` resolve `ok`
+
+They resolve `{ ok: true }` where they resolved `{}`, and `{ ok: false, error, issues }` where they resolved `{ issues }` (`saveEntries` also `{ ok: false, error, changed: true }` where it resolved `{ changed: true }`); `issues` and `changed` stay. A test fake or a wrapper that builds one of these by hand needs `ok` and `error`, and code comparing the result to `{}` reads `ok`. No lint can see it: a value read from a promise is not visible to `kay check`.
+
+### `resource()` asks its route while the page renders
+
+An island's `resource(api, '/path')` is now asked in process, as the visitor, while the server renders the page, and the island hydrates `ready` instead of rendering `loading` and asking from the browser. A route whose read must happen in the browser, because reading it records something or admits the reader as the cms editor's entry read does, takes `{ seed: false }` to keep the old behaviour: [read a route's answer in an island](api-from-islands.md#read-a-routes-answer-in-an-island).
+### kayjs-auth results carry `error` as an `ErrorShape`, the kind is `error.code`
+
+Every failed kayjs-auth result is `{ ok: false, error }` with `error` the `ErrorShape` the rest of kay answers (`status`, `message`, `errors`, `data`) and the kind in `error.code`, where `error` was the kind string: `result.error === 'limited'` is `result.error.code === 'limited'`, `switch (result.error)` is `switch (result.error.code)`, and `ctx.fail(400, { error: result.error })` is `{ error: result.error.code }` to keep passing the word to a form. A call that refused its input (`errors` by field) puts `error` beside `errors`, with `error.code` `'invalid'`; `'errors' in result` still tells them apart. `deprecated-auth-error` finds the comparisons where `kay check` types the result as an auth one and `kay upgrade` rewrites them; a result stored or passed on untyped, and a form's `failed()?.data?.error` string, are left to you. The old form does not keep working, as the string and the object cannot share `error`. A test comparing a whole result, `toEqual({ ok: false, error: 'limited' })`, matches `{ ok: false, error: { code: 'limited' } }` with `toMatchObject`, as `error` also carries `status` and `message`.
+
+### kayjs-auth hooks follow the hook convention, `onSignUp` no longer fails the sign-up
+
+`onAuthEvent` is `onEvent` and `onDelete` is `beforeDelete`, and every hook of `auth()` gets a `context` (an `AuthHookContext`: kay's `HookContext` and the `actor`, the admin or manager who acted, else `null`) beside its fields: `onSignUp({ user, profile, context })`, `beforeDelete({ user, context })`, `onEvent({ event, user, context, ...fields })`. The old names work until 1.95, `kay check` flags them as `deprecated-hook-names`, and `kay upgrade` renames the `onAuthEvent` key in the options of `auth()`, `authCore()` or `createAuth()` and in the `hooks` of `src/auth.ts`. It leaves `onDelete` to you: `beforeDelete` is cut off after 10 s and refuses on `false` or a throw, where `onDelete` waited and propagated, so check a slow cleanup before renaming. `onDelete` keeps running before the erase and a throw keeps the account, after `beforeDelete`: it has not turned into an after-delete hook. `beforeDelete` can also refuse with `false` or `refuse()`, which `account.delete` and `admin.deleteUser` answer as `{ ok: false, error: { code: 'refused', status, message } }`, so an exhaustive `switch (result.error.code)` over their results adds `'refused'`.
+
+`kay check` cannot find the change of `onSignUp`: a throw in it used to fail `password.register`, `signInAsGuest` and the OAuth callback after the user was written, and is now logged, reported to the app's `onError` with source `auth.onSignUp`, and the sign-up stands. A hook that relied on the throw to refuse a sign-up checks in `allow`, or deletes the user itself. A throw in `onEvent` was already logged; it is reported to `onError` with source `auth.onEvent` too.
+
+### kayjs-ai hooks follow the hook convention, `onError` is told an object
+
+`onRequest` is `beforeRequest` and `onFinish` is `onSuccess`, `onError(error)` is `onError({ error, context })`, and every hook of `ai()` and `ask()` gets a `context` (kay's `HookContext`) beside its fields. `beforeRequest` also refuses with `false` (a 403, as `refuse()`). The old `onRequest` and `onFinish` work until 1.95, run after the new names when both are set, and `kay check` flags them as `deprecated-hook-names`; `kay upgrade` renames them in the options written out at a call of `ai()` or `ask()`, and wraps the argument of an `onError` written there as an arrow or a function: `error => report(error)` becomes `({ error }) => report(error)`.
+
+`kay check` cannot find an `onError` that is a reference (`onError: report`), a function with a typed parameter, or one set through a variable: it reports them with no fix, and the hook is told `{ error, context }` where it was told the error, so read `error` of its argument.
+
+A hook given to `ask(prompt, { onSuccess })` no longer replaces the one of `ai()` of the same name: both run, the one of `ai()` first. An app that relied on the replacement to switch a bill or an audit off for one ask sets it from one place instead (an option of its own that the hook reads). A throw in `onStep`, `onToolCall`, `onSuccess` or `onError` is still logged and never fails the reply, and is now also handed to the app's `onError` with source `ai.onStep`, `ai.onToolCall`, `ai.onSuccess` or `ai.onError`.
+
+### kayjs-ui callbacks follow the hook convention, SaveForm's `onSave` is `save`
+
+`onSaved` is `onSave` on Form, FormDialog and SaveForm, `onSent` is `onSend` on ContactForm and SubscribeForm, and `onEnded` is `onEnd` on AudioPlayer, each told what it was told. The old names work until 1.95, run after the new ones when both are set (also when the new one throws), and `kay check` flags them in a template as `deprecated-hook-names`; `kay upgrade` renames them, a shorthand `{onSaved}` becoming `onSave={onSaved}`. An element with a spread is reported with no fix.
+
+SaveForm's `onSave` was the call that does the save for an editor with no `action` (`SaveForm(dirty={changed()} onSave={run})`), and is `save` now, as `onSave` hears an `action`'s result. An `onSave` with no `action` is still read as the call that does the save until 1.95, and `kay check` offers `save` for it when the SaveForm has no `action` and no spread. `kay upgrade` does not apply that one: an `on*` attribute made the component an island and `save` does not, so `kay check` reports `promoted-island` until the component is marked `--- island`.
+
+An `onSave` beside an `action` used to replace the `action`, and now only hears its result: the form calls the `action` and the function is told the result. `kay check` warns, with no fix, about one that takes no parameter, which was the old call; write `save` for it and drop the `action`. It cannot tell a reference or a function reading its parameter from the new hook, and leaves those alone.
+
+### kay `QueuedJob.runAt` is a `Date`
+
+The jobs `jobs(queue)` follows in an island carry `runAt` as a `Date` where they carried milliseconds: read `job.runAt.getTime()` for the number. The `JobStore` interface keeps milliseconds. No lint can see it: a type changing under a property is not visible to `kay check`.
+
+### kayjs-ai `ConversationSummary.updatedAt` is a `Date`, and a store lists `ConversationRow`
+
+A Chat's `conversations()` holds `ConversationSummary` with `updatedAt` a `Date`, where it was milliseconds: read `.getTime()` for the number. A `ConversationStore` of your own lists the new `ConversationRow` (the old `ConversationSummary`, `updatedAt` in milliseconds), and `StoredConversation` extends it. No lint can see it: a type changing under a property is not visible to `kay check`.
+
+### kayjs-cms `KeptDraft.at` is `editedAt`
+
+A `DraftKeeper` of your own reads and writes `editedAt` (milliseconds) where it read `at`. `browserKeeper()` still reads the drafts an older release kept in `localStorage`. No lint can see it: the property is read on a value.
+
+### A `local()` issue's `at` is `createdAt`, a `Date`
+
+`issues()` of a `local()` collection lists `createdAt: Date` where it listed `at` in milliseconds: read `issue.createdAt` (`.getTime()` for the number). Issues a browser stored before the upgrade are read as they were, `at` becoming `createdAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
+### kay `StoredFile.modified` is `modifiedAt`
+
+`files.list()` and `FileStore.list` answer `{ key, modifiedAt }` where they answered `modified`, still a `Date` and absent when the store cannot say. A `FileStore` of your own returns `modifiedAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
+### kayjs-auth `ban.at` is `ban.bannedAt`
+
+The `ban` of an admin's `User` and of the data export is `{ bannedAt, until, reason }`: `at` is now `bannedAt`, the same name as `UserRecord.bannedAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
+### kayjs-cms `EntryRow` times are a `Date`
+
+`EntryRow.modifiedAt`, `scheduledAt` and `endsAt` are a `Date` where they were epoch milliseconds: a row read with `row.modifiedAt - now` reads `row.modifiedAt.getTime() - now`. The cms screens' own rows follow (`HistoryRow.savedAt` and `revision`, `TrashRow.deletedAt`, `ActivityRow.doneAt`, `LibraryUpload.sentAt`, the `doneAt` of each event of a `ReviewView`), as do the props of the `EntryEdited` (`editedAt`) and `EntryStatus` (`goesLiveAt`, `endsAt`) components. No lint can see it: a property read on a value is not visible to `kay check`.
+
+### kayjs-cms `Recovery.at` is `editedAt`, a `Date`
+
+`cmsDrafts().recovery(ref)` answers `{ editedAt, restored }`, `editedAt` a `Date` where `at` was milliseconds: a notice reading `recovery.at` reads `recovery.editedAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
+### kay `Notification.at` is `createdAt`, a `Date`, and the notification and push stores rename their times
+
+`notify()`, `notifications.list()` and the items of `notifications.inbox()` carry `createdAt: Date` where they carried `at` in milliseconds, and `pushSubscriptions.list()` answers `{ endpoint, createdAt: Date }`. A store of your own (`NotificationStore`, `PushStore`) keeps milliseconds under the new names: `StoredNotification` is `{ createdAt, expiresAt }` (was `at`, `expires`), `PushSubscriptionRecord` has `createdAt` (was `at`), and `NotificationStore.list` answers the new `NotificationRow`, a notification with `createdAt` in milliseconds. The built-in stores keep their tables as they were. No lint can see it: the old names are properties on values, which `kay check` does not follow.
+
+### kayjs-mail `Suppression.at` is `suppressedAt`, a `Date`
+
+`mail.suppression(address)` answers `{ email, reason, source, suppressedAt }` with `suppressedAt` a `Date`, where it answered `at` in milliseconds: read `suppression.suppressedAt` (`.getTime()` for the number). A `SuppressionStore` of your own returns the new `StoredSuppression`, the same row with `suppressedAt` in milliseconds, from `suppressed()`. No lint can see it: a number becoming a `Date` and a property read on a value are not visible to `kay check`. The rule is in [conventions](component-library-conventions.md#reference).
+
+### kayjs-ui Menu entries are a wider type, and `@item` is handed any of them
+
+`MenuEntry` gained checkbox, radio, submenu and heading entries (`MenuCheckbox`, `MenuRadio`, `MenuSubmenu`, `MenuHeading`), and a Menu's `@item(entry)` snippet is handed a `MenuItem` (an action, checkbox, radio or submenu) instead of a `MenuAction`. A snippet typed `(entry: MenuAction)`, or code reading `entry.label` of every `MenuEntry`, stops type-checking: type the snippet `Snippet<[entry: MenuItem]>` or narrow on the entry's kind (`'items' in entry`, `'radioGroup' in entry`, `'heading' in entry`). `kay check` cannot flag it, as the old form is a type annotation.
+
+### A link handler that prevents the default keeps the router from following it
+
+An island's `onClick` on a link that calls `event.preventDefault()` now stops kay's router from swapping the page in; before, the router followed the link anyway. A handler that wants the navigation to go on leaves the default alone.
+
+### A Menu entry's `danger: true` is `tone: 'danger'`, and a toast's `type` is its `tone`
+
+`MenuAction.danger` is `tone: 'danger'`, the tone every component names a meaning with, and `kay check` flags the flag as `deprecated-menu-danger` in the entries written out in a Menu's `items`, with a safe fix that `kay upgrade` applies; items built elsewhere and passed by name are found by the editor's strike-through on `danger` instead. The flag works until 2.0.0.
+
+`Toast.type` and `ToastType` are deprecated for `Toast.tone`, where `error` is `danger`, and the exported `Toast` is `{ id, message, tone }` in 2.0.0. No lint can see it: an app reading `toasts()[n].type`, or a `@toast` snippet reading `item.type`, reads `item.tone` instead. `toast.error`, `toast.success` and `toast.info` stay.
+
+### An IconPicker's `search` is a function `icons`
+
+`IconPicker(search={find})` is `IconPicker(icons={({ q, limit, offset }) => find(q, limit, offset)})`: `icons` takes a set, a promise or a function handed `{ q, limit, offset }`, the source every choice control takes, and its `onError` gets `{ error, query }` with a new `onLoad(icons, query)` beside it. `kay check` flags `search` as `deprecated-icon-picker-search` with a safe fix that `kay upgrade` applies; the prop works until 1.95.
+
+### kayjs-ai retries a failed request, and a `Step` has four more members
+
+A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` before anything streamed is now asked again by default, 2 requests per model (`ai({ retry: false })` opts out), so a failing request can cost up to two requests per model, and each failed attempt reaches `onStep` and `onError` and is listed in `reply.steps`. An app building a `Step` by hand (a test double, a stored copy) adds `provider`, `model`, `attempt` and `failed`: [when a provider fails](../packages/ai/llms/asking.md#when-a-provider-fails).
+### The `slug` matcher takes more
+
+A `[x=slug]` route beside a plain `[y]` route now takes `été` and `a_b`, which used to fall through to the plain route: lowercase words of any script, digits and `_`, joined by dashes (and `/` in a rest param). Nothing already accepted is refused. A matcher now gets a second argument, `true` for a catch-all param, so one exported as a built-in taking a second parameter, `export default parseInt`, wraps it: `(value: string) => parseInt(value)`.
+
+### The forms 1.88 deprecated are gone
+
+Their `deprecated-config-groups`, `deprecated-room-types` and `deprecated-duration-seconds` lints go with them: run `kay upgrade` on 1.91 first and it rewrites what it can; what `kay check` reported with no fix (a config with the bag already present or a spread, a `lifetime` or `durationWords` number that is no integer literal or is held in a variable) is changed by hand. On 1.92 a flat config key is refused as an unknown key naming its bag, and a bare number of seconds throws.
+
+- The flat config keys are refused in `kay.config.ts`, an extension's `config` and the options of `pages()` and `testSite()`, naming where each lives: `routesDir`, `apiDir` and `publicDir` are `dirs: { routes, api, public }`, `maxSize` and `maxSizeByPath` are `limits: { body, byPath }`, `apiPath`, `compress`, `compressionDictionary` and `shutdownTimeout` are `serve`, `log`, `serverTiming`, `requestIdHeader`, `tracer` and `onError` are `observe`, and `navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch` and `saveData` are `client`.
+- The types AsyncRoomStore and AsyncRooms from `kay/server` are `RoomStore` and `Rooms`, and StoreRooms is `Rooms`.
+- kayjs-auth's `lifetime(seconds, locale)` and kay's `durationWords(seconds, locale)` take a duration with its unit, `'86400s'` for 86400, and throw for a bare number.
+
+### `EventReader` and `StreamRun` are `Connection` and `Stream`, and `.on` of a stream is `.onData`
+
+`stream()` has two overloads and one return type: a `Stream`, a `Connection` with `start()` (a stream opened with `start: false` was a `StreamRun`), and a streaming action's `ActionStream` is a `Connection` too, so it has `retry()`, `onOpen()` and `onData()` beside `ended()`. `EventReader` and `StreamRun` from `kay` are `Connection` and `Stream`; the old names work until 1.95, `kay check` flags an import of them as `deprecated-stream-types` and `kay upgrade` renames it. `feed.on(value => ...)` is `feed.onData(({ value }) => ...)`, the hook every source hands its data through; `on` works until 1.95 and `kay check` flags it as `deprecated-stream-on`, with a safe fix, on a name the file binds once to `stream(` or `socket(` from `kay` (a stream reached through a property, a parameter or an action's answer is changed by hand). A mock of a stream written out as an object must add what the type now holds: `ended`, `onData` and `start` for a `stream()`, `retry`, `onOpen` and `onData` for an `ActionStream`, `onData` for a `socket()`.
+
+### `pending()` and `status()` of a `local()` collection are `unsynced()` and `syncStatus()`
+
+Every other source reads `pending()` as a boolean and `status()` as `idle|loading|ready|failed`, so a collection's count of writes waiting is `unsynced()` and its sync states, `'unsynced'` for the former `'pending'`, are `syncStatus()`. Nothing changes yet: `pending()` and `status()` keep their old values until 2.0, which gives them the shared meaning (a template rendering `{todos.pending()}` would then print `true`). `kay check` flags both as `deprecated-local-state` on a name the file binds once to `local(` from `kay`, templates included, with a safe fix for `.pending()` and for a `status()` compared with a string (`'pending'` becomes `'unsynced'`); a `status()` read in any other way, or on a collection reached through a prop or another file, is changed by hand. A mock of a `local()` collection written out as an object must add `unsynced`, `syncStatus`, `error`, `retry`, `onSync`, `onIssue` and `onError`.
+
+### `onOpen` of a socket, a stream and an action's stream is told `{ reconnected }`
+
+`feed.onOpen(reconnected => ...)` is `feed.onOpen(({ reconnected }) => ...)`, the one object argument every [hook](hooks.md) takes; a callback taking no argument is unchanged. The old form still compiles, as an object is truthy, so `onOpen(reconnected => reconnected && refetch())` now runs on every open, the first included. `kay check` flags it as `deprecated-stream-open` on a name the file binds once to `stream(` or `socket(` from `kay`, with a safe fix for an arrow of one plain parameter (a function reference is reported, not fixed); a stream reached through a property, a parameter or an action's answer is changed by hand. A mock of a `stream()`, a `socket()` or an `ActionStream` written out as an object must add `onError` and `onClose`, a mock of a `resource()` `onData` and `onError`, and of a `track()` handle `onSuccess` and `onError`.
 
 ## 1.92.0 (continued)
 
@@ -32,97 +152,4 @@ What a component passes never makes it an island any more. `kay upgrade` runs th
 
 The route that resizes an image is `/_kay/images?src=...&w=...`, beside the variants under `/_kay/images/`; the `/_kay/image` it had keeps answering, for cached pages and links you wrote, until 1.95. A link you wrote by hand moves to the new path; kay's own `image()` URLs change at the next build. Queues, workflows and schedules are defined and mounted in `src/plugins/jobs.ts` (`export default` the queue); a `src/jobs.ts` that a plugin or `src/server.ts` imports still works, and `kay check` warns (`unmounted-jobs`) of one nothing imports. No lint rewrites either, as `kay upgrade` rewrites text inside a file and moves no file.
 
-## 1.91.0
-
-### kayjs-auth: the escape is `server: false`
-
-- `auth({ plugin: false })` is `auth({ server: false })`, the escape `mail({ server: false })` takes too; the old name works until 1.94 and `kay check` flags it as `deprecated-escape-option`, with a safe fix that `kay upgrade` applies.
-
-### The forms 1.87 deprecated are gone
-
-Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it rewrites every one that has a fix. On 1.91 each fails `kay check`, and a Table, TreeView or Timeline `onSelect`, a `queue()`, `workflow()` or `mailer({ queue })` `onFailed` or `keepFailed`, and `fileStore` in the config also throw when they run, so none is a silent change.
-
-- `fileStore` in the config is `store: { files }`; the config refuses the old key, naming the new one.
-- kayjs-auth's flat account, provider and audit methods (`auth.deleteAccount`, `auth.changeUsername`, `auth.listIdentities`, `auth.listAuditLog` and the rest) are `auth.account.*`, `auth.oauth.*` and `auth.audit.*`, and `createUser` on the `createAuth` result is `auth.admin.createUser`.
-- A page's `revalidate` is `ttl`, `notify(user, { keep })` is `ttl`, a `queue()` or `workflow()` `keepFailed` is `failedTtl`, and kayjs-ai's `Chat` `keep` is `history`.
-- `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, which also gets `id` and `attempts`.
-- The `onSelect` of a Table, TreeView or Timeline is `onSelectedChange`, and is no longer called.
-- `.answer` of an `ApiError` is `.data`, and of an `ActionError` `.body`.
-- `refusalMessage(error, fallback)` is `error instanceof ApiError ? error.message : fallback`.
-- The types StreamStatus, ResourceStatus and ResourceFailure from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError`.
-- `api({ errorShape })` is gone: a refused input always answers `{ errors, status }`, and `'elysia'` no longer keeps Elysia's own body.
-### Environment variable names follow one rule
-
-- `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL` (kayjs-auth), and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND` (kayjs-mail), as `MAIL_EVENTS_<PROVIDER>` is named. The old names are read until 1.94, with one warning at boot, and `kay env` warns when the environment, a compose file or `.env.example` holds one; `kay check` reads code, not the environment, so no lint ships: rename them in your `.env`, compose files and deployment. `SITE_URL`, `SITE_BASE`, the vendors' keys and `<PROVIDER>_CLIENT_ID` and `_SECRET` keep their names. The rule is in [Environment variables](environment.md).
-
-### Constructors are nouns, Postgres helpers share one `PgSource`
-
-- kayjs-auth's `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms's `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`.
-- `PgJobsSource` is `PgSource` (`kay/server`, `kay/library`), which every Postgres store and table helper takes; kayjs-mail's `createMailSuppressionTable` from `@kaynooo/kayjs-mail/pg` is `createMailSuppressionTables` and its `mailListTables` is `mailListTableNames`, as `jobTableNames` lists names and `createXTables` creates.
-- The `sql` key of `pgLoader({ ... })` in kayjs-cms is `source`, which also takes a pg-orm `Database`.
-- The old names work until 1.94, and `kay check` flags an import of each, and the `sql` key, as `deprecated-library-names`, with a safe fix that `kay upgrade` applies.
-### `AiError.code` is `ai-error`, and the library error messages open with one prefix
-
-- `AiError` extends `KayError`: read `error.kind` for what the failure is (`'auth'`, `'rate-limited'`, `'schema'`), which `error.code` held until now. `kay check` cannot see a read of `.code`, so no lint reports it. `error.code` is `'ai-error'` and `kay explain ai-error` lists the kinds.
-- A message opens with `kay: ` for a setting, `kayjs-<library>: ` for a refused call and nothing for text shown to a visitor: `OAuthExchangeError`, `MailNotConfiguredError`, `UnreadReferrersError` and `UpstreamError` gained their library prefix. An app matching on the start of one of those messages updates the match.
-
-## 1.90.0
-
-### FileDrop is a form control
-
-- kayjs-ui FileDrop's `onReject(files, reason)` is called once per reason (`type`, `size`, `count`) instead of once with every file left out, so a toast counting the refused files fires once per reason; `kay check` cannot see it, the type being unchanged. Its `onChange` is the kept-files callback, no longer the root `div`'s DOM `onChange`: a handler reading an event there stops working, with no safe fix, so move it to a wrapping element.
-
-### One name, one meaning
-
-- kayjs-mail's `cssColours` is `cssColors`, the spelling `colorField` and the `color` props use. The old name works until 1.93, and `kay check` flags an import of it as `deprecated-export-names`, with a safe fix that `kay upgrade` applies.
-- `kay/server` has three names that `kay` and `kay/pg-orm` give another meaning: `EveryOptions` of `schedule()` is `ScheduleEveryOptions` (`EveryOptions` of `kay` is the client timer's), and the lists of table names for pg-orm's `ignoreTables`, `jobTables` and `dataTables` of `kay/server`, are `jobTableNames` and `dataTableNames` (`jobTables` of `kay/pg-orm` stays the table definitions). The old names work until 1.93, and `deprecated-export-names` renames an import from `kay/server`, with its uses.
-- The libraries' types and functions that shared a name with another package's now carry their library's prefix, so an app importing from two of them aliases none: kayjs-mail's `Reply`, `Attachment` and `WaitOptions` are `MailReply`, `MailAttachment` and `MailWaitOptions`; kayjs-ai's `Reply`, `Attachment`, `ToolCall` and `Message` are `AiReply`, `AiAttachment`, `AiToolCall` and `AiMessage`; kayjs-cms's `Action` and `DraftEntry` are `CmsAction` and `CmsDraftEntry`, its `Member` from `@kaynooo/kayjs-cms/room` is `CmsMember` and its `SeedEntry` from `/pg` and `/sqlite` is `CmsSeedEntry`; kayjs-auth's `guard`, `Member` and `ProofOfWorkOptions` are `authGuard`, `AuthMember` and `AuthProofOfWorkOptions` (`kay add auth` and `kay new` write `authGuard()` in `_guard.ts`); kayjs-ui's `editing()` and `Editing` are `rowEditing()` and `RowEditing`, as `editing()` of `kay` says whether the server renders for an editor. The old names work until 1.93, and `kay check` flags an import of each as `deprecated-export-names`, with a safe fix that `kay upgrade` applies. `Logo` of kayjs-mail and kayjs-cms, `CollectionInfo`, `JsonSchema` and `LazyGuard` of kayjs-cms are kay's own types re-exported, and kayjs-cms's `EntryRef` is now `EntryRef` of `kay/edit`, whose `locale` also accepts `undefined`: none of them changes.
-
-### One `RateLimit`
-
-- Every rate limit is kay's `RateLimit` (`{ max, window, store?, key? }`), and each `rateLimit` option takes one or a list. Renamed, the old names working until 1.93 and `deprecated-export-names` renaming an import: `ApiRateLimit` of `kay/server` is `RateLimit`, kayjs-auth's `Limit` is `AuthRateLimit`, kayjs-ai's `LimitOptions` is `AskLimit`.
-
-### The email format is one strict check
-
-- `s.String({ format: 'email' })`, the browser check and kayjs-auth's sign-up now share one check, the one kayjs-mail delivers to: one plain address, a local part up to 64 characters and a label up to 63 (both were unbounded in auth's pattern), at most 254 characters in all, and a host typed as the URL parser keeps it (no soft hyphen, zero-width space, fullwidth letter or ideographic full stop). A quoted or commented local part, a name with angle brackets, a list and a line break are refused. `user@192.168.0.1` passed the schema before and is refused now; use a domain name. Non-ASCII local parts and internationalised domains now pass `format: 'email'` for every field of an app, which Elysia's ASCII pattern refused; only kayjs-auth also refuses a name mixing Latin with Cyrillic or Greek. `kay check` cannot recognise any of it, so there is no lint.
-### `context` is `createContext`
-
-- `context(default)` of `kay` is `createContext(default)`, as `context` read as `ctx` and `defineContext`, which are other things. The old name works until 1.93; `deprecated-context-name` renames the import and its uses, and a re-export keeps its public name (`export { createContext as context } from 'kay'`); a namespace import or a dynamic `import()` is left to the type check.
-
-### The root of kayjs-auth and kayjs-cms stops repeating their browser entries
-
-- `normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `DEFAULT_RULES`, `mixesConfusableScripts`, the length constants and their types are imported from `@kaynooo/kayjs-auth/rules`, no longer from `@kaynooo/kayjs-auth`; `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, no longer from `@kaynooo/kayjs-cms`. `deprecated-import-path` rewrites the import, and a re-export from the root. A namespace import (`import * as auth from '@kaynooo/kayjs-auth'`) or a dynamic `import()` of a moved name is left to the type check.
-### kayjs-ui: show and hide state is `open`, `onOpenChange` and `false`
-
-- A Table's and a TreeView's `onToggle(key, open)` and `onToggle(id, open, node)` are `onOpenChange` with the same arguments; the old name works until 1.93 and `kay check` flags it as `deprecated-open-change`, with a safe fix that `kay upgrade` applies.
-- `CollapsibleSection` starts folded and `Accordion` draws plain headings, as every `open` and `boxed` defaults to `false`: `kay check` cannot see a default, so write `CollapsibleSection(title="Active" open)` where the section starts unfolded, and `Accordion(items boxed)` where the cards are wanted.
-### A `@keyframes` name in a `--- style` fence is scoped
-
-- The name is scoped to its component, with the `animation` and `animation-name` values in the same fence that use it, so two components defining `@keyframes spin` no longer collide. A keyframes name an app uses from elsewhere (another stylesheet, `animate-[spin_1s]`, a class set in a script) stops matching: write `@keyframes :global(spin)` in the fence to keep the name as written, or move the keyframes to a stylesheet the page imports. A name held in a custom property (`--anim: spin` read through `var(--anim)`) is not rewritten: write it through `:global` or set the property to the scoped name: [components](components.md#file-layout).
-### kayjs-auth: a feature that is off answers `'off'`, and a default-on feature is switched off with `false`
-
-- `password.register` and `signInAsGuest` with `signUp: false` answer `{ ok: false, error: 'off' }` where they answered `'closed'`, as every other switched-off feature does, and `twoFactor.regenerateRecoveryCodes` for a user without two-factor answers `'not-enabled'` where it answered `'disabled'`. An app that compares `error === 'closed'` or `'disabled'` (or maps them to its own text) changes the word; `kay check` cannot see a comparison made on a value read at run time, so search for both. `RegisterResult`, `GuestSignInResult` and `RecoveryCodesResult` carry the new words, which a typed `switch` shows as errors. The prebuilt pages' `closed` text is gone, `off` saying the feature is switched off; `unavailable` stays for a feature that is on but lacks what it needs (mail, a page).
-- `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` and `createAuth()`, and `pages` of `auth()`, are on by default, so they take `false` (or an object) and `password: true` says nothing: the old form works until 1.93 and `kay check` flags it as `deprecated-auth-options`, with a safe fix that `kay upgrade` applies by dropping the property. `oauthServer` and `breachedPasswords` keep `true`, which demands them where they are not on by themselves. The words of a result that does not run are listed in one table in kayjs-auth's `llms` (Switching features off).
-### One name for a size limit
-
-- A size limit is `maxSize`, bytes or a size such as `'5mb'`, and a map of limits by path is `maxSizeByPath`. kayjs-ai's `ask({ maxAttachmentBytes })` is `maxSize` and its `Chat` prop `maxFileSize` is `maxSize` (a number of bytes is a size, so the value stays as it is). An extension's `maxSize: { '/auth/upload': '8mb' }` is `maxSizeByPath`, as the config's `limits.byPath` is. The old names work until 1.93, `deprecated-size-limits` flags them and `kay upgrade` renames each.
-### Attributes typed by what HTML and SVG allow
-
-- `kay check` types the attributes HTML limits to keywords: `type` on `button`, `input` and `ol`, `loading` and `decoding` on `img`, `crossorigin`, `referrerpolicy`, `scope` on `th`, `dir`, `inputmode`, `enterkeyhint`, `method`, `enctype`, `formmethod`, `formenctype`, and `target` (a keyword or a named browsing context), so a typo (`loading="lazyy"`) or a value held in a `string` (`type={kind}` with `kind: string`) is an error: write the keyword in lowercase, or type the value as the union (`'button' | 'submit' | 'reset'`).
-- The new `invalid-aria-value` lint (a11y, deny) reports an ARIA state written as text with a value ARIA does not define, `aria-expanded="yes"` for one, its quick fix writing the closest value; an expression is not read, and other `aria-*` stay free text.
-- An SVG element takes the SVG attributes, spelled as SVG does (`viewBox`, `stroke-width`), prefixed names (`xlink:href`), `data-*` and `aria-*`, where it took any name: `viewbox` or `strokeWidth` is an error naming the nearest attribute. TypeScript does not check a hyphenated name, so `stroke-widht` still passes. A custom element still takes any. A bare `crossorigin`, a `false` and `type={1}` on an `ol` still pass.
-### kayjs-ui: empty components draw a default text
-
-- Table with neither `@empty` nor `@noMatch` draws a `No rows.` row, and LineChart, ContributionGraph, Sparkline, StatusStrip, Timeline, DescriptionList, TreeView, Carousel and VirtualList draw their `ui.<component>.empty` text where they drew nothing. `emptyLabel=""` draws nothing again, and an `@empty` block replaces the text.
-### kayjs-ui: a failure is named the same everywhere
-
-- A failure message is `failureLabel`: `failure` on CopyButton, ConfirmDelete, FormDialog, RecordButton, SaveForm and AudioPlayer, `errorLabel` on IconPicker and ImageCropper, and `errorMessage` on kayjs-ai's Chat, are renamed; Steps keeps `errorLabel`, named after its `error` state. ConfirmDelete and FormDialog no longer require the message: they say `Could not delete.` and `Could not save.` (`ui.confirmDelete.failure`, `ui.formDialog.failure`). The old names work until 1.93 and `kay check` flags them as `deprecated-ui-failures`, with a safe fix that `kay upgrade` applies.
-- A CopyButton's `onFail(error)` is `onError({ error })`; the old name works until 1.93 and is reported with no fix, as its argument changes shape.
-- A component's `onError` receives one object, so a field is added without breaking a caller, `{ error }` for a thrown value and `{ event }` for a failure the DOM raised. Read the error from the object: `onError={error => log(error)}` is `onError={({ error }) => log(error)}` on Table, VirtualList, Select, IconPicker, FormDialog, SaveForm and CopyButton; Combobox and MultiSelect give `{ error, query }` where they gave `(error, query)`; RecordButton gives `{ problem, error }` where it gave `(problem, cause)`; Avatar and SiteFavicon give `{ event }`; AudioPlayer gives `{ error, event }`; ImageCropper gives `{ event }` or `{ error }` where it gave nothing. `callAction`'s `onError` and `recorder`'s too. `kay check` cannot tell an `onError` written for the old argument from one for the new, so no lint reports it: search the app for `onError` on these components.
-
-### kayjs-ui: the same role is one block name
-
-- The controls a component holds beside its own content are `@actions`: a Card's `@head`, a FormField's `@action`, an AppHeader's `@end`, a TreeView's `@trailing` and a MarkdownEditor's `@toolbarExtra` are renamed (a prop of the same name too), and a ConfirmDelete's `trigger` string, which picks a look rather than content, is `triggerLook`. The old names work until 1.93, and `kay check` flags them as `deprecated-ui-actions` with a safe fix.
-- kayjs-ai's Chat and ChatLauncher draw their round buttons' icons from one `icons` prop, `icons={{ send: ArrowUp }}`, in place of `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon`, `@recordIcon` and the launcher's `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`. The blocks work until 1.93 and are flagged as `deprecated-chat-icons`, with no fix, as a block holds any markup.
-
-Releases before 1.90 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.92 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
