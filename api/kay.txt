@@ -3602,6 +3602,17 @@ interface ScriptHashOptions
 [./server] sendPush
 function sendPush(user: string, message: PushMessage, options?: PushSendOptions): Promise<PushResult>
 
+[./server] ServerWebSocket
+const ServerWebSocket: ServerWebSocketClient
+
+[./server] ServerWebSocketClient
+interface ServerWebSocketClient
+  CLOSED: 3
+  CLOSING: 2
+  CONNECTING: 0
+  OPEN: 1
+  prototype: WebSocket
+
 [./server] session
 function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", {
   decorator: {};

@@ -12,6 +12,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay new --with postgres` and `kay add postgres` give each app its own development database port (derived from the app's name, in `.env`, `.env.test` and `compose.dev.yaml`) and keep its data in `data/postgres`, bind-mounted and out of git, instead of port 5433 and a named volume, and the production composes bind-mount `data-prod` (create it before the first start, owned by the container's user) instead of a named volume; the next step reads `bun run db:generate`, as pg-orm's `generate` takes no name ([project new and add](project-new-and-add.md)).
 - kayjs-mail's confirmation and footer views get `site` as the site's origin and `host` as its host, and the default confirmation words name the site by its host as the subject does ([upgrading](upgrading.md)).
 - The accent picker `kay new` writes sizes its popover to its seven swatches, which no longer overlap.
+- `ServerWebSocket` from `kay/server` is Bun's `WebSocket` client typed with its options, so server code opens a websocket with `headers` or `protocols` with no cast ([server](server.md)).
 - An `api()` route with a `params` schema (`params: s.Object({ number: s.Integer() })`) answers over real HTTP again, as it did through `site.api`: kay hands the schema a plain copy of the route's params, which Elysia 1.4.31 could not read from Bun's; kay requires that Elysia.
 
 ## 1.93.0

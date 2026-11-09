@@ -228,6 +228,11 @@ export default defineConfig({ requireGuards: true })
 - A session lasts `maxAge` without use, `'30d'` by default, and one used past half of it is extended, but never past `absoluteMaxAge` from its start or its last `regenerate()`, `'90d'` by default, however much it is used, so a stolen cookie dies too; no `maxAge()` outlasts it.
 - A forged or expired cookie reads as an empty session and is cleared.
 
+### Websocket client with headers
+
+- `new WebSocket(url, { headers })` is a type error in a project, whose DOM types give the constructor no options; `new ServerWebSocket(url, { headers, protocols })` from `kay/server` is Bun's `WebSocket` typed with `Bun.WebSocketOptions`, and is the global at run time.
+- Server code only: an island, which runs in a browser, uses the global `WebSocket`.
+
 ### Files from a folder
 
 - `safePath(root, name)` from `kay/server` is the real path of the file `name` names inside `root`, relative to the working directory or absolute, or `undefined`: `safePath('media', name)`, never `join('media', name)`, for a `name` a visitor typed.
