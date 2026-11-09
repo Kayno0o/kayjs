@@ -1,14 +1,14 @@
 import type { ConversationKey, StoredCall, StoredTurn } from './conversation-store'
 import type { ConversationAnswer } from './conversation-title'
 import type { ConversationCall } from './resume'
-import type { AiMessage, AiReply, AiToolCall, AskOptions, ProviderMessage } from './types'
+import type { AiMessage, AiReply, AiToolCall, AskOptions, ProviderMessage, Thinking } from './types'
 import { within } from '@kaynooo/utils/promise'
 import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
 import { usableSources } from './chat-sources'
 import { conversationStore } from './conversation-home'
-import { LEFT_OUT } from './conversation-store'
+import { LEFT_OUT, thinkingChars } from './conversation-store'
 import { renamedTitle, titleOf } from './conversation-title'
 import { deferredReply } from './deferred'
 import { AiError } from './errors'
@@ -78,26 +78,26 @@ const scopeOf = (request: Request) => new URL(request.url).pathname
 // What stands for the answer of a reply that called tools and said nothing, as a provider needs an assistant turn after the results.
 const NO_ANSWER = '(no answer was given)'
 
-type Replayed = AiMessage & Pick<ProviderMessage, 'calls' | 'results'>
+type Replayed = AiMessage & Pick<ProviderMessage, 'calls' | 'results' | 'thinking'>
 
 // A turn as the model read it: the user's text, or for a reply each request's calls and their results, then its text.
 // A turn of no text and no calls, a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
 // A call's id is told apart by the turn it is in, as a provider leaving ids out has them reissued as `call_1` in every turn and Anthropic refuses a repeated one.
 // A reply stopped before it said anything is left out whole, calls and results with it: no words stand for it that the model could take for its own, and the turns around it read as one.
-function replayed({ role, content, steps, stopped }: StoredTurn, shortened: boolean, at: number): Replayed[] {
+function replayed({ role, content, steps, thinking, stopped }: StoredTurn, shortened: boolean, at: number): Replayed[] {
   if (role === 'user' || steps === undefined || steps.length === 0 || (stopped === true && content === ''))
     return content === '' ? [] : [{ role, content }]
 
   return [
-    ...steps.flatMap(calls => [
-      { role: 'assistant' as const, content: '', calls: calls.map(({ id, name, arguments: input }) => ({ id: `t${at}_${id}`, name, arguments: input })) },
+    ...steps.flatMap((calls, step) => [
+      { role: 'assistant' as const, content: '', ...!shortened && thinking?.[step] !== undefined && thinking[step].length > 0 && { thinking: thinking[step] }, calls: calls.map(({ id, name, arguments: input }) => ({ id: `t${at}_${id}`, name, arguments: input })) },
       { role: 'user' as const, content: '', results: calls.map(({ id, result, ok }) => ({ id: `t${at}_${id}`, content: shortened && result.length > LEFT_OUT.length ? LEFT_OUT : result, ok })) },
     ]),
     { role, content: content === '' ? NO_ANSWER : content },
   ]
 }
 
-const charsOf = (messages: readonly Replayed[]) => messages.reduce((sum, message) => sum + message.content.length + toolChars(message), 0)
+const charsOf = (messages: readonly Replayed[]) => messages.reduce((sum, message) => sum + message.content.length + toolChars(message) + (message.thinking ?? []).reduce((inner, block) => inner + thinkingChars(block), 0), 0)
 
 // Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn; a message of calls or results stands alone.
 function fitted(kept: readonly StoredTurn[], posted: readonly AiMessage[], maxInputChars: number): Replayed[] {
@@ -235,14 +235,16 @@ const MOST_STORED_RESULT = 4000
 const storedCall = ({ id, name, input, result, status }: AiToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: clip(result ?? '', MOST_STORED_RESULT), ok: status === 'done' })
 
 // The calls a reply made, request by request, and how it finished, none for one that broke off before telling.
-async function ending(reply: AiReply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][]]> {
+async function ending(reply: AiReply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][], thinking: Thinking[][]]> {
   try {
-    const [calls, finish, steps] = await Promise.all([reply.calls, reply.finish, reply.steps])
+    const [calls, finish, all] = await Promise.all([reply.calls, reply.finish, reply.steps])
+    // The thinking of each kept request stays beside its calls.
+    const kept = all.map(step => ({ calls: step.calls.filter(isAnswered).map(storedCall), thinking: step.thinking ?? [] })).filter(step => step.calls.length > 0)
 
-    return [calls, finish, steps.map(step => step.calls.filter(isAnswered).map(storedCall)).filter(step => step.length > 0)]
+    return [calls, finish, kept.map(step => step.calls), kept.map(step => step.thinking)]
   }
   catch {
-    return [[], undefined, []]
+    return [[], undefined, [], []]
   }
 }
 
@@ -261,13 +263,13 @@ async function kept(reply: AiReply, key: ConversationKey, revision: number, drop
     failed = true
   }
 
-  const [calls, finish, steps] = await ending(reply)
+  const [calls, finish, steps, thinking] = await ending(reply)
 
   if (text === '' && calls.length === 0 && (failed || finish === undefined))
     return
 
   const sources = text === '' ? [] : usableSources(options.sources)
-  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...steps.length > 0 && { steps }, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
+  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...steps.length > 0 && { steps }, ...thinking.some(blocks => blocks.length > 0) && { thinking }, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
   const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer].map(turn => writer === undefined ? turn : { ...turn, reply: writer })
 
   try {

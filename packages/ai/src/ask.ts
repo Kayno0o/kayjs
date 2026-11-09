@@ -29,7 +29,7 @@ const DEFAULT_CONNECT_TIMEOUT = '30s'
 const DEFAULT_IDLE_TIMEOUT = '60s'
 const ROLES = new Set(['user', 'assistant'])
 
-// `replayed` keeps the calls and results of messages the library built from a stored conversation; a prompt the app gives holds none.
+// `replayed` keeps the calls, results and thinking of messages the library built from a stored conversation; a prompt the app gives holds none.
 function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[] {
   if (typeof prompt === 'string')
     return [{ role: 'user', content: prompt }]
@@ -46,9 +46,9 @@ function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[]
     if (attachments.length > 0 && message.role !== 'user')
       throw new AiError('unsupported', 'only a user message holds attachments')
 
-    const { calls, results } = message as ProviderMessage
+    const { calls, results, thinking } = message as ProviderMessage
 
-    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments }, ...replayed && calls !== undefined && { calls }, ...replayed && results !== undefined && { results } }
+    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments }, ...replayed && calls !== undefined && { calls }, ...replayed && results !== undefined && { results }, ...replayed && thinking !== undefined && { thinking } }
   })
 }
 

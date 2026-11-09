@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { ConversationRow } from './conversation-title'
-import type { Source } from './types'
+import type { Source, Thinking } from './types'
 import { openSqlite } from 'kay/library'
 
 // A tool call a reply made and what the model was told of it, as the next ask replays them.
@@ -19,6 +19,8 @@ export interface StoredTurn {
   content: string
   // The calls of each request a reply made to the model, in order, which are left out of what a Chat shows.
   steps?: StoredCall[][] | undefined
+  // The thinking blocks of each of those requests, signatures included, which Anthropic wants back with the calls of a turn when it thinks; an entry per step, empty for a request that thought nothing.
+  thinking?: Thinking[][] | undefined
   sources?: Source[] | undefined
   stopped?: boolean | undefined
   // The id of the Chat's reply whose write added it, which a store keeps with the turn: a tab whose write lost to another's is then refused its next send.
@@ -67,9 +69,13 @@ export const MOST_STORED_RESULTS = 200_000
 // What a result becomes once it is shortened.
 export const LEFT_OUT = '(left out)'
 
+export function thinkingChars(block: Thinking): number {
+  return 'redacted' in block ? block.redacted.length : block.text.length + block.signature.length
+}
+
 // The turns with the results of the oldest replaced by `LEFT_OUT` until the results kept fit `MOST_STORED_RESULTS`; the turns of the latest exchange are never touched.
 export function withinResultCap(turns: StoredTurn[]): StoredTurn[] {
-  const size = (turn: StoredTurn) => (turn.steps ?? []).reduce((sum, calls) => sum + calls.reduce((inner, call) => inner + call.result.length, 0), 0)
+  const size = (turn: StoredTurn) => (turn.steps ?? []).reduce((sum, calls) => sum + calls.reduce((inner, call) => inner + call.result.length, 0), 0) + (turn.thinking ?? []).reduce((sum, blocks) => sum + blocks.reduce((inner, block) => inner + thinkingChars(block), 0), 0)
   let total = turns.reduce((sum, turn) => sum + size(turn), 0)
 
   if (total <= MOST_STORED_RESULTS)
@@ -80,7 +86,7 @@ export function withinResultCap(turns: StoredTurn[]): StoredTurn[] {
       return turn
 
     const before = size(turn)
-    const shortened = { ...turn, steps: turn.steps.map(calls => calls.map(call => call.result.length > LEFT_OUT.length ? { ...call, result: LEFT_OUT } : call)) }
+    const shortened: StoredTurn = { ...turn, thinking: undefined, steps: turn.steps.map(calls => calls.map(call => call.result.length > LEFT_OUT.length ? { ...call, result: LEFT_OUT } : call)) }
 
     total -= before - size(shortened)
 

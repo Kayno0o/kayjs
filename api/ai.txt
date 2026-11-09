@@ -582,6 +582,7 @@ interface Step
   model: string
   ms: number
   provider: string
+  thinking?: Thinking[] | undefined
   usage: Usage | undefined
 
 [.] StoredConversation
@@ -603,6 +604,7 @@ interface StoredTurn
   sources?: Source[] | undefined
   steps?: StoredCall[][] | undefined
   stopped?: boolean | undefined
+  thinking?: Thinking[][] | undefined
 
 [.] StructuredAskOptions
 interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions

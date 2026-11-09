@@ -397,6 +397,8 @@ export interface Step {
   finish: Finish | undefined
   // The tool calls the model made in this request, run, with their `ms`.
   calls: AiToolCall[]
+  // The finished thinking blocks this request produced, signatures included, which a provider that thinks wants back with the calls; absent when it produced none.
+  thinking?: Thinking[] | undefined
   // The provider and model that took this request. After a retry or a fallback they are the ones that answered, or the ones that failed for a request listed with `failed`.
   provider: string
   model: string

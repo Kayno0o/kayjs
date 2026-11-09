@@ -282,7 +282,7 @@ export async function* converse(provider: Streams, base: ProviderRequest, offere
       used.outputTokens = Math.ceil(received / CHARS_PER_TOKEN)
     }
 
-    const stepped = (calls: AiToolCall[]): Step => stepOf(began, requested, first, used, finish !== undefined && 'finish' in finish ? finish.finish : undefined, calls, served)
+    const stepped = (calls: AiToolCall[]): Step => ({ ...stepOf(began, requested, first, used, finish !== undefined && 'finish' in finish ? finish.finish : undefined, calls, served), ...thinking.length > 0 && { thinking } })
 
     for (const field of USAGE_FIELDS) {
       if (used[field] !== undefined)

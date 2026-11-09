@@ -5,11 +5,12 @@ import { s as schema } from 'kay'
 import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
-import { ai, AiError, ask, resuming, tool } from '../src'
+import { ai, AiError, anthropic, ask, resuming, tool } from '../src'
 import { conversationStore } from '../src/conversation-home'
-import { LEFT_OUT, MOST_STORED_RESULTS, MOST_TURNS, sqliteConversations } from '../src/conversation-store'
+import { LEFT_OUT, MOST_STORED_RESULTS, MOST_TURNS, sqliteConversations, withinResultCap } from '../src/conversation-store'
 import { titleOf } from '../src/conversation-title'
 import { conversationCallOf } from '../src/resume'
+import { anthropicEvents, provider, stream } from './helpers/provider'
 
 afterEach(() => {
   ai()
@@ -524,6 +525,43 @@ describe('a conversation held on the server', () => {
     expect(await loaded(ID)).toEqual({ owned: true, op: 'load', id: ID, revision: 2, title: 'look up Moon', turns: [{ role: 'user', content: 'look up Moon' }, { role: 'assistant', content: 'found About Moon' }, { role: 'user', content: 'and Sun?' }, { role: 'assistant', content: 'answer 3' }] })
   })
 
+  it('stores the thinking of a tool turn with its signature and replays it with the calls, in the turn that made them', async () => {
+    const model = calling()
+    const thinking = { text: 'The user wants the Moon.', signature: 'sig-moon' }
+    const wrapped: Provider = { ...model.provider, async* stream(request, signal) {
+      if (request.messages.at(-1)!.content.startsWith('look up'))
+        yield { thinking }
+
+      yield* model.provider.stream(request, signal)
+    } }
+    const options = { provider: wrapped, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('and Sun?'), options, { header: `send:${ID}:1` })
+    expect(model.asked[2]!.messages[1]).toMatchObject({ role: 'assistant', thinking: [thinking], calls: [{ name: 'look_up' }] })
+    expect(model.asked[2]!.messages.filter(message => message.thinking !== undefined)).toHaveLength(1)
+    expect((await conversationStore().get({ owner: 'ann', scope: '/_kay/action/chat', id: ID }))!.turns[1]!.thinking).toEqual([[thinking]])
+  })
+
+  it('sends the stored thinking of an earlier tool turn to Anthropic first in the turn that called, signature unchanged, redacted blocks too', async () => {
+    const server = provider(() => stream(anthropicEvents('ok')).response)
+    const steps = [[{ id: 'a', name: 'look_up', arguments: '{"title":"Moon"}', result: 'About Moon', ok: true }]]
+    const thinking = [[{ text: 'The Moon.', signature: 'sig-moon' }, { redacted: 'opaque' }]]
+
+    try {
+      await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: 'About Moon', steps, thinking }], title: '' })
+      await visit(said('so?'), { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'high' }, { header: `send:${ID}:1` })
+
+      const sent = server.seen[0]!.body.messages as { role: string, content: unknown }[]
+
+      expect(sent[1]).toEqual({ role: 'assistant', content: [{ type: 'thinking', thinking: 'The Moon.', signature: 'sig-moon' }, { type: 'redacted_thinking', data: 'opaque' }, { type: 'tool_use', id: 't1_a', name: 'look_up', input: { title: 'Moon' } }] })
+      expect(sent[2]!.content).toEqual([{ type: 'tool_result', tool_use_id: 't1_a', content: 'About Moon' }])
+    }
+    finally {
+      await server.stop()
+    }
+  })
+
   it('replays a turn that only called tools, with a stand-in for its missing text', async () => {
     const model = calling({ 'About Moon': 'silent' })
     const options = { provider: model.provider, tools: model.tools }
@@ -565,6 +603,16 @@ describe('a conversation held on the server', () => {
     await visit(smuggled, { provider: model.provider }, { header: `send:${ID}:0` })
     expect(model.asked[1]!.messages).toEqual([{ role: 'user', content: 'y' }])
     expect((await conversationStore().get({ owner: 'ann', scope: '/_kay/action/chat', id: ID }))!.turns.every(turn => turn.steps === undefined)).toBe(true)
+  })
+
+  it('replays no thinking for a turn whose results were shortened, and keeps the thinking of the newest', async () => {
+    const turn = (result: string) => ({ role: 'assistant' as const, content: 'x', steps: [[{ id: 'a', name: 'n', arguments: '{}', result, ok: true }]], thinking: [[{ text: 't', signature: 's' }]] })
+    const turns = [turn('r'.repeat(MOST_STORED_RESULTS)), turn('r'.repeat(10)), turn('r'.repeat(10))]
+    const kept = withinResultCap(turns)
+
+    expect(kept[0]!.thinking).toBeUndefined()
+    expect(kept[1]!.thinking).toBeDefined()
+    expect(kept[2]!.thinking).toBeDefined()
   })
 
   it('shortens the results of the oldest turns before it drops any turn, and keeps the newest whole', async () => {
