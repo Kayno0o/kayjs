@@ -27,7 +27,7 @@ test('every transition duration of the library is multiplied by --motion-scale, 
         continue
 
       // A time only counts where a transition is written: the autoplay and debounce delays are not motion.
-      const motion = DURATION_PROP.test(line) || line.includes('[transition:') || DURATION_UTILITY.test(line)
+      const motion = DURATION_PROP.test(line) || line.includes('[transition:') || line.search(DURATION_UTILITY) !== -1
 
       if (!motion)
         continue
