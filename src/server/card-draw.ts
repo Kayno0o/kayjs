@@ -65,9 +65,14 @@ export async function drawCard(look: CardLook, title: string, image?: Uint8Array
   return new Bun.Image(png).jpeg({ quality }).bytes()
 }
 
+// The first pixel, then the filled part copied after itself, doubling each time: about 20 copies for a card in place of one `set` per pixel.
 function fill(canvas: Canvas, color: Color): void {
-  for (let at = 0; at < canvas.pixels.length; at += 3)
-    canvas.pixels.set(color, at)
+  const { pixels } = canvas
+
+  pixels.set(color, 0)
+
+  for (let filled = color.length; filled < pixels.length; filled *= 2)
+    pixels.copyWithin(filled, 0, Math.min(filled, pixels.length - filled))
 }
 
 function rgbPng(image: Uint8Array): Png {
