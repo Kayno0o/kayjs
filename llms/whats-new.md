@@ -20,6 +20,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai keeps a reply's thinking blocks, signatures included, with the tool calls a `keepOnServer` conversation stores, and replays them with those calls, so an earlier tool turn passes Anthropic with thinking on ([conversations](../packages/ai/llms/chat-conversations.md)).
 - `kay check` warns when `i18n.paths` translates the default locale, whose path is the pattern: a link written as the translation would not localize ([locales](locales.md)).
 - The sitemap lists a routed entry's translation at its own slug, and points each copy's `xhtml:link` alternates at the others' own slugs, as the page's `<link rel="alternate">` does ([locales](locales.md)).
+- A second `else`, or an `else` after a line that separates it from its `if` or `for`, gets a message of its own that points at the first `else` or the line between, instead of "must directly follow an `if`".
 
 ## 1.93.0
 

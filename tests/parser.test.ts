@@ -528,6 +528,21 @@ describe('control flow', () => {
     expect(parse('p a\nelse\n  p b').diagnostics[0]?.message).toContain('must directly follow')
   })
 
+  it('names a second else and the line that separates an else from its if', () => {
+    const source = 'if a\n  p x\nelse if b\n  p y\nelse\n  p z\nelse\n  p w'
+    const second = parse(source).diagnostics[0]!
+
+    expect(second.message).toBe('An `if` or a `for` takes one `else`')
+    expect(second.related).toEqual([{ start: source.indexOf('else\n'), end: source.indexOf('else\n') + 4, label: 'the first `else`' }])
+    expect(parse('for x of xs\n  p x\nelse\n  p a\nelse\n  p b').diagnostics[0]?.related?.[0]?.label).toBe('the first `else`')
+    expect(parse('if a\n  p x\nelse\n  p y\nelse if b\n  p z').diagnostics[0]?.message).toBe('`else if` cannot follow an `else`')
+
+    const separated = parse('for x of xs\n  p x\np between\nelse\n  p y').diagnostics[0]!
+
+    expect(separated.message).toContain('a line sits between them')
+    expect(separated.related?.[0]).toMatchObject({ start: 18, end: 27, label: 'this line separates them' })
+  })
+
   it('reads an if on the line after else as a child of the else, not as else if', () => {
     const file = parse('if a\n  p x\nelse\n  if b\n    p y\n  p z\n')
     const node = file.template[0] as IfNode

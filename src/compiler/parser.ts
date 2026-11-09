@@ -1,6 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, SnippetNode, Span, TextNode, TryNode } from './ast'
 import type { Expression } from './estree'
 import { scanClassName } from './class-name'
+import { strayElse } from './else-problem'
 import { parseExpression } from './estree'
 import { Scanner } from './scanner'
 
@@ -326,7 +327,7 @@ class TemplateParser {
     [keyword('match'), 'm', (parser, indent, siblings) => siblings.push(parser.parseMatch(indent))],
     [keyword('when'), 'w', (parser, indent) => parser.skipLine(indent, { length: 4, message: '`when` sits in a `match` block', help: '`match status`, then one `when \'draft\'` line per case below it' })],
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
-    [keyword('else[ \\t]+if|else'), 'e', (parser, indent, siblings, head) => parser.attachElse(indent, siblings.at(-1), head[0] !== 'else')],
+    [keyword('else[ \\t]+if|else'), 'e', (parser, indent, siblings, head) => parser.attachElse(indent, siblings.at(-1), head[0] !== 'else', siblings)],
     [PUG_KEYWORD, 'ewucibmd', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is pug syntax kay does not have`, help: PUG_HINTS[head[0]] })],
     [MODULE_STATEMENT, 'ie', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is a module statement, which a template does not take`, help: head[0] === 'import' ? 'write the import in the script fence (`---`) above the template' : 'declare it in the script fence (`---`), or in a `--- module` fence to export it' })],
     [DECLARATION, 'facietd', (parser, indent, _, head) => parser.skipLine(indent, { length: FIRST_WORD.exec(head[0])![0].length, message: `\`${FIRST_WORD.exec(head[0])![0]}\` starts a declaration, which a template does not take`, help: 'write it in the script fence (`---`) above the template, or in a `--- module` fence to export it' })],
@@ -715,13 +716,12 @@ class TemplateParser {
     return { test, values }
   }
 
-  private attachElse(indent: number, previous: Node | undefined, hasTest: boolean) {
+  private attachElse(indent: number, previous: Node | undefined, hasTest: boolean, siblings: Node[]) {
     const start = this.pos
 
     if (previous?.kind === 'if' && !previous.fallback) {
       if (hasTest) {
-        const testStart = this.src.indexOf('if', start + 4)
-        const branch = this.parseBranch(testStart + 2, indent)
+        const branch = this.parseBranch(this.src.indexOf('if', start + 4) + 2, indent)
 
         previous.branches.push(branch)
         previous.end = branch.end
@@ -743,12 +743,13 @@ class TemplateParser {
       this.pos = start + 4
       this.expectLineEnd('`else` takes no condition after a `for`')
       previous.fallback = this.parseBlock(indent)
+
       previous.end = this.lastContentEnd()
 
       return
     }
 
-    this.skipLine(indent, { message: '`else` must directly follow an `if`, an `else if` or a `for` at the same indentation' })
+    this.skipLine(indent, strayElse(this.src, siblings, hasTest))
   }
 
   private parseAwait(indent: number): AwaitNode {
