@@ -148,7 +148,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),
   async ({ root, options }) => hookDispatch(root, options),
-  async ({ root, options }) => deprecatedAuthOptions(root, options),
   async ({ root, options }) => deprecatedEscapeOption(root, options),
   async ({ root, options }) => streamTypes(root, options),
   async ({ root, options }) => streamOn(root, options),
