@@ -525,10 +525,10 @@ export class JsxTemplate {
   }
 
   // Opens a block declaring the loop's index, as a `let` so a write to it is read as one to a parameter, which the caller closes with ` }` after what it returns.
-  private openIndex(index: Span, row: boolean) {
+  private openIndex(index: Span, site: boolean) {
     this.b.add('{ let ')
 
-    if (row)
+    if (site)
       this.sites.rows.add(this.b.code.length)
 
     // A name starting with `_` is unused on purpose, as TypeScript takes it of a parameter.

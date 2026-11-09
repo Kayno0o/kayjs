@@ -6,7 +6,7 @@ function elseStart(src: string, node: Node | undefined): number | undefined {
 
   // A `for` keeps no span for its `else`, which sits on the line before the first node under it.
   if (node?.kind === 'for' && node.fallback)
-    return src.lastIndexOf('else', node.fallback[0]?.start ?? node.end)
+    return src.lastIndexOf('else', node.fallback[0] ? src.lastIndexOf('\n', node.fallback[0].start) : node.end)
 
   return undefined
 }
