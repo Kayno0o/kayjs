@@ -22,18 +22,20 @@ afterEach(() => {
 const FAST = { backoff: '1ms' } as const
 const down = () => new AiError('unavailable', 'down', { status: 503 })
 
+interface Call { model: string, thinking: (readonly unknown[] | undefined)[] }
+
 type Behaviour = (call: number) => Piece[] | Error | { text: string, fails: Error }
 
 // A provider answering each call as `behave` says: pieces, an error before anything, or a text and then an error.
-function scripted(behave: Behaviour, name = 'scripted', model = 'm'): Provider & { calls: { model: string }[] } {
-  const calls: { model: string }[] = []
+function scripted(behave: Behaviour, name = 'scripted', model = 'm'): Provider & { calls: Call[] } {
+  const calls: Call[] = []
 
   return {
     name,
     model,
     calls,
     async* stream(request): AsyncGenerator<Piece> {
-      calls.push({ model: request.model })
+      calls.push({ model: request.model, thinking: request.messages.map(message => message.thinking) })
 
       const outcome = behave(calls.length)
 
@@ -267,5 +269,29 @@ describe('fallback', () => {
 
     expect(await reply).toBe('let me look\n\ndone')
     expect((await reply.steps).map(step => step.failed)).toEqual([undefined, 'unavailable', undefined])
+  })
+  describe('thinking of an earlier request', () => {
+    const look = tool({ name: 'look', description: 'Looks', input: s.Object({}), run: () => 'seen' })
+    const thought = [{ text: 'hm', signature: 'sig' }]
+    const thinkingThenDown = () => scripted((call) => {
+      if (call === 1)
+        return [{ thinking: thought[0]! }, { toolUse: { id: 'a', name: 'look', arguments: '{}' } }, { finish: 'stop' }]
+
+      return call === 2 ? down() : says('done')
+    })
+
+    it('is left out of the request to a fallback on another model, as its signature is the first model\'s', async () => {
+      const provider = thinkingThenDown()
+
+      expect(await ask('go', { provider, tools: [look], retry: false, fallback: [{ model: 'other' }] })).toBe('done')
+      expect(provider.calls.map(call => [call.model, call.thinking.some(blocks => blocks !== undefined)])).toEqual([['m', false], ['m', true], ['other', false]])
+    })
+
+    it('is kept in the request to a fallback on the same provider and model', async () => {
+      const provider = thinkingThenDown()
+
+      expect(await ask('go', { provider, tools: [look], retry: false, fallback: [{ model: 'm' }] })).toBe('done')
+      expect(provider.calls.map(call => call.thinking.some(blocks => blocks !== undefined))).toEqual([false, true, true])
+    })
   })
 })

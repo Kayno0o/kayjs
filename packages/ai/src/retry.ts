@@ -108,7 +108,6 @@ function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): nu
   return Math.min(maxWait, backoff * 2 ** (made - 1)) * (1 - Math.random() * JITTER)
 }
 
-// What the model said or did that the reply shows or the loop acts on: a request that sent any is never asked again.
 // Thinking is signed for the model that thought it, which Anthropic checks, so a request to another model, as a fallback or a later ask on another model is, leaves out the blocks of the turns that model did not think.
 function thinkingFor(messages: ProviderMessage[], by: string): ProviderMessage[] {
   if (!messages.some(message => message.thinking !== undefined && message.thinkingBy !== undefined && message.thinkingBy !== by))
@@ -117,6 +116,7 @@ function thinkingFor(messages: ProviderMessage[], by: string): ProviderMessage[]
   return messages.map(({ thinking, thinkingBy, ...message }) => thinkingBy === undefined || thinkingBy === by ? { ...message, ...thinking !== undefined && { thinking }, thinkingBy } : message)
 }
 
+// What the model said or did that the reply shows or the loop acts on: a request that sent any is never asked again.
 function streamed(piece: Inner): boolean {
   return 'text' in piece || 'reasoning' in piece || 'thinking' in piece || 'toolUse' in piece
 }
