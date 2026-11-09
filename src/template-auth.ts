@@ -59,23 +59,21 @@ services:
       POSTGRES_DB: app
       APP_DB_PASSWORD: app_rw
     ports:
-      - 127.0.0.1:5433:5432
+      - 127.0.0.1:__DB_PORT__:5432
     volumes:
-      - db:/var/lib/postgresql
+      # In the checkout and out of git (data/), so deleting the project deletes its database.
+      - ./data/postgres:/var/lib/postgresql
       - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     # What --wait waits for, so the migrations run on a database that answers, over TCP: on its first start the image's server listens on its socket only.
     healthcheck:
       test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
       interval: 2s
       retries: 15
-
-volumes:
-  db:
 `,
   }
 }
 
 // Read by `bun test` only, so tests run in a fresh clone and CI; never a real secret. With `postgres`, each test file gets a copy of the database.
 export function authTestFiles({ has }: Setup): Record<string, string> {
-  return has('postgres') ? { '.env.test': 'DATABASE_URL=postgres://app:app@127.0.0.1:5433/app_test\n' } : {}
+  return has('postgres') ? { '.env.test': 'DATABASE_URL=postgres://app:app@127.0.0.1:__DB_PORT__/app_test\n' } : {}
 }

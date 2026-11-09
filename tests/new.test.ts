@@ -15,7 +15,7 @@ import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config-loader'
 import { formatFiles } from '../src/format'
 import { projectCapabilities } from '../src/mcp/tools'
-import { createProject, detectHost, FEATURE_NAMES, FEATURES, libraryFeature, PRESETS, toggle } from '../src/new'
+import { createProject, detectHost, FEATURE_NAMES, FEATURES, libraryFeature, PRESETS, projectFiles, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
 import { agentsFile, TAILWIND_CLASS_REGEX } from '../src/templates'
 import { listeningPort } from './listening'
@@ -848,6 +848,25 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
+  it('gives each app its own dev database port and keeps its data in a bind-mounted folder of the checkout', async () => {
+    const features = new Set<Feature>([...PRESETS.app.features, 'postgres'])
+    const [one, other] = await Promise.all(['one-app', 'other-app'].map(async name => projectFiles(`/x/${name}`, features, '^1.0.0')))
+    const port = (files: Record<string, string>) => (/@127\.0\.0\.1:(\d+)\/app\n/).exec(files['.env']!)![1]
+
+    expect(port(one!)).not.toBe(port(other!))
+    expect(one!['compose.dev.yaml']).toContain(`- 127.0.0.1:${port(one!)}:5432\n`)
+    expect(one!['.env.test']).toContain(`@127.0.0.1:${port(one!)}/app_test`)
+    expect(one!['compose.dev.yaml']).toContain('- ./data/postgres:/var/lib/postgresql\n')
+    expect(one!['compose.dev.yaml']).not.toContain('volumes:\n  db:')
+    expect(one!['compose.dev.yaml']).not.toContain('__DB_PORT__')
+  })
+
+  it('sizes the accent picker popover to its seven swatches', async () => {
+    const files = await projectFiles('/x/app', new Set<Feature>(PRESETS.app.features), '^1.0.0')
+
+    expect(files['src/components/accent-picker.kay']).toContain('grid w-max grid-cols-7')
+  })
+
   it('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
@@ -856,7 +875,7 @@ describe('kay new', () => {
 
       expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/.gitkeep', 'pg-orm.config.ts', 'src/db/index.ts', 'src/db/tables.ts', 'src/routes/_guard.ts', 'src/api/online.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
-      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^DATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
+      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^DATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:(\d+)\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:\1\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
 
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { scripts: Record<string, string> }
 
@@ -912,7 +931,7 @@ describe('kay new', () => {
         await admin?.unsafe(`DROP DATABASE IF EXISTS ${name}`)
         await admin?.unsafe(`CREATE DATABASE ${name}`)
 
-        const generate = Bun.spawn([process.execPath, 'run', 'db:generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...scratch && { MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } } })
+        const generate = Bun.spawn([process.execPath, 'run', 'db:generate'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...scratch && { MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } } })
         const [generated, generateErrors] = await Promise.all([new Response(generate.stdout).text(), new Response(generate.stderr).text(), generate.exited])
 
         await admin?.unsafe(`DROP DATABASE IF EXISTS ${name}`)

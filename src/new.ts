@@ -267,9 +267,14 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
 
   // The development database, never committed. With Postgres the app connects as app_rw, which cannot change the schema, and the migrations as the owner; COMPOSE_FILE makes a bare `docker compose` start that database.
   if (has('postgres'))
-    files['.env'] = `DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
+    files['.env'] = `DATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:__DB_PORT__/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:__DB_PORT__/app\nCOMPOSE_FILE=compose.dev.yaml\n`
 
-  return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name).replaceAll('__SITE__', siteName(name))]))
+  return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name).replaceAll('__SITE__', siteName(name)).replaceAll('__DB_PORT__', String(devDatabasePort(name)))]))
+}
+
+// The host port of the development database: one per app name, so two apps on a machine do not fight over it. 15432 to 25431, clear of Postgres' own 5432 and the ephemeral range.
+function devDatabasePort(name: string): number {
+  return 15432 + Number(BigInt(Bun.hash(name)) % 10000n)
 }
 
 // The site's name for mails and authenticator apps, as kayjs-auth's `kay add` words it: the package name in capitals.

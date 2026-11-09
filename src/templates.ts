@@ -47,7 +47,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   return {
     // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
     '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', server && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
+    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', (server || has('postgres')) && 'data', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),
