@@ -91,7 +91,7 @@ Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports 
 | `ci` | A Forgejo or GitHub workflow checking, formatting, linting, testing and building the server, or publishing the static site to Pages | server, site, app |
 | `docker` | A `Dockerfile` and `compose.prod.yaml` running the executable, or nginx serving the static site as an unprivileged user on port 8080 | server, site, app |
 | `auth` | kayjs-auth, as `kay add auth` writes it: sign-in, register and account pages behind a guard on every page, its users in a SQLite file; needs `server` and `tailwind` | app |
-| `postgres` | kayjs-auth's users in Postgres instead of SQLite, with a compose stack for development; run `bun run db:generate init` for the first migration; `kay add` plans kayjs-auth too | none |
+| `postgres` | kayjs-auth's users in Postgres instead of SQLite, with a compose stack for development; run `bun run db:generate` for the first migration; `kay add` plans kayjs-auth too | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
 
 `blank` has none of them. In the terminal, checking a feature checks what it needs. With options, a feature missing what it needs is refused with the flag to add:
