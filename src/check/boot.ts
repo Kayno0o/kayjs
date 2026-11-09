@@ -16,7 +16,7 @@ import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs, liveLimits, remot
 import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
-import { localeSettings, refuseLocaleClashes } from '../server/i18n'
+import { defaultLocaleTranslations, localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { mcpKeySetting } from '../server/mcp-key'
 import { pageFlags } from '../server/page-flags'
 import { claimPublic, publicFiles } from '../server/public'
@@ -95,8 +95,12 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   }
   catch {}
 
-  if (settings)
+  if (settings) {
     refused(config, () => refuseLocaleClashes(settings, routes))
+
+    for (const { pattern, path } of defaultLocaleTranslations(settings))
+      diagnostics.push({ file: config, line: 1, column: 1, severity: 'warning', message: `kay: i18n.paths translates ${pattern} for ${settings.defaultLocale}, the default locale, as ${path}: the default locale's path is the pattern, so name the page ${path} and translate it for the other locales, as links to ${path} would not localize` })
+  }
 
   // Claimed in the order the server claims them, in `refuseScanned` (src/server/app.ts), which this keeps in step with.
   const served = new ServedPaths()

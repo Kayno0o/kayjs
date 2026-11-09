@@ -266,6 +266,11 @@ export function linkedSettings(settings: LocaleSettings, routes: Pick<Route, 'pa
   return { ...settings, pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds }, ...entryRoutes.length > 0 && { entryRoutes } }
 }
 
+// The patterns `i18n.paths` translates for the default locale, which a page is served under whatever it names: links go by the pattern, so a link written as the translation is not found, nor localized.
+export function defaultLocaleTranslations(settings: LocaleSettings): { pattern: string, path: string }[] {
+  return Object.entries(settings.paths ?? {}).flatMap(([pattern, translations]) => translations[settings.defaultLocale] === undefined || translations[settings.defaultLocale] === pattern ? [] : [{ pattern, path: translations[settings.defaultLocale]! }])
+}
+
 // The pattern a page is served under in a locale, translated when i18n.paths names it.
 export function localePattern(settings: LocaleSettings, pattern: string, locale: string): string {
   return settings.paths?.[pattern]?.[locale] ?? pattern

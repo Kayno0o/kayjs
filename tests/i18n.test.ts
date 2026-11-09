@@ -754,6 +754,21 @@ describe('kay check', () => {
 
     expect(diagnostics.map(({ file, message }) => ({ file: file.slice(file.indexOf(fixture)), message }))).toContainEqual({ file: `${fixture}/kay.config.ts`, message: 'kay: i18n\'s defaultLocale en is not one of its locales: fr' })
   })
+
+  const warnings = async (paths: Record<string, Record<string, string>>) => (await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, paths } })).filter(({ message }) => message.includes('the default locale'))
+
+  it('reports the translation of the default locale at the config, saying the pattern is its path', async () => {
+    const found = await warnings({ '/about': { fr: '/a-propos', en: '/about-us' } })
+
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({ severity: 'warning', message: expect.stringContaining('translates /about for fr, the default locale, as /a-propos: the default locale\'s path is the pattern') })
+    expect(found[0]!.file).toEndWith('kay.config.ts')
+  })
+
+  it('reports nothing for another locale\'s translation, or the default one\'s own pattern', async () => {
+    expect(await warnings({ '/about': { en: '/about-us' } })).toEqual([])
+    expect(await warnings({ '/about': { fr: '/about' } })).toEqual([])
+  })
 })
 
 describe('localize() on a path under a locale', () => {

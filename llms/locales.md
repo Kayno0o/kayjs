@@ -28,14 +28,14 @@ export default defineConfig({
 
 ### Name a page its own way in a locale
 
-`paths` is keyed by the pattern the page is served under, so `/about` is served at `/a-propos` in French and `/blog/:slug` at `/en/articles/hello` in English:
+`paths` is keyed by the pattern the page is served under, which is the default locale's path: the page is the file named after it, and `paths` translates it for the other locales. With French the default, `/a-propos` is served at `/en/about` in English and `/blog/:slug` at `/en/articles/hello`, and a link is written as the default locale's path. Translating the default locale itself, `{ '/about': { fr: '/a-propos' } }`, makes `kay check` warn, as a link to `/a-propos` would not localize:
 
 ```ts
 export default defineConfig({
   i18n: {
     locales: ['fr', 'en'],
     defaultLocale: 'fr',
-    paths: { '/about': { fr: '/a-propos' }, '/blog/:slug': { en: '/articles/:slug' } },
+    paths: { '/a-propos': { en: '/about' }, '/blog/:slug': { en: '/articles/:slug' } },
   },
 })
 ```
@@ -166,9 +166,9 @@ p {target}
 - `domains` and `prefixDefault` do not go together.
 - A page cannot sit under a locale's prefix itself, `src/routes/en/`: kay serves every page there already.
 - A root `[slug].kay` with no `index.kay` would take `/en` as a slug, so give the site an index page.
-- `paths` names a page its own way in some locales, keyed by the pattern the page is served under: `{ '/about': { fr: '/a-propos' }, '/blog/:slug': { en: '/articles/:slug' } }`.
+- `paths` names a page its own way in some locales, keyed by the pattern the page is served under: `{ '/a-propos': { en: '/about' }, '/blog/:slug': { en: '/articles/:slug' } }`, the pattern being the default locale's path (`kay check` warns on a translation of the default locale).
 - A translation keeps the page's `:params`, an optional `:page?` and a final `*` alike, and may move them.
-- The page is then served at `/a-propos` and `/en/articles/hello`, its untranslated path in that locale redirecting there with a 308, unless a public file, an endpoint, a redirect, an API route or a feed serves it, and with domains a host serves only its own locale's paths.
+- The page is then served at `/en/about` and `/en/articles/hello`, its untranslated path in that locale redirecting there with a 308, unless a public file, an endpoint, a redirect, an API route or a feed serves it, and with domains a host serves only its own locale's paths.
 - `localize`, `alternate`, the `hreflang` links, the sitemap and `kay build --static` follow, and `kay check` checks links against the translated paths.
 - A pattern no page serves, or a translation another page of the locale takes, stops the server.
 
