@@ -22,7 +22,7 @@ import { throughLinks } from './links'
 import { namedRefresh } from './named-refresh'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
-import { embeddedMap, registerSourceMap } from './sourcemap'
+import { embeddedMap, hasSourceMapOf, registerSourceMap } from './sourcemap'
 import { uiEntryOf, uiKeyOf } from './ui'
 
 export type Target = 'dom' | 'ssr'
@@ -124,12 +124,15 @@ export async function transformKayCached(source: string, filename: string, given
 
   countCache('components', cached !== undefined)
 
+  // A file compiled earlier in this build, as a cold build does for each variant, keeps the map it made then.
   if (cached !== undefined) {
-    registerSourceMap(filename, () => {
-      const { code, map } = compile(source, filename, options, signals)
+    if (!hasSourceMapOf(filename, cached, options.target === 'dom')) {
+      registerSourceMap(filename, () => {
+        const { code, map } = compile(source, filename, options, signals)
 
-      return { source, tsx: code, map }
-    }, options.target === 'dom')
+        return { source, tsx: code, map }
+      }, options.target === 'dom')
+    }
 
     return cached
   }

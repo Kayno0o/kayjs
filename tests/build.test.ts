@@ -28,7 +28,7 @@ import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
 import * as serverRecord from '../src/build/server-record'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
-import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
+import { decodeBundleMappings, describeThrown, embeddedMap, hasSourceMapOf, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
 import { analyzeKayCached, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config-loader'
 import { devBuilder } from '../src/dev/builder'
@@ -2113,6 +2113,25 @@ process.exit(0)
     expect(await embeddedMapCached(source, file, code, dir)).toBe(blob)
     // The source or the code changing is a new key.
     await expect(embeddedMapCached(`${source}\n`, file, code, dir)).rejects.toThrow('compiled again')
+  })
+
+  it('keeps the map a cold build made when the same file is transformed again from the cache, compiling it no second time', async () => {
+    const dir = await scratchDir('kay-twice-')
+    const file = join(dir, 'twice.kay')
+    const source = '--- server\nfunction explode() {\n  throw new Error(\'x\')\n}\n---\np\n'
+    const code = await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })
+
+    expect(hasSourceMapOf(file, code)).toBe(true)
+    // The second transform hits the cache, and the map the first compile made stays: no lazy one replaces it to compile the file again.
+    expect(await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })).toBe(code)
+    expect(hasSourceMapOf(file, code)).toBe(true)
+
+    // A warm run in a new process holds no map yet, and gets the one that compiles on demand.
+    registerSourceMap(file, () => {
+      throw new Error('compiled again')
+    })
+    await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })
+    expect(hasSourceMapOf(file, code)).toBe(false)
   })
 
   it('maps a frame an executable prints relative to where it was built, in either form, and leaves a map that cannot be read', async () => {

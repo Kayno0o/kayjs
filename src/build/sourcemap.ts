@@ -55,6 +55,13 @@ export function registerSourceMap(file: string, entry: Compiled | (() => Compile
   (browser ? browserCompiled : compiled).set(file, entry)
 }
 
+// Whether the file already holds the map of exactly this code, which a cache hit on it keeps rather than a lazy one compiling the file again.
+export function hasSourceMapOf(file: string, code: string, browser = false): boolean {
+  const entry = (browser ? browserCompiled : compiled).get(file)
+
+  return typeof entry === 'object' && entry.tsx === code
+}
+
 // A file's compiled server map for an executable to carry, which has no compiler to make it: line structure only of the source and the generated code, which is all a position needs, so zstd-compressed it is a small string of base64.
 export async function embeddedMap(file: string): Promise<string | undefined> {
   const entry = compiledFor(file)
