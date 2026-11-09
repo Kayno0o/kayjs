@@ -12,6 +12,8 @@ export default api()
   .get('/rest/:id/*', ({ params }) => ({ id: params.id, rest: params['*'] }))
   .get('/free/:id', ({ params }) => ({ id: params.id }))
   .get('/opt/:id/:other?', ({ params }) => ({ id: params.id, other: params.other ?? null }))
+  .get('/mid/:a?/:b', ({ params }) => ({ a: params.a ?? null, b: params.b }))
+  .get('/two/:id/:x?/:y?', ({ params }) => ({ id: params.id, x: params.x ?? null, y: params.y ?? null }))
 `
 
 let dir = ''
@@ -51,6 +53,10 @@ describe('an api route with a params schema over real HTTP', () => {
       expect(await (await fetch(`${origin}/api/temtem/rest/a%2Fb/c%2Fd`)).json()).toMatchObject({ id: 'a/b' })
       expect(await (await fetch(`${origin}/api/temtem/opt/a%2Fb`)).json()).toEqual({ id: 'a/b', other: null })
       expect(await (await fetch(`${origin}/api/temtem/opt/a%2Fb/c%2Fd`)).json()).toEqual({ id: 'a/b', other: 'c/d' })
+      expect(await (await fetch(`${origin}/api/temtem/mid/a%2Fb/c%2Fd`)).json()).toEqual({ a: 'a/b', b: 'c/d' })
+      expect(await (await fetch(`${origin}/api/temtem/two/a%2Fb`)).json()).toEqual({ id: 'a/b', x: null, y: null })
+      expect(await (await fetch(`${origin}/api/temtem/two/a%2Fb/c%2Fd`)).json()).toEqual({ id: 'a/b', x: 'c/d', y: null })
+      expect(await (await fetch(`${origin}/api/temtem/two/a%2Fb/c%2Fd/e%2Ff`)).json()).toEqual({ id: 'a/b', x: 'c/d', y: 'e/f' })
       // A malformed escape keeps the value Bun decoded, as before.
       expect(await (await fetch(`${origin}/api/temtem/free/%E0%A4%A`)).json()).toEqual({ id: '��A' })
     }
