@@ -85,7 +85,7 @@
     "complexity": 42
   },
   "src/commands/env-compare.ts": {
-    "complexity": 48
+    "complexity": 46
   },
   "src/commands/new.ts": {
     "complexity": 42
@@ -123,7 +123,7 @@
     "max-lines": 689
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1221
+    "max-lines": 1194
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,
@@ -256,7 +256,7 @@
     "complexity": 111
   },
   "src/server/protection.ts": {
-    "max-lines": 756,
+    "max-lines": 755,
     "complexity": 54
   },
   "src/server/queue.ts": {

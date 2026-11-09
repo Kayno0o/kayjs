@@ -184,6 +184,3 @@ function connect(path: string): Database {
 
   return db
 }
-
-/** @deprecated Renamed `CmsSeedEntry` in 1.90, as `kay/test` has a `SeedEntry` of its own; the old name works until 1.93. */
-export type SeedEntry = CmsSeedEntry

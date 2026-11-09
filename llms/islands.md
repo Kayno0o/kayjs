@@ -115,7 +115,7 @@ catch error
 
 ### Hand a value down without props
 
-A `context` from `kay`, provided by a component and used by anything it renders:
+A context made with `createContext` from `kay`, provided by a component and used by anything it renders:
 
 ```ts
 // src/theme.ts

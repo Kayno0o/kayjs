@@ -268,9 +268,6 @@ interface ConnectionHooks<T>
 [.] ConnectionStatus
 type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
 
-[.] context
-function context<T>(fallback: T): Context<T>
-
 [.] Context
 interface Context<T>
   provide: (value: T) => void
@@ -2529,9 +2526,6 @@ interface ApiOptions
   rateLimit?: RateLimit | RateLimit[] | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
-[./server] ApiRateLimit
-type ApiRateLimit = RateLimit
-
 [./server] AppStore
 interface AppStore extends StoreBase
   cache?: CacheStore | undefined
@@ -2654,9 +2648,6 @@ class CspViolationError
 [./server] dataTableNames
 const dataTableNames: readonly string[]
 
-[./server] dataTables
-const dataTables: readonly string[]
-
 [./server] defineConfig
 function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & {
   dirs?: UnknownKeys<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig>;
@@ -2703,9 +2694,6 @@ function eventStream<T>(source: Source<T>, options?: EventStreamOptions<T>): Eve
 [./server] EventStreamOptions
 interface EventStreamOptions<T>
   id?: (value: T) => number | string
-
-[./server] EveryOptions
-type EveryOptions = ScheduleEveryOptions
 
 [./server] exitPreview
 function exitPreview(ctx: { cookies: CookieMap; }): void
@@ -2844,9 +2832,6 @@ interface JobStore extends StoreBase
 
 [./server] jobTableNames
 const jobTableNames: readonly ["kay_jobs", "kay_locks"]
-
-[./server] jobTables
-const jobTables: readonly ["kay_jobs", "kay_locks"]
 
 [./server] KayConfig
 interface KayConfig extends AppHooks

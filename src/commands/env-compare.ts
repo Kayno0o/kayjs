@@ -406,38 +406,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     }
   }
 
-  problems.push(...renamedProblems(root, set, examplePath === undefined || !await Bun.file(examplePath).exists() ? undefined : { path: examplePath, names: parseEnvFile(await Bun.file(examplePath).text()) }, composes[0]))
-
   for (const { name, file, line } of complete ? await rawReads(root) : []) {
     if (!declared.has(name) && !fileNames.has(name) && !IGNORED_READS.has(name))
       problems.push(diagnostic('warning', file, line, `process.env.${name} is read with no schema declaring it: declare it with defineEnv so kay env lists it, or write // kay-env: raw in a file that must read the environment itself`))
-  }
-
-  return problems
-}
-
-// Variables renamed in 1.91, whose old names are still read until 1.94 with a boot warning of their library.
-export const RENAMED_ENV: Record<string, string> = {
-  KAYJS_AUTH_DATABASE_URL: 'AUTH_DATABASE_URL',
-  MAIL_INBOUND_SECRET: 'MAIL_EVENTS_INBOUND',
-}
-
-// A warning for each old name the environment of this process, a compose service or the example file holds.
-export function renamedProblems(root: string, set: Map<string, Assignment>, example: { path: string, names: Assignment[] } | undefined, compose: string | undefined): CheckDiagnostic[] {
-  const problems: CheckDiagnostic[] = []
-  const note = (old: string, where: string) => `${old} is now ${RENAMED_ENV[old]}: ${where} still sets the old name, which is read until 1.94`
-
-  for (const old of Object.keys(RENAMED_ENV)) {
-    if (set.has(old))
-      problems.push(diagnostic('warning', compose ?? root, set.get(old)!.line, note(old, 'a compose service')))
-
-    for (const { name, line } of example?.names ?? []) {
-      if (name === old)
-        problems.push(diagnostic('warning', example!.path, line, note(old, relative(root, example!.path))))
-    }
-
-    if ((process.env[old] ?? '') !== '')
-      problems.push(diagnostic('warning', root, 1, note(old, 'the environment')))
   }
 
   return problems

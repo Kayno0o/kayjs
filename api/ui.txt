@@ -121,12 +121,6 @@ interface DescriptionItem
 [.] dismissToast
 function dismissToast(id: number, reason?: ToastDismissReason): void
 
-[.] editing
-function editing<Row, Draft = void>(): RowEditing<Row, Draft>
-
-[.] Editing
-type Editing<Row, Draft = void> = RowEditing<Row, Draft>
-
 [.] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
 

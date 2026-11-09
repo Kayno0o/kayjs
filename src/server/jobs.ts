@@ -46,9 +46,6 @@ type WhenOf<Key extends string> = Key extends Duration ? PositiveDuration<Key> :
 // What a schedule repeating every so long takes: it runs on the epoch's multiples of its length, the same instants in every time zone.
 export type ScheduleEveryOptions = Omit<ScheduleOptions, 'tz'>
 
-/** @deprecated Renamed `ScheduleEveryOptions` in 1.90, as the client timer `every()` of `kay` has an `EveryOptions` of its own; the old name works until 1.93. */
-export type EveryOptions = ScheduleEveryOptions
-
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
 const DEFAULT_TIMEOUT = '10m'

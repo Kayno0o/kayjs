@@ -40,9 +40,6 @@ const CONNECTION = { connectionTimeout: 10, idleTimeout: 60, maxLifetime: 1800 }
 // The names of the tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` of an app that creates them with `createJobTables`: one that lists the table definitions of `jobTables` from `kay/pg-orm` has no use for it.
 export const jobTableNames = ['kay_jobs', 'kay_locks'] as const
 
-/** @deprecated Renamed `jobTableNames` in 1.90, as `jobTables` of `kay/pg-orm` is the table definitions; the old name works until 1.93. */
-export const jobTables = jobTableNames
-
 // An index a kay table keeps, created with its table or, on a table already there, on its own.
 export interface PgIndex { name: string, on: string, unique?: boolean }
 

@@ -69,6 +69,3 @@ export function editorsOf(others: readonly CmsMember[], count: number, own: CmsM
 
   return { names: [], unnamed: others.length > 0 ? 1 : 0 }
 }
-
-/** @deprecated Renamed `CmsMember` in 1.90, as kayjs-auth has a `Member` of its own; the old name works until 1.93. */
-export type Member = CmsMember

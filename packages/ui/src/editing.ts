@@ -39,9 +39,3 @@ export function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft> {
     close: () => session.set(null),
   }
 }
-
-/** @deprecated Renamed `rowEditing` in 1.90, as `editing()` of `kay` says whether the server renders for an editor; the old name works until 1.93. */
-export const editing = rowEditing
-
-/** @deprecated Renamed `RowEditing` in 1.90, with `rowEditing`; the old name works until 1.93. */
-export type Editing<Row, Draft = void> = RowEditing<Row, Draft>

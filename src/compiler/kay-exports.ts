@@ -13,7 +13,6 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   byteCount: 'shared',
   carrySchema: 'browser',
   call: 'browser',
-  context: 'browser',
   createContext: 'browser',
   ctx: 'shared',
   debounced: 'browser',

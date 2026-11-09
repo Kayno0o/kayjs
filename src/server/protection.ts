@@ -448,9 +448,6 @@ function actionLimits(action: ServerAction<TSchema, unknown>): ActionLimit[] {
   return limits
 }
 
-/** @deprecated Use `RateLimit`. */
-export type ApiRateLimit = RateLimit
-
 // The longest wait among the limits a request to an API route is over, counting it against each, or undefined while it is under all; under the key each gives, the client's address else.
 export async function apiLimitWait(limits: { name: string, limit: RateLimit }[], request: Request, server: Server<unknown> | null | undefined, context: () => Omit<RateKeyContext, 'client'>): Promise<number | undefined> {
   if (limits.length === 0)

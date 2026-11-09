@@ -1171,9 +1171,6 @@ interface GrantStore<P, G extends string>
   hasCredential: (principal: P) => boolean
   subjectId: (principal: P) => string
 
-[.] guard
-function guard(options?: GuardOptions): Guard<void>
-
 [.] GuardOptions
 interface GuardOptions
   redirect?: string | undefined
@@ -1236,9 +1233,6 @@ type Level = 'read' | 'write'
 
 [.] lifetime
 function lifetime(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, locale: string): string
-
-[.] Limit
-type Limit = AuthRateLimit
 
 [.] LimitOption
 type LimitOption = AuthRateLimit | AuthRateLimit[]
@@ -1306,9 +1300,6 @@ interface ManagedUser extends BareUser
 
 [.] MaybePromise
 type MaybePromise<T> = T | Promise<T>
-
-[.] Member
-type Member<Role extends string = string> = AuthMember<Role>
 
 [.] MemberRecord
 interface MemberRecord
@@ -1713,9 +1704,6 @@ function proofOfWork(options?: AuthProofOfWorkOptions): ProofOfWorkCaptcha
 interface ProofOfWorkCaptcha
   on: Partial<Record<CaptchaAction, "always" | false | number>>
   proofOfWork: { difficulty: number; maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; store: RateStore | undefined; }
-
-[.] ProofOfWorkOptions
-type ProofOfWorkOptions = AuthProofOfWorkOptions
 
 [.] ProviderOptions
 interface ProviderOptions

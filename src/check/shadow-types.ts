@@ -44,11 +44,10 @@ import { largePublicImages } from './large-images'
 import { libraryNames, pgLoaderSource } from './library-names'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
-import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { contextName, exportNames, hookDispatch } from './renamed-exports'
+import { hookDispatch } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
@@ -147,12 +146,9 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-  async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),
-  async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => hookDispatch(root, options),
-  async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
   async ({ root, options }) => deprecatedEscapeOption(root, options),
   async ({ root, options }) => streamTypes(root, options),

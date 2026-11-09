@@ -1,6 +1,3 @@
-[.] Action
-type Action = CmsAction
-
 [.] BeforeSaveChange
 interface BeforeSaveChange
   body: string
@@ -195,9 +192,6 @@ interface CustomFieldProps
 
 [.] defaults
 const defaults: Settings
-
-[.] DraftEntry
-type DraftEntry = CmsDraftEntry
 
 [.] DraftKeeper
 interface DraftKeeper
@@ -874,9 +868,6 @@ interface PgLoaderOptions extends LoaderOptions
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
-[./pg] SeedEntry
-type SeedEntry = CmsSeedEntry
-
 [./presence] entryPresence
 function entryPresence(ctx: GuardContext, collection: string, entry: { slug: string; locale?: string | undefined; }): Promise<EntryPresence>
 
@@ -894,9 +885,6 @@ interface CmsMember
 [./room] entryRoom
 function entryRoom(collection: string, entry: { slug: string; locale?: string | undefined; }, listed: CmsMember): { room: string; member: CmsMember; }
 
-[./room] Member
-type Member = CmsMember
-
 [./sqlite] CmsSeedEntry
 interface CmsSeedEntry
   body?: string | undefined
@@ -911,9 +899,6 @@ interface LoaderOptions
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-
-[./sqlite] SeedEntry
-type SeedEntry = CmsSeedEntry
 
 [./sqlite] sqliteLoader
 function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>

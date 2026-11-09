@@ -797,15 +797,6 @@ export const LINTS = {
     wrong: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { chat } from \'./chat\'\n---\nChat(action={chat})\n  @sendIcon\n    span go',
     right: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { chat } from \'./chat\'\n---\nChat(action={chat} icons={{ send: \'plus\' }})',
   },
-  'deprecated-export-names': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.90',
-    site: true,
-    summary: 'An import of an export under the name it had before 1.90, when each name came to mean one thing across kay and its libraries: kayjs-mail\'s `cssColours` is `cssColors`, the one British spelling of the API. The old names work until 1.93. The names are listed per module in `llms/upgrading.md`. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix. A re-export (`export { X } from \'pkg\'`), `import(\'pkg\').X` and a namespace use are not found.',
-    wrong: '--- server\nimport { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColours(\'a { --brand: #0047ff }\')\n---\np x',
-    right: '--- server\nimport { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColors(\'a { --brand: #0047ff }\')\n---\np x',
-  },
   'deprecated-library-names': {
     level: 'warn',
     group: 'deprecated',
@@ -814,15 +805,6 @@ export const LINTS = {
     summary: 'An import of an export under the name it had before 1.91, when the libraries\' constructors became nouns and every Postgres helper took one `PgSource`: kayjs-auth\'s `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms\'s `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`; kayjs-mail\'s `createMailSuppressionTable` and `mailListTables` from `/pg` are `createMailSuppressionTables` and `mailListTableNames`; `PgJobsSource` of `kay/server` is `PgSource`. The `sql` key of a `pgLoader({ ... })` literal is `source`. The old names work until 1.94. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it, or the key. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix, as is a `sql` written beside a `source` or a spread. A re-export keeps its public name (`export { createAuth } from \'pkg\'` becomes `export { authCore as createAuth } from \'pkg\'`); `import(\'pkg\').X` is renamed with a safe fix, and a namespace use is not found.',
     wrong: '--- server\nimport { createGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = createGate\n---\np x',
     right: '--- server\nimport { authGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = authGate\n---\np x',
-  },
-  'deprecated-context-name': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.90',
-    site: true,
-    summary: 'An import of `context` from `kay`, `createContext` since 1.90: the old name read as `ctx` and `defineContext`, which are other things. The old name works until 1.93. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
-    wrong: '--- server\nimport { context } from \'kay\'\n\nexport const Theme = context(\'light\')\n---\np x',
-    right: '--- server\nimport { createContext } from \'kay\'\n\nexport const Theme = createContext(\'light\')\n---\np x',
   },
   'deprecated-stream-types': {
     level: 'warn',
@@ -868,15 +850,6 @@ export const LINTS = {
     summary: 'An import of `notify` or `NotifyOptions` from `kay/library`, `dispatch` and `DispatchOptions` since 1.92: `notify` now names only the inbox of `kay/server`. The old names work until 1.95. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
     wrong: '--- server\nimport { notify } from \'kay/library\'\n\nexport const tell = () => notify(\'app.onSave\', [], {})\n---\np x',
     right: '--- server\nimport { dispatch } from \'kay/library\'\n\nexport const tell = () => dispatch(\'app.onSave\', [], {})\n---\np x',
-  },
-  'deprecated-import-path': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.90',
-    site: true,
-    summary: 'A name imported from the root of a library that its own entry exports since 1.90, the root no longer repeating it: kayjs-auth\'s credential rules (`normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `DEFAULT_RULES`, `PASSWORD_MIN_LENGTH` and the other lengths, and their types) are in `@kaynooo/kayjs-auth/rules`, which is browser-safe, and kayjs-cms\'s `EntryForm` and `FormScope` are in `@kaynooo/kayjs-cms/form`. Found in the TypeScript files and `.kay` fences of the project; the fix changes the module of an import that held only those names, and moves them to an import of their own entry otherwise. An import with a default or a namespace beside them is reported with no fix.',
-    wrong: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
-    right: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
   },
   'deprecated-auth-error': {
     level: 'warn',

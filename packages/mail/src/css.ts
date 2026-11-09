@@ -65,6 +65,3 @@ export function cssColors(stylesheet: string | URL, name = 'the stylesheet'): (p
     return Bun.color(value, 'hex')!
   }
 }
-
-/** @deprecated Renamed `cssColors` in 1.90, the spelling `colorField` and the `color` props use; the old name works until 1.93. */
-export const cssColours = cssColors

@@ -41,9 +41,6 @@ const OWN_INDEXES: readonly PgIndex[] = [
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
 export const dataTableNames = [...jobTableNames, ...OWN_TABLES] as readonly string[]
 
-/** @deprecated Renamed `dataTableNames` in 1.90, with `jobTableNames`; the old name works until 1.93. */
-export const dataTables = dataTableNames
-
 // What a Postgres store reaches its database through: the connection, once the tables are in place.
 export interface PgHandle {
   db: () => Promise<SQL>

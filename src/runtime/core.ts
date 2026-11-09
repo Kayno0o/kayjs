@@ -208,10 +208,6 @@ export function createContext<T>(fallback: T): Context<T> {
   }
 }
 
-/** @deprecated Renamed `createContext` in 1.90, so it does not read as `ctx` or `defineContext`; the old name works until 1.93, and `kay upgrade` renames it. */
-// kept: free
-export const context = createContext
-
 export interface Selection<Key> {
   (): Key | undefined
   set: (key: Key | undefined | ((current: Key | undefined) => Key | undefined)) => void

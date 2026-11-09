@@ -1,4 +1,3 @@
-import type { ImportDeclaration, ImportSpecifier } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node, Program } from '../compiler/estree'
 import type { LintName } from '../compiler/lints'
@@ -9,7 +8,6 @@ import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
 
-const NEWLINE = /^\r?\n/
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 
 export interface Edit { start: number, end: number, text: string }
@@ -187,29 +185,6 @@ interface RenamedTypes {
   // The release that renamed them and the one that drops the old names.
   since: string
   until: string
-  // Modules exporting the same thing under the same new name as a module of `modules`: a file already importing the new name from one of them has the old import dropped instead of renamed. The new name taken in the same module stays a report with no fix.
-  same?: Readonly<Record<string, readonly string[]>>
-}
-
-// Whether `name` is imported as itself from one of `modules`.
-function importedFrom(ast: Program, name: string, modules: readonly string[]): boolean {
-  return ast.body.some(statement => statement.type === 'ImportDeclaration' && modules.includes(statement.source.value) && statement.specifiers.some(specifier => specifier.type === 'ImportSpecifier' && importedName(specifier) === name && specifier.local.name === name))
-}
-
-// The edit removing one specifier of an import, or the whole import when it is the only one.
-function withoutSpecifier(statement: ImportDeclaration, specifier: ImportSpecifier, base: number, text: string): Edit {
-  const index = statement.specifiers.indexOf(specifier)
-
-  if (statement.specifiers.length === 1) {
-    const end = statement.end + (NEWLINE.exec(text.slice(statement.end))?.[0].length ?? 0)
-
-    return { start: base + statement.start, end: base + end, text: '' }
-  }
-
-  if (index < statement.specifiers.length - 1)
-    return { start: base + specifier.start, end: base + statement.specifiers[index + 1]!.start, text: '' }
-
-  return { start: base + statement.specifiers[index - 1]!.end, end: base + specifier.end, text: '' }
 }
 
 // A name imported from one of `config.modules` under an old name, as a type or a value import: the fix renames the import and every use of it.
@@ -219,7 +194,7 @@ export async function renamedTypes(root: string, options: CheckOptions, config: 
     return []
 
   return scan(root, options, config.lint, config.needle, ({ parsed, unparsed, report }) => {
-    for (const { ast, base, text } of parsed) {
+    for (const { ast, base } of parsed) {
       for (const statement of ast.body) {
         // A re-export keeps its public name: `export { context } from 'kay'` becomes `export { createContext as context } from 'kay'`.
         if (statement.type === 'ExportNamedDeclaration' && statement.source !== null && statement.source !== undefined && Object.hasOwn(config.modules, statement.source.value)) {
@@ -262,14 +237,6 @@ export async function renamedTypes(root: string, options: CheckOptions, config: 
             continue
           }
 
-          if (importedFrom(ast, next, config.same?.[statement.source.value] ?? []) && !new RegExp(`\\b${old}\\b`).test(unparsed)) {
-            const reads = uses(ast, old, next)
-
-            report(importEdit.start, importEdit.end, message, help, reads ? [withoutSpecifier(statement, specifier, base, text), ...reads.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
-
-            continue
-          }
-
           const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
 
           report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
@@ -279,36 +246,9 @@ export async function renamedTypes(root: string, options: CheckOptions, config: 
   })
 }
 
-// The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.
-export const EXPORT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'kay/server': { EveryOptions: 'ScheduleEveryOptions', jobTables: 'jobTableNames', dataTables: 'dataTableNames', ApiRateLimit: 'RateLimit' },
-  '@kaynooo/kayjs-mail': { cssColours: 'cssColors', Reply: 'MailReply', Attachment: 'MailAttachment', WaitOptions: 'MailWaitOptions' },
-  '@kaynooo/kayjs-ai': { Reply: 'AiReply', Attachment: 'AiAttachment', ToolCall: 'AiToolCall', Message: 'AiMessage', LimitOptions: 'AskLimit' },
-  '@kaynooo/kayjs-cms': { Action: 'CmsAction', DraftEntry: 'CmsDraftEntry' },
-  '@kaynooo/kayjs-cms/room': { Member: 'CmsMember' },
-  '@kaynooo/kayjs-cms/pg': { SeedEntry: 'CmsSeedEntry' },
-  '@kaynooo/kayjs-cms/sqlite': { SeedEntry: 'CmsSeedEntry' },
-  '@kaynooo/kayjs-auth': { guard: 'authGuard', Member: 'AuthMember', ProofOfWorkOptions: 'AuthProofOfWorkOptions', Limit: 'AuthRateLimit' },
-  '@kaynooo/kayjs-ui': { editing: 'rowEditing', Editing: 'RowEditing' },
-}
-
-const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).flatMap(names => Object.keys(names)))].join('|')})\\b`)
-
-// An export imported under the name it had before 1.90 (`EXPORT_NAMES`): the fix renames the import and every use of it.
-export async function exportNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', same: { 'kay/server': ['kay'] } })
-}
-
 const OLD_HOOK_HELPER = /\b(?:notify|NotifyOptions)\b/
 
 // `notify` and `NotifyOptions` imported from `kay/library`: `dispatch` and `DispatchOptions`, so `notify` names only the inbox of `kay/server`.
 export async function hookDispatch(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   return renamedTypes(root, options, { lint: 'deprecated-hook-dispatch', modules: { 'kay/library': { notify: 'dispatch', NotifyOptions: 'DispatchOptions' } }, needle: OLD_HOOK_HELPER, since: '1.92', until: '1.95' })
-}
-
-const OLD_CONTEXT = /\bcontext\b/
-
-// `context` imported from `kay`: the `createContext` it was renamed to in 1.90, so it does not read as `ctx` or `defineContext`.
-export async function contextName(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-context-name', modules: { kay: { context: 'createContext' } }, needle: OLD_CONTEXT, since: '1.90', until: '1.93' })
 }

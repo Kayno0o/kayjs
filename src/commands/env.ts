@@ -10,7 +10,7 @@ import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, fileFormOf, listingEnv } from '../server/env-state'
 import { registerLoader } from '../server/loader'
 import { formatOption, printDocument, printedProblems, printFailure, printProblems, projectRoot, withStdoutOnStderr } from './command'
-import { compareEnv, defaultEnvFiles, renamedProblems, withDeclaredVariables } from './env-compare'
+import { compareEnv, defaultEnvFiles, withDeclaredVariables } from './env-compare'
 import { importApi } from './import-module'
 
 // A variable with the place that declares it.
@@ -79,11 +79,9 @@ export const env: Command = {
           console.error(added.length === 0 ? `${relative(root, path)} already lists every variable` : `${relative(root, path)}: added ${added.join(', ')}`)
         }
 
-        // With no file to compare, the environment alone is still checked for an old name.
-        const renamed = renamedProblems(root, new Map(), undefined, undefined)
-        const findings = files === undefined ? renamed : await compareEnv(root, listed.variables, files, listed.unread)
+        const findings = files === undefined ? undefined : await compareEnv(root, listed.variables, files, listed.unread)
 
-        return { ...listed, findings: files === undefined && renamed.length === 0 ? undefined : findings }
+        return { ...listed, findings }
       })
 
       if (format === 'json') {

@@ -1,9 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { listEnv } from '../src/commands/env'
-import { RENAMED_ENV, renamedProblems } from '../src/commands/env-compare'
 import { buildingWithoutEnv } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
@@ -36,37 +34,6 @@ describe('environment variable names', () => {
 
     expect(kays.length).toBeGreaterThan(4)
     expect(kays.filter(name => !name.startsWith('KAY_') && !HOST_SET.has(name))).toEqual([])
-  })
-
-  it('has no renamed variable listed under its old name', () => {
-    expect(Object.values(RENAMED_ENV).every(name => (/^(?:AUTH|MAIL|AI|CMS)_/).test(name))).toBe(true)
-  })
-})
-
-describe('kay env on a renamed variable', () => {
-  it('warns for an old name in the environment, a compose file or the example file', async () => {
-    const root = await project({
-      'compose.yaml': 'services:\n  app:\n    image: x\n    environment:\n      MAIL_INBOUND_SECRET: abc\n',
-      '.env.example': 'KAYJS_AUTH_DATABASE_URL=\n',
-    })
-    const saved = process.env.MAIL_INBOUND_SECRET
-
-    process.env.MAIL_INBOUND_SECRET = 'abc'
-
-    try {
-      const { compareEnv } = await import('../src/commands/env-compare')
-      const found = (await compareEnv(root, [], { compose: ['compose.yaml'], example: '.env.example' })).filter(({ severity }) => severity === 'warning').map(({ message }) => message)
-
-      expect(found.filter(message => message.startsWith('MAIL_INBOUND_SECRET is now MAIL_EVENTS_INBOUND'))).toHaveLength(2)
-      expect(found.filter(message => message.startsWith('KAYJS_AUTH_DATABASE_URL is now AUTH_DATABASE_URL'))).toHaveLength(1)
-      expect(renamedProblems(root, new Map(), undefined, undefined).map(({ message }) => message)).toEqual([expect.stringContaining('MAIL_INBOUND_SECRET is now MAIL_EVENTS_INBOUND')])
-    }
-    finally {
-      if (saved === undefined)
-        delete process.env.MAIL_INBOUND_SECRET
-      else
-        process.env.MAIL_INBOUND_SECRET = saved
-    }
   })
 })
 

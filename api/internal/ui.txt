@@ -894,12 +894,6 @@ class Sortable
 interface SortableOptions
   onReorder: (from: number, to: number) => unknown
 
-[./lib/editing] editing
-function editing<Row, Draft = void>(): RowEditing<Row, Draft>
-
-[./lib/editing] Editing
-type Editing<Row, Draft = void> = RowEditing<Row, Draft>
-
 [./lib/editing] rowEditing
 function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft>
 
@@ -1247,12 +1241,6 @@ interface DescriptionItem
 
 [./lib/index] dismissToast
 function dismissToast(id: number, reason?: ToastDismissReason): void
-
-[./lib/index] editing
-function editing<Row, Draft = void>(): RowEditing<Row, Draft>
-
-[./lib/index] Editing
-type Editing<Row, Draft = void> = RowEditing<Row, Draft>
 
 [./lib/index] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'

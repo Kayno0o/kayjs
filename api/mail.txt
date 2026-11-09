@@ -1,9 +1,6 @@
 [.] Address
 type Address = string | { name: string, address: string }
 
-[.] Attachment
-type Attachment = MailAttachment
-
 [.] AuthKind
 type AuthKind = AuthMailKind
 
@@ -115,9 +112,6 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
 
 [.] cssColors
 function cssColors(stylesheet: URL | string, name?: string): (property: string) => string
-
-[.] cssColours
-function cssColours(stylesheet: URL | string, name?: string): (property: string) => string
 
 [.] darkPalette
 function darkPalette(settings: MailSettings): Palette
@@ -426,9 +420,6 @@ interface ProviderSettings
 [.] registeredMailer
 function registeredMailer(): Promise<Mailer | undefined>
 
-[.] Reply
-type Reply = MailReply
-
 [.] ReplyAttachment
 interface ReplyAttachment
   content: Uint8Array<ArrayBufferLike>
@@ -557,9 +548,6 @@ interface Transport
 
 [.] ViewContent
 type ViewContent<P extends object> = { view: (props: P) => JSX.Element, text?: string, html?: never } & (object extends P ? { props?: P } : { props: P })
-
-[.] WaitOptions
-type WaitOptions = MailWaitOptions
 
 [./add] default
 const default: { description: string; files: {}; extension: { import: string; expression: string; }; notes: string[]; }

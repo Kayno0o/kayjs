@@ -565,8 +565,6 @@ This checks your deploy files against what the project declares. It reports an e
 
 A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warning. `NODE_ENV` and test files are left out.
 
-A variable renamed in 1.91 and still set under its old name in the environment, a compose service or the example file is a warning too: `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL`, and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND`. The libraries read the old names until 1.94.
-
 `kay check --fix` declares those variables for you. It adds them to your `defineEnv` schema, or writes `src/env.ts` when you have none, turns a `?? 'default'` into the variable's `default`, and rewrites each read to `env.X` with the import.
 
 A file that reads the environment on its own is left alone, with no warning: the entry of a standalone binary (a file a `bun build` script of `package.json` names, in `src` or elsewhere) and the files it imports by relative path, the content config (`src/content.config.ts`, or the `contentConfig` of `kay.config.ts`), and any file with a `// kay-env: raw` line. A module the entry shares with the app is left alone for the whole app.

@@ -144,9 +144,6 @@ interface AskOptions extends AskHooks, Resilience
 }
   tools?: readonly (FunctionTool | ToolAction)[] | undefined
 
-[.] Attachment
-type Attachment = AiAttachment
-
 [.] AudioFormat
 type AudioFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'
 
@@ -381,18 +378,12 @@ interface Heard
 [.] lastChatMessage
 function lastChatMessage<Messages extends readonly ChatMessage[]>(messages: Messages): Messages[number]
 
-[.] LimitOptions
-type LimitOptions = AskLimit
-
 [.] Media
 interface Media
   data: Uint8Array<ArrayBufferLike>
   kind: "image" | "pdf"
   name?: string | undefined
   type: string
-
-[.] Message
-type Message = AiMessage
 
 [.] mocked
 function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & {
@@ -500,9 +491,6 @@ function replaces(request?: Request | undefined): Replaces | undefined
 interface Replaces
   kind: "edit" | "regenerate"
   turns: number
-
-[.] Reply
-type Reply = AiReply
 
 [.] ReplyOf
 type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
@@ -664,9 +652,6 @@ function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>
 
 [.] ToolAction
 type ToolAction = Action<never, unknown>
-
-[.] ToolCall
-type ToolCall = AiToolCall
 
 [.] ToolOutcome
 interface ToolOutcome

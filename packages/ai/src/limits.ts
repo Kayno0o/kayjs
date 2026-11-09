@@ -24,9 +24,6 @@ let storeTimeoutMs = 5000
 // The store is the app's `store.rates` unless given, else this process's memory: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
 export type AskLimit = Omit<RateLimit, 'key'>
 
-/** @deprecated Use `AskLimit`. */
-export type LimitOptions = AskLimit
-
 // How many tokens, input and output, the replies to a visitor may use in a window, and to all visitors with `total`.
 export interface BudgetOptions {
   tokens: number
