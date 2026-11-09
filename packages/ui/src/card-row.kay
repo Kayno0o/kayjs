@@ -2,14 +2,14 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 
-// The actions are dimmed until the row is hovered or holds focus, which the row's `group/row` tells them.
+// The actions are dimmed until the row is hovered or holds focus, which the row's `group/row` tells them; a device that cannot hover shows them in full, as it never would otherwise.
 const look = recipe({
   parts: {
     root: 'kui-card-row group/row flex items-center gap-3 rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface p-4 [box-shadow:var(--shadow-raised)] data-linked:relative data-linked:[&_:is(a,button,select,textarea,summary,label,[role=button],input:not(label_input)):not([data-stretched])]:relative data-linked:[&_:is(a,button,select,textarea,summary,label,[role=button],input:not(label_input)):not([data-stretched])]:z-10',
     body: 'min-w-0 flex-1',
     // The link covers the row through its `::after`, so a click anywhere on the row follows it, and every control in the row is lifted above it.
     link: 'text-inherit no-underline after:absolute after:inset-0 after:content-[""] hover:underline focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-accent focus-visible:after:rounded-lg',
-    actions: 'flex shrink-0 items-center gap-2 opacity-60 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100',
+    actions: 'flex shrink-0 items-center gap-2 opacity-60 transition-opacity [@media(hover:none)]:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100',
   },
 })
 
