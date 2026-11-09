@@ -825,7 +825,7 @@ describe('kay new', () => {
       const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
 
       expect(compose).toContain('KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}')
-      expect(compose).toContain('source: ./data-prod\n        target: /app/data\n        bind: { create_host_path: false }')
+      expect(compose).toContain('source: ./data-prod\n        target: /app/data\n        bind:\n          create_host_path: false')
       expect(compose).not.toContain('volumes:\n  data:')
       expect(compose).toContain('cap_drop: [ALL]')
       expect(compose).toContain('no-new-privileges:true')

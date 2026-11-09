@@ -65,7 +65,8 @@ const APP_COMPOSE = `services:
       - type: bind
         source: ./data-prod/postgres
         target: /var/lib/postgresql
-        bind: { create_host_path: false }
+        bind:
+          create_host_path: false
       # Creates app_rw when the database is first created; db/roles.sh says how to run it on an existing one.
       - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     healthcheck:
@@ -127,7 +128,8 @@ const SQLITE_COMPOSE = `services:
       - type: bind
         source: ./data-prod
         target: /app/data
-        bind: { create_host_path: false }
+        bind:
+          create_host_path: false
 `
 
 function databaseCompose(postgres: boolean): string {
