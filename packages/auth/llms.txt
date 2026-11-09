@@ -24,4 +24,4 @@ The rest is split by topic, each file read whole with one command:
 
 ## Environment
 
-The database url is `AUTH_DATABASE_URL` (`KAYJS_AUTH_DATABASE_URL` is read until 1.94, with a warning); an OAuth provider keeps its own name, `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`.
+The database url is `AUTH_DATABASE_URL`; an OAuth provider keeps its own name, `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`.

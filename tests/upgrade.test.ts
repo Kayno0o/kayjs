@@ -799,8 +799,6 @@ describe('the deprecations', () => {
 
 // Migration shims kept for a few minors: the first minor each must be gone by, and the code that marks it. A shim past its minor fails here, so the release that reaches it drops it.
 const SHIMS: { what: string, file: string, pattern: RegExp, removedIn: readonly [number, number] }[] = [
-  { what: 'the KAYJS_AUTH_DATABASE_URL fallback of kayjs-auth', file: 'packages/auth/src/own.ts', pattern: /KAYJS_AUTH_DATABASE_URL/, removedIn: [1, 94] },
-  { what: 'the MAIL_INBOUND_SECRET fallback of kayjs-mail', file: 'packages/mail/src/events.ts', pattern: /MAIL_INBOUND_SECRET/, removedIn: [1, 94] },
 ]
 
 // Whether a shim marked for `removedIn` is overdue at `version`.

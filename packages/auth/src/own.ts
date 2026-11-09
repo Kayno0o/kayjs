@@ -56,8 +56,8 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   plugin?: undefined
   // Where the OAuth and page routes live, `/auth` by default.
   prefix?: Prefix | undefined
-  // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`). `true` works until 1.93, leave it out.
-  pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember' | 'main'> | undefined
+  // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`). Left out they are served.
+  pages?: false | Pick<AuthPagesConfig, 'profile' | 'remember' | 'main'> | undefined
   // The session cookie's name, `kay_session` by default; kay names it `__Host-` first over https unless `forwardAuth` shares it under a domain.
   cookie?: string | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
@@ -116,6 +116,11 @@ function appOf(name: string, given: true | PresetApp | OAuthApp): OAuthApp {
   return { provider: preset(options), clientId: id, clientSecret: secret, ...label !== undefined && { label }, ...keepTokens !== undefined && { keepTokens } }
 }
 
+// The database url: `AUTH_DATABASE_URL`, empty as `.env.example` lists it counting as unset.
+function databaseUrlFromEnv(): string | undefined {
+  return filled(process.env.AUTH_DATABASE_URL)
+}
+
 function filled(value: string | undefined): string | undefined {
   return value === '' ? undefined : value
 }
@@ -149,24 +154,6 @@ const OWN_FILE = 'data/auth.sqlite'
 // What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose users are in it keeps it.
 const LEGACY_OWN_FILE = 'data/auth.db'
 const warned = new Set<string>()
-let warnedOldDatabaseName = false
-
-// The database url: `AUTH_DATABASE_URL`, else the name before 1.91, `KAYJS_AUTH_DATABASE_URL`, which warns once.
-function databaseUrlFromEnv(): string | undefined {
-  const given = filled(process.env.AUTH_DATABASE_URL)
-
-  if (given !== undefined)
-    return given
-
-  const old = filled(process.env.KAYJS_AUTH_DATABASE_URL)
-
-  if (old !== undefined && !warnedOldDatabaseName) {
-    warnedOldDatabaseName = true
-    log.warn('KAYJS_AUTH_DATABASE_URL is now AUTH_DATABASE_URL: rename it in your .env or compose service, the old name is read until 1.94')
-  }
-
-  return old
-}
 
 async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined, exporting: boolean | undefined): Promise<AuthStore> {
   if (typeof store === 'function')

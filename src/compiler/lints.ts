@@ -731,15 +731,6 @@ export const LINTS = {
     wrong: '// src/jobs.ts, imported by no plugin\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)',
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
-  'deprecated-auth-options': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.90',
-    site: true,
-    summary: 'A kayjs-auth feature that is on by default, written `feature: true`: `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` or `createAuth()`, and `pages` of `auth()`. A default-on feature is switched off with `false` or tuned with an object, so `true` is left out. The old form works until 1.93. Found in the options object written out at a call of `auth` or `createAuth` read from `@kaynooo/kayjs-auth`; the fix drops the property.',
-    wrong: 'auth({ password: true, twoFactor: true, signUp: false })',
-    right: 'auth({ signUp: false })',
-  },
   'deprecated-escape-option': {
     level: 'warn',
     group: 'deprecated',

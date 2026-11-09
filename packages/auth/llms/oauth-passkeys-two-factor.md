@@ -71,7 +71,7 @@ catch (caught) {
 ### Switching features off
 
 - `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })`, and the same keys of `authCore`, switch a feature off; each is on by default where it works. A method of a feature that is off answers `{ ok: false, error: { code: 'off' } }`: `password.register`, `password.signIn`, `password.requestReset`, `password.reset` and `password.change` for `password`; `magicLink.request`, `magicLink.signIn` and `magicLink.signInWithCode` for `magicLink`; the passkey sign-in, adding and proof methods for `passkeys`; `twoFactor.setUp` and `twoFactor.enable` for `twoFactor`. `passkeys.signInOptions` throws.
-- A default-on feature is `false | Config` and a default-off one `true | Config`, so `password: true`, `magicLink: true`, `twoFactor: true`, `signUp: true` and `pages: true` of `auth()` only restate the default: they work until 1.93 and `kay check` drops them (`deprecated-auth-options`). `oauthServer` and `breachedPasswords` keep `true`, which demands them where they would not be on by themselves.
+- A default-on feature is `false | Config` and a default-off one `true | Config`: `password`, `magicLink`, `twoFactor`, `signUp` and `pages` of `auth()` take `false` (or an object), never `true`, so leaving one out is how it stays on. `oauthServer` and `breachedPasswords` keep `true`, which demands them where they would not be on by themselves.
 - The `error.code` an `{ ok: false, error }` result carries for a feature that does not run:
 
   | Word | Means | Seen from |

@@ -45,8 +45,6 @@ const ANY = new Set(['NODE_ENV'])
 const FOREIGN = new Set(['BROWSER', 'DATABASE_URL', 'FORCE_COLOR', 'GITHUB_WORKSPACE', 'HOST', 'LOCALAPPDATA', 'MIGRATE_DATABASE_URL', 'NODE_PORT', 'NO_COLOR', 'PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'PORT', 'SITE_BASE', 'SITE_URL', 'TRACKER_PASSWORD', 'TRACKER_USER', 'UMAMI_HOST', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'X'])
 const BUN = /^BUN_/
 const VENDOR = new Set(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'])
-// The names before 1.91, allowed only in the file that reads them as a fallback until 1.94.
-const OLD_NAMES: Record<string, string> = { KAYJS_AUTH_DATABASE_URL: 'packages/auth/src/own.ts', MAIL_INBOUND_SECRET: 'packages/mail/src/events.ts' }
 // kayjs-ai's switch for its own tests, read where `ask` picks a provider.
 const TEST_SWITCH = new Set(['KAYJS_AI_REAL_PROVIDERS'])
 
@@ -79,20 +77,11 @@ async function namesIn(root: string): Promise<{ name: string, file: string }[]> 
 describe('every variable the source reads', () => {
   for (const { root, allowed } of SCANNED) {
     it(`follows the rule in ${root}`, async () => {
-      const broken = (await namesIn(root)).filter(({ name, file }) => !ANY.has(name) && !allowed(name) && OLD_NAMES[name] !== file)
+      const broken = (await namesIn(root)).filter(({ name }) => !ANY.has(name) && !allowed(name))
 
       expect(broken).toEqual([])
     })
   }
-
-  it('reads an old name only in the file that falls back to it', async () => {
-    const all = (await Promise.all(SCANNED.map(async ({ root }) => namesIn(root)))).flat()
-
-    for (const [old, file] of Object.entries(OLD_NAMES)) {
-      expect(all.filter(({ name }) => name === old).every(read => read.file === file)).toBe(true)
-      expect(await Bun.file(join(ROOT, file)).text()).toContain(old)
-    }
-  })
 
   it('spells the insecure flag <PREFIX>_INSECURE as an optional boolean in kayjs-mail and kayjs-ai', async () => {
     for (const [prefix, file] of [['MAIL', 'packages/mail/src/mailer.ts'], ['AI', 'packages/ai/src/config.ts']] as const)

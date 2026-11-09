@@ -33,7 +33,6 @@ afterEach(() => {
   delete process.env.GITHUB_CLIENT_ID
   delete process.env.GITHUB_CLIENT_SECRET
   delete process.env.AUTH_DATABASE_URL
-  delete process.env.KAYJS_AUTH_DATABASE_URL
 })
 
 type Options = OwnOptions<string, string>
@@ -253,20 +252,6 @@ describe('the store', () => {
     await registerOn({})
 
     expect(existsSync(join(root, 'data/other.db'))).toBe(true)
-  })
-
-  test('still reads KAYJS_AUTH_DATABASE_URL, the name before 1.91, and AUTH_DATABASE_URL wins', async () => {
-    process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/old-name.db'
-
-    await registerOn({})
-
-    expect(existsSync(join(root, 'data/old-name.db'))).toBe(true)
-
-    process.env.AUTH_DATABASE_URL = 'sqlite://data/new-name.db'
-
-    await registerOn({})
-
-    expect(existsSync(join(root, 'data/new-name.db'))).toBe(true)
   })
 
   test('follows the project root when the process runs elsewhere, as kay/test of a nested project does', async () => {

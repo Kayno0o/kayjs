@@ -356,7 +356,7 @@ describe('twoFactor.require in OAuth consent', () => {
 })
 
 describe('the boot warning', () => {
-  const make = (twoFactor?: boolean | { require: 'admin'[] }) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), roles: { admin: [] }, admin: 'admin', ...twoFactor === undefined ? {} : { twoFactor } })
+  const make = (twoFactor?: false | { require: 'admin'[] }) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), roles: { admin: [] }, admin: 'admin', ...twoFactor === undefined ? {} : { twoFactor } })
   const told = (warned: { mock: { calls: unknown[][] } }) => warned.mock.calls.filter(([message]) => String(message).includes('twoFactor.require')).length
 
   test('warns in production when admin is on and no requirement names it', () => {

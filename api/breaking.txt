@@ -3,8 +3,10 @@ ai [.] LimitOptions
 ai [.] Message
 ai [.] Reply
 ai [.] ToolCall
+auth [.] AuthOptions
 auth [.] Limit
 auth [.] Member
+auth [.] OwnOptions
 auth [.] ProofOfWorkOptions
 auth [.] guard
 cms [./pg] SeedEntry

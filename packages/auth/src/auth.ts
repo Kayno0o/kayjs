@@ -70,8 +70,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   oauth?: Record<string, OAuthApp> | undefined
   // Asked with every provider account before any user is touched; false refuses the sign-in, as an allowlist does.
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
-  // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is the default and works until 1.93: leave it out.
-  signUp?: boolean | undefined
+  // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is not accepted, it is the default.
+  signUp?: false | undefined
   // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, the provider's `profile` for a sign-up by a provider account, and `context`. A throw is logged and reported to the app's `onError` with source `auth.onSignUp`, and never fails the sign-up.
   onSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
@@ -117,13 +117,13 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   rateLimit?: LimitsOption | undefined
   // Passkeys are made for `site`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`name` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
   passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | false | undefined
-  // Password sign-in, registering, resets and changes; `false` answers `{ ok: false, error: { code: 'off' } }` from their methods and hides them from the prebuilt pages. On by default; `true` works until 1.93, leave it out.
-  password?: boolean | undefined
-  // Sign-in links and codes mailed to the address (they need `email`); `false` answers `off` from their methods and the pages show none. On by default; `true` works until 1.93, leave it out.
-  magicLink?: boolean | undefined
-  // Authenticator-app two-step verification: `false` answers `off` from setting it up, turning it on and new recovery codes, and the account page offers none. A user who turned it on before is still asked for the code at sign-in. On by default; `true` works until 1.93, leave it out.
+  // Password sign-in, registering, resets and changes; `false` answers `{ ok: false, error: { code: 'off' } }` from their methods and hides them from the prebuilt pages. On by default, so it takes `false` alone.
+  password?: false | undefined
+  // Sign-in links and codes mailed to the address (they need `email`); `false` answers `off` from their methods and the pages show none. On by default, so it takes `false` alone.
+  magicLink?: false | undefined
+  // Authenticator-app two-step verification: `false` answers `off` from setting it up, turning it on and new recovery codes, and the account page offers none. A user who turned it on before is still asked for the code at sign-in. On by default, so it takes `false` or `{ require }`.
   // `{ require }` makes two-factor a must for the users it names (a role, a predicate or a list, as a guard's `require`): their guards and gates, the admin pages and `auth.admin`, and OAuth consent send them to the security page, or answer 403 (`two-factor-required` from `auth.admin`) when they cannot be sent. An app's own security page sits behind `guard({ twoFactor: false })`.
-  twoFactor?: boolean | { require?: AuthRequirement<Role> | undefined } | undefined
+  twoFactor?: false | { require?: AuthRequirement<Role> | undefined } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds. On by default in production, `false` turns it off; a check that fails lets the password through.

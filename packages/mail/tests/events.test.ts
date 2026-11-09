@@ -8,7 +8,6 @@ import { Database } from 'bun:sqlite'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
-import { secretsOf } from '../src/events'
 import { createLists } from '../src/list'
 import { openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
@@ -473,25 +472,6 @@ describe('inbound replies', () => {
       expect((await inbound('Subject: x\r\n\r\ny')).status).toBe(404)
     }
     finally {
-      process.env.MAIL_EVENTS_INBOUND = saved
-    }
-  })
-})
-
-describe('the inbound secret\'s old name', () => {
-  it('is still read as MAIL_INBOUND_SECRET until 1.94, the new name winning', async () => {
-    const saved = process.env.MAIL_EVENTS_INBOUND
-
-    delete process.env.MAIL_EVENTS_INBOUND
-    process.env.MAIL_INBOUND_SECRET = INBOUND
-
-    try {
-      expect(secretsOf(undefined).inbound).toBe(INBOUND)
-      process.env.MAIL_EVENTS_INBOUND = 'new-name-secret'
-      expect(secretsOf(undefined).inbound).toBe('new-name-secret')
-    }
-    finally {
-      delete process.env.MAIL_INBOUND_SECRET
       process.env.MAIL_EVENTS_INBOUND = saved
     }
   })

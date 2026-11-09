@@ -450,7 +450,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   forwardAuth?: ForwardAuthOptions | ForwardDomains | undefined
   guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
-  magicLink?: boolean | undefined
+  magicLink?: false | undefined
   name?: string | undefined
   oauth?: Record<string, OAuthApp> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
@@ -461,7 +461,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   pages?: AuthPagesConfig | boolean | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
-  password?: boolean | undefined
+  password?: false | undefined
   prefix?: Prefix | undefined
   profileFields?: ((event: {
   user: User<UserData>;
@@ -482,10 +482,10 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   sessions: SessionPlugin<Data>
   sessionsPage?: string | undefined
   signInPage?: string | undefined
-  signUp?: boolean | undefined
+  signUp?: false | undefined
   site?: string | undefined
   store: AuthStore
-  twoFactor?: boolean | undefined | { require?: AuthRequirement<Role> | undefined; }
+  twoFactor?: false | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
   user?: (TSchema & { static: UserData; }) | undefined
 
@@ -1519,7 +1519,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onAuthEvent" | "onDelete" | "onEvent" | "onSignUp" | "profileFields">>;
 }>) | undefined
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
-  magicLink?: boolean | undefined
+  magicLink?: false | undefined
   module?: undefined
   name?: string | undefined
   oauth?: Record<string, OAuthApp | PresetApp | true> | undefined
@@ -1529,9 +1529,9 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
   onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
-  pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | boolean | undefined
+  pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | false | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
-  password?: boolean | undefined
+  password?: false | undefined
   plugin?: undefined
   prefix?: Prefix | undefined
   profileFields?: ((event: {
@@ -1553,10 +1553,10 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   server?: undefined
   sessionsPage?: string | undefined
   signInPage?: string | undefined
-  signUp?: boolean | undefined
+  signUp?: false | undefined
   site?: string | undefined
   store?: StoreOption | undefined
-  twoFactor?: boolean | undefined | { require?: AuthRequirement<Role> | undefined; }
+  twoFactor?: false | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
   user?: (TSchema & { static: UserData; }) | undefined
   viewer?: boolean | undefined
