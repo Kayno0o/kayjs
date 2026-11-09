@@ -491,16 +491,11 @@ export class JsxTemplate {
       // A key the loop matches rows by sees the item alone, as the browser's key function does, so the index is declared after it is read.
       const keyIndex = node.key && !staticLoop && !positional ? node.index : undefined
 
-      if (node.index && !keyIndex) {
-        b.add(', ')
-
-        if (!staticLoop && !positional)
-          this.sites.rows.add(b.code.length)
-
-        b.addSource(node.index)
-      }
-
       b.add(') => ')
+
+      // The index is a local of the block rather than a parameter, so an index nothing reads is reported as any name is, without `noUnusedParameters`.
+      if (node.index && !keyIndex)
+        this.openIndex(node.index, !staticLoop && !positional)
 
       // The key is read in the block, so the type check sees it, and hover and rename reach the key's name.
       if (node.key && node.row !== undefined)
@@ -511,7 +506,7 @@ export class JsxTemplate {
       else
         this.emitRoot(node.children)
 
-      b.add(node.index && !keyIndex ? ')(KayRow(kayEach), 0)' : ')(KayRow(kayEach))')
+      b.add(node.index && !keyIndex ? ' })(KayRow(kayEach))' : ')(KayRow(kayEach))')
 
       if (staticLoop) {
         if (node.fallback) {
@@ -529,23 +524,29 @@ export class JsxTemplate {
     })
   }
 
+  // Opens a block declaring the loop's index, as a `let` so a write to it is read as one to a parameter, which the caller closes with ` }` after what it returns.
+  private openIndex(index: Span, row: boolean) {
+    this.b.add('{ let ')
+
+    if (row)
+      this.sites.rows.add(this.b.code.length)
+
+    // A name starting with `_` is unused on purpose, as TypeScript takes it of a parameter.
+    this.b.addSource(index).add(` = 0 as number; ${this.src.startsWith('_', index.start) ? `void ${this.src.slice(index.start, index.end)}; ` : ''}return `)
+  }
+
   private emitKeyRead(key: Span, index: Span | undefined, nodes: Node[]) {
     const { b } = this
 
     b.add('(void (').addSource(key).add('), ')
 
     if (index) {
-      b.add('((')
-      this.sites.rows.add(b.code.length)
-      b.addSource(index).add(') => ')
-      this.emitRoot(nodes)
-      b.add(')(0)')
-    }
-    else {
-      this.emitRoot(nodes)
+      b.add('(() => ')
+      this.openIndex(index, true)
     }
 
-    b.add(')')
+    this.emitRoot(nodes)
+    b.add(index ? ' })())' : ')')
   }
 
   // Nothing here updates, so the loop's callback gets the item and the index themselves rather than `For`'s accessors.

@@ -512,6 +512,41 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports an unused loop index as any unused name, whatever the tsconfig says, and not one a key, the template or an underscore reads', async () => {
+    const root = await scratchProject({
+      'src/card.kay': '---\nimport type { Snippet } from \'kay\'\nconst {} = props<{ children: Snippet }>()\n---\nsection\n  slot\n',
+      'src/list.kay': [
+        '---',
+        'const { tags, rows } = props<{ tags: string[], rows: { id: number }[] }>()',
+        '---',
+        'for tag, position of tags',
+        '  em {tag}',
+        'for tag, position of tags',
+        '  em {tag} {position}',
+        'for tag, _position of tags',
+        '  em {tag}',
+        'for tag, position of tags key={tag}',
+        '  em {tag}',
+        'for tag, position of tags key={position}',
+        '  em {tag}',
+        'for { id }, position of rows',
+        '  em {id}',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([
+        [4, 'unread-name', '\'position\' is declared but its value is never read.'],
+        [10, 'unread-name', '\'position\' is declared but its value is never read.'],
+        [14, 'unread-name', '\'position\' is declared but its value is never read.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a template const hiding a name, and one reassigned', async () => {
     const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string }[] }>()\n---\nfor product of products\n  const { name } = product\n  const products = []\n  button(onClick={() => { name = \'x\' }}) {products.length}\n' })
 

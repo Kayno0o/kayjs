@@ -334,7 +334,7 @@ describe('control flow', () => {
     expect(server).toContain('{KayStaticFor(__props.rows, (row, i) => <li>{i}: {row}</li>, () => <li>none</li>)}')
     expect(server).not.toContain('KayLoopFor ')
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).toContain('<KayLoopFor each={__props.rows}')
-    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('KayStaticFor(kayEach, ((row, i) => (void (row), <li>{i}: {row}</li>))(KayRow(kayEach), 0), <li>none</li>)')
+    expect(compileKay(page, 'src/routes/index.kay', { check: true }).tsx).toContain('KayStaticFor(kayEach, ((row) => { let i = 0 as number; return (void (row), <li>{i}: {row}</li>) })(KayRow(kayEach)), <li>none</li>)')
     expect(compileKay('---\nconst { rows } = props<{ rows: number[] }>()\n---\nfor row of rows key={row}\n  p {row}', 'src/comp.kay', { check: true }).tsx).toContain('<KayLoopFor each={kayEach}')
   })
 

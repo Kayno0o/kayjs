@@ -8,7 +8,7 @@ import type { ConstantSignal, FoundRewrites, RewriteInput, Rewrites } from './re
 import type { Binding, Path, Scope } from './scope'
 import { parseProgram } from './estree'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
-import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
 import { Scanner } from './rewrite-scan'
 import { analyze } from './scope'
 
@@ -115,7 +115,9 @@ class RewriteFinder {
     else if (path.is('VariableDeclarator')) {
       const at = path.node.id.start
 
-      if (this.input.sites.consts.has(at))
+      if (this.input.sites.rows.has(at))
+        this.rowBinding(path.scope, this.input.code.slice(at, path.node.id.end), undefined)
+      else if (this.input.sites.consts.has(at))
         this.templateConst(path, this.input.sites.consts.get(at)!, this.input.sites.loopItems.has(at))
       else if (this.input.sites.snippets.has(at))
         this.templateConst(path, false, false, 'snippet')
@@ -541,7 +543,7 @@ class RewriteFinder {
         this.diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: `a ${noun} would hide it from the lines after it`, help: `give the ${noun} a name of its own`, related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
       }
 
-      const readOnly = loopItem ? { message: `\`${name}\` is read-only here`, note: 'it tracks the current value' } : { message: `\`${name}\` is a ${noun}, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }
+      const readOnly = loopItem ? rowReadOnly(name) : { message: `\`${name}\` is a ${noun}, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }
 
       if (!accessor || this.input.values)
         this.visitBinding(path.scope, name, reference => accessor && tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
@@ -553,18 +555,18 @@ class RewriteFinder {
   // A loop's row and index and an `if`'s alias track the current value, so code that runs reads them through a call.
   private rows(path: Path<ArrowFunctionExpression>) {
     for (const [index, param] of path.node.params.entries()) {
-      if (param.type !== 'Identifier' || !this.input.sites.rows.has(param.start))
-        continue
-
-      const key = index === 0 ? loopKey(path, param.name) : undefined
-      const readOnly = { message: `\`${param.name}\` is read-only here`, note: 'it tracks the current value' }
-
-      // Read as a value, a row or an alias is left as written, except as a tag, which still goes through `Dynamic` as a value of any component type may.
-      if (this.input.values)
-        this.visitBinding(path.scope, param.name, reference => tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
-      else
-        this.visitBinding(path.scope, param.name, reference => keyRead(reference, param.name, key, this.input.code) ?? withShorthand(reference, param.name, { after: '()' }), readOnly, `ReturnType<typeof ${param.name}>`)
+      if (param.type === 'Identifier' && this.input.sites.rows.has(param.start))
+        this.rowBinding(path.scope, param.name, index === 0 ? loopKey(path, param.name) : undefined)
     }
+  }
+
+  // `key` is the loop's key expression when the name is its row, which a read in it is left as written.
+  private rowBinding(scope: Path['scope'], name: string, key: ReturnType<typeof loopKey>) {
+    // Read as a value, a row or an alias is left as written, except as a tag, which still goes through `Dynamic` as a value of any component type may.
+    if (this.input.values)
+      this.visitBinding(scope, name, reference => tagPosition(reference) === 'opening' ? {} : undefined, rowReadOnly(name))
+    else
+      this.visitBinding(scope, name, reference => keyRead(reference, name, key, this.input.code) ?? withShorthand(reference, name, { after: '()' }), rowReadOnly(name), `ReturnType<typeof ${name}>`)
   }
 
   // A script declaration: a signal or memo made by `kay`, or the names destructured off the props object.

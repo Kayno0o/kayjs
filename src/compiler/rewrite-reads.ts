@@ -355,6 +355,11 @@ export function memberTypes(name: TSTypeQuery['exprName']): string {
   return name.type === 'TSQualifiedName' ? `${memberTypes(name.left)}[${JSON.stringify(name.right.name)}]` : ''
 }
 
+// What a write to a loop's row or index, or an `if`'s alias, is reported as.
+export function rowReadOnly(name: string) {
+  return { message: `\`${name}\` is read-only here`, note: 'it tracks the current value' }
+}
+
 // `{ todo }` cannot become `{ todo() }`, so a shorthand property spells its key out first.
 // The members a keyed loop's `keyed={(item) => item.a.b}` reads off its item, when `row` is that loop's row: none for a key that is the item itself.
 export function loopKey(row: Path<ArrowFunctionExpression>, name: string): string[] | undefined {

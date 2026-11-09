@@ -127,6 +127,8 @@ Card(title="Todos")
   p Body text
 ```
 
+To require the children, or a block, type it in `props` and destructure nothing: `const {} = props<{ children: Snippet }>()`. The component only renders it with `slot`, and a destructured name nothing reads would be reported as unused.
+
 ### Blocks that take parameters
 
 A `@name(x)` block is markup the component calls with values, typed `Snippet<[...]>` (`Snippet` alone is markup with no parameters, as the children and `@name` are), for a block that needs the component's own data. The component renders it with `slot name(x)`. This is `src/components/list.kay`.

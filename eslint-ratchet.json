@@ -120,7 +120,7 @@
     "complexity": 112
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 692
+    "max-lines": 689
   },
   "src/compiler/lints.ts": {
     "max-lines": 1221

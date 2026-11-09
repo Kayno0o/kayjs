@@ -8,7 +8,7 @@ export type Rewrites = Map<number, Rewrite & { end: number }>
 
 // Where the analysis pass declares the names whose reads the final pass rewrites, by generated offset.
 export interface Sites {
-  // Arrow parameters code that runs reads through a call: a loop's row and index, an `if`'s alias.
+  // Arrow parameters, and the index a loop declares in its block, that code which runs reads through a call: a loop's row and index, an `if`'s alias.
   rows: Set<number>
   // A template `const`'s pattern, true when code that runs reads its names as memos.
   consts: Map<number, boolean>
