@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { serverOnlyImports } from '../src/compiler/fence-checks'
 import { parseKay } from '../src/compiler/parser'
-import { analyzeScript, analyzeServer, parseFence } from '../src/compiler/script'
+import { analyzeServer, parseFence } from '../src/compiler/script'
 import { walkScope } from '../src/compiler/walk'
 import { semanticTokens } from '../src/lsp/semantic-tokens'
 
@@ -35,13 +35,6 @@ describe('a fence declaring a name twice', () => {
 
   it('compiles as a server fence exporting a name and reading one in a recipe', () => {
     expect(() => compileKay(SERVER, 'src/routes/server.kay')).not.toThrow()
-  })
-
-  it('takes the values of kay it reads unimported, and none named in a string', () => {
-    const { implicit } = analyzeScript(TWICE, parseKay(TWICE).script)
-
-    expect(implicit).toContain('signal')
-    expect(implicit).not.toContain('store')
   })
 
   it('gives the fence no tokens, as Babel refuses it on every walk', () => {

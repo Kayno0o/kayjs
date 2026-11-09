@@ -241,7 +241,7 @@ class Validator {
     if (query && this.options.special)
       this.error(query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
-    if ((this.options.island !== undefined || this.options.insideIsland === true) && ([...script.implicit, ...server?.implicit ?? []].includes('ctx') || kayCtxImport(script.imports) !== undefined))
+    if ((this.options.island !== undefined || this.options.insideIsland === true) && kayCtxImport(script.imports) !== undefined)
       this.ctxInIsland()
 
     const head = this.head(this.file.template)

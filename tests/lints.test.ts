@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
-import { browserRole, compileKay, onceReadChecks, promotedChecks } from '../src/compiler'
+import { browserRole, compileKay, onceReadChecks } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
 
@@ -565,8 +565,7 @@ describe('constant-signal', () => {
     expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'warning', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
   })
 
-  it('reports a signal kay imports by itself too, and one a prop takes the value of', () => {
-    expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }, { code: 'implicit-import', severity: 'warning', at: 'signal' }])
+  it('reports a signal a prop takes the value of', () => {
     expect(lints(script('const open = signal(false)', 'Child(open={open()})\np {open()}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
   })
 
@@ -609,7 +608,7 @@ describe('uncalled-signal', () => {
   })
 
   it('reports a signal in a class object, written in full or as a shorthand', () => {
-    const source = '---\n\nconst on = signal(false)\nconst open = signal(false)\n---\np(class={{ active: on, open }}) x\np(class={{ active: on(), open: open() }}) y\n'
+    const source = '---\nimport { signal } from \'kay\'\n\nconst on = signal(false)\nconst open = signal(false)\n---\np(class={{ active: on, open }}) x\np(class={{ active: on(), open: open() }}) y\n'
     const found = compileKay(source, 'tab.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
 
     expect(found.map(d => [source.slice(d.start, d.end), d.fixes?.[0]?.edits[0]?.text])).toEqual([['on', '()'], ['open', ': open()']])
@@ -629,7 +628,7 @@ describe('uncalled-signal', () => {
   })
 
   it('still reads the value of a signal left uncalled, in the server and the browser output alike', () => {
-    const source = '---\nconst count = signal(0)\n---\np {count} and {`${count}`}\n'
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\np {count} and {`${count}`}\n'
 
     for (const output of ['html', 'dom'] as const) {
       const { tsx, diagnostics } = compileKay(source, 'count.kay', { output, hydratable: true })
@@ -1147,11 +1146,9 @@ describe('server-only-import', () => {
     expect(only(namespace)).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
   })
 
-  it('leaves a static component that may be promoted to the project check, and reaches a name destructured off a namespace by assignment or a default', () => {
-    const promoted = '---\nimport Picker from \'./picker.kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\nfunction pick() {}\n---\nPicker(format={pick})\np {disk}'
+  it('reaches a name destructured off a namespace by assignment or a default', () => {
     const assigned = '---\nimport { signal } from \'kay\'\nimport * as cache from \'kay/cache\'\n\nconst count = signal(0)\nlet sqliteCache\n;({ sqliteCache } = cache)\nconst withDefault = ({ invalidatePage } = cache) => invalidatePage\n---\nbutton(onClick={() => count++}) {count()}'
 
-    expect(only(promoted)).toEqual([])
     expect(only(assigned)).toEqual([
       { code: 'server-only-import', severity: 'error', at: 'sqliteCache' },
       { code: 'server-only-import', severity: 'error', at: 'invalidatePage' },
@@ -1457,7 +1454,6 @@ describe('once-read-prop', () => {
     expect(lints(plain).filter(d => d.code === 'once-read-prop')).toEqual([])
     expect(lints(plain, { insideIsland: true }).filter(d => d.code === 'once-read-prop')).toHaveLength(1)
     expect(onceReadChecks(plain)).toHaveLength(1)
-    expect(promotedChecks(plain).filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 
   it('has nothing to say about a component without a script or a page', () => {
@@ -1507,7 +1503,7 @@ describe('deprecated-hook-names in a template', () => {
     expect(found('Save(dirty={changed()} {onSave})')).toEqual([{ at: 'onSave', fix: ['{onSave}->save={onSave}'], safe: false }])
   })
 
-  it('offers the save rename without applying it, as the component may become promotable', () => {
+  it('offers the save rename without applying it, as the component may stop being an island', () => {
     const source = `---\n${imports}---\nSave(dirty={false} onSave={() => undefined})\n`
     const [diagnostic] = compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names')
     const edits = diagnostic!.fixes!.flatMap(fix => fix.edits).toSorted((a, b) => b.start - a.start)
@@ -1517,7 +1513,7 @@ describe('deprecated-hook-names in a template', () => {
     expect(diagnostic!.fixes!.every(fix => fix.safe !== true)).toBe(true)
     expect(diagnostic!.help).toContain('--- island')
     expect(browserRole(source, 'hooks.kay')).toBe('island')
-    expect(browserRole(fixed, 'hooks.kay')).toBe('promotable')
+    expect(browserRole(fixed, 'hooks.kay')).toBeUndefined()
     expect(codes(fixed)).not.toContain('deprecated-hook-names')
   })
 

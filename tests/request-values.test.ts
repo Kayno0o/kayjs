@@ -120,12 +120,12 @@ describe('a template reading ctx', () => {
 
   it('is no island\'s to read, which renders in the browser too', () => {
     const messages = (source: string, insideIsland?: boolean) => compileKay(source, 'test.kay', { insideIsland }).diagnostics.map(d => d.message)
-    const reactive = '---\nimport { signal } from "kay"\nconst count = signal(0)\n---\np {ctx.user?.name} {count()}\n'
+    const read = '---\nimport { ctx } from "kay"\n---\np {ctx.user?.name}\n'
+    const reactive = '---\nimport { ctx, signal } from "kay"\nconst count = signal(0)\n---\np {ctx.user?.name} {count()}\n'
 
     expect(messages(reactive)).toEqual([expect.stringContaining('`ctx` is read on the server')])
-    expect(messages('p {ctx.user?.name}\n', true)).toEqual([expect.stringContaining('`ctx` is read on the server')])
-    expect(messages('p {ctx.user?.name}\n')).toEqual([])
-    expect(messages('---\nimport { ctx, signal } from "kay"\nconst count = signal(0)\n---\np {ctx.user?.name} {count()}\n')).toEqual([expect.stringContaining('`ctx` is read on the server')])
+    expect(messages(read, true)).toEqual([expect.stringContaining('`ctx` is read on the server')])
+    expect(messages(read)).toEqual([])
   })
 
   it('keeps a script\'s own ctx, and a fence\'s, as they are', () => {
@@ -184,7 +184,7 @@ describe('a template reading ctx', () => {
     await Bun.write(resolve(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'values\', context: \'./lib/context.ts\' }] })\n')
     await Bun.write(resolve(root, 'tsconfig.json'), await Bun.file('tests/fixtures/action-streams/tsconfig.json').text())
     await Bun.write(resolve(root, 'src/routes/typed.kay'), '---\nimport { ctx } from \'kay\'\n---\np#typed {ctx.user?.name}\n')
-    await Bun.write(resolve(root, 'src/routes/untyped.kay'), 'p#untyped {ctx.nope}\n')
+    await Bun.write(resolve(root, 'src/routes/untyped.kay'), '---\nimport { ctx } from \'kay\'\n---\np#untyped {ctx.nope}\n')
 
     const { output, report } = await kayCheck([root])
     const text = output + report
@@ -446,7 +446,7 @@ describe('a production server started from disk', () => {
 
     await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
     await Bun.write(resolve(root, 'lib/other.wasm'), Bun.file(WASM))
-    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\nimport url from \'../../lib/other.wasm\'\n---\np#path {path}\np#url {url}\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\nimport url from \'../../lib/other.wasm\'\n--- script\nimport { ctx } from \'kay\'\n---\np#path {path}\np#url {url}\np#who {ctx.user?.name}\n')
     await build(options)
     expect(Object.keys((await recordOf(root)).files)).toEqual(expect.arrayContaining(['lib/add.wasm', 'lib/other.wasm']))
 
@@ -487,7 +487,7 @@ describe('a production server started from disk', () => {
     const { root, options } = await project([EXTENSION])
 
     await Bun.write(resolve(root, 'src/shared/info.ts'), 'export const info = \'plain\'\n')
-    await Bun.write(resolve(root, 'src/routes/info.kay'), '--- server\nimport { info } from \'../shared/info\'\n---\np#info {info}\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/info.kay'), '--- server\nimport { info } from \'../shared/info\'\n--- script\nimport { ctx } from \'kay\'\n---\np#info {info}\np#who {ctx.user?.name}\n')
     await build(options)
     expect(Object.keys((await recordOf(root)).covered as object)).toContain('src/shared/info.ts')
     expect((await boot(options, ['/info'])).loaded).toBe(0)
@@ -504,7 +504,7 @@ describe('a production server started from disk', () => {
 
     await mkdir(outside, { recursive: true })
     await Bun.write(join(outside, 'add.wasm'), Bun.file(WASM))
-    await Bun.write(resolve(root, 'src/routes/up.kay'), `--- server\nimport path from '../../../${basename(outside)}/add.wasm' with { type: 'file' }\n---\np#path {path}\np#who {ctx.user?.name}\n`)
+    await Bun.write(resolve(root, 'src/routes/up.kay'), `--- server\nimport path from '../../../${basename(outside)}/add.wasm' with { type: 'file' }\n--- script\nimport { ctx } from 'kay'\n---\np#path {path}\np#who {ctx.user?.name}\n`)
     await build(options)
     expect((await recordOf(root)).anchor).toBe('..')
 
@@ -526,7 +526,7 @@ describe('a production server started from disk', () => {
 
     await symlink(resolve(root), link)
     await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
-    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n---\np#path {path}\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n--- script\nimport { ctx } from \'kay\'\n---\np#path {path}\np#who {ctx.user?.name}\n')
     await build(options.replaceAll(resolve(root), link))
 
     const { answers, loaded } = await boot(options.replaceAll(resolve(root), link), ['/wasm'])
@@ -539,7 +539,7 @@ describe('a production server started from disk', () => {
     const { root, options } = await project([EXTENSION])
 
     await Bun.write(resolve(root, 'lib/add.wasm'), Bun.file(WASM))
-    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n---\np#path {path}\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/wasm.kay'), '--- server\nimport path from \'../../lib/add.wasm\' with { type: \'file\' }\n--- script\nimport { ctx } from \'kay\'\n---\np#path {path}\np#who {ctx.user?.name}\n')
     await build(options)
     await Bun.write(resolve(root, 'lib/add.wasm'), new Uint8Array([...await Bun.file(WASM).bytes(), 0]))
 
@@ -604,7 +604,7 @@ describe('a production server started from disk', () => {
     const { root, options } = await project([EXTENSION])
 
     await Bun.write(resolve(root, 'package.json'), JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }))
-    await Bun.write(resolve(root, 'src/routes/icon.kay'), '---\nimport home from \'~icons/tabler/home\'\n---\nsvg#icon({...home})\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/icon.kay'), '---\nimport { ctx } from \'kay\'\nimport home from \'~icons/tabler/home\'\n---\nsvg#icon({...home})\np#who {ctx.user?.name}\n')
     await build(options)
     expect(Object.keys((await recordOf(root)).icons as object)).toEqual(['~icons/tabler/home'])
 
@@ -624,7 +624,7 @@ describe('a production server started from disk', () => {
     await Bun.write(join(library, 'package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' }, kay: { settings: './src/settings' } }))
     await Bun.write(join(library, 'src/settings.ts'), 'export default { label: \'default\' }\n')
     await Bun.write(join(library, 'src/badge.kay'), '---\nimport settings from \'./settings\'\n---\nspan#badge {settings.label}\n')
-    await Bun.write(resolve(root, 'src/routes/badge.kay'), '---\nimport Badge from \'kay-lib/badge.kay\'\n---\nBadge\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/badge.kay'), '---\nimport { ctx } from \'kay\'\nimport Badge from \'kay-lib/badge.kay\'\n---\nBadge\np#who {ctx.user?.name}\n')
     await build(options)
     expect((await recordOf(root)).replaced).toEqual(['node_modules/kay-lib/src/settings.ts'])
 
@@ -639,7 +639,7 @@ describe('a production server started from disk', () => {
 
     await Bun.write(resolve(root, 'src/content.config.ts'), 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\nimport \'../lib/gate.kay\'\n\nexport const notes = collection(\'content/notes\', { schema: s.Object({ title: s.String() }) })\n')
     await Bun.write(resolve(root, 'src/content/notes/a.md'), '---\ntitle: First\n---\nbody\n')
-    await Bun.write(resolve(root, 'src/routes/notes.kay'), '--- server\nimport { notes } from \'../content.config\'\n\nconst all = await notes.all()\n---\np#count {all.length}\np#who {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/notes.kay'), '--- server\nimport { notes } from \'../content.config\'\n\nconst all = await notes.all()\n--- script\nimport { ctx } from \'kay\'\n---\np#count {all.length}\np#who {ctx.user?.name}\n')
     await build(options)
     expect(Object.keys((await recordOf(root)).files)).toContain('lib/gate.kay')
 

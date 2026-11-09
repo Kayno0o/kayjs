@@ -9,6 +9,8 @@ import { drainOutput } from './listening'
 import { scratchDir } from './scratch'
 
 const COUNTER = `---
+import { onCleanup, signal } from 'kay'
+
 const { start, onGone } = props<{ start: number, onGone: () => void }>()
 let count = signal(start)
 
@@ -36,6 +38,8 @@ const { text } = props<{ text: string }>()
 `
 
 const SWITCH = `---
+import { signal } from 'kay'
+
 let shown = signal(true)
 ---
 button(onClick={() => shown.set(!shown())}) Switch

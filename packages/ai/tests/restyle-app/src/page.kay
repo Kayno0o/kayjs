@@ -1,4 +1,4 @@
----
+--- island
 import type { Action, Failure } from 'kay'
 import type { AiMessage, Progress } from '@kaynooo/kayjs-ai'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'

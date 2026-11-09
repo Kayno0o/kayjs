@@ -6,7 +6,6 @@ import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
 import type { Built } from './increments'
 import type { ImportGraph, KayLibrary } from './libraries'
-import type { BrowserRole } from './promotion'
 import type { ChunkInputs, IslandWhy } from './report'
 import type { StyleUses, UnresolvedClass } from './style-uses'
 import type { Reached } from './styles'
@@ -38,13 +37,13 @@ import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './l
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
-import { buildFiles, promotedFiles } from './promotion'
 import { unusedLibraryClasses } from './prune'
 import { referencesOf } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { refuseBuiltinImports, refuseServerOnlyReads } from './server-only'
 import { inSignalsScope } from './signals'
+import { buildFiles } from './source-files'
 import { forgetBundleMaps } from './sourcemap'
 import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
@@ -364,7 +363,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     if (compiled.island !== undefined) {
       islands.set(compiled.island, file)
-      why.set(compiled.island, { cause: compiled.cause, promoted: false })
+      why.set(compiled.island, { cause: compiled.cause })
     }
     else if (file === editor) {
       throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
@@ -378,24 +377,6 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     shorthand.set(file, [...compiled.classes])
     actionForms ||= compiled.actionForm
-  }
-
-  // A static component that may render as an island gets a chunk too, which a page loads only when it does: when it hands an island it renders what only an island sends.
-  // One reaching no island through its imports never does, and its chunk would only bundle for the browser what its script imports, a library's server code included.
-  const promoted = await promotedFiles(root, libraries, files, analyses.map(({ island, promote }): BrowserRole => {
-    if (island !== undefined)
-      return 'island'
-
-    return promote === undefined ? undefined : 'promotable'
-  }), graph)
-
-  for (const [index, yes] of promoted.entries()) {
-    const { promote } = analyses[index]!
-
-    if (yes && promote !== undefined) {
-      islands.set(promote, files[index]!)
-      why.set(promote, { cause: analyses[index]!.cause, promoted: true })
-    }
   }
 
   // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.

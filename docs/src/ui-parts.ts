@@ -19,7 +19,7 @@ export function partsOfComponent(file: string): Part[] {
   if (parsed.server !== undefined)
     return []
 
-  const script = analyzeScript(source, parsed.script, [], [], parsed.module)
+  const script = analyzeScript(source, parsed.script, [], parsed.module)
   const facts = templateFacts(parsed, script.recipe).parts
 
   if (facts === undefined)

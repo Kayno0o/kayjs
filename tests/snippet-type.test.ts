@@ -112,7 +112,7 @@ describe('Snippet', () => {
     })).toEqual([['src/routes/index.kay', 5, 'island-prop']])
   })
 
-  it('refuses a block with parameters from a layout, and allows it from a static component the island promotes', async () => {
+  it('refuses a block with parameters from a layout, and allows it from a component pinned `--- island`', async () => {
     const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { row } = props<{ row: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1})\n  slot row(\'x\')\n'
 
     expect(await problems({

@@ -12,19 +12,16 @@ export interface Size {
   gzip: number
 }
 
-// Why a component is in the island list: what makes it an island, or for a static component that only becomes one when it passes an island a function, what may.
+// Why a component is in the island list: what makes it an island.
 export interface IslandWhy {
   cause?: IslandCause | undefined
-  // The component renders as an island only when a page passes it what only an island sends, so a page may ship none of it.
-  promoted?: boolean | undefined
 }
 
 export interface IslandSize {
-  // The cause as a sentence, as `onClick, line 4` or `onPick passed to Picker, line 8`.
+  // The cause as a sentence, as `onClick, line 4`.
   why?: string | undefined
   // The same cause as data, its span left out.
-  cause?: { kind: IslandCauseKind, name: string, line: number, target?: string | undefined } | undefined
-  promoted?: boolean | undefined
+  cause?: { kind: IslandCauseKind, name: string, line: number } | undefined
   // The island's `.kay` file, relative to the root.
   file: string
   // What it loads beyond the entry, the chunks it shares with other islands included.
@@ -79,10 +76,10 @@ const PACKAGE = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)/
 const KAY_ROOT = resolve(import.meta.dir, '../..')
 const SHOWN_MODULES = 5
 
-function causeOf(found: IslandWhy | undefined): Pick<IslandSize, 'why' | 'cause' | 'promoted'> {
+function causeOf(found: IslandWhy | undefined): Pick<IslandSize, 'why' | 'cause'> {
   const cause = found?.cause
 
-  return { ...cause && { why: describeCause(cause), cause: { kind: cause.kind, name: cause.name, line: cause.line, ...cause.target !== undefined && { target: cause.target } } }, ...found?.promoted !== undefined && { promoted: found.promoted } }
+  return { ...cause && { why: describeCause(cause), cause: { kind: cause.kind, name: cause.name, line: cause.line } } }
 }
 
 // Sizes read off the files the build wrote, gzip as most hosts serve them; `inputs` breaks each chunk down by module.
@@ -270,12 +267,9 @@ export function formatSizeReport(report: SizeReport, { width = Infinity, previou
   ].join('\n')
 }
 
-// Why a component is in the list, one line: what makes it an island, or for a static one what would.
+// Why a component is in the list, one line: what makes it an island.
 function becauseOf(island: IslandSize): string | undefined {
-  if (island.why === undefined)
-    return undefined
-
-  return island.promoted === true ? `static unless it passes an island what only an island sends: ${island.why}` : `an island because of ${island.why}`
+  return island.why === undefined ? undefined : `an island because of ${island.why}`
 }
 
 // One row per route, the heaviest first: its pattern, whether it was prerendered, kept or rendered per request, and what it loads; a page rendered per request gets a line saying what stopped the build from keeping it.

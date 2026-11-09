@@ -24,10 +24,7 @@ function titleOf(island: string | undefined, cause: string | undefined, insideIs
   if (island !== undefined)
     return `Island: ${cause ?? 'a live value'}`
 
-  if (insideIsland)
-    return 'Part of an island: only islands render it'
-
-  return cause === undefined ? 'Static: ships no JavaScript' : `Static unless it passes an island what only an island sends: ${cause}`
+  return insideIsland ? 'Part of an island: only islands render it' : 'Static: ships no JavaScript'
 }
 
 // A lens on the first line of a component saying whether it is an island and why, the same cause `kay build` lists, and revealing it on a click; none on a page or a layout.

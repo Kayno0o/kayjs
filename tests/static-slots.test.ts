@@ -100,15 +100,15 @@ describe('static slots', () => {
     expect(document.querySelector('span.label')?.textContent).toBe('Plain text')
   })
 
-  it('renders a static component passing an island a function or a block taking parameters as an island itself, one passing only data staying static', () => {
+  it('renders a component pinned `--- island` as an island passing a function or a block taking parameters on, one passing only data staying static', () => {
     expect(pageHtml).toContain(`<slot data-component="tests/fixtures/slots/toolbar.kay" data-props='[{"label":1},"Tool"]'><div class="toolbar"><button class="pick">`)
     expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/rows.kay" data-props="[{}]">')
     expect(pageHtml).toContain('<div class="counted"><slot data-component="tests/fixtures/slots/counter.kay"')
-    // A snippet is a function, so a component passing one on is an island as one passing a block taking parameters is.
+    // A snippet is a function, so a component passing one on is pinned an island as one passing a block taking parameters is.
     expect(pageHtml).toContain('<slot data-component="tests/fixtures/slots/shelf.kay" data-props="[{}]">')
   })
 
-  it('hydrates a promoted component, which runs the function, the block and the class instance it passes', async () => {
+  it('hydrates an island pinned for what it passes, which runs the function, the block and the class instance it passes', async () => {
     const pick = document.querySelector('button.pick')!
 
     click(pick)

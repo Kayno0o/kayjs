@@ -537,11 +537,11 @@ describe('renderToString', () => {
     })(), inner: Promise.resolve('nested') })).toBe('<p>start</p><p>one</p><p>nested</p><p>middle</p><p>two</p>')
   })
 
-  it('imports t for a template and a script reading it unimported, in a project with no i18n settings', async () => {
+  it('renders t imported from kay/i18n in a template and a script, in a project with no i18n settings', async () => {
     const project = join(scratch, 'unimported')
 
     await Bun.write(join(project, 'src/messages/en.ts'), 'export default { hello: \'Hello {name}\', bye: \'Bye\' }\n')
-    const view = await load<{ name: string }>('---\nconst { name } = props<{ name: string }>()\nconst bye = t(\'bye\')\n---\np {t(\'hello\', { name })} {bye}')
+    const view = await load<{ name: string }>('---\nimport { t } from \'kay/i18n\'\n\nconst { name } = props<{ name: string }>()\nconst bye = t(\'bye\')\n---\np {t(\'hello\', { name })} {bye}')
     const shadowed = await load('for t of [\'x\']\n  p {t}')
     const saved = process.env.KAY_ROOT
 

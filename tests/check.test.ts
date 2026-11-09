@@ -14,7 +14,7 @@ import { DESCRIPTION_LENGTH, pageSeoLints, TITLE_LENGTH } from '../src/check/seo
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { warnOtherKay } from '../src/commands/command'
-import { compileKay, iconSetsKey } from '../src/compiler'
+import { compileKay } from '../src/compiler'
 import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
@@ -921,22 +921,21 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports a prop read once in a component an island renders, even when a page renders it too, and in a promoted one', async () => {
+  it('reports a prop read once in a component an island renders, even when a page renders it too', async () => {
     const script = (extra: string) => `---\nconst { items } = props<{ items: string[] }>()\n${extra}const last = items.length - 1\n---\np {last}\n`
     const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Card from \'../components/card.kay\'\nimport Island from \'../components/island.kay\'\nimport Promoted from \'../components/promoted.kay\'\nimport Allowed from \'../components/allowed.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nCard(items={[]})\nIsland\nPromoted\nAllowed(items={[]})\nPlain(items={[]})\n',
+      'src/routes/index.kay': '---\nimport Card from \'../components/card.kay\'\nimport Island from \'../components/island.kay\'\nimport Allowed from \'../components/allowed.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nCard(items={[]})\nIsland\nAllowed(items={[]})\nPlain(items={[]})\n',
       'src/components/island.kay': '---\nimport Card from \'./card.kay\'\nimport Allowed from \'./allowed.kay\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\nCard(items={[]})\nAllowed(items={[]})\n',
       'src/components/card.kay': script(''),
       'src/components/allowed.kay': script('// kay-allow once-read-prop\n'),
       'src/components/plain.kay': script(''),
-      'src/components/promoted.kay': `---\nimport Child from './child.kay'\n\nconst { items = [] } = props<{ items?: string[] }>()\nconst last = items.length - 1\nfunction pick() {}\n---\nChild(format={pick})\np {last}\n`,
       'src/components/child.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
     })
 
     try {
       const onceRead = async (options?: CheckOptions) => (await check(root, options)).filter(d => d.code === 'once-read-prop').map(d => d.file.slice(root.length + 1)).sort()
 
-      expect(await onceRead()).toEqual(['src/components/card.kay', 'src/components/promoted.kay'])
+      expect(await onceRead()).toEqual(['src/components/card.kay'])
       expect(await onceRead({ lints: { 'once-read-prop': 'allow' } })).toEqual([])
     }
     finally {
@@ -944,213 +943,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports a server-only name in a component the build promotes to an island, and in none it never promotes', async () => {
-    const component = (child: string) => `---\nimport Child from './${child}.kay'\nimport { sqliteCache } from 'kay/cache'\n\nconst disk = sqliteCache('a.sqlite')\nfunction pick() {}\n---\nChild(format={pick})\np {disk}\n`
+  it('reports an `island-prop` error for a static component passing an island a function, unless it is an island by `--- island`', async () => {
+    const component = (fence: string) => `${fence}\nimport Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
     const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Promoted from \'../components/promoted.kay\'\nimport Static from \'../components/static.kay\'\n---\nPromoted\nStatic\n',
-      'src/components/promoted.kay': component('island'),
-      'src/components/static.kay': component('plain'),
-      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
-      'src/components/plain.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
-    })
-
-    try {
-      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => [d.file.slice(root.length + 1), d.line])).toEqual([['src/components/promoted.kay', 3]])
-      expect((await check(root, { lints: { 'server-only-import': 'allow' } })).filter(d => d.code === 'server-only-import')).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports a component promoted to an island, unless it says so with `// kay-island` or `--- island`, and an `island-prop` error for one pinned static', async () => {
-    const component = (marker: string) => `---\n${marker}import Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
-    const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Said from \'../components/said.kay\'\nimport Denied from \'../components/denied.kay\'\nimport Fenced from \'../components/fenced.kay\'\nimport Pinned from \'../components/pinned.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nSaid\nDenied\nFenced\nPinned\nPlain\n',
-      'src/components/bare.kay': component(''),
-      'src/components/said.kay': component('// kay-island\n'),
-      'src/components/denied.kay': component('// kay-static\n'),
-      'src/components/fenced.kay': '--- island\nimport Child from \'./island.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
-      'src/components/pinned.kay': '--- static\nimport Child from \'./island.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
+      'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Fenced from \'../components/fenced.kay\'\nimport Pinned from \'../components/pinned.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nFenced\nPinned\nPlain\n',
+      'src/components/bare.kay': component('---'),
+      'src/components/fenced.kay': component('--- island'),
+      'src/components/pinned.kay': component('--- static'),
       'src/components/plain.kay': '---\nimport Child from \'./plain-child.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
       'src/components/plain-child.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
     })
 
     try {
-      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'island-prop' || d.code === 'static-pin')
+      const found = (await check(root)).filter(d => d.code === 'island-prop' || d.code === 'static-pin')
 
-      expect(found.map(d => [d.code, d.file.slice(root.length + 1)]).toSorted()).toEqual([
-        ['island-prop', 'src/components/denied.kay'],
-        ['island-prop', 'src/components/pinned.kay'],
-        ['promoted-island', 'src/components/bare.kay'],
+      expect(found.map(d => [d.code, d.severity, d.file.slice(root.length + 1)]).toSorted()).toEqual([
+        ['island-prop', 'error', 'src/components/bare.kay'],
+        ['island-prop', 'error', 'src/components/pinned.kay'],
       ])
-      expect((await check(root, { lints: { 'promoted-island': 'allow' } })).filter(d => d.code === 'promoted-island')).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports a static component passing an island an `@option` block, which the island cannot take from the server', async () => {
-    const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Parent from \'../components/parent.kay\'\n---\nParent\n',
-      'src/components/parent.kay': '---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @option(item)\n    strong {item}\n',
-      'src/components/picker.kay': '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { option } = props<{ option: Snippet<[string]> }>()\n---\nbutton(onClick={() => count++}) {count()}\n| {option(\'a\')}\n',
-    })
-
-    try {
-      const found = (await check(root)).filter(d => d.code === 'promoted-island')
-
-      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component passes an island a valu']])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports a component passing an island what the types show as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
-    const data: Record<string, [script: string, call: string]> = {
-      mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
-      panel: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
-      icon: ['import Brand from \'~icons/tabler/brand-github\'', 'Child(format={Brand})'],
-      constant: ['const biggest = Math.PI + Number.MAX_VALUE', 'Child(format={biggest})'],
-      called: ['const biggest = Math.max(1, 2)\nconst now = Date.now()\nconst absolute = [-1].map(Math.abs)', 'Child(format={[biggest, now, absolute]})'],
-      mapped_global: ['const { rows } = props<{ rows: number[] }>()', 'Child(format={rows.map(Math.abs)})'],
-      named: ['', 'Child(format={Math.max.name})'],
-      found: ['const { rows, current } = props<{ rows: { id: number }[], current: number }>()', 'Child(format={rows.find(row => row.id === current)})'],
-      from: ['const items = Array.from({ length: 3 }, (_, index) => ({ id: index }))', 'Child(format={items})'],
-      dated: ['const days = Array.from({ length: 2 }, (_, index) => new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10))', 'Child(format={days})'],
-      indexed: ['const hours = [\'a\', \'b\']', 'Child(format={[{ values: hours.map((_, index) => index) }]})'],
-      labels: ['import { LABELS, SIZES } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={[LABELS[kind], SIZES.small, LABELS]})'],
-      listed: ['import { LISTED, RENAMED } from \'../forms\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[LISTED[kind], RENAMED[kind]]})'],
-      reexported: ['import { LABELS as SHOWN, TEXTS } from \'../barrel\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[SHOWN[kind], TEXTS[kind]]})'],
-      cycled: ['import { LOOP } from \'../loop-a\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={LOOP[kind]})'],
-      defaulted: ['import DEFAULTED from \'../forms\'\nimport CONSTANT from \'../constant\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[DEFAULTED[kind], CONSTANT[kind]]})'],
-      json: ['import copy from \'../copy.json\'\nimport { title } from \'../copy.json\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[copy[kind], title]})'],
-      fenced: ['import { TAGS } from \'./tags.kay\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={TAGS[kind]})'],
-      iconMap: ['import ICON, { APP_ICONS, LISTED_ICONS } from \'../app-icons\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={[APP_ICONS[kind], LISTED_ICONS[0], ICON]})'],
-      iconTiles: ['import { APP_ICONS } from \'../app-icons\'\nimport { APPS } from \'../apps\'\nconst tiles = APPS.map(app => ({ ...app, icon: APP_ICONS[app.id] }))', 'Child(format={tiles})'],
-      fencedIcons: ['import { FENCED_ICONS } from \'./icons.kay\'', 'Child(format={FENCED_ICONS.Home})'],
-      ordered: ['const ids = [3, 1].map(id => id + 1)\nconst sorted = ids.filter(id => id > 1).slice(0, 1)', 'Child(format={sorted})'],
-    }
-    const functions: Record<string, [script: string, call: string]> = {
-      returned: ['const pick = (value: number) => () => value\nconst built = [1].map(value => pick(value))', 'Child(format={built})'],
-      filtered: ['const entries = [{ label: \'a\', enabled: true, onSelect: () => 1 }]\nconst shown = entries.filter(entry => entry.enabled)', 'Child(format={shown})'],
-      spread: ['const entries = [{ onSelect: () => 1 }]\nconst copy = [...entries].sort()', 'Child(format={copy})'],
-      shorthand: ['function run() {}\nconst rows = [1].map(index => ({ index, run }))', 'Child(format={rows})'],
-      passthrough: ['function handler() {}\nconst id = (value: unknown) => value\nconst same = id(handler)', 'Child(format={same})'],
-      selected: ['function handler() {}\nconst pick = (flag: boolean) => flag ? handler : 1\nconst chosen = pick(true)', 'Child(format={chosen})'],
-      concat: ['const joined = [1].concat(() => 1)', 'Child(format={joined})'],
-      imported: ['import { handlers } from \'../handlers\'\nconst shown = handlers.filter(Boolean).slice(0, 2)', 'Child(format={shown})'],
-      handlerMap: ['import { ACTIONS } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={ACTIONS[kind]})'],
-      builtMap: ['import { BUILT } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={BUILT[kind]})'],
-      listedFn: ['import { HANDLERS } from \'../forms\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={HANDLERS[kind]})'],
-      reexportedFn: ['import { ACTIONS } from \'../barrel\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={ACTIONS[kind]})'],
-      defaultedFn: ['import RUN from \'../runs-default\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={RUN[kind]})'],
-      fencedFn: ['import { RUNS } from \'./runs.kay\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={RUNS[kind]})'],
-      local: ['const make = () => { const run = () => 1; return run }\nconst made = make()', 'Child(format={made})'],
-      optional: ['const { getHandler } = props<{ getHandler?: () => void }>()\nconst got = getHandler?.()', 'Child(format={got})'],
-      model: ['const money = Money.from(5)', 'Child(format={money})'],
-      handed: ['const hours = [\'a\']', 'Child(format={hours.map(hour => () => hour)})'],
-      tested: ['function handler() {}\nconst { rows } = props<{ rows: unknown[] }>()', 'Child(format={[handler].find(one => one === rows[0])})'],
-      global: ['const biggest = Math.max', 'Child(format={biggest})'],
-      logged: ['const log = console.log', 'Child(format={log})'],
-      inline: ['', 'Child(format={Math.max})'],
-      bound: ['', 'Child(format={Math.max.bind(null, 1)})'],
-      uninstalled: ['import Brand from \'~icons/not-installed/brand-github\'', 'Child(format={Brand})'],
-      uninstalledMap: ['import { BRANDS } from \'../brand-icons\'', 'Child(format={BRANDS.a})'],
-    }
-    const all = { ...data, ...functions }
-    const component = ([script, call]: [string, string]) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
-    const names = Object.keys(all)
-    const root = await scratchProject({
-      'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }),
-      'src/routes/index.kay': `---\n${names.map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\n${names.map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`,
-      ...Object.fromEntries(names.map(name => [`src/components/${name}.kay`, component(all[name]!)])),
-      'src/forms.ts': 'const LISTED = { a: \'x\' }\nconst ORIGINAL = { a: \'y\' }\nconst HANDLERS = { a: () => 1 }\nexport { LISTED, ORIGINAL as RENAMED, HANDLERS }\nexport default { a: \'z\' }\n',
-      'src/constant.ts': 'const VALUES = { a: \'v\' }\nexport default VALUES\n',
-      'src/runs-default.ts': 'export default { a: () => 1 }\n',
-      'src/barrel.ts': 'export { LABELS } from \'./labels\'\nexport { ACTIONS } from \'./labels\'\nexport * from \'./more\'\n',
-      'src/more.ts': 'export const TEXTS = { a: \'t\' }\n',
-      'src/loop-a.ts': 'export * from \'./loop-b\'\nexport const LOOP = { a: \'l\' }\n',
-      'src/loop-b.ts': 'export * from \'./loop-a\'\n',
-      'src/copy.json': '{ "a": "A", "title": "T" }',
-      'src/handlers.ts': 'export const handlers = [() => 1]\n',
-      'src/app-icons.ts': 'import Home from \'~icons/tabler/home\'\nimport Mail from \'~icons/tabler/mail\'\n\nexport const APP_ICONS: Record<\'a\' | \'b\', typeof Home> = { a: Home, b: Mail }\nexport const LISTED_ICONS = [Home, Mail] as const\nexport default Home\n',
-      'src/apps.ts': 'export const APPS = [{ id: \'a\', name: \'A\' }, { id: \'b\', name: \'B\' }] as const\n',
-      'src/brand-icons.ts': 'import Brand from \'~icons/not-installed/brand-github\'\n\nexport const BRANDS = { a: Brand }\n',
-      'src/components/icons.kay': '--- module\nimport Home from \'~icons/tabler/home\'\n\nexport const FENCED_ICONS = { Home }\n---\np icons\n',
-      'src/components/tags.kay': '--- module\nexport const TAGS = { a: \'x\' }\n---\np tags\n',
-      'src/components/runs.kay': '--- module\nexport const RUNS = { a: () => 1 }\n---\np runs\n',
-      'src/labels.ts': 'export const LABELS: Record<\'a\' | \'b\', string> = { a: \'A\', b: `B` }\nexport const SIZES = { small: 1, nested: [true, null, { deep: \'x\' }] } as const\nexport const ACTIONS = { a: () => 1, b: () => 2 }\nconst make = () => \'x\'\nexport const BUILT = { a: make(), b: \'b\' }\n',
-      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: unknown }>()\n---\nbutton(onClick={() => count++}) {count()} {String(format)}\n',
-    })
-
-    try {
-      const found = (await check(root)).filter(d => d.code === 'promoted-island')
-      // The build still promotes these on the call, but their types say a string, `unknown` or `any`, so the types report none (the render, not `kay check`, finds the function a call returns).
-      const typedAsData = new Set(['builtMap', 'concat', 'model', 'passthrough', 'uninstalled', 'uninstalledMap'])
-
-      expect(found.map(d => d.file.slice(root.length + 1)).sort()).toEqual(Object.keys(functions).filter(name => !typedAsData.has(name)).map(name => `src/components/${name}.kay`).sort())
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('keys a cached compile on the icon sets the project installs, for a source importing icons only', async () => {
-    const root = await scratchProject({ 'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }) })
-
-    try {
-      expect(iconSetsKey('import home from \'~icons/tabler/home\'', root)).toBe('tabler')
-      expect(iconSetsKey('p hi', root)).toBe('')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('follows the imports of a promoted component to the island it reaches, a library\'s included, and reads the modules it imports as the browser\'s', async () => {
-    const island = '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: () => void }>()\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n'
-    const passing = (child: string, module: string) => `---\nimport ${child === 'Lib' ? 'Lib from \'ui-lib/card.kay\'' : `Child from './${child}.kay'`}\nimport { disk } from '../${module}'\n\nfunction pick() {}\n---\n${child === 'Lib' ? 'Lib' : 'Child'}(format={pick})\np {disk.name}\n`
-    const root = await scratchProject({
-      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
-      'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
-      'node_modules/ui-lib/src/card.kay': island,
-      'src/routes/index.kay': '---\nimport Through from \'../components/through.kay\'\nimport Lib from \'../components/library.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nThrough\nLib\nPlain\n',
-      'src/components/through.kay': passing('middle', 'through-disk.ts'),
-      'src/components/middle.kay': '---\nimport Island from \'./island.kay\'\n---\nIsland\n',
-      'src/components/island.kay': island,
-      'src/components/library.kay': passing('Lib', 'library-disk.ts'),
-      'src/components/plain.kay': passing('leaf', 'plain-disk.ts'),
-      'src/components/leaf.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
-      'src/through-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'a.sqlite\')\n',
-      'src/library-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'b.sqlite\')\n',
-      'src/plain-disk.ts': 'import { sqliteCache } from \'kay/cache\'\n\nexport const disk = sqliteCache(\'c.sqlite\')\n',
-    })
-
-    try {
-      const found = (await check(root)).filter(d => d.code === 'server-only-import').map(d => d.file.slice(root.length + 1)).sort()
-
-      // The component reaching an island through another, and the one reaching a library's, are promoted; the one reaching none is not, so its module is the server's.
-      expect(found).toEqual(['src/library-disk.ts', 'src/through-disk.ts'])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports a server-only name of a component both promoted and only rendered by islands once', async () => {
-    const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Host from \'../components/host.kay\'\n---\nHost\n',
-      'src/components/host.kay': '---\nimport { signal } from \'kay\'\nimport Promoted from \'./promoted.kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\nPromoted\n',
-      'src/components/promoted.kay': '---\nimport Island from \'./island.kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\nfunction pick() {}\n---\nIsland(format={pick})\np {disk}\n',
-      'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: () => void }>()\nconst count = signal(0)\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
-    })
-
-    try {
-      expect((await check(root)).filter(d => d.code === 'server-only-import').map(d => [d.file.slice(root.length + 1), d.line])).toEqual([['src/components/promoted.kay', 3]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1750,7 +1561,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('types style:prop values and the handler an event modifier leaves', async () => {
     const page = [
       '---',
-      'const size = signal<number | null>(1)',
+      'import { signal } from \'kay\'; const size = signal<number | null>(1)',
       '---',
       'p(style:width={size()} style:color={null}) x',
       'p(style:--gap={size()} style:color={\'red\'}) y',
@@ -1763,18 +1574,18 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[2, 'implicit-import'], [6, 'TS2322'], [8, 'TS2339']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2322'], [8, 'TS2339']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('types what the fences use of kay unimported', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
+  it('types what the fences use of kay', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nimport { effect, signal } from \'kay\'\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[4, 'implicit-import'], [7, 'implicit-import'], [8, 'TS2322']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[9, 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -2659,7 +2470,11 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      expect((await check(root)).filter(d => d.code !== 'promoted-island').map(d => [d.file.slice(root.length + 1), d.line, d.column, d.code])).toEqual([
+      expect((await check(root)).map(d => [d.file.slice(root.length + 1), d.line, d.column, d.code])).toEqual([
+        ['src/components/user.kay', 10, 62, 'island-prop'],
+        ['src/components/user.kay', 11, 6, 'island-prop'],
+        ['src/components/user.kay', 12, 14, 'island-prop'],
+        ['src/components/user.kay', 13, 14, 'island-prop'],
         ['src/routes/index.kay', 10, 62, 'island-prop'],
         ['src/routes/index.kay', 11, 6, 'island-prop'],
         ['src/routes/index.kay', 12, 14, 'island-prop'],
@@ -2711,7 +2526,6 @@ describe.concurrent('kay check, edge cases', () => {
       'src/columns.ts': 'import type { Column } from \'./table\'\n\nexport const fromModule: Column<{ id: number, name: string }>[] = [{ key: \'name\', sortValue: row => row.name }]\n',
       'src/components/grid.kay': '--- <Row>\nimport { signal } from \'kay\'\nimport type { Column } from \'../table\'\n\nconst { columns, rows, virtual = false } = props<{ columns: Column<Row>[], rows: Row[], virtual?: boolean }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen = columns.length + rows.length + (virtual ? 1 : 0)}) {chosen()}\n',
       'src/routes/index.kay': `--- server${page.slice(3)}`,
-      // A static component imports no value that may be a function, which would have the build promote it and leave it unchecked.
       'src/components/panel.kay': page.replaceAll('../components/', './').replace('import { fromModule } from \'../columns\'\n', '').replace(/Grid\(columns=\{fromModule\}[^\n]*\n/g, ''),
     })
 
@@ -2880,7 +2694,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect(await check(islandOnly)).toEqual([])
-      expect((await check(alsoStatic)).filter(d => d.code !== 'promoted-island').map(d => [relative(alsoStatic, d.file), d.line])).toEqual([['src/components/wrapper.kay', 7], ['src/components/wrapper.kay', 8]])
+      expect((await check(alsoStatic)).map(d => [relative(alsoStatic, d.file), d.line])).toEqual([['src/components/wrapper.kay', 7], ['src/components/wrapper.kay', 8]])
     }
     finally {
       await Promise.all([islandOnly, alsoStatic].map(async root => rm(root, { recursive: true, force: true })))
@@ -3904,7 +3718,7 @@ describe.concurrent('kay check, unused code', () => {
   it('warns of a match with no else that leaves members of a finite union out, and of no other', async () => {
     const page = [
       '---',
-      'import { Level } from \'../levels\'',
+      'import { Level } from \'../levels\'; import { signal } from \'kay\'',
       'type Shape = { kind: \'a\', size: number } | { kind: \'b\' } | { kind: \'c\' }',
       'const { status, level, flag, maybe, name, count, shape, full, other } = props<{ status: \'open\' | \'closed\' | \'draft\', level: Level, flag: boolean, maybe: \'x\' | \'y\' | null, name: string, count: number, shape: Shape, full: \'p\' | \'q\', other: \'r\' | \'s\' }>()',
       'const picked = signal<\'u\' | \'v\'>(\'u\')',
@@ -3963,7 +3777,7 @@ describe.concurrent('kay check, unused code', () => {
         [22, 'This `match` has no `else` and leaves "b" | "c" out'],
         [25, 'This `match` has no `else` and leaves "v" out'],
       ])
-      expect((await check(root, { lints: { 'incomplete-match': 'allow' } })).map(d => d.code)).toEqual(['implicit-import'])
+      expect((await check(root, { lints: { 'incomplete-match': 'allow' } })).map(d => d.code)).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4013,7 +3827,7 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('types a value of kay read with no import and names the module of a name from another entry', async () => {
+  it('reports a value of kay read with no import as a missing name, and names the module of a name from another entry', async () => {
     const page = '--- server\nimport { env } from \'../env\'\n\nconst id = uid()\nconst posts = await cached(\'posts\', \'5m\', async () => [id])\n---\np {posts.length} {env.NAME}\n'
     const env = 'import { defineEnv, s } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ NAME: s.String({ default: \'kay\' }) }))\n'
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/env.ts': env })
@@ -4021,7 +3835,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const found = (await check(root)).map(d => [d.line, d.message, d.help])
 
-      expect(found).toEqual([[4, expect.stringContaining('`uid` is used with no import'), expect.stringContaining('import { uid } from \'kay\'')], [5, expect.stringContaining('Cannot find name \'cached\''), 'did you mean `cached` from `kay/cache`? Add `import { cached } from \'kay/cache\'`']])
+      expect(found).toEqual([[4, 'Cannot find name \'uid\'.', 'did you mean `uid` from `kay`? Add `import { uid } from \'kay\'`'], [5, 'Cannot find name \'cached\'. Did you mean \'Cache\'?', 'did you mean `cached` from `kay/cache`? Add `import { cached } from \'kay/cache\'`']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

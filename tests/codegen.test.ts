@@ -58,19 +58,15 @@ describe('component shell', () => {
     const SHARED = Object.entries(KAY_ROLES).filter(([, role]) => role === 'shared').map(([name]) => name)
     const BROWSER = Object.entries(KAY_ROLES).filter(([, role]) => role === 'browser').map(([name]) => name)
 
-    it('keeps a component static for each shared value, imported, implicit or read by the template alone', () => {
+    it('keeps a component static for each shared value it imports', () => {
       for (const name of SHARED) {
         expect(islandOf(`---\nimport { ${name} } from 'kay'\nconst x = ${name}\n---\np {x}`)).toBe(false)
-        expect(islandOf(`---\nconst x = ${name}\n---\np {x}`)).toBe(false)
-        expect(islandOf(`p {${name}}`)).toBe(false)
       }
     })
 
-    it('makes a component an island for each browser value, imported, implicit or read by the template alone', () => {
+    it('makes a component an island for each browser value it imports', () => {
       for (const name of BROWSER) {
         expect(islandOf(`---\nimport { ${name} } from 'kay'\nconst x = ${name}\n---\np {x}`)).toBe(true)
-        expect(islandOf(`---\nconst x = ${name}\n---\np {x}`)).toBe(true)
-        expect(islandOf(`p {${name}}`)).toBe(true)
       }
     })
 
@@ -126,16 +122,6 @@ describe('component shell', () => {
 })
 
 describe('translations', () => {
-  it('imports t from kay/i18n for a component reading it unimported, and leaves a t it declares or imports alone', () => {
-    const translation = 'import { t } from \'kay/i18n\''
-
-    expect(tsx('p {t(\'hello\')}')).toContain(translation)
-    expect(tsx('---\nconst label = t(\'hello\')\n---\np {label}')).toContain(translation)
-    expect(tsx('for t of [1]\n  p {t}')).not.toContain('kay/i18n')
-    expect(tsx('---\nimport { t } from \'./words\'\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
-    expect(tsx('---\nconst t = (key: string) => key\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
-  })
-
   it('has the browser code of a component writing a link\'s href import kay/i18n-links, and that of one writing none leave it out', () => {
     const dom = (template: string) => compileKay(`---\nconst { href, attrs, items } = props<{ href: string, attrs: Record<string, string>, items: unknown[] }>()\n---\n${template}`, 'test.kay', { output: 'dom' }).tsx
     const links = 'import \'kay/i18n-links\''
@@ -154,7 +140,6 @@ describe('translations', () => {
     const dom = (script: string) => compileKay(`---\n${script}\n---\np x`, 'test.kay', { output: 'dom' }).tsx
     const links = 'import \'kay/i18n-links\''
 
-    expect(dom('const go = () => navigate(\'/second\')')).toContain(links)
     expect(dom('import { navigate } from \'kay\'\nconst go = () => navigate(\'/second\')')).toContain(links)
     expect(dom('import { navigate as go } from \'kay\'\nconst again = () => go(\'/second\')')).toContain(links)
     expect(dom('import * as kay from \'kay\'\nconst go = () => kay.navigate(\'/second\')')).toContain(links)
@@ -163,91 +148,20 @@ describe('translations', () => {
   })
 })
 
-describe('values of kay without an import', () => {
-  it('imports each value of kay a script or a server fence reads unimported, once', () => {
-    const script = tsx('---\nconst id = uid()\nconst stop = every(\'1s\', () => navigate(\'/x\'))\nconst again = navigate\n---\np {id}')
-
-    expect(script).toMatch(/import \{ (?:uid|every|navigate)(?:, (?:uid|every|navigate)){2} \} from 'kay'/)
-    expect(tsx('--- server\nconst Row = s.Object({ id: s.String() })\nconst path = localPath(\'/x\')\n---\np {path}')).toMatch(/import \{ (?:s, localPath|localPath, s) \} from 'kay'/)
+describe('values of kay with no import', () => {
+  it('adds no import of its own: a name a file does not import is the type check\'s to report', () => {
+    expect(tsx('---\nconst id = uid()\nconst again = navigate\n---\np {id}')).not.toContain('from \'kay\'')
+    expect(tsx('--- server\nconst Row = s.Object({ id: s.String() })\n---\np {String(Row)}')).not.toMatch(/import \{[^}]*\bs\b[^}]*\} from 'kay'/)
+    expect(tsx('a(href={route(\'/x\')}) {durationMs(5)}')).not.toContain('from \'kay\'')
+    expect(tsx('p {t(\'hello\')}')).not.toContain('kay/i18n')
   })
 
-  it('imports refuse from kay for a server fence throwing it, and makes no island of it', () => {
-    const source = '--- server\nexport const save = action(s.Object({}), () => refuse(\'No\'))\n---\np x'
-    const compiled = compileKay(source, 'test.kay')
+  it('makes no island of a name it does not import, whatever it holds in kay', () => {
+    const island = (source: string) => compileKay(source, 'test.kay').tsx.includes('Island')
 
-    expect(compiled.tsx).toMatch(/import \{ [^}]*\brefuse\b[^}]*\} from 'kay'/)
-    expect(compiled.tsx.includes('Island')).toBe(false)
-  })
-
-  it('leaves a name the file declares, imports, destructures or takes from the server fence alone', () => {
-    expect(tsx('---\nconst route = 1\nconst { stream } = props<{ stream: string }>()\nimport { watch } from \'./watch\'\nwatch()\nconst x = route + stream\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
-    expect(tsx('--- server\nconst root = 1\n---\n---\nconst x = root\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
-    expect(tsx('---\nconst x = { route: 1 }.route + other.stream\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
-  })
-
-  it('makes a script an island for a value of kay that holds state, not for one of its static helpers', () => {
-    const island = (body: string) => compileKay(`---\n${body}\n---\np x`, 'test.kay').tsx.includes('Island')
-
-    expect(island('const id = uid()')).toBe(false)
-    expect(island('const count = signal(1)')).toBe(true)
-    expect(island('const stop = listen(window, \'click\', () => undefined)')).toBe(true)
-  })
-})
-
-describe('values of kay a template reads', () => {
-  const imports = (source: string) => (/^import \{ ([^}]*) \} from 'kay'$/m).exec(tsx(source))?.[1]?.split(', ').toSorted() ?? []
-  const island = (source: string) => compileKay(source, 'test.kay').tsx.includes('Island')
-
-  it('imports what a component template reads with no script, and keeps the component static for a helper', () => {
-    const source = 'a(href={route(\'/x\')}) {durationMs(5)} {withBase(\'/y\')}'
-
-    expect(imports(source)).toEqual(['durationMs', 'route', 'withBase'])
-    expect(island(source)).toBe(false)
-  })
-
-  it('imports what a page template reads, beside what its fences read', () => {
-    expect(imports('--- server\nconst id = uid()\n---\na(href={localPath(\'/x\')}) {id}')).toEqual(['localPath', 'uid'])
-    expect(imports('--- server\nconst Row = s.Object({})\n---\na(href={route(\'/x\')}) {s.String}')).toEqual(['route', 's'])
-  })
-
-  it('imports what an island template reads, and a stateful one makes the component an island', () => {
-    const source = '---\nconst count = signal(0)\n---\na(href={withBase(\'/x\')}) {count()}'
-
-    expect(imports(source)).toEqual(['signal', 'withBase'])
-    expect(island(source)).toBe(true)
-    expect(island('p {memo(() => 1)()}')).toBe(true)
-    expect(island('p {listen}')).toBe(true)
-  })
-
-  it('keeps a component static for a script reading only helpers that read nothing reactive', () => {
-    for (const body of ['route(\'/x\')', 'localPath(\'/x\')', 'withBase(\'/x\')', 's.String()', 'durationMs(5)', 'sanitizeHtml(\'x\')'])
-      expect(island(`---\nconst x = ${body}\n---\np {String(x)}`)).toBe(false)
-  })
-
-  it('leaves a name the file declares, a template binds or a string and a key only spell', () => {
-    expect(imports('---\nconst route = 1\n---\np {route}')).toEqual([])
-    expect(imports('---\nimport { watch } from \'./watch\'\n---\np {watch()}')).toEqual([])
-    expect(imports('---\nconst { stream } = props<{ stream: string }>()\n---\np {stream}')).toEqual([])
-    expect(imports('for route of [1]\n  p {route}')).toEqual([])
-    expect(imports('const watch = 1\np {watch}')).toEqual([])
-    expect(imports('snippet card(route: string)\n  p {route}\n{card(\'a\')}')).toEqual([])
-    expect(imports('if watch() as route\n  p {route}')).toEqual(['watch'])
-    expect(imports('---\nconst later = Promise.resolve(1)\n---\nawait later\n  p x\nthen route\n  p {route}\ncatch watch\n  p {watch}')).toEqual([])
-    expect(imports('try\n  p x\ncatch route\n  p {route}')).toEqual([])
-    expect(imports('markdown\n  Hello {route(\'/x\')}')).toEqual(['route'])
-    expect(imports('p {[1].map(signal => signal + 1)}')).toEqual([])
-    expect(imports('p {\'watch later\'} {({ signal: 1 }).signal} {String(Math.route)}')).toEqual([])
-    expect(island('p {\'watch later\'}')).toBe(false)
-  })
-
-  it('leaves a name the server fence declares to the template, in an island too', () => {
-    expect(imports('--- server\nconst root = 1\n---\np {root}')).toEqual([])
-    expect(imports('--- server\nconst route = 1\n---\n---\nconst count = signal(0)\n---\np {route} {count()}')).toEqual(['signal'])
-    expect(imports('--- server\nimport { route } from \'./routes\'\n---\na(href={route(\'/x\')}) x')).toEqual([])
-  })
-
-  it('imports typeof route in a type position like any other read', () => {
-    expect(imports('---\ntype R = typeof route\nconst x = 1 as unknown as R\n---\np {String(x)}')).toEqual(imports('---\nconst x = route(\'/\')\n---\np {x}'))
+    expect(island('---\nconst count = signal(1)\n---\np {count}')).toBe(false)
+    expect(island('p {memo(() => 1)()}')).toBe(false)
+    expect(island('---\nimport { signal } from \'kay\'\n\nconst count = signal(1)\n---\np {count()}')).toBe(true)
   })
 })
 
@@ -347,7 +261,7 @@ describe('control flow', () => {
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
-  it('compiles an island and a promotable component the same whether or not they type a prop as an action', () => {
+  it('compiles an island and a static component the same whether or not they type a prop as an action', () => {
     const island = (type: string) => `---\nimport { signal } from 'kay'\n\nconst { run } = props<{ run: ${type} }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(1)}) Go`
 
     for (const output of ['dom', 'html'] as const) {
@@ -529,8 +443,7 @@ describe('elements', () => {
     const source = '---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}'
 
     expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
-    // A component the build promotes to an island in its place should List be one is checked the same, as the deprecated lint.
-    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayPromotedFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
+    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
   })
 
   it('renders a block prop through a named slot, the lines under a slot standing in when there is none', () => {
@@ -619,16 +532,16 @@ describe('islands', () => {
     expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([])
   })
 
-  it('imports what the fences use of kay unimported, which makes the component an island', () => {
-    const source = '--- server\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
+  it('makes the component an island for the values of kay its fences import', () => {
+    const source = '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nimport { memo, signal } from \'kay\'\n\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
 
-    expect(tsx(source)).toStartWith('import { signal, memo, action, s } from \'kay\'\n')
+    expect(tsx(source)).toContain('import { action, s } from \'kay\'\n')
     expect(compileKay(source, 'test.kay').island).toBe('test.kay')
     expect(compileKay('---\nconst label = \'signal\'\n---\np {label}\n', 'test.kay').island).toBeUndefined()
   })
 
   it('reads a signal by calling it through optional chaining, a property and await blocks', () => {
-    const code = tsx('---\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count: count() })}) {user()?.name}\nawait later\n  p {count()}\nthen value\n  p {count() + value}\n')
+    const code = tsx('---\nimport { memo, signal } from \'kay\'\n\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count: count() })}) {user()?.name}\nawait later\n  p {count()}\nthen value\n  p {count() + value}\n')
 
     // Type checking reads each through `__values`, which it narrows.
     expect(code).toContain('const __values = { user: user(), count: count() }')
@@ -645,10 +558,10 @@ describe('islands', () => {
 
 describe('fences', () => {
   it('report markup as belonging in the template, a fence holding TypeScript only', () => {
-    expect(reports('---\nconst el = <p>x</p>\n---\np x')).toEqual([{ message: 'A fence holds TypeScript, never JSX', at: '<p>x</p>', help: 'put markup in the template, or in a component of its own' }])
+    expect(reports('---\nimport { signal } from \'kay\'\nconst el = <p>x</p>\n---\np x')).toEqual([{ message: 'A fence holds TypeScript, never JSX', at: '<p>x</p>', help: 'put markup in the template, or in a component of its own' }])
     expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual(['A fence holds TypeScript, never JSX'])
     expect(compileKay('---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst el = <p>x</p>\n---\np {count}\n', 'test.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['A fence holds TypeScript, never JSX'])
-    expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
+    expect(errors('---\nimport { signal } from \'kay\'\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
   })
 
   it('keep one that fails to parse in the shadow whole, for the editor to complete in while its quote is still open', () => {
@@ -656,9 +569,9 @@ describe('fences', () => {
     const components: [string, number][] = [
       ['---\nimport BrandGithub from \'~icons/tabler/brand\n---\np x\n', 1],
       ['---\nimport { signal } from "kay/\nconst count = signal(1)\n---\np {count()}\n', 1],
-      ['---\nconst a = \'one\nconst b = "two\n---\np {a}\n', 1],
+      ['---\nimport { signal } from \'kay\'\nconst a = \'one\nconst b = "two\n---\np {a}\n', 1],
       ['--- server\nimport { listTodos } from \'../da\nexport const page = {}\n---\n---\nconst label = "x\n---\np x\n', 2],
-      ['---\nconst count = 1\nconst label = \'x\n---\np {count}\n', 1],
+      ['---\nimport { signal } from \'kay\'\nconst count = 1\nconst label = \'x\n---\np {count}\n', 1],
       ['--- client\nconst label = "x\n---\np x\n', 1],
     ]
 
@@ -678,7 +591,7 @@ describe('fences', () => {
   })
 
   it('analyse the rest of a fence while one statement of it does not parse, as the editor sees it typed', () => {
-    const broken = ['---\nconst count = signal(1)\nconst items = signal([1])\nconst b = count.\nconst c = 1\n---\nfor item of items\n  p {item} {count()}\n', 'const b = count.\n']
+    const broken = ['---\nimport { signal } from \'kay\'\nconst count = signal(1)\nconst items = signal([1])\nconst b = count.\nconst c = 1\n---\nfor item of items\n  p {item} {count()}\n', 'const b = count.\n']
     const parsed = broken[0]!.replace(broken[1]!, '')
     const withBroken = compileKay(broken[0]!, 'test.kay', { check: true })
     const without = compileKay(parsed, 'test.kay', { check: true })
@@ -691,9 +604,9 @@ describe('fences', () => {
   })
 
   it('blame the statement left unfinished, not the good one that follows it', () => {
-    const imports = compileKay('---\nconst b = items.\n\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true })
-    const rewritten = compileKay('---\nconst items = signal([1])\nconst b = items.\nconst count = signal(1)\n---\np {count}\n', 'test.kay', { check: true })
-    const opened = compileKay('---\nconst count = signal(\nconst other = 1\n---\np {other}\n', 'test.kay', { check: true })
+    const imports = compileKay('---\nimport { signal } from \'kay\'\nconst b = items.\n\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true })
+    const rewritten = compileKay('---\nimport { signal } from \'kay\'\nconst items = signal([1])\nconst b = items.\nconst count = signal(1)\n---\np {count}\n', 'test.kay', { check: true })
+    const opened = compileKay('---\nimport { signal } from \'kay\'\nconst count = signal(\nconst other = 1\n---\np {other}\n', 'test.kay', { check: true })
     const server = compileKay('--- server\nconst todos = load.\nconst a = 1\n---\np {a}\n', 'test.kay', { check: true })
 
     expect(imports.tsx).toContain('import { signal } from \'kay\'')
@@ -705,25 +618,17 @@ describe('fences', () => {
 
   it('read past the comment lines above a statement to tell what the text before it left unfinished', () => {
     for (const comment of ['// what?', '// note', '// a > b', '// a.']) {
-      const { tsx, diagnostics } = compileKay(`---\nconst b = signal.\n${comment}\nconst count = signal(1)\n---\np {count}\n`, 'test.kay', { check: true })
+      const { tsx, diagnostics } = compileKay(`---\nimport { signal } from 'kay'\nconst b = signal.\n${comment}\nconst count = signal(1)\n---\np {count}\n`, 'test.kay', { check: true })
 
       expect(diagnostics.map(d => d.message)).toContain('`count` is a signal, read by calling it')
       expect(tsx).toContain('count()')
     }
   })
 
-  it('blame the last statement of a fence that ends unfinished, whatever it ends with', () => {
-    for (const body of ['const a = 1\nconst e = signal(1', 'const d = foo(\n// c\nconst e = signal(1', 'const a = 1\n\nconst e = signal(1\n\n', 'const e = signal(1']) {
-      const { tsx } = compileKay(`---\n${body}\n---\np x\n`, 'test.kay', { check: true })
-
-      expect(tsx).toContain('import { signal }')
-    }
-  })
-
   it('keep a broken import.meta statement in the body, and read a block comment before a broken import', () => {
-    const meta = compileKay('---\nimport.meta.hot.\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
-    const block = compileKay('---\n/* c */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
-    const multiline = compileKay('---\n/* a\n b */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const meta = compileKay('---\nimport { signal } from \'kay\'\nimport.meta.hot.\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const block = compileKay('---\nimport { signal } from \'kay\'\n/* c */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
+    const multiline = compileKay('---\nimport { signal } from \'kay\'\n/* a\n b */ import { a } from \'x\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true }).tsx
     const island = (code: string) => code.indexOf('import { island')
 
     expect(meta.indexOf('import.meta.hot.')).toBeGreaterThan(island(meta))
@@ -731,37 +636,16 @@ describe('fences', () => {
     expect(multiline.indexOf('import { a }')).toBeLessThan(island(multiline))
   })
 
-  it('count a name of a statement that does not parse as read only where it is code', () => {
-    const imported = (body: string) => compileKay(`---\n${body}\n---\np x\n`, 'test.kay', { check: true }).tsx.includes('import { signal }')
-
-    expect(imported('const d = \'signal(1')).toBe(false)
-    expect(imported('const d = foo( // signal(1)\n')).toBe(false)
-    expect(imported('const d = foo( /* signal */\n')).toBe(false)
-    expect(imported('const d = { signal: 1,\n')).toBe(false)
-    expect(imported('const d = `signal\n')).toBe(false)
-    expect(imported('const d = { x: signal(1),\n')).toBe(true)
-    expect(imported('const d = { x: \'a\', y: signal(1),\n')).toBe(true)
-    expect(imported('const d = `${signal(1)}\n')).toBe(true)
-    expect(imported('const d = `a ${b}` + signal(')).toBe(true)
-    expect(imported('const d = foo(`x`, `${y}`, signal(')).toBe(true)
-    expect(imported('const d = foo(`${{ a: 1 }.a}`, signal(')).toBe(true)
-    expect(imported('const d = foo(/\' /, signal(')).toBe(true)
-    expect(imported('const d = foo(/signal/')).toBe(false)
-    expect(imported('const d = 4 / 2 + signal(')).toBe(true)
-    expect(imported('const d = `signal\nconst e = signal(')).toBe(true)
-    expect(imported('const d = `signal`\nconst e = foo(\nconst f = signal(')).toBe(true)
-  })
-
   it('blame only the unfinished statement when the line after it starts with a bracket, a quote or a comment ends it', () => {
     for (const next of ['[x] = [1]', '(async () => 1)()', '\'use strict\'', '`t`']) {
-      const { tsx } = compileKay(`---\nconst x = signal(1)\nconst a = x.\n${next}\nconst b = signal(2)\n---\np x\n`, 'test.kay', { check: true })
+      const { tsx } = compileKay(`---\nimport { signal } from 'kay'\nconst x = signal(1)\nconst a = x.\n${next}\nconst b = signal(2)\n---\np x\n`, 'test.kay', { check: true })
 
       expect(tsx).toContain('const b = signal(2)')
       expect(tsx.indexOf('const b = signal(2)')).toBeGreaterThan(tsx.indexOf(next))
     }
 
     for (const comment of ['// ok', '// url http://x', '// "q']) {
-      const { diagnostics } = compileKay(`---\nconst count = signal(1)\nconst x = count. ${comment}\nconst signal2 = signal(2)\n---\np {signal2}\n`, 'test.kay', { check: true })
+      const { diagnostics } = compileKay(`---\nimport { signal } from 'kay'\nconst count = signal(1)\nconst x = count. ${comment}\nconst signal2 = signal(2)\n---\np {signal2}\n`, 'test.kay', { check: true })
 
       expect(diagnostics.map(d => d.message)).toContain('`signal2` is a signal, read by calling it')
     }
@@ -774,17 +658,6 @@ describe('fences', () => {
 
     for (const { tsx } of [tail, beforeExport, beforeImport])
       expect(tsx).toContain('const todos = load.')
-  })
-
-  it('import the names kay provides to a fence with a statement that does not parse, the server\'s included', () => {
-    const script = compileKay('---\nconst { label } = props<{ label: string }>()\nconst count = signal(1)\nconst b = \'x\n---\np {label}\n', 'test.kay', { check: true })
-    const server = compileKay('--- server\nexport const add = action(() => 1)\nconst todos = load.\n---\np x\n', 'test.kay', { check: true })
-    const translated = compileKay('---\nconst b = \'x\n---\np {t(\'hello\')}\n', 'test.kay', { check: true })
-
-    expect(script.tsx).toContain('import { signal } from \'kay\'')
-    expect(script.tsx).toContain('__props.label')
-    expect(server.tsx).toContain('import { action } from \'kay\'')
-    expect(translated.tsx).toContain('import { t } from \'kay/i18n\'')
   })
 
   it('relocate a relative import beside a statement that does not parse', () => {
@@ -807,7 +680,7 @@ describe('fences', () => {
   })
 
   it('keep the lints of the rewrites for the template and the other fence while one fence does not parse', () => {
-    const { diagnostics } = compileKay('--- server\nconst todos = [1]\n---\n---\nconst count = signal(1)\nconst b = count.\n---\np {count}\nbutton(onClick={() => todos = []}) x\n', 'test.kay', { check: true })
+    const { diagnostics } = compileKay('--- server\nconst todos = [1]\n---\n---\nimport { signal } from \'kay\'\nconst count = signal(1)\nconst b = count.\n---\np {count}\nbutton(onClick={() => todos = []}) x\n', 'test.kay', { check: true })
     const messages = diagnostics.map(d => d.message)
 
     expect(messages).toContain('Unexpected token')
@@ -1151,7 +1024,7 @@ describe('component names', () => {
 
     it('reads `typeof` of a template `const` as the type its memo holds, at the top of a type and nested, in html and dom', () => {
       for (const output of ['html', 'dom'] as const) {
-        const code = compileKay('---\nconst items = signal([1])\n---\nfor n of items\n  const t = n + 1\n  p {(t as unknown as typeof t)} {(1 as unknown as { a: { b: typeof t }, f: (v: typeof t) => void })} {(1 as unknown as typeof t.a)}', 'test.kay', { output }).tsx
+        const code = compileKay('---\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nfor n of items\n  const t = n + 1\n  p {(t as unknown as typeof t)} {(1 as unknown as { a: { b: typeof t }, f: (v: typeof t) => void })} {(1 as unknown as typeof t.a)}', 'test.kay', { output }).tsx
 
         expect(code).toContain('as unknown as ReturnType<typeof t>)')
         expect(code).toContain('{ a: { b: ReturnType<typeof t> }, f: (v: ReturnType<typeof t>) => void }')
@@ -1319,7 +1192,7 @@ describe('signal writes', () => {
   })
 
   it('reject a write to a memo, a signal written by destructuring and a constant plainly holding no signal', () => {
-    const source = '---\nimport { loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams()\nconst cast = {} as never\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  cast = 1\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
+    const source = '---\nimport { loud } from \'./theme\'\nimport { memo, signal } from \'kay\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams()\nconst cast = {} as never\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  cast = 1\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
     const found = compileKay(source, 'test.kay', { importedSignals: { './theme': { loud: 'memo' } } }).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
 
     expect(found).toEqual([
@@ -1353,13 +1226,13 @@ describe('signal writes', () => {
   })
 
   it('keep a parenthesized right side whole, in a plain, compound or logical assignment, on the server, in an island and when type checking', () => {
-    const source = '---\nimport { accent } from \'./theme\'\nconst open = signal(false)\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
+    const source = '---\nimport { accent } from \'./theme\'\nimport { signal } from \'kay\'\nconst open = signal(false)\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
     const runs = compileKay(source, 'test.kay', { output: 'dom' })
     const served = compileKay(source, 'test.kay', { output: 'html' })
     const checked = compileKay(source, 'test.kay', { check: true })
 
     for (const { tsx: code, diagnostics } of [runs, served, checked]) {
-      expect(diagnostics.filter(d => d.code !== 'implicit-import').map(d => d.message)).toEqual([])
+      expect(diagnostics.map(d => d.message)).toEqual([])
       expect(parser.parseSync('test.tsx', code).errors).toEqual([])
     }
 

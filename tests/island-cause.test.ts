@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
-import { describeCause } from '../src/compiler/island-cause'
 import { islandLens } from '../src/lsp/island-lens'
 import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
@@ -24,23 +23,21 @@ describe('the island cause', () => {
     const handler = 'p a\nbutton(onClick={() => 1}) b\n'
     const signalSource = '---\nimport { signal } from \'kay\'\nconst n = signal(0)\n---\np {n()}\n'
     const client = '--- client\nconst x = 1\n---\np {x}\n'
-    const implicit = '---\nconst n = signal(0)\n---\np {n()}\n'
 
     expect(cause(handler)).toMatchObject({ kind: 'attribute', name: 'onClick', line: 2 })
     expect(slice(handler, cause(handler)!.span)).toBe('onClick')
     expect(cause(signalSource)).toMatchObject({ kind: 'value', name: 'signal', source: 'kay', line: 2 })
     expect(slice(signalSource, cause(signalSource)!.span)).toBe('signal')
     expect(cause(client)).toMatchObject({ kind: 'client', line: 1 })
-    expect(slice(implicit, cause(implicit)!.span)).toBe('signal')
     expect(cause('p a\n')).toBeUndefined()
   })
 
-  it('finds an implicit `kay` value where the script reads it, not in a comment or a string before', () => {
-    const source = '---\n// signal comes later\nconst label = \'signal\'\nconst n = signal(0)\n---\np {n()}\n'
+  it('finds the `kay` value where the script reads it, not in a comment or a string before', () => {
+    const source = '---\nimport { signal } from \'kay\'\n// signal comes later\nconst label = \'signal\'\nconst n = signal(0)\n---\np {n()}\n'
 
     expect(slice(source, cause(source)!.span)).toBe('signal')
-    expect(cause(source)).toMatchObject({ kind: 'value', name: 'signal', line: 4 })
-    expect(source.indexOf('signal(0)')).toBe(cause(source)!.span.start)
+    expect(cause(source)).toMatchObject({ kind: 'value', name: 'signal', line: 2 })
+    expect(source.indexOf('{ signal }') + 2).toBe(cause(source)!.span.start)
   })
 
   it('counts the span and the line in the file the author wrote, not in the markdown it expands to', () => {
@@ -54,16 +51,6 @@ describe('the island cause', () => {
   it('keeps `why` as the sentence of the cause', () => {
     expect(compileKay('button(onClick={() => 1}) b\n', 'src/components/part.kay').why).toBe('`onClick`, line 1')
     expect(compileKay('p a\n', 'src/components/part.kay').why).toBeUndefined()
-  })
-
-  it('names what a static component passes, with the component it passes it to', () => {
-    const prop = '---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
-    const block = '---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n'
-
-    expect(cause(prop)).toMatchObject({ kind: 'prop', name: 'format', target: 'Picker', line: 5 })
-    expect(cause(block)).toMatchObject({ kind: 'block', target: 'Picker' })
-    expect(describeCause(cause(prop)!)).toBe('`format` passed to Picker, line 5')
-    expect(describeCause(cause(block)!)).toBe('a block taking parameters passed to Picker, line 4')
   })
 })
 
@@ -112,7 +99,7 @@ describe('kay explain island', () => {
       'package.json': '{"name":"x","type":"module"}',
       'src/components/button.kay': 'button(onClick={() => 1}) Go\n',
       'src/components/plain.kay': 'p Plain\n',
-      'src/components/wrap.kay': '---\nimport Button from \'./button.kay\'\nfunction pick() {}\n---\nButton(format={pick})\n',
+      'src/components/wrap.kay': '--- island\nimport Button from \'./button.kay\'\nfunction pick() {}\n---\nButton(format={pick})\n',
       'src/routes/_layout.kay': 'main\n  button(onClick={() => 1}) Menu\n  slot\n',
       'src/routes/server.kay': '--- server\nconst n = 1\n---\nbutton(onClick={() => 1}) {n}\n',
       'src/routes/index.kay': '---\nimport Button from \'../components/button.kay\'\n---\nButton\n',
@@ -135,24 +122,23 @@ describe('kay explain island', () => {
     expect(JSON.parse(plain.stdout)).toMatchObject({ file: 'src/components/plain.kay', role: 'static' })
     expect((JSON.parse(all.stdout) as { islands: unknown[] }).islands).toEqual([
       { file: 'src/components/button.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) },
-      { file: 'src/components/wrap.kay', role: 'promoted', cause: expect.objectContaining({ kind: 'prop', name: 'format', line: 5 }) },
+      { file: 'src/components/wrap.kay', role: 'island', cause: expect.objectContaining({ kind: 'island', name: '--- island', line: 1 }) },
       { file: 'src/routes/_layout.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 2 }) },
       { file: 'src/routes/server.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 4 }) },
     ])
   })
 
-  it('says what a promoted component is, and reports a layout or a server page with a handler as the compiler decides it', async () => {
+  it('says what a pinned component is, and reports a layout or a server page with a handler as the compiler decides it', async () => {
     const root = await project()
-    const [promoted, layout, server] = await Promise.all([
+    const [pinned, layout, server] = await Promise.all([
       kay(['explain', 'island', 'src/components/wrap.kay', '--format', 'json'], root),
       kay(['explain', 'island', 'src/routes/_layout.kay', '--format', 'json'], root),
       kay(['explain', 'island', 'src/routes/server.kay'], root),
     ])
 
-    expect(JSON.parse(promoted.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'promoted', cause: { kind: 'prop', name: 'format', line: 5, description: '`format` passed to Button, line 5' } })
+    expect(JSON.parse(pinned.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'island', cause: { kind: 'island', name: '--- island', line: 1, description: 'a `--- island` fence' } })
     expect(JSON.parse(layout.stdout)).toMatchObject({ role: 'island', cause: { kind: 'attribute', name: 'onClick', line: 2 } })
     expect(server.stdout).toContain('src/routes/server.kay: an island')
-    expect((await kay(['explain', 'island', 'src/components/wrap.kay'], root)).stdout).toContain('which the build bundles only when its imports reach an island')
   })
 
   it('reports the error of a file that does not compile instead of a role', async () => {

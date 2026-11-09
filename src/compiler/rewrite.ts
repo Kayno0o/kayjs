@@ -48,7 +48,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
     ({ program: ast, comments } = parseProgram(input.code, { lang: 'tsx', semantic: true }))
   }
   catch (error) {
-    return { plan: { rewrites: new Map(), translates: false, values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
+    return { plan: { rewrites: new Map(), values: new Map(), writes: new Set() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }
   }
 
   return new RewriteFinder(input, new Scanner(input.code, comments)).run(ast)
@@ -71,7 +71,6 @@ class RewriteFinder {
   private readonly writes = new Set<keyof typeof WRITE_HELPERS>()
   // The source offsets of the writes already dispatched: the code of a fence may be generated twice, and its rewrites keyed by source apply to both copies.
   private readonly dispatched = new Set<number>()
-  private translates = false
   private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
   private globals = new Set<string>()
@@ -92,7 +91,7 @@ class RewriteFinder {
     this.dispatchedWrites()
 
     return {
-      plan: { rewrites: this.rewrites, translates: this.translates, values: this.values, writes: this.writes },
+      plan: { rewrites: this.rewrites, values: this.values, writes: this.writes },
       findings: { unread: this.unread, serverReads: this.serverReads, constantSignals: [...this.constantSignals.values()], globalReads: this.globalReads },
       diagnostics: this.diagnostics,
     }
@@ -137,7 +136,6 @@ class RewriteFinder {
 
   private program(path: Path<Program>) {
     this.globals = path.scope.globals
-    this.translates = this.globals.has('t')
 
     for (const [name, kind] of this.input.imported ?? []) {
       const binding = path.scope.getBinding(name)

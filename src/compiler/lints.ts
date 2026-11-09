@@ -453,17 +453,9 @@ export const LINTS = {
   'island-marker': {
     level: 'deny',
     group: 'islands',
-    summary: 'A `--- island` fence line, or the old `// kay-island` comment, on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
+    summary: 'A `--- island` fence line on a page, a layout or a special page: they render on the server and are never islands. Move what needs the browser to a component of its own.',
     wrong: '--- server\nconst title = \'Home\'\n--- island\n---\nh1 {title}',
     right: '--- server\nconst title = \'Home\'\n---\nh1 {title}',
-  },
-  'island-comment': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.92',
-    summary: 'A `// kay-island` or `// kay-static` comment on a line of its own in a component\'s script. The fence line says it now: `--- island` or `--- static` in place of `---`, which the compiler parses where the comment was matched in the text. The comment works until 1.95. The fix writes the fence line and deletes the comment; a `--- client` component is an island already, so only its comment goes, and a `// kay-static` on one has no fix.',
-    wrong: '---\n// kay-island\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}',
-    right: '--- island\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}',
   },
   'island-prop': {
     level: 'deny',
@@ -472,23 +464,6 @@ export const LINTS = {
     summary: 'A component that is not an island passing one a value its type says cannot be sent: a function (a callback, a signal), a block taking parameters, a symbol, or an object holding either, such as a `Column` with a `sortValue` function. An island is sent its props serialized into the page, so only data crosses; an action, a Date or a Map does. The types decide, so a value typed `any` or `unknown` is not reported, nor a call returning data. The fix writes `--- island` on the component, applied by `kay check --fix` where the value is always a function and offered, not applied, where its type is a union holding one; a page or a layout is never an island, so it passes the island data or goes through a component of its own. Rendering throws an `IslandPropsError` for the same value, naming the fix.',
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
     right: '--- island\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
-  },
-  'implicit-import': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.92',
-    summary: 'A value of `kay` that a component reads with no import (`signal`, `uid`, `route`), or `t` of `kay/i18n`, which kay imported for the file. Every name is imported where it is used since 1.92, in a `.kay` file and in a `.ts` module alike, so code moves between the two unchanged and the import line shows what makes a component an island. The compiler adds the imports until 1.95. One diagnostic per fence, at the first use, and the fix writes the names into the `kay` import the fence has, else as an import of their own at its start, opening a `---` fence for a template with no script. `kay check --fix` also writes the import of any other name a `kay/*` entry exports (`files`, `cached`, `pages`) that a `.kay` or `.ts` file uses with none.',
-    wrong: '---\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
-    right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
-  },
-  'promoted-island': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.92',
-    typed: true,
-    summary: 'A static component that passes an island a function or a block taking parameters, which cannot be sent as data, so the render makes it an island itself when it meets one: a component that is an island or not depending on what a page gives it. Since 1.92 `--- island` says it, and a component without it is an `island-prop` error. The promotion works until 1.95. The fix writes `--- island`, applied by `kay upgrade` where the value is always a function or the block takes parameters, and offered, not applied, where its type is a union holding a function, as the component is static on the pages that pass data. A value the type shows is data, such as an action, reports nothing.',
-    wrong: '---\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
-    right: '--- island\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
   },
   'hydration-mismatch': {
     level: 'deny',
@@ -1124,7 +1099,7 @@ export interface TypeLint {
   message: string
   note: string
   help: string
-  // The value is a function whatever else its type allows, so the fix of an `island-prop` or a `promoted-island` is safe.
+  // The value is a function whatever else its type allows, so the fix of an `island-prop` is safe.
   always?: boolean
 }
 
@@ -1135,7 +1110,7 @@ const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 const SECRET_PROP = 'kayLint: "secret-prop"'
 const CUT_PATHS = /\.\.\. \d+ more/
 const PATHS_SHOWN = 3
-const UNSENDABLE = /kayLint: "(island-prop|promoted-island)"/
+const UNSENDABLE = 'kayLint: "island-prop"'
 const ALWAYS = 'kayAlways: true'
 const SECRET_PATHS = /kayPath: ((?:"[^"]*"|\.\.\. \d+ more \.\.\.)(?: \| (?:"[^"]*"|\.\.\. \d+ more \.\.\.))*)/
 
@@ -1144,7 +1119,7 @@ function secretPath(prop: string | undefined, path: string): string {
 }
 
 // What an island is refused, naming the paths of the functions the type holds when it gives them.
-function unsendable(lint: 'island-prop' | 'promoted-island', message: string, prop: string | undefined): TypeLint {
+function unsendable(message: string, prop: string | undefined): TypeLint {
   const found = SECRET_PATHS.exec(message)?.[1]
   const always = message.includes(ALWAYS)
   const cut = found !== undefined && CUT_PATHS.test(found)
@@ -1157,18 +1132,8 @@ function unsendable(lint: 'island-prop' | 'promoted-island', message: string, pr
   const shown = named.slice(0, PATHS_SHOWN).map(path => `\`${path}\``).join(', ')
   const holds = named.length > 0 ? `${shown}${cut || named.length > PATHS_SHOWN ? ' and more' : ''} ${verb}` : `${subject} ${always ? 'is a function' : 'holds what is not data'}`
 
-  if (lint === 'promoted-island') {
-    return {
-      code: lint,
-      message: `This component passes an island a value that cannot be sent as data (${holds}), so the build makes it an island`,
-      note: 'a component that is an island or not by what it is given was deprecated in 1.92 and goes in 1.95; the render hydrated it only when it met such a value',
-      help: 'write `--- island` in place of `---`, or pass the island data',
-      always,
-    }
-  }
-
   return {
-    code: lint,
+    code: 'island-prop',
     message: `${holds}, and an island is sent its props as data`,
     note: 'an island\'s props are serialized into the page: plain objects, arrays, Dates, Maps, Sets, bigints, URLs, RegExps and actions, but no functions, symbols or class instances',
     help: 'write `--- island` in place of `---` on this component, so it is an island itself, or pass the island data',
@@ -1178,10 +1143,8 @@ function unsendable(lint: 'island-prop' | 'promoted-island', message: string, pr
 
 // `prop` is the attribute the value is handed as, which the type does not carry.
 export function typeLint(message: string, prop?: string): TypeLint | undefined {
-  const refused = UNSENDABLE.exec(message)?.[1]
-
-  if (refused !== undefined)
-    return unsendable(refused as 'island-prop' | 'promoted-island', message, prop)
+  if (message.includes(UNSENDABLE))
+    return unsendable(message, prop)
 
   if (message.includes(SECRET_PROP)) {
     const found = SECRET_PATHS.exec(message)?.[1]

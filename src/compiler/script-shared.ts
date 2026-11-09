@@ -2,7 +2,6 @@ import type { Comment, Node, Program, Statement, TSInterfaceDeclaration, TSTypeA
 import type { Diagnostic, Span } from './ast'
 import type { NodeOfType } from './estree'
 import { isPlainProperty } from './estree'
-import { KAY_VALUES } from './kay-exports'
 
 export const WHITESPACE = /\s/
 export const FIRST_TOKEN = /^[\w$]*/
@@ -10,9 +9,6 @@ export const FIRST_TOKEN = /^[\w$]*/
 export const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 export const BINDABLE_TYPE = 'Bindable'
 export const REMOVED_PROP_TYPES = new Set(['Signal', 'Memo'])
-// What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
-// Each name written as a name of its own, not a member or part of a longer one.
-export const KAY_NAME = new RegExp(`(?:(?<![\\w$.])|(?<=\\.\\.\\.))(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.
@@ -60,8 +56,6 @@ export interface ScriptAnalysis {
   specifiers: Span[]
   // True when the script imports a value from `kay`: it holds client state, so the component becomes an island.
   reactive: boolean
-  // What the script reads of kay's values without declaring or importing it.
-  implicit: string[]
   body: Span[]
   props?: PropsDeclaration
   // The name of the `const card = recipe({ ... })` of the script, which moves to module level so the props type can take its type: the component takes its variant props from it.
@@ -71,8 +65,6 @@ export interface ScriptAnalysis {
   recipeRoot?: boolean | undefined
   // The variants and values of the recipe's literal config, which `src/ui.ts` is checked against; none when the config is not a literal.
   recipeVariants?: Record<string, string[]> | undefined
-  // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
-  functions: string[]
   // The `const` names the component body declares as plain data written out, literals in arrays and objects, which a static parent sends an island whatever type the declaration gives them.
   plain: string[]
   diagnostics: Diagnostic[]

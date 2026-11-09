@@ -27,7 +27,7 @@ const files: Record<string, string> = {
   'rooted.kay': 'header.p-2(part="top") a\nfooter.p-2(part="root") b\n',
   'wrapper.kay': '---\nimport Card from \'./card.kay\'\n---\nCard(title="w" part="root" class="from-wrapper") inside\n',
   'btn.kay': '---\nconst { onClick, class: className, ...rest } = props<{ onClick: () => void, class?: string, [key: string]: unknown }>()\n---\nbutton.btn.p-2({...rest} class={className} onClick={onClick})\n  slot\n',
-  'island.kay': '---\nimport Btn from \'./btn.kay\'\nconst { title, items } = props<{ title: string, items: string[] }>()\nconst count = signal(0)\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n  if count > 0\n    p(part="shown") shown\n  for item of items\n    li(part="item") {item}\n  Btn(part="action" onClick={() => count++}) {count}\n',
+  'island.kay': '---\nimport { signal } from \'kay\'\nimport Btn from \'./btn.kay\'\nconst { title, items } = props<{ title: string, items: string[] }>()\nconst count = signal(0)\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n  if count > 0\n    p(part="shown") shown\n  for item of items\n    li(part="item") {item}\n  Btn(part="action" onClick={() => count++}) {count}\n',
   'link.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na(part="link" href="/x" {...attrs}) go\n',
   'link-class.kay': '---\nconst { attrs } = props<{ attrs: Record<string, unknown> }>()\n---\na.p-2(part="link" href="/x" {...attrs}) go\n',
   '_layout.kay': 'main.p-2(part="page") page\n',

@@ -398,7 +398,7 @@ describe('event handlers', () => {
 describe('what a handler registers', () => {
   const marks = (name: string) => `onCleanup(() => { document.body.dataset.${name} = 'cleaned' })`
   const mountOwned = site({
-    'main.kay': `---\nconst props = { onClick: () => ${marks('spread')} }\n---\nbutton.click(onClick={() => ${marks('click')}}) a\nbutton.focus(onFocus={() => ${marks('focus')}}) b\nform.submit(onSubmit={(event: Event) => { event.preventDefault(); ${marks('submit')} }}) c\nbutton.spread({...props}) d\n`,
+    'main.kay': `---\nimport { onCleanup } from 'kay'\n\nconst props = { onClick: () => ${marks('spread')} }\n---\nbutton.click(onClick={() => ${marks('click')}}) a\nbutton.focus(onFocus={() => ${marks('focus')}}) b\nform.submit(onSubmit={(event: Event) => { event.preventDefault(); ${marks('submit')} }}) c\nbutton.spread({...props}) d\n`,
   })
 
   it('belongs to the island through delegated, direct, held and spread listeners, so it runs once the island goes', async () => {
@@ -426,33 +426,9 @@ describe('what a handler registers', () => {
   })
 })
 
-describe('kay without imports', () => {
-  const mount10 = site({
-    'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\nonCleanup(() => { document.body.dataset.cleaned = \'yes\' })\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
-  })
-
-  it('runs signal, memo, effect, onMount and onCleanup a script uses unimported', async () => {
-    const { root, dispose } = await mount10()
-
-    try {
-      await settle()
-      expect(root.querySelector('button')!.textContent).toBe('2 1 mounted')
-      root.querySelector('button')!.click()
-      await settle()
-      expect(root.querySelector('button')!.textContent).toBe('4 2 mounted')
-      expect(document.body.dataset.cleaned).toBeUndefined()
-    }
-    finally {
-      await dispose()
-    }
-    expect(document.body.dataset.cleaned).toBe('yes')
-    delete document.body.dataset.cleaned
-  })
-})
-
 describe('signals in the template', () => {
   const mount11 = site({
-    'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items(), draft()])}) {count()} items\nif count() > 1\n  p.many many\nul\n  for item of items()\n    li {item}\n',
+    'main.kay': '---\nimport { memo, signal } from \'kay\'\n\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items(), draft()])}) {count()} items\nif count() > 1\n  p.many many\nul\n  for item of items()\n    li {item}\n',
   })
 
   it('read by calling them, in text, conditions, loops and handlers, a bind still writing the signal', async () => {
@@ -520,7 +496,7 @@ describe('signal writes', () => {
   const mount12 = site({
     'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
     'toggle.kay': '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open}) {open ? \'open\' : \'closed\'}\n',
-    'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(bind:open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(bind:open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
   })
 
   it('assigns a signal by name, its own, a module\'s and one a bound prop holds, reads them all by calling them, and binds a component to it', async () => {
@@ -551,7 +527,7 @@ describe('signal writes', () => {
 
   const mountWrites = site({
     'box.ts': 'import { memo, signal } from \'kay\'\n\nexport function makeBox() {\n  const count = signal(0)\n\n  return { count, double: memo(() => count() * 2), plain: 1, handler: Object.assign(() => 0, { set: (_: number) => 0 }), list: [signal(1), signal(2)], name: \'a\' }\n}\n',
-    'main.kay': '---\nimport { makeBox } from \'./box\'\n\nconst box = makeBox()\nlet picked = makeBox().count\nlet label = makeBox().name\nconst plain = { n: 0 }\nconst tick = signal(0)\n\nfunction bump() {\n  box.list[1] = 20\n  label += \'!\'\n}\n---\nbutton.set(onClick={() => box.count = 5}) set\nbutton.add(onClick={() => box.count += 2}) add\nbutton.inc(onClick={() => box.count++}) inc\nbutton.dec(onClick={() => --box.count}) dec\nbutton.list(onClick={bump}) list\nbutton.pick(onClick={() => picked = 7}) pick\nbutton.again(onClick={() => picked++}) again\nbutton.plain(onClick={() => { box.plain = 2; box.name = \'b\'; plain.n++; tick++ }}) plain\nbutton.own(onClick={() => { box.handler = Object.assign(() => 9, { set: (_: number) => 1 }); tick++ }}) own\np.count {box.count()}\np.double {box.double()}\np.list {box.list[0]()} {box.list[1]()}\np.picked {picked()}\np.plain {[tick(), box.plain, box.name, plain.n, label, box.handler()].join(\' \')}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport { makeBox } from \'./box\'\n\nconst box = makeBox()\nlet picked = makeBox().count\nlet label = makeBox().name\nconst plain = { n: 0 }\nconst tick = signal(0)\n\nfunction bump() {\n  box.list[1] = 20\n  label += \'!\'\n}\n---\nbutton.set(onClick={() => box.count = 5}) set\nbutton.add(onClick={() => box.count += 2}) add\nbutton.inc(onClick={() => box.count++}) inc\nbutton.dec(onClick={() => --box.count}) dec\nbutton.list(onClick={bump}) list\nbutton.pick(onClick={() => picked = 7}) pick\nbutton.again(onClick={() => picked++}) again\nbutton.plain(onClick={() => { box.plain = 2; box.name = \'b\'; plain.n++; tick++ }}) plain\nbutton.own(onClick={() => { box.handler = Object.assign(() => 9, { set: (_: number) => 1 }); tick++ }}) own\np.count {box.count()}\np.double {box.double()}\np.list {box.list[0]()} {box.list[1]()}\np.picked {picked()}\np.plain {[tick(), box.plain, box.name, plain.n, label, box.handler()].join(\' \')}\n',
   })
 
   it('writes a signal a property, an element or a let holds by assigning it, and assigns anything else', async () => {
@@ -2773,7 +2749,7 @@ describe('a stream an island starts', () => {
 describe('a form posting an action with fixed fields from an island', () => {
   const mountFixed = site({
     'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const move = action(t.Object({ id: t.Integer(), to: t.Integer() }), ({ id }) => id)\n---\np Page\n',
-    'main.kay': '---\nimport { move } from \'./page.kay\'\n\nconst to = signal(2)\n---\nform(action={move.with({ id: 3, to: to() })})\n  button Up\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport { move } from \'./page.kay\'\n\nconst to = signal(2)\n---\nform(action={move.with({ id: 3, to: to() })})\n  button Up\n',
   })
 
   it('carries them in its action URL and renders no input', async () => {

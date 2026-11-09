@@ -58,7 +58,7 @@ const files: Record<string, string> = {
   'src/untouched.kay': CARD,
   'src/plain.kay': 'section.card\n  header(part="head") a\n',
   'src/no-parts.kay': 'div.box a\n',
-  'src/switch.kay': '---\nimport Card from \'./card.kay\'\nconst tone = signal<\'plain\' | \'danger\'>(\'plain\')\n---\nbutton(onClick={() => tone.set(\'danger\')}) swap\nCard(title="t" tone={tone()}) body\n',
+  'src/switch.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\nconst tone = signal<\'plain\' | \'danger\'>(\'plain\')\n---\nbutton(onClick={() => tone.set(\'danger\')}) swap\nCard(title="t" tone={tone()}) body\n',
   'node_modules/uilib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\nsection.card.p-4\n  header.p-2(part="head") {title}\n',
   'src/entry.ts': 'export { default as Card } from \'./card.kay\'\nexport { default as Untouched } from \'./untouched.kay\'\nexport { default as Plain } from \'./plain.kay\'\nexport { default as Library } from \'uilib/card.kay\'\nexport { default as Switch } from \'./switch.kay\'\nexport { render } from \'kay/dom\'\n',
 }

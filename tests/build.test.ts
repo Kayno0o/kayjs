@@ -124,29 +124,20 @@ describe('kay build', () => {
     await expect(buildClient(root, options)).rejects.toThrow(message)
   })
 
-  it('gives a static component that may render as an island a chunk once it reaches one, directly, through a barrel, a library or a glob, under a linked root too', async () => {
-    const passing = (imports: string) => `---\n${imports}\nimport { go } from '../go'\n---\nIsl(format={go})\n`
+  it('gives an island, and one from a library, a chunk, under a linked root too', async () => {
     const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Card from \'ui-lib/card.kay\'\nimport Isl from \'../cards/isl.kay\'\n---\nCard\nIsl\n',
       'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
       'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
       'node_modules/ui-lib/src/card.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: (n: number) => string }>()\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {format(n())}\n',
       'src/cards/isl.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: (n: number) => string }>()\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {format(n())}\n',
-      'src/go.ts': 'export function go(n: number): string {\n  return String(n)\n}\n',
-      'src/ui/barrel.ts': 'export { default as Isl } from \'../cards/isl.kay\'\n',
-      'src/ui/direct.kay': passing('import Isl from \'../cards/isl.kay\''),
-      'src/ui/barreled.kay': passing('import { Isl } from \'./barrel\''),
-      'src/ui/library.kay': passing('import Isl from \'ui-lib/card.kay\''),
-      'src/ui/glob.kay': passing('const { \'../cards/isl.kay\': Isl } = import.meta.glob(\'../cards/*.kay\', { eager: true, import: \'default\' })'),
-      // Reaching no island, it never renders as one.
-      'src/ui/label.kay': '---\nconst { text } = props<{ text: string }>()\n---\nspan {text}\n',
-      'src/ui/plain.kay': '---\nimport { go } from \'../go\'\nimport Label from \'./label.kay\'\n---\nLabel(text={go(1)})\n',
     })
     const linked = `${root}-linked`
 
     await symlink(root, linked)
 
     try {
-      const islands = ['node_modules/ui-lib/src/card.kay', 'src/cards/isl.kay', 'src/ui/barreled.kay', 'src/ui/direct.kay', 'src/ui/glob.kay', 'src/ui/library.kay']
+      const islands = ['node_modules/ui-lib/src/card.kay', 'src/cards/isl.kay']
 
       expect(Object.keys((await buildClient(root)).islands).sort()).toEqual(islands)
       // Bun resolves imports to real paths, which a project's own modules are found under too.
@@ -289,7 +280,7 @@ describe('kay build', () => {
     const project = await scratchDir('kay-worker-kept-')
     const files = {
       'src/echo.ts': 'postMessage(1)\n',
-      'src/lab.kay': '---\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
+      'src/lab.kay': '---\nimport { onMount } from \'kay\'\n\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
       'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
     }
 
@@ -336,7 +327,7 @@ describe('kay build', () => {
     const files = {
       'src/inner.ts': 'postMessage(1)\n',
       'src/echo.ts': 'new Worker(new URL(\'./inner.ts\', import.meta.url), { type: \'module\' })\n',
-      'src/lab.kay': '---\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
+      'src/lab.kay': '---\nimport { onMount } from \'kay\'\n\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n})\n---\np lab\n',
       'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
     }
 
@@ -727,7 +718,7 @@ describe('kay build', () => {
       'src/commented.ts': 'postMessage(1)\n',
       // Each left as written: a directory, an absolute path, a template with a part, and a call a comment shows.
       'src/others.ts': '// new Worker(new URL("./commented.ts", import.meta.url))\nexport const others = (name: string) => [new URL("./data", import.meta.url), new URL("/abs.js", import.meta.url), new URL(`./${name}.js`, import.meta.url)]\n',
-      'src/lab.kay': '---\nimport { scan } from \'scanner\'\nimport { missing, start, wasm } from \'threads\'\nimport add from \'./add.wasm\'\nimport { others } from \'./others\'\n\nonMount(() => {\n  others(\'x\')\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n  start()\n  void scan()\n  void WebAssembly.instantiateStreaming(fetch(add))\n  void fetch(wasm())\n  void fetch(missing())\n})\n---\np lab\n',
+      'src/lab.kay': '---\nimport { scan } from \'scanner\'\nimport { missing, start, wasm } from \'threads\'\nimport add from \'./add.wasm\'\nimport { others } from \'./others\'\nimport { onMount } from \'kay\'\n\nonMount(() => {\n  others(\'x\')\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n  start()\n  void scan()\n  void WebAssembly.instantiateStreaming(fetch(add))\n  void fetch(wasm())\n  void fetch(missing())\n})\n---\np lab\n',
       'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
     }
 
@@ -775,7 +766,7 @@ describe('kay build', () => {
 
       return ''
     }
-    const lab = (worker: string) => `---\nonMount(() => {\n  new Worker(new URL('./${worker}', import.meta.url), { type: 'module' })\n})\n---\np lab\n`
+    const lab = (worker: string) => `---\nimport { onMount } from 'kay'\n\nonMount(() => {\n  new Worker(new URL('./${worker}', import.meta.url), { type: 'module' })\n})\n---\np lab\n`
 
     try {
       await Promise.all([
@@ -1845,36 +1836,6 @@ describe('what a build keeps in memory', () => {
     expect(after).not.toContain('text-red-500')
   })
 
-  it('builds again from a changed module that an earlier build of the process read for its imports', async () => {
-    const root = await scratchProject({
-      'src/clicks.kay': 'button(type="button" onClick={() => {}}) Go\n',
-      'src/link.ts': 'import \'./clicks.kay\'\n',
-      'src/other.kay': '---\nimport \'./link\'\n---\np Other\n',
-      'src/wrap.kay': '---\nimport Other from \'./other.kay\'\n\nfunction pick() {}\n---\nOther(format={pick})\n',
-      'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\nimport Clicks from \'../clicks.kay\'\n---\nWrap\nClicks\n',
-    })
-    const promoted = async () => (await buildClient(root, { minify: true, report: 'sizes' })).report!.islands.filter(island => island.promoted).map(island => island.file)
-
-    expect(await promoted()).toEqual(['src/wrap.kay'])
-
-    await Bun.write(join(root, 'src/link.ts'), 'export {}\n')
-    expect(await promoted()).toEqual([])
-  })
-
-  it('promotes no component for tiles built from icons another module exports, as kay check reads them', async () => {
-    const root = await scratchProject({
-      'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }),
-      'src/app-icons.ts': 'import Home from \'~icons/tabler/home\'\n\nexport const APP_ICONS = { a: Home }\n',
-      'src/apps.ts': 'export const APPS = [{ id: \'a\', name: \'A\' }] as const\n',
-      'src/clicks.kay': '---\nconst { tiles } = props<{ tiles: unknown }>()\n---\nbutton(type="button" onClick={() => {}}) {String(tiles)}\n',
-      'src/tiles.kay': '---\nimport Clicks from \'./clicks.kay\'\nimport { APP_ICONS } from \'./app-icons\'\nimport { APPS } from \'./apps\'\n\nconst tiles = APPS.map(app => ({ ...app, icon: APP_ICONS[app.id] }))\n---\nClicks(tiles={tiles})\n',
-      'src/routes/index.kay': '---\nimport Tiles from \'../tiles.kay\'\n---\nTiles\n',
-    })
-    const promoted = async () => (await buildClient(root, { minify: true, report: 'sizes' })).report!.islands.filter(island => island.promoted).map(island => island.file)
-
-    expect(await promoted()).toEqual([])
-  })
-
   it('finds the runtime chunk once while the modules it was found in, and what the key says, stay as they were', async () => {
     const dir = resolve(await scratchDir('kay-runtime-'))
     const entry = join(dir, 'out/entry.ts')
@@ -2268,7 +2229,7 @@ describe('the size report', () => {
     expect(printed.split('\n').at(-1)).toBe('      an island because of `onClick`, line 6')
   })
 
-  it('says what makes each component an island, and what may make a static one', async () => {
+  it('says what makes each component an island', async () => {
     const root = await scratchProject({
       'src/clicks.kay': 'button(type="button" onClick={() => {}}) Go\n',
       'src/field.kay': '---\nlet text = \'\'\n---\ninput(bind:value={text})\n',
@@ -2276,8 +2237,7 @@ describe('the size report', () => {
       'src/client.kay': '--- client\nconst x = 1\n---\np {x}\n',
       'src/handle.kay': '---\nlet el\n---\ndiv(ref={el}) Here\n',
       'src/ago.kay': '---\nimport { relativeTime } from \'kay/i18n\'\n---\np {relativeTime(new Date())}\n',
-      'src/wrap.kay': '---\nimport Clicks from \'./clicks.kay\'\n\nfunction pick() {}\n---\np Wrapped\nClicks(format={pick})\n',
-      'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Wrap from \'../wrap.kay\'\nimport Handle from \'../handle.kay\'\nimport Ago from \'../ago.kay\'\n---\nClicks\nField\nState\nClient\nWrap\nHandle\nAgo\n',
+      'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Handle from \'../handle.kay\'\nimport Ago from \'../ago.kay\'\n---\nClicks\nField\nState\nClient\nHandle\nAgo\n',
     })
 
     const { report } = await buildClient(root, { minify: true, report: 'sizes' })
@@ -2290,9 +2250,7 @@ describe('the size report', () => {
       'src/client.kay': 'a `--- client` fence',
       'src/handle.kay': '`ref`, line 4',
       'src/ago.kay': '`relativeTime` from kay/i18n',
-      'src/wrap.kay': '`format` passed to Clicks, line 7',
     })
-    expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])
     // The same cause as data, which `kay build --format json` carries beside the sentence.
     expect(Object.fromEntries(report!.islands.map(island => [island.file, island.cause]))).toEqual({
       'src/clicks.kay': { kind: 'attribute', name: 'onClick', line: 1 },
@@ -2301,9 +2259,7 @@ describe('the size report', () => {
       'src/client.kay': { kind: 'client', name: '--- client', line: 1 },
       'src/handle.kay': { kind: 'attribute', name: 'ref', line: 4 },
       'src/ago.kay': { kind: 'value', name: 'relativeTime', line: 2 },
-      'src/wrap.kay': { kind: 'prop', name: 'format', line: 7, target: 'Clicks' },
     })
-    expect(formatSizeReport(report!)).toContain('static unless it passes an island what only an island sends: `format` passed to Clicks, line 7')
   })
 
   it('reports no JavaScript bundle for a site with no island', () => {

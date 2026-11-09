@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../src/compiler/ast'
 import { describe, expect, it } from 'bun:test'
-import { browserRole, compileKay, promotedChecks, rendersAsIsland } from '../src/compiler'
+import { browserRole, compileKay, rendersAsIsland } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
 
 const part = 'src/components/part.kay'
@@ -9,7 +9,7 @@ const pins = (source: string, filename = part, options = {}) => compileKay(sourc
 const apply = (source: string, diagnostic: Diagnostic) => diagnostic.fixes![0]!.edits.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
 
 const handler = 'button(onClick={() => 1}) b\n'
-const promoting = '---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
+const passing = '---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
 
 describe('the island and static fence lines', () => {
   it('reads `--- island` and `--- static` as the script fence, generic ones included', () => {
@@ -60,13 +60,12 @@ describe('--- island', () => {
     expect(compileKay(source, part).why).toBe('a `--- island` fence')
   })
 
-  it('keeps a component that passes a function an island rather than a promotion', () => {
-    const pinned = promoting.replace('---\n', '--- island\n')
-    const compiled = compileKay(pinned, part)
+  it('makes a component that passes a function an island, which the same component without it is not', () => {
+    const pinned = passing.replace('---\n', '--- island\n')
 
-    expect(compiled.island).toBeDefined()
-    expect(compiled.promote).toBeUndefined()
-    expect(promotedChecks(pinned)).toEqual([])
+    expect(compileKay(pinned, part).island).toBeDefined()
+    expect(compileKay(passing, part).island).toBeUndefined()
+    expect(compileKay(passing, part, { output: 'html', hydratable: true }).tsx).not.toContain('KayPromote')
   })
 
   it('stays static in a page, a layout or a special page, and says so', () => {
@@ -118,13 +117,12 @@ describe('--- static', () => {
     expect(pins('--- static\nlet node\n---\ndiv(ref={node})\n')).toHaveLength(1)
   })
 
-  it('is never promoted, so what it passes an island that cannot be sent is the `island-prop` error of the types', () => {
-    const source = promoting.replace('---\n', '--- static\n')
+  it('is no island, so what it passes an island that cannot be sent is the `island-prop` error of the types', () => {
+    const source = passing.replace('---\n', '--- static\n')
 
-    expect(promotedChecks(source)).toEqual([])
     expect(pins(source)).toEqual([])
     expect(browserRole(source, part)).toBeUndefined()
-    expect(compileKay(source, part, { output: 'html', hydratable: true }).promote).toBeUndefined()
+    expect(compileKay(source, part, { output: 'html', hydratable: true }).island).toBeUndefined()
   })
 
   it('is an error for a live value, and not for a route file, which is never an island', () => {
@@ -159,62 +157,17 @@ describe('--- static', () => {
   })
 })
 
-describe('island-comment', () => {
-  const found = (source: string, filename = part) => compileKay(source, filename, { check: true }).diagnostics.filter(diagnostic => diagnostic.code === 'island-comment')
+describe('the old comments', () => {
+  it('pin nothing since 1.95: a `// kay-island` or `// kay-static` comment is a comment', () => {
+    for (const word of ['island', 'static']) {
+      const source = `---\n// kay-${word}\nconst a = 1\n---\n${handler}`
+      const compiled = compileKay(source, part, { check: true })
 
-  it('rewrites `// kay-island` and `// kay-static` into the fence line, and what is left reports nothing', () => {
-    for (const [word, pin] of [['island', 'island'], ['static', 'static']] as const) {
-      const source = `---\n// kay-${word}\nconst a = 1\n---\np {a}\n`
-      const [lint] = found(source)
-
-      expect(slice(source, lint!)).toBe(`// kay-${word}`)
-      expect(lint!.fixes![0]!.safe).toBe(word === 'static')
-
-      const fixed = apply(source, lint!)
-
-      expect(fixed).toBe(`--- ${pin}\nconst a = 1\n---\np {a}\n`)
-      expect(found(fixed)).toEqual([])
+      expect(compiled.diagnostics.filter(diagnostic => diagnostic.code === 'island-comment' || diagnostic.code === 'static-pin')).toEqual([])
+      expect(compiled.island).toBeDefined()
     }
-  })
 
-  it('keeps the type parameters, a named script fence and an indented marker', () => {
-    expect(apply('--- <T>\n// kay-island\nconst { a } = props<{ a: T }>()\n---\np {a}\n', found('--- <T>\n// kay-island\nconst { a } = props<{ a: T }>()\n---\np {a}\n')[0]!)).toBe('--- island <T>\nconst { a } = props<{ a: T }>()\n---\np {a}\n')
-
-    const named = '--- script\n  // kay-island\nconst a = 1\n---\np {a}\n'
-
-    expect(apply(named, found(named)[0]!)).toBe('--- island\nconst a = 1\n---\np {a}\n')
-  })
-
-  it('only deletes the comment when a fence says it already', () => {
-    const source = '--- island\n// kay-island\nconst a = 1\n---\np {a}\n'
-
-    expect(apply(source, found(source)[0]!)).toBe('--- island\nconst a = 1\n---\np {a}\n')
-
-    const client = '--- client\n// kay-island\nconst a = 1\n---\np {a}\n'
-
-    expect(apply(client, found(client)[0]!)).toBe('--- client\nconst a = 1\n---\np {a}\n')
-  })
-
-  it('offers no fix where the comment cannot become the fence line', () => {
-    const noScript = '--- module\n// kay-island\nexport const a = 1\n---\np\n'
-    const clientStatic = '--- client\n// kay-static\nconst a = 1\n---\np {a}\n'
-
-    expect(found(noScript).map(lint => lint.fixes)).toEqual([undefined])
-    expect(found(clientStatic).map(lint => lint.fixes)).toEqual([undefined])
-  })
-
-  it('ignores text that only looks like the comment', () => {
-    expect(found('---\nconst md = `\n// kay-island\n`\n---\np {md}\n')).toEqual([])
-    expect(found('---\nconst a = 1 // kay-island\n---\np {a}\n')).toEqual([])
-    expect(found('p // kay-island\n')).toEqual([])
-    expect(found('---\n// kay-islands\n---\np\n')).toEqual([])
-  })
-
-  it('still holds a component to the comment while it lasts', () => {
-    const contradicted = `---\n// kay-static\nconst a = 1\n---\n${handler}`
-
-    expect(pins(contradicted).map(diagnostic => slice(contradicted, diagnostic))).toEqual(['onClick'])
-    expect(browserRole(`---\n// kay-static\n${promoting.slice(4)}`, part)).toBeUndefined()
+    expect(browserRole(`---\n// kay-island\n${passing.slice(4)}`, part)).toBeUndefined()
   })
 })
 
@@ -222,11 +175,9 @@ describe('island-marker', () => {
   it('is only a pin on a route file now', () => {
     const marker = (source: string, filename = part) => compileKay(source, filename, { check: true }).diagnostics.filter(diagnostic => diagnostic.code === 'island-marker')
 
-    expect(marker('---\n// kay-island\nconst a = 1\n---\np {a}\n')).toEqual([])
-    expect(marker('---\n// kay-island\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toHaveLength(1)
+    expect(marker('---\n// kay-island\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toEqual([])
     expect(marker('--- island\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toHaveLength(1)
     expect(marker('--- static\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay')).toEqual([])
-    expect(marker('---\n// kay-static\nconst a = 1\n---\np {a}\n')).toEqual([])
   })
 })
 
@@ -241,7 +192,7 @@ describe('beside the pin', () => {
     }
   })
 
-  it('does not error on a static pin whose promotion site hands a plain child a function', () => {
+  it('does not error on a static pin that hands a plain child a function', () => {
     expect(pins('--- static\nimport Child from \'./plain.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n')).toEqual([])
   })
 })

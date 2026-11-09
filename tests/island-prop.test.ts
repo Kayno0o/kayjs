@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { applySafeFixes, check as checkProject } from '../src/check'
-import { browserRole, compileKay, promotedChecks } from '../src/compiler'
+import { browserRole, compileKay } from '../src/compiler'
 import { islandFence } from '../src/compiler/island-marker'
 import { parseKay } from '../src/compiler/parser'
 import { child } from '../src/runtime/html'
@@ -12,6 +12,7 @@ import { IslandPropsError, island as makeIsland } from '../src/runtime/island.se
 import { limiter } from '../src/server/limit'
 import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
+import { pages } from './shared-pages'
 
 setDefaultTimeout(90_000)
 
@@ -30,7 +31,7 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 const check = async (root: string, options?: Parameters<typeof checkProject>[1]) => turn(async () => checkProject(root, options))
-const reported = (found: Awaited<ReturnType<typeof check>>) => found.filter(diagnostic => diagnostic.code === 'island-prop' || diagnostic.code === 'promoted-island')
+const reported = (found: Awaited<ReturnType<typeof check>>) => found.filter(diagnostic => diagnostic.code === 'island-prop')
 const lints = (found: Awaited<ReturnType<typeof check>>, root: string) => reported(found).map(diagnostic => [diagnostic.file.slice(root.length + 5), diagnostic.code, diagnostic.line] as const).toSorted()
 const apply = (source: string, diagnostic: Pick<Diagnostic, 'fixes'>) => diagnostic.fixes![0]!.edits.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
 
@@ -58,7 +59,7 @@ function files(extra: Record<string, string> = {}) {
     'src/components/plain.kay': component('import { rows, when } from \'../data\'', 'Island(v={[rows, when]})\nIsland(v={rows.map(row => row + 1)})'),
     'src/components/untyped.kay': component('import { anything, unknownValue } from \'../data\'', 'Island(v={anything})\nIsland(v={unknownValue})'),
     'src/components/markup.kay': component('import { rows } from \'../data\'', 'Island(v={rows})\n  @row\n    p hi\n'),
-    // A function: promoted by the build, so the deprecated lint; static, so the error.
+    // A function, a block with parameters or a class instance: the error, in a static component.
     'src/components/script.kay': component('function pick() {}', 'Island(v={pick})'),
     'src/components/imported.kay': component('import { shout } from \'../data\'', 'Island(v={shout})'),
     'src/components/member.kay': component('import { handlers } from \'../data\'', 'Island(v={handlers.select})'),
@@ -79,7 +80,7 @@ function files(extra: Record<string, string> = {}) {
   }
 }
 
-describe('island-prop and promoted-island, decided by the types of what is passed', () => {
+describe('island-prop, decided by the types of what is passed', () => {
   it('reports a function from the type, and nothing for data a heuristic would have doubted', async () => {
     const root = await project(files())
 
@@ -87,15 +88,15 @@ describe('island-prop and promoted-island, decided by the types of what is passe
       const found = await check(root)
 
       expect(lints(found, root)).toEqual([
-        ['components/block.kay', 'promoted-island', 6],
+        ['components/block.kay', 'island-prop', 6],
         ['components/callback.kay', 'island-prop', 5],
-        ['components/fields.kay', 'promoted-island', 5],
-        ['components/imported.kay', 'promoted-island', 5],
-        ['components/inline.kay', 'promoted-island', 5],
+        ['components/fields.kay', 'island-prop', 5],
+        ['components/imported.kay', 'island-prop', 5],
+        ['components/inline.kay', 'island-prop', 5],
         ['components/instance.kay', 'island-prop', 5],
-        ['components/member.kay', 'promoted-island', 5],
+        ['components/member.kay', 'island-prop', 5],
         ['components/pinned.kay', 'island-prop', 5],
-        ['components/script.kay', 'promoted-island', 5],
+        ['components/script.kay', 'island-prop', 5],
         ['components/spread.kay', 'island-prop', 5],
         ['components/union.kay', 'island-prop', 5],
         ['routes/_layout.kay', 'island-prop', 4],
@@ -110,7 +111,7 @@ describe('island-prop and promoted-island, decided by the types of what is passe
       expect(by('spread.kay').message).toBe('`onSelect` is a function, and an island is sent its props as data')
       expect(by('fields.kay').message).toContain('`v.onPick` is a function')
       expect(by('block.kay').message).toContain('`row` is a function')
-      expect(by('script.kay')).toMatchObject({ severity: 'warning', message: expect.stringContaining('`v` is a function') })
+      expect(by('script.kay')).toMatchObject({ severity: 'error', message: expect.stringContaining('`v` is a function') })
       expect(by('index.kay').fixes).toBeUndefined()
       expect(by('index.kay').help).toContain('never an island')
     }
@@ -145,8 +146,7 @@ describe('island-prop and promoted-island, decided by the types of what is passe
     const root = await project(files())
 
     try {
-      expect(reported(await check(root, { lints: { 'island-prop': 'allow', 'promoted-island': 'allow' } }))).toEqual([])
-      expect((await check(root, { lints: { 'promoted-island': 'deny' } })).find(diagnostic => diagnostic.code === 'promoted-island')?.severity).toBe('error')
+      expect(reported(await check(root, { lints: { 'island-prop': 'allow' } }))).toEqual([])
 
       await applySafeFixes(root, await check(root))
 
@@ -183,38 +183,31 @@ describe('the fence line island-prop writes', () => {
     }
   })
 
-  it('deletes a `// kay-static` comment in the same fix, so no comment contradicts the fence', () => {
-    const source = '---\n// kay-static\nconst a = 1\n---\np {a}\n'
-
-    expect(written(source)).toBe('--- island\nconst a = 1\n---\np {a}\n')
-    expect(islandFence(parseKay('---\n// kay-island\nconst a = 1\n---\np {a}\n'))!.edits).toHaveLength(1)
-  })
-
   it('writes nothing for an island already or a component that renders on the server only', () => {
     for (const source of ['--- island\n---\np\n', '--- client\n---\np\n', '--- server\nconst a = 1\n---\np {a}\n'])
       expect(fence(source)).toBeUndefined()
   })
 })
 
-describe('--- static, with the promotion gone to the types', () => {
+describe('--- static, and a component with no pin, both left to the types', () => {
   const passing = (fence: string) => `${fence}\nimport Picker from './picker.kay'\nfunction shout() {}\n---\nPicker(format={shout})\n`
 
-  it('never promotes: the role is static and the compile has no promote', () => {
-    expect(browserRole(passing('---'), 'src/components/part.kay')).toBe('promotable')
-    expect(compileKay(passing('---'), 'src/components/part.kay', { output: 'html', hydratable: true }).promote).toBeDefined()
-
-    for (const pinned of [passing('--- static'), passing('---').replace('---\n', '---\n// kay-static\n')]) {
+  it('stays static whatever it passes: the role is none and the render is no island', () => {
+    for (const pinned of [passing('---'), passing('--- static')]) {
       expect(browserRole(pinned, 'src/components/part.kay')).toBeUndefined()
-      expect(compileKay(pinned, 'src/components/part.kay', { output: 'html', hydratable: true }).promote).toBeUndefined()
-      expect(promotedChecks(pinned)).toEqual([])
+
+      const compiled = compileKay(pinned, 'src/components/part.kay', { output: 'html', hydratable: true })
+
+      expect(compiled.island).toBeUndefined()
+      expect(compiled.tsx).not.toContain('KayPromote')
     }
   })
 
-  it('types what it passes an island as a static component, and what a promotable one passes as the deprecated lint', () => {
+  it('types what it passes an island as a static component, pinned or not', () => {
     expect(compileKay(passing('--- static'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
-    expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayPromotedProp(Picker)')
+    expect(compileKay(passing('---'), 'src/components/part.kay', { check: true }).tsx).toContain('KayProp(Picker)')
     expect(compileKay('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
-    expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayPromotedFunctionProp(Picker)')
+    expect(compileKay('---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n', 'src/components/part.kay', { check: true }).tsx).toContain('KayFunctionProp(Picker)')
   })
 })
 
@@ -224,7 +217,7 @@ describe('--- static, passing what cannot be sent as data', () => {
     const literal = '--- static\nimport Table from \'./table.kay\'\n---\nTable(format={() => 1})\n'
     const block = '--- static\nimport Table from \'./table.kay\'\n---\nTable\n  @row(item)\n    p {item}\n'
 
-    for (const source of [local, literal, block, literal.replace('--- static', '---\n// kay-static')])
+    for (const source of [local, literal, block])
       expect(compileKay(source, 'src/components/part.kay', { output: 'html' }).diagnostics).toEqual([])
   })
 
@@ -257,8 +250,8 @@ describe('--- static, passing what cannot be sent as data', () => {
   })
 })
 
-describe('the lints around libraries and `// kay-island`', () => {
-  it('hides `promoted-island` in a library\'s component, which is the library\'s to migrate, and keeps it in the app\'s', async () => {
+describe('the lints around libraries', () => {
+  it('reports `island-prop` in a library\'s component as in the app\'s', async () => {
     const passing = '---\nimport Island from \'./island.kay\'\nfunction pick() {}\n---\nIsland(v={pick})\n'
     const root = await project({
       'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
@@ -273,22 +266,7 @@ describe('the lints around libraries and `// kay-island`', () => {
     try {
       const found = await check(root)
 
-      expect(found.filter(diagnostic => diagnostic.code === 'promoted-island').map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/components/own.kay'])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('reports nothing for a `// kay-island` comment, which already accepts the promotion', async () => {
-    const root = await project({
-      'src/components/island.kay': island,
-      'src/components/said.kay': component('// kay-island\nfunction pick() {}', 'Island(v={pick})'),
-      'src/routes/index.kay': '---\nimport Said from \'../components/said.kay\'\n---\nSaid\n',
-    })
-
-    try {
-      expect(reported(await check(root))).toEqual([])
+      expect(found.filter(diagnostic => diagnostic.code === 'island-prop').map(diagnostic => diagnostic.file.slice(root.length + 1)).toSorted()).toEqual(['node_modules/ui-lib/src/card.kay', 'src/components/own.kay'])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -304,4 +282,31 @@ describe('IslandPropsError', () => {
     expect(() => child(Picker({ format: () => 1 }))).toThrow('write `--- island` in the component passing it')
     expect(() => child(Picker({ format: Symbol('x') as never }))).toThrow('`island-prop`')
   })
+})
+
+describe('a static page passing an island a function', () => {
+  const picker = '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\nconst picked = signal(\'a\')\n---\nbutton(onClick={() => picked.set(format(picked()))}) {picked()}\n'
+  const page = '---\nimport Picker from \'./picker.kay\'\n\nconst shout = (value: string) => value.toUpperCase()\n---\nPicker(format={shout})\n'
+
+  for (const dev of [false, true]) {
+    for (const base of ['', '/repo']) {
+      it(`fails the render naming the prop, and promotes nothing, ${dev ? 'dev' : 'production'}, base ${base || 'unset'}`, async () => {
+        const root = await scratchDir('island-prop-render-')
+
+        try {
+          await Promise.all([Bun.write(join(root, 'routes/picker.kay'), picker), Bun.write(join(root, 'routes/index.kay'), page)])
+
+          const app = await pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, dev, base: base || undefined, observe: { log: false } })
+          const response = await app.handle(new Request('http://localhost/'))
+
+          expect(response.status).toBe(500)
+          expect(dev ? await response.text() : '`format` prop').toContain('`format` prop')
+          expect(compileKay(page, join(root, 'routes/index.kay'), { root }).island).toBeUndefined()
+        }
+        finally {
+          await rm(root, { recursive: true, force: true })
+        }
+      })
+    }
+  }
 })

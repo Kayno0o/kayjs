@@ -6,11 +6,9 @@ import type { Unchanged } from './module-state'
 import { relative } from 'node:path'
 import { findProjectFiles, readSource, resolveFrom } from '../build/files'
 import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
-import { parseExpanded } from '../compiler/markdown-block'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
-import { analyzeScript, analyzeServer } from '../compiler/script'
-import { templateReads } from '../compiler/template-reads'
+import { analyzeServer } from '../compiler/script'
 import { CONTENT_EXPORTS, I18N_EXPORTS, IMAGE_EXPORTS, KAY_EXPORTS } from './kept-exports'
 import { readKeptSource } from './kept-source'
 import { literalOf, neverWritten } from './literal-writes'
@@ -287,8 +285,8 @@ function impureNames(specifier: string, { names, withDefault }: KeptImport, read
   })
 }
 
-// Why a page importing `impure` of a kay entry is not kept, `implicit` when the file reads them with no import.
-function impureWhy(specifier: string, impure: KeptImport['names'], implicit: boolean): string {
+// Why a page importing `impure` of a kay entry is not kept.
+function impureWhy(specifier: string, impure: KeptImport['names']): string {
   const what = impure === undefined ? 'the whole module' : impure.map(({ text }) => `\`${text}\``).join(', ')
 
   if (specifier === 'kay/image')
@@ -297,7 +295,7 @@ function impureWhy(specifier: string, impure: KeptImport['names'], implicit: boo
   if (specifier === 'kay/content' && impure !== undefined && impure.every(({ own }) => own === 'collection'))
     return 'calls `collection` with something other than a folder written as a string, a loader that may read a database or refresh on a `ttl`, which no rebuild tells the page of'
 
-  return `${implicit ? 'reads' : 'imports'} ${what} from \`${specifier}\`, which a request or the clock can change`
+  return `imports ${what} from \`${specifier}\`, which a request or the clock can change`
 }
 
 async function scanned(file: string, root: string | undefined, scans: object): Promise<Scan> {
@@ -332,17 +330,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   }
 
   const taken = new Map<string, ReadonlySet<string> | 'all'>()
-  const imports: (KeptImport & { implicit?: boolean })[] = [...read.imports]
-
-  // What a `.kay` file reads of `kay` with no import is judged as if it imported it.
-  if (file.endsWith('.kay')) {
-    const { file: parts } = parseExpanded(source)
-    const server = analyzeServer(parts.source, parts.server)
-    const implicit = [...new Set([...analyzeScript(parts.source, parts.script, server?.data.map(({ name }) => name), templateReads(parts), parts.module).implicit, ...server?.implicit ?? []])]
-
-    if (implicit.length > 0)
-      imports.push({ specifier: 'kay', at: 0, names: implicit.map(name => ({ own: name, local: name, text: name })), withDefault: false, typesOnly: false, implicit: true })
-  }
+  const imports: KeptImport[] = [...read.imports]
 
   // The first stop in the file is the one named.
   imports.sort((a, b) => a.at - b.at)
@@ -357,7 +345,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
       const impure = impureNames(specifier, imported, read)
 
       if (impure === undefined || impure.length > 0)
-        return stopAt(at, impureWhy(specifier, impure, imported.implicit === true))
+        return stopAt(at, impureWhy(specifier, impure))
 
       continue
     }

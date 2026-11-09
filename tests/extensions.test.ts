@@ -450,7 +450,7 @@ const LOCAL_CHECKED: Record<string, string> = {
   'linked/unused.kay': '---\nconst wrong: number = \'unreached\'\n---\nspan {wrong}\n',
   // An editor alone, no routes beside it, and what it reaches.
   'edit/package.json': JSON.stringify({ name: 'edit' }),
-  'edit/editor.kay': '---\nimport Part from \'./part.kay\'\n\nconst wrong: number = \'editor\'\nonCleanup(() => undefined)\nnope()\n---\nPart\np {wrong}\n',
+  'edit/editor.kay': '---\nimport { onCleanup } from \'kay\'\nimport Part from \'./part.kay\'\n\nconst wrong: number = \'editor\'\nonCleanup(() => undefined)\nnope()\n---\nPart\np {wrong}\n',
   'edit/part.kay': '---\nimport { label } from \'./labels\'\n\nconst wrong: number = \'edited\'\n---\nspan {wrong} {label}\n',
   'edit/labels.ts': 'const wrong: number = \'editmodule\'\n\nexport const label = `${wrong}`\n',
   // Listed through the link a workspace gives, its routes under `node_modules` by path but not for real.
@@ -580,7 +580,7 @@ describe('an extension listed from beside the app', () => {
       expect(output).toContain('Type \'number\' is not assignable to type \'string\'.\n --> ../lib/routes/codes/[id=code]/label.kay:2:')
       expect(output).toContain('--> ../lib/routes/[slug].kay:3:')
       expect([...output.matchAll(/serves (\S+?)"/g)].map(match => match[1])).toEqual(['/auth/no/such/page', '/auth/no/such/page'])
-      // A name the compiled script does not get, as `onCleanup` now does.
+      // A name the script never declares or imports is an error, `onCleanup` imported from kay is not.
       expect(output).toContain('Cannot find name \'nope\'.')
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
       expect(output).toContain('14 errors')

@@ -483,6 +483,7 @@ describe('kay lsp', () => {
     const page = 'site/src/routes/lints.kay'
     const source = [
       '---',
+      'import { signal } from \'kay\'',
       'const { todos } = props<{ todos: { id: number }[] }>()',
       '// kay-allow unread-name',
       'const idle = 1',
@@ -506,10 +507,10 @@ describe('kay lsp', () => {
     const checked = (await check(join(workspace, 'site'))).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
 
     // The index of a positionally keyed for whose rows do not read it is no unread name.
-    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[4, 2, 'implicit-import'], [7, 2, 'positional-key'], [9, 2, 'positional-key'], [13, 1, 2774]])
+    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[8, 2, 'positional-key'], [10, 2, 'positional-key'], [14, 1, 2774]])
     expect(published).toEqual(checked)
     // That index renames with its key.
-    expect(spots((await editor.rename(page, 9, 10, 'index'))[page]!)).toEqual([[9, 10, 11], [9, 26, 27]])
+    expect(spots((await editor.rename(page, 10, 10, 'index'))[page]!)).toEqual([[10, 10, 11], [10, 26, 27]])
   })
 })
 
@@ -605,11 +606,11 @@ describe('kay lsp imports', () => {
     const hoverOf = async (source: string) => {
       await editor.change(page, source, 20)
 
-      return JSON.stringify((await editor.request<Hover>('textDocument/hover', page, 5, 5)).contents)
+      return JSON.stringify((await editor.request<Hover>('textDocument/hover', page, 6, 5)).contents)
     }
 
-    const parsed = await hoverOf('---\nconst items = signal([1, 2])\nconst total = items.length\n---\nfor row of items\n  p {row}\n')
-    const typing = await hoverOf('---\nconst items = signal([1, 2])\nconst total = items.\n---\nfor row of items\n  p {row}\n')
+    const parsed = await hoverOf('---\nimport { signal } from \'kay\'\nconst items = signal([1, 2])\nconst total = items.length\n---\nfor row of items\n  p {row}\n')
+    const typing = await hoverOf('---\nimport { signal } from \'kay\'\nconst items = signal([1, 2])\nconst total = items.\n---\nfor row of items\n  p {row}\n')
 
     expect(parsed).toContain('number')
     expect(typing).toBe(parsed)
@@ -642,18 +643,16 @@ describe('kay lsp imports', () => {
     expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
   })
 
-  it('offers the import of a name kay adds as a quick fix, and in the fixes of the whole file', async () => {
-    const source = '---\nconst count = signal(0)\n---\np {count()} {t(\'hi\')}\n'
+  it('reports a name of kay nothing imports as a type error, and offers its import as a quick fix', async () => {
+    const source = '---\nconst count = signal(0)\n---\np {count()}\n'
     const diagnostics = await editor.change(page, source, 5)
-    const lint = diagnostics.filter(diagnostic => diagnostic.code === 'implicit-import')
+    const missing = diagnostics.filter(diagnostic => diagnostic.code === 2304)
     const range = { start: { line: 1, character: 14 }, end: { line: 1, character: 20 } }
-    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: lint } })
-    const all = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: lint, only: ['source.fixAll'] } })
-    const written = '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst count = signal(0)\n---\np {count()} {t(\'hi\')}\n'
+    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: missing } })
 
-    expect(lint).toHaveLength(1)
-    expect(actions.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!))).toContain(written)
-    expect(all.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!))).toEqual([written])
+    expect(missing).toHaveLength(1)
+    expect(diagnostics.some(diagnostic => diagnostic.code === 'implicit-import')).toBe(false)
+    expect(actions.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!)).some(text => text.includes('import { signal } from \'kay\''))).toBe(true)
   })
 
   it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {
@@ -1875,6 +1874,7 @@ const HINTS_PAGE = [
   'const label = \'😀é\'; const sum = compute(3, 4)',
   '---',
   '---',
+  'import { signal } from \'kay\'',
   'const clicks = signal(0)',
   'function double(value: number) { return value * 2 }',
   'const twice = double(5)',
@@ -2072,12 +2072,12 @@ describe('kay lsp editor features of an app under a base', () => {
         '3:41 left:',
         '3:44 right:',
         // The script of the island, and an argument in the template.
-        '6:12 : Signal<number>',
-        '6:22 value:',
-        '7:30 : number',
-        '8:11 : number',
-        '8:21 value:',
-        '11:10 value:',
+        '7:12 : Signal<number>',
+        '7:22 value:',
+        '8:30 : number',
+        '9:11 : number',
+        '9:21 value:',
+        '12:10 value:',
       ])
     })
 
@@ -2088,7 +2088,7 @@ describe('kay lsp editor features of an app under a base', () => {
     const hintsIn = async (start: [number, number], end: [number, number]) => (await request<InlayHint[]>('textDocument/inlayHint', 'src/routes/hints.kay', { range: { start: { line: start[0], character: start[1] }, end: { line: end[0], character: end[1] } } })).map(hint => `${hint.position.line}:${hint.position.character} ${hint.label}`)
 
     it('shows the hints of a range crossing the server fence and the script', async () => {
-      expect(await hintsIn([3, 0], [7, 0])).toEqual(['3:30 : number', '3:41 left:', '3:44 right:', '6:12 : Signal<number>', '6:22 value:'])
+      expect(await hintsIn([3, 0], [8, 0])).toEqual(['3:30 : number', '3:41 left:', '3:44 right:', '7:12 : Signal<number>', '7:22 value:'])
     })
 
     it('shows the hint right after the name a range ends on', async () => {

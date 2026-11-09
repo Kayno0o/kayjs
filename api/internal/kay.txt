@@ -21,7 +21,7 @@ type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : {
 }
 
 [.] FunctionProp
-type FunctionProp<Component, Lint extends string = 'island-prop'> = Component extends IslandBrand ? { kayLint: Lint, kayAlways: true, kayError: Unsendable } : 0
+type FunctionProp<Component> = Component extends IslandBrand ? { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
 
 [.] HandedPart
 type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
@@ -769,9 +769,6 @@ class IslandPropsError
 
 [./island] noteMessage
 function noteMessage(key: string): void
-
-[./island] promote
-function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[], cause?: string | undefined): (props: P) => Element
 
 [./island] RenderedIslands
 interface RenderedIslands

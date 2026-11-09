@@ -1,7 +1,7 @@
 import type { CheckDiagnostic } from '.'
 import type { Fix, Span } from '../compiler/ast'
 import { extname } from 'node:path'
-import { importEdits, prologueLength } from '../compiler/implicit-imports'
+import { importEdits, prologueLength } from '../compiler/import-edits'
 import { offsetAt } from '../compiler/mapping'
 import { parseExpanded } from '../compiler/markdown-block'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -63,7 +63,7 @@ function fenceAt(file: ReturnType<typeof parseExpanded>['file'], offset: number)
 // A name nothing declares that a module of kay exports gets a safe fix writing its import: `kay check --fix` adds it where the name is used, in a `.ts` module and in a `.kay` fence, and the names of one file that come from one entry share one edit.
 export async function addImportFixes(diagnostics: CheckDiagnostic[]): Promise<void> {
   const found = diagnostics.flatMap((diagnostic) => {
-    const unknown = diagnostic.fixes === undefined && diagnostic.code !== 'implicit-import' ? unknownName(diagnostic.message) : undefined
+    const unknown = diagnostic.fixes === undefined ? unknownName(diagnostic.message) : undefined
 
     return unknown ? [{ diagnostic, ...unknown }] : []
   })
@@ -80,7 +80,7 @@ export async function addImportFixes(diagnostics: CheckDiagnostic[]): Promise<vo
 
     const kay = extname(file) === '.kay'
     const parsed = kay ? parseExpanded(source).file : undefined
-    const imports = parsed ? [...analyzeScript(source, parsed.script, [], [], parsed.module).imports, ...analyzeServer(source, parsed.server)?.imports ?? []] : []
+    const imports = parsed ? [...analyzeScript(source, parsed.script, [], parsed.module).imports, ...analyzeServer(source, parsed.server)?.imports ?? []] : []
     // A `.kay` file takes the import in the fence the name is used in; a module has the one place.
     const groups = Map.groupBy(inFile, entry => parsed ? fenceAt(parsed, offsetAt(source, entry.diagnostic)) : undefined)
 

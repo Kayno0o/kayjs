@@ -1,7 +1,7 @@
 --- server
-import { ctx } from 'kay'
-
 const shown = ctx.url.pathname
+--- script
+import { ctx } from 'kay'
 ---
 p#path {shown}
 if ctx.user

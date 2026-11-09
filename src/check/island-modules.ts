@@ -4,9 +4,9 @@ import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { resolveFrom, scoped, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
-import { buildFiles, promotedFiles } from '../build/promotion'
 import { isBuiltinSpecifier } from '../build/server-only'
 import { importedSignals } from '../build/signals'
+import { buildFiles } from '../build/source-files'
 import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { isApiStubbed } from '../server/api-modules'
@@ -51,7 +51,6 @@ function scanScriptImports(source: string): string[] {
 
 export interface BrowserModules {
   modules: Set<string>
-  promoted: Set<string>
   // The components whose own script the browser runs.
   seeds: string[]
   // For each module, every component reaching it and the import of its own that leads there.
@@ -79,15 +78,15 @@ export function importEdges(file: string, specifiers: string[], stubbed: (file: 
   })
 }
 
-// The imports of the islands alone, which every one of them bundles: all a check needs of the browser when no module is to be read for the server's globals, and far cheaper than finding the components the build promotes.
+// The imports of the islands alone, which every one of them bundles: all a check needs of the browser when no module is to be read for the server's globals, and far cheaper than reading every component.
 export function islandEdges(islands: string[], sources: Map<string, string>, api: RouteMount[]): Map<string, ImportEdge[]> {
   const stubbed = isApiStubbed(api)
 
   return new Map(islands.map(island => [island, importEdges(island, scriptImportsOf(sources.get(island)!), stubbed)]))
 }
 
-// The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
-// A static component that passes a function is promoted only when its imports reach an island, the project's own, a library's or a mounted one, as the build decides, and a module the server alone imports is left out, as the browser never loads it.
+// The project's own TypeScript modules the browser bundle reaches: those the script of an island or of a component only islands render imports, and those they import in turn.
+// A module the server alone imports is left out, as the browser never loads it.
 // `own` holds the text of the project's own components.
 export async function browserModules(root: string, routesDir: string, extensions: KayExtension[] | undefined, own: Map<string, string>, api: RouteMount[] = []): Promise<BrowserModules> {
   const built = await buildFiles(root, extensions)
@@ -95,15 +94,12 @@ export async function browserModules(root: string, routesDir: string, extensions
 
   await Promise.all(built.files.filter(file => !sources.has(file)).map(async file => sources.set(file, await Bun.file(file).text())))
 
-  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!), root))
+  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!)))
   const files = [...own.keys()]
-  const isPromoted = await promotedFiles(root, built.libraries, built.files, roles)
   const islandOnly = await islandOnlyComponents(root, routesDir, files, sources)
-  // A component only islands render is read by the compile already.
-  const promoted = new Set(built.files.filter((file, index) => isPromoted[index] && own.has(file) && !islandOnly.has(file)))
   const project = realpathSync(root) + sep
   const islands = built.files.filter((file, index) => roles[index] === 'island' && own.has(file))
-  const seeds = [...new Set([...islands, ...promoted, ...islandOnly])]
+  const seeds = [...new Set([...islands, ...islandOnly])]
   // The build gives an island a module of an API tree as where its routes are served, none of its code, so the walk stops there.
   const stubbed = isApiStubbed(api)
   const inside = (file: string) => !stubbed(file) && file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
@@ -140,5 +136,5 @@ export async function browserModules(root: string, routesDir: string, extensions
     }
   }
 
-  return { modules: reached, promoted, seeds, origins, edges }
+  return { modules: reached, seeds, origins, edges }
 }

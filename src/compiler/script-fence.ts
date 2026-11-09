@@ -1,10 +1,9 @@
-import type { Node, Program } from 'oxc-parser'
+import type { Node } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { parseProgram } from './estree'
-import { FIRST_TOKEN, KAY_NAME, WHITESPACE } from './script-shared'
-import { walkScope } from './walk'
+import { FIRST_TOKEN, WHITESPACE } from './script-shared'
 
 // A fence being typed breaks a handful of statements at most; more than this is not recovered.
 const MAX_BROKEN = 20
@@ -255,34 +254,4 @@ export function codeOf(text: string): string {
   }
 
   return code.replaceAll(OBJECT_KEY, '$1')
-}
-
-// Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.
-export function undeclared(ast: Program, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
-  // `ctx` in a fence is the request, which only a template reading it unimported gets from `kay`.
-  const written = new Set([...(typed === '' ? [code] : [code, typed]).flatMap(text => (text.match(KAY_NAME) ?? []).filter(name => name !== 'ctx')), ...read])
-  const mentioned = [...written].filter(name => !declared.includes(name))
-  const found: string[] = []
-
-  if (mentioned.length === 0)
-    return found
-
-  const inTyped = new Set(typed.match(KAY_NAME) ?? [])
-
-  const walked = walkScope(ast, {
-    Program(path) {
-      found.push(...mentioned.filter(name => (path.scope.globals.has(name) || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
-
-      return 'stop'
-    },
-  })
-
-  // A fence kay's scope pass refuses takes as read every name it mentions outside its strings and comments.
-  if (!walked) {
-    const outside = new Set([...(codeOf(code).match(KAY_NAME) ?? []), ...inTyped, ...read])
-
-    return mentioned.filter(name => outside.has(name))
-  }
-
-  return found
 }

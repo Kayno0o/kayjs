@@ -14,7 +14,7 @@ import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { pickConfig } from '../config'
 import { authErrorKind } from './auth-error'
-import { diagnoseShadow, ownFile, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
+import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
 import { addImportFixes } from './missing-imports'
@@ -211,10 +211,6 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
     const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow))
 
     if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
-      continue
-
-    // A deprecation in a library's component is the library's to migrate, not the app's.
-    if (shadow && diagnosed?.code === 'promoted-island' && !ownFile(root, shadow.file))
       continue
 
     const mapped: CheckDiagnostic = await authErrorLint(diagnostic, shadow, diagnosed, shadow ? levelsOf(shadow) : undefined, options) ?? (shadow && diagnosed

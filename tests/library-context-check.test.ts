@@ -44,7 +44,8 @@ async function check(root: string): Promise<{ code: number, output: string }> {
 }
 
 const CLEAN = /checked with no problems in \d+ ms/
-const READS_INBOX = 'if ctx.inbox\n  p yes\n'
+const WITH_CTX = '---\nimport { ctx } from \'kay\'\n---\n'
+const READS_INBOX = `${WITH_CTX}if ctx.inbox\n  p yes\n`
 const PLAIN = 'export default {}\n'
 const CALLING = 'import ctxlib from \'ctxlib/extension\'\n\nexport default { extensions: [ctxlib()] }\n'
 
@@ -64,7 +65,7 @@ describe('a library component reading its extension\'s ctx key', () => {
   }, TIMEOUT)
 
   it('stays a type error for a key no extension declares', async () => {
-    const { code, output } = await check(await project(PLAIN, 'if ctx.nope\n  p yes\n'))
+    const { code, output } = await check(await project(PLAIN, `${WITH_CTX}if ctx.nope\n  p yes\n`))
 
     expect(output).toContain('bell.kay')
     expect(output).toContain('\'nope\'')
@@ -72,7 +73,7 @@ describe('a library component reading its extension\'s ctx key', () => {
   }, TIMEOUT)
 
   it('stays a type error in an app calling the extension', async () => {
-    const { code, output } = await check(await project(CALLING, 'if ctx.nope\n  p yes\n'))
+    const { code, output } = await check(await project(CALLING, `${WITH_CTX}if ctx.nope\n  p yes\n`))
 
     expect(output).toContain('\'nope\'')
     expect(code).not.toBe(0)

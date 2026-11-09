@@ -8,12 +8,11 @@ import type { CacheSlot } from './cache'
 import { existsSync, realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { compileKay, formatDiagnostic, iconSetsKey, ISLAND_TWIN, withoutTwin } from '../compiler'
+import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
 import { isErrorCode } from '../compiler/errors'
 import { parseExpanded } from '../compiler/markdown-block'
 import { analyzeScript } from '../compiler/script'
-import { templateReads } from '../compiler/template-reads'
 import { usesTailwind } from '../format/tailwind'
 import { projectPaths } from '../project'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
@@ -70,8 +69,7 @@ interface Compiled {
 // What `buildClient` reads off each component before bundling.
 export interface Analysis {
   island?: string | undefined
-  promote?: string | undefined
-  // What makes the component an island, or may make it one when `promote` is set.
+  // What makes the component an island.
   cause?: IslandCause | undefined
   classes: string[]
   actionForm: boolean
@@ -119,7 +117,7 @@ export async function transformKayCached(source: string, filename: string, given
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -165,7 +163,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   // The id the file goes by is part of what it compiles to, and a link may change it.
   const signals = importedSignals(filename, source)
   const kind = check ? 'analysis-check' : 'analysis'
-  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${component}\0${source}`
+  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${component}\0${source}`
   const slot = `${kind}\0${filename}`
   const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const last = analyzed.get(slot)
@@ -183,8 +181,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, promote, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined, component })
-  const analysis = { island, promote, cause, classes, actionForm, diagnostics }
+  const { island, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined, component })
+  const analysis = { island, cause, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
     analyzed.set(slot, { file: filename, key: entry.key, analysis })
@@ -314,7 +312,7 @@ function probedPackages(source: string): string[] {
   if (file.client || (!file.script && !file.module) || file.server)
     return []
 
-  const script = analyzeScript(file.source, file.script, [], templateReads(file), file.module)
+  const script = analyzeScript(file.source, file.script, [], file.module)
 
   return isInteractive(file, script) || file.pin?.kind === 'island' ? packagesToProbe(source, script) : []
 }

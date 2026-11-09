@@ -54,7 +54,7 @@ Import what you use, as in any TypeScript module: `signal`, `memo`, `persisted`,
 
 [Modules](/reference/modules) says which entry holds what. A script importing only helpers that compute the same on both sides, such as `route`, `apiUrl` or `withBase`, keeps the component static: [Islands](/essentials/islands) lists them.
 
-Until 1.95 kay still adds the import of a `kay` value or of `t` that a component uses without one, and `kay check` warns with `implicit-import`. `kay upgrade` writes the missing lines in one run.
+A name a component uses with no import is a type error, and `kay check --fix` writes the missing lines in one run.
 
 ## Props
 

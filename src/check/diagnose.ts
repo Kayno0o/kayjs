@@ -10,7 +10,7 @@ import { basename, dirname, relative, resolve, sep } from 'node:path'
 import { KAY_FILE } from '../build/files'
 import { libraryOf, packageRoot } from '../build/libraries'
 import { ROUTE_FILES } from '../compiler'
-import { islandFence, islandPin } from '../compiler/island-marker'
+import { islandFence } from '../compiler/island-marker'
 import { typeLint } from '../compiler/lints'
 import { WRITABLE } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
@@ -90,24 +90,21 @@ function blockName(message: string, source: string, span: Span | undefined): str
   return written !== undefined && PLAIN_NAME.test(written) && message.includes('kayAlways: true') && !message.includes('kayPath') ? written : undefined
 }
 
-// What an island-prop or promoted-island lint offers: `--- island` on the component, which is safe where the value is always a function; `said` where the old `// kay-island` comment, which works for three minors, already accepts the promotion.
-function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: ShadowFile): Pick<Diagnosed, 'fixes' | 'help'> | 'said' | undefined {
-  if (lint.code !== 'island-prop' && lint.code !== 'promoted-island')
+// What an island-prop lint offers: `--- island` on the component, which is safe where the value is always a function.
+function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: ShadowFile): Pick<Diagnosed, 'fixes' | 'help'> | undefined {
+  if (lint.code !== 'island-prop')
     return undefined
 
   const file = parseKay(shadow.source)
   const route = file.server !== undefined || ROUTE_FILES.has(basename(shadow.file))
-
-  if (lint.code === 'promoted-island' && islandPin(file)?.kind === 'island')
-    return 'said'
 
   if (route)
     return { help: 'a page, a layout or a special page is never an island: pass the island data, or go through a component of its own written `--- island`' }
 
   const fix = islandFence(file)
 
-  // A `static` pin, written as a fence or a comment, is the author's decision: the fix is offered and never applied by `--fix`.
-  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true && islandPin(file)?.kind !== 'static' }] }
+  // A `static` pin is the author's decision: the fix is offered and never applied by `--fix`.
+  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true && file.pin?.kind !== 'static' }] }
 }
 
 // A block with no parameters is markup, so one a component calls with values is a type error on `Element`: the help names the parameters its prop is typed with.
@@ -140,7 +137,7 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
 
     const offered = level === 'allow' ? undefined : unsendableFix(lint, shadow)
 
-    return level === 'allow' || offered === 'said' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
+    return level === 'allow' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
   }
 
   // A kayjs-auth result's `error` compared with a kind, which `kay check` also fixes and the editor reports as it stands.

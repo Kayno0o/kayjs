@@ -60,7 +60,7 @@ export default defineMessages({
 
 ### Show a message
 
-`t` of `kay/i18n` is imported by kay until 1.95, and gives the message in the request's locale:
+`t` of `kay/i18n` gives the message in the request's locale:
 
 ```kay
 ---
@@ -208,7 +208,7 @@ export default defineMessages({
 ### Helpers
 
 - `t`, `locale`, `locales`, `localeName`, `direction`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime` and `formatList` come from `kay/i18n`, which works anywhere a request is served from: loads, templates, components, islands, actions and guards, and in `renderToString` outside one, in the site's default locale or the one its `locale` option names (see rendering).
-- `t('greeting', { name })`, which a template, a fence or an island reads with no import unless the file names its own `t`, gives a message in the request's locale, its key and placeholders typed from the default locale's file.
+- `t('greeting', { name })`, imported from `kay/i18n` where a template, a fence or an island uses it, gives a message in the request's locale, its key and placeholders typed from the default locale's file.
 - A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`.
 - An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given.
 - A key no locale has renders as itself.

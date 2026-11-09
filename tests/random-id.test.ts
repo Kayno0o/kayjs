@@ -19,9 +19,8 @@ describe('randomId', () => {
     expect(() => randomId(-1)).toThrow()
   })
 
-  it('makes a component an island, imported or implicit', () => {
+  it('makes a component an island', () => {
     expect(compileKay('---\nimport { randomId } from \'kay\'\nconst key = randomId()\n---\np {key}', 'a.kay').island).toBeDefined()
-    expect(compileKay('---\nconst key = randomId()\n---\np {key}', 'b.kay').island).toBeDefined()
   })
 
   it('names a presence tab with 24 characters', () => {

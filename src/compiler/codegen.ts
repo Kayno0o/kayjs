@@ -4,7 +4,6 @@ import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Sp
 import type { IslandCause } from './island-cause'
 import type { LoadPlan } from './load-plan'
 import type { Rewrite } from './mapping'
-import type { ImportedSignals } from './module-signals'
 import type { WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite-types'
@@ -12,7 +11,6 @@ import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } 
 import { actionUrl } from '../runtime/action'
 import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
-import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { constDeclaration } from './items'
@@ -23,6 +21,7 @@ import { helperName } from './markup'
 import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { codeOf, reactiveValue } from './script'
+import { kayCtxImport } from './script-shared'
 import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
@@ -41,7 +40,6 @@ export interface GenerateOptions {
   classTable?: ClassTable | undefined
   classMerge?: boolean | undefined
   // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
-  translates?: boolean | undefined
   // The write helpers the rewrites call, imported from the runtime.
   writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -90,8 +88,6 @@ export interface GenerateOptions {
   outerSlots?: string[] | undefined
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string | undefined
-  // Set for a static component that may pass an island what only an island sends: the id it renders as an island by when it does.
-  promote?: string | undefined
   // Code to run rather than type-check, built from the template: `html` builds server markup as strings, `dom` builds the browser's DOM. The analysis pass still generates JSX, which scope analysis reads.
   output?: 'html' | 'dom' | undefined
   // The component's own `@failed` block as a `KayFailed` function, which a server island reads off the component.
@@ -137,8 +133,8 @@ const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
 // What a pass builds: JSX, which the analysis pass reads, the same JSX with `kay check`'s assertions, or the code that runs, markup strings on the server or the browser's DOM.
 type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
 
-// Where a component stands toward islands: an island root; a static component rendering through its hydratable twin inside one, which may also render as an island itself where it must (`promotable twin`, or `promotable` without a twin); a static component only islands render; or a plain one.
-type IslandKind = 'island' | 'twin' | 'promotable twin' | 'promotable' | 'inside island' | 'static'
+// Where a component stands toward islands: an island root; a static component rendering through its hydratable twin inside one; a static component only islands render; or a plain one.
+type IslandKind = 'island' | 'twin' | 'inside island' | 'static'
 
 // The specifier of an import statement that did not parse, when it can still be read, an unclosed one ending at the first space, semicolon or line end.
 function brokenSpecifier(source: string, span: Span): Span[] {
@@ -165,12 +161,9 @@ function islandKind(options: GenerateOptions): IslandKind {
     return 'island'
 
   if (options.twin !== undefined)
-    return options.promote === undefined ? 'twin' : 'promotable twin'
+    return 'twin'
 
-  if (options.insideIsland)
-    return 'inside island'
-
-  return options.promote === undefined ? 'static' : 'promotable'
+  return options.insideIsland ? 'inside island' : 'static'
 }
 
 // The ways the template names a prop typed `Bindable<T>`: its destructured name, or the props name and its key.
@@ -267,8 +260,7 @@ class ModuleShell {
     return this.jsxTemplate ??= new JsxTemplate(this.b, this.src, this.facts, {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
-      sendsIslandProps: this.kind === 'static' || this.kind === 'twin' || this.kind === 'promotable' || this.kind === 'promotable twin',
-      promoted: this.kind === 'promotable' || this.kind === 'promotable twin',
+      sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
       plain: this.plainNames(),
       ownMarkup: this.ownMarkup(),
     }, this.sites)
@@ -376,25 +368,14 @@ class ModuleShell {
 
   private imports(head: boolean, errors: ErrorMessages | undefined, titled: boolean): void {
     const { b, script, server, fence, facts, mode } = this
-    // What the fences use from `kay` unimported, as they use `props<T>()`; a name the other fence of the same module imports needs no import.
-    const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
-    const implicit = [...script.implicit, ...fence?.implicit ?? []].filter(name => !imported.has(name))
+    // The `ctx` the script imports from `kay`, typed with the keys of the package's own context module as well: the import is left out of the file and the name declared in its place, as one statement line.
+    const ctx = this.options.contextModule === undefined ? undefined : kayCtxImport(script.imports)
 
-    // `ctx` typed with the keys of the package's own context module as well, as one statement line.
-    const typed = this.options.contextModule !== undefined && implicit.includes('ctx')
-    const names = [...new Set(implicit)].filter(name => !typed || name !== 'ctx')
-
-    if (names.length > 0)
-      b.add(`import { ${names.join(', ')} } from 'kay'\n`)
-
-    if (typed)
-      b.add(`import { ctx as KayCtx } from 'kay'; import type { ContextOfModule } from 'kay'; const ctx = KayCtx as typeof KayCtx & ContextOfModule<typeof import(${JSON.stringify(this.options.contextModule)})>\n`)
-
-    if (this.options.translates === true && !imported.has('t'))
-      b.add('import { t } from \'kay/i18n\'\n')
+    if (ctx !== undefined)
+      b.add(`import { ctx as KayCtx } from 'kay'; import type { ContextOfModule } from 'kay'; const ${ctx.local} = KayCtx as typeof KayCtx & ContextOfModule<typeof import(${JSON.stringify(this.options.contextModule)})>\n`)
 
     for (const span of script.hoisted)
-      this.emitHoisted(span, script.specifiers, script.imports, [])
+      this.emitHoisted(span, script.specifiers, script.imports, ctx === undefined ? [] : [ctx])
 
     if (fence) {
       const { duplicates } = sharedImports(script, fence)
@@ -486,8 +467,8 @@ class ModuleShell {
     if (this.kind === 'island')
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
-    if (this.kind === 'twin' || this.kind === 'promotable twin')
-      b.add(`import { ${this.kind === 'twin' ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
+    if (this.kind === 'twin')
+      b.add(`import { insideIsland as KayInsideIsland } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
     if (this.styled)
       b.add(`const ${helperName('ui')} = ${helperName('uiRecipe')}(${JSON.stringify(this.options.ui)}${facts.recipe === undefined ? '' : `, ${facts.recipe}`})\n`)
@@ -642,9 +623,9 @@ class ModuleShell {
     }
   }
 
-  // Whether the script has `navigate` from `kay`, by import under any name, as a member of a namespace import or unimported.
+  // Whether the script has `navigate` from `kay`, by import under any name or as a member of a namespace import.
   private navigates(): boolean {
-    return this.script.implicit.includes('navigate') || this.script.imports.some(binding => binding.source === 'kay' && !binding.typeOnly && (binding.imported === 'navigate' || binding.imported === '*'))
+    return this.script.imports.some(binding => binding.source === 'kay' && !binding.typeOnly && (binding.imported === 'navigate' || binding.imported === '*'))
   }
 
   // Whether the `@name` blocks at the root of the template stand for the calls keeping them: only a page or a layout writes them, which a compile of one file alone cannot tell, so type checking says which files are not and reports them.
@@ -697,9 +678,7 @@ class ModuleShell {
     if (this.mode === 'html' && this.options.failedCode !== undefined)
       b.add(`\n${this.options.failedCode}\n${name}.kayFailed = KayFailed\n`)
 
-    if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.options.cause === undefined ? islandMessages(src) : `${islandMessages(src) || ', []'}, ${JSON.stringify(this.options.cause)}`}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
-    else if (this.kind === 'twin')
+    if (this.kind === 'twin')
       b.add(`\nexport default ${this.mode === 'html' && this.options.failedCode !== undefined ? `Object.assign((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props), { kayFailed: KayFailed })` : `((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props))`} as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
@@ -710,7 +689,7 @@ class ModuleShell {
   }
 
   private get wrapped(): boolean {
-    return this.kind === 'island' || this.kind === 'twin' || this.kind === 'promotable twin'
+    return this.kind === 'island' || this.kind === 'twin'
   }
 
   private get runs(): boolean {
@@ -722,7 +701,7 @@ class ModuleShell {
     if (this.kind === 'island')
       return false
 
-    return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined || this.options.route === true
+    return this.options.output === 'html' || this.kind === 'twin' || this.fence !== undefined || this.options.route === true
   }
 
   // What `ctx` is typed as: the error page and the card page carry what they render.
@@ -1157,35 +1136,6 @@ class ModuleShell {
 // A component needs the browser when it handles events, binds inputs, takes refs or holds reactive state.
 export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return script.reactive || templateFacts(file).interactive
-}
-
-// What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, the first in the template, with the span of that component's tag. A name imported from a module that exports it as a literal of strings and numbers is data, `imported` telling which.
-export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): IslandCause | undefined {
-  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/') && imported?.[binding.source]?.[binding.imported] !== 'data').map(binding => binding.local)])
-  let cause: IslandCause | undefined
-
-  visitNodes(file.template, (node) => {
-    if (node.kind === 'snippet')
-      names.add(file.source.slice(node.name.start, node.name.end))
-  })
-
-  someNode(file.template, (node) => {
-    if (node.kind !== 'element' || !node.component)
-      return false
-
-    const attribute = node.attributes.find(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names))
-
-    const line = lineOf(file.source, node.start)
-
-    if (attribute !== undefined)
-      cause = attribute.kind === 'spread' ? { kind: 'spread', name: '', span: node.tag, line, target: node.name } : { kind: 'prop', name: file.source.slice(attribute.name.start, attribute.name.end), span: node.tag, line, target: node.name }
-    else if (node.children.some(child => child.kind === 'slot' && child.params !== undefined))
-      cause = { kind: 'block', name: '', span: node.tag, line, target: node.name }
-
-    return cause !== undefined
-  })
-
-  return cause
 }
 
 // The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, a `--- client` fence or a `--- island` one.

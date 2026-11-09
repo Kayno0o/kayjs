@@ -90,7 +90,7 @@ export async function uiData(project: Project, document?: Document, tag?: string
     return { components: await styleInfos(project.root, project.libraries), tokens }
 
   const parsed = parseKay(document.source)
-  const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
+  const { imports } = analyzeScript(document.source, parsed.script, [], parsed.module)
   const binding = imports.find(candidate => candidate.local === tag && !candidate.typeOnly)
   const file = binding && resolveFrom(binding.source, document.file)
   const info = file === undefined ? undefined : styleInfo(realPath(file))
@@ -146,7 +146,7 @@ export async function servedRoutes(project: Project): Promise<string[]> {
 // The components a file imports; a local `.kay` one is read for the props and blocks it takes, and the props of `tag` come from TypeScript when the file alone does not say them: a package's component, or a props type declared elsewhere.
 export async function importedComponents(host: LspHost, document: Document, project: Project, tag?: string): Promise<TemplateData['components']> {
   const parsed = parseKay(document.source)
-  const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
+  const { imports } = analyzeScript(document.source, parsed.script, [], parsed.module)
   const found: TemplateData['components'] = []
 
   for (const binding of imports.filter(candidate => CAPITALIZED.test(candidate.local) && !candidate.typeOnly)) {

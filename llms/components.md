@@ -199,10 +199,9 @@ ul
 - Both fences may import the same name; the server fence's copy is dropped.
 - A fence holds TypeScript only: markup goes in the template, and JSX in a fence is reported.
 
-### Imports kay adds
+### Every name is imported
 
-- Every name is imported where it is used, in a `.kay` file and in a `.ts` module alike: `import { signal, memo } from 'kay'` in a script, `import { t } from 'kay/i18n'` for the translation, `import { cached } from 'kay/cache'` in a server fence. The import line is what makes a component an island or keeps it static: a script importing only the values that compute the same on both sides (`route`, `localPath`, `withBase`, `s`, `apiUrl`, `ApiError`, `publicEnv` and the rest listed in [Islands](islands.md#islands)) keeps the component static. A type is imported with `import type { Signal } from 'kay'`.
-- Until 1.95 the compiler still imports a `kay` value a fence or a template reads with no import, and `t` of `kay/i18n`, so a component without the lines compiles: `kay check` warns, as `implicit-import` (one warning per fence, at the first use), and `kay upgrade` or `kay check --fix` writes the import into the fence's `kay` import, opening a `---` fence for a template with no script. `kay check --fix` also writes the import of any name a `kay/*` entry exports (`files` of `kay/server`, `cached` of `kay/cache`) that a `.kay` or `.ts` file uses with none, and the editor offers it as a quick fix.
+- Every name is imported where it is used, in a `.kay` file and in a `.ts` module alike: `import { signal, memo } from 'kay'` in a script, `import { t } from 'kay/i18n'` for the translation, `import { cached } from 'kay/cache'` in a server fence. A name used with no import is a type error, `Cannot find name 'signal'`, and `kay check --fix` writes the import of any name a `kay/*` entry exports (`files` of `kay/server`, `cached` of `kay/cache`) that a `.kay` or `.ts` file uses with none, which the editor offers as a quick fix. The import line is what makes a component an island or keeps it static: a script importing only the values that compute the same on both sides (`route`, `localPath`, `withBase`, `s`, `apiUrl`, `ApiError`, `publicEnv` and the rest listed in [Islands](islands.md#islands)) keeps the component static. A type is imported with `import type { Signal } from 'kay'`.
 - `kay/server` also exports `s`, so a server module (`env.ts`, an API route) imports `defineEnv` and `s` from one path; a module an island also imports takes `s` from `kay`, which has the lighter browser build.
 
 ### Props

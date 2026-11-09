@@ -15,7 +15,7 @@ import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../
 import { missingContextModules } from '../build/manifests'
 import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
-import { browserRole, onceReadChecks, promotedChecks } from '../compiler'
+import { browserRole, onceReadChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -138,21 +138,20 @@ export async function withoutMissingCaptcha(root: string, options: CheckOptions)
   return options
 }
 
-// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches, or by a component the build promotes to an island.
+// The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches.
 async function moduleLints(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  // Following the imports of every component is worth it only when the browser has a component to start from, an island or one the build may promote, and some module or component names the entry or a server-only global, or one passes an island a function.
+  // Following the imports of every component is worth it only when the browser has a component to start from, an island, and some module or component names the entry or a server-only global.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
   const mentioned = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text))
-  const roles = new Map([...componentTexts].map(([file, text]) => [file, browserRole(text, file, importedSignals(file, text), root)] as const))
-  const named = [...roles.values()].some(role => mentioned ? role !== undefined : role === 'promotable')
+  const roles = new Map([...componentTexts].map(([file, text]) => [file, browserRole(text, file, importedSignals(file, text))] as const))
+  const named = mentioned && [...roles.values()].some(role => role !== undefined)
   const api = apiTrees(root, options)
   const islands = [...roles].filter(([, role]) => role === 'island').map(([file]) => file)
   const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, api) : undefined
   const inBrowser = browser?.modules ?? new Set<string>()
-  const promoted = browser?.promoted ?? new Set<string>()
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
     const levelAt = lintLevels(source, levels)
 
@@ -162,22 +161,21 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]
     })
   }
-  // A component the compile does not read as an island's: one a page or a static component also renders, and one the build promotes.
+  // A component the compile does not read as an island's: one a page or a static component also renders.
   const componentFiles = [...componentTexts.keys()]
   const routes = projectPaths(root, options).routes
   const isIsland = (file: string) => roles.get(file) === 'island'
-  const graph = islands.length > 0 || promoted.size > 0 ? await componentImporters(root, componentFiles, componentTexts) : undefined
-  const browserRun = graph ? renderedInIslands(componentFiles, graph, [...islands, ...promoted], isIsland) : new Set<string>()
+  const graph = islands.length > 0 ? await componentImporters(root, componentFiles, componentTexts) : undefined
+  const browserRun = graph ? renderedInIslands(componentFiles, graph, islands, isIsland) : new Set<string>()
   const readByCompile = graph && browserRun.size > 0 ? await islandOnlyComponents(root, routes, componentFiles, componentTexts, isIsland, graph) : new Set<string>()
-  const onceRead = [...new Set([...browserRun, ...promoted])].filter(file => roles.get(file) !== 'island' && !readByCompile.has(file) && !file.startsWith(routes + sep))
+  const onceRead = [...browserRun].filter(file => roles.get(file) !== 'island' && !readByCompile.has(file) && !file.startsWith(routes + sep))
   const found = [
     ...files.flatMap((file) => {
       const source = texts.get(file)!
 
       return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
     }),
-    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
-    ...onceRead.flatMap(file => report(file, componentTexts.get(file)!, onceReadChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
+    ...onceRead.flatMap(file => report(file, componentTexts.get(file)!, onceReadChecks(componentTexts.get(file)!))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
     ...await builtinImportsInIsland(root, browser?.seeds ?? islands, browser?.edges ?? islandEdges(islands, componentTexts, api), api),
   ]

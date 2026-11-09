@@ -61,10 +61,10 @@ async function reachable(dir: string, chunk: string, seen = new Set<string>()): 
 // The function only the module of each block holds, as the client build names them.
 const BLOCKS = { loop: 'function keyedRows', await: 'function awaited(', try: 'function attempt(', spread: 'function spread(' }
 const BLOCK_ISLANDS: Record<string, string> = {
-  loopy: '---\nconst rows = signal([{ id: 1 }, { id: 2 }])\n---\nbutton.add(onClick={() => rows.set(list => [...list, { id: list.length + 1 }])}) Add\nul\n  for row of rows()\n    li.row {row.id}\n',
-  awaity: '---\nconst reply = signal(Promise.resolve(\'ready\'))\n---\nawait reply()\n  p.pending Waiting\nthen text\n  p.ready {text}\n',
-  trying: '---\nconst count = signal(0)\n---\nbutton.bump(onClick={() => count.set(count() + 1)}) Bump\ntry\n  p.shown {count()}\ncatch\n  p.fallback Failed\n',
-  spreading: '---\nconst label = signal(\'one\')\n---\nbutton.spreading({...{ title: label() }} onClick={() => label.set(\'two\')}) {label()}\n',
+  loopy: '---\nimport { signal } from \'kay\'\n\nconst rows = signal([{ id: 1 }, { id: 2 }])\n---\nbutton.add(onClick={() => rows.set(list => [...list, { id: list.length + 1 }])}) Add\nul\n  for row of rows()\n    li.row {row.id}\n',
+  awaity: '---\nimport { signal } from \'kay\'\n\nconst reply = signal(Promise.resolve(\'ready\'))\n---\nawait reply()\n  p.pending Waiting\nthen text\n  p.ready {text}\n',
+  trying: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton.bump(onClick={() => count.set(count() + 1)}) Bump\ntry\n  p.shown {count()}\ncatch\n  p.fallback Failed\n',
+  spreading: '---\nimport { signal } from \'kay\'\n\nconst label = signal(\'one\')\n---\nbutton.spreading({...{ title: label() }} onClick={() => label.set(\'two\')}) {label()}\n',
 }
 
 describe('the blocks an island compiles to', () => {

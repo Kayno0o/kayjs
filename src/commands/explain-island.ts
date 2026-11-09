@@ -10,7 +10,7 @@ import { formatDiagnostic } from '../compiler/frame'
 import { CAUSE_KINDS, describeCause, ISLAND_RULE } from '../compiler/island-cause'
 import { printDocument, printFailure, projectRoot } from './command'
 
-type Role = 'island' | 'promoted' | 'static'
+type Role = 'island' | 'static'
 
 interface Explained {
   file: string
@@ -20,19 +20,11 @@ interface Explained {
 
 const ROLE_WORDS: Record<Role, string> = {
   island: 'an island: it renders on the server and hydrates in the browser',
-  promoted: 'static, and an island only when a page passes it what only an island sends, which the build bundles only when its imports reach an island',
   static: 'static: it ships no JavaScript',
 }
 
 function shown(cause: IslandCause) {
   return { kind: cause.kind, name: cause.name, line: cause.line, description: describeCause(cause), meaning: CAUSE_KINDS[cause.kind] }
-}
-
-function roleOf(island: string | undefined, promote: string | undefined): Role {
-  if (island !== undefined)
-    return 'island'
-
-  return promote === undefined ? 'static' : 'promoted'
 }
 
 // The role of each file, as `compileKay` decides it, with what decides it, and the files that do not compile, which have no role.
@@ -42,7 +34,7 @@ async function explained(root: string, files: string[]): Promise<{ found: Explai
 
   for (const file of files) {
     const source = await readFile(file, 'utf8')
-    const { island, promote, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source) })
+    const { island, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source) })
     const error = diagnostics.find(diagnostic => diagnostic.severity !== 'warning')
 
     if (error !== undefined) {
@@ -51,9 +43,7 @@ async function explained(root: string, files: string[]): Promise<{ found: Explai
       continue
     }
 
-    const role = roleOf(island, promote)
-
-    found.push({ file: relative(root, file), role, ...cause && { cause: shown(cause) } })
+    found.push({ file: relative(root, file), role: island === undefined ? 'static' : 'island', ...cause && { cause: shown(cause) } })
   }
 
   return { found, broken }

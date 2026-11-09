@@ -6,7 +6,7 @@ const SOURCES: [name: string, file: string, text: string][] = [
   ['static', 'card.kay', 'p hi\n'],
   ['interactive', 'counter.kay', '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(onClick={() => n = n() + 1}) {n()}\n'],
   ['client', 'map.kay', '--- client\nconst x = 1\n---\np {x}\n'],
-  ['promotable', 'list.kay', '---\nimport Picker from \'./picker.kay\'\n\nfunction pick() {}\n---\nPicker(select={pick})\n'],
+  ['passing a function', 'list.kay', '---\nimport Picker from \'./picker.kay\'\n\nfunction pick() {}\n---\nPicker(select={pick})\n'],
   ['route file with a handler', '_layout.kay', '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(onClick={() => n = 1}) x\n'],
   ['server page', 'page.kay', '--- server\nconst a = 1\n---\np {a}\n'],
 ]
@@ -18,15 +18,7 @@ describe('the analysis scope of a check', () => {
     const inside = await inAnalysisScope(async () => SOURCES.map(([, file, text]) => [rendersAsIsland(text), browserRole(text, file), rendersAsIsland(text, LIVE), browserRole(text, file, LIVE)]))
 
     expect(inside).toEqual(outside)
-    expect(outside.map(row => row[1])).toEqual([undefined, 'island', 'island', 'promotable', 'island', undefined])
-  })
-
-  it('answers the same with a project root and an icon import as without', async () => {
-    const icon = '---\nimport Home from \'~icons/tabler/home\'\n---\nHome\n'
-    const root = process.cwd()
-
-    expect(rendersAsIsland(icon, undefined, root)).toBe(rendersAsIsland(icon))
-    expect(await inAnalysisScope(async () => browserRole(icon, 'icon.kay', undefined, root))).toBe(browserRole(icon, 'icon.kay', undefined, root))
+    expect(outside.map(row => row[1])).toEqual([undefined, 'island', 'island', undefined, 'island', undefined])
   })
 
   it('parses a component once for every question about it with the same signals, and again outside the scope', async () => {

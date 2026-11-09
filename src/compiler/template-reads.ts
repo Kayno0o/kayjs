@@ -3,7 +3,7 @@ import type { Node as EstreeNode, Expression } from './estree'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
 import { parseExpression, VISITOR_KEYS } from './estree'
 import { parsedBindingNames, patternNames } from './pattern-names'
-import { codeOf, KAY_NAME } from './script'
+import { codeOf } from './script'
 
 const WORD = /[\w$]+/g
 const FIRST_NAME = /^\s*([\w$]+)/
@@ -32,46 +32,6 @@ export function binders(node: Node): Span[] {
     case 'text':
       return []
   }
-}
-
-// Every name a function inside the expression takes as a parameter, or a declaration or catch inside it binds, which shadows a value of kay there; none when the expression does not parse.
-function parameters(code: string): Set<string> | undefined {
-  const names = new Set<string>()
-  let expression: Expression
-
-  try {
-    expression = parseExpression(code, { lang: 'ts' })
-  }
-  catch {
-    return undefined
-  }
-
-  // `plain` marks the function of a method, getter or setter, whose parameters the tree of `@babel/parser` left out as it had no function node there.
-  const walk = (value: unknown, inParameters: boolean, plain = false): void => {
-    if (Array.isArray(value)) {
-      for (const child of value)
-        walk(child, inParameters, plain)
-
-      return
-    }
-
-    if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
-      return
-
-    const node = value as EstreeNode
-
-    if (inParameters && node.type === 'Identifier')
-      names.add(node.name)
-
-    const method = (node.type === 'Property' && (node.method || node.kind !== 'init')) || node.type === 'MethodDefinition'
-
-    for (const [key, child] of Object.entries(node))
-      walk(child, inParameters || (!plain && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') && key === 'params') || (node.type === 'VariableDeclarator' && key === 'id') || (node.type === 'CatchClause' && key === 'param'), method && key === 'value')
-  }
-
-  walk(expression, false)
-
-  return names
 }
 
 // The TypeScript nodes that wrap a value, which a read of a name goes through; any other holds a type.
@@ -211,57 +171,6 @@ export function templateWords(file: KayFile): string[] {
   })
 
   return [...words]
-}
-
-const reads = new WeakMap<KayFile, string[]>()
-
-// The values of `kay` the template's expressions read, bar the names the template binds itself and the ones a function in an expression takes as parameters: the script declares the rest or leaves them to the compiler to import. A binder or a parameter hides its name file-wide, not only where it is in scope, so a file mixing both uses of one name imports it from the script.
-export function templateReads(file: KayFile): string[] {
-  const known = reads.get(file)
-
-  if (known)
-    return known
-
-  const found = readsOf(file)
-
-  reads.set(file, found)
-
-  return found
-}
-
-function readsOf(file: KayFile): string[] {
-  const bound = new Set<string>()
-  const read = new Set<string>()
-  const text = (span: Span) => file.source.slice(span.start, span.end)
-
-  visitNodes(file.template, (node) => {
-    const own = binders(node)
-
-    for (const span of own) {
-      for (const name of bindingNames(text(span)))
-        bound.add(name)
-    }
-
-    for (const span of nodeExpressions(node)) {
-      if (own.includes(span))
-        continue
-
-      const expression = text(span)
-      const names = codeOf(expression).match(KAY_NAME)
-
-      if (names === null)
-        continue
-
-      const shadowed = parameters(expression)
-
-      for (const name of names) {
-        if (!shadowed?.has(name))
-          read.add(name)
-      }
-    }
-  })
-
-  return [...read].filter(name => !bound.has(name))
 }
 
 // The child blocks of a node with the spans naming what each sees besides its parent's names: a loop's item and index, a snippet's or slot's parameters, a branch's alias.

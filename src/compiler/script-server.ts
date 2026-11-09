@@ -65,8 +65,6 @@ export interface ServerAnalysis {
   // What a refresh of some of the page's loads needs to know of each statement of `body`.
   // Read only for a page whose project refreshes loads by name, so no other compile pays for them.
   facts: Map<Span, () => BodyFact>
-  // What the fence reads of kay's values without declaring or importing it.
-  implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
   data: ServerData[]
   // The `const` names among them declared as plain data written out.
@@ -85,7 +83,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], actionCallees: [], toolActions: [], body: [], facts: new Map(), broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], actionCallees: [], toolActions: [], body: [], facts: new Map(), broken: [], brokenModule: [], data: [], plain: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, [], analysis)
 
   if (!split)

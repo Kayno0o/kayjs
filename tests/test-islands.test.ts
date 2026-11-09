@@ -7,7 +7,7 @@ import * as files from '../src/build/files'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
-const ISLAND = '---\nimport { hello } from \'./greeting\'\nimport logo from \'../logo.png\'\nconst count = signal(0)\nconst work = () => new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n---\nbutton(onClick={() => count.set(count() + 1)}) {hello()} {count()}\nimg(src={logo} onClick={work})\n'
+const ISLAND = '---\nimport { signal } from \'kay\'\nimport { hello } from \'./greeting\'\nimport logo from \'../logo.png\'\nconst count = signal(0)\nconst work = () => new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n---\nbutton(onClick={() => count.set(count() + 1)}) {hello()} {count()}\nimg(src={logo} onClick={work})\n'
 const BROWSERLESS = 'import { Database } from \'bun:sqlite\'\nexport const hello = () => String(Database.name)\n'
 const FINE = 'export const hello = () => \'hi\'\n'
 

@@ -290,21 +290,21 @@ type Unsendable = 'An island is sent its props serialized: plain objects, arrays
 
 type Callable = (...args: never[]) => unknown
 
-// `Lint` is `island-prop` for a component that is static, `promoted-island` for one the build still promotes to an island when it passes a function (deprecated). `kayAlways` marks a value that is a function whatever else the type allows, which `--- island` always fixes.
-type NotSerializable<Value, Lint extends string> = [FunctionPaths<Value>] extends [never]
-  ? { kayLint: Lint, kayError: Unsendable }
+// `kayAlways` marks a value that is a function whatever else the type allows, which `--- island` always fixes.
+type NotSerializable<Value> = [FunctionPaths<Value>] extends [never]
+  ? { kayLint: 'island-prop', kayError: Unsendable }
   : [Value] extends [Callable]
-    ? { kayLint: Lint, kayAlways: true, kayPath: FunctionPaths<Value>, kayError: Unsendable }
-    : { kayLint: Lint, kayPath: FunctionPaths<Value>, kayError: Unsendable }
+    ? { kayLint: 'island-prop', kayAlways: true, kayPath: FunctionPaths<Value>, kayError: Unsendable }
+    : { kayLint: 'island-prop', kayPath: FunctionPaths<Value>, kayError: Unsendable }
 
 // Props a static parent passes to an island are serialized for the browser, so they must survive it, and are public, so they should hold no secret-looking field. `kay check` reports the second as the `secret-prop` lint.
-export type IslandProp<Component, Value, Lint extends string = 'island-prop'> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value, Lint> : unknown
+export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
 
 // What a static parent sends an island for a name its script declares as plain data written out: it serializes whatever type the declaration gives it, such as a `Column<Row>[]` whose `sortValue` could have been a function.
 export type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
 
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
-export type FunctionProp<Component, Lint extends string = 'island-prop'> = Component extends IslandBrand ? { kayLint: Lint, kayAlways: true, kayError: Unsendable } : 0
+export type FunctionProp<Component> = Component extends IslandBrand ? { kayLint: 'island-prop', kayAlways: true, kayError: Unsendable } : 0
 
 // What `defer()` returns, a plain promise: an `await` block takes any promise, so nothing marks one.
 export type Deferred<T> = Promise<T>

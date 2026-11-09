@@ -1,4 +1,4 @@
----
+--- island
 import type { Column } from '@kaynooo/kayjs-ui'
 import type { ConfiguredRedirect } from '../missing'
 import Table from '@kaynooo/kayjs-ui/table.kay'

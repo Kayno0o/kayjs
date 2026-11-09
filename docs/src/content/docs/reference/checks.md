@@ -82,7 +82,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |
 | `signal-set-call` | warn | islands | A signal written with `.set(value)` where assigning it does the same |
-| `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser; a static component the build promotes to an island is reported by `kay check` only, not in the editor |
+| `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
@@ -133,9 +133,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
-| `promoted-island` | warn | deprecated | A static component passing an island a function or a block with parameters, which the build still turns into an island on its own; `--- island` says so, and the promotion goes in 1.95 |
-| `implicit-import` | warn | deprecated | A `kay` value or `t` used with no import, which kay adds until 1.95; the fix writes the import into the fence (`kay check --fix` also writes any `kay/*` import a file lacks) |
-| `island-comment` | warn | deprecated | `// kay-island` or `// kay-static` in a script, now the fence line `--- island` or `--- static`; the comment works until 1.95 |
 | `deprecated-icon-picker-search` | warn | deprecated | A kayjs-ui IconPicker `search`, now a function `icons` handed `{ q, limit, offset }`; the old prop works until 1.95 |
 | `deprecated-menu-danger` | warn | deprecated | A kayjs-ui Menu entry flagged `danger: true`, now `tone: 'danger'`; the flag works until 2.0.0 |
 | `deprecated-auth-error` | warn | deprecated | A kayjs-auth result's `error` compared with a kind, `result.error === 'limited'`, since 1.92: `error` holds the kind as `error.code` now, so the old comparison is never true; `kay upgrade` rewrites it |
@@ -169,7 +166,7 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `page-settings-invalid` | compile | A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`. | [Page settings](/essentials/routing) |
 | `signal-misuse` | compile | A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal. | [Signals](/essentials/components) |
 | `client-route-fence` | compile | A page, layout or special page with a `--- client` fence: they render on the server. | [Islands](/essentials/islands) |
-| `static-pin` | compile | A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, or a live value. The error stands at that thing. Such a component is never promoted, so a function or a block with parameters it passes an island is `island-prop`. | [Islands](/essentials/islands) |
+| `static-pin` | compile | A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, or a live value. The error stands at that thing. A function or a block with parameters it passes an island is `island-prop`. | [Islands](/essentials/islands) |
 | `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](/essentials/islands) |
 | `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node or Bun built-in a browser build refuses, such as `async_hooks` or `bun:sqlite`; `kay check` reports it too. | [Browser-only components](/essentials/islands) |

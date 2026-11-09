@@ -2,7 +2,7 @@ import type { Node, Statement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { ImportBinding, ParsedFence, ScriptAnalysis } from './script-shared'
 import { eachNode } from './each-node'
-import { codeOf, parseFence, undeclared } from './script-fence'
+import { parseFence } from './script-fence'
 import { withLeadingComments } from './script-props'
 import { misplacedRecipe, recipeDeclaration, recipeNames, reportRecipeReads } from './script-recipe'
 import { declaredIdentifiers, importedName, isAmbient, typeDeclaration, unexported } from './script-shared'
@@ -18,7 +18,7 @@ interface FenceStatement {
   gap: Span[]
 }
 
-type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence' | 'unparsed' | 'broken' | 'brokenModule'>
+type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'diagnostics' | 'fence' | 'unparsed' | 'broken' | 'brokenModule'>
 
 // The text from `start` to `end` as spans, with each broken statement in it as the very span `broken` holds.
 function textAround(start: number, end: number, parsed: Span[], moduleLevel: Span[]): Span[] {
@@ -44,9 +44,9 @@ function textAround(start: number, end: number, parsed: Span[], moduleLevel: Spa
   return spans
 }
 
-// Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
+// Parses a fence once, moves its imports and types to module level and the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-export function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = [], withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] }) | undefined {
+export function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -80,8 +80,6 @@ export function splitFence(source: string, fence: Span, names: string[], analysi
     else
       analysis.broken.push(span)
   }
-
-  analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'), templateReads)
 
   for (const statement of ast.body) {
     const span = withLeadingComments(statement, previousEnd, parsed)

@@ -217,31 +217,6 @@ function placeholder(given: JSX.Element | undefined, own: (() => JSX.Element) | 
   return fallback === undefined ? '' : withFieldMarks(undefined, () => child(fallback))
 }
 
-// A static component that passes an island what only an island sends, a function, a block taking parameters or an instance of a class, renders as an island itself, sending its own props instead; one passing only data stays static.
-export function promote<P extends object>(id: string, render: (props: P) => JSX.Element, hydrated: (props: P) => JSX.Element, messages: readonly string[] = [], cause?: string): (props: P) => JSX.Element {
-  const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends', [], cause)
-
-  return carryFailed(render, (props: P) => {
-    if (depth > 0)
-      return hydrated(props)
-
-    const restore = islandCheckpoint()
-
-    try {
-      return render(props)
-    }
-    catch (error) {
-      if (!(error instanceof IslandPropsError))
-        throw error
-
-      // The islands it rendered before render inside it now.
-      restore?.()
-
-      return asIsland(props)
-    }
-  })
-}
-
 // The children and slots without parameters a static parent passes, which the compiler writes as getters, as the markup they render to; one holding only text is data like any prop.
 function staticSlots(props: object): [key: string, markup: string][] {
   const slots: [string, string][] = []

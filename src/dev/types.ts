@@ -85,7 +85,7 @@ const probes: ProbeMemory = new Map()
 // The diagnostics tsgo reported, with or without a code of its own, and the lints made of its errors: the other lints `kay check` finds in the .kay files are the dev tool's already, from the compile.
 const TYPE_CODE = /^TS\d+$/
 // The lints only the types find, which the compile does not report.
-const TYPE_LINTS = new Set(['uncalled-signal', 'secret-prop', 'island-prop', 'promoted-island', 'incomplete-match', 'deprecated-auth-error'])
+const TYPE_LINTS = new Set(['uncalled-signal', 'secret-prop', 'island-prop', 'incomplete-match', 'deprecated-auth-error'])
 
 // Types the project as `kay check` does, with the config this process loaded, and says the type errors on a line of their own.
 async function typecheck(): Promise<number> {

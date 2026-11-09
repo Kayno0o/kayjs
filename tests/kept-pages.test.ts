@@ -93,7 +93,7 @@ const KEPT: Record<string, string> = {
 // Each page here depends on its request or the moment in a way its source shows or hides.
 const READING: Record<string, string> = {
   'src/routes/ctx.kay': 'p {ctx.url.search}\n',
-  'src/routes/query.kay': '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Optional(s.Number()) }) }\n---\np Query\n',
+  'src/routes/query.kay': '--- server\nimport { action, s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Optional(s.Number()) }) }\n---\np Query\n',
   'src/routes/date.kay': 'p {new Date().getFullYear()}\n',
   'src/routes/random.kay': 'p {Math.random()}\n',
   'src/routes/env.kay': 'p {process.env.HOME}\n',
@@ -238,10 +238,10 @@ const GUESTBOOK: Record<string, string> = {
   'src/routes/index.kay': '---\nimport { messages } from \'../guestbook\'\n---\np {messages.join(\',\')}\n',
   'src/routes/about.kay': '---\nimport { stable } from \'../guestbook\'\n---\np {stable()}\n',
   'src/routes/asked.kay': '--- server\nimport { asked } from \'../guestbook\'\n\nexport const page = { prerender: true }\n---\np {asked()}\n',
-  'src/routes/add.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n})\n---\nform(action={save}) button Add\n',
-  'src/routes/invalidate.kay': '--- server\nimport { s } from \'kay\'\nimport { invalidatePage } from \'kay/cache\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n  invalidatePage(\'/\')\n})\n---\nform(action={save}) button Invalidate\n',
-  'src/routes/slow.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  await Bun.sleep(300)\n  add()\n})\n---\nform(action={save}) button Slow\n',
-  'src/routes/fail.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n\n  throw new Error(\'boom\')\n})\n---\nform(action={save}) button Fail\n',
+  'src/routes/add.kay': '--- server\nimport { action, s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n})\n---\nform(action={save}) button Add\n',
+  'src/routes/invalidate.kay': '--- server\nimport { action, s } from \'kay\'\nimport { invalidatePage } from \'kay/cache\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n  invalidatePage(\'/\')\n})\n---\nform(action={save}) button Invalidate\n',
+  'src/routes/slow.kay': '--- server\nimport { action, s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  await Bun.sleep(300)\n  add()\n})\n---\nform(action={save}) button Slow\n',
+  'src/routes/fail.kay': '--- server\nimport { action, s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n\n  throw new Error(\'boom\')\n})\n---\nform(action={save}) button Fail\n',
   'src/routes/calls.json.ts': 'import { counts } from \'../guestbook\'\n\nexport function GET(): Response {\n  return Response.json(counts)\n}\n',
   'src/routes/private/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-pass\'))\n    deny(403)\n})\n',
   'src/routes/private/index.kay': '---\nimport { messages } from \'../../guestbook\'\n---\np {messages.join(\',\')}\n',
@@ -988,15 +988,15 @@ describe('what kay exports to a page that is kept', () => {
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })
   })
 
-  it('judges a value of kay a page reads with no import as it judges an imported one', async () => {
+  it('judges a value of kay a page reads, in its script, template or markdown, by what it is', async () => {
     const root = await project({
-      'src/routes/free.kay': '---\nconst id = uid()\nconst count = signal(1)\n---\np {id} {count()}\n',
-      'src/routes/local.kay': '---\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
-      'src/routes/cookie.kay': '---\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
-      'src/routes/server.kay': '--- server\nconst origin = publicEnv.SITE\n---\np {origin}\n',
+      'src/routes/free.kay': '---\nimport { signal, uid } from \'kay\'\n\nconst id = uid()\nconst count = signal(1)\n---\np {id} {count()}\n',
+      'src/routes/local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
+      'src/routes/cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/server.kay': '--- server\nimport { publicEnv } from \'kay\'\n\nconst origin = publicEnv.SITE\n---\np {origin}\n',
       'src/routes/declared.kay': '---\nconst live = 1\n---\np {live}\n',
-      'src/routes/template.kay': 'p {publicEnv.SITE}\n',
-      'src/routes/markdown.kay': 'markdown\n  Hello {publicEnv.SITE}\n',
+      'src/routes/template.kay': '---\nimport { publicEnv } from \'kay\'\n---\np {publicEnv.SITE}\n',
+      'src/routes/markdown.kay': '---\nimport { publicEnv } from \'kay\'\n---\nmarkdown\n  Hello {publicEnv.SITE}\n',
     })
 
     roots.push(root)
@@ -1097,7 +1097,7 @@ describe('what kay exports to a page that is kept', () => {
 
   it('names what a page really reads beside an export that reads nothing', async () => {
     const root = await project({
-      'src/routes/both.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.String()\n---\np {ctx.url.search}\n',
+      'src/routes/both.kay': '--- server\nimport { action, s } from \'kay\'\n\nconst shape = s.String()\n---\np {ctx.url.search}\n',
       'src/routes/bound.kay': '---\nimport { s, queryParam } from \'kay\'\n\nconst page = queryParam(\'page\')\n---\np {page()}\n',
       'src/routes/unknown.kay': '---\nimport { somethingNew } from \'kay\'\n---\np Hi\n',
     })

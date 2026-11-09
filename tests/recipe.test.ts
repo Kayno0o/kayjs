@@ -41,7 +41,7 @@ const files: Record<string, string> = {
   'button.kay': '---\nimport { recipe } from \'kay\'\nconst button = recipe({ parts: \'rounded px-4\', variants: { size: { sm: \'text-sm\', lg: \'text-lg\' }, wide: { true: \'w-full\' } }, defaults: { size: \'sm\' } })\nconst { label, ...rest } = props<{ label: string, [key: string]: unknown }>()\n---\nbutton.btn({...rest}) {label}\n',
   'plain.kay': 'section.card\n  header(part="head") a\n',
   'calls.kay': '---\nimport Button from \'./button.kay\'\nimport Card from \'./card.kay\'\n---\nCard(title="default") a\nCard(title="danger" tone="danger") b\nCard(title="compact" compact) c\nCard(title="override" compact class={{ head: \'p-6\' }}) d\nCard(title="string" class="mt-4") e\nButton(label="small")\nButton(label="large" size="lg" wide id="x")\nButton(label="no-wide" wide={false})\n',
-  'parent.kay': '---\nimport Card from \'./card.kay\'\nconst tone = signal<\'plain\' | \'danger\'>(\'plain\')\nconst compact = signal(false)\n---\nbutton.swap(onClick={() => tone.set(\'danger\')}) swap\nbutton.pack(onClick={() => compact.set(true)}) pack\nCard(title="t" tone={tone()} compact={compact()}) body\n',
+  'parent.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\nconst tone = signal<\'plain\' | \'danger\'>(\'plain\')\nconst compact = signal(false)\n---\nbutton.swap(onClick={() => tone.set(\'danger\')}) swap\nbutton.pack(onClick={() => compact.set(true)}) pack\nCard(title="t" tone={tone()} compact={compact()}) body\n',
   'part-call.kay': '---\nimport { recipe } from \'kay\'\nimport Card from \'./card.kay\'\nconst panel = recipe({ parts: { root: \'rounded\', card: \'mt-2\' }, variants: { flat: { true: { card: \'mt-0\' } } } })\n---\nsection\n  Card(part="card" title="inner") x\n',
 }
 

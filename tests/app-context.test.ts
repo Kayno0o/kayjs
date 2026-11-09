@@ -99,7 +99,7 @@ describe('the app\'s src/context.ts', () => {
   })
 
   it('is no island\'s to read', () => {
-    const island = '---\nimport { signal } from "kay"\nconst n = signal(0)\n---\nbutton(click={() => n++}) {ctx.plan} {n()}\n'
+    const island = '---\nimport { ctx, signal } from "kay"\nconst n = signal(0)\n---\nbutton(click={() => n++}) {ctx.plan} {n()}\n'
 
     expect(compileKay(island, 'test.kay').diagnostics.map(d => d.message)).toEqual([expect.stringContaining('`ctx` is read on the server')])
   })
@@ -109,7 +109,7 @@ describe('the app\'s src/context.ts', () => {
 
     await Bun.write(resolve(root, 'tsconfig.json'), await Bun.file('tests/fixtures/action-streams/tsconfig.json').text())
     await Bun.write(resolve(root, 'src/routes/typed.kay'), '---\nimport { ctx } from \'kay\'\n---\np#typed {ctx.plan.length} {ctx.cartCount.toFixed(0)}\n')
-    await Bun.write(resolve(root, 'src/routes/untyped.kay'), 'p#untyped {ctx.nope}\n')
+    await Bun.write(resolve(root, 'src/routes/untyped.kay'), '---\nimport { ctx } from \'kay\'\n---\np#untyped {ctx.nope}\n')
 
     const { output, report } = await kayCheck([root])
     const text = output + report
