@@ -95,7 +95,7 @@ function pressed(event: PointerEvent) {
 
   const text = next?.dataset.tooltip ?? next?.dataset.hint
 
-  if (event.pointerType === 'mouse' || !next || !text || aimed()?.element === next || (next.dataset.hint === undefined && next.matches(CONTROL))) {
+  if (event.pointerType === 'mouse' || !next || !text || aimed()?.element === next || next.getAttribute('aria-expanded') === 'true' || (next.dataset.hint === undefined && next.matches(CONTROL))) {
     hide()
 
     return
