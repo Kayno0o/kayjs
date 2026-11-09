@@ -1,0 +1,10 @@
+---
+import Nav from '../components/nav.kay'
+import Online from '../components/online.kay'
+import RoomUsers from '../components/room-users.kay'
+---
+Nav
+h1 Deferred
+Online
+div(style="height: 3000px")
+RoomUsers(id="lobby" hydrate="visible")

@@ -8,6 +8,9 @@ const failed = new WeakMap<Element, string>()
 // The scripts each selector found once the page was parsed, until a swap changes the page: a read that finds nothing, the usual one, then searches the page once.
 const found = new Map<string, Element[]>()
 
+// The islands a page hydrates as it loads, whose code may still be arriving, which a live value's connection waits for so it carries what they all read.
+export const loadingIslands: Promise<unknown>[] = []
+
 // Called where a swap changes the page's elements, so the next read searches the page again.
 export function forgetPageData(): void {
   found.clear()

@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A page opens its one live connection once the islands it hydrates as it loads have all subscribed, however late their code arrives, instead of a second one when an island is slow ([live values](live-values.md)).
+
 ## 1.94.0
 
 - A link pressed while its hover prefetch was still waiting no longer fetches its page a second time, so a page is requested once per visit on a slow machine too ([navigation](navigation-from-code.md)).

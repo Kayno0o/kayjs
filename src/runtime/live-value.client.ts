@@ -2,7 +2,7 @@ import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-
 import { withBase } from './base'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
-import { pageData } from './page-data'
+import { loadingIslands, pageData } from './page-data'
 import { isHydrating, onCleanup, ownSignal, tracking, untrack, whenHydrated } from './reactive'
 import { decodeServerValue } from './wire'
 
@@ -15,6 +15,8 @@ const GONE_RETRY_MS = 5 * 60_000
 const RENEW_EVENT = 'kay-renew'
 // How long a browser waits after the values it reads change before it opens, moves or closes its connection, so the islands of a page and a swap share one.
 const SETTLE_MS = 30
+// The longest it then waits for the islands the page hydrates as it loads, whose code may arrive late, so one that never does leaves the page no less followed.
+const ISLANDS_MS = 5000
 
 interface Entry {
   read: () => unknown
@@ -152,7 +154,23 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 function settle(): void {
   clearTimeout(settling)
-  settling = setTimeout(sync, SETTLE_MS)
+  settling = setTimeout(() => void syncAfterIslands(), SETTLE_MS)
+}
+
+async function loaded(): Promise<void> {
+  while (loadingIslands.length > 0)
+    await Promise.allSettled(loadingIslands.splice(0))
+}
+
+// The keys of every island hydrating as the page loads are read before the connection opens, however late their code arrives, so a page costs one connection; one that subscribes later still moves it.
+async function syncAfterIslands(): Promise<void> {
+  const mine = settling
+
+  await Promise.race([loaded(), new Promise(resolve => setTimeout(resolve, ISLANDS_MS))])
+
+  // A key that changed meanwhile settled again, and that one syncs.
+  if (settling === mine)
+    sync()
 }
 
 // Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; `gone` when the page no longer holds any, as one the visitor may not see, `failed` when it could not be asked.

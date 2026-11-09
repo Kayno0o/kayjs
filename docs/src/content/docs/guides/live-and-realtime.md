@@ -32,7 +32,7 @@ You read a live value by calling it, as you read a signal. A browser only reads:
 
 Declare each one as `export const name = live(...)` at the top of a module. The build names it from its path, so the server and the browser agree.
 
-A component that reads a live value is an island. A page that reads none ships no JavaScript and opens no connection. A page that reads some opens one connection, however many it reads, and its HTML already holds the values, so nothing flashes while it loads.
+A component that reads a live value is an island. A page that reads none ships no JavaScript and opens no connection. A page that reads some opens one connection, however many it reads and however long its islands take to hydrate, and its HTML already holds the values, so nothing flashes while it loads.
 
 ### When the connection fails
 

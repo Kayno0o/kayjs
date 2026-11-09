@@ -1,5 +1,5 @@
 import type { LivePage, LiveRequest } from '../src/runtime/live-value'
-import type { TestSite } from '../src/test'
+import type { TestPage, TestSite } from '../src/test'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
@@ -543,6 +543,16 @@ describe('writing a live value in a browser', () => {
 })
 
 const chrome = browserPath()
+// The time the keyed island of the fixture takes to arrive, past the one a page settles its connection in.
+const ISLAND_DELAY_MS = 400
+
+// Answers the chunk of the room island late, so it hydrates after the island beside it.
+async function delayRoomIsland(page: TestPage): Promise<void> {
+  await page.route('/_kay/room-users-*', async (request) => {
+    await Bun.sleep(ISLAND_DELAY_MS)
+    await request.continue()
+  })
+}
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live values in a browser', () => {
@@ -585,6 +595,69 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     live.room.set('lobby', { id: 'lobby', users: 4 })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '4 in lobby')
     expect(connections).toHaveLength(1)
+  })
+
+  it('opens one connection for every value the page reads at load, however late its islands hydrate', async () => {
+    connections.length = 0
+    live.room.set('lobby', { id: 'lobby', users: 1 })
+
+    await using page = await site.open('/about')
+
+    await delayRoomIsland(page)
+    await page.goto('/')
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '1 in lobby')
+    live.room.set('lobby', { id: 'lobby', users: 5 })
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '5 in lobby')
+    live.visitors.set(77)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '77 online')
+    expect(connections).toHaveLength(1)
+    expect(page.errors).toEqual([])
+  })
+
+  it('carries the values of a page a link swaps in on one connection, however late its islands hydrate', async () => {
+    connections.length = 0
+
+    await using page = await site.open('/about')
+
+    await delayRoomIsland(page)
+    await page.click('a.home')
+    await page.waitUntil(() => document.querySelector('p.users') !== null)
+    live.room.set('lobby', { id: 'lobby', users: 6 })
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '6 in lobby')
+    expect(connections).toHaveLength(1)
+  })
+
+  it('opens its one connection for a page loaded in a hidden tab once the tab is shown, however late its islands hydrate', async () => {
+    connections.length = 0
+
+    await using page = await site.open('/about')
+
+    await delayRoomIsland(page)
+    await page.cdp('Page.addScriptToEvaluateOnNewDocument', { source: 'Object.defineProperty(document, \'hidden\', { configurable: true, get: () => true })' })
+    await page.goto('/')
+    await Bun.sleep(ISLAND_DELAY_MS + 200)
+    expect(connections).toEqual([])
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, 'hidden')
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await until(() => connections.length === 1)
+    live.room.set('lobby', { id: 'lobby', users: 8 })
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '8 in lobby')
+    expect(connections).toHaveLength(1)
+  })
+
+  it('moves the connection for a value that subscribes once the page has loaded, as a deferred island does', async () => {
+    connections.length = 0
+
+    await using page = await site.open('/deferred')
+
+    await until(() => connections.length === 1)
+    await page.hover('p.users')
+
+    live.room.set('lobby', { id: 'lobby', users: 9 })
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '9 in lobby')
+    expect(connections).toHaveLength(2)
   })
 
   it('closes the connection of a hidden tab, and opens it again with the values as they are once the tab is shown', async () => {
