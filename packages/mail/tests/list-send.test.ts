@@ -97,6 +97,17 @@ describe('a broadcast', () => {
     expect([...ids].every(id => isOwnMessageId(id))).toBe(true)
   })
 
+  it('names the site by its host in the footer', async () => {
+    const [email] = seed(1)
+    const app = mailer({ from: 'a@fixture.test' })
+    const list = app.list('news', { file, pace: PACE })
+    const { id } = await list.send({ subject: 'News', text: 'Hello' })
+
+    await finish(app, id)
+
+    expect(sentTo(email!)[0]!.text).toContain('subscribed to the mails of localhost.')
+  })
+
   it('resumes after a restart where it stopped, mailing nobody twice', async () => {
     const emails = seed(5)
     const jobs = memoryJobs()

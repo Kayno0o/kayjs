@@ -242,6 +242,23 @@ describe('the subscribe form', () => {
     expect(outbox.mails).toHaveLength(before)
   })
 
+  it('gives every view the site as its origin and the host apart, the words and the subject naming the host', async () => {
+    const email = fresh()
+
+    await site.call(subscribeCounted, { email })
+
+    expect({ site: rendered.site, host: rendered.host }).toEqual({ site: 'http://localhost', host: 'localhost' })
+
+    const [other, subject] = [fresh(), 'Confirm your subscription to localhost']
+
+    await site.call(subscribe, { email: other })
+
+    const sent = await confirmationOf(other)
+
+    expect(sent.subject).toBe(subject)
+    expect(sent.html).toContain('the mails of localhost')
+  })
+
   it('takes the same steps for a listed address as for a new one, mailing only the new one', async () => {
     const email = fresh()
     const before = rendered.count
@@ -602,7 +619,7 @@ describe('what the subscriber is told and what is kept', () => {
 
     const sent = await confirmationOf(email)
 
-    expect(sent.text).toContain('the list Spring news of http://localhost')
+    expect(sent.text).toContain('the list Spring news of localhost')
     expect(outbox.links(sent)).toContain('http://localhost/privacy')
   })
 
@@ -613,7 +630,7 @@ describe('what the subscriber is told and what is kept', () => {
 
     const sent = await confirmationOf(email)
 
-    expect(sent.text).toContain('You will receive the mails of http://localhost')
+    expect(sent.text).toContain('You will receive the mails of localhost')
     expect(sent.text).not.toContain('/privacy')
   })
 

@@ -38,6 +38,8 @@ export interface ListConfirmProps {
   url: string
   // The site's origin.
   site: string
+  // The site's host, as `example.com`, which the default view names the site by; the host of `site` when left out.
+  host?: string | undefined
   // The list's `title`, or its name unless that is `default`; undefined for the site's only list.
   list?: string | undefined
   // The absolute link of the privacy policy, the list's `privacy`.
@@ -193,8 +195,9 @@ async function view<T>(file: 'confirm' | 'footer' | 'page'): Promise<T> {
 
 // The footer in one locale with a stand-in for the link, so a broadcast renders it once per locale and not once per subscriber.
 async function footerOf(locale: string): Promise<{ html: string, text: string }> {
-  const footer = await view<(props: { url: string, site: string }) => JSX.Element>('footer')
-  const html = await renderToString(footer, { url: PLACEHOLDER, site: new URL(siteOrigin()).host }, { locale })
+  const footer = await view<(props: { url: string, site: string, host?: string }) => JSX.Element>('footer')
+  const origin = siteOrigin()
+  const html = await renderToString(footer, { url: PLACEHOLDER, site: origin, host: new URL(origin).host }, { locale })
 
   return { html, text: htmlToText(html) }
 }
@@ -385,9 +388,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           const subscriber = await lists.get().ask(name, email, keyedDigest('mail-list-id', `${name}\n${email}`), locale, asked, { source: sourceOf(ctx), wording: input.wording })
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
-          const site = new URL(origin).host
+          const siteHost = new URL(origin).host
 
-          const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin, list: options.title ?? (name === 'default' ? undefined : name), privacy: options.privacy === undefined ? undefined : new URL(options.privacy, origin).href } }
+          const confirmation: MailMessage<ListConfirmProps> = { to: email, subject: wording('mail.list.confirm.subject', 'Confirm your subscription to {site}', { site: siteHost }), locale, view: options.view ?? await view<(props: ListConfirmProps) => JSX.Element>('confirm'), props: { url, site: origin, host: siteHost, list: options.title ?? (name === 'default' ? undefined : name), privacy: options.privacy === undefined ? undefined : new URL(options.privacy, origin).href } }
 
           try {
             // Rendered for a listed address too, and only a pending one is queued, off the response path, so the answer takes the same time whether the address is known or not.

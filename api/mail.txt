@@ -165,6 +165,7 @@ function htmlToText(html: string): string
 
 [.] ListConfirmProps
 interface ListConfirmProps
+  host?: string | undefined
   list?: string | undefined
   privacy?: string | undefined
   site: string
@@ -642,6 +643,7 @@ component default
 
 [./list-confirm.kay] default
 component default
+  host?: string | undefined
   list?: string | undefined
   privacy?: string | undefined
   site: string
@@ -649,6 +651,7 @@ component default
 
 [./list-footer.kay] default
 component default
+  host?: string
   site: string
   url: string
 
