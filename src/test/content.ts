@@ -116,17 +116,6 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
     originals.delete(collection)
   }
 
-  const entriesOf = (name: string, collection: Collection<unknown>, seeded: SeedEntry[]) => {
-    const localized = collection.options.localized === true
-
-    return seeded.map((entry): LoadedEntry => {
-      if (localized && entry.locale === undefined)
-        throw new KayError('content-api-misuse', `kay: the seed of ${name} gives ${entry.slug} no locale, which each entry of a localized collection has`)
-
-      return { slug: localized ? `${entry.locale}/${entry.slug}` : entry.slug, data: entry.data, ...entry.body !== undefined && { body: entry.body }, ...entry.html !== undefined && { html: entry.html } }
-    })
-  }
-
   // Replaces a loader's methods by ones working on entries kept in memory, `save` and `remove` only where the loader declares them.
   const seedLoaded = (name: string, collection: Collection<unknown>, seeded: SeedEntry[]) => {
     const loader = collection.loader as (ContentLoader & Partial<Methods>) | undefined
@@ -184,7 +173,10 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   // The first use of the content moves every folder collection to its copy, so a file written straight into the project's folder is ignored from then on as a saved one is, and not only once a save reaches its folder.
-  const isolateAll = async () => {
+  // False when a reset came meanwhile and ended this test's content, so the write or seed waiting on it lands nowhere.
+  const isolateAll = async (): Promise<boolean> => {
+    const mine = epoch
+
     started ??= (async () => {
       await Promise.all(folders.map(async ([, collection]) => isolate(resolve(contentPlace().base, collection.dir))))
     })()
@@ -197,15 +189,12 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
 
       throw error
     }
+
+    return mine === epoch
   }
 
   const seed = async (name: string, entries: SeedEntry[]) => {
-    const mine = epoch
-
-    await isolateAll()
-
-    // A reset that came meanwhile ended this test's content, so the seed lands nowhere.
-    if (mine !== epoch)
+    if (!await isolateAll())
       return
 
     const found = named.find(([exported]) => exported === name)
@@ -224,9 +213,9 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const write = async (name: string, file: string, text: string) => {
-    const mine = epoch
-
-    await isolateAll()
+    // Every folder is copied by then, this one too.
+    if (!await isolateAll())
+      return
 
     const folder = folders.find(([exported]) => exported === name)
 
@@ -234,14 +223,6 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
       throw new KayError('content-api-misuse', `kay: content.write() writes a file of a folder collection, and ${name} is ${named.some(([exported]) => exported === name) ? 'loaded: seed it instead' : `exported by no content config${named.length === 0 ? '' : `; it exports ${named.map(([exported]) => exported).join(', ')}`}`}`)
 
     const real = resolve(contentPlace().base, folder[1].dir)
-
-    if (mine === epoch)
-      await isolate(real)
-
-    // A reset that came meanwhile ended this test's content, so the write lands nowhere.
-    if (mine !== epoch)
-      return
-
     const target = resolve(copies.get(real)!, file)
 
     if (relative(copies.get(real)!, target).startsWith('..'))
@@ -252,23 +233,21 @@ async function makeContent(root: string, config: string | undefined): Promise<{ 
   }
 
   const reset = async (given: ContentSeed = {}) => {
-    // A copy under way ends first, and its epoch is over, so it lands nowhere; one asked for from here on copies into a scratch folder of its own, not the one being removed.
+    // A copy under way ends first, and its epoch is over, so it lands nowhere.
     epoch++
-
-    const under = [...isolating.values()]
-    const removed = scratch
-
-    copies.clear()
-    isolating.clear()
-    started = undefined
-    scratch = undefined
-    await Promise.allSettled(under)
+    await Promise.allSettled(isolating.values())
 
     for (const [, collection] of named)
       restoreLoader(collection)
 
-    if (removed !== undefined)
-      await rm(await removed, { recursive: true, force: true })
+    copies.clear()
+    isolating.clear()
+    started = undefined
+
+    if (scratch !== undefined)
+      await rm(await scratch, { recursive: true, force: true })
+
+    scratch = undefined
 
     for (const [, collection] of named)
       collection.invalidate()
@@ -310,6 +289,18 @@ interface Held {
 let held: Held | undefined
 
 // The process serves one project, so its sites share one copy of the content, which goes when the last of them closes.
+// The entries a seed of a loaded collection holds, each slug under its locale in a localized one.
+function entriesOf(name: string, collection: Collection<unknown>, seeded: SeedEntry[]): LoadedEntry[] {
+  const localized = collection.options.localized === true
+
+  return seeded.map((entry): LoadedEntry => {
+    if (localized && entry.locale === undefined)
+      throw new KayError('content-api-misuse', `kay: the seed of ${name} gives ${entry.slug} no locale, which each entry of a localized collection has`)
+
+    return { slug: localized ? `${entry.locale}/${entry.slug}` : entry.slug, data: entry.data, ...entry.body !== undefined && { body: entry.body }, ...entry.html !== undefined && { html: entry.html } }
+  })
+}
+
 export async function testContent(root: string, config: string | undefined): Promise<{ content: TestContent, release: () => Promise<void> }> {
   const key = `${root}\0${config ?? ''}`
 
