@@ -7,3 +7,6 @@ h1 Shell
 button#saved(type="button" onClick={() => toast.success('Saved')}) Save
 button#acted(type="button" onClick={() => toast.error('Diverged', { action: { label: 'Rebase', run: async () => { await new Promise(resolve => setTimeout(resolve, 50)); document.body.dataset.rebased = 'yes' } } })}) Act
 IconButton#help(icon="info" label="Help")
+span#hinted(data-hint="Deals double damage") Hinted
+// kay-allow unreachable-tooltip: the tooltip a tap shows on an element no keyboard reaches
+span#noted(data-tooltip="Worn on the head") Noted

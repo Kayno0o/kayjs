@@ -8,6 +8,8 @@ const CARRIER = '[data-tooltip], [data-hint]'
 // The anchor name the tooltip's recipe positions against.
 const ANCHOR = '--tooltip-anchor'
 const WHITESPACE = /\s+/
+// A control a tap acts on, whose tooltip a tap leaves alone, as it does what the tap asked instead.
+const CONTROL = 'a[href], button, input, select, textarea, summary, label, [contenteditable], [role=button], [role=link], [role=menuitem], [role=tab], [role=option], [role=checkbox], [role=radio], [role=switch]'
 // The id of the tooltip panel, which the element it shows for points at with `aria-describedby`.
 const PANEL_ID = 'kui-tooltip'
 
@@ -87,6 +89,23 @@ function over(event: PointerEvent) {
   onto(found(event))
 }
 
+// A touch screen has no hover, so a tap shows a hint, or the tooltip of an element no tap acts on, and a second tap on it hides it; a mouse press, or a tap anywhere else, hides it as before.
+function pressed(event: PointerEvent) {
+  const next = found(event)
+
+  const text = next?.dataset.tooltip ?? next?.dataset.hint
+
+  if (event.pointerType === 'mouse' || !next || !text || aimed()?.element === next || (next.dataset.hint === undefined && next.matches(CONTROL))) {
+    hide()
+
+    return
+  }
+
+  clearTimeout(timer)
+  at = next
+  aimed = { element: next, text }
+}
+
 // Escape closes the tooltip and leaves the key to whatever else it does; it stays closed until the pointer or the focus moves to another element.
 function keyDown(event: KeyboardEvent) {
   if (event.key !== 'Escape' || !aimed())
@@ -110,7 +129,7 @@ effect(() => {
   document.addEventListener('pointerover', over)
   document.addEventListener('focusin', focused)
   document.addEventListener('focusout', blurred)
-  document.addEventListener('pointerdown', hide)
+  document.addEventListener('pointerdown', pressed)
   document.addEventListener('keydown', keyDown)
   window.addEventListener('blur', hide)
   // A popover's toggle does not bubble, so it is caught on its way down.
@@ -121,7 +140,7 @@ effect(() => {
     document.removeEventListener('pointerover', over)
     document.removeEventListener('focusin', focused)
     document.removeEventListener('focusout', blurred)
-    document.removeEventListener('pointerdown', hide)
+    document.removeEventListener('pointerdown', pressed)
     document.removeEventListener('keydown', keyDown)
     window.removeEventListener('blur', hide)
     document.removeEventListener('toggle', toggled, true)

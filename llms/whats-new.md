@@ -2,6 +2,11 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui's `TooltipHost` shows a `data-hint`, or the `data-tooltip` of an element no tap acts on, when a touch screen taps it, and hides it on a second tap or a tap elsewhere: hints on a phone are readable with nothing to add ([tooltips](../packages/ui/llms/basics.md)).
+- kay/test's `page.tap(selector)` taps an element as a finger does, with `touch` pointer events, so a touch-screen behaviour is tested without raw DevTools touch events ([browser tests](testing-browser.md)).
+
 ## 1.92.0
 
 - kayjs-ui `AppHeader`, `SiteNav`, `TabNav` and `SideNav` given no links draw nothing to navigate with: no nav landmark, no menu toggle opening an empty popover, no menu button, so the `class={{ nav: links.length === 0 ? 'hidden' : '' }}` workaround goes ([navigation](../packages/ui/llms/tables-navigation-and-layout.md)).

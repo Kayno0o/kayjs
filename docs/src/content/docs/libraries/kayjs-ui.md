@@ -111,6 +111,8 @@ slot
 
 For a hover explanation of read-only text, such as a stat, write `data-hint="Damage per second"` instead of `data-tooltip`: the host shows it under the pointer only, and `kay check` does not report it as an `unreachable-tooltip`. A hint only adds to what the element already says, as the keyboard and screen readers never reach it.
 
+A touch screen has no hover, so a tap shows a hint, or the `data-tooltip` of an element the tap does not act on (anything but a link, a button, a field or a control role). A second tap on it, or a tap anywhere else, hides it again.
+
 ```kay
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'

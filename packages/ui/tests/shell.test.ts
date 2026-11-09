@@ -48,6 +48,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('shows a hint or a non-control\'s tooltip on a tap, hides it on a second tap or a tap elsewhere, and leaves a control\'s alone', async () => {
+    const page = await site.open('/shell')
+    const open = async () => page.evaluate(() => document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+
+    await page.tap('#hinted')
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')?.matches(':popover-open'))
+    expect(await page.text('#kui-tooltip')).toBe('Deals double damage')
+
+    await page.tap('#hinted')
+    await page.waitUntil(() => !document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+
+    await page.tap('#noted')
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')?.matches(':popover-open'))
+    expect(await page.text('#kui-tooltip')).toBe('Worn on the head')
+
+    await page.tap('h1')
+    await page.waitUntil(() => !document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+
+    // A tap on a control does what it asks; its tooltip stays for the mouse and the keyboard, past the show delay too.
+    await page.tap('#help')
+    await Bun.sleep(300)
+    expect(await open()).toBe(false)
+
+    // A mouse press still hides what the hover showed.
+    await page.hover('#hinted')
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')?.matches(':popover-open'))
+    await page.click('#hinted')
+    await page.waitUntil(() => !document.querySelector('#kui-tooltip')!.matches(':popover-open'))
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('runs a toast\'s action from its button and goes once it resolves', async () => {
     const page = await site.open('/shell')
 
