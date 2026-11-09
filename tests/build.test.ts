@@ -530,6 +530,50 @@ describe('kay build', () => {
       await Bun.write(kay, 'p changed\n')
       await keep()
       expect(pointed).toBe(2)
+
+      // A map kept for a chunk this build no longer has goes; the ones it named stay.
+      const kept = join(projectPaths(dir).cache, 'kept-maps')
+      const stray = join(kept, 'stray.zst')
+
+      await Bun.write(stray, 'old')
+      await keep()
+      expect(await Bun.file(stray).exists()).toBe(false)
+      expect((await readdir(kept)).length).toBeGreaterThan(0)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('points a kept map again when the .kay file behind an island twin in it changes', async () => {
+    const dir = await scratchDir('kept-maps-twin-')
+    const raw = join(dir, '.kay', 'client', 'island-bbbbbbbb.js.map')
+    const kay = join(dir, 'src', 'twin.kay')
+    const text = JSON.stringify({ version: 3, sources: ['../../src/twin.kay?island'], sourcesContent: ['compiled'], mappings: '' })
+    let pointed = 0
+    const keep = async () => {
+      await Bun.write(raw, text)
+      forgetBundleMaps()
+      registerSourceMap(`${kay}?island`, () => {
+        pointed++
+
+        return { source: 'p twin\n', tsx: 'compiled', map: undefined as never }
+      }, true)
+      await keepMaps(dir, [raw])
+    }
+
+    try {
+      await Bun.write(kay, 'p twin\n')
+      await keep()
+      await keep()
+      expect(pointed).toBe(1)
+
+      const before = pointed
+
+      // A blank line moves every line under it, though the twin compiles to the same code.
+      await Bun.write(kay, '\np twin\n')
+      await keep()
+      expect(pointed).toBe(before + 1)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -2160,17 +2204,19 @@ process.exit(0)
     const source = '--- server\nfunction explode() {\n  throw new Error(\'x\')\n}\n---\np\n'
     const code = await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })
 
-    expect(hasSourceMapOf(file, code)).toBe(true)
+    expect(hasSourceMapOf(file, source, code)).toBe(true)
     // The second transform hits the cache, and the map the first compile made stays: no lazy one replaces it to compile the file again.
     expect(await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })).toBe(code)
-    expect(hasSourceMapOf(file, code)).toBe(true)
+    expect(hasSourceMapOf(file, source, code)).toBe(true)
+    // A map made for other text of the file points at other lines, even where it compiled to the same code.
+    expect(hasSourceMapOf(file, `\n${source}`, code)).toBe(false)
 
     // A warm run in a new process holds no map yet, and gets the one that compiles on demand.
     registerSourceMap(file, () => {
       throw new Error('compiled again')
     })
     await transformKayCached(source, file, { target: 'ssr', root: dir, cacheDir: dir })
-    expect(hasSourceMapOf(file, code)).toBe(false)
+    expect(hasSourceMapOf(file, source, code)).toBe(false)
   })
 
   it('maps a frame an executable prints relative to where it was built, in either form, and leaves a map that cannot be read', async () => {

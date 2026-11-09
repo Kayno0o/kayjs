@@ -126,7 +126,7 @@ export async function transformKayCached(source: string, filename: string, given
 
   // A file compiled earlier in this build, as a cold build does for each variant, keeps the map it made then.
   if (cached !== undefined) {
-    if (!hasSourceMapOf(filename, cached, options.target === 'dom')) {
+    if (!hasSourceMapOf(filename, source, cached, options.target === 'dom')) {
       registerSourceMap(filename, () => {
         const { code, map } = compile(source, filename, options, signals)
 

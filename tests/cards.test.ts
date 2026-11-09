@@ -11,7 +11,7 @@ import { bootProblems } from '../src/check/boot'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { runInLocale } from '../src/runtime/locale-state'
 import { serveCards, setupCards, writeCards } from '../src/server/card'
-import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
+import { fill, fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
 import { decodePng } from '../src/server/crop'
 import { readFace } from '../src/server/face'
 import { prepareFonts } from '../src/server/fonts'
@@ -142,6 +142,17 @@ describe('outlines', () => {
 })
 
 describe('share cards', () => {
+  it('fills a canvas of any size with its background, pixel for pixel', () => {
+    const color: [number, number, number] = [12, 200, 77]
+
+    for (const length of [1, 2, 3, 5, 7, 64, 1201]) {
+      const canvas = { width: length, height: 1, pixels: new Uint8Array(length * 3) }
+
+      fill(canvas, color)
+      expect(canvas.pixels).toEqual(Uint8Array.from({ length: length * 3 }, (_, index) => color[index % 3]!))
+    }
+  })
+
   it('links a page\'s card from its head, signed, and draws it as a 1200x630 JPEG kept a year', async () => {
     const path = await cardPath('/plain')
     const url = new URL(path, 'http://localhost')

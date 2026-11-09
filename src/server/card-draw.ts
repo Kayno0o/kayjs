@@ -66,7 +66,7 @@ export async function drawCard(look: CardLook, title: string, image?: Uint8Array
 }
 
 // The first pixel, then the filled part copied after itself, doubling each time: about 20 copies for a card in place of one `set` per pixel.
-function fill(canvas: Canvas, color: Color): void {
+export function fill(canvas: Canvas, color: Color): void {
   const { pixels } = canvas
 
   pixels.set(color, 0)
