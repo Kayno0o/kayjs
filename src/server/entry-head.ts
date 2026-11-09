@@ -8,9 +8,15 @@ import { FEED_TYPES, feedPaths, resolvedFeed } from '../content/feed'
 import { localHref } from '../runtime/html'
 import { pagePrerender, pageSetting } from './page-settings'
 
+// The page modules that list no collection and name no feed, which have no entry head on any request.
+const headless = new WeakSet<object>()
+
 // The head of a page showing one entry of the collection its `prerender` or `sitemap` lists, written from the entry's data: the collection fills a route of one param with the slugs, so the entry is the one `get()` finds for it.
-// With the discovery links of the feeds of that collection and of those the page's `feed` setting names, unless it says `false`.
-export async function entryHeadOf(page: object, route: ServedRoute, ctx: PageContext<Record<string, unknown>>): Promise<HeadTag[] | undefined> {
+// With the discovery links of the feeds of that collection and of those the page's `feed` setting names, unless it says `false`. Settled at once when there is no entry to read.
+export function entryHeadOf(page: object, route: ServedRoute, ctx: PageContext<Record<string, unknown>>): Promise<HeadTag[] | undefined> | HeadTag[] | undefined {
+  if (headless.has(page))
+    return undefined
+
   const listed = pagePrerender(page, route)
   const collection = isCollection(listed) ? listed : pageSetting(page, 'sitemap')
   const setting = pageSetting(page, 'feed')
@@ -18,9 +24,16 @@ export async function entryHeadOf(page: object, route: ServedRoute, ctx: PageCon
   const feeds = setting === false ? [] : [...new Set([...shown, ...[setting].flat().filter(isCollection)])].filter(each => each.options.feed !== undefined)
   const links = feeds.flatMap(feedLinks)
 
+  if (!isCollection(collection) && links.length === 0)
+    headless.add(page)
+
   if (!isCollection(collection) || route.params.length !== 1)
     return links.length > 0 ? links : undefined
 
+  return entryTags(collection, route, ctx, links)
+}
+
+async function entryTags(collection: Collection<unknown>, route: ServedRoute, ctx: PageContext<Record<string, unknown>>, links: HeadTag[]): Promise<HeadTag[] | undefined> {
   const slug = ctx.params[route.params[0]!]
   const entry = typeof slug === 'string' ? await collection.get(slug) : undefined
   const tags = entry === undefined ? [] : entryHead(collection, entry)

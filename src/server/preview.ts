@@ -504,7 +504,8 @@ export function exitPreview(ctx: { cookies: CookieMap }): void {
 
 // A share link's token taken out of a URL once kay has read it, so a page never sees it in `ctx.url` or `ctx.query`, nor copies it into its own links.
 export function withoutShareToken(url: URL): void {
-  if (url.searchParams.has(SHARE_PARAM))
+  // Most URLs have no query, and reading searchParams parses one.
+  if (url.search !== '' && url.searchParams.has(SHARE_PARAM))
     url.searchParams.delete(SHARE_PARAM)
 }
 

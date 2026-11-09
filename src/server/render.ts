@@ -469,10 +469,11 @@ function runLoads(files: string[], modules: PageModule[], ctx: PageContext<Recor
 }
 
 async function runLoadsAsync(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Promise<Record<string, unknown>[]> {
-  const loads = await Promise.allSettled(modules.map(async (module, index) => {
+  // eslint-disable-next-line ts/await-thenable -- a module without a load, or whose load went through already, settles with no promise of its own
+  const loads = await Promise.allSettled(modules.map((module, index): Record<string, unknown> | Promise<Record<string, unknown>> => {
     const prior = loaded.get(files[index]!)
 
-    return prior?.status === 'fulfilled' ? prior.value : runLoad(files[index]!, module, ctx, timings, index)
+    return prior?.status === 'fulfilled' ? prior.value : (module.load && runLoad(files[index]!, module, ctx, timings, index)) ?? {}
   }))
 
   for (const [index, load] of loads.entries())
