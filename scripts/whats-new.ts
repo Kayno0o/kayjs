@@ -122,19 +122,20 @@ function capSection(page: string, archive: string, cap: number, pick: RegExp, un
   // The page's last line belongs to the last section's text, so it is set aside and put back after it.
   const section = index === sections.length - 1 && note !== undefined ? sections[index]?.replace(`\n${note}\n`, '') : sections[index]
 
-  if (section === undefined || link === undefined || Buffer.byteLength(section) <= cap)
-    return { page, archive }
-
-  const pointer = `The rest of this release is in ${link}.\n`
-  const heading = section.slice(0, section.indexOf('\n'))
-  // A section cut before ends on its pointer, which is written again below the lines kept now.
-  const body = `${section.replace(POINTER, '\n').trimEnd()}\n`
-  const starts = bulletStarts(body, unit)
-  // A heading with another right under it has lost its body to a section a lane inserted between them, and a cut would carry the body away from the heading.
-  const bare = unit === '- ' ? null : new RegExp(`^${unit}[^\\n]*(?=\\n${unit})`, 'm').exec(body)
+  const heading = section?.slice(0, section.indexOf('\n'))
+  // A heading with another right under it has lost its body to a section a lane inserted between them, and a cut would carry the body away from the heading; refused before any cut is due, so a page under its cap is caught too.
+  const bare = unit === '- ' || section === undefined ? null : new RegExp(`^${unit}[^\\n]*(?=\\n${unit})`, 'm').exec(section)
 
   if (bare !== null)
     throw new Error(`${heading}: "${bare[0]}" has no text before the next heading: a section was inserted under it, so its text belongs to another heading; move it back above the heading before capping`)
+
+  if (section === undefined || heading === undefined || link === undefined || Buffer.byteLength(section) <= cap)
+    return { page, archive }
+
+  const pointer = `The rest of this release is in ${link}.\n`
+  // A section cut before ends on its pointer, which is written again below the lines kept now.
+  const body = `${section.replace(POINTER, '\n').trimEnd()}\n`
+  const starts = bulletStarts(body, unit)
 
   const cut = starts.findLast(start => Buffer.byteLength(`${body.slice(0, start).trimEnd()}\n\n${pointer}\n`) <= cap)
 

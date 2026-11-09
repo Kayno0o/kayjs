@@ -282,6 +282,8 @@ describe('what\'s new', () => {
     const archive = '# Old\n\nWhat each minor release before 1.72 broke.\n'
 
     expect(() => capNewest(page, archive, 100, '### ')).toThrow('### A')
+    // Under its cap, nothing is cut, and the bare heading is refused all the same.
+    expect(() => capNewest(page, archive, 10_000, '### ')).toThrow('### A')
   })
 
   it('drops every release of an archive left with only the cut end of an unreleased section, and ends on the release its paragraph stops before', () => {
