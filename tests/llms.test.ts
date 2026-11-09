@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { ARCHIVES } from '../scripts/whats-new'
 import { compileKay, formatDiagnostic } from '../src/compiler'
-import { KAY_ROLES, KAY_VALUES } from '../src/compiler/kay-exports'
+import { KAY_ROLES } from '../src/compiler/kay-exports'
 import { LINTS } from '../src/compiler/lints'
 import { nativeExe } from '../src/compiler/native-typescript'
 import { formatKay } from '../src/format'
@@ -134,9 +134,8 @@ describe('llms.txt and its docs', () => {
     const named = new Set([...spec.matchAll(NAMED)].map(match => match[1]!))
     // A default export, such as kay/bun's plugin for bunfig, is imported by no name
     const exported = new Set((await Promise.all(PUBLIC_ENTRIES.map(async entry => Object.keys(await import(entry))))).flat().filter(name => name !== 'default'))
-    const implicit = new Set([...KAY_VALUES, 't'])
 
-    expect([...exported].filter(name => named.has(name) && !placed.has(name) && !implicit.has(name)).sort()).toEqual([])
+    expect([...exported].filter(name => named.has(name) && !placed.has(name) && !(name in KAY_ROLES) && name !== 't').sort()).toEqual([])
   })
 
   it.each(['llms/islands.md', 'docs/src/content/docs/essentials/islands.md'])('names every shared value of kay in %s, which the compiler table decides', async (file) => {
@@ -150,8 +149,8 @@ describe('llms.txt and its docs', () => {
       expect(named.filter(name => KAY_ROLES[name] === 'browser').sort()).toEqual(['call', 'logFrom', 'navigate', 'refresh'])
   })
 
-  it('lists every value of kay for the compiler to import where a file reads it unimported', async () => {
-    expect([...KAY_VALUES].sort()).toEqual(Object.keys(await import('kay')).sort())
+  it('gives every value of kay a role in the compiler table', async () => {
+    expect(Object.keys(KAY_ROLES).sort()).toEqual(Object.keys(await import('kay')).sort())
   })
 
   it('keeps what generated code and kay\'s own build import off the public entries', async () => {

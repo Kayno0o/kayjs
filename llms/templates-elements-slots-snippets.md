@@ -103,7 +103,7 @@ Card(title="Todos")
 
 A prop taking markup is typed `Snippet` from `kay`: `Snippet` for the children and a block with no parameters, `Snippet<[Item, number]>` for markup the component calls with values, once per row for instance. `@name(a, b)`, a local `snippet` passed as `name={feature}` and `slot name(a, b)` all use it, a fill with other parameters, or a `@name` written without the parameters the prop is called with, is a `kay check` error (the second names the parameters to write), and `slot name` on a prop that is no `Snippet` is reported at the name.
 
-No function reaches the browser, so a static component passing one to an island renders as an island itself, and a layout or a page with a `--- server` fence cannot pass one.
+No function reaches the browser, so a static component passing one to an island is the `island-prop` error, fixed with `--- island`, and a layout or a page with a `--- server` fence cannot pass one.
 
 A static component that only islands render is part of them, so it can.
 
@@ -144,5 +144,5 @@ List(items={todos})
 - A name another snippet, an import, a script const, a prop or a loop variable already holds is reported at the snippet, and assigning one is refused.
 - It can hold components, a bare `slot` of the component declaring it, `if`, `for`, `await`, `match` and other snippets, and is a plain function, so `List(row={feature})` passes it where a prop takes a function, which the component renders with `slot row(item, i)`.
 - An `error` line in a snippet reads the form around the snippet's declaration, so declare a snippet repeating a form field inside that form.
-- A static component passing one to an island renders as an island itself, as it does for a `@row(item)` block.
+- A static component passing one to an island is the `island-prop` error, as it is for a `@row(item)` block.
 - Markup used by several files is a component; a snippet is for one file.

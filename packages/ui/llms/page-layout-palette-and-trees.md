@@ -103,4 +103,4 @@ DescriptionList(items={[{ label: 'Host', value: 'relay.example.com' }, { label: 
 
 ## Reference
 
-- The words of these components, their props and the tokens they read are listed in their sections above; a component taking a function or a block with parameters renders as an island, as [Tables, navigation and layout](tables-navigation-and-layout.md) says under Reference.
+- The words of these components, their props and the tokens they read are listed in their sections above; a component passing a function or a block with parameters to one writes `--- island`, as [Tables, navigation and layout](tables-navigation-and-layout.md) says under Reference.

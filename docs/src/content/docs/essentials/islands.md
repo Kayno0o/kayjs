@@ -68,10 +68,8 @@ An effect made with no owner, at the top of a module, after an `await` or in a t
 
 `kay build` lists every island under the JavaScript it ships. Each line gives the first thing that made it one, such as `onClick, line 4` or `bind:value, line 9`.
 
-A static component that passes an island a function is listed too, as `format passed to Picker, line 8`.
 
 `kay check` reads what a component passes an island from its types. A value typed as a function, a symbol, a class instance or an object holding a function (a `Column` with a `sortValue`), or a block with parameters, cannot be sent to the browser: it is the error `island-prop` at that prop, naming the field.
-
 
 `--- island` is the fix, applied by `kay check --fix` where the value is always a function and offered where its type is a union holding one, as the component may be static on some pages. A page, a layout or a special page is never an island: pass the island data, or go through a component of its own. When the check was skipped, rendering throws an `IslandPropsError` naming the prop and the same fix.
 

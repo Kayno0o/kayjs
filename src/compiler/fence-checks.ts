@@ -529,7 +529,7 @@ function droppedFails(node: Node, reads: (call: NodeOfType<'CallExpression'>) =>
   return node.type === 'ParenthesizedExpression' || node.type === 'TSNonNullExpression' ? droppedFails(node.expression, reads) : []
 }
 
-// The names `action` is called by: the one `kay` gives with no import, and the aliases imported from it; none when another module's or a local one takes the name.
+// The names `action` is called by: the one `kay` exports, as imported or not yet, and the aliases imported from it; none when another module's or a local one takes the name.
 function actionNames(fence: ParsedFence): Set<string> {
   const names = new Set(['action'])
 

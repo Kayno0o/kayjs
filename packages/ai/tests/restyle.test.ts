@@ -16,6 +16,7 @@ const PATH = /\sd="([^"]+)"/
 const MARKERS = /<!--[[\]]-->/g
 
 let html = ''
+let staticPage: (props: Record<string, unknown>) => unknown = () => undefined
 let icons: Record<string, string> = {}
 
 // The drawing of a tabler icon, as the page holds it.
@@ -40,7 +41,9 @@ beforeAll(async () => {
   if (!build.success)
     throw new AggregateError(build.logs, 'build failed')
 
-  const { Page } = await import(build.outputs[0]!.path) as { Page: (props: Record<string, unknown>) => unknown }
+  const { Page, StaticPage } = await import(build.outputs[0]!.path) as { Page: (props: Record<string, unknown>) => unknown, StaticPage: typeof staticPage }
+
+  staticPage = StaticPage
 
   icons = Object.fromEntries(Object.entries((await Bun.file(TABLER).json() as { icons: Record<string, { body: string }> }).icons).map(([name, { body }]) => [name, body]))
   html = child(Page({})).replace(MARKERS, '')
@@ -139,4 +142,10 @@ describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
     for (const name of ['hand-stop', 'minimize'])
       expect(code).toContain(body(name).match(PATH)![1]!)
   }, 60_000)
+})
+
+describe('a static page giving the launcher a block with parameters', () => {
+  test('fails to render naming the prop, as the launcher is no island of the app\'s', () => {
+    expect(() => child(staticPage({}))).toThrow('cannot reach the browser')
+  })
 })

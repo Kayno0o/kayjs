@@ -7,7 +7,7 @@ const CTX = /(?<![\w$])(?<!(?<!\.\.)\.)ctx(?![\w$])(?:\s*\??\.\s*([A-Za-z_$][\w$
 
 // The keys a `.kay` source reads off the `ctx` it takes from kay, or `'all'` when it uses `ctx` any other way, passed whole, spread or indexed, or imports it under another name; none when it imports no `ctx` of kay's.
 // A `ctx` in a comment or a string only adds a key or makes it `'all'`, so a page loads more and never fewer. The server fence reads the request's own `ctx`, so it is left out, as is the import naming it.
-export function implicitContextKeys(source: string): string[] | 'all' | undefined {
+export function contextReadKeys(source: string): string[] | 'all' | undefined {
   const parsed = parseKay(source)
   const script = analyzeScript(source, parsed.script, [], parsed.module)
   const imported = kayCtxImport(script.imports)

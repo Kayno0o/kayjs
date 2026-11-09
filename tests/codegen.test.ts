@@ -1,7 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
 import { compileKay, componentName } from '../src/compiler'
-import { KAY_ROLES, KAY_VALUES } from '../src/compiler/kay-exports'
+import { KAY_ROLES } from '../src/compiler/kay-exports'
 import { jsonKinds, moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
@@ -96,10 +96,6 @@ describe('component shell', () => {
     it('names the shared values the audit moved, ApiError and apiUrl among them', () => {
       expect(SHARED).toEqual(expect.arrayContaining(['ActionError', 'ActionRedirectError', 'ApiError', 'apiUrl', 'publicEnv', 'defineUi']))
       expect(BROWSER).toEqual(expect.arrayContaining(['navigate', 'refresh', 'call', 'logFrom']))
-    })
-
-    it('derives KAY_VALUES from the table', () => {
-      expect(KAY_VALUES).toEqual(Object.keys(KAY_ROLES))
     })
   })
 

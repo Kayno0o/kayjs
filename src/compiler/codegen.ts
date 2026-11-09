@@ -20,13 +20,12 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
-import { codeOf, reactiveValue } from './script'
+import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
 import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
 const HORIZONTAL_SPACE = /^[ \t]*/
-const IDENTIFIER_PART = /[\w$]/
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
@@ -39,7 +38,6 @@ export interface GenerateOptions {
   name: string
   classTable?: ClassTable | undefined
   classMerge?: boolean | undefined
-  // The component reads `t` unimported: the translation function from `kay/i18n`, imported here.
   // The write helpers the rewrites call, imported from the runtime.
   writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
@@ -1173,31 +1171,14 @@ export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause 
   if (value === undefined)
     return cause
 
-  const span = valueSpan(file, script, value.name)
+  const span = valueSpan(script, value.name)
 
   return { kind: 'value', name: value.name, span, line: lineOf(file.source, span.start), source: value.source }
 }
 
-// Where the script says a `kay` value: its import, or its first read in a script or module fence as an implicit one, outside comments and strings; a value only the template reads sits at the top of the file.
-function valueSpan(file: KayFile, script: ScriptAnalysis, name: string): Span {
-  const binding = script.imports.find(binding => !binding.typeOnly && binding.local === name)
-
-  if (binding !== undefined)
-    return binding.span
-
-  for (const fence of [file.script, file.module]) {
-    if (fence === undefined)
-      continue
-
-    const text = file.source.slice(fence.start, fence.end)
-
-    for (let index = text.indexOf(name); index !== -1; index = text.indexOf(name, index + 1)) {
-      if (!IDENTIFIER_PART.test(text[index - 1] ?? ' ') && !IDENTIFIER_PART.test(text[index + name.length] ?? ' ') && codeOf(text.slice(0, index + name.length)).endsWith(name))
-        return { start: fence.start + index, end: fence.start + index + name.length }
-    }
-  }
-
-  return { start: 0, end: 0 }
+// Where the script says a `kay` value: its import.
+function valueSpan(script: ScriptAnalysis, name: string): Span {
+  return script.imports.find(binding => !binding.typeOnly && binding.local === name)?.span ?? { start: 0, end: 0 }
 }
 
 export function lineOf(source: string, offset: number): number {

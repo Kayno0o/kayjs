@@ -52,7 +52,7 @@ const { icons, turn, actions, call, source, empty, footer, note, openLabel, clos
 
 const iconOf = (name: keyof ChatLauncherIcons, fallback: string) => (icons?.[name] ?? fallback) as IconValue
 
-// The blocks the app gave, passed on to the chat. A function passed to the chat island makes this component render as an island when the app gives one, and only then.
+// The blocks the app gave, passed on to the chat. A function the app gives reaches the chat only from an island of the app's own (`--- island`): from a static page it fails at render, naming the prop.
 function forwarded() {
   const given: Pick<ChatProps, 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions'> = {}
 
@@ -76,7 +76,7 @@ function forwarded() {
   return given
 }
 
-// What the app set of the panel's opening, as getters so a change of `open` reaches the panel; a function passed to the panel by name would make this component an island whatever the app gives.
+// What the app set of the panel's opening, as getters so a change of `open` reaches the panel; a function passed to the panel by name would be sent whether the app gave one or not.
 function opening() {
   return {
     get open() { return open },

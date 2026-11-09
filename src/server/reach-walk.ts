@@ -4,7 +4,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { KAY_FILE } from '../build/files'
 import { followedImports, kayLibrariesOf, projectImportGraph } from '../build/libraries'
-import { implicitContextKeys } from './context-reads'
+import { contextReadKeys } from './context-reads'
 import { reachOver } from './reach'
 
 function realFile(file: string): string {
@@ -23,7 +23,7 @@ export async function openReach(root: string, collect?: ContextReads): Promise<R
   const project = realFile(root) + sep
   const graph = projectImportGraph(root)
   const edges = new Map<string, string[]>()
-  const reads = new Map<string, ReturnType<typeof implicitContextKeys>>()
+  const reads = new Map<string, ReturnType<typeof contextReadKeys>>()
 
   return reachOver({
     edges(file) {
@@ -50,7 +50,7 @@ export async function openReach(root: string, collect?: ContextReads): Promise<R
 
       if (!reads.has(file)) {
         try {
-          reads.set(file, implicitContextKeys(readFileSync(file, 'utf8')))
+          reads.set(file, contextReadKeys(readFileSync(file, 'utf8')))
         }
         catch {
           reads.set(file, undefined)

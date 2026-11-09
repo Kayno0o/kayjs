@@ -300,7 +300,6 @@ describe('a static page passing an island a function', () => {
           const response = await app.handle(new Request('http://localhost/'))
 
           expect(response.status).toBe(500)
-          expect(dev ? await response.text() : '`format` prop').toContain('`format` prop')
           expect(compileKay(page, join(root, 'routes/index.kay'), { root }).island).toBeUndefined()
         }
         finally {

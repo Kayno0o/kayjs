@@ -64,7 +64,7 @@ export function splitFence(source: string, fence: Span, names: string[], analysi
   const recipeStatements = new Set<Statement>()
   const recipeCalls = recipeNames(ast.body)
 
-  // A `recipe` written in a server fence with no import and no declaration of its own is kay's, missing its import.
+  // A `recipe` written in a server fence with no import and no declaration of its own is taken for kay's, its import not written yet.
   if (!withRecipes && !ast.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(unexported(statement)).some(identifier => identifier.name === 'recipe')))
     recipeCalls.add('recipe')
 

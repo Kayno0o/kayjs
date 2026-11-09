@@ -51,7 +51,7 @@ Chat(action={reply} label="Assistant" regenerate)
 - `@call` replaces the folded line and the list of calls of a turn, including the turn being written: it is called again as a call's status or result changes. `toolLabels`, `toolDetails` and the status labels apply to the default only, and the list is a plain `div.kai-chat-calls` the app styles, without the muted small text of the folded line. A call held for the visitor's yes still shows its Allow and Deny buttons.
 - `@source` replaces the link of each source in the list, which keeps its `ol`, its label and each item's number; the `[n]` links in the text stay.
 - `@footer` sits under the form, inside the chat's root.
-- `ChatLauncher` takes the same six blocks and passes them to its chat. The block is a function, so the component writing it renders as an island, as for any block with parameters; a launcher given none stays static.
+- `ChatLauncher` takes the same six blocks and passes them to its chat. The block is a function, so the component writing it is an island of its own (`--- island`), as for any block with parameters: a static page or layout giving the launcher one fails to render with an `IslandPropsError` naming the prop, and a launcher given none stays static.
 - `ChatPanel` is the launcher's shell around the chat and draws none of these.
 
 ### Change the icons

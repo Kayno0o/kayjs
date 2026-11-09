@@ -651,7 +651,6 @@ describe('kay lsp imports', () => {
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: missing } })
 
     expect(missing).toHaveLength(1)
-    expect(diagnostics.some(diagnostic => diagnostic.code === 'implicit-import')).toBe(false)
     expect(actions.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!)).some(text => text.includes('import { signal } from \'kay\''))).toBe(true)
   })
 

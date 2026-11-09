@@ -60,4 +60,4 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 ## Reference
 
-- Any parent, a layout and a page included, passes an island children and slots without parameters, which the server renders as static markup. A component or a page without a `--- server` fence passing one a function, a block with parameters or a class instance (such as Tabs' `@panel`, a Table's `@cell` or a function `rowKey`) renders as an island itself; a layout, or a page with a `--- server` fence, cannot, and moves that markup into a component of its own.
+- Any parent, a layout and a page included, passes an island children and slots without parameters, which the server renders as static markup. A component or a page without a `--- server` fence passing one a function, a block with parameters or a class instance (such as Tabs' `@panel`, a Table's `@cell` or a function `rowKey`) is the `island-prop` error, fixed with `--- island` on it; a layout, or a page with a `--- server` fence, cannot be one, and moves that markup into a component of its own.

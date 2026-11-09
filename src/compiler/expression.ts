@@ -3,9 +3,6 @@ import type { Expression, Node } from './estree'
 import { parseExpression } from './estree'
 import { ENTITIES } from './jsx-entities'
 
-// The classes whose instances island props carry.
-export const SENDABLE_CLASSES = new Set(['Date', 'Map', 'Set', 'URL', 'URLSearchParams', 'RegExp'])
-
 // Whether the expression at `span` is a function, parsed once however many passes ask, `known` holding the answers so far.
 export function isFunctionAt(source: string, span: Span, known: Map<number, boolean>): boolean {
   let found = known.get(span.start)
@@ -25,21 +22,6 @@ function isFunctionExpression(code: string): boolean {
   catch {
     return false
   }
-}
-
-// The globals whose members are functions, `Math.max` or `console.log`, bar their constants, `Math.PI` or `Number.NaN`, which start with a capital.
-const LOWERCASE = /^[a-z]/
-const NOT_FUNCTIONS = new Set(['name', 'length', 'prototype'])
-const FUNCTION_NAMESPACES = new Set(['Math', 'console', 'JSON', 'Object', 'Array', 'Number', 'String', 'Boolean', 'Date', 'Promise', 'Reflect', 'Intl', 'BigInt'])
-
-// Whether a node reads a function off a global, `Math.max` as a value; `shadowed` says whether the script declares the global's name itself.
-export function isGlobalFunctionMember(node: Node, shadowed: (name: string) => boolean): boolean {
-  const member = node.type === 'ChainExpression' ? node.expression : node
-
-  if (member.type !== 'MemberExpression' || member.computed || member.object.type !== 'Identifier' || member.property.type !== 'Identifier')
-    return false
-
-  return FUNCTION_NAMESPACES.has(member.object.name) && !shadowed(member.object.name) && LOWERCASE.test(member.property.name) && !NOT_FUNCTIONS.has(member.property.name)
 }
 
 // Values no island prop check needs to see.

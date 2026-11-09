@@ -44,7 +44,6 @@ export interface RewriteInput {
 // What the final pass applies.
 interface RewritePlan {
   rewrites: Rewrites
-  // True when the component reads a `t` nothing declares or imports: the translation function, which the compiler imports.
   // Type checking: the value of each signal the template reads, which `VALUES` holds.
   values: Map<string, string>
   // The write helpers the rewrites call, which the module imports from the runtime.

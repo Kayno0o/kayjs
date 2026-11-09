@@ -19,7 +19,7 @@ describe('a name a file uses with no import', () => {
   })
 
   async function project(files: Record<string, string>): Promise<string> {
-    const root = await scratchDir('implicit-import-')
+    const root = await scratchDir('missing-imports-')
     const tsconfig = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] })
 
     await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
@@ -44,6 +44,26 @@ describe('a name a file uses with no import', () => {
       ])
       expect(await applySafeFixes(root, found)).toBeGreaterThan(0)
       expect((await check(root)).filter(diagnostic => diagnostic.message.startsWith('Cannot find name'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('writes the import in the file\'s own line ending, after a directive, and into the server fence of a file that has no other', async () => {
+    const root = await project({
+      'src/routes/crlf.kay': '---\r\nconst count = signal(0)\r\n---\r\np {count()}\r\n',
+      'src/routes/directive.kay': '---\n\'use strict\'\n\nconst count = signal(0)\n---\np {count()}\n',
+      'src/routes/server-only.kay': '--- server\nconst a = 1\n---\np {a} {uid()}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(diagnostic => diagnostic.message.startsWith('Cannot find name'))
+
+      expect(await applySafeFixes(root, found)).toBeGreaterThan(0)
+      expect(await Bun.file(join(root, 'src/routes/crlf.kay')).text()).toBe('---\r\nimport { signal } from \'kay\'\r\n\r\nconst count = signal(0)\r\n---\r\np {count()}\r\n')
+      expect(await Bun.file(join(root, 'src/routes/directive.kay')).text()).toBe('---\n\'use strict\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\np {count()}\n')
+      expect(await Bun.file(join(root, 'src/routes/server-only.kay')).text()).toBe('--- server\nimport { uid } from \'kay\'\n\nconst a = 1\n---\np {a} {uid()}\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -1,4 +1,4 @@
-// Every value `kay` exports, which a component script and a server fence use with no import: the compiler imports the ones a file reads without declaring or importing a name of its own.
+// Every value `kay` exports, which a component script and a server fence import.
 // Each is `browser` when a component using it needs the browser (state, effects, lifecycle, browser readings, navigation), which makes the component an island, or `shared` when it computes the same on both sides, so a component using only those stays static.
 // `tests/llms.test.ts` holds this table to the exports of `kay`.
 export type KayRole = 'browser' | 'shared'
@@ -92,8 +92,6 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
 export const I18N_ROLES: Readonly<Record<string, KayRole>> = {
   relativeTime: 'browser',
 }
-
-export const KAY_VALUES: readonly string[] = Object.keys(KAY_ROLES)
 
 // Whether an import of `source` named `imported` needs the browser: any name of `kay` the table does not mark shared, and the browser names of `kay/i18n`.
 export function needsBrowser(source: string, imported: string): boolean {

@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { implicitContextKeys } from '../src/server/context-reads'
+import { contextReadKeys } from '../src/server/context-reads'
 import { kayCheck } from './check-helper'
 import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
@@ -125,21 +125,21 @@ describe('a library component', () => {
 
 describe('the keys the Bell reads off ctx', () => {
   it('are `inbox` alone, so a page reaching it loads that one context key', async () => {
-    expect(implicitContextKeys(await Bun.file(resolve('packages/ui/src/bell.kay')).text())).toEqual(['inbox'])
+    expect(contextReadKeys(await Bun.file(resolve('packages/ui/src/bell.kay')).text())).toEqual(['inbox'])
   })
 })
 
 describe('the keys a component reads off a ctx it imports', () => {
   it('are the members read, the import itself reading none', () => {
-    expect(implicitContextKeys('---\nimport { ctx, signal } from \'kay\'\n\nconst open = signal(false)\n---\nif ctx.impersonator && open()\n  p {ctx.user.name}\n')).toEqual(['impersonator', 'user'])
+    expect(contextReadKeys('---\nimport { ctx, signal } from \'kay\'\n\nconst open = signal(false)\n---\nif ctx.impersonator && open()\n  p {ctx.user.name}\n')).toEqual(['impersonator', 'user'])
   })
 
   it('are all of them under another name, whose reads no pattern follows', () => {
-    expect(implicitContextKeys('---\nimport { ctx as request } from \'kay\'\n---\np {request.user.name}\n')).toBe('all')
+    expect(contextReadKeys('---\nimport { ctx as request } from \'kay\'\n---\np {request.user.name}\n')).toBe('all')
   })
 
   it('are none for a type alone, or a ctx of another module', () => {
-    expect(implicitContextKeys('---\nimport type { ctx } from \'kay\'\n---\np Hi\n')).toBeUndefined()
-    expect(implicitContextKeys('---\nimport { ctx } from \'./mine\'\n---\np {ctx.user}\n')).toBeUndefined()
+    expect(contextReadKeys('---\nimport type { ctx } from \'kay\'\n---\np Hi\n')).toBeUndefined()
+    expect(contextReadKeys('---\nimport { ctx } from \'./mine\'\n---\np {ctx.user}\n')).toBeUndefined()
   })
 })

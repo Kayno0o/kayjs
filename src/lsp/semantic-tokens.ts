@@ -119,7 +119,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
   return encode(source, [...tokens.values()].toSorted((a, b) => a.start - b.start))
 }
 
-// What calling the name makes: by the `kay` import it comes from, else by its own name since a file may use `signal` with no import.
+// What calling the name makes: by the `kay` import it comes from, else by its own name, for a file whose import is not written yet.
 function madeBy(callee: string, made: ReadonlyMap<string, SignalKind | undefined>): SignalKind | undefined {
   if (made.has(callee))
     return made.get(callee)

@@ -5,7 +5,7 @@ import { isPlainProperty, parseProgram } from './estree'
 export type SignalKind = 'signal' | 'memo' | 'live'
 
 // The signals and memos of each module a component imports, by the specifier it imports them with.
-// A name a module exports as a literal of strings, numbers and icons is `data`: no function, so a component passing one to an island is not promoted for it.
+// A name a module exports as a literal of strings, numbers and icons is `data`: no function, so a component passing one to an island sends it as it is.
 export type ImportedSignals = Record<string, Record<string, SignalKind | 'data'>>
 
 // The signal kind of an imported name, which `data` is not.
