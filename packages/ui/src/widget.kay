@@ -13,7 +13,7 @@ const look = recipe({
   },
 })
 
-const { title, level = 2, icon, actions, empty = false, emptyState, isEmpty = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
+const { title, level = 2, icon, actions, empty = false, emptyState, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
   // A `@title` block draws markup inside the heading instead of the string.
   title?: string | Snippet | undefined
   // The title's heading level, under the page's outline.
@@ -22,16 +22,12 @@ const { title, level = 2, icon, actions, empty = false, emptyState, isEmpty = fa
   // The end of the head line: a link, a button, a row of actions.
   actions?: Snippet
   // Whether the data behind the widget is empty. With an `@emptyState` block, the frame and its head stay while the body shows the block; without one, an empty widget renders nothing at all.
-  // Before 1.89 this was `isEmpty` and the block `@empty`; both work until 1.92 (`deprecated-ui-props`), a snippet in `empty` being the old block.
-  empty?: boolean | Snippet | undefined
+  empty?: boolean | undefined
   emptyState?: Snippet
-  isEmpty?: boolean | undefined
 }>()
-const none = typeof empty === 'boolean' ? empty : isEmpty
-const block = emptyState ?? (typeof empty === 'boolean' ? undefined : empty)
 ---
 // A dashboard tile: a framed body under a head line of icon, title and actions.
-if block !== undefined || !none
+if emptyState !== undefined || !empty
   div(part="root" {...rest})
     if title || icon || actions
       div(part="head")
@@ -51,7 +47,7 @@ if block !== undefined || !none
           else
             h6.kui-heading-section(part="title") {title}
         | {actions}
-    if none
-      | {block}
+    if empty
+      | {emptyState}
     else
       slot

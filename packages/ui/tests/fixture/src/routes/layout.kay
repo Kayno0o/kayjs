@@ -41,12 +41,6 @@ main
       @emptyState
         p.none No visits yet
       p 42
-  // kay-allow-file deprecated-ui-props
-  article#old-empty-widget
-    Widget(title="Visits" isEmpty)
-      @empty
-        p.none No visits yet
-      p 42
   article#hidden-widget
     Widget(title="Visits" empty)
       p 42

@@ -763,14 +763,6 @@ export const LINTS = {
     wrong: 'auth({ plugin: false })',
     right: 'auth({ server: false })',
   },
-  'deprecated-ui-props': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.89',
-    summary: 'A kayjs-ui prop under its name before 1.89: `isDisabled` on a DateInput or DateRangeInput, the per-day predicate, is `disabledDay` now, so `disabled` alone is the boolean every other control takes, and a Widget\'s `isEmpty` is `empty` with its `@empty` block `@emptyState`. The old names work until 1.92. The fix renames the attribute or the block.',
-    wrong: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" isDisabled={iso => iso.endsWith("-25")})',
-    right: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" disabledDay={iso => iso.endsWith("-25")})',
-  },
   'deprecated-menu-danger': {
     level: 'warn',
     group: 'deprecated',
@@ -983,7 +975,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.84', removedIn: '1.88' },
   { since: '1.87', removedIn: '1.91' },
   { since: '1.88', removedIn: '1.92' },
-  { since: '1.89' },
+  { since: '1.89', removedIn: '1.93' },
   { since: '1.90' },
   { since: '1.91' },
   { since: '1.92' },

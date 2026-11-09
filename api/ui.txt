@@ -1334,7 +1334,6 @@ component default
   disabledDay?: ((iso: string) => boolean) | undefined
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   invalid?: boolean | undefined
-  isDisabled?: ((iso: string) => boolean) | undefined
   max?: string | undefined
   min?: string | undefined
   nextLabel?: string | undefined
@@ -1360,7 +1359,6 @@ component default
   fromLabel?: string | undefined
   fromName?: string | undefined
   invalid?: boolean | undefined
-  isDisabled?: ((iso: string) => boolean) | undefined
   label: string
   max?: string | undefined
   min?: string | undefined
@@ -3091,10 +3089,9 @@ component default
   actions?: Element
   children?: Element
   class?: string | undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; }
-  empty?: Element
+  empty?: boolean | undefined
   emptyState?: Element
   icon?: IconProps | IconSlot | undefined
-  isEmpty?: boolean | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   title?: Element
 

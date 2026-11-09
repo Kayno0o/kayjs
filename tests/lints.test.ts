@@ -1264,61 +1264,6 @@ describe('deprecated-icon-picker-search', () => {
   })
 })
 
-describe('deprecated-ui-props', () => {
-  const imports = 'import DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\nimport DateRangeInput from \'@kaynooo/kayjs-ui/date-range-input.kay\'\nimport Other from \'./other.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'props.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames isDisabled on both date inputs', () => {
-    expect(found('DateInput(aria-label="x" isDisabled={closed})')).toEqual([{ at: 'isDisabled', fix: ['isDisabled->disabledDay'] }])
-    expect(found('DateRangeInput(label="x" isDisabled={closed})')).toHaveLength(1)
-  })
-
-  it('writes the shorthand as disabledDay={isDisabled}', () => {
-    expect(found('DateInput(aria-label="x" {isDisabled})')).toEqual([{ at: 'isDisabled', fix: ['{isDisabled}->disabledDay={isDisabled}'] }])
-  })
-
-  it('renames the isEmpty and the @empty block of a Widget', () => {
-    const widget = (template: string) => {
-      const source = `---\nimport Widget from '@kaynooo/kayjs-ui/widget.kay'\n---\n${template}\n`
-      const result = compileKay(source, 'widget.kay', { check: true })
-
-      return result.diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-    }
-
-    expect(widget('Widget(title="x" isEmpty)\n  @empty\n    p none')).toEqual([{ at: 'isEmpty', fix: ['isEmpty->empty'] }, { at: 'empty', fix: ['empty->emptyState'] }])
-    expect(widget('Widget(title="x" {isEmpty})')).toEqual([{ at: 'isEmpty', fix: ['{isEmpty}->empty={isEmpty}'] }])
-    expect(widget('Widget(title="x" empty)\n  @emptyState\n    p none')).toEqual([])
-  })
-
-  it('offers no fix where the new name is already written', () => {
-    const widget = (template: string) => {
-      const source = `---\nimport Widget from '@kaynooo/kayjs-ui/widget.kay'\n---\n${template}\n`
-
-      return compileKay(source, 'widget.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => ({ at: source.slice(d.start, d.end), fixes: d.fixes?.length ?? 0 }))
-    }
-
-    expect(widget('Widget(title="x" isEmpty empty={none})')).toEqual([{ at: 'isEmpty', fixes: 0 }])
-    expect(widget('Widget(title="x" empty)\n  @empty\n    p old\n  @emptyState\n    p new')).toEqual([{ at: 'empty', fixes: 0 }])
-  })
-
-  it('finds a Widget under an alias and leaves a Table\'s @empty alone', () => {
-    const source = `---\nimport Panel from '@kaynooo/kayjs-ui/widget.kay'\nimport Table from '@kaynooo/kayjs-ui/table.kay'\n---\nPanel(title="x" isEmpty)\nTable(columns={[]} rows={[]})\n  @empty\n    p none\n`
-    const found = compileKay(source, 'alias.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => source.slice(d.start, d.end))
-
-    expect(found).toEqual(['isEmpty'])
-  })
-
-  it('leaves the new name, the boolean and other tags alone', () => {
-    expect(found('DateInput(aria-label="x" disabledDay={closed} disabled)')).toEqual([])
-    expect(found('Other(isDisabled={closed})')).toEqual([])
-  })
-})
-
 describe('deprecated-size-limits on the Chat of kayjs-ai', () => {
   const found = (template: string) => {
     const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Other from './other.kay'\n---\n${template}\n`

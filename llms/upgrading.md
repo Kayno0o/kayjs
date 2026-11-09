@@ -2,6 +2,15 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.93.0
+
+### The kayjs-ui prop names 1.89 deprecated are gone
+
+Their `deprecated-ui-props` lint goes with them: run `kay upgrade` on 1.92 first and it rewrites every one. On 1.93 the old names are type errors.
+
+- `isDisabled` on DateInput and DateRangeInput, the per-day predicate, is `disabledDay`.
+- Widget's `isEmpty` is `empty`, and its `@empty` block is `@emptyState`.
+
 ## 1.92.0
 
 ### `saveEntry`, `saveEntries`, `removeEntry` and `showDraft` resolve `ok`

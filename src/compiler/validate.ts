@@ -19,10 +19,6 @@ const MENU_TAG = 'menu'
 const ICON_PICKER_TAG = 'icon-picker'
 // The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
 const TOGGLE_TAGS = new Set(['table', 'tree-view'])
-// The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
-const DATE_TAGS = new Set(['date-input', 'date-range-input'])
-// Widget's `isEmpty` is `empty` and its `@empty` block `@emptyState` since 1.89.
-const WIDGET_TAG = 'widget'
 // The kayjs-ui props renamed in 1.90 so a failure is named the same everywhere: a message is `failureLabel`, a failed copy `onError`. `onFail` takes its error bare and `onError` an object, so it is reported with no fix.
 const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'copy-button': { failure: 'failureLabel', onFail: 'onError' },
@@ -895,15 +891,6 @@ class Validator {
       return
 
     // A rename is left to the app when the new name is already written, as it would repeat it.
-    if (file === WIDGET_TAG) {
-      const named = element.children.some(child => child.kind === 'slot' && this.text(child.name) === 'emptyState')
-
-      for (const child of element.children) {
-        if (child.kind === 'slot' && this.text(child.name) === 'empty')
-          this.lint(child.name, 'deprecated-ui-props', '`@empty` on `Widget` is `@emptyState` since kayjs-ui 1.89, so `empty` alone is the boolean', named ? { help: 'Drop `@empty`, `@emptyState` is there' } : { help: 'Write `@emptyState`', fixes: [{ title: 'Write `@emptyState`', edits: [{ start: child.name.start, end: child.name.end, text: 'emptyState' }], safe: true }] })
-      }
-    }
-
     const actionRenames = Object.hasOwn(ACTIONS_RENAMES, file) ? ACTIONS_RENAMES[file] : undefined
 
     if (actionRenames !== undefined) {
@@ -964,30 +951,12 @@ class Validator {
         continue
       }
 
-      if (file === WIDGET_TAG && name === 'isEmpty') {
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'empty={isEmpty}' } : { start: attribute.name.start, end: attribute.name.end, text: 'empty' }
-
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'empty')
-
-        this.lint(attribute.name, 'deprecated-ui-props', '`isEmpty` on `Widget` is `empty` since kayjs-ui 1.89, the bare-adjective boolean', named ? { help: 'Drop `isEmpty`, `empty` is there' } : { help: 'Write `empty`', fixes: [{ title: 'Write `empty`', edits: [edit], safe: true }] })
-
-        continue
-      }
-
       if (TOGGLE_TAGS.has(file) && name === 'onToggle') {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onOpenChange={onToggle}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onOpenChange' }
 
         const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'onOpenChange')
 
         this.lint(attribute.name, 'deprecated-open-change', `\`onToggle\` on \`${element.name}\` is \`onOpenChange\` since kayjs-ui 1.90, as every show and hide state reports`, named ? { help: 'Drop `onToggle`, `onOpenChange` is there' } : { help: 'Write `onOpenChange`', fixes: [{ title: 'Write `onOpenChange`', edits: [edit], safe: true }] })
-
-        continue
-      }
-
-      if (DATE_TAGS.has(file) && name === 'isDisabled') {
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'disabledDay={isDisabled}' } : { start: attribute.name.start, end: attribute.name.end, text: 'disabledDay' }
-
-        this.lint(attribute.name, 'deprecated-ui-props', `\`isDisabled\` on \`${element.name}\` is \`disabledDay\` since kayjs-ui 1.89, so \`disabled\` alone is the boolean`, { help: 'Write `disabledDay`', fixes: [{ title: 'Write `disabledDay`', edits: [edit], safe: true }] })
 
         continue
       }

@@ -581,15 +581,14 @@ describe('layout', () => {
     expect((await one('/layout', '#collapsed .kui-collapsible-section-body')).text).toBe('Deimos')
   })
 
-  test('Widget heads its body with icon, title and actions, swaps an empty body for its @empty block, and renders nothing empty without one', async () => {
+  test('Widget heads its body with icon, title and actions, swaps an empty body for its @emptyState block, and renders nothing empty without one', async () => {
     const head = async (id: string) => (await find('/layout', `#${id} [data-part=head] > *`)).map(found => found.tag)
 
     expect(await head('widget')).toEqual(['svg', 'h2', 'a'])
     expect((await one('/layout', '#widget p')).text).toBe('42')
     expect(await head('empty-widget')).toEqual(['h2'])
     expect((await find('/layout', '#empty-widget p')).map(found => found.text)).toEqual(['No visits yet'])
-    expect(await head('old-empty-widget')).toEqual(['h2'])
-    expect((await find('/layout', '#old-empty-widget p')).map(found => found.text)).toEqual(['No visits yet'])
+
     expect((await one('/layout', '#hidden-widget')).html).toBe('')
   })
 

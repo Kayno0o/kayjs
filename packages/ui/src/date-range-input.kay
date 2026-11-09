@@ -15,7 +15,7 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, disabledDay, isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, disabledDay, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The size of both date boxes: `md` by default, `sm` and `lg` change their padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -38,8 +38,6 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, f
   disabled?: boolean | undefined
   // Whether a single day cannot be chosen, and the block drawing the inside of a day's button, as on a DateInput; both boxes share them.
   disabledDay?: ((iso: string) => boolean) | undefined
-  // The name `disabledDay` replaced in 1.89, which `kay upgrade` renames; it works until 1.92.
-  isDisabled?: ((iso: string) => boolean) | undefined
   day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined
   // Shows the calendar of that box when the page sets it, and none for `false`; left out, the buttons, a click outside and Escape work on their own. `onOpenChange` reports each change, so a page driving `open` can set it back.
   open?: 'from' | 'to' | false | undefined
@@ -89,6 +87,6 @@ function commit(from: string, to: string) {
 }
 ---
 div({...rest} ref={ref} role="group" aria-label={label})
-  DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay ?? isDisabled} day={day} onMonthChange={month => onMonthChange?.(month, 'from')} open={open === undefined ? undefined : open === 'from'} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+  DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'from')} open={open === undefined ? undefined : open === 'from'} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
   span(part="separator" aria-hidden="true") -
-  DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay ?? isDisabled} day={day} onMonthChange={month => onMonthChange?.(month, 'to')} open={open === undefined ? undefined : open === 'to'} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+  DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'to')} open={open === undefined ? undefined : open === 'to'} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
