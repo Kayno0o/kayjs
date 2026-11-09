@@ -157,9 +157,12 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
   if (diagnostic.code !== undefined && UNUSED_CODES.has(diagnostic.code)) {
     const level = shadow.map.isExact(diagnostic.start) ? levelAt('unread-name', offset) : 'allow'
 
+    if (level === 'allow')
+      return undefined
+
     const fixes = loopIndexFix(shadow.source, span)
 
-    return level === 'allow' ? undefined : { code: 'unread-name', severity: severityOf(level), message: diagnostic.message, span, unread: true, ...fixes && { fixes } }
+    return { code: 'unread-name', severity: severityOf(level), message: diagnostic.message, span, unread: true, ...fixes && { fixes } }
   }
 
   // An assignment to a name holding no signal, which kay wrote through `.set`.
