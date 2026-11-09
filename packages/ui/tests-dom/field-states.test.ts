@@ -31,11 +31,11 @@ test('every control takes a size, written as data-size on its box and left off t
   expect(await boxes('plain', 'data-size')).toEqual([])
 })
 
-test('every control takes invalid, written as aria-invalid on its box, data-refused on the trigger of a MultiSelect', async () => {
-  for (const id of CONTROLS.filter(id => id !== 'multi'))
+test('every control takes invalid, written as aria-invalid on its box, the trigger of a MultiSelect included', async () => {
+  for (const id of CONTROLS)
     expect(new Set(await boxes(id, 'aria-invalid')), id).toEqual(new Set(['true']))
 
-  expect(await boxes('multi', 'data-refused')).toEqual(['true'])
+  expect(await boxes('multi', 'data-refused')).toEqual([])
   expect(await boxes('plain', 'aria-invalid')).toEqual([])
 })
 
@@ -87,13 +87,13 @@ test('a Checkbox and a Toggle show the issue they are given under the box and ma
   }
 })
 
-test('every refused control draws a danger look: the stylesheet field class, or a class answering aria-invalid or data-refused with the danger colour', async () => {
+test('every refused control draws a danger look: the stylesheet field class, or a class answering aria-invalid with the danger colour', async () => {
   mounted ??= await mountComponent(FieldStates, {})
 
   for (const id of [...CONTROLS, 'radios', 'segmented', 'chips', 'rating', 'color', 'drop', 'box', 'switch', 'rows', 'markdown', 'icons']) {
     const classes = [...mounted.root.querySelectorAll(`#${id} [class]`)].map(element => element.getAttribute('class')).join(' ')
 
-    expect(classes, id).toMatch(/kui-field-input|(?:aria-invalid|data-refused|has-\[input\[aria-invalid)[^ ]*danger|danger[^ ]*(?:aria-invalid|data-refused)/)
+    expect(classes, id).toMatch(/kui-field-input|(?:aria-invalid|has-\[input\[aria-invalid)[^ ]*danger|danger[^ ]*aria-invalid/)
   }
 })
 

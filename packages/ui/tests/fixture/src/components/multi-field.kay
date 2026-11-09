@@ -1,0 +1,12 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+
+const issue = signal<string>()
+const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]
+---
+button#refuse(type="button" onClick={() => issue = 'Pick one'}) Refuse
+button#clear(type="button" onClick={() => issue = undefined}) Clear
+FormField(label="Tags" required issue={issue()})
+  MultiSelect#tags(options={options} label="Tags")

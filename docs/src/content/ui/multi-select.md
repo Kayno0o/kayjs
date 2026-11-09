@@ -39,4 +39,4 @@ The status line says `loadingLabel` while it waits and `failureLabel` when it fa
 
 ## Size and invalid
 
-`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the button. `invalid` draws the line and the focus ring in the danger colour and sets `data-refused="true"` on the trigger, a button taking no `aria-invalid`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the button. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid` on the trigger, a button with the `combobox` role opening a dialog, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

@@ -109,6 +109,15 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* The one motion token: every duration of the library is written as `calc(<time> * var(--motion-scale))`, so zero stills each transition at once. Tailwind's default duration, which a bare `transition` takes, reads it too. */
+    --motion-scale: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-scale: 0;
+      --default-transition-duration: calc(150ms * var(--motion-scale));
+    }
   }
 
   @media (prefers-color-scheme: light) {
@@ -408,7 +417,7 @@
   }
 
   /* A refused field: the line and the focus ring in the danger colour, on a control marked by its `invalid` prop or by a FormField showing a message. */
-  .kui-field-input:is([aria-invalid='true'], [data-refused='true']),
+  .kui-field-input[aria-invalid='true'],
   .kui-form-field :where(input, select, textarea)[aria-invalid='true'] {
     border-color: var(--color-danger);
 
@@ -760,10 +769,10 @@
     & :where(.leaflet-touch-drag) { touch-action: pinch-zoom; }
     & :where(.leaflet-touch-drag.leaflet-touch-zoom) { touch-action: none; }
     & :where(.leaflet-zoom-animated) { transform-origin: 0 0; }
-    & :where(.leaflet-zoom-anim .leaflet-zoom-animated) { transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1); }
+    & :where(.leaflet-zoom-anim .leaflet-zoom-animated) { transition: transform calc(0.25s * var(--motion-scale)) cubic-bezier(0, 0, 0.25, 1); }
     & :where(.leaflet-zoom-anim .leaflet-tile, .leaflet-pan-anim .leaflet-tile) { transition: none; }
     & :where(.leaflet-zoom-anim .leaflet-zoom-hide) { visibility: hidden; }
-    & :where(.leaflet-fade-anim .leaflet-popup) { opacity: 0; transition: opacity 0.2s linear; }
+    & :where(.leaflet-fade-anim .leaflet-popup) { opacity: 0; transition: opacity calc(0.2s * var(--motion-scale)) linear; }
     & :where(.leaflet-fade-anim .leaflet-map-pane .leaflet-popup) { opacity: 1; }
     & :where(.leaflet-interactive) { cursor: pointer; }
     & :where(.leaflet-grab) { cursor: grab; }
