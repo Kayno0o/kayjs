@@ -11,16 +11,16 @@ import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandCause, islandMessages, lineOf } from './codegen'
+import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
+import { islandMessages } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
-import { signalKind } from './module-signals'
 import { SELF } from './names'
 import { patternNames } from './pattern-names'
 import { findRewrites } from './rewrite'
@@ -272,7 +272,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
-    const kind = binding.typeOnly ? undefined : signalKind(options.importedSignals?.[binding.source]?.[binding.imported])
+    const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
 
     return kind ? [[binding.local, kind] as const] : []
   }))

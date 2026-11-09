@@ -15,6 +15,8 @@ const scratch = await scratchDir('module-fence-')
 const MARKERS = /<!--[[\]]-->/g
 const files: Record<string, string> = {
   'counter.kay': '--- module\nimport { signal } from \'kay\'\n\nexport const visits = signal(0)\nexport function label(count: number): string {\n  return `${count} visits`\n}\nlet renders = 0\n--- script\nconst { name } = props<{ name: string }>()\nrenders++\n---\np {name}: {label(renders)}\n',
+  'asks.kay': '--- module\nexport const island = { persist: true, hydrate: \'idle\' } as const\n--- island\n---\nbutton Go\n',
+  'asks-page.kay': '---\nimport Asks from \'./asks.kay\'\nimport Own from \'./asks.kay\'\n---\nAsks\nOwn(persist="mine" hydrate="load")\n',
   'reader.kay': '---\nimport { label } from \'./counter.kay\'\n---\nspan {label(2)}\n',
 }
 
@@ -133,5 +135,19 @@ describe('what the analyses read of a module fence', () => {
     const source = '--- module\nimport { x } from \'../lib/x.kay\'\nexport const y = x\n---\np {y}\n'
 
     expect(importEdits('/app/src/routes/part.kay', source, new Map([['/app/src/lib/x.kay', '/app/src/shared/x.kay']])).map(edit => edit.text)).toEqual(['../shared/x.kay'])
+  })
+})
+
+describe('the island a module fence exports', () => {
+  it('is what hydrate and persist default to wherever the island is used, a parent\'s own winning', async () => {
+    const page = await import(join(scratch, 'asks-page.kay')) as { default: () => unknown }
+    const html = child(page.default()).replace(MARKERS, '')
+    const slots = [...html.matchAll(/<slot data-component="[^"]*asks\.kay"([^>]*)>/g)].map(match => match[1])
+
+    expect(slots).toHaveLength(2)
+    expect(slots[0]).toMatch(/data-persist="[^"]*asks\.kay"/)
+    expect(slots[0]).toContain('data-hydrate="idle"')
+    expect(slots[1]).toContain('data-persist="mine"')
+    expect(slots[1]).toContain('data-hydrate="load"')
   })
 })

@@ -835,29 +835,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
   })
 
   describe('the launcher', () => {
-    const chunks = (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => name.endsWith('.js')).length)
-    // The chat inside the panel is an island of its own, marked `_$k` once hydrated.
-    const chatHydrated = () => document.querySelector('.kai-launcher-body [data-component]') && (document.querySelector('.kai-launcher-body [data-component]') as unknown as { _$k?: boolean })._$k === true
+    // The launcher is the island, marked `_$k` once hydrated.
+    const chatHydrated = () => (document.querySelector('.kai-launcher')?.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true
     const closed = '.kai-launcher-panel[hidden]'
     const opened = '.kai-launcher-panel:not([hidden])'
 
-    test('the chat loads and hydrates on the first open only, and the button opens and closes the panel by keyboard', async () => {
+    test('the launcher hydrates when the browser is idle, and the button opens and closes the panel by keyboard', async () => {
       const page = await site.open('/launcher/one')
 
       expect(await page.count(closed)).toBe(1)
       expect(await page.evaluate(() => document.querySelector('.kai-launcher-button')?.getAttribute('aria-expanded'))).toBe('false')
 
-      const before = await chunks(page)
-
-      expect(await page.evaluate(chatHydrated)).toBe(false)
-
+      await page.waitUntil(chatHydrated)
       await page.evaluate(() => document.querySelector<HTMLElement>('.kai-launcher-button')?.focus())
       await page.press('Enter')
       await page.waitFor(opened)
 
-      await page.waitUntil(chatHydrated)
-
-      expect(await chunks(page)).toBeGreaterThan(before)
       expect(await page.evaluate(() => document.querySelector('.kai-launcher-button')?.getAttribute('aria-expanded'))).toBe('true')
       expect(await page.evaluate(() => document.activeElement?.closest('.kai-launcher-panel') !== null)).toBe(true)
       expect(await page.a11y('.kai-launcher')).toEqual([])

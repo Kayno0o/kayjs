@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test
 import { Elysia, t } from 'elysia'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
-import { islandMessages } from '../src/compiler/codegen'
+import { islandMessages } from '../src/compiler/island-arguments'
 import { collection } from '../src/content'
 import { flattenMessages, localeName, localePath, localizedLink, matchLinksWith, textDirection, translate, translatedPath, untranslatedPath } from '../src/runtime/i18n'
 import { localize, relativeTime } from '../src/runtime/i18n.server'

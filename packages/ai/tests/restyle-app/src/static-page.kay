@@ -3,7 +3,7 @@ import Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 
 const reply = (() => undefined) as never
 ---
-// kay-allow island-prop -- the render fails here, which the test reads
+// kay-allow island-prop -- the launcher is an island, so `kay check` refuses the block here, and the render fails naming it, which the test reads
 Launcher(action={reply})
   @call(call)
     b {call.name}

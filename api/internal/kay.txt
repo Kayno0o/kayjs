@@ -754,7 +754,7 @@ function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: 
 function insideIsland(): boolean
 
 [./island] island
-function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], cause?: string | undefined, ownFallback?: (() => Element) | undefined): IslandComponent<P>
+function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], cause?: string | undefined, ownFallback?: (() => Element) | undefined, asks?: IslandOptions | undefined): IslandComponent<P>
 
 [./island] islandCheckpoint
 function islandCheckpoint(): (() => void) | undefined

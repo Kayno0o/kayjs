@@ -122,16 +122,23 @@ export function noteMessage(key: string): void {
 // The prop a use's `@fallback` block arrives under besides `fallback`: a client-only island shows that block and does not send it as a prop, while a `fallback` attribute is the component's own and goes through.
 const USE_FALLBACK = 'kay:fallback'
 
+// The key a `persist` keeps an island under: its component's for `true`, its own for a string, none for `false` and an empty string.
+function persistKey(wanted: IslandOptions['persist'], id: string): string | undefined {
+  if (wanted === true)
+    return id
+
+  return wanted === false || wanted === '' ? undefined : wanted
+}
+
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
 // `cause` is only passed under `kay dev`, which writes it as the `data-why` the dev tool's Islands tab shows, so production markup is the same with or without it.
-export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string, ownFallback?: () => JSX.Element): IslandComponent<P> {
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string, ownFallback?: () => JSX.Element, asks?: IslandOptions): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
-    const when = props.hydrate
-    const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
-    const persist = props.persist === true ? id : kept
+    const when = props.hydrate ?? asks?.hydrate
+    const persist = persistKey(props.persist ?? asks?.persist, id)
     const browserOnly = client || when === 'client'
     const own = 'hydrate' in props || 'persist' in props || USE_FALLBACK in props ? omit(props, 'hydrate', 'persist', USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P : props
 

@@ -118,7 +118,7 @@ it('sends a message sent while a new conversation is still being read, once the 
 // The launcher's chat is an island of its own, marked `_$k` once hydrated, which reads its conversation then.
 async function openLauncher(page: Page) {
   await page.click('.kai-launcher-button')
-  await page.waitUntil(() => (document.querySelector('.kai-launcher-body [data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
+  await page.waitUntil(() => (document.querySelector('.kai-launcher')?.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
   await page.waitFor('.kai-launcher-body .kai-chat-log:not([aria-busy])')
 }
 

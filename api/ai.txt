@@ -828,6 +828,9 @@ component default
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
 
+[./chat-launcher.kay] island
+const island: { readonly persist: true; readonly hydrate: "idle"; }
+
 [./chat-panel.kay] default
 component default
   children?: Element

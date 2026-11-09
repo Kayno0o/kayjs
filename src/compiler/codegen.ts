@@ -13,6 +13,7 @@ import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, name
 import { domHelperImport, DomTemplate } from './dom'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
+import { exportsIslandOptions, islandMessages } from './island-arguments'
 import { constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { planLoads } from './load-plan'
@@ -122,7 +123,6 @@ const PRERENDER: PageSettingName = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY: PageSettingName = 'query'
 // `t('nav.home')`, `wording('ui.close', 'Close')` or `T(key="intro")`: a message key an island's source names as it is written.
-const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -679,11 +679,18 @@ class ModuleShell {
     if (this.kind === 'twin')
       b.add(`\nexport default ${this.mode === 'html' && this.options.failedCode !== undefined ? `Object.assign((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props), { kayFailed: KayFailed })` : `((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props))`} as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.islandTail(src)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
     else if (widened && this.kind !== 'island')
       b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(`typeof ${name}`)}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${this.islandTail(src)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+  }
+
+  // The arguments after the component that `island()` takes: its message keys, the live values and cause of a server render, and the `island` the module fence exports, the hydrate and persist the component asks for wherever it is used.
+  private islandTail(src: string): string {
+    const html = this.options.output === 'html'
+
+    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script))
   }
 
   private get wrapped(): boolean {
@@ -1228,27 +1235,6 @@ function typeParameterNames(parameters: string): string[] {
   }
 
   return names
-}
-
-function messageKeys(source: string): string[] {
-  return [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
-}
-
-// The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
-// Under `kay dev` the cause goes last, as the `data-why` the dev tool shows.
-export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false): string {
-  const keys = messageKeys(source)
-
-  if (fallback)
-    return `, ${JSON.stringify(keys)}, true, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, KayFallback`
-
-  if (lives.length > 0 || cause !== undefined)
-    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]${cause === undefined ? '' : `, ${JSON.stringify(cause)}`}`
-
-  if (client)
-    return `, ${JSON.stringify(keys)}, true`
-
-  return keys.length > 0 ? `, ${JSON.stringify(keys)}` : ''
 }
 
 // The server values the template's `await` blocks render by name, which `load` defers.

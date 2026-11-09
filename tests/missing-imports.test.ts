@@ -70,6 +70,25 @@ describe('a name a file uses with no import', () => {
     }
   })
 
+  it('offers the import of ctx a template reads, into the script fence the template reads it from', async () => {
+    const root = await project({
+      'src/routes/index.kay': '---\nconst { page } = props<{ page?: string }>()\n---\np {ctx.url.pathname}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(diagnostic => diagnostic.message.startsWith('Cannot find name'))
+
+      expect(found.map(diagnostic => diagnostic.message)).toEqual(['Cannot find name \'ctx\'.'])
+      expect(found[0]?.fixes?.[0]?.safe).toBe(true)
+      expect(await applySafeFixes(root, found)).toBeGreaterThan(0)
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('import { ctx } from \'kay\'')
+      expect((await check(root)).filter(diagnostic => diagnostic.message.startsWith('Cannot find name'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('adds no import to the compiled component', () => {
     expect(compileKay('---\nconst count = signal(0)\n---\np {count()}\n', 'src/components/part.kay').tsx).not.toContain('import { signal }')
     expect(compileKay('p {t(\'a\')}\n', 'src/components/part.kay').tsx).not.toContain('kay/i18n')

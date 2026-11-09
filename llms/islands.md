@@ -77,6 +77,17 @@ const { postId } = props<{ postId: number }>()
 Comments(postId={postId} hydrate="visible")
 ```
 
+A component that wants one of these wherever it is used, a launcher kept across pages for one, exports `island` from a `--- module` fence; a parent's own `hydrate` or `persist` wins:
+
+```kay
+--- module
+export const island = { persist: true, hydrate: 'idle' } as const
+--- island
+const { label } = props<{ label: string }>()
+---
+button {label}
+```
+
 ### Animate an element in and out
 
 `transition="fade"` plays the classes `fade-enter-*` and `fade-leave-*` as a block shows and hides it:

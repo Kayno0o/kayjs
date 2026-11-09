@@ -1,4 +1,7 @@
----
+--- module
+// The launcher is on every page and the address of none: its panel keeps its state across page swaps, and the chat inside loads when the browser is idle. A conversation kept on the server is named by the browser.
+export const island = { persist: true, hydrate: 'idle' } as const
+--- island
 import type { Component, Snippet } from 'kay'
 import type { ChatLauncherIcons } from './types'
 import Chat from './chat.kay'
@@ -85,8 +88,7 @@ function opening() {
   }
 }
 ---
-// The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown. A conversation kept on the server is named by the browser, as the panel is on every page and the address of none.
-Panel(persist {...opening()} label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
+Panel({...opening()} label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon
     Icon(icon={iconOf('open', 'chat')})
   @closeIcon
@@ -97,7 +99,7 @@ Panel(persist {...opening()} label={chat.label} openLabel={openLabel} closeLabel
     Icon(icon={iconOf('expand', 'expand')})
   @collapseIcon
     Icon(icon={iconOf('collapse', 'collapse')})
-  Chat(hydrate="visible" {...chat} {...forwarded()} icons={icons} remember={remember} links="here" conversationIn="browser")
+  Chat({...chat} {...forwarded()} icons={icons} remember={remember} links="here" conversationIn="browser")
   if note
     .kai-launcher-note
       | {note}
