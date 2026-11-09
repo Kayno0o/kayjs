@@ -825,7 +825,8 @@ describe('kay new', () => {
       const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
 
       expect(compose).toContain('KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}')
-      expect(compose).toContain('- data:/app/data')
+      expect(compose).toContain('source: ./data-prod\n        target: /app/data\n        bind: { create_host_path: false }')
+      expect(compose).not.toContain('volumes:\n  data:')
       expect(compose).toContain('cap_drop: [ALL]')
       expect(compose).toContain('no-new-privileges:true')
       expect(compose).not.toContain('postgres')
@@ -907,6 +908,9 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
       // Base images by digest, and the app container with no capability nor privilege gain.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toMatch(/^FROM debian:trixie-slim@sha256:[0-9a-f]{64}$/m)
+      expect(compose).toContain('source: ./data-prod/postgres')
+      expect(compose).toContain('create_host_path: false')
+      expect(compose).not.toContain('\nvolumes:\n')
       expect(compose).toMatch(/image: postgres:18-alpine@sha256:[0-9a-f]{64}/)
       expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toMatch(/\n {4}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toMatch(/\n {8}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
@@ -1053,7 +1057,7 @@ describe('kay new', () => {
 
           // The file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {
-            expect({ features, dir: dockerfile?.includes('RUN mkdir data && chown nobody data\n'), ignored: contents['.dockerignore']!.split('\n').includes('data'), volume: compose?.includes('- data:/app/data') && compose.includes('\nvolumes:\n') && compose.includes('\n  data:') }).toEqual({ features, dir: true, ignored: true, volume: file })
+            expect({ features, dir: dockerfile?.includes('RUN mkdir data && chown nobody data\n'), ignored: contents['.dockerignore']!.split('\n').includes('data'), volume: compose?.includes('source: ./data-prod\n') && !compose.includes('\nvolumes:\n') }).toEqual({ features, dir: true, ignored: true, volume: file })
           }
         }
 

@@ -61,7 +61,11 @@ const APP_COMPOSE = `services:
       # The password of app_rw, the role the app connects with: a different secret from the owner's, letters and digits only as well.
       APP_DB_PASSWORD: \${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
     volumes:
-      - db:/var/lib/postgresql
+      # In a folder of the checkout, out of git and the image, apart from the data/ of development; it must exist, owned by the image's postgres user (uid 70): mkdir -p data-prod/postgres && sudo chown 70 data-prod/postgres. A missing folder refuses the start rather than being created as root's.
+      - type: bind
+        source: ./data-prod/postgres
+        target: /var/lib/postgresql
+        bind: { create_host_path: false }
       # Creates app_rw when the database is first created; db/roles.sh says how to run it on an existing one.
       - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     healthcheck:
@@ -100,12 +104,9 @@ const APP_COMPOSE = `services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-
-volumes:
-  db:
 `
 
-// An app on SQLite: kayjs-auth's file lives on a volume, which the app creates its tables in when it starts.
+// An app on SQLite: kayjs-auth's file lives in a bind-mounted folder, which the app creates its tables in when it starts.
 const SQLITE_COMPOSE = `services:
   app:
     build: .
@@ -122,10 +123,11 @@ const SQLITE_COMPOSE = `services:
       # The public origin of the site, which the mailed links and the OAuth callbacks start from. Its host is the one the server answers to, so the proxy in front passes the real Host header.
       SITE_URL: \${SITE_URL:?set SITE_URL}
     volumes:
-      - data:/app/data
-
-volumes:
-  data:
+      # In a folder of the checkout, out of git and the image, apart from the data/ of development; it must exist, owned by the image's user (nobody, uid 65534): mkdir -p data-prod && sudo chown 65534 data-prod. A missing folder refuses the start rather than being created as root's.
+      - type: bind
+        source: ./data-prod
+        target: /app/data
+        bind: { create_host_path: false }
 `
 
 function databaseCompose(postgres: boolean): string {
@@ -146,7 +148,7 @@ FROM ${RUNTIME_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
-# Sessions are kept in data/sessions.sqlite unless a store is given, and kayjs-auth's SQLite file is written there too: a folder the unprivileged user can write, which the SQLite compose mounts a volume on.
+# Sessions are kept in data/sessions.sqlite unless a store is given, and kayjs-auth's SQLite file is written there too: a folder the unprivileged user can write, which the SQLite compose mounts data-prod on.
 RUN mkdir data && chown nobody data
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
@@ -154,7 +156,7 @@ USER nobody
 HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
-    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\ndata\n`,
+    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\ndata\ndata-prod\n`,
     'compose.prod.yaml': has('auth')
       ? databaseCompose(has('postgres'))
       : `services:

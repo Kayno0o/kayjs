@@ -854,6 +854,30 @@ it('adds postgres to a project without kayjs-auth, which it plans under it', asy
   }
 })
 
+it('adds postgres with its own dev port, the bind-mounted data folders and data and data-prod ignored', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'my-app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
+    await addFeatures(dir, ['postgres'], { install: false })
+
+    const port = (/@127\.0\.0\.1:(\d+)\/app\n/).exec(await Bun.file(join(dir, '.env')).text())![1]
+    const lines = (await Bun.file(join(dir, '.gitignore')).text()).split('\n')
+
+    expect(port).not.toBe('5433')
+    expect(await Bun.file(join(dir, '.env')).text()).toContain(`app:app@127.0.0.1:${port}/app\n`)
+    expect(await Bun.file(join(dir, '.env.test')).text()).toContain(`127.0.0.1:${port}/app_test`)
+    expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toContain(`- 127.0.0.1:${port}:5432\n`)
+    expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toContain('- ./data/postgres:/var/lib/postgresql\n')
+    expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('source: ./data-prod/postgres')
+    expect(lines).toEqual(expect.arrayContaining(['data', 'data-prod']))
+    expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toContain('data-prod')
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
 it('adds kayjs-auth over the Postgres database postgres sets up, with no second sign-in', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 

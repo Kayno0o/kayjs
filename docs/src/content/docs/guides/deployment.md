@@ -107,7 +107,7 @@ The image has no curl, so `./server --health` checks the health route and exits 
 
 Its compose also requires `SITE_URL`, which `.env.example` lists. Without an https `SITE_URL` production sends no HSTS and writes no canonical URLs.
 
-If you keep SQLite files, mount a volume the `nobody` user can write. The `app` preset does. Its `compose.prod.yaml` mounts a `data` volume at `/app/data`, which the image prepares for `nobody`, and kayjs-auth keeps its users in `data/auth.sqlite` there, so they survive a deploy. The Postgres preset keeps them in the database instead.
+If you keep SQLite files, bind-mount a folder the `nobody` user can write. The `app` preset does. Its `compose.prod.yaml` mounts `./data-prod` (git and docker ignore it, and it is apart from the `data` of development) at `/app/data`; create it before the first start with `mkdir -p data-prod && sudo chown 65534 data-prod`, as a missing folder refuses the start. kayjs-auth keeps its users in `data/auth.sqlite` there, so they survive a deploy. The Postgres preset keeps them in the database instead.
 
 ### Database roles
 
