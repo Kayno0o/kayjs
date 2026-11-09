@@ -242,7 +242,8 @@ describe('sanitizeHtml', () => {
     for (const opener of ['<script>', '<!--', '<style>x</style'])
       sanitizeHtml(opener.repeat(1_000_000 / opener.length))
 
-    expect(performance.now() - started).toBeLessThan(1000)
+    // About 150 ms in one pass, 1.6 s on a loaded CI host; a pass per tag would take minutes.
+    expect(performance.now() - started).toBeLessThan(5000)
   })
 
   it('gives markup it already gave back as it is', () => {
