@@ -106,16 +106,21 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   analysis.reactive = analysis.implicit.some(name => needsBrowser('kay', name)) || analysis.imports.some(importsReactiveValue)
 
+  const repeated: Span[] = []
+
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
 
     const props = propsDeclaration(statement, ast.body, shift, analysis.diagnostics)
 
     if (props) {
-      if (analysis.props)
-        analysis.diagnostics.push({ ...props.statement, message: 'A component declares its props once' })
-
-      analysis.props = props
+      if (analysis.props) {
+        analysis.diagnostics.push({ ...props.statement, message: 'A component declares its props once', related: [{ ...analysis.props.statement, label: 'declared here first' }] })
+        repeated.push(props.statement)
+      }
+      else {
+        analysis.props = props
+      }
     }
     else {
       if (isExport(statement))
@@ -136,7 +141,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
   for (const extra of split.recipes.slice(1))
     analysis.diagnostics.push({ ...extra.span, message: 'A component has one recipe', help: 'put its variants in the first `recipe({ ... })`' })
 
-  reportMisplacedProps(ast, analysis, shift)
+  reportMisplacedProps(ast, analysis, shift, repeated)
 
   return analysis
 }

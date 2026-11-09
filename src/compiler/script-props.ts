@@ -175,7 +175,8 @@ function reportSignalProps(type: TSType | undefined, body: Statement[], shift: (
   }
 }
 
-export function reportMisplacedProps(ast: Program, analysis: ScriptAnalysis, shift: (node: Span) => Span) {
+// A call outside the first declaration is misplaced, unless it is one of `repeated`, which are reported as such.
+export function reportMisplacedProps(ast: Program, analysis: ScriptAnalysis, shift: (node: Span) => Span, repeated: Span[]) {
   const declared = analysis.props?.statement
 
   eachNode(ast, (node) => {
@@ -183,6 +184,9 @@ export function reportMisplacedProps(ast: Program, analysis: ScriptAnalysis, shi
       return
 
     const span = shift(node)
+
+    if (repeated.some(other => span.start >= other.start && span.end <= other.end))
+      return false
 
     if (!declared || span.start < declared.start || span.end > declared.end)
       analysis.diagnostics.push({ ...span, message: '`props<T>()` is only valid as `const ... = props<T>()` at the top of the script' })

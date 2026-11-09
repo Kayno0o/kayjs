@@ -276,6 +276,12 @@ describe('props', () => {
     expect(errors('---\nconst { a } = props()\n---\np x')).toEqual([expect.stringContaining('needs the props type')])
   })
 
+  it('reports only the second props() call, pointing at the first', () => {
+    const source = '---\nconst { a } = props<{ a: number }>()\nconst { b } = props<{ b: number }>()\n---\np {a}{b}'
+
+    expect(reports(source)).toEqual([{ message: 'A component declares its props once', at: 'const { b } = props<{ b: number }>()', related: [['const { a } = props<{ a: number }>()', 'declared here first']] }])
+  })
+
   it('allows only type exports', () => {
     expect(tsx('---\nexport type Props = { a: number }\n---\np x')).toStartWith('export type Props')
     expect(errors('---\nexport const a = 1\n---\np x')).toEqual([expect.stringContaining('exports only types')])
