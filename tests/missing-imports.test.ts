@@ -89,6 +89,19 @@ describe('a name a file uses with no import', () => {
     }
   })
 
+  it('has no ctx to import for a template reading the one its server fence imports: the import is the module\'s', async () => {
+    const root = await project({
+      'src/routes/index.kay': '--- server\nimport { ctx } from \'kay\'\n\nconst path = ctx.url.pathname\n---\np {path} {ctx.url.search}\n',
+    })
+
+    try {
+      expect((await check(root)).filter(diagnostic => diagnostic.message.startsWith('Cannot find name'))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('adds no import to the compiled component', () => {
     expect(compileKay('---\nconst count = signal(0)\n---\np {count()}\n', 'src/components/part.kay').tsx).not.toContain('import { signal }')
     expect(compileKay('p {t(\'a\')}\n', 'src/components/part.kay').tsx).not.toContain('kay/i18n')

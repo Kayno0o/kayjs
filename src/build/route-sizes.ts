@@ -21,6 +21,7 @@ const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
 // An island's slot in a prerendered page, named by its file.
 const ISLAND_SLOT = /<slot data-component="([^"]+)"/g
 const PATH_SEPARATOR = /[/\\]/
+const EXPORTED_WAIT = /^export\s+const\s+island\b[^=]*=\s*\{[^}]*\bhydrate\s*:\s*['"](?:visible|idle)['"]/m
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 const DEFAULT_IMPORT = /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\}\s*)?from\s*['"]([^'"]+)['"]/g
@@ -213,7 +214,7 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         const { template } = parseKay(source)
         const elements = [...elementsIn(template)]
 
-        return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), full: LIVE.test(source) || elements.some(element => serverIslandOf(element, source) !== undefined) || someNode(template, node => node.kind === 'await'), waits: elements.some(element => waitsToHydrate(element, source)) }
+        return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), full: LIVE.test(source) || elements.some(element => serverIslandOf(element, source) !== undefined) || someNode(template, node => node.kind === 'await'), waits: elements.some(element => waitsToHydrate(element, source)) || asksToWait(source) }
       }
       catch {
         // A file it cannot read keeps a form-only route on the islands' entry, the most it may load.
@@ -357,6 +358,11 @@ function waitsToHydrate(element: ElementNode, source: string): boolean {
     return false
 
   return mark.kind !== 'static' || mark.text === 'visible' || mark.text === 'idle'
+}
+
+// Whether the component's `--- module` fence exports `island = { hydrate: 'visible' }` or `'idle'`, which every use that writes no `hydrate` of its own gets.
+function asksToWait(source: string): boolean {
+  return EXPORTED_WAIT.test(source)
 }
 
 // A component anywhere, as a package may ship islands; a script only of the app, as the rest is a library whose islands an app imports as components.

@@ -161,3 +161,23 @@ describe('the island a module fence exports', () => {
     }
   })
 })
+
+describe('an island export the compiler would ignore', () => {
+  const problems = (source: string) => compileKay(source, 'asks.kay', { output: 'html', root: scratch, check: true, component: true }).diagnostics.filter(diagnostic => diagnostic.code === 'fence-invalid').map(diagnostic => diagnostic.message)
+
+  it('is reported for a listed export, which only `export const island` is read as', () => {
+    const [message] = problems('--- module\nconst island = { hydrate: \'idle\' } as const\nexport { island }\n--- island\n---\nbutton Go\n')
+
+    expect(message).toContain('`export const island = ')
+  })
+
+  it('is reported on a component that is no island, where nothing would read it', () => {
+    const [message] = problems('--- module\nexport const island = { hydrate: \'idle\' } as const\n--- static\n---\np Hi\n')
+
+    expect(message).toContain('is no island')
+  })
+
+  it('is not reported on an island that exports it as a constant', () => {
+    expect(problems(files['asks.kay']!)).toEqual([])
+  })
+})

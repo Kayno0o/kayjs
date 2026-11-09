@@ -77,7 +77,7 @@ const { postId } = props<{ postId: number }>()
 Comments(postId={postId} hydrate="visible")
 ```
 
-A component that wants one of these wherever it is used, a launcher kept across pages for one, exports `island` from a `--- module` fence; a parent's own `hydrate` or `persist` wins:
+A component that wants one of these wherever it is used, a launcher kept across pages for one, exports `island` from a `--- module` fence; a parent's own `hydrate` or `persist` wins. Only `export const island = ...` in an island's module fence is read, and `kay check` reports any other form of the export, or one on a component that is no island:
 
 ```kay
 --- module

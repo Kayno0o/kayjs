@@ -15,7 +15,7 @@ import { generate, isInteractive, islandCause, lineOf } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
-import { islandMessages } from './island-arguments'
+import { ignoredIslandExport, islandMessages } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
@@ -319,7 +319,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...ignoredIslandExport(script, island !== undefined))
   }
 
   if (checked && pin !== undefined)

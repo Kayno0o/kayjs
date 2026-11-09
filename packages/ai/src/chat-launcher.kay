@@ -55,7 +55,7 @@ const { icons, turn, actions, call, source, empty, footer, note, openLabel, clos
 
 const iconOf = (name: keyof ChatLauncherIcons, fallback: string) => (icons?.[name] ?? fallback) as IconValue
 
-// The blocks the app gave, passed on to the chat. A function the app gives reaches the chat only from an island of the app's own (`--- island`): from a static page it fails at render, naming the prop.
+// The blocks the app gave, passed on to the chat. A function the app gives reaches the chat only from an island of the app's own (`--- island`): from a static page `kay check` reports it as `island-prop`, and the render fails naming the prop.
 function forwarded() {
   const given: Pick<ChatProps, 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions'> = {}
 

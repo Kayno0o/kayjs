@@ -1,3 +1,4 @@
+import type { Diagnostic, Span } from './ast'
 import type { ScriptAnalysis } from './script'
 
 const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
@@ -6,9 +7,37 @@ function messageKeys(source: string): string[] {
   return [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
 }
 
+// The `island` the `--- module` fence exports: `const` for `export const island = { hydrate, persist }`, the one form the compiler reads, `listed` for any other, `export { island }` included.
+export function islandExport(script: ScriptAnalysis): { form: 'const' | 'listed', span: Span } | undefined {
+  const fence = script.moduleFence
+
+  for (const statement of fence?.ast.body ?? []) {
+    if (statement.type !== 'ExportNamedDeclaration')
+      continue
+
+    if (statement.declaration?.type === 'VariableDeclaration' && statement.declaration.declarations.some(declarator => declarator.id.type === 'Identifier' && declarator.id.name === 'island'))
+      return { form: 'const', span: fence!.shift(statement) }
+
+    if (statement.specifiers.some(specifier => specifier.exported.type === 'Identifier' ? specifier.exported.name === 'island' : specifier.exported.value === 'island'))
+      return { form: 'listed', span: fence!.shift(statement) }
+  }
+
+  return undefined
+}
+
+// The problem with an `island` export nothing reads: one written any other way than `export const island`, or on a component that is no island.
+export function ignoredIslandExport(script: ScriptAnalysis, isIsland: boolean): Diagnostic[] {
+  const asked = islandExport(script)
+
+  if (asked?.form === 'listed')
+    return [{ ...asked.span, code: 'fence-invalid', message: 'Only `export const island = { hydrate, persist }` is read as what the component asks of its parents', help: 'write it as that declaration' }]
+
+  return asked && !isIsland ? [{ ...asked.span, code: 'fence-invalid', message: 'This component is no island, so nothing reads its `island` export', help: 'write `--- island`, or drop the export' }] : []
+}
+
 // Whether the `--- module` fence has `export const island = { hydrate, persist }`: what the component asks of every parent that uses it.
 export function exportsIslandOptions(script: ScriptAnalysis): boolean {
-  return script.moduleFence?.ast.body.some(statement => statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' && statement.declaration.declarations.some(declarator => declarator.id.type === 'Identifier' && declarator.id.name === 'island')) === true
+  return islandExport(script)?.form === 'const'
 }
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.

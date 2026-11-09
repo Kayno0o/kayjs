@@ -23,7 +23,7 @@ The three forms that 1.92 deprecated are gone, with their lints (`promoted-islan
 - A static component that passes an island a function, a class instance or a block with parameters is no longer made an island when it renders: `kay check` reports `island-prop`, and rendering throws an `IslandPropsError` naming the prop. Write `--- island` in place of `---` on the component (`--- island <T>` for a generic one), or pass the island data. A build lists a component as an island only for what its own code says, so `kay build --format json` has no `promoted` field and a `cause` is never a `prop`, a `spread` or a `block`.
 - `// kay-island` and `// kay-static` are comments: write `--- island` and `--- static`.
 - A `kay` value or `t` of `kay/i18n` used with no import is a type error, `Cannot find name 'signal'`, and the compiler adds no import: write `import { signal } from 'kay'` in the fence, or run `kay check --fix`, which writes the import of any name a `kay/*` entry exports. A library component reading `ctx` imports it from `kay`, and is still typed with the keys of its context module.
-- A template reading `ctx` needs `import { ctx } from 'kay'` in its script fence, which a server fence's import no longer stands in for: `kay check --fix` adds it.
+- A template reading `ctx` needs `import { ctx } from 'kay'` in its script fence: `kay check --fix` adds it.
 - The `IslandProp` and `FunctionProp` types of `kay` take one type parameter less, as a lint name was their second.
 - `compileKay` no longer returns `promote`, its `cause` has no `target`, and `analyzeScript` takes no template reads.
 

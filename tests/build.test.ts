@@ -2355,6 +2355,8 @@ describe('the build report', () => {
         'src/routes/plain.kay': 'p Plain\n',
         'src/routes/visible.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="visible")\n',
         'src/routes/eager.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="load")\n',
+        'src/c.kay': '--- module\nexport const island = { hydrate: \'idle\' } as const\n--- island\n---\np C\n',
+        'src/routes/asks.kay': '---\nimport C from \'../c.kay\'\n---\nC\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 
       const url = (name: string) => `/_kay/${name}`
@@ -2363,14 +2365,16 @@ describe('the build report', () => {
         islands: [
           { file: 'src/a.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js'), url('shared.js')] },
           { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js'), url('shared.js')] },
+          { file: 'src/c.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js'), url('shared.js')] },
         ],
       }
-      const routes = ['helper', 'dynamic', 'alias', 'both', 'form', 'defer', 'plain', 'visible', 'eager'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const routes = ['helper', 'dynamic', 'alias', 'both', 'form', 'defer', 'plain', 'visible', 'eager', 'asks'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
       const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map(), navigation: true, hydrateWhen: [url('when.js'), url('shared.js')] } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each.js]))
       const [entry, a, b, shared, when] = await Promise.all(['entry.js', 'a.js', 'b.js', 'shared.js', 'when.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
 
       expect(sizes['/visible']).toBe(entry! + a! + shared! + when!)
       expect(sizes['/eager']).toBe(entry! + a! + shared!)
+      expect(sizes['/asks']).toBe(entry! + a! + shared! + when!)
       expect(sizes['/helper']).toBe(entry! + a! + shared!)
       expect(sizes['/alias']).toBe(entry! + a! + shared!)
       expect(sizes['/dynamic']).toBe(entry! + b! + shared!)
