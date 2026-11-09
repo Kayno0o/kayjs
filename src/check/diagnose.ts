@@ -18,6 +18,7 @@ import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
 import { authErrorKind } from './auth-error'
 import { unknownNameHelp } from './export-homes'
+import { loopIndexFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
 import { templateHint } from './template-hints'
 
@@ -156,7 +157,9 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
   if (diagnostic.code !== undefined && UNUSED_CODES.has(diagnostic.code)) {
     const level = shadow.map.isExact(diagnostic.start) ? levelAt('unread-name', offset) : 'allow'
 
-    return level === 'allow' ? undefined : { code: 'unread-name', severity: severityOf(level), message: diagnostic.message, span, unread: true }
+    const fixes = loopIndexFix(shadow.source, span)
+
+    return level === 'allow' ? undefined : { code: 'unread-name', severity: severityOf(level), message: diagnostic.message, span, unread: true, ...fixes && { fixes } }
   }
 
   // An assignment to a name holding no signal, which kay wrote through `.set`.

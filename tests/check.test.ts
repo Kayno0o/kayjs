@@ -4708,6 +4708,19 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('fixes an unread loop index with --fix, as kay upgrade does, keeping the item and the key', async () => {
+    const list = (head: string) => `---\nconst { tags, rows } = props<{ tags: string[], rows: { id: number }[] }>()\n---\nfor ${head}\n  em {tag}\nfor { id }, _n of rows\n  em {id}\n`
+    const root = await scratchProject({ 'src/list.kay': list('tag, position of tags key={tag}').replace('for { id }, _n of rows', 'for { id }, n of rows') })
+
+    try {
+      expect((await runCheck(root, '--fix')).report).toStartWith('fixed 2 problems\n')
+      expect(await Bun.file(join(root, 'src/list.kay')).text()).toBe(list('tag of tags key={tag}').replace('for { id }, _n of rows', 'for { id } of rows'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks again on every change with --watch', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
     const watch = watchChecks(root)
