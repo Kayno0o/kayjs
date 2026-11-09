@@ -22,7 +22,7 @@ import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
 import { readsOf } from './page-reads'
 import { chainSetting, pagePrerender, pageSetting } from './page-settings'
-import { listedIn, listedParams, pageEtag, pathOf } from './prerendered'
+import { listedIn, listedParams, pageEtag, pathOf, translatedSlugs } from './prerendered'
 import { matchesEtag, REVALIDATE } from './public'
 import { onPublished } from './publishing'
 import { reportServerError } from './report'
@@ -322,6 +322,26 @@ export async function sitemapXml(routes: ServedRoute[], origin: string, trailing
   return urlset(await sitemapUrls(routes, origin, trailingSlash, settings, only), settings)
 }
 
+// Each locale's copy of a listed page. A routed entry whose translations have slugs of their own points at each one's own url, and lists only the copy of its own locales: the others are listed by the entries they are the copy of.
+function copiesOf(route: ServedRoute, params: ListedParams, settings: LocaleSettings | undefined): (LocaleCopy & { own?: boolean })[] {
+  const slugs = translatedSlugs(params)
+
+  if (slugs === undefined || settings === undefined)
+    return localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))
+
+  const param = route.params[0]!
+  const fallback = slugs[settings.defaultLocale]
+
+  return settings.locales.flatMap((locale) => {
+    const slug = slugs[locale] ?? fallback
+
+    if (slug === undefined)
+      return []
+
+    return localeCopies(settings, pathOf(route, { ...params, [param]: slug })).filter(copy => copy.locale === locale).map(copy => ({ ...copy, own: slug === params[param] }))
+  })
+}
+
 // Every page a crawler can reach: a page without params unless it opts out, a page with params for the ones its `sitemap` or `prerender` export lists.
 // A page behind a guard is left out unless its `sitemap` export puts it in.
 // In a site of several locales, each copy of a page lists every other, `x-default` the default locale's; `only` keeps the copies of one locale, a domain's.
@@ -381,11 +401,11 @@ async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash:
 
   const absolute = (copy: LocaleCopy) => escape(`${copy.host === undefined ? origin : `https://${copy.host}${base}`}${slashedPath(copy.path, trailingSlash)}`)
   const urls = routes.flatMap((route, index) => lists[index]!.flatMap(({ params, modified }) => {
-    const copies = localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))
+    const copies = copiesOf(route, params, settings)
     const fallback = copies.find(copy => copy.locale === settings?.defaultLocale)
     const alternates = settings && fallback ? [...copies.map(copy => `<xhtml:link rel="alternate" hreflang="${copy.locale}" href="${absolute(copy)}"/>`), `<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(fallback)}"/>`].join('') : ''
 
-    return copies.filter(copy => only === undefined || copy.locale === only).map(copy => `<url><loc>${absolute(copy)}</loc>${modified}${alternates}</url>`)
+    return copies.filter(copy => (only === undefined || copy.locale === only) && (copy.own ?? true)).map(copy => `<url><loc>${absolute(copy)}</loc>${modified}${alternates}</url>`)
   }))
 
   return urls

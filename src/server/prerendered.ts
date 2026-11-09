@@ -2,6 +2,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { Route } from './routes'
 import { KayError } from '../compiler/errors'
 import { isCollection, isPaginated } from '../content'
+import { translationKey } from '../content/load'
 
 const FILE_BREAKERS = /[\\\0]/
 
@@ -11,7 +12,15 @@ const ENTRY_LOCALES = Symbol('kay.entryLocales')
 // The locales a paginated list has a page in, each counting its own entries.
 const PAGE_LOCALES = Symbol('kay.pageLocales')
 
-export type ListedParams = Record<string, string> & { [ENTRY_LOCALES]?: readonly string[], [PAGE_LOCALES]?: readonly string[] }
+// The slug each locale's translation of a listed entry has, when some differ from the listed one: the paired entries by `translationKey`, whatever their own slugs.
+const ENTRY_SLUGS = Symbol('kay.entrySlugs')
+
+export type ListedParams = Record<string, string> & { [ENTRY_LOCALES]?: readonly string[], [PAGE_LOCALES]?: readonly string[], [ENTRY_SLUGS]?: Readonly<Record<string, string>> }
+
+// The slug of a listed entry's translation in each locale that has one, when some translation has a slug of its own.
+export function translatedSlugs(params: ListedParams): Readonly<Record<string, string>> | undefined {
+  return params[ENTRY_SLUGS]
+}
 
 // The headers a prerendered page is served with: the cookies its render set were for no one.
 export function storedHeaders(headers: Headers): Record<string, string> {
@@ -73,11 +82,26 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
 
     // A localized collection lists a slug once, each locale's copy of the page following from it.
     const locales = new Map<string, string[]>()
+    const paired = new Map<string, Record<string, string>>()
+    const slugs = new Map<string, Record<string, string>>()
 
-    for (const entry of entries)
+    for (const entry of entries) {
+      if (entry.locale !== undefined)
+        paired.set(translationKey(entry), { ...paired.get(translationKey(entry)), [entry.locale]: entry.slug })
+    }
+
+    for (const entry of entries) {
       locales.set(entry.slug, [...locales.get(entry.slug) ?? [], ...entry.locale === undefined ? [] : [entry.locale]])
 
-    return [...locales].map(([slug, held]) => ({ [param]: slug, ...held.length > 0 && { [ENTRY_LOCALES]: held } }))
+      if (entry.locale !== undefined)
+        slugs.set(entry.slug, { ...slugs.get(entry.slug), ...paired.get(translationKey(entry)) })
+    }
+
+    return [...locales].map(([slug, held]) => {
+      const own = slugs.get(slug)
+
+      return { [param]: slug, ...held.length > 0 && { [ENTRY_LOCALES]: held }, ...own && Object.values(own).some(each => each !== slug) && { [ENTRY_SLUGS]: own } }
+    })
   }
 
   if (value === true) {
