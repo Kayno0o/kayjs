@@ -177,7 +177,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
         continue
       }
 
-      const identity = replaceableIdentity(tag) ?? `u:${unique++}`
+      const identity = identityOf(tag) ?? `u:${unique++}`
       const list = own.get(identity)
 
       if (list)
@@ -274,14 +274,14 @@ function fillSocial(winners: Map<string, HeadTag[]>, title: string | undefined, 
     const identity = `meta:${key}:${name}`
 
     if (value !== undefined && !winners.has(identity))
-      winners.set(identity, [{ tag: 'meta', props: { [key]: name, content: value } }])
+      winners.set(identity, [filledTag(key, name, value)])
   }
 
   const absolute = (identity: string, attribute: 'content' | 'href') => {
     const tags = winners.get(identity)
 
     if (origin !== undefined && tags)
-      winners.set(identity, tags.map(tag => typeof tag.props[attribute] === 'string' && ABSOLUTE_PATH.test(tag.props[attribute]) ? { tag: tag.tag, props: { ...tag.props, [attribute]: origin + tag.props[attribute] } } : tag))
+      winners.set(identity, tags.map(tag => absoluteTag(tag, attribute, origin)))
   }
 
   const image = content(OG_IMAGE)
@@ -359,14 +359,67 @@ function replaceableIdentity({ tag, props }: HeadTag): string | undefined {
   return undefined
 }
 
-// The markup of the tags every page starts from, the same objects from one render to the next, which nothing changes once kept.
+// The markup and identity of the tags every page starts from, the same objects from one render to the next, which nothing changes once kept.
 const keptMarkup = new WeakMap<HeadTag, string>()
+const keptIdentity = new WeakMap<HeadTag, string | undefined>()
 
 export function keepHeadMarkup(tags: HeadTag[]): void {
   for (const tag of tags) {
-    if (tag.tag !== 'html' && HEAD_TAGS.has(tag.tag))
+    if (tag.tag !== 'html' && HEAD_TAGS.has(tag.tag)) {
       keptMarkup.set(tag, markupNow(tag))
+      keptIdentity.set(tag, replaceableIdentity(tag))
+    }
   }
+}
+
+function identityOf(tag: HeadTag): string | undefined {
+  return keptIdentity.has(tag) ? keptIdentity.get(tag) : replaceableIdentity(tag)
+}
+
+// The social tags `fillSocial` makes, by name and value, kept with their markup: most pages fill the same few from the site's defaults. A value that differs per page, such as `og:url`, empties it once it holds `FILLED_MAX`.
+const filled = new Map<string, HeadTag>()
+const FILLED_MAX = 256
+
+function filledTag(key: 'name' | 'property', name: string, value: string): HeadTag {
+  const id = `${key}:${name}\n${value}`
+  const known = filled.get(id)
+
+  if (known)
+    return known
+
+  if (filled.size >= FILLED_MAX)
+    filled.clear()
+
+  const tag = { tag: 'meta', props: { [key]: name, content: value } }
+
+  keepHeadMarkup([tag])
+  filled.set(id, tag)
+
+  return tag
+}
+
+// A tag whose URL is a path of the site, with that URL made absolute: one copy per kept tag, such as the site's default `og:image`.
+const absoluteCopies = new WeakMap<HeadTag, HeadTag>()
+
+function absoluteTag(tag: HeadTag, attribute: 'content' | 'href', origin: string): HeadTag {
+  const value = tag.props[attribute]
+
+  if (typeof value !== 'string' || !ABSOLUTE_PATH.test(value))
+    return tag
+
+  const copy = absoluteCopies.get(tag)
+
+  if (copy && copy.props[attribute] === origin + value)
+    return copy
+
+  const made = { tag: tag.tag, props: { ...tag.props, [attribute]: origin + value } }
+
+  if (keptMarkup.has(tag)) {
+    keepHeadMarkup([made])
+    absoluteCopies.set(tag, made)
+  }
+
+  return made
 }
 
 function tagMarkup(tag: HeadTag): string {
