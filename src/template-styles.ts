@@ -142,7 +142,7 @@ details.relative
     Palette.size-5.text-accent
     | Accent
   div(
-    class="absolute right-0 mt-2 grid grid-cols-7 gap-1 rounded border-2 border-overlay0 bg-mantle p-2 shadow-lg"
+    class="absolute right-0 mt-2 grid w-max grid-cols-7 gap-1 rounded border-2 border-overlay0 bg-mantle p-2 shadow-lg"
     role="radiogroup"
     aria-label="Accent colour"
   )
