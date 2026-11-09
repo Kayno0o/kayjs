@@ -1,21 +1,14 @@
-import type { ImportedSignals, Reexported, SignalKind } from '../compiler/module-signals'
+import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { iconSetsOf } from '../compiler/host'
-import { importedModules, jsonKinds, moduleKinds } from '../compiler/module-signals'
+import { importedModules, moduleSignals } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
-import { fences, packageRoot } from './libraries'
+import { fences } from './libraries'
 
-type ImportedKinds = Record<string, SignalKind | 'data'>
 const KAY_FILE = /\.kay$/
-const JSON_FILE = /\.json$/
-// A key of the modules a read depended on that marks a re-export cycle cut short, or a re-export that resolves to nothing: such a read is not remembered, so a module in a cycle is parsed again on each call.
-const CUT = '<cycle>'
-const MISSING = 'missing'
 const KAY_MODULE = /^kay(?:\/|$)/
-const scanned = new Map<string, { stamp: string, signals: ImportedKinds, deps: Map<string, string> }>()
+const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -25,7 +18,7 @@ const open = new Set<Memo>()
 // What each component imports, read again only once its text changes.
 const imports = new Map<string, { hash: number | bigint | string, specifiers: string[] }>()
 
-// The signals and memos the modules a component imports export, and the names they export as literal data, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
+// The signals and memos the modules a component imports export, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
   const memo = scope.getStore() ?? (open.size === 1 ? open.values().next().value : undefined)
@@ -79,7 +72,7 @@ function readImportedSignals(file: string, source: string): ImportedSignals {
   for (const specifier of specifiers) {
     const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
 
-    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path) || JSON_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
+    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
       continue
 
     const signals = signalsOf(path)
@@ -99,65 +92,23 @@ export function keepImportedSignals(files: ReadonlySet<string>): void {
   }
 }
 
-// What a module exports, read again once its stamp, or the stamp of a module it re-exports from, changes.
-// `walk` holds the modules being read, so a cycle of re-exports ends, and what a cycle cut short is not remembered.
-function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string, string>()): ImportedKinds {
+// What a module exports, read again once its stamp changes.
+function signalsOf(path: string): Record<string, SignalKind> {
   try {
     const stats = statSync(path, { throwIfNoEntry: false })
 
-    if (!stats) {
-      deps.set(path, MISSING)
-
+    if (!stats)
       return {}
-    }
 
     const stamp = `${stats.mtimeMs}-${stats.size}`
     const known = scanned.get(path)
 
-    deps.set(path, stamp)
-
-    if (known?.stamp === stamp && [...known.deps].every(([dep, depStamp]) => dep === path || (stampOf(dep) ?? MISSING) === depStamp)) {
-      for (const [dep, depStamp] of known.deps)
-        deps.set(dep, depStamp)
-
+    if (known?.stamp === stamp)
       return known.signals
-    }
 
-    if (walk.has(path)) {
-      deps.set(CUT, '')
+    const signals = kindsOf(path, readFileSync(path, 'utf8'))
 
-      return {}
-    }
-
-    walk.add(path)
-
-    const own = new Map<string, string>([[path, stamp]])
-    const text = readFileSync(path, 'utf8')
-    const reexported: Reexported = (specifier) => {
-      const target = resolveFrom(specifier, path)
-
-      if (target === undefined) {
-        own.set(CUT, '')
-
-        return {}
-      }
-
-      return SCRIPT_FILE.test(target) || KAY_FILE.test(target) || JSON_FILE.test(target) ? signalsOf(target, walk, own) : {}
-    }
-    let signals: ImportedKinds
-
-    try {
-      signals = kindsOf(path, text, reexported, iconSetsFor(path, text, own))
-    }
-    finally {
-      walk.delete(path)
-    }
-
-    for (const [dep, depStamp] of own)
-      deps.set(dep, depStamp)
-
-    if (!own.has(CUT))
-      scanned.set(path, { stamp, signals, deps: own })
+    scanned.set(path, { stamp, signals })
 
     return signals
   }
@@ -166,43 +117,13 @@ function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string
   }
 }
 
-// The icon sets the project holding a module that imports icons installs, its package.json and installed sets joining `deps`, so installing a set reads the module again.
-function iconSetsFor(path: string, text: string, deps: Map<string, string>): ReadonlySet<string> | undefined {
-  if (JSON_FILE.test(path) || !text.includes('~icons/'))
-    return undefined
-
-  const root = packageRoot(dirname(path))
-
-  for (const dep of [join(root, 'package.json'), join(root, 'node_modules/@iconify-json')])
-    deps.set(dep, stampOf(dep) ?? MISSING)
-
-  return iconSetsOf(text, root)
-}
-
-function kindsOf(path: string, text: string, reexported: Reexported, iconSets: ReadonlySet<string> | undefined): ImportedKinds {
-  if (JSON_FILE.test(path))
-    return jsonKinds(text)
-
+function kindsOf(path: string, text: string): Record<string, SignalKind> {
   // A component's signals are the ones its `--- module` fence exports.
-  if (KAY_FILE.test(path))
-    return kayModuleSignals(text, reexported, iconSets)
+  if (KAY_FILE.test(path)) {
+    const { module } = parseKay(text)
 
-  return moduleKinds(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx', reexported, iconSets)
-}
+    return module ? moduleSignals(text.slice(module.start, module.end)) : {}
+  }
 
-function stampOf(path: string): string | undefined {
-  const stats = statSync(path, { throwIfNoEntry: false })
-
-  return stats && `${stats.mtimeMs}-${stats.size}`
-}
-
-function kayModuleSignals(text: string, reexported: Reexported, iconSets: ReadonlySet<string> | undefined): ImportedKinds {
-  const { module } = parseKay(text)
-
-  if (!module)
-    return {}
-
-  const fence = text.slice(module.start, module.end)
-
-  return moduleKinds(fence, false, reexported, iconSets)
+  return moduleSignals(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
 }

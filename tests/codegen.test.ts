@@ -2,7 +2,7 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
 import { compileKay, componentName } from '../src/compiler'
 import { KAY_ROLES } from '../src/compiler/kay-exports'
-import { jsonKinds, moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
+import { moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
 function tsx(source: string): string {
@@ -1247,29 +1247,6 @@ describe('module signals', () => {
     expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'signal' })
     expect(moduleSignals('import { debounced, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const settled = debounced(typed, \'300ms\')\n')).toEqual({ typed: 'signal', settled: 'memo' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
-    expect(moduleData('export const a = { x: \'1\', y: [1, -2, true, null, { z: `t` }] } as const\nexport const b = \'s\'\nexport const c = { ...a }\nexport const d = { get x() { return 1 } }\nexport const e = { m() {} }\nexport const f = { [k]: 1 }\nexport const g = { x }\nexport const h = `a${b}`\nexport const i = [1, , 2]\nexport const j = { f: () => 1 }\nexport const k = fn()\nexport let l = \'x\'\nconst m = \'x\'\nexport { m }\n')).toEqual(['a', 'b', 'm'])
-    expect(moduleData('const a = { x: 1 }\nconst f = () => 1\nconst o = { f }\nexport { a as b, f, o }\nexport default a\nexport type { a as c }\n')).toEqual(['b', 'default'])
-    expect(moduleData('export * from \'./x\'\nexport const L = { f: () => 1 }\nconst M = { f: () => 1 }\nexport { M }\nexport function N() {}\n', false, () => ({ L: 'data', M: 'data', N: 'data', O: 'data' }))).toEqual(['O'])
-    expect(moduleData('export default { a: 1 }\n')).toEqual(['default'])
-    expect(moduleData('export default { a: () => 1 }\n')).toEqual([])
-    expect(moduleData('export { a, b as c, default as d } from \'./x\'\nexport * from \'./y\'\nexport * as ns from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data', default: 'data' } : { z: 'data', default: 'data', f: 'signal' })).toEqual(['a', 'c', 'd', 'z'])
-    expect(moduleKinds('import { signal } from \'kay\'\nexport const a = signal(1)\nexport const b = { x: \'y\' }\n')).toEqual({ a: 'signal', b: 'data' })
-    expect(moduleKinds('const a = 1\n')).toEqual({})
-    const icons = 'import Home from \'~icons/tabler/home\'\nimport Brand from \'~icons/brands/github\'\nimport other from \'./other\'\nexport const a = { Home, list: [Home] }\nexport const b = { Brand }\nexport const c = { other }\nexport default Home\n'
-
-    expect(moduleKinds(icons)).toEqual({ a: 'data', b: 'data', default: 'data' })
-    expect(moduleKinds(icons, false, undefined, new Set(['tabler']))).toEqual({ a: 'data', default: 'data' })
-  })
-
-  it('reads a name a destructured export or two stars give as not data', () => {
-    expect(moduleData('export * from \'./x\'\nexport const { a, b: [c], ...d } = source\n', false, () => ({ a: 'data', c: 'data', d: 'data', e: 'data' }))).toEqual(['e'])
-    expect(moduleData('export * from \'./x\'\nexport * from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data' } : { a: 'data', c: 'data' })).toEqual(['b', 'c'])
-  })
-
-  it('reads a JSON file with a BOM or comments as not data', () => {
-    expect(jsonKinds('{ "a": 1 }')).toEqual({ default: 'data', a: 'data' })
-    expect(jsonKinds('\uFEFF{ "a": 1 }')).toEqual({})
-    expect(jsonKinds('{ // note\n "a": 1 }')).toEqual({})
   })
 })
 

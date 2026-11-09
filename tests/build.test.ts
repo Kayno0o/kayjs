@@ -1581,49 +1581,6 @@ describe('what a build keeps in memory', () => {
     }
   })
 
-  it('reads the data a module re-exports, again once the module it re-exports from changes, and ends a cycle of re-exports', async () => {
-    const dir = resolve(await scratchDir('kay-reexport-'))
-    const file = join(dir, 'label.kay')
-    const source = '---\nimport { LABELS } from \'./barrel\'\nimport { LOOP } from \'./loop-a\'\nimport copy from \'./copy.json\'\n---\np.label {LABELS.a}\n'
-
-    try {
-      await Bun.write(join(dir, 'barrel.ts'), 'export * from \'./labels\'\n')
-      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: \'A\' }\n')
-      await Bun.write(join(dir, 'loop-a.ts'), 'export * from \'./loop-b\'\nexport const LOOP = { a: \'l\' }\n')
-      await Bun.write(join(dir, 'loop-b.ts'), 'export * from \'./loop-a\'\n')
-      await Bun.write(join(dir, 'copy.json'), '{ "a": 1 }')
-      expect(importedSignals(file, source)).toEqual({ './barrel': { LABELS: 'data' }, './loop-a': { LOOP: 'data' }, './copy.json': { default: 'data', a: 'data' } })
-      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: () => \'A\' }\n')
-      expect(importedSignals(file, source)['./barrel']).toBeUndefined()
-      // A module a re-export names before it exists is read again once it does.
-      await Bun.write(join(dir, 'barrel.ts'), 'export * from \'./labels\'\nexport * from \'./later\'\n')
-      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: \'A\' }\n')
-      expect(importedSignals(file, source)['./barrel']).toEqual({ LABELS: 'data' })
-      await Bun.write(join(dir, 'later.ts'), 'export const LATER = { a: \'A\' }\n')
-      expect(importedSignals(file, source)['./barrel']).toEqual({ LABELS: 'data', LATER: 'data' })
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('reads an object of icons a module exports as data while their set is installed, again once the project\'s package.json changes', async () => {
-    const dir = resolve(await scratchDir('kay-icons-'))
-    const file = join(dir, 'tiles.kay')
-    const source = '---\nimport { ICONS } from \'./icons\'\n---\np {String(ICONS.a)}\n'
-
-    try {
-      await Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true }))
-      await Bun.write(join(dir, 'icons.ts'), 'import Home from \'~icons/tabler/home\'\n\nexport const ICONS = { a: Home }\n')
-      expect(importedSignals(file, source)).toEqual({})
-      await Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }))
-      expect(importedSignals(file, source)).toEqual({ './icons': { ICONS: 'data' } })
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
   it('looks up the signals a component imports once inside a scope, and from the disk again in the next', async () => {
     const dir = resolve(await scratchDir('kay-scope-'))
     const file = join(dir, 'count.kay')

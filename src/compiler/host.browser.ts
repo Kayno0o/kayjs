@@ -23,7 +23,3 @@ export function markdownHtml(): string {
 export function markdownEntity(): undefined {
   return undefined
 }
-
-export function iconSetsOf(): undefined {
-  return undefined
-}

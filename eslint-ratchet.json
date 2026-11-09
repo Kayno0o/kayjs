@@ -129,9 +129,6 @@
     "max-lines": 621,
     "complexity": 75
   },
-  "src/compiler/module-signals.ts": {
-    "complexity": 45
-  },
   "src/compiler/parser.ts": {
     "max-lines": 1097
   },
