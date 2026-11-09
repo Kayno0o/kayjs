@@ -35,6 +35,20 @@ export function ignoredIslandExport(script: ScriptAnalysis, isIsland: boolean): 
   return asked && !isIsland ? [{ ...asked.span, code: 'fence-invalid', message: 'This component is no island, so nothing reads its `island` export', help: 'write `--- island`, or drop the export' }] : []
 }
 
+// The `hydrate` the exported `island` asks for, when it is written as a string.
+export function exportedHydrate(script: ScriptAnalysis): string | undefined {
+  for (const statement of script.moduleFence?.ast.body ?? []) {
+    const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations.find(each => each.id.type === 'Identifier' && each.id.name === 'island') : undefined
+    const init = declaration?.init?.type === 'TSAsExpression' ? declaration.init.expression : declaration?.init
+    const property = init?.type === 'ObjectExpression' ? init.properties.find(each => each.type === 'Property' && each.key.type === 'Identifier' && each.key.name === 'hydrate') : undefined
+
+    if (property?.type === 'Property' && property.value.type === 'Literal' && typeof property.value.value === 'string')
+      return property.value.value
+  }
+
+  return undefined
+}
+
 // Whether the `--- module` fence has `export const island = { hydrate, persist }`: what the component asks of every parent that uses it.
 export function exportsIslandOptions(script: ScriptAnalysis): boolean {
   return islandExport(script)?.form === 'const'

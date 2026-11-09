@@ -8,7 +8,9 @@ import type { RouteSize, SizeReport } from './report'
 import { realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { actionOf, elementsIn, serverIslandOf, someNode } from '../compiler/ast'
+import { exportedHydrate } from '../compiler/island-arguments'
 import { parseKay } from '../compiler/parser'
+import { analyzeScript } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 import { describeStop } from '../server/pure-page'
 import { ASSET_PREFIX } from './assets'
@@ -21,7 +23,6 @@ const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
 // An island's slot in a prerendered page, named by its file.
 const ISLAND_SLOT = /<slot data-component="([^"]+)"/g
 const PATH_SEPARATOR = /[/\\]/
-const EXPORTED_WAIT = /^export\s+const\s+island\b[^=]*=\s*\{[^}]*\bhydrate\s*:\s*['"](?:visible|idle)['"]/m
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 const DEFAULT_IMPORT = /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\}\s*)?from\s*['"]([^'"]+)['"]/g
@@ -362,7 +363,10 @@ function waitsToHydrate(element: ElementNode, source: string): boolean {
 
 // Whether the component's `--- module` fence exports `island = { hydrate: 'visible' }` or `'idle'`, which every use that writes no `hydrate` of its own gets.
 function asksToWait(source: string): boolean {
-  return EXPORTED_WAIT.test(source)
+  const parsed = parseKay(source)
+  const hydrate = exportedHydrate(analyzeScript(source, parsed.script, [], parsed.module))
+
+  return hydrate === 'visible' || hydrate === 'idle'
 }
 
 // A component anywhere, as a package may ship islands; a script only of the app, as the rest is a library whose islands an app imports as components.

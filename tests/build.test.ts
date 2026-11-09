@@ -2355,7 +2355,7 @@ describe('the build report', () => {
         'src/routes/plain.kay': 'p Plain\n',
         'src/routes/visible.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="visible")\n',
         'src/routes/eager.kay': '---\nimport A from \'../a.kay\'\n---\nA(hydrate="load")\n',
-        'src/c.kay': '--- module\nexport const island = { hydrate: \'idle\' } as const\n--- island\n---\np C\n',
+        'src/c.kay': '--- module\nexport const island = { persist: { key: \'c\' }, hydrate: \'visible\' } as const\n--- island\n---\np C\n',
         'src/routes/asks.kay': '---\nimport C from \'../c.kay\'\n---\nC\n',
       }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 
