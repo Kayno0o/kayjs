@@ -16,7 +16,7 @@ const look = recipe({
     empty: 'text-xs text-muted',
     viewport: 'relative w-full overflow-hidden bg-surface',
     // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
-    slide: 'absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none',
+    slide: 'absolute inset-0 transition-transform duration-[calc(700ms*var(--motion-scale))] ease-in-out motion-reduce:transition-none',
     link: 'block size-full',
     image: 'size-full object-cover',
     controls: 'flex items-center justify-center gap-4',

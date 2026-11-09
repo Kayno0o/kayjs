@@ -218,7 +218,7 @@ export class Sortable {
 
     for (const item of items) {
       if (item.el !== el)
-        item.el.style.transition = 'transform 150ms'
+        item.el.style.transition = 'transform calc(150ms * var(--motion-scale))'
     }
 
     clearSelection()

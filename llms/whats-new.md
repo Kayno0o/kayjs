@@ -5,6 +5,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A link pressed or clicked while its hover prefetch was still waiting no longer fetches its page a second time, so a page is requested once per visit on a slow machine too ([navigation](navigation-from-code.md)).
+- kayjs-ui's FormField, Checkbox, Toggle and FileDrop keep an empty message line out of the layout, so no row gap is left under a control and a button beside the field lines up with it; the line stays in the page to announce a message ([forms](../packages/ui/llms/forms-and-steps.md)).
+- kayjs-ui's CardRow actions show at full opacity on a screen that cannot hover ([layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
+- kayjs-ui's MultiSelect trigger is a `combobox` button opening a dialog and takes `aria-invalid` (`invalid` or a FormField message), `aria-required` and `aria-describedby`; its `data-refused` mark is gone ([MultiSelect](../docs/src/content/ui/multi-select.md)).
+- kayjs-ui reads one `--motion-scale` token, `0` under `prefers-reduced-motion`, for every transition it draws, the carousel, SidePanel, Badge, sortable lists and the skins included ([setup](../packages/ui/llms/setup.md)).
 
 ## 1.93.0
 
