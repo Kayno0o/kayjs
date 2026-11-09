@@ -112,6 +112,13 @@ A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` 
 A `[x=slug]` route beside a plain `[y]` route now takes `été` and `a_b`, which used to fall through to the plain route: lowercase words of any script, digits and `_`, joined by dashes (and `/` in a rest param). Nothing already accepted is refused. A matcher now gets a second argument, `true` for a catch-all param, so one exported as a built-in taking a second parameter, `export default parseInt`, wraps it: `(value: string) => parseInt(value)`.
 
 ### The forms 1.88 deprecated are gone
+
+Their `deprecated-config-groups`, `deprecated-room-types` and `deprecated-duration-seconds` lints go with them: run `kay upgrade` on 1.91 first and it rewrites what it can; what `kay check` reported with no fix (a config with the bag already present or a spread, a `lifetime` or `durationWords` number that is no integer literal or is held in a variable) is changed by hand. On 1.92 a flat config key is refused as an unknown key naming its bag, and a bare number of seconds throws.
+
+- The flat config keys are refused in `kay.config.ts`, an extension's `config` and the options of `pages()` and `testSite()`, naming where each lives: `routesDir`, `apiDir` and `publicDir` are `dirs: { routes, api, public }`, `maxSize` and `maxSizeByPath` are `limits: { body, byPath }`, `apiPath`, `compress`, `compressionDictionary` and `shutdownTimeout` are `serve`, `log`, `serverTiming`, `requestIdHeader`, `tracer` and `onError` are `observe`, and `navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch` and `saveData` are `client`.
+- The types AsyncRoomStore and AsyncRooms from `kay/server` are `RoomStore` and `Rooms`, and StoreRooms is `Rooms`.
+- kayjs-auth's `lifetime(seconds, locale)` and kay's `durationWords(seconds, locale)` take a duration with its unit, `'86400s'` for 86400, and throw for a bare number.
+
 ### `EventReader` and `StreamRun` are `Connection` and `Stream`, and `.on` of a stream is `.onData`
 
 `stream()` has two overloads and one return type: a `Stream`, a `Connection` with `start()` (a stream opened with `start: false` was a `StreamRun`), and a streaming action's `ActionStream` is a `Connection` too, so it has `retry()`, `onOpen()` and `onData()` beside `ended()`. `EventReader` and `StreamRun` from `kay` are `Connection` and `Stream`; the old names work until 1.95, `kay check` flags an import of them as `deprecated-stream-types` and `kay upgrade` renames it. `feed.on(value => ...)` is `feed.onData(({ value }) => ...)`, the hook every source hands its data through; `on` works until 1.95 and `kay check` flags it as `deprecated-stream-on`, with a safe fix, on a name the file binds once to `stream(` or `socket(` from `kay` (a stream reached through a property, a parameter or an action's answer is changed by hand). A mock of a stream written out as an object must add what the type now holds: `ended`, `onData` and `start` for a `stream()`, `retry`, `onOpen` and `onData` for an `ActionStream`, `onData` for a `socket()`.
@@ -123,17 +130,6 @@ Every other source reads `pending()` as a boolean and `status()` as `idle|loadin
 ### `onOpen` of a socket, a stream and an action's stream is told `{ reconnected }`
 
 `feed.onOpen(reconnected => ...)` is `feed.onOpen(({ reconnected }) => ...)`, the one object argument every [hook](hooks.md) takes; a callback taking no argument is unchanged. The old form still compiles, as an object is truthy, so `onOpen(reconnected => reconnected && refetch())` now runs on every open, the first included. `kay check` flags it as `deprecated-stream-open` on a name the file binds once to `stream(` or `socket(` from `kay`, with a safe fix for an arrow of one plain parameter (a function reference is reported, not fixed); a stream reached through a property, a parameter or an action's answer is changed by hand. A mock of a `stream()`, a `socket()` or an `ActionStream` written out as an object must add `onError` and `onClose`, a mock of a `resource()` `onData` and `onError`, and of a `track()` handle `onSuccess` and `onError`.
-
-### An island is decided by the component's own code, and every name is imported
-
-What a component passes never makes it an island any more. `kay upgrade` runs the fixes below, and `kay check` reports the rest.
-
-- `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` compute the same on both sides. A component whose only `kay` value is one of them is static now, with the same markup, and no lint says so; `kay explain island <file>` gives a role.
-- `promoted-island` (deprecated, since 1.92) and `island-prop` report a static component handing an island a function, a class instance or a block with parameters. `--- island` in place of `---` is the fix, applied where the value is always a function. A component promoted on some renders only, a prop typed `T | (() => T)` or an island inside an `if`, is offered the fix and not given it, as `--- island` would hydrate it on every page: pick `--- island`, or pass data and keep it static. Promotion stops in 1.95.
-- `// kay-island` and `// kay-static` are `island-comment` (deprecated, since 1.92): `kay upgrade` writes `--- island` and `--- static`. `--- static` makes anything that would turn the component into an island the error `static-pin`.
-- `implicit-import` (deprecated, since 1.92) reports a `kay` value or `t` used with no import. `kay upgrade` writes the line; `kay check --fix` also writes the import of any `kay/*` name in a `.ts` file. The compiler stops adding them in 1.95.
-
-### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
 
 The rest of this release is in [Upgrading, older releases](upgrading-archive.md).
 

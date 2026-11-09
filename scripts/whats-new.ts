@@ -130,6 +130,12 @@ function capSection(page: string, archive: string, cap: number, pick: RegExp, un
   // A section cut before ends on its pointer, which is written again below the lines kept now.
   const body = `${section.replace(POINTER, '\n').trimEnd()}\n`
   const starts = bulletStarts(body, unit)
+  // A heading with another right under it has lost its body to a section a lane inserted between them, and a cut would carry the body away from the heading.
+  const bare = unit === '- ' ? null : new RegExp(`^${unit}[^\\n]*(?=\\n${unit})`, 'm').exec(body)
+
+  if (bare !== null)
+    throw new Error(`${heading}: "${bare[0]}" has no text before the next heading: a section was inserted under it, so its text belongs to another heading; move it back above the heading before capping`)
+
   const cut = starts.findLast(start => Buffer.byteLength(`${body.slice(0, start).trimEnd()}\n\n${pointer}\n`) <= cap)
 
   // A section whose first unit alone outgrows the cap has nowhere to be cut.

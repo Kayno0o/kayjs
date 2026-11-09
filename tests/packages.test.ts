@@ -276,6 +276,14 @@ describe('what\'s new', () => {
     expect(capNewest(page, archive, 20, '### ')).toEqual({ page, archive })
   })
 
+  it('refuses to cut a release holding a `###` heading with another heading right under it, as a lane inserting a section there leaves it', () => {
+    const [a, b] = ['a', 'b'].map(letter => letter.repeat(60))
+    const page = `# Up\n\n## 1.72.0\n\n### A\n### B\n\n${b}\n\n${a}\n\nReleases before 1.72 are in [Old](old.md).\n`
+    const archive = '# Old\n\nWhat each minor release before 1.72 broke.\n'
+
+    expect(() => capNewest(page, archive, 100, '### ')).toThrow('### A')
+  })
+
   it('drops every release of an archive left with only the cut end of an unreleased section, and ends on the release its paragraph stops before', () => {
     const archive = '# Old\n\nWhat each release before 1.72 added.\n\n## Unreleased (continued)\n\n- c\n\n## 1.71.0\n\n- aaaaaaaaaa\n'
 

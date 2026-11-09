@@ -4,17 +4,22 @@ What each minor release before 1.92 broke, and what an app changed to move to it
 
 ## 1.92.0 (continued)
 
-### The 404 log functions of `kay/library` return promises, and a `pgData` store gains three tables
+### An island is decided by the component's own code, and every name is imported
 
-`unansweredPaths`, `dismissMissing`, `clearMissing`, `runtimeRedirects`, `addRuntimeRedirect`, `removeRuntimeRedirect` and `redirectMovedPage` are imported from `kay/library` and now return promises, so a call that used the answer at once awaits it: the 404 log and the redirects added while the site runs live in the Postgres of a `pgData` store, which only a promise can read. An app whose `pgData` role may not create tables has the owner run `await createDataTables(db)` from `kay/server` once (`kay_missing`, `kay_missing_referrers` and `kay_redirects` join `dataTableNames`, so pg-orm's `ignoreTables` lists them); until then the first boot names the missing tables. A `data/not-found.sqlite` beside a `pgData` app is moved into them at the next start.
+What a component passes never makes it an island any more. `kay upgrade` runs the fixes below, and `kay check` reports the rest.
+
+- `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` compute the same on both sides. A component whose only `kay` value is one of them is static now, with the same markup, and no lint says so; `kay explain island <file>` gives a role.
+- `promoted-island` (deprecated, since 1.92) and `island-prop` report a static component handing an island a function, a class instance or a block with parameters. `--- island` in place of `---` is the fix, applied where the value is always a function. A component promoted on some renders only, a prop typed `T | (() => T)` or an island inside an `if`, is offered the fix and not given it, as `--- island` would hydrate it on every page: pick `--- island`, or pass data and keep it static. Promotion stops in 1.95.
+- `// kay-island` and `// kay-static` are `island-comment` (deprecated, since 1.92): `kay upgrade` writes `--- island` and `--- static`. `--- static` makes anything that would turn the component into an island the error `static-pin`.
+- `implicit-import` (deprecated, since 1.92) reports a `kay` value or `t` used with no import. `kay upgrade` writes the line; `kay check --fix` also writes the import of any `kay/*` name in a `.ts` file. The compiler stops adding them in 1.95.
+
+### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
 
 `notify` names one thing, the inbox of `kay/server`; the helper a library runs its `onX` hooks with is `dispatch(source, hooks, event)` now. The old names work until 1.95, and `kay check` flags an import of them as `deprecated-hook-dispatch`, with a safe fix that `kay upgrade` applies.
 
-Their `deprecated-config-groups`, `deprecated-room-types` and `deprecated-duration-seconds` lints go with them: run `kay upgrade` on 1.91 first and it rewrites what it can; what `kay check` reported with no fix (a config with the bag already present or a spread, a `lifetime` or `durationWords` number that is no integer literal or is held in a variable) is changed by hand. On 1.92 a flat config key is refused as an unknown key naming its bag, and a bare number of seconds throws.
+### The 404 log functions of `kay/library` return promises, and a `pgData` store gains three tables
 
-- The flat config keys are refused in `kay.config.ts`, an extension's `config` and the options of `pages()` and `testSite()`, naming where each lives: `routesDir`, `apiDir` and `publicDir` are `dirs: { routes, api, public }`, `maxSize` and `maxSizeByPath` are `limits: { body, byPath }`, `apiPath`, `compress`, `compressionDictionary` and `shutdownTimeout` are `serve`, `log`, `serverTiming`, `requestIdHeader`, `tracer` and `onError` are `observe`, and `navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch` and `saveData` are `client`.
-- The types AsyncRoomStore and AsyncRooms from `kay/server` are `RoomStore` and `Rooms`, and StoreRooms is `Rooms`.
-- kayjs-auth's `lifetime(seconds, locale)` and kay's `durationWords(seconds, locale)` take a duration with its unit, `'86400s'` for 86400, and throw for a bare number.
+`unansweredPaths`, `dismissMissing`, `clearMissing`, `runtimeRedirects`, `addRuntimeRedirect`, `removeRuntimeRedirect` and `redirectMovedPage` are imported from `kay/library` and now return promises, so a call that used the answer at once awaits it: the 404 log and the redirects added while the site runs live in the Postgres of a `pgData` store, which only a promise can read. An app whose `pgData` role may not create tables has the owner run `await createDataTables(db)` from `kay/server` once (`kay_missing`, `kay_missing_referrers` and `kay_redirects` join `dataTableNames`, so pg-orm's `ignoreTables` lists them); until then the first boot names the missing tables. A `data/not-found.sqlite` beside a `pgData` app is moved into them at the next start.
 
 ### The roots of kayjs-mail and kayjs-ai stop exporting the store names that moved in 1.88
 
