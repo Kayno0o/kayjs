@@ -14,7 +14,11 @@ const MAX_DOC_BYTES = 25_000
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const root = join(import.meta.dir, '..')
 // llms.txt and every doc of llms/, read as one.
-const spec = (await Promise.all(['llms.txt', ...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`)].map(async file => Bun.file(join(root, file)).text()))).join('\n')
+const pages = await Promise.all(['llms.txt', ...(await readdir(join(root, 'llms'))).map(name => `llms/${name}`)].map(async file => ({ file, text: await Bun.file(join(root, file)).text() })))
+const spec = pages.map(page => page.text).join('\n')
+// What's new and upgrading lose text to their archives at each release, and the archives drop their oldest releases, so a name they alone place loses its import with no landing to catch it.
+const RELEASE_NOTES = /^llms\/(?:whats-new|upgrading)/
+const reference = pages.filter(page => !RELEASE_NOTES.test(page.file)).map(page => page.text).join('\n')
 const examples = [...spec.matchAll(KAY_BLOCK)].map(match => match[1]!)
 const IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'(kay(?:\/[^']*)?)'/g
 const NAMED = /`(\w+)(?:<[^`>]*>)?(?:\([^`]*\))?`/g
@@ -29,16 +33,16 @@ const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
 
 // Every name the spec imports from kay or says comes from it, by entry point.
-function documentedImports(): Map<string, Set<string>> {
+function documentedImports(text = spec): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>()
   const add = (module: string, name: string) => found.set(module, (found.get(module) ?? new Set()).add(name))
 
-  for (const [, names, module] of spec.matchAll(IMPORT)) {
+  for (const [, names, module] of text.matchAll(IMPORT)) {
     for (const name of names!.split(',').map(name => name.trim().replace(LEADING_TYPE, '').replace(ALIAS, '')).filter(name => name !== ''))
       add(module!, name)
   }
 
-  for (const [, names, module] of spec.matchAll(MENTION)) {
+  for (const [, names, module] of text.matchAll(MENTION)) {
     for (const [, name] of names!.matchAll(NAMED))
       add(module!, name!)
   }
@@ -126,7 +130,7 @@ describe('llms.txt and its docs', () => {
   }, 60_000)
 
   it('says where each export it names is imported from', async () => {
-    const placed = new Set([...documentedImports().values()].flatMap(names => [...names]))
+    const placed = new Set([...documentedImports(reference).values()].flatMap(names => [...names]))
     const named = new Set([...spec.matchAll(NAMED)].map(match => match[1]!))
     // A default export, such as kay/bun's plugin for bunfig, is imported by no name
     const exported = new Set((await Promise.all(PUBLIC_ENTRIES.map(async entry => Object.keys(await import(entry))))).flat().filter(name => name !== 'default'))
