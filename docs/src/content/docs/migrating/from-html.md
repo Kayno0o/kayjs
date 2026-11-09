@@ -41,5 +41,5 @@ The conversion lists what it left out, one line each. Look at these.
 - `lang` on `<html>`, which belongs in `kay.config.ts`, and the attributes of `<body>`, which kay writes itself.
 - A tag HTML lets you leave open, such as `<li>` or `<p>` without its end tag. Close it first, as the conversion fails on it.
 - A web component's `<slot>`, which kay cannot write as an element, as a comment with a note.
-- Whitespace inside `<pre>` and `<textarea>`, which the template collapses; the conversion notes each one.
+
 - Anything dynamic. The result is static markup: turn repeated items into a `for`, and values into props.

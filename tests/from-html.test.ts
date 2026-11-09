@@ -197,8 +197,13 @@ describe('kay fmt --from-html', () => {
 
   it('lowers shouted tag names, reads a trailing slash of an unquoted value as part of it and notes whitespace it collapses', () => {
     expect(htmlToKay('<DIV><A HREF=/foo/>go</A></DIV>').code).toBe('div\n  a(HREF="/foo/") go\n')
-    expect(htmlToKay('<pre>a\n  b</pre>').notes.map(note => note.message)).toEqual([expect.stringContaining('pre keeps its whitespace')])
     expect(htmlToKay('<p>&amp;lt; &amp;</p>').code).toBe('p {\'&\'}lt; &\n')
+  })
+
+  it('writes pre, textarea and listing text one line per source line, keeping its whitespace', () => {
+    expect(htmlToKay('<pre>\nline one\n  indented\nline three\n</pre>')).toEqual({ code: 'pre\n  | line one\n  |   indented\n  | line three\n  |\n', notes: [] })
+    expect(htmlToKay('<textarea name="t">a\n\n b</textarea><listing>x  y</listing>').code).toBe('textarea(name="t")\n  | a\n  |\n  |  b\nlisting\n  | x  y\n')
+    expect(htmlToKay('<pre><code>a {b}\n  c</code> and <b>d</b>\n</pre>').code).toBe('pre\n  code\n    | a {\'{\'}b{\'}\'}\n    |   c\n  |  and \n  b\n    | d\n  |\n  |\n')
   })
 
   it('throws a MarkupError for HTML JSX cannot read, such as a tag left open', () => {

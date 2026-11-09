@@ -14,7 +14,9 @@ const HTML_COMMENT = /<!--([\s\S]*?)-->/g
 const VOID_TAG = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\b((?:[^>"'{/]|"[^"]*"|'[^']*'|\{[^}]*\}|\/(?!>))*)(\/?)>/gi
 const BRACE = /[{}]/g
 const ENTITY_START = /&(?=#?\w+;)/g
-const PRESERVED_SPACE = /\n|[ \t]{2}/
+const PREFORMATTED = new Set(['pre', 'textarea', 'listing'])
+const LINE_BREAKS = /\r\n?/g
+const LEADING_LINE_BREAK = /^\n/
 const LEADING_SPACE = /^[ \t\n\r\f]*/
 const TRAILING_SPACE = /[ \t\n\r\f]*$/
 const INTERPOLATION = /#\[/g
@@ -119,6 +121,8 @@ type Child = JSXChild
 class Translator {
   private readonly note: MarkupHost['note']
   private readonly lang: MarkupHost['lang']
+  // Inside a `pre`, `textarea` or `listing`.
+  private verbatim = false
 
   constructor(private readonly source: string, private readonly host: MarkupHost, private readonly imports: Imports, private readonly raws: RawBlock[], private readonly comments: Comment[]) {
     this.note = host.note
@@ -370,8 +374,8 @@ class Translator {
         : this.slot(element)
     }
 
-    if (this.html && (name === 'pre' || name === 'textarea') && element.children.some(inner => inner.type === 'JSXText' && PRESERVED_SPACE.test(decodeEntities(inner.value))))
-      this.note(this.line(element), `${name} keeps its whitespace in HTML: the template collapses it to single spaces, so write its text with \`\\n\` by hand`)
+    if (this.html && (PREFORMATTED.has(name) || this.verbatim))
+      return this.preformatted(element, PREFORMATTED.has(name))
 
     const tag = this.imports.image.has(name) ? 'img' : name
     const head = this.head(element, tag)
@@ -390,6 +394,19 @@ class Translator {
       return [`${head} ${inline}`]
 
     return [head, ...this.indent(this.componentChildren(element, children))]
+  }
+
+  // The text of `pre`, `textarea` and `listing`, and of the elements in them, keeps its whitespace in HTML, so it goes out one `|` line per source line, which the template renders with its line breaks and spaces. A leading line break right after the opening tag is not part of the text.
+  private preformatted(element: JSXElement, opening: boolean): string[] {
+    const outer = this.verbatim
+    const head = this.head(element, this.tagName(element))
+
+    this.verbatim = true
+    const lines = element.children.flatMap((child, index) => child.type === 'JSXText' ? verbatimLines(decodeEntities(child.value), opening && index === 0) : this.child(child))
+
+    this.verbatim = outer
+
+    return lines.length === 0 ? [head] : [head, ...this.indent(lines)]
   }
 
   // astro-icon's `<Icon name="mdi:sun" />`, drawn as the icon imported from its `@iconify-json` set.
@@ -670,7 +687,19 @@ function trimSpace(value: string): string {
 
 // Text as kay writes it on a line: its whitespace collapsed, a brace, which would open an expression, written as one, and `#[`, which would open an inline element, escaped.
 function text(value: string): string {
-  return value.replace(HTML_SPACE, ' ').replace(BRACE, brace => `{'${brace}'}`).replace(INTERPOLATION, '\\#[').replace(ENTITY_START, '{\'&\'}')
+  return escapeText(value.replace(HTML_SPACE, ' '))
+}
+
+function escapeText(value: string): string {
+  return value.replace(BRACE, brace => `{'${brace}'}`).replace(INTERPOLATION, '\\#[').replace(ENTITY_START, '{\'&\'}')
+}
+
+// Text as the lines of a `|` block, each keeping its whitespace after the one space that follows the bar.
+function verbatimLines(value: string, opening: boolean): string[] {
+  const normal = value.replace(LINE_BREAKS, '\n')
+  const body = opening ? normal.replace(LEADING_LINE_BREAK, '') : normal
+
+  return body === '' ? [] : body.split('\n').map(line => line === '' ? '|' : `| ${escapeText(line)}`)
 }
 
 function containsJsx(node: Node): boolean {

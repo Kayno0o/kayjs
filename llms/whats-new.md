@@ -22,6 +22,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The sitemap lists a routed entry's translation at its own slug, and points each copy's `xhtml:link` alternates at the others' own slugs, as the page's `<link rel="alternate">` does ([locales](locales.md)).
 - A second `else`, or an `else` after a line that separates it from its `if` or `for`, gets a message of its own that points at the first `else` or the line between, instead of "must directly follow an `if`".
 - A `for` loop's index nothing reads is reported by `unread-name` like any other unused name, without `noUnusedParameters`; start it with `_` to keep it ([checks](checks.md#what-kay-check-verifies)).
+- `kay fmt --from-html` writes the text of `pre`, `textarea` and `listing` as one `|` line per source line, keeping its line breaks and spaces, instead of collapsing it and noting it ([migrating from HTML](https://kayjs.kaynooo.fr/migrating/from-html)).
 - A second `props()` call is the one reported, with the first as the span it repeats, instead of the first being called misplaced.
 
 ## 1.93.0
