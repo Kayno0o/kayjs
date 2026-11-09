@@ -11,13 +11,12 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSave, onSaved, onError, onDiscard, dirty, save, status, failureLabel, failure, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
+const { action, refused, saved, onSave, onSaved, onError, onDiscard, dirty, save, status, failureLabel, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `save` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `save` rejects.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
   // Checks the fields against `action`'s schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when Save is pressed, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server. Not read with `save`.
   validate?: FormValidation
   // Whether the editor holds unsaved changes, when its state is the app's own signals rather than named fields: the bar, the leave guard and Save follow it instead of the fields, so `dirty={isNew || changed()}` lets a new item save with no change.
@@ -62,7 +61,7 @@ const saving = signal(false)
 const asking = signal(false)
 const checking = signal(false)
 // The dialog of `confirm`, a chunk of its own fetched once there is a question to ask, held in a list of at most one component.
-const failureText = () => failureLabel ?? failure ?? wording('ui.saveForm.failure', 'Could not save.')
+const failureText = () => failureLabel ?? wording('ui.saveForm.failure', 'Could not save.')
 const confirmView = signal<(typeof import('./internal/save-confirm.kay'))['default'][]>([])
 // The fetch of that chunk, under way or done; unset again when it failed.
 let confirmLoad: Promise<void> | undefined

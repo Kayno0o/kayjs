@@ -34,27 +34,23 @@ async function failedDialog(props: Record<string, unknown>) {
 }
 
 describe('failure messages', () => {
-  test('ConfirmDelete says failureLabel, still takes failure, and has words of its own', async () => {
+  test('ConfirmDelete says failureLabel, and has words of its own', async () => {
     expect(await failedDelete({ failureLabel: 'New' })).toBe('New')
-    mounted?.unmount()
-    expect(await failedDelete({ failure: 'Old' })).toBe('Old')
     mounted?.unmount()
     expect(await failedDelete({})).toBe('Could not delete.')
   })
 
-  test('FormDialog says failureLabel, still takes failure, has words of its own and tells onError { error }', async () => {
+  test('FormDialog says failureLabel, has words of its own and tells onError { error }', async () => {
     const given = await failedDialog({ failureLabel: 'New' })
 
     expect(given.text).toBe('New')
     expect(given.heard).toEqual([{ error: expect.any(Error) }])
     mounted?.unmount()
-    expect((await failedDialog({ failure: 'Old' })).text).toBe('Old')
-    mounted?.unmount()
     expect((await failedDialog({})).text).toBe('Could not save.')
   })
 
-  test('ImageCropper says failureLabel and still takes errorLabel', async () => {
-    for (const [props, said] of [[{ failureLabel: 'New' }, 'New'], [{ errorLabel: 'Old' }, 'Old'], [{}, 'The image could not be loaded.']] as const) {
+  test('ImageCropper says failureLabel', async () => {
+    for (const [props, said] of [[{ failureLabel: 'New' }, 'New'], [{}, 'The image could not be loaded.']] as const) {
       mounted = await mountComponent(await library('image-cropper'), { src: '/photo.png', ...props })
       mounted.root.querySelector('[data-part="image"]')!.dispatchEvent(new Event('error'))
       await settle()
@@ -63,8 +59,8 @@ describe('failure messages', () => {
     }
   })
 
-  test('IconPicker says failureLabel and still takes errorLabel', async () => {
-    for (const [props, said] of [[{ failureLabel: 'New' }, 'New'], [{ errorLabel: 'Old' }, 'Old'], [{}, 'The icons could not be loaded.']] as const) {
+  test('IconPicker says failureLabel', async () => {
+    for (const [props, said] of [[{ failureLabel: 'New' }, 'New'], [{}, 'The icons could not be loaded.']] as const) {
       mounted = await mountComponent(await library('icon-picker'), { search: async () => Promise.reject(new Error('down')), ...props })
       await settle()
       expect(mounted.root.textContent).toContain(said)

@@ -235,7 +235,7 @@ test('a rejected onRecord says failure, and the recording stops by itself after 
   const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
   try {
-    const { button, look } = await mount({ maxDuration: '30ms', failure: 'Not sent', onRecord: async () => Promise.reject(new Error('down')) })
+    const { button, look } = await mount({ maxDuration: '30ms', failureLabel: 'Not sent', onRecord: async () => Promise.reject(new Error('down')) })
 
     click(button)
     await settle()

@@ -169,17 +169,6 @@ describe('an extension\'s own limit', () => {
     expect((await stream(site, '/auth/upload', 2 * MB)).status).toBe(200)
   })
 
-  it('still reads the map under its name before 1.90, maxSize, and prefers maxSizeByPath beside it', async () => {
-    const old = await app({ extension: { maxSize: { '/auth/upload': '8mb' } } })
-
-    expect((await post(old, '/auth/upload', big)).status).toBe(200)
-
-    const both = await app({ extension: { maxSize: { '/auth/upload': '8mb' }, maxSizeByPath: { '/auth/token': '8mb' } } })
-
-    expect((await post(both, '/auth/token', big)).status).toBe(200)
-    expect((await post(both, '/auth/upload', big)).status).toBe(413)
-  })
-
   it('can lower it, under a base too', async () => {
     const site = await app({ base: '/blog', extension: { maxSizeByPath: { '/auth/token': 100 } } })
 

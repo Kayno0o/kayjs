@@ -75,7 +75,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onOpenChange, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -157,8 +157,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   expanded?: RowKeyValue<Row, Key>[] | undefined
   // Called with a row's key and whether it is now open, each time a toggle is used.
   onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
-  // Before 1.90 `onOpenChange` was called `onToggle`; both work until 1.93 (`deprecated-open-change`).
-  onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+
   // What an open row shows under it.
   detail?: Snippet<[row: Row]> | undefined
   // Names a row's toggle: `Details of <first column's text>`.
@@ -330,7 +329,7 @@ function toggleRow(key: RowKeyValue<Row, Key>) {
   const open = !openSet().has(key)
 
   opened = open ? [...opened(), key] : opened().filter(other => other !== key)
-  onOpenChange ? onOpenChange(key, open) : onToggle?.(key, open)
+  onOpenChange?.(key, open)
 }
 
 function pick(key: RowKeyValue<Row, Key>, on: boolean) {

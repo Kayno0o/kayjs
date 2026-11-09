@@ -118,7 +118,6 @@ interface AskOptions extends AskHooks, Resilience
   confirm?: Confirm | false | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
-  maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
   maxSize?: ByteSize | undefined
   maxSteps?: number | undefined
@@ -604,7 +603,6 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   confirm?: Confirm | false | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
-  maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
   maxSize?: ByteSize | undefined
   maxSteps?: number | undefined
@@ -743,7 +741,6 @@ component default
   argumentsLabel?: string | undefined
   attach?: boolean | undefined
   attachFullLabel?: string | undefined
-  attachIcon?: Element
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
@@ -751,9 +748,7 @@ component default
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | undefined
-  closeIcon?: Element
   closeLabel?: string | undefined
-  collapseIcon?: Element
   collapseLabel?: string | undefined
   conflictLabel?: string | undefined
   conversations?: boolean | undefined
@@ -766,12 +761,9 @@ component default
   doneLabel?: string | undefined
   editBusyLabel?: string | undefined
   editEmptyLabel?: string | undefined
-  editIcon?: Element
   editLabel?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  errorMessage?: string | undefined
-  expandIcon?: Element
   expandLabel?: string | undefined
   failedLabel?: string | undefined
   failureLabel?: string | undefined
@@ -780,7 +772,6 @@ component default
   greeting?: string | undefined
   hash?: false | string | undefined
   history?: number | undefined
-  icon?: Element
   icons?: (Partial<Record<ChatIconName, ChatIconValue>> & Partial<Record<"close" | "collapse" | "expand" | "open", ChatIconValue>>) | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
@@ -788,10 +779,8 @@ component default
   label?: string | undefined
   loadFailedLabel?: string | undefined
   maxChars?: number | undefined
-  maxFileSize?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
-  newIcon?: Element
   newLabel?: string | undefined
   note?: Element
   onEdit?: ((text: string) => unknown) | undefined
@@ -808,10 +797,8 @@ component default
   placeholder?: string | undefined
   reasoning?: boolean | undefined
   reasoningLabel?: string | undefined
-  recordIcon?: Element
   recordLabel?: string | undefined
   regenerate?: boolean | undefined
-  regenerateIcon?: Element
   regenerateLabel?: string | undefined
   remember?: string | undefined
   removeLabel?: string | undefined
@@ -820,13 +807,11 @@ component default
   retryLabel?: string | undefined
   runningLabel?: string | undefined
   saveLabel?: string | undefined
-  sendIcon?: Element
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
-  stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
@@ -892,7 +877,6 @@ component default
   argumentsLabel?: string | undefined
   attach?: boolean | undefined
   attachFullLabel?: string | undefined
-  attachIcon?: Element
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
@@ -984,11 +968,9 @@ component default
   doneLabel?: string | undefined
   editBusyLabel?: string | undefined
   editEmptyLabel?: string | undefined
-  editIcon?: Element
   editLabel?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  errorMessage?: string | undefined
   failedLabel?: string | undefined
   failureLabel?: string | undefined
   fill?: boolean | undefined
@@ -1003,11 +985,9 @@ component default
   links?: "apart" | "here" | undefined
   loadFailedLabel?: string | undefined
   maxChars?: number | undefined
-  maxFileSize?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
-  newIcon?: Element
   newLabel?: string | undefined
   onEdit?: ((text: string) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
@@ -1020,10 +1000,8 @@ component default
   placeholder?: string | undefined
   reasoning?: boolean | undefined
   reasoningLabel?: string | undefined
-  recordIcon?: Element
   recordLabel?: string | undefined
   regenerate?: boolean | undefined
-  regenerateIcon?: Element
   regenerateLabel?: string | undefined
   remember?: string | undefined
   removeLabel?: string | undefined
@@ -1032,13 +1010,11 @@ component default
   retryLabel?: string | undefined
   runningLabel?: string | undefined
   saveLabel?: string | undefined
-  sendIcon?: Element
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
-  stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined

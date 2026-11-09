@@ -26,7 +26,7 @@ const look = recipe({
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failureLabel, failure, maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onCancel' | 'onError'> & {
+const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failureLabel, maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onCancel' | 'onError'> & {
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
   onRecord: (audio: File) => unknown
   // Called once the microphone is open and the recording runs: to dim the page, stop a player.
@@ -45,13 +45,12 @@ const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChan
   label?: string | undefined
   // Said when the promise of `onRecord` rejects.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
   // How long a recording runs before it stops and is handed over as if pressed, `5m` by default, so one left running does not outgrow the action's `maxSize`.
   maxDuration?: Duration | undefined
 }>()
 
-const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure: failureLabel ?? failure ?? wording('ui.recordButton.failure', 'The recording could not be sent.'), maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
+const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure: failureLabel ?? wording('ui.recordButton.failure', 'The recording could not be sent.'), maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
 
 // Follows `recording` when the app sets it; only its changes act, so a recording that ended on its own is not started again.
 effect(() => {

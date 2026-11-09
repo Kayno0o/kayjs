@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, failure, validate = false, onFocusOut, refused, onSave, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, validate = false, onFocusOut, refused, onSave, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -26,8 +26,7 @@ const { open, title, heading, action, submitLabel, savingLabel = wording('ui.for
   cancelLabel?: string | undefined
   // Toasted when the call fails other than on a field; a refused field shows its message on its FormField.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
   // Checks the fields against the action's schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when the form is sent, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server.
   validate?: FormValidation
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
@@ -85,7 +84,7 @@ async function submit(event: SubmitEvent) {
   if (action.pending() || checking() || !form)
     return
 
-  const failureText = failureLabel ?? failure ?? wording('ui.formDialog.failure', 'Could not save.')
+  const failureText = failureLabel ?? wording('ui.formDialog.failure', 'Could not save.')
 
   if (validate !== false && !(await checkSent(form, action, issues, failureText, checking)))
     return

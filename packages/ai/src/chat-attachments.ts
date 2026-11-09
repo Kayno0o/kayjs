@@ -4,14 +4,14 @@ import { byteCount, signal } from 'kay'
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
 
 // The bytes a `maxSize` stands for, 5 MB when none is given: bytes or `'2mb'`.
-export function fileSizeLimit(size: ByteSize | undefined, key = 'maxSize'): number {
+export function fileSizeLimit(size: ByteSize | undefined): number {
   if (size === undefined)
     return DEFAULT_MAX_SIZE
 
   const bytes = byteCount(size)
 
   if (bytes === undefined)
-    throw new Error(`kay: the ${key} of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
+    throw new Error(`kay: the maxSize of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
 
   return bytes
 }

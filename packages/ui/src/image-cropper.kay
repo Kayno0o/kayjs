@@ -27,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), failureLabel, errorLabel, crop: given, onCrop, onCropEnd, onLoad, onError, fallback, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onLoad' | 'onError'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), failureLabel, crop: given, onCrop, onCropEnd, onLoad, onError, fallback, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onLoad' | 'onError'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined
@@ -51,8 +51,7 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   // Called with `{ event }` (the image's error event) or `{ error }` (the decode's rejection) when the image does not load; the stage then shows `fallback` or `failureLabel`, until `src` changes.
   onError?: ((failure: { event?: Event | undefined, error?: unknown }) => unknown) | undefined
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  errorLabel?: string | undefined
+
   // Replaces `failureLabel` where the image failed.
   fallback?: Snippet | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
@@ -257,7 +256,7 @@ div(part="root" {...rest})
       if fallback
         | {fallback}
       else
-        p(part="error" role="alert") {failureLabel ?? errorLabel ?? wording('ui.imageCropper.error', 'The image could not be loaded.')}
+        p(part="error" role="alert") {failureLabel ?? wording('ui.imageCropper.error', 'The image could not be loaded.')}
     if crop().w > 0 && !broken()
       div(part="crop" role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
         if grid

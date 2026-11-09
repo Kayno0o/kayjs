@@ -15,7 +15,7 @@ const look = recipe({
   variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', warning: 'kui-btn-warning', danger: 'kui-btn-danger', info: 'kui-btn-info' } },
 })
 
-const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failureLabel, failure, onCopy, onError, onFail, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type' | 'onCopy' | 'onError'> & {
+const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failureLabel, onCopy, onError, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type' | 'onCopy' | 'onError'> & {
   // What is copied: the text, or a function returning it, or a promise of it, for a value that has to be fetched or built on the click (a signed link). Nothing is copied while it is empty.
   text: string | (() => string | Promise<string>)
   label: string
@@ -30,14 +30,12 @@ const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', cop
   copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
   // Called with the text copied, once the copy went through.
   onCopy?: ((text: string) => unknown) | undefined
   // Called with `{ error }` when the text could not be built or the browser refused the copy, beside the `failureLabel` toast.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
-  // Deprecated: `onError`, which takes `{ error }`. Works until 1.93.
-  onFail?: ((error: unknown) => unknown) | undefined
+
 }>()
 
 const copied = signal(false)
@@ -89,10 +87,9 @@ async function press() {
     }
     catch (error) {
       onError?.({ error })
-      onFail?.(error)
       throw error
     }
-  }, failureLabel ?? failure ?? wording('ui.copyButton.failure', 'Could not copy to the clipboard'))
+  }, failureLabel ?? wording('ui.copyButton.failure', 'Could not copy to the clipboard'))
 
   pressing = false
 

@@ -104,7 +104,7 @@ test('the arrow keys walk link rows as they walk any other', async () => {
   expect(document.activeElement).toBe(items(root)[4]!)
 })
 
-test('the trailing block is drawn per row with the node, and its controls neither select nor take the tree keys', async () => {
+test('the actions block is drawn per row with the node, and its controls neither select nor take the tree keys', async () => {
   const root = await tree()
   const star = root.querySelectorAll<HTMLElement>('.star')
 

@@ -25,7 +25,7 @@ const look = recipe({
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, size = 'md', actions, action, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { label, name, issue, hint, required = false, group = false, size = 'md', actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   label: string
   // The field the control posts as: the message its form's action refused it with shows here, inside a `form(action)`, a Form, a FormDialog or a SaveForm.
   name?: string | undefined
@@ -38,11 +38,7 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
   group?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
   actions?: Snippet
-  // Before 1.90 `actions` was called `action`; both work until 1.93 (`deprecated-ui-actions`).
-  action?: Snippet
 }>()
-
-const ends = () => actions ?? action
 
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
@@ -63,9 +59,9 @@ if group
         if required
           span(part="required" aria-hidden="true") *
     slot
-    if ends()
+    if actions
       span(part="action")
-        | {ends()}
+        | {actions}
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()
@@ -81,9 +77,9 @@ else
           if required
             span(part="required" aria-hidden="true") *
       slot
-    if ends()
+    if actions
       span(part="action")
-        | {ends()}
+        | {actions}
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()

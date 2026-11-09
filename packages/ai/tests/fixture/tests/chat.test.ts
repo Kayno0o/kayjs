@@ -140,15 +140,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
-  test('failureLabel words the alert of a failed reply, and errorMessage still does', async () => {
-    for (const [path, text] of [['/failure-label', 'Broke'], ['/failure-label-old', 'Kept']] as const) {
-      const page = await site.open(path)
+  test('failureLabel words the alert of a failed reply', async () => {
+    const page = await site.open('/failure-label')
 
-      fakeAi.fail(new Error('down'))
-      await page.fill('textarea', 'Hello')
-      await page.press('Enter')
-      await page.waitFor('[role="alert"]', { text })
-    }
+    fakeAi.fail(new Error('down'))
+    await page.fill('textarea', 'Hello')
+    await page.press('Enter')
+    await page.waitFor('[role="alert"]', { text: 'Broke' })
   })
 
   test('a reply that fails shows an alert and Try again asks for it once more without a second copy of the message', async () => {

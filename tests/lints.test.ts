@@ -1180,24 +1180,6 @@ describe('an extension satisfying missing-alt', () => {
   })
 })
 
-describe('deprecated-open-change', () => {
-  const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'open-change.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-open-change').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames onToggle on a Table and a TreeView, unless onOpenChange is written', () => {
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={open})')).toEqual([{ at: 'onToggle', fix: ['onToggle->onOpenChange'] }])
-    expect(found('TreeView(nodes={[]} label="x" {onToggle})')).toEqual([{ at: 'onToggle', fix: ['{onToggle}->onOpenChange={onToggle}'] }])
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={a} onOpenChange={b})')).toEqual([{ at: 'onToggle', fix: undefined }])
-    expect(found('Timeline(label="x" entries={[]} onToggle={b})')).toEqual([])
-    expect(found('TreeView(nodes={[]} label="x" onOpenChange={b})')).toEqual([])
-  })
-})
-
 describe('deprecated-menu-danger', () => {
   const imports = 'import Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport Other from \'./other.kay\'\n'
   const found = (template: string) => {
@@ -1261,27 +1243,6 @@ describe('deprecated-icon-picker-search', () => {
     expect(found('IconPicker(search={a} icons={b})')).toEqual([{ at: 'search', fix: undefined }])
     expect(found('IconPicker(icons={b})')).toEqual([])
     expect(found('Other(search={a})')).toEqual([])
-  })
-})
-
-describe('deprecated-size-limits on the Chat of kayjs-ai', () => {
-  const found = (template: string) => {
-    const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Other from './other.kay'\n---\n${template}\n`
-    const result = compileKay(source, 'chat.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-size-limits').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames maxFileSize to maxSize, however the value is written', () => {
-    expect(found('Chat(action={reply} label="x" attach maxFileSize={1000})')).toEqual([{ at: 'maxFileSize', fix: ['maxFileSize->maxSize'] }])
-    expect(found('Chat(action={reply} label="x" attach maxFileSize={limit})')).toEqual([{ at: 'maxFileSize', fix: ['maxFileSize->maxSize'] }])
-  })
-
-  it('reports maxFileSize beside maxSize with no fix, and leaves maxSize and other components alone', () => {
-    expect(found('Chat(action={reply} label="x" attach maxFileSize={1} maxSize="2mb")')).toEqual([{ at: 'maxFileSize', fix: undefined }])
-    expect(found('Chat(action={reply} label="x" attach maxSize="2mb")')).toEqual([])
-    expect(found('Other(maxFileSize={2})')).toEqual([])
-    expect(found('// kay-allow deprecated-size-limits\nChat(action={reply} label="x" attach maxFileSize={1})')).toEqual([])
   })
 })
 
@@ -1513,47 +1474,6 @@ describe('once-read-prop', () => {
   })
 })
 
-describe('deprecated-ui-failures', () => {
-  const imports = 'import CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\nimport SaveForm from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport Other from \'./other.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'failures.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-ui-failures').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames the message props to failureLabel', () => {
-    expect(found('CopyButton(text="x" failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
-    expect(found('IconPicker(search={find} errorLabel="No")')).toEqual([{ at: 'errorLabel', fix: ['errorLabel->failureLabel'] }])
-    expect(found('CopyButton(text="x" {failure})')).toEqual([{ at: 'failure', fix: ['{failure}->failureLabel={failure}'] }])
-  })
-
-  it('renames the message of a ConfirmDelete, a SaveForm and a kayjs-ai Chat', () => {
-    expect(found('ConfirmDelete(message="x" failure="No" onConfirm={run})')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
-    expect(found('SaveForm(failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
-    expect(found('Chat(action={reply} errorMessage="No")')).toEqual([{ at: 'errorMessage', fix: ['errorMessage->failureLabel'] }])
-  })
-
-  it('finds the old name beside a spread', () => {
-    expect(found('CopyButton(text="x" {...rest} failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
-  })
-
-  it('reports a shorthand onFail alone', () => {
-    expect(found('CopyButton(text="x" {onFail})')).toEqual([{ at: 'onFail', fix: undefined }])
-  })
-
-  it('reports onFail alone, as onError takes an object', () => {
-    expect(found('CopyButton(text="x" onFail={log})')).toEqual([{ at: 'onFail', fix: undefined }])
-  })
-
-  it('leaves the new names, a rename already written and other tags alone', () => {
-    expect(found('CopyButton(text="x" failureLabel="No" onError={log})')).toEqual([])
-    expect(found('CopyButton(text="x" failure="No" failureLabel="No")')).toEqual([{ at: 'failure', fix: undefined }])
-    expect(found('Other(failure="No")')).toEqual([])
-    expect(found('SaveForm(onSave={run})')).toEqual([])
-  })
-})
-
 describe('deprecated-hook-names in a template', () => {
   const imports = 'import Form from \'@kaynooo/kayjs-ui/form.kay\'\nimport FormDialog from \'@kaynooo/kayjs-ui/form-dialog.kay\'\nimport Save from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport ContactForm from \'@kaynooo/kayjs-ui/contact-form.kay\'\nimport SubscribeForm from \'@kaynooo/kayjs-ui/subscribe-form.kay\'\nimport AudioPlayer from \'@kaynooo/kayjs-ui/audio-player.kay\'\nimport Other from \'./other.kay\'\n'
   const found = (template: string, levels?: LintLevels) => {
@@ -1664,54 +1584,5 @@ describe('deprecated-hook-names in a template', () => {
   it('leaves a tag of the app and the allow level alone', () => {
     expect(found('Other(onSaved={done} onSent={done} onEnded={done})')).toEqual([])
     expect(found('Form(action={add} onSaved={done})', { 'deprecated-hook-names': 'allow' })).toEqual([])
-  })
-})
-
-describe('deprecated-ui-actions', () => {
-  const imports = ['card', 'form-field', 'app-header', 'tree-view', 'markdown-editor', 'confirm-delete'].map(file => `import ${file.split('-').map(word => word[0]!.toUpperCase() + word.slice(1)).join('')} from '@kaynooo/kayjs-ui/${file}.kay'\n`).join('')
-  const found = (template: string, code = 'deprecated-ui-actions') => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'actions.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === code).map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames the block each component named differently', () => {
-    expect(found('Card(title="x")\n  @head\n    p y')).toEqual([{ at: 'head', fix: ['head->actions'] }])
-    expect(found('FormField(label="x")\n  @action\n    p y\n  input')).toEqual([{ at: 'action', fix: ['action->actions'] }])
-    expect(found('AppHeader(links={[]} current="/" label="x")\n  @end\n    p y')).toEqual([{ at: 'end', fix: ['end->actions'] }])
-    expect(found('TreeView(nodes={[]} label="x")\n  @trailing(node)\n    p y')).toEqual([{ at: 'trailing', fix: ['trailing->actions'] }])
-    expect(found('MarkdownEditor()\n  @toolbarExtra(tools)\n    p y')).toEqual([{ at: 'toolbarExtra', fix: ['toolbarExtra->actions'] }])
-  })
-
-  it('renames the attribute, and a ConfirmDelete\'s trigger string', () => {
-    expect(found('ConfirmDelete(message="x" trigger="button" onConfirm={run})')).toEqual([{ at: 'trigger', fix: ['trigger->triggerLook'] }])
-    expect(found('Card(title="x" {head})')).toEqual([{ at: 'head', fix: ['{head}->actions={head}'] }])
-  })
-
-  it('leaves the new names, a rename already written and other tags alone', () => {
-    expect(found('Card(title="x")\n  @actions\n    p y')).toEqual([])
-    expect(found('ConfirmDelete(message="x" triggerLook="button" onConfirm={run})')).toEqual([])
-    expect(found('Card(title="x")\n  @head\n    p y\n  @actions\n    p z')).toEqual([{ at: 'head', fix: undefined }])
-    expect(found('Other()\n  @head\n    p y')).toEqual([])
-  })
-})
-
-describe('deprecated-chat-icons', () => {
-  const imports = 'import Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport ChatLauncher from \'@kaynooo/kayjs-ai/chat-launcher.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'icons.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-chat-icons').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.length }))
-  }
-
-  it('reports each icon block of a Chat and a ChatLauncher, with no fix', () => {
-    expect(found('Chat(action={reply})\n  @sendIcon\n    span go\n  @editIcon\n    span e')).toEqual([{ at: 'sendIcon', fix: undefined }, { at: 'editIcon', fix: undefined }])
-    expect(found('ChatLauncher(action={reply})\n  @closeIcon\n    span x')).toEqual([{ at: 'closeIcon', fix: undefined }])
-  })
-
-  it('leaves icons and the other blocks alone', () => {
-    expect(found('Chat(action={reply} icons={{ send: \'plus\' }})\n  @footer\n    p y')).toEqual([])
   })
 })

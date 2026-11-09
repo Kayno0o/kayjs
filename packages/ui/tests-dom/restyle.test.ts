@@ -47,7 +47,7 @@ test('an inline ConfirmDelete draws its armed pair with the restyle once a click
 
   process.env.KAY_ROOT = app
 
-  const confirm = await mountComponent(await library('confirm-delete'), { message: 'Sure?', failure: 'Failed', ask: 'inline', trigger: 'button', onConfirm: () => undefined })
+  const confirm = await mountComponent(await library('confirm-delete'), { message: 'Sure?', failureLabel: 'Failed', ask: 'inline', triggerLook: 'button', onConfirm: () => undefined })
 
   mounted.push(confirm)
   expect(confirm.root.querySelector('[data-part=armed]')).toBeNull()

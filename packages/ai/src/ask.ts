@@ -301,10 +301,9 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   const described = answer === undefined ? undefined : answerSchema(answer)
   const schema = described?.plain
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
-  // `maxAttachmentBytes` is the name before 1.90.
-  const attachmentSize = options.maxSize ?? options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
+  const attachmentSize = options.maxSize ?? DEFAULT_MAX_ATTACHMENT_BYTES
   // `Infinity` lifts the limit, as it does `maxInputChars`.
-  const maxAttachmentBytes = attachmentSize === Infinity ? Infinity : byteSize(attachmentSize, `the ${options.maxSize === undefined ? 'maxAttachmentBytes' : 'maxSize'} of ask`)
+  const maxAttachmentBytes = attachmentSize === Infinity ? Infinity : byteSize(attachmentSize, 'the maxSize of ask')
 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw configError('ai', 'maxInputChars', 'maxInputChars is a number of characters of 1 or more')

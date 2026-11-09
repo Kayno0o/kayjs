@@ -136,8 +136,8 @@
     "max-lines": 1097
   },
   "src/compiler/validate.ts": {
-    "max-lines": 736,
-    "complexity": 75
+    "max-lines": 666,
+    "complexity": 50
   },
   "src/content/edit-entries.ts": {
     "max-lines": 630

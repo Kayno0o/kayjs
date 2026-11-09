@@ -81,7 +81,7 @@ describe('attachments to the fake', () => {
     expect(fakeAi.asked).toHaveLength(0)
   })
 
-  it('refuses an attachment past maxSize, 10 MB by default, and past the maxAttachmentBytes it was called', async () => {
+  it('refuses an attachment past maxSize, 10 MB by default', async () => {
     const big = new Uint8Array(1000)
 
     big.set(PNG)
@@ -90,12 +90,11 @@ describe('attachments to the fake', () => {
 
     expect(error.kind).toBe('too-long')
     expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '999b' }))).kind).toBe('too-long')
-    expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: 999 }))).kind).toBe('too-long')
+
     expect(error.status).toBeUndefined()
     expect(fakeAi.asked).toHaveLength(0)
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi })).toBe('Fake reply to: x')
-    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb', maxAttachmentBytes: 10 })).toBe('Fake reply to: x')
-    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: Infinity })).toBe('Fake reply to: x')
+    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb' })).toBe('Fake reply to: x')
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: Infinity })).toBe('Fake reply to: x')
   })
 
@@ -176,7 +175,7 @@ describe('attachments to the fake', () => {
     expect(() => ask([{ role: 'user', content: 'x', attachments: ['/etc/passwd' as never] }], { provider: fakeAi })).toThrow('an attachment is')
     expect(() => ask([{ role: 'user', content: 'x', attachments: 'nope' as never }], { provider: fakeAi })).toThrow('attachments are a list')
     expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: 0 })).toThrow('maxSize')
-    expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxAttachmentBytes: 0 })).toThrow('maxAttachmentBytes')
+
     expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: '5gb' as never })).toThrow('maxSize')
   })
 

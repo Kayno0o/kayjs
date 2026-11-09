@@ -59,4 +59,3 @@ Chat(action={reply} label="Assistant" regenerate)
 `icons` names an icon for each round button, by the name of the button: `Chat(action={reply} icons={{ send: ArrowUp, stop: PlayerStopFilled }})`, each an icon of the app's settings or one imported from `~icons/<prefix>/<name>`, as `Icon` takes it. Only the names given change.
 
 - A `Chat` takes `send`, `stop`, `new`, `attach`, `regenerate`, `edit` and `record`; a `ChatLauncher` takes those and `open`, `close`, `expand` and `collapse` for its button and its panel's header.
-- Before 1.90 each was a block of its own, `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon` and `@recordIcon`, and the launcher's `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`. They work until 1.93 and win over `icons`; `kay check` reports them as `deprecated-chat-icons`, with no fix, as a block holds any markup.

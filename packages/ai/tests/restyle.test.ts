@@ -108,17 +108,8 @@ describe('restyling the chat from src/ui.ts', () => {
 })
 
 describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
-  // The chat the page gives its own @sendIcon and @stopIcon blocks, labelled apart; the markup before it holds the others.
-  const split = () => {
-    const at = html.indexOf('aria-label="Own icons"')
-
-    return { before: html.slice(0, at), own: html.slice(at, html.indexOf('kai-launcher', at)) }
-  }
-
   test('the send button draws the app\'s send slot, not kayjs-ui\'s arrow', () => {
-    const { before } = split()
-
-    expect(before).toContain(body('rocket'))
+    expect(html.slice(0, html.indexOf('aria-label="Icons prop"'))).toContain(body('rocket'))
     expect(html).not.toContain('M12 5v14m6-8l-6-6m-6 6l6-6')
   })
 
@@ -148,11 +139,4 @@ describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
     for (const name of ['hand-stop', 'minimize'])
       expect(code).toContain(body(name).match(PATH)![1]!)
   }, 60_000)
-
-  test('an @sendIcon block wins over the setting', () => {
-    const { own } = split()
-
-    expect(own).toContain('class="own-send"')
-    expect(own).not.toContain(body('rocket'))
-  })
 })

@@ -10,27 +10,12 @@ import { dangerFlags } from './menu-danger'
 import { kayCtxImport } from './script-shared'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
-const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
-// The `file` key `uiComponents` holds for kayjs-ai's Chat.
-const AI_CHAT = 'ai-chat'
+
 // Menu's `items` took `danger: true` for a destructive entry until `tone: 'danger'` replaced it, deprecated since 1.92.
 const MENU_TAG = 'menu'
 // IconPicker's `search(query, limit, offset)` is a function `icons` handed `{ q, limit, offset }` since 1.92.
 const ICON_PICKER_TAG = 'icon-picker'
-// The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
-const TOGGLE_TAGS = new Set(['table', 'tree-view'])
-// The kayjs-ui props renamed in 1.90 so a failure is named the same everywhere: a message is `failureLabel`, a failed copy `onError`. `onFail` takes its error bare and `onError` an object, so it is reported with no fix.
-const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'copy-button': { failure: 'failureLabel', onFail: 'onError' },
-  'confirm-delete': { failure: 'failureLabel' },
-  'form-dialog': { failure: 'failureLabel' },
-  'record-button': { failure: 'failureLabel' },
-  'save-form': { failure: 'failureLabel' },
-  'audio-player': { failure: 'failureLabel' },
-  'icon-picker': { errorLabel: 'failureLabel' },
-  'image-cropper': { errorLabel: 'failureLabel' },
-  'ai-chat': { errorMessage: 'failureLabel' },
-}
+
 // The kayjs-ui callbacks renamed in 1.92 to follow the hook convention (`llms/hooks.md`): `onX` after a transition X in its base form, never a participle. SaveForm is apart, as its own `onSave` was the call that does the save, which `save` is now.
 const NO_PARAMETER_FUNCTION = /^\s*(?:async\s+)?(?:\(\s*\)\s*=>|function\s*(?:\w+\s*)?\(\s*\))/
 
@@ -49,17 +34,6 @@ const HOOK_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> =
   'subscribe-form': { onSent: 'onSend' },
   'audio-player': { onEnded: 'onEnd' },
 }
-// The kayjs-ui props and blocks that are `actions` since 1.90, where the role is the controls a component holds beside its own: the rest of a Card's title line, a FormField's label line, an AppHeader's far end, a TreeView row's end and a MarkdownEditor's toolbar. A ConfirmDelete's `trigger` string is `triggerLook`, as `trigger` is a block elsewhere.
-const ACTIONS_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'card': { head: 'actions' },
-  'form-field': { action: 'actions' },
-  'app-header': { end: 'actions' },
-  'tree-view': { trailing: 'actions' },
-  'markdown-editor': { toolbarExtra: 'actions' },
-  'confirm-delete': { trigger: 'triggerLook' },
-}
-// kayjs-ai's Chat and ChatLauncher drew each round button's icon from a block of its own before 1.90; `icons` names them all.
-const CHAT_ICON_BLOCKS: Readonly<Record<string, string>> = { sendIcon: 'send', stopIcon: 'stop', newIcon: 'new', attachIcon: 'attach', regenerateIcon: 'regenerate', editIcon: 'edit', recordIcon: 'record', icon: 'open', closeIcon: 'close', expandIcon: 'expand', collapseIcon: 'collapse' }
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -252,8 +226,6 @@ class Validator {
 
       if (match)
         this.uiComponents.set(binding.local, match[1]!)
-      else if (binding.imported === 'default' && !binding.typeOnly && AI_CHAT_SOURCES.has(binding.source))
-        this.uiComponents.set(binding.local, AI_CHAT)
     }
 
     this.restName = script.props?.rest && this.text(script.props.rest)
@@ -890,33 +862,6 @@ class Validator {
     if (file === undefined)
       return
 
-    // A rename is left to the app when the new name is already written, as it would repeat it.
-    const actionRenames = Object.hasOwn(ACTIONS_RENAMES, file) ? ACTIONS_RENAMES[file] : undefined
-
-    if (actionRenames !== undefined) {
-      for (const child of element.children) {
-        const old = child.kind === 'slot' ? this.text(child.name) : undefined
-        const renamed = old === undefined ? undefined : ownName(ACTIONS_RENAMES, file, old)
-
-        if (child.kind !== 'slot' || old === undefined || renamed === undefined)
-          continue
-
-        const named = element.children.some(other => other.kind === 'slot' && this.text(other.name) === renamed) || element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === renamed)
-
-        this.lint(child.name, 'deprecated-ui-actions', `\`@${old}\` on \`${element.name}\` is \`@${renamed}\` since kayjs-ui 1.90, the one name for the controls a component holds`, named ? { help: `Drop \`@${old}\`, \`@${renamed}\` is there` } : { help: `Write \`@${renamed}\``, fixes: [{ title: `Write \`@${renamed}\``, edits: [{ start: child.name.start, end: child.name.end, text: renamed }], safe: true }] })
-      }
-    }
-
-    if (file === AI_CHAT) {
-      for (const child of element.children) {
-        const old = child.kind === 'slot' ? this.text(child.name) : undefined
-        const icon = old === undefined || !Object.hasOwn(CHAT_ICON_BLOCKS, old) ? undefined : CHAT_ICON_BLOCKS[old]
-
-        if (child.kind === 'slot' && old !== undefined && icon !== undefined)
-          this.lint(child.name, 'deprecated-chat-icons', `\`@${old}\` on \`${element.name}\` is \`icons={{ ${icon}: ... }}\` since kayjs-ai 1.90, one prop for every icon`, { help: `Give \`icons={{ ${icon}: <icon> }}\`, an icon of the app's set or one imported from \`~icons/<prefix>/<name>\`` })
-      }
-    }
-
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread')
         continue
@@ -936,27 +881,6 @@ class Validator {
       if (file === MENU_TAG && name === 'items' && attribute.kind === 'expression') {
         for (const { property, toned } of dangerFlags(this.text(attribute.expression), attribute.expression.start))
           this.lint(property, 'deprecated-menu-danger', '`danger: true` in the `items` of a `Menu` is `tone: \'danger\'`, the one way every component names a meaning', toned ? { help: 'Drop `danger: true`, the `tone` beside it wins' } : { help: 'Write `tone: \'danger\'`', fixes: [{ title: 'Write `tone: \'danger\'`', edits: [{ start: property.start, end: property.end, text: 'tone: \'danger\'' }], safe: true }] })
-
-        continue
-      }
-
-      const actionRenamed = ownName(ACTIONS_RENAMES, file, name)
-
-      if (actionRenamed !== undefined) {
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === actionRenamed) || element.children.some(other => other.kind === 'slot' && this.text(other.name) === actionRenamed)
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${actionRenamed}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: actionRenamed }
-
-        this.lint(attribute.name, 'deprecated-ui-actions', `\`${name}\` on \`${element.name}\` is \`${actionRenamed}\` since kayjs-ui 1.90, the one name for the controls a component holds`, named ? { help: `Drop \`${name}\`, \`${actionRenamed}\` is there` } : { help: `Write \`${actionRenamed}\``, fixes: [{ title: `Write \`${actionRenamed}\``, edits: [edit], safe: true }] })
-
-        continue
-      }
-
-      if (TOGGLE_TAGS.has(file) && name === 'onToggle') {
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onOpenChange={onToggle}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onOpenChange' }
-
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'onOpenChange')
-
-        this.lint(attribute.name, 'deprecated-open-change', `\`onToggle\` on \`${element.name}\` is \`onOpenChange\` since kayjs-ui 1.90, as every show and hide state reports`, named ? { help: 'Drop `onToggle`, `onOpenChange` is there' } : { help: 'Write `onOpenChange`', fixes: [{ title: 'Write `onOpenChange`', edits: [edit], safe: true }] })
 
         continue
       }
@@ -998,26 +922,6 @@ class Validator {
         }
 
         continue
-      }
-
-      const renamed = ownName(FAILURE_RENAMES, file, name)
-
-      if (renamed !== undefined) {
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === renamed)
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${renamed}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: renamed }
-        const reshaped = name === 'onFail'
-
-        this.lint(attribute.name, 'deprecated-ui-failures', `\`${name}\` on \`${element.name}\` is \`${renamed}\` since kayjs-ui 1.90${reshaped ? ', and `onError` takes `{ error }` where `onFail` took the error' : ''}`, named || reshaped ? { help: reshaped ? 'Write `onError` and read `error` from its argument' : `Drop \`${name}\`, \`${renamed}\` is there` } : { help: `Write \`${renamed}\``, fixes: [{ title: `Write \`${renamed}\``, edits: [edit], safe: true }] })
-
-        continue
-      }
-
-      // kayjs-ai's Chat took its upload limit as `maxFileSize` before 1.90.
-      if (file === AI_CHAT && name === 'maxFileSize') {
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'maxSize')
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'maxSize={maxFileSize}' } : { start: attribute.name.start, end: attribute.name.end, text: 'maxSize' }
-
-        this.lint(attribute.name, 'deprecated-size-limits', '`maxFileSize` of `Chat` is `maxSize` since 1.90, as every size limit is', named ? { help: 'Drop `maxFileSize`, `maxSize` is there' } : { help: 'Write `maxSize`', fixes: [{ title: 'Write `maxSize`', edits: [edit], safe: true }] })
       }
     }
   }

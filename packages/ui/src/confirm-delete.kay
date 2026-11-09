@@ -19,12 +19,10 @@ const frame = recipe({
   variants: {
     // An icon by default; `button` is a labelled danger button, for a dialog footer, `link` a plain underlined text button, for a confirm inside running text, and `none` draws no trigger, for an app that opens it from elsewhere with `open`.
     triggerLook: { icon: '', button: '', link: 'cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40', none: '' },
-    // Before 1.90 `triggerLook` was called `trigger`, a name the other components give a block; both work until 1.93 (`deprecated-ui-actions`).
-    trigger: { icon: '', button: '', link: 'cursor-pointer text-xs text-muted underline transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40', none: '' },
   },
 })
 
-const { message, details, onConfirm, open, onOpenChange, failureLabel, failure, success, refused, tone = 'danger', triggerLook, trigger, ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
+const { message, details, onConfirm, open, onOpenChange, failureLabel, success, refused, tone = 'danger', triggerLook, ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Markup under the message in the dialog, such as a count, the names of what goes or a consequence; the message stays the name asked inline, where there is no room for it.
@@ -37,8 +35,7 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, failure, 
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
   // Toasted once `onConfirm` went through.
   success?: string | undefined
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failureLabel`, which stays for an answer of undefined or another error.
@@ -63,7 +60,7 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, failure, 
   variant?: 'solid' | 'ghost' | 'inline' | undefined
 }>()
 
-const kind = () => triggerLook ?? trigger ?? 'icon'
+const kind = () => triggerLook ?? 'icon'
 
 const danger = () => tone === 'danger'
 const triggerLabel = () => label ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : wording('ui.confirmDelete.confirm', 'Confirm'))
@@ -117,7 +114,7 @@ function close() {
 async function confirm() {
   pending = true
 
-  const done = await attempt(async () => onConfirm(), { failure: failureLabel ?? failure ?? wording('ui.confirmDelete.failure', 'Could not delete.'), success, refused })
+  const done = await attempt(async () => onConfirm(), { failure: failureLabel ?? wording('ui.confirmDelete.failure', 'Could not delete.'), success, refused })
 
   pending = false
 

@@ -358,8 +358,7 @@ export interface AskOptions extends AskHooks, Resilience {
   maxInputChars?: number | undefined
   // The most bytes one attachment may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails the reply with a `too-long` error before the provider is called.
   maxSize?: ByteSize | undefined
-  /** @deprecated Named `maxSize` since 1.90, as every size limit is; the old key works until 1.93, and `kay upgrade` renames it. */
-  maxAttachmentBytes?: number | undefined
+
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.
   provider?: Provider | undefined
 }

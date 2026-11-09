@@ -47,7 +47,7 @@ const look = recipe({
   },
 })
 
-const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onEnded, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel, failure = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
+const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onEnded, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
   // The audio file or stream.
   src: string
   // Names the audio on the lock screen, with the chapter playing as the song when there are chapters.
@@ -91,8 +91,7 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   linkLabel?: string | undefined
   // The toast shown when the browser refuses to play.
   failureLabel?: string | undefined
-  // Deprecated: `failureLabel`. Works until 1.93.
-  failure?: string | undefined
+
 }>()
 
 const player = signal<HTMLAudioElement>()
@@ -237,7 +236,7 @@ async function start(audio: HTMLAudioElement) {
         throw error
       }
     }
-  }, failureLabel ?? failure)
+  }, failureLabel)
 }
 
 async function seek(seconds: number, play: boolean) {

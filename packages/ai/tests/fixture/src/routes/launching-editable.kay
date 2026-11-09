@@ -3,12 +3,6 @@ import { reply } from './replacing.kay'
 --- script
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 
-// The icon blocks before 1.90 still work.
-// kay-allow-file deprecated-chat-icons
 ---
 h1 Launching
 ChatLauncher(action={reply} label="Assistant" editable regenerate)
-  @editIcon
-    span.mine-edit E
-  @regenerateIcon
-    span.mine-regenerate R

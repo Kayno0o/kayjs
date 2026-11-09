@@ -9,7 +9,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 type IconValue = typeof Icon extends Component<infer Props> ? Props extends { icon: infer Value } ? Value : never : never
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, open, onOpenChange, hash, onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, suggestions, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
+const { icons, turn, actions, call, source, empty, footer, note, openLabel, closeLabel, open, onOpenChange, hash, onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, suggestions, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
@@ -22,11 +22,6 @@ const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, send
   remember?: string | undefined
   // What the round buttons draw, by name, in place of the library's own, as `Chat` takes them, with the panel's `open`, `close`, `expand` and `collapse` besides.
   icons?: ChatLauncherIcons | undefined
-  // Before 1.90 each icon was a block of its own; they work until 1.93 and win over `icons` (`deprecated-chat-icons`). These two draw the button and the panel's close button, in place of a chat bubble and a cross.
-  icon?: Snippet
-  closeIcon?: Snippet
-  // The header's two other buttons, which clear the conversation and enlarge the panel: a new-chat plus, and a pair of arrows out and in.
-  newIcon?: Snippet
   // What the chat hears and the questions it offers, as `Chat` takes them: the callbacks, and `suggestions` as a list or a function.
   onSend?: ChatProps['onSend']
   onReply?: ChatProps['onReply']
@@ -44,12 +39,7 @@ const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, send
   source?: ChatProps['source']
   empty?: ChatProps['empty']
   footer?: ChatProps['footer']
-  // The chat's round buttons, as `Chat` takes them.
-  sendIcon?: Snippet
-  stopIcon?: Snippet
-  attachIcon?: Snippet
-  expandIcon?: Snippet
-  collapseIcon?: Snippet
+
   // Names and tooltips of those buttons: `New conversation`, `Enlarge the chat` and `Shrink the chat`.
   newLabel?: string | undefined
   expandLabel?: string | undefined
@@ -98,46 +88,16 @@ function opening() {
 // The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown. A conversation kept on the server is named by the browser, as the panel is on every page and the address of none.
 Panel(persist {...opening()} label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon
-    if icon
-      | {icon}
-    else
-      Icon(icon={iconOf('open', 'chat')})
+    Icon(icon={iconOf('open', 'chat')})
   @closeIcon
-    if closeIcon
-      | {closeIcon}
-    else
-      Icon(icon={iconOf('close', 'close')})
+    Icon(icon={iconOf('close', 'close')})
   @newIcon
-    if newIcon
-      | {newIcon}
-    else
-      Icon(icon={iconOf('new', 'plus')})
+    Icon(icon={iconOf('new', 'plus')})
   @expandIcon
-    if expandIcon
-      | {expandIcon}
-    else
-      Icon(icon={iconOf('expand', 'expand')})
+    Icon(icon={iconOf('expand', 'expand')})
   @collapseIcon
-    if collapseIcon
-      | {collapseIcon}
-    else
-      Icon(icon={iconOf('collapse', 'collapse')})
+    Icon(icon={iconOf('collapse', 'collapse')})
   Chat(hydrate="visible" {...chat} {...forwarded()} icons={icons} remember={remember} links="here" conversationIn="browser")
-    @sendIcon
-      if sendIcon
-        | {sendIcon}
-      else
-        Icon(icon={iconOf('send', 'send')})
-    @stopIcon
-      if stopIcon
-        | {stopIcon}
-      else
-        Icon(icon={iconOf('stop', 'stop')})
-    @attachIcon
-      if attachIcon
-        | {attachIcon}
-      else
-        Icon(icon={iconOf('attach', 'plus')})
   if note
     .kai-launcher-note
       | {note}

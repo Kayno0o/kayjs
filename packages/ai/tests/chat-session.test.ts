@@ -615,7 +615,7 @@ test('a file size limit is bytes or a size with its unit, 5 MB by default', () =
   expect(fileSizeLimit('1.5mb')).toBe(1.5 * 1024 * 1024)
   expect(() => fileSizeLimit('5gb' as never)).toThrow('maxSize')
   expect(() => fileSizeLimit(0)).toThrow('maxSize')
-  expect(() => fileSizeLimit(0, 'maxFileSize')).toThrow('the maxFileSize of Chat')
+  expect(() => fileSizeLimit(0)).toThrow('the maxSize of Chat')
 })
 
 test('files past a maxSize written with a unit are left out', () => {

@@ -21,7 +21,7 @@ Your own buttons go in the `@actions(tools)` block, after the built-in ones; the
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 ---
 MarkdownEditor(value="Note" toolbar={['bold', 'link']})
-  @toolbarExtra(tools)
+  @actions(tools)
     button(type="button" onClick={() => tools.wrap('> [!NOTE]\n> ', '')}) Callout
 ```
 
