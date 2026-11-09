@@ -2604,6 +2604,14 @@ class BrowserError
   name: string
   url: string
 
+[./server] BunWebSocketConstructor
+interface BunWebSocketConstructor
+  CLOSED: 3
+  CLOSING: 2
+  CONNECTING: 0
+  OPEN: 1
+  prototype: WebSocket
+
 [./server] clientAddress
 function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string
 
@@ -3602,17 +3610,6 @@ interface ScriptHashOptions
 [./server] sendPush
 function sendPush(user: string, message: PushMessage, options?: PushSendOptions): Promise<PushResult>
 
-[./server] ServerWebSocket
-const ServerWebSocket: ServerWebSocketClient
-
-[./server] ServerWebSocketClient
-interface ServerWebSocketClient
-  CLOSED: 3
-  CLOSING: 2
-  CONNECTING: 0
-  OPEN: 1
-  prototype: WebSocket
-
 [./server] session
 function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", {
   decorator: {};
@@ -3826,6 +3823,9 @@ interface VerifyWorkOptions
 
 [./server] WaitResult
 type WaitResult<Data> = | { ok: true, timedOut: false, data: Data, error?: undefined } | { ok: false, timedOut: true, error: ErrorShape, data?: undefined }
+
+[./server] WebSocket
+const WebSocket: BunWebSocketConstructor
 
 [./server] workChallenge
 function workChallenge(scope: string, options?: WorkChallengeOptions): string

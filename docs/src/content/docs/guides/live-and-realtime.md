@@ -413,12 +413,12 @@ A route takes 1 MB a message and 100 messages a second from one socket. A socket
 })
 ```
 
-Server code that opens a websocket to another service, with headers or a protocol, uses `ServerWebSocket` from `kay/server`. It is the `WebSocket` Bun runs, typed with Bun's options, as the DOM types in a project give the global one no second argument:
+Server code that opens a websocket to another service, with headers or a protocol, uses `WebSocket` from `kay/server`. It is the `WebSocket` Bun runs, typed with Bun's options, as the DOM types in a project give the global one no second argument:
 
 ```ts
-import { ServerWebSocket } from 'kay/server'
+import { WebSocket } from 'kay/server'
 
-const upstream = new ServerWebSocket('wss://media.example.com/socket', { headers: { 'x-api-key': Bun.env.MEDIA_KEY! } })
+const upstream = new WebSocket('wss://media.example.com/socket', { headers: { 'x-api-key': Bun.env.MEDIA_KEY! } })
 ```
 
 ## Notifications

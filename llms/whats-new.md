@@ -15,7 +15,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Links to the current page inside an island get `aria-current` in the server HTML, as those of a page do, and an island a swap keeps (`persist`) takes the next page's marks ([navigation](navigation.md)).
 - After a page swap to `/docs#install` the focus, and a screen reader's position, go to the element the fragment points at, as a page loaded natively does, the title still announced ([navigation](navigation.md)).
 - A `session()` made as a module loads reads the app's secret on first use, so `secret` in `kay.config.ts` and its rotation list apply to sessions as well as `KAY_SECRET` ([the app secret](environment.md#the-app-secret)).
-- `ServerWebSocket` from `kay/server` is Bun's `WebSocket` client typed with its options, so server code opens a websocket with `headers` or `protocols` with no cast ([server](server.md)).
+- `WebSocket` from `kay/server` is Bun's `WebSocket` client typed with its options, so server code opens a websocket with `headers` or `protocols` with no cast ([server](server.md)).
 - An `api()` route with a `params` schema (`params: s.Object({ number: s.Integer() })`) answers over real HTTP again, as it did through `site.api`: kay hands the schema a plain copy of the route's params, which Elysia 1.4.31 could not read from Bun's; kay requires that Elysia.
 
 ## 1.93.0

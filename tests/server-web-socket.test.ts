@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import { ServerWebSocket } from '../src/server'
+import { WebSocket } from '../src/server'
 
-describe('ServerWebSocket', () => {
+describe('WebSocket from kay/server', () => {
   it('opens a socket with headers and a protocol, which the DOM constructor types refuse', async () => {
     const seen: (string | null)[] = []
     const server = Bun.serve({
@@ -18,7 +18,7 @@ describe('ServerWebSocket', () => {
     })
 
     try {
-      const socket = new ServerWebSocket(`ws://127.0.0.1:${server.port}/`, { headers: { 'x-token': 'abc' }, protocols: ['chat'] })
+      const socket = new WebSocket(`ws://127.0.0.1:${server.port}/`, { headers: { 'x-token': 'abc' }, protocols: ['chat'] })
       const reply = await new Promise<string>((resolve, reject) => {
         socket.addEventListener('open', () => socket.send('hi'))
         socket.addEventListener('message', event => resolve(String(event.data)))
@@ -27,8 +27,8 @@ describe('ServerWebSocket', () => {
 
       expect(reply).toBe('echo hi')
       expect(seen).toEqual(['abc', 'chat'])
-      expect(socket instanceof WebSocket).toBe(true)
-      expect(ServerWebSocket.OPEN).toBe(1)
+      expect(socket instanceof globalThis.WebSocket).toBe(true)
+      expect(WebSocket.OPEN).toBe(1)
       socket.close()
     }
     finally {
