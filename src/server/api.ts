@@ -134,7 +134,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         route.handler = route.method === 'WS' ? located : timedHandler(located, routeTimeout, options)
       }
 
-      const hooks = route.hooks as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
+      const hooks = withPlainParams(route) as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
 
       // A string in a route's body takes the default bound an action's does; a model named by a string, another library's validator and a websocket's messages, which have limits of their own, are left as written.
       if (hooks && route.method !== 'WS' && typeof hooks.body === 'object' && hooks.body !== null && !('~standard' in hooks.body))
@@ -164,7 +164,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (cors)
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
 
-      const guarded = group.onTransform(plainParams)
+      const guarded = group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted, set }) => {
           // The module a request matched, as the first hook of its group saw it.
@@ -512,7 +512,16 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
-// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation. Every route of the module gets it, as the hook cannot know which carry a schema; a plain object is left as it is.
+// Bun hands a route's params as an object whose properties cannot be redefined, which Elysia's schema defaults do for a `params` schema (elysia 1.4.31): a plain copy, before validation. Only a route with a `params` schema gets it, on its own hooks, and a plain object is left as it is.
+function withPlainParams(route: { method: string, hooks?: unknown }): unknown {
+  const hooks = route.hooks as { params?: unknown, transform?: unknown } | undefined
+
+  if (hooks?.params !== undefined && route.method !== 'WS')
+    hooks.transform = [plainParams, ...[hooks.transform ?? []].flat()]
+
+  return hooks
+}
+
 function plainParams(context: { params?: Record<string, unknown> }): void {
   const { params } = context
 

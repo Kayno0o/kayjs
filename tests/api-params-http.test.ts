@@ -40,6 +40,9 @@ describe('an api route with a params schema over real HTTP', () => {
       expect((await fetch(`${origin}/api/temtem/dex/x`)).status).toBe(422)
       expect((await fetch(`${origin}/api/temtem/dex/%E0%A4%A`)).status).toBeLessThan(500)
       expect(await (await fetch(`${origin}/api/temtem/tags/ab`)).json()).toEqual({ tag: 'ab' })
+      // Elysia 1.4.31 hands a decoded slash as `%2F`, so an encoded slash stays one segment and never reads as a path.
+      expect(await (await fetch(`${origin}/api/temtem/tags/a%2Fb`)).json()).toEqual({ tag: 'a%2Fb' })
+      expect(await (await fetch(`${origin}/api/temtem/tags/%2E%2E%2Fx`)).json()).toEqual({ tag: '..%2Fx' })
     }
     finally {
       await served.stop(true)

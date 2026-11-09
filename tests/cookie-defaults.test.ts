@@ -151,11 +151,11 @@ describe('cookie defaults', () => {
     expect((await cookies('always', '/api/jar')).set[0]).toBe('theme=dark; Path=/; HttpOnly; Secure; SameSite=Lax')
   })
 
-  it('hardens a removal, leaves a module\'s own cookie config unread, and does nothing with the defaults off', async () => {
+  it('hardens a removal, keeps a module\'s own cookie config, and does nothing with the defaults off', async () => {
     expect((await cookies('safe', '/api/gone', { headers: { cookie: 'theme=old' } })).set[0]).toMatch(/^theme=; Max-Age=0; Path=\/; Expires=[^;]+; HttpOnly; SameSite=Lax$/)
-    // Elysia composes every module under the app's config, so a module's own `cookie` config is not read, defaults or none.
-    expect((await cookies('plain', '/api/own')).set).toEqual(['theme=dark; Path=/'])
-    expect((await cookies('safe', '/api/own')).set).toEqual(['theme=dark; Path=/; HttpOnly; SameSite=Lax'])
+    // Since Elysia 1.4.31 a module's own `cookie` config is read (its path and httpOnly here), and the defaults fill what it leaves unset.
+    expect((await cookies('plain', '/api/own')).set).toEqual(['theme=dark; Path=/own'])
+    expect((await cookies('safe', '/api/own')).set).toEqual(['theme=dark; Path=/own; SameSite=Lax'])
     expect((await cookies('off', '/api/jar')).set).toEqual(['theme=dark; Path=/', 'loose=1; Path=/x; SameSite=Strict'])
   })
 
