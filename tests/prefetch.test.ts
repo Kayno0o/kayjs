@@ -315,7 +315,7 @@ describe('pages fetched ahead of a click', () => {
     }
 
     it('listens to hover and focus for anyone else', async () => {
-      expect(await listening(withConnection(false))).toEqual(['kay:navigate', 'pointerover', 'focusin', 'pointerdown', 'click'])
+      expect(await listening(withConnection(false))).toEqual(['kay:navigate', 'pointerover', 'focusin', 'pointerdown'])
     })
 
     it('listens to nothing when the browser reports Save-Data', async () => {
@@ -341,7 +341,7 @@ describe('pages fetched ahead of a click', () => {
       document.head.append(meta)
 
       try {
-        expect(await listening(withConnection(true))).toEqual(['kay:navigate', 'pointerover', 'focusin', 'pointerdown', 'click'])
+        expect(await listening(withConnection(true))).toEqual(['kay:navigate', 'pointerover', 'focusin', 'pointerdown'])
       }
       finally {
         meta.remove()
