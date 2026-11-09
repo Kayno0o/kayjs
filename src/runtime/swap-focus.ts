@@ -1,5 +1,6 @@
 import type { Swap } from './navigation'
 import type { Policy } from './swap-flight'
+import { hashTarget } from './navigation'
 
 function byName(element: Element | null): Element | null {
   const name = element?.getAttribute('name') ?? ''
@@ -7,8 +8,8 @@ function byName(element: Element | null): Element | null {
   return name === '' ? null : document.getElementsByName(name)[0] ?? null
 }
 
-// The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already.
-export async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
+// The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, the element its hash points at, else its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already, and a position an entry saved leaves the hash alone, as it does the scroll.
+export async function moveFocus(swap: Swap, policy: Policy, hash: string): Promise<void> {
   if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
@@ -31,11 +32,12 @@ export async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   }
 
   // Going back to a position the entry saved leaves the window there, the focus moving without scrolling.
-  const target = (traversed ? null : document.querySelector<HTMLElement>('[autofocus]')) ?? document.querySelector<HTMLElement>('h1') ?? document.querySelector<HTMLElement>('main')
+  const pointed = swap.saved === undefined && policy.scroll !== 'keep' ? hashTarget(hash) : null
+  const target = pointed ?? (traversed ? null : document.querySelector<HTMLElement>('[autofocus]')) ?? document.querySelector<HTMLElement>('h1') ?? document.querySelector<HTMLElement>('main')
 
   if (target) {
-    // Focusable only while it holds the focus, so a click inside it later draws no ring around it.
-    if (!target.matches('[autofocus]') && !target.hasAttribute('tabindex')) {
+    // Focusable only while it holds the focus, so a click inside it later draws no ring around it; a link or a field the hash points at is focusable as it stands.
+    if (target.tabIndex < 0 && !target.hasAttribute('tabindex')) {
       target.setAttribute('tabindex', '-1')
       target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true })
     }

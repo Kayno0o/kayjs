@@ -391,7 +391,7 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     if (policy.scroll !== 'keep')
       restoreScroll(swap.saved, hash)
 
-    void moveFocus(swap, policy)
+    void moveFocus(swap, policy, hash)
 
     navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)

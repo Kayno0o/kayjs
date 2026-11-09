@@ -1,0 +1,10 @@
+head
+  title Sections
+main
+  h1 Sections
+  section#install
+    h2 Install
+  div(id="two words") Two words
+  div(id="100%") Percent
+  a#field-link(href="/second") A link
+  div(style="height: 2000px")

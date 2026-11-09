@@ -2998,6 +2998,54 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => document.querySelector('main')!.hasAttribute('tabindex'))).toBe(false)
   })
 
+  it('focuses the element a swap\'s hash points at, and the heading when it points at nothing', async () => {
+    const follow = async (href: string) => page.evaluate((to: string) => {
+      const link = Object.assign(document.createElement('a'), { href: to })
+
+      document.body.append(link)
+      link.click()
+    }, href)
+    const focused = async () => page.evaluate(() => [document.activeElement?.id === '' ? document.activeElement.tagName : document.activeElement?.id, document.activeElement?.getAttribute('tabindex')])
+
+    // Encoded, as the id has a space; an invalid escape read as written, `#100%`; a link focusable as it is; an id the page has not, and no hash: the heading.
+    for (const [hash, id, tabindex] of [['#install', 'install', '-1'], ['#two%20words', 'two words', '-1'], ['#100%', '100%', '-1'], ['#field-link', 'field-link', null], ['#nothing', 'H1', '-1'], ['', 'H1', '-1']] as const) {
+      await page.goto(origin)
+      await follow(`/sections${hash}`)
+      await page.waitFor('h1', { text: 'Sections' })
+
+      expect(await focused()).toEqual([id, tabindex])
+    }
+
+    // Focusable only while focused, as the heading is.
+    await page.goto(origin)
+    await follow('/sections#install')
+    await page.waitFor('h1', { text: 'Sections' })
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+
+    expect(await page.evaluate(() => document.querySelector('#install')!.hasAttribute('tabindex'))).toBe(false)
+
+    // Back to an entry that saved its position leaves the focus on the heading.
+    await follow('/contrast')
+    await page.waitFor('button.faint')
+    await page.back()
+    await page.waitFor('h1', { text: 'Sections' })
+
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
+  })
+
+  it('announces the title when focus goes to a hash target', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      const link = Object.assign(document.createElement('a'), { href: '/sections#install' })
+
+      document.body.append(link)
+      link.click()
+    })
+    await page.waitUntil(() => document.querySelector('body > [aria-live="polite"]')?.textContent === 'Sections')
+
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('install')
+  })
+
   it('focuses a page\'s autofocus field when visited, and its heading on Back', async () => {
     const follow = async (href: string) => page.evaluate((to: string) => {
       const link = Object.assign(document.createElement('a'), { href: to })

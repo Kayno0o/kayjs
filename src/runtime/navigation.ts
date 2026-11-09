@@ -192,12 +192,17 @@ export function restoreScroll(saved: [number, number] | undefined, hash: string)
     return
   }
 
-  const anchor = hash === '' ? null : document.getElementById(fragment(hash))
+  const anchor = hashTarget(hash)
 
   if (anchor)
     anchor.scrollIntoView()
   else
     scrollTo(0, 0)
+}
+
+// The element a hash points at, none for an empty hash or an id the page has not.
+export function hashTarget(hash: string): HTMLElement | null {
+  return hash === '' ? null : document.getElementById(fragment(hash))
 }
 
 // The element id a hash points at, kept as written when it is no valid escape, as `#100%` is.
