@@ -297,7 +297,7 @@ export interface SecurityConfig {
   headers?: Record<string, string | false> | undefined
   // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding and a link built from `ctx.url.origin` poisoned by the header: `true` allows those alone, which is the default once `site` is set, and `false` trusts every `Host`. Localhost and IP addresses always pass, as a health check reaches the server by them. Under `kay dev` it is `KAY_DEV_HOSTS` instead.
   hosts?: string[] | boolean | undefined
-  // What a cookie set with `ctx.cookies.set` gets for an option it does not give, so an app's cookies are as hardened as kay's own: on by default: `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, and a call's own option wins. `false` (or `security: false`) leaves Bun's plain defaults (`SameSite=Lax`, `Path=/`, neither `HttpOnly` nor `Secure`).
+  // What a cookie set with `ctx.cookies.set` gets for an option it does not give, so an app's cookies are as hardened as kay's own, on by default: `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, and a call's own option wins. `false` (or `security: false`) leaves Bun's plain defaults (`SameSite=Lax`, `Path=/`, neither `HttpOnly` nor `Secure`).
   cookies?: CookieDefaults | false | undefined
 }
 
