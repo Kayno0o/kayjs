@@ -66,7 +66,7 @@ async function project(config?: string, server?: string): Promise<string> {
   const dir = await fixtureCopy('bare')
 
   if (config !== undefined)
-    await writeFile(join(dir, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig(${config})\n`)
+    await writeFile(join(dir, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ requireGuards: false, ...${config} })\n`)
 
   if (server !== undefined)
     await writeFile(join(dir, 'src', 'server.ts'), server)

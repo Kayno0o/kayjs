@@ -14,7 +14,7 @@ it.skipIf(!existsSync('/proc/self/maps')).each([['its config imports the Tailwin
   await Bun.write(join(root, 'src/app.css'), '@import "tailwindcss" source("..");\n')
   await Bun.write(join(root, 'src/routes/_layout.kay'), `---\nimport '../app.css'\n---\nslot\n`)
   await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', devDependencies: { 'bun-plugin-tailwind': '*' } }))
-  await Bun.write(join(root, 'kay.config.ts'), listed ? `import tailwind from 'bun-plugin-tailwind'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ plugins: [tailwind] })\n` : `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({})\n`)
+  await Bun.write(join(root, 'kay.config.ts'), listed ? `import tailwind from 'bun-plugin-tailwind'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ requireGuards: false, plugins: [tailwind] })\n` : `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ requireGuards: false })\n`)
   await Bun.write(script, `import { readFileSync } from 'node:fs'
 import { testSite } from ${JSON.stringify(resolve('src/test'))}
 
