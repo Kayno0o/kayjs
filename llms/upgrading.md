@@ -34,6 +34,9 @@ Their lints (`deprecated-stream-types`, `deprecated-stream-on`, `deprecated-hook
 - Form, FormDialog and SaveForm `onSaved` is `onSave`, ContactForm and SubscribeForm `onSent` is `onSend`, AudioPlayer `onEnded` is `onEnd`, and the call that does a SaveForm's save is `save`, no longer `onSave`.
 - IconPicker's `search(query, limit, offset)` is `icons={({ q, limit, offset }) => ...}`.
 - The image resizer answers `/_kay/images` only: a link to `/_kay/image` is a 404, so rewrite one an app wrote by hand.
+### A cookie an app sets is hardened by default
+
+A cookie set with `ctx.cookies.set` (a page, endpoint, guard or action) or by an `api()` route is now `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, where it was Bun's plain `Path=/` with neither `HttpOnly` nor `Secure`, unless the call gives the option itself. No lint can see it. A cookie a script reads from `document.cookie` needs `{ httpOnly: false }` on its `set`; to keep the old headers for every cookie, set `security: { cookies: false }` in kay.config.ts. A scaffolded `security: { cookies: {} }` is now the default and can go ([server](server.md#sessions)).
 
 ## 1.94.0
 

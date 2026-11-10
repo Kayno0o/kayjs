@@ -6,6 +6,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -18,6 +19,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "afterResponse: ({ request, set, responseValue }) => { const start = started.get(request); if (!start) return; const...",
@@ -34,6 +36,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /_kay/health": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -47,6 +50,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /admin, refused by its guard": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -59,6 +63,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -74,6 +79,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /api/items": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -91,6 +97,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "beforeHandle: async (context) => { const refused = await answeringRequest(context.request, async () => inApiLocale...",
         "afterHandle: ({ request, responseValue, set }) => { if (cors) { withCors(cors, request, set.headers); if (respons...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -106,6 +113,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /api/items/broken, which throws": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -123,6 +131,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "beforeHandle: async (context) => { const refused = await answeringRequest(context.request, async () => inApiLocale...",
         "error: ({ request, error, code, set }) => { const span = recordOf(request)?.apiSpan; if (isResponseMismatch...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -130,6 +139,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
         "error: async (context) => { if (context.code !== "VALIDATION" && context.code !== "INVALID_FILE_TYPE" || gu...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -137,6 +147,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
         "error: ({ request, error, code, set }) => { const refused = { request, error, code, set }; return refusedIn...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -152,6 +163,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /ext, an extension's route": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -164,6 +176,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -178,6 +191,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /hello.txt": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -190,6 +204,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "afterResponse: ({ request, set, responseValue }) => { const start = started.get(request); if (!start) return; const...",
@@ -202,6 +217,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /metrics": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -216,6 +232,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /missing": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -228,6 +245,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -243,6 +261,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /old, redirected": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -255,6 +274,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -270,11 +290,13 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET /renamed, rewritten": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
         "request: async ({ request, server }) => { if (request.headers.get(REWRITTEN) === TOKEN) { const address = req...",
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -287,6 +309,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -302,6 +325,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "GET an entry chunk": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -314,6 +338,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -328,6 +353,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "OPTIONS /api/items, a preflight": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -340,6 +366,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -355,6 +382,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "POST /api/items": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -372,6 +400,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "beforeHandle: async (context) => { const refused = await answeringRequest(context.request, async () => inApiLocale...",
         "afterHandle: ({ request, responseValue, set }) => { if (cors) { withCors(cors, request, set.headers); if (respons...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -387,6 +416,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "POST /mcp": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -399,6 +429,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -414,6 +445,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "POST an action": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -427,6 +459,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "transform: async (context) => { refuseCrossSite(context.request); if (guards.length > 0) requestRecord(context....",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
@@ -610,6 +643,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -622,6 +656,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -635,6 +670,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /admin": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -647,6 +683,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -660,6 +697,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /api/items": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -676,6 +714,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "beforeHandle: ({ request }) => crossSiteRefused(request) ? crossSiteResponse(request, "request") : void 0",
         "afterHandle: ({ request, responseValue, set }) => { if (cors) { withCors(cors, request, set.headers); if (respons...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -689,6 +728,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /ext": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -701,6 +741,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "afterResponse: ({ request, set, responseValue }) => { const start = started.get(request); if (!start) return; const...",
@@ -713,6 +754,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "GET /missing": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -725,6 +767,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -738,6 +781,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
     "POST an action": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -751,6 +795,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
         "transform: async (context) => { refuseCrossSite(context.request); if (guards.length > 0) requestRecord(context....",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "afterResponse: ({ request, set, responseValue }) => { const start = started.get(request); if (!start) return; const...",
@@ -818,6 +863,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -828,6 +874,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -841,6 +888,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /admin": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -851,6 +899,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -864,6 +913,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /admin/": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -874,6 +924,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -887,6 +938,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /api/items": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -901,6 +953,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "beforeHandle: ({ request }) => crossSiteRefused(request) ? crossSiteResponse(request, "request") : void 0",
         "afterHandle: ({ request, responseValue, set }) => { if (cors) { withCors(cors, request, set.headers); if (respons...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -914,6 +967,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /missing/": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -924,6 +978,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -937,6 +992,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "GET /old": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -947,6 +1003,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ responseValue }) => { if (!(responseValue instanceof Response)) return; const targets = []; for (...",
@@ -1014,6 +1071,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1026,6 +1084,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1038,6 +1097,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/footprint": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1048,6 +1108,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "request: ({ request }) => { started.set(request, performance.now()); }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1059,6 +1120,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/patch.js": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1069,6 +1131,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "request: ({ request }) => { started.set(request, performance.now()); }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1080,6 +1143,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/routes": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1090,6 +1154,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "request: ({ request }) => { started.set(request, performance.now()); }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1101,6 +1166,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/tool.js": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1111,6 +1177,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "request: ({ request }) => { started.set(request, performance.now()); }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1122,6 +1189,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /api/items": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1138,6 +1206,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "beforeHandle: ({ request }) => crossSiteRefused(request) ? crossSiteResponse(request, "request") : void 0",
         "afterHandle: ({ request, responseValue, set }) => { if (cors) { withCors(cors, request, set.headers); if (respons...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1150,6 +1219,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /ext": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1162,6 +1232,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1173,6 +1244,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /missing": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1185,6 +1257,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "transform: () => ({ fromExtension: !0 })",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1197,6 +1270,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "POST /_kay/dev/stack": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1207,6 +1281,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "request: ({ request }) => { started.set(request, performance.now()); }",
         "request: async ({ request, server }) => { if (NO_BODY.has(request.method)) return; const path = withoutSlash(...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1218,6 +1293,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "POST an action": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request, set }) => { if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), f...",
         "request: ({ request }) => { const pathname = pathOf(request.url); if ((!pathname.startsWith(ASSET_PREFIX) || ...",
@@ -1231,6 +1307,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
         "transform: async (context) => { refuseCrossSite(context.request); if (guards.length > 0) requestRecord(context....",
         "beforeHandle: () => { return; }",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const url = new URL(request.url); if (FRAMEWORK_PATH.test(url...",
@@ -1609,6 +1686,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET /": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1623,6 +1701,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1636,6 +1715,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET / from a host not listed, refused": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1645,6 +1725,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET / on the fr host": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1659,6 +1740,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1672,6 +1754,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET / without the proxy key, refused": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
       ],
@@ -1680,6 +1763,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET /about, a kept page": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1694,6 +1778,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1707,6 +1792,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET the jobs page": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1721,6 +1807,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1734,6 +1821,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET the preview, leaving it": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1748,6 +1836,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1761,6 +1850,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET the public env": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1773,6 +1863,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "transform: ({ request }) => { if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "...",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "afterResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
@@ -1785,6 +1876,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET the service worker": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1799,6 +1891,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1812,6 +1905,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "POST a draft, refused out of edit mode": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1826,6 +1920,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
@@ -1839,6 +1934,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "POST an action, which a kept page counts": {
       "hooks": [
         "request: ({ request, server }) => { const record = requestRecord(request); record.proxy = proxy; if (server) ...",
+        "request: ({ request }) => { requestRecord(request).cookieDefaults = defaults; }",
         "request: ({ request }) => { receiveInternal(request); }",
         "request: ({ request }) => { const path = routerPath(pathOf(request.url), options.base), metrics = options.met...",
         "request: ({ request }) => { const host = request.headers.get("host"); if (host === null) return; const name =...",
@@ -1854,6 +1950,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
         "beforeHandle: () => { return; }",
         "mapResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
+        "mapResponse: ({ request, set }) => { for (const cookie of Object.values(set.cookie ?? {})) if (cookie.secure === ...",
         "mapResponse: async ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Respon...",
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "afterResponse: ({ request, set, responseValue }) => { if (!started.delete(request)) return; active--; if (!REFUSED....",

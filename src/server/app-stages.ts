@@ -288,7 +288,7 @@ function hostsToAnswer(security: SecurityConfig | false | undefined, site: strin
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
   setRequestIdHeader(options.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
-  defaultCookies(app, cookieDefaults(typeof options.security === 'object' ? options.security.cookies : undefined, env.base))
+  defaultCookies(app, cookieDefaults(options.security, env.base))
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
   app.onRequest(({ request }) => {
     receiveInternal(request)
@@ -314,7 +314,7 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 
     return undefined
   })
-  const secure = secureCookies(cookieDefaults(typeof options.security === 'object' ? options.security.cookies : undefined, env.base))
+  const secure = secureCookies(cookieDefaults(options.security, env.base))
 
   if (secure)
     app.mapResponse({ as: 'scoped' }, secure)

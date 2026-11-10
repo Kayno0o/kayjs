@@ -15,9 +15,11 @@ export interface ResolvedCookieDefaults {
   path: string
 }
 
-// What `security.cookies` gives every cookie an app sets with `ctx.cookies.set`, or undefined for an app that sets none.
-export function cookieDefaults(setting: CookieDefaults | false | undefined, base: string): ResolvedCookieDefaults | undefined {
-  if (setting === undefined || setting === false)
+// What `security.cookies` gives every cookie an app sets with `ctx.cookies.set`: on unless `security: false` or `cookies: false` turns it off, `{}` when the app says nothing.
+export function cookieDefaults(security: { cookies?: CookieDefaults | false | undefined } | false | undefined, base: string): ResolvedCookieDefaults | undefined {
+  const setting = security === false ? false : security?.cookies ?? {}
+
+  if (setting === false)
     return undefined
 
   const { httpOnly = true, sameSite = 'lax', secure = 'auto', path = base || '/' } = setting

@@ -52,6 +52,10 @@ describe('cookie defaults', () => {
     servers.plain = await pages({ ...base, security: false })
     servers.off = await pages({ ...base, security: { cookies: false } })
     servers.safe = await pages({ ...base, security: { cookies: {} } })
+    servers.unset = await pages(base)
+    servers.unsetMounted = await pages({ ...base, base: '/app' })
+    servers.unsetSlash = await pages({ ...base, base: '/app', trailingSlash: 'always' })
+    servers.unsetSecurity = await pages({ ...base, security: { csp: false } })
     servers.mounted = await pages({ ...base, base: '/app', security: { cookies: {} } })
     servers.custom = await pages({ ...base, security: { cookies: { sameSite: 'none', path: '/shop', httpOnly: false } } })
     servers.never = await pages({ ...base, security: { cookies: { secure: false } } })
@@ -184,6 +188,42 @@ describe('cookie defaults', () => {
     const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, dev: true, security: { cookies: {} } })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
+  })
+
+  it('hardens an app that sets nothing, as { cookies: {} } does, under a base and a trailing-slash policy too', async () => {
+    const post = async (name: string, origin = 'http://localhost') => servers[name]!.handle(new Request(`${origin}/_kay/action/routes/act/index.kay/act`, { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': `${origin}/act`, origin }, body: '' }))
+
+    for (const name of ['unset', 'unsetSecurity']) {
+      expect((await cookies(name, '/cookie')).set).toEqual((await cookies('safe', '/cookie')).set)
+      expect((await cookies(name, '/cookie', {}, 'https://localhost')).set[0]).toBe('theme=dark; Path=/; Secure; HttpOnly; SameSite=Lax')
+      expect((await cookies(name, '/theme.txt')).set).toEqual(['theme=dark; Path=/; HttpOnly; SameSite=Lax'])
+      expect((await cookies(name, '/api/jar')).set[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
+      expect((await post(name)).headers.getSetCookie()[0]).toBe('seen=1; Path=/; HttpOnly; SameSite=Lax')
+    }
+
+    expect((await cookies('unsetMounted', '/cookie')).set[0]).toBe('theme=dark; Path=/app; HttpOnly; SameSite=Lax')
+    expect((await cookies('unsetSlash', '/cookie/')).set[0]).toBe('theme=dark; Path=/app; HttpOnly; SameSite=Lax')
+    expect((await cookies('unsetMounted', '/api/jar')).set[0]).toBe('theme=dark; Path=/app; HttpOnly; SameSite=Lax')
+  })
+
+  it('hardens an unset app in production and development, and `security: { cookies: false }` and `security: false` keep Bun\'s defaults', async () => {
+    const before = process.env.NODE_ENV
+
+    try {
+      process.env.NODE_ENV = 'production'
+      setSite('https://shop.example')
+      expect((await cookies('unset', '/cookie')).set[0]).toBe('theme=dark; Path=/; Secure; HttpOnly; SameSite=Lax')
+    }
+    finally {
+      process.env.NODE_ENV = before ?? 'test'
+      setSite(undefined)
+    }
+
+    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, dev: true })
+
+    expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
+    expect((await cookies('off', '/cookie')).set[0]).toBe('theme=dark; Path=/; SameSite=Lax')
+    expect((await cookies('plain', '/cookie')).set[0]).toBe('theme=dark; Path=/; SameSite=Lax')
   })
 
   it('refuses a setting that is no cookie attribute', async () => {

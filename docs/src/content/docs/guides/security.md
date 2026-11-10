@@ -330,7 +330,7 @@ Each entry is an IPv4 or IPv6 range or a single address. Cloudflare publishes th
 
 A forwarded value that is not an IP address is ignored, and the visitor counts by the address that reached the server.
 
-Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. `security: { cookies: {} }` in `kay.config.ts` makes the cookies your own code sets with `ctx.cookies.set` `HttpOnly`, `SameSite=Lax` and `Secure` over https too, with the `base` as their path; a call's own option wins. The cookies of an API route get the same. kay's cookies are `Secure`, and the session is named `__Host-kay_session` over https, so a request that says `http` reads no session.
+Pass `X-Forwarded-Proto` from the proxy on every location, websockets included. The cookies your own code sets with `ctx.cookies.set` are `HttpOnly`, `SameSite=Lax` and `Secure` over https too, with the `base` as their path; a call's own option wins, and `security: { cookies: false }` in `kay.config.ts` turns it off. The cookies of an API route get the same. kay's cookies are `Secure`, and the session is named `__Host-kay_session` over https, so a request that says `http` reads no session.
 
 ### Refuse requests that skipped the proxy
 

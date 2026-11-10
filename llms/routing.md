@@ -263,7 +263,7 @@ The fence's `ctx`:
   - A page with `layouts: false` reads none of the dropped layouts' params. `query` on a special page is reported, "Only a page or a layout declares its query".
   - Without a schema each name reads as its text, a repeated one as a list, typed `unknown`; the raw text is `ctx.url.searchParams`.
   - An island reads and writes one param the same way with `queryParam` (see islands).
-- `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included; `security: { cookies: {} }` gives what `set` writes `HttpOnly`, `SameSite=Lax`, `Secure` over https and the `base` as `Path` ([cookie defaults](server.md#sessions))
+- `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included; what `set` writes is `HttpOnly`, `SameSite=Lax`, `Secure` over https and the `base` as `Path` unless `security: { cookies: false }` ([cookie defaults](server.md#sessions))
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response. A page rendered per request behind any guard, or whose loads or render read the session, `ctx.cookies`, a cookie `persisted` signal or how a form post went, goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN never hands one visitor's page to another, redirects included, unless `ctx.headers` sets a `cache-control` of its own; what an `await` block reads once the page started streaming comes too late to count
 - `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
