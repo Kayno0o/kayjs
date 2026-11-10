@@ -25,7 +25,7 @@ export const FIELD_LOOK = 'kui-field-input rounded-md bg-surface text-foreground
 
 // The icon a text box draws inside itself at its start: the `field` wrapping box and icon, and the `icon`. Both start at the box's own padding, scaled by density.
 export const FIELD_ICON = {
-  field: 'relative inline-flex min-w-0 items-center',
+  field: 'kui-field-wrap relative inline-flex min-w-0 items-center has-[>input.w-full]:w-full has-[>input.flex-1]:flex-1',
   icon: 'pointer-events-none absolute start-[calc(var(--spacing)*2.5*var(--density))] size-4 shrink-0 text-muted',
 }
 

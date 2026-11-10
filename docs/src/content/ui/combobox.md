@@ -8,7 +8,7 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 A label typed whole, with no row chosen, counts as a pick of that option once the input loses focus or Enter is pressed. That Enter only adopts the option, so a form around the input is not submitted by it; the next Enter submits.
 
-`icon` draws an icon inside the input at its start, as a TextInput does.
+`icon` draws an icon inside the input at its start, as a TextInput does. The input always sits in a `field` part now, which the icon joins when one is drawn.
 
 ## Options loaded as the visitor types
 
