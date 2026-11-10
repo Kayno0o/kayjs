@@ -124,7 +124,7 @@ export function redirectProblems(redirects: Redirects, served: string[]): string
     const slash = path.length > 1 && path.endsWith('/')
     const segments = (slash ? path.slice(0, -1) : path).split('/').slice(1)
 
-    if (gone.has(path))
+    if (gone.has(slash ? path.slice(0, -1) : path))
       return [`the redirect from ${from} goes to ${to}, which answers 410 Gone`]
 
     return paths.some(served => reaches(segments, slash, served)) ? [] : [`the redirect from ${from} goes to ${to}, which nothing on the site serves`]

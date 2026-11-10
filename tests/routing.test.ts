@@ -175,6 +175,7 @@ describe('redirects', () => {
   })
 
   it('are refused a target that answers 410', () => {
+    expect(redirectProblems({ '/a': '/retired/', '/retired': { status: 410 } }, [])).toEqual(['the redirect from /a goes to /retired/, which answers 410 Gone'])
     expect(redirectProblems({ '/a': '/retired', '/retired': { status: 410 } }, [])).toEqual(['the redirect from /a goes to /retired, which answers 410 Gone'])
   })
 })
