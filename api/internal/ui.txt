@@ -615,7 +615,7 @@ function chartTooltip(): { place(at: { clientX: number; clientY: number; }): str
 
 [./lib/chart-marks] EVENT_LOOK
 const EVENT_LOOK: {
-  readonly event: "pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center outline-none data-[kind=link]:pointer-events-auto data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground";
+  readonly event: "pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center bg-transparent p-0 outline-none data-[kind=button]:pointer-events-auto data-[kind=link]:pointer-events-auto data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground";
   readonly eventRule: "h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]";
 }
 
@@ -630,6 +630,7 @@ interface PlacedEvent
   event: ChartEvent
   index: number
   slot: number
+  source: number
 
 [./lib/chart-marks] placeEvents
 function placeEvents(events: readonly ChartEvent[] | undefined, labels: readonly string[]): PlacedEvent[]

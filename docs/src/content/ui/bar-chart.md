@@ -36,7 +36,9 @@ With no labels, the chart reads `emptyLabel` instead, `No data yet.` by default.
 
 ## Marking events
 
-`marks` takes the same events as LineChart's: `marks={[{ at: 'Tue', title: 'Schedule changed', href: '/changes/42' }]}` draws a dashed rule over the column at `at` (a label or an index into `labels`), its `title` joining that column's tooltip and what screen readers read. With an `href` the rule is a link and a tab stop beside the columns. An `at` that is no label is left out, and several on one column stand side by side.
+`marks` takes the same events as LineChart's: `marks={[{ at: 'Tue', title: 'Schedule changed', href: '/changes/42' }]}` draws a dashed rule over the column at `at` (a label or an index into `labels`), its `title` joining that column's tooltip and what screen readers read. With an `href` the rule is a link and a tab stop beside the columns.
+
+`onMark(mark, index)` makes a mark without an `href` a button, as in LineChart. An `at` that is no label is left out, and several on one column stand side by side.
 
 ## Pressing and linking
 

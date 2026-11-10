@@ -25,3 +25,7 @@ main
     BarChart(label="Backups" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Minutes', values: [4, 2, 8] }]} marks={[{ at: 'Tue', title: 'Schedule changed', href: '/changes/2' }, { at: 'Tue', title: 'Disk added' }, { at: 'Fri', title: 'Outside' }, { at: 2, title: 'Retention', color: 'red' }]})
   article#line-events
     LineChart(label="Visits" labels={['x', 'y']} series={[{ name: 'Visits', values: [3, 5] }]} marks={[{ at: 'y', title: 'Deployed' }, { at: 'nope', title: 'Lost' }]})
+  article#mark-buttons
+    BarChart(label="Backups" labels={['Mon', 'Tue']} series={[{ name: 'Minutes', values: [4, 2] }]} marks={[{ at: 'Mon', title: 'Pressable' }, { at: 'Tue', title: 'Linked', href: '/c' }]} onMark={() => {}})
+  article#mark-plain
+    BarChart(label="Backups" labels={['Mon']} series={[{ name: 'Minutes', values: [4] }]} marks={[{ at: 'Mon', title: 'Plain' }]})

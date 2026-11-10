@@ -110,6 +110,8 @@ export interface ChartEvent {
 // An event placed on its label: where it falls and, among the events on the same label, which one in line it is, so they stay side by side.
 export interface PlacedEvent {
   event: ChartEvent
+  // Its place in the app's `marks`, which `onMark` hands back.
+  source: number
   index: number
   slot: number
 }
@@ -121,7 +123,7 @@ export function placeEvents(events: readonly ChartEvent[] | undefined, labels: r
   const taken = new Map<number, number>()
   const placed: PlacedEvent[] = []
 
-  for (const event of events ?? []) {
+  for (const [source, event] of (events ?? []).entries()) {
     const index = typeof event.at === 'number' ? numbered(event.at, labels.length) : labels.indexOf(event.at)
 
     if (index < 0)
@@ -130,7 +132,7 @@ export function placeEvents(events: readonly ChartEvent[] | undefined, labels: r
     const slot = taken.get(index) ?? 0
 
     taken.set(index, slot + 1)
-    placed.push({ event, index, slot })
+    placed.push({ event, source, index, slot })
   }
 
   return placed
@@ -138,6 +140,6 @@ export function placeEvents(events: readonly ChartEvent[] | undefined, labels: r
 
 // The look of an event's rule and its hit area, shared by every chart that draws them: the area is the width of a pointer, the rule a dashed line in its middle.
 export const EVENT_LOOK = {
-  event: 'pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center outline-none data-[kind=link]:pointer-events-auto data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground',
+  event: 'pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center bg-transparent p-0 outline-none data-[kind=button]:pointer-events-auto data-[kind=link]:pointer-events-auto data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground',
   eventRule: 'h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]',
 } as const

@@ -849,6 +849,11 @@ describe('charts', () => {
     expect([...bars.matchAll(/data-part="eventCell">/g)]).toHaveLength(3)
   })
 
+  test('a chart mark is a button with onMark, a link with an href, and a plain rule with neither', async () => {
+    expect([...(await page('mark-buttons')).matchAll(/<(a|button|span) [^>]*data-part="event"/g)].map(match => match[1])).toEqual(['button', 'a'])
+    expect([...(await page('mark-plain')).matchAll(/<(a|button|span) [^>]*data-part="event"/g)].map(match => match[1])).toEqual(['span'])
+  })
+
   test('LineChart reads its events in the table beside the values, leaving out one that is on no label', async () => {
     expect((await find('/charts', '#line-events thead th, #line-events tbody td')).map(found => found.text)).toEqual(['Visits', 'Events', '3', '', '5', 'Deployed'])
     expect(await attributes('/charts', '#line-events [role="slider"]', ['aria-valuetext'])).toEqual([{ 'aria-valuetext': 'y: Visits 5; Deployed' }])

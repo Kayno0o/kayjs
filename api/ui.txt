@@ -851,6 +851,7 @@ component default
   marks?: ChartEvent[] | undefined
   newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
+  onMark?: ((mark: ChartEvent, index: number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   series: BarSeries[]
   stacked?: boolean | undefined
@@ -1756,6 +1757,7 @@ component default
   marks?: ChartEvent[] | undefined
   newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
+  onMark?: ((mark: ChartEvent, index: number) => unknown) | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   options?: LineChartPresetOptions | undefined

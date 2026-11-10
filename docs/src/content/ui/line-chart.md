@@ -54,7 +54,9 @@ Give the chart a signal or a store and it updates in place on each change. The S
 
 `at` is a label or an index into `labels`, and the rule is dashed in the warning tone, or in `color` when the mark has one. Its `title` shows in the tooltip at that point and is read by screen readers, in the table as an extra `Events` column (`eventsLabel` renames it) and in the slider's reading.
 
-With an `href` the rule is a link, so a middle click or a new tab works, and a tab stop of its own: the plot's slider keeps its arrows. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
+With an `href` the rule is a link, so a middle click or a new tab works, and a tab stop of its own: the plot's slider keeps its arrows.
+
+`onMark(mark, index)` makes a mark without an `href` a button handing back the mark and its place in `marks`, and hears a plain click on a link; a mark with neither stays a plain rule. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
 
 ## Data and axes
 

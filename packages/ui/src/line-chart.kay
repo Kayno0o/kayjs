@@ -2,7 +2,8 @@
 import type { AxisFactory, ChartPlugin, DomRenderOutput, Layer, LineChartPresetOptions, LinePresetState, PluginEntry, Renderer } from 'chartist'
 import type { JSX, Snippet } from 'kay'
 import type { ChartEvent, ChartMark } from './chart-marks'
-import { EVENT_LOOK, placeEvents } from './chart-marks'
+import { EVENT_LOOK, markKind, placeEvents } from './chart-marks'
+import type { PlacedEvent } from './chart-marks'
 import type { ChartSeries } from './plot'
 import { effect, memo, navigate, onCleanup, onMount, recipe, signal, uid, untrack } from 'kay'
 import type { LabelContext } from './chart-axis'
@@ -52,7 +53,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -77,6 +78,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   onRange?: ((from: number, to: number) => unknown) | undefined
   // Events marked on the x axis, such as a change applied between two readings: a dashed rule at `at` (a label, or an index into `labels`), its `title` in the tooltip at that point and in what screen readers read, and a link to `href` when given, a tab stop of its own beside the slider. An `at` that is no label is left out, and several on one label stand side by side.
   marks?: ChartEvent[] | undefined
+  // Makes each mark a button handing back the mark and its place in `marks`; a mark with an `href` stays a link, and a plain click on it goes to `onMark` too. A mark with neither stays a plain rule.
+  onMark?: ((mark: ChartEvent, index: number) => unknown) | undefined
   // Names the events in the table screen readers get.
   eventsLabel?: string | undefined
   // Hears the point a click without a drag lands on, or Enter with no span being picked, as `{ index, label, values }`.
@@ -215,10 +218,26 @@ const placed = memo(() => placeEvents(marks, labels))
 const titlesAt = (index: number) => placed().filter(item => item.index === index).map(item => item.event.title)
 
 // Where an event's rule stands across the plot, side by side with the ones on its label.
-const eventStyle = (item: { event: ChartEvent, index: number, slot: number }) => {
+const eventStyle = (item: PlacedEvent) => {
   const drawn = plot()
 
   return drawn ? `left: calc(${drawn.x1 + positionOf(item.index, labels.length, times()) * drawn.width}px + ${item.slot * 0.5}rem); top: ${drawn.y2}px; height: ${drawn.height}px${item.event.color ? `; --event-color: ${item.event.color}` : ''}` : undefined
+}
+
+// The link of a mark that has an address, with the tab it opens in.
+const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
+
+function markPressedAt(item: PlacedEvent) {
+  void onMark?.(item.event, item.source)
+}
+
+// A plain click on a mark link goes to `onMark` when the app gave one; a modified or middle click is left to the browser.
+function markPressed(event: MouseEvent, item: PlacedEvent) {
+  if (!onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onMark(item.event, item.source)
 }
 
 const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '', values: series.map(item => item.values[index] ?? null) })
@@ -643,8 +662,11 @@ div(part="root" {...rest} role="figure" aria-label={label})
           div(part="dot" style={dot(index)})
     if plot()
       for item of placed() key={`${item.index}-${item.slot}`}
-        if item.event.href
-          a(part="event" {...tabOf(item.event.href, newTab)} href={item.event.href} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item)})
+        if markKind(item.event.href, onMark !== undefined) === 'link'
+          a(part="event" {...markLink(item)} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item)} onClick={event => markPressed(event, item)})
+            span(part="eventRule")
+        else if onMark
+          button(part="event" type="button" data-kind="button" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item)} onClick={() => markPressedAt(item)})
             span(part="eventRule")
         else
           span(part="event" aria-hidden="true" style={eventStyle(item)})
