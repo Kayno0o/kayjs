@@ -1,6 +1,7 @@
 import type { CallOptions } from './config'
 import { configError } from 'kay/library'
 import { setUp } from './config'
+import { billed } from './limits'
 
 export interface EmbedOptions extends CallOptions {
   // The length of each vector, sent as `dimensions` for a model that can shorten its own (OpenAI's text-embedding-3, Ollama's Matryoshka models); a vector of another length fails the call, so it always fits a `vector(n)` column of that size.
@@ -17,9 +18,12 @@ export async function embed(input: string | readonly string[], options: EmbedOpt
     throw configError('ai', 'dimensions', `embed({ dimensions }) is ${dimensions}; it takes a whole number of 1 or more`)
 
   const { send, model, timeout, signal } = setUp('embed', options)
+  const texts = typeof input === 'string' ? [input] : [...input]
 
-  if (typeof input === 'string')
-    return (await send({ input: [input], model, dimensions, timeout }, signal))[0]!
+  if (texts.length === 0)
+    return []
 
-  return input.length === 0 ? [] : send({ input: [...input], model, dimensions, timeout }, signal)
+  const vectors = await billed(texts.reduce((sum, text) => sum + text.length, 0), signal, async () => send({ input: texts, model, dimensions, timeout }, signal), () => 0)
+
+  return typeof input === 'string' ? vectors[0]! : vectors
 }

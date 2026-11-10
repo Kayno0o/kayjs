@@ -51,7 +51,7 @@ The attach button, the upload's checks (`accept`, `maxFiles`, `maxSize`), their 
 import { s, action } from 'kay'
 import { transcribe } from '@kaynooo/kayjs-ai'
 
-export const dictate = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb' })
+export const dictate = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb', protect: { rateLimit: { max: 10, window: '1m' } } })
 ---
 Chat(action={reply} transcribe={dictate})
 ```

@@ -6,7 +6,7 @@ import type { ModelsOptions } from './models'
 import type { AskHooks, Piece, Resilience, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { configError, durationSeconds, keyedDigest, knownAddress, limiter, userOf } from 'kay/library'
+import { configError, currentRequest, durationSeconds, keyedDigest, knownAddress, limiter, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -42,6 +42,8 @@ export interface AiOptions extends AskHooks, Resilience, ModelsOptions {
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
   // Where the conversations of a `Chat` with `keepOnServer` are kept: the app's database (`pgConversations`, or the SQLite file of `sqliteData`) or `data/ai-conversations.sqlite` unless given (in memory under `bun test`).
   conversations?: ConversationStore | undefined
+  // How long a conversation is kept after its last turn, a year (`'365d'`) unless set; `false` keeps them until their visitor deletes them. The conversations of an erased user go with the account whatever this says.
+  conversationAge?: Duration | false | undefined
   // Drafts the `alt` of each imported image a server-rendered page shows with none, once per image content, and `kay check` lists the drafts for review. Off by default, as it sends the images to the model. `{ reviewed }` names the images (`team-abc.png`, as `kay check` prints them) whose draft was reviewed, which `kay check` stops listing.
   imageAlt?: boolean | { reviewed?: string[] | undefined } | undefined
 }
@@ -352,6 +354,25 @@ export function tokensUsed(usage: Partial<Usage>, sent: number, received: number
   const cached = (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
 
   return (usage.inputTokens ?? Math.ceil(sent / CHARS_PER_TOKEN)) + cached + (usage.outputTokens ?? Math.ceil(received / CHARS_PER_TOKEN))
+}
+
+// Runs a transcribe, speak or embed call under the limit and budget of `ai()` as an ask is, counting `sent` characters in and `received(result)` out at 4 per token; a call that fails counts nothing. Outside a request only the total counts.
+export async function billed<T>(sent: number, signal: AbortSignal, run: () => Promise<T>, received: (result: T) => number): Promise<T> {
+  const asker: Asker = { request: currentRequest(), visitor: undefined, chars: sent, maxTokens: 0 }
+  let result: { value: T } | undefined
+
+  // The only piece is the usage that `guarded` counts.
+  await Array.fromAsync(guarded(async function* () {
+    const value = await run()
+
+    result = { value }
+    yield { usage: { inputTokens: Math.ceil(sent / CHARS_PER_TOKEN), outputTokens: Math.ceil(received(value) / CHARS_PER_TOKEN) } }
+  }, asker, signal))
+
+  if (result === undefined)
+    throw signal.reason ?? new Error('the call was stopped before it began')
+
+  return result.value
 }
 
 // The pieces `open` yields, once the settings of `ai()` let the ask through and until the reply ends, when its tokens are counted whether it finished, failed or was stopped.

@@ -10,7 +10,7 @@ import { transcribe } from '@kaynooo/kayjs-ai'
 const text = await transcribe(recording, { language: 'fr' })
 ```
 
-`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.File()`, a `Chat`'s recording) and returns the text, trimmed. `language` is an ISO 639-1 code; left out, the model tells, which a few words may get wrong. A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
+`transcribe(audio, options?)` takes a `Blob` or a `File` (an action's `s.File()`, a `Chat`'s recording) and returns the text, trimmed. `language` is an ISO 639-1 code; left out, the model tells, which a few words may get wrong. `maxSize` caps the recording (10 MB by default). A `Chat` takes it through its `transcribe` action: [Speaking a message](chat.md#speaking-a-message).
 
 ### Read a text aloud
 
@@ -22,7 +22,7 @@ const audio = await speak('Your table is booked for eight', { voice: 'nova', spe
 return new Response(audio)
 ```
 
-`speak(text, options?)` returns the audio as a `Blob` typed by its format, so `new Response(audio)` serves it with its `content-type`, `Bun.write(path, audio)` saves it and `await audio.bytes()` reads it. `voice` is `AI_VOICE` unless given, `speed` goes from 0.25 to 4 (another throws), `format` is `mp3`, `opus`, `aac`, `flac`, `wav` or `pcm`, the server's own (mp3 for OpenAI) unless given.
+`speak(text, options?)` returns the audio as a `Blob` typed by its format, so `new Response(audio)` serves it with its `content-type`, `Bun.write(path, audio)` saves it and `await audio.bytes()` reads it. `voice` is `AI_VOICE` unless given, `speed` goes from 0.25 to 4 (another throws), `maxInputChars` caps the text (4,096 by default), `format` is `mp3`, `opus`, `aac`, `flac`, `wav` or `pcm`, the server's own (mp3 for OpenAI) unless given.
 
 ### Embed texts, store and search them
 

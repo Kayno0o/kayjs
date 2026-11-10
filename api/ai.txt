@@ -32,6 +32,7 @@ interface AiMessage
 interface AiOptions extends AskHooks, Resilience, ModelsOptions
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   budget?: BudgetOptions | false | undefined
+  conversationAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   conversations?: ConversationStore | undefined
   default?: string | undefined
   fallback?: readonly FallbackModel[] | undefined
@@ -231,8 +232,11 @@ interface ConversationRow
 [.] ConversationStore
 interface ConversationStore
   delete: (key: ConversationKey) => Promise<boolean>
+  deleteOlderThan?: ((before: number) => Promise<number>) | undefined
+  eraseOwner?: ((owner: string) => Promise<number>) | undefined
   get: (key: ConversationKey) => Promise<StoredConversation | undefined>
   list: (owner: string, scope: string, limit: number) => Promise<ConversationRow[]>
+  ownedBy?: ((owner: string) => Promise<OwnedConversation[]>) | undefined
   rename: (key: ConversationKey, title: string) => Promise<boolean>
   write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>
 
@@ -403,6 +407,15 @@ interface OpenAiOptions
   model?: string | undefined
   pdf?: Documents | undefined
 
+[.] OwnedConversation
+interface OwnedConversation extends StoredConversation
+  id: string
+  revision: number
+  scope: string
+  title: string
+  turns: StoredTurn[]
+  updatedAt: number
+
 [.] Passage
 interface Passage
   href: string
@@ -529,6 +542,7 @@ function speak(text: string, options?: SpeakOptions): Promise<Blob>
 [.] SpeakOptions
 interface SpeakOptions extends CallOptions
   format?: AudioFormat | undefined
+  maxInputChars?: number | undefined
   model?: string | undefined
   provider?: Provider | undefined
   signal?: AbortSignal | undefined
@@ -673,6 +687,7 @@ function transcribe(audio: Blob, options?: TranscribeOptions): Promise<string>
 [.] TranscribeOptions
 interface TranscribeOptions extends CallOptions
   language?: string | undefined
+  maxSize?: number | string | undefined
   model?: string | undefined
   provider?: Provider | undefined
   signal?: AbortSignal | undefined

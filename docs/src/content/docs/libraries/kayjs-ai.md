@@ -257,7 +257,11 @@ If your `ask` has `outlive: true`, a reply still running when the page reloads p
 
 When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
 
-The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/ai-conversations.sqlite`, unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.
+The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/ai-conversations.sqlite`, unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice.
+
+A conversation not touched for a year is dropped. `ai({ conversationAge: '90d' })` changes that, and `false` keeps them.
+
+With kayjs-auth, deleting an account deletes its conversations and the data export lists them, with nothing to declare. Without it, call `personalData.erase(userId)` from `kay/server`.
 
 <ReadMore href="/llms/kayjs-ai-chat-conversations">How the server holds and replays the history, the list's words and parts, and the store.</ReadMore>
 
@@ -636,6 +640,8 @@ const vectors = await embed(['first passage', 'second passage'], { dimensions: 7
 ```
 
 They speak OpenAI's audio and embeddings API, which OpenAI, Ollama and most local servers serve. By default they go to the server `ask` uses. `AI_AUDIO_URL` and `AI_EMBED_URL` send them to another one, which you need with Anthropic, as it has neither. Each call reads its model from its own variable: `AI_TRANSCRIBE_MODEL`, `AI_SPEECH_MODEL` and `AI_EMBED_MODEL`.
+
+All three count against `ai({ rateLimit, budget })` like an ask, so a visitor cannot loop them on your bill. `transcribe` refuses a recording past 10 MB and `speak` a text past 4,096 characters unless you raise `maxSize` or `maxInputChars`. An action taking a recording from anyone should still carry its own `protect: { rateLimit }`.
 
 Give `embed` the size of the column you store the vectors in. A model that answers another size fails the call, so a vector never meets a column it does not fit. pg-orm 8 keeps them in a pgvector column, embeds a row's text through an `embedding()` trait and reads the closest rows with `nearest()`.
 
