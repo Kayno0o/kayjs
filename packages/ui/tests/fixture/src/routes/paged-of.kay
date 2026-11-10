@@ -1,0 +1,5 @@
+---
+import PagedOf from '../components/paged-of.kay'
+---
+main
+  PagedOf

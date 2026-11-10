@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
+
 import { hoverable, hoverOver } from './hoverable'
 
 const ROOT = join(import.meta.dir, '..')
@@ -51,6 +52,38 @@ inBrowser('navigation recipes in the browser', () => {
     expect(phone.separators.slice(1).every(content => content !== 'none' && content !== 'normal')).toBe(true)
     expect(desktop.separators[0]).toBe('none')
     expect(desktop.separators.slice(1).every(content => content !== 'none' && content !== 'normal')).toBe(true)
+  }, 120_000)
+
+  test('Pagination(of, onPage) in an island: the server draws the links of the list, the browser hydrates them, and a click calls the handler and moves the page', async () => {
+    const site = await shared()
+    const { html } = await site.visit('/paged-of')
+
+    expect(html).toContain('href="/blog/2"')
+
+    await using page = await site.open('/paged-of')
+    const state = () => page.evaluate(() => ({
+      page: document.querySelector('#page')?.textContent,
+      heard: document.querySelector('#heard')?.textContent,
+      current: document.querySelector('[aria-current="page"]')?.textContent,
+      hrefs: [...document.querySelectorAll('[data-part="page"]')].map(link => link.getAttribute('href')),
+    }))
+
+    expect(await state()).toEqual({ page: '1', heard: '', current: '1', hrefs: ['/blog', '/blog/2', '/blog/3'] })
+
+    await page.evaluate(() => (document.querySelector('a[href="/blog/3"]') as HTMLElement).click())
+
+    let moved = false
+
+    for (let attempt = 0; attempt < 500 && !moved; attempt++) {
+      moved = (await state()).page === '3'
+
+      if (!moved)
+        await Bun.sleep(10)
+    }
+
+    expect(await state()).toEqual({ page: '3', heard: '3', current: '3', hrefs: ['/blog', '/blog/2', '/blog/3'] })
+    expect(await page.evaluate(() => location.pathname)).toBe('/paged-of')
+    expect(await page.errors).toEqual([])
   }, 120_000)
 
   test('Pagination draws its step in the control line of the space skin, at --border-width, and dims a span step', async () => {

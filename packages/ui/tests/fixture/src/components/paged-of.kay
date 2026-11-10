@@ -1,0 +1,10 @@
+--- island
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { signal } from 'kay'
+
+const page = signal(1)
+const heard = signal<string[]>([])
+---
+p#page {page()}
+p#heard {heard().join(',')}
+Pagination(of={{ page: page(), pages: 3, href: n => n === 1 ? '/blog' : `/blog/${n}` }} onPage={next => { heard = [...heard(), String(next)]; page = next }})
