@@ -195,14 +195,14 @@ describe('a page kay does not serve', () => {
     const { mount } = await built()
     const element = document.createElement('div')
     const seen: unknown[] = []
-    const Probe = (props: { node?: Element, note?: string }) => {
+    const Probe = (props: { node?: Map<string, string>, note?: string }) => {
       seen.push(props)
 
       return () => ''
     }
-    const [first, second] = [document.createElement('div'), document.createElement('div')]
-    const handle = mount<{ node?: Element, note?: string }>(Probe, element, { node: first, note: 'x' })
-    const props = seen[0] as { node?: Element, note?: string }
+    const [first, second] = [new Map(), new Map()]
+    const handle = mount<{ node?: Map<string, string>, note?: string }>(Probe, element, { node: first, note: 'x' })
+    const props = seen[0] as { node?: Map<string, string>, note?: string }
 
     expect(props.node).toBe(first)
     handle.update({ node: second })
