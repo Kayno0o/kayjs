@@ -581,6 +581,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   "start": [
     "() => { if (options.holds()) warnMetricsOpen(options.proxy); }",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
+    "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
@@ -592,6 +593,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "function serverStopped() { if (running === 0) return; running--; if (running === 0) notify(); }",
     "() => release?.()",
     "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
@@ -787,6 +789,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   ],
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
+    "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
     "async (root) => { await dispatch("onStart", [onStart], { url: root.server?.url.href }); }",
@@ -798,6 +801,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "function serverStopped() { if (running === 0) return; running--; if (running === 0) notify(); }",
     "() => release?.()",
     "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "async () => { await dispatch("onStop", [onStop], {}); }",
@@ -983,6 +987,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   ],
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
+    "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
@@ -993,6 +998,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "function serverStopped() { if (running === 0) return; running--; if (running === 0) notify(); }",
     "() => release?.()",
     "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
@@ -1575,6 +1581,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   ],
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
+    "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
@@ -1585,6 +1592,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "function serverStopped() { if (running === 0) return; running--; if (running === 0) notify(); }",
     "() => release?.()",
     "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
@@ -1994,6 +2002,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   ],
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
+    "function serverStarted() { running++; if (running === 1) notify(); }",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
     "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
@@ -2005,6 +2014,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "function serverStopped() { if (running === 0) return; running--; if (running === 0) notify(); }",
     "() => release?.()",
     "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
