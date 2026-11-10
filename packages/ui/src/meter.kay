@@ -1,10 +1,19 @@
 ---
 import { recipe } from 'kay'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import { fillOf, thresholdTone } from './threshold'
+import type { Threshold } from './threshold'
 
-const look = recipe({ parts: { root: 'kui-meter h-2 w-full overflow-hidden bg-surface', fill: 'h-full transition-[width] motion-reduce:transition-none' } })
+const look = recipe({
+  parts: { root: 'kui-meter h-2 w-full overflow-hidden bg-surface', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+  variants: {
+    // The bar's height: `sm`, `md` (default) or `lg`.
+    size: { sm: { root: 'h-1' }, md: '', lg: { root: 'h-3' } },
+  },
+  defaults: { size: 'md' },
+})
 
-const { value, max = 100, label, fillClass, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { value, max = 100, label, fillClass, size = 'md', formatValue, thresholds, showValue, reading, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // How much is filled, held between 0 and `max`.
   value: number
   // The value of a full meter, 100 by default so `value` reads as a percentage.
@@ -13,10 +22,34 @@ const { value, max = 100, label, fillClass, ...rest } = props<Omit<JSX.Intrinsic
   label: string
   /** @deprecated Use `class={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. */
   fillClass?: string | undefined
+
+  // Words the value, `(value, max) => '3 of 10 GB'`: screen readers hear it as `aria-valuetext`, and `showValue` and `@reading` draw it.
+  formatValue?: ((value: number, max: number) => string) | undefined
+  // Colours the fill by value: the first entry whose `upTo` is at least the value gives its `tone`, whatever the order, and a value past all of them keeps the accent. `[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]`.
+  thresholds?: Threshold[] | undefined
+  // Draws the value as text under the bar: `formatValue`'s words, else `value / max`.
+  showValue?: boolean | undefined
+  // Draws the value's text in place of the default one, `@reading(text, value, max)`, for an icon or a unit in markup. It shows without `showValue`.
+  reading?: Snippet<[text: string, value: number, max: number]> | undefined
 }>()
 
-const percent = () => max > 0 ? Math.min(100, Math.max(0, value / max * 100)) : 0
+const held = () => max > 0 ? Math.min(max, Math.max(0, Number.isNaN(value) ? 0 : value)) : 0
+const percent = () => max > 0 ? held() / max * 100 : 0
+const text = () => formatValue ? formatValue(held(), max) : `${held()} / ${max}`
+const tone = () => thresholdTone(thresholds, held())
 ---
-div(part="root" {...rest} role="meter" aria-valuenow={percent()} aria-valuemin={0} aria-valuemax={100} aria-label={label})
+snippet bar()
   // The accent is the fill's own class, not the recipe's, so `fillClass` and the caller's `class={{ fill }}` both replace it.
-  div(part="fill" class={['bg-accent', fillClass]} style={`width: ${percent()}%`})
+  div(part="root" {...rest} role="meter" aria-valuenow={held()} aria-valuemin={0} aria-valuemax={max} aria-valuetext={formatValue ? text() : undefined} aria-label={label} data-size={size})
+    div(part="fill" class={[fillOf(tone()), fillClass]} data-tone={tone()} style={`width: ${percent()}%`})
+
+if reading || showValue
+  div(part="field")
+    {bar()}
+    span(part="reading" aria-hidden="true")
+      if reading
+        | {reading(text(), held(), max)}
+      else
+        | {text()}
+else
+  {bar()}

@@ -3,15 +3,9 @@ import { signal } from 'kay'
 import Meter from '@kaynooo/kayjs-ui/meter.kay'
 
 const usage = signal(40)
-function fill() {
-  if (usage() > 90)
-    return 'bg-danger'
-
-  return usage() > 70 ? 'bg-warning' : undefined
-}
 ---
 .flex.max-w-sm.flex-col.gap-3
-  Meter(value={usage()} label="Disk" class={{ fill: fill() }})
+  Meter(value={usage()} label="Disk" showValue thresholds={[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]})
   input(
     type="range"
     min="0"

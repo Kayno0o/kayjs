@@ -624,8 +624,15 @@ describe('data', () => {
     expect(await find('/data', '#avatar-skeleton [role="status"]')).toEqual([])
   })
 
-  test('Meter reads value out of a custom max', async () => {
-    expect(await attributes('/data', '#meter-max [role="meter"]', ['aria-valuenow', 'aria-valuemax'])).toEqual([{ 'aria-valuenow': '75', 'aria-valuemax': '100' }])
+  test('Meter announces value out of a custom max, so 3 of 4 is 3', async () => {
+    expect(await attributes('/data', '#meter-max [role="meter"]', ['aria-valuenow', 'aria-valuemax'])).toEqual([{ 'aria-valuenow': '3', 'aria-valuemax': '4' }])
+    expect((await one('/data', '#meter-max [data-part=fill]')).attributes.style).toBe('width: 75%')
+  })
+
+  test('Meter draws its value under the bar from the server, and thresholds and size reach the markup', async () => {
+    expect((await one('/data', '#meter-read [data-part=reading]')).text).toBe('3 / 10')
+    expect(await attributes('/data', '#meter-read [role="meter"]', ['aria-valuenow', 'aria-valuemax', 'data-size'])).toEqual([{ 'aria-valuenow': '3', 'aria-valuemax': '10', 'data-size': 'lg' }])
+    expect((await one('/data', '#meter-read [data-part=fill]')).attributes['data-tone']).toBe('success')
   })
 
   test('BarList measures each row against the largest, reads its display, and says when it has none', async () => {

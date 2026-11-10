@@ -31,3 +31,7 @@ input(type="file" aria-label="Photo" onChange={send})
 if upload.progress() !== undefined
   Progress(value={upload.progress()} max={1} label="Sending the photo")
 ```
+
+## Value text, thresholds and size
+
+`formatValue(value, max)` becomes `aria-valuetext` and the text `showValue` draws under the bar (the percentage without it), `@reading(text, value, max)` draws it in your markup, `thresholds` colors the fill by value as [Meter](/ui/meter)'s do, in the units of `max`, and `size` is `sm`, `md` (default) or `lg`. An indeterminate bar has no value, so none of the text shows.

@@ -1,0 +1,5 @@
+--- island
+import Meter from '@kaynooo/kayjs-ui/meter.kay'
+---
+.flex.max-w-sm.flex-col.gap-3
+  Meter(value={3} max={10} label="Seats" showValue formatValue={(value, max) => `${value} of ${max} seats`} size="lg")

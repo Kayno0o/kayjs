@@ -1958,10 +1958,15 @@ component default
 
 [./meter.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; field?: string | undefined; reading?: string | undefined; }
   fillClass?: string | undefined
+  formatValue?: ((value: number, max: number) => string) | undefined
   label: string
   max?: number | undefined
+  reading?: ((text: string, value: number, max: number) => Element) | undefined
+  showValue?: boolean | undefined
+  size?: "lg" | "md" | "sm" | undefined
+  thresholds?: Threshold[] | undefined
   value: number
 
 [./multi-select.kay] default
@@ -2101,9 +2106,14 @@ component default
 
 [./progress.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; field?: string | undefined; reading?: string | undefined; }
+  formatValue?: ((value: number, max: number) => string) | undefined
   label: string
   max?: number | undefined
+  reading?: ((text: string, value: number, max: number) => Element) | undefined
+  showValue?: boolean | undefined
+  size?: "lg" | "md" | "sm" | undefined
+  thresholds?: Threshold[] | undefined
   value?: number | undefined
 
 [./qr-code.kay] default

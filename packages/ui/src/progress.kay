@@ -1,26 +1,59 @@
 ---
 import { recipe } from 'kay'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import { fillOf, thresholdTone } from './threshold'
+import type { Threshold } from './threshold'
 
 // Indeterminate, a bar slides across the track, held still and part-filled under reduced motion.
 const look = recipe({
   parts: {
     root: 'kui-progress h-2 w-full overflow-hidden bg-surface',
-    fill: 'h-full bg-accent transition-[width] motion-reduce:transition-none data-indeterminate:w-2/5 data-indeterminate:animate-[kui-progress-slide_1.4s_ease-in-out_infinite] data-indeterminate:motion-reduce:animate-none',
+    fill: 'h-full transition-[width] motion-reduce:transition-none data-indeterminate:w-2/5 data-indeterminate:animate-[kui-progress-slide_1.4s_ease-in-out_infinite] data-indeterminate:motion-reduce:animate-none',
+    field: 'block',
+    reading: 'mt-1 block text-xs text-muted tabular-nums',
   },
+  variants: {
+    // The bar's height: `sm`, `md` (default) or `lg`.
+    size: { sm: { root: 'h-1' }, md: '', lg: { root: 'h-3' } },
+  },
+  defaults: { size: 'md' },
 })
 
-const { value, max = 100, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { value, max = 100, label, size = 'md', formatValue, thresholds, showValue, reading, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // How far along the task is, from 0 to `max`; without it the bar is indeterminate.
   value?: number | undefined
   // The value of a finished task, 100 as Meter's percentage; pass `max={1}` for an upload's `progress()`.
   max?: number | undefined
   // Names the bar for screen readers.
   label: string
+
+  // Words the progress, `(value, max) => '3 of 10 files'`: screen readers hear it as `aria-valuetext`, and `showValue` and `@reading` draw it. Never called while the bar is indeterminate.
+  formatValue?: ((value: number, max: number) => string) | undefined
+  // Colours the fill by value as Meter's `thresholds` do, in the units of `max`.
+  thresholds?: Threshold[] | undefined
+  // Draws the progress as text under the bar: `formatValue`'s words, else the percentage.
+  showValue?: boolean | undefined
+  // Draws the text in place of the default one, `@reading(text, value, max)`. It shows without `showValue`.
+  reading?: Snippet<[text: string, value: number, max: number]> | undefined
 }>()
 
 // A value that is not a number leaves the bar indeterminate.
 const fraction = () => value === undefined || Number.isNaN(value) || !(max > 0) ? undefined : Math.min(1, Math.max(0, value / max))
+const held = () => (fraction() ?? 0) * max
+const text = () => formatValue ? formatValue(held(), max) : `${Math.round((fraction() ?? 0) * 100)}%`
+const tone = () => fraction() === undefined ? undefined : thresholdTone(thresholds, held())
 ---
-div(part="root" {...rest} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={fraction() === undefined ? undefined : Math.round(fraction()! * 100)} data-indeterminate={fraction() === undefined ? '' : undefined})
-  div(part="fill" style={fraction() === undefined ? undefined : `width: ${fraction()! * 100}%`} data-indeterminate={fraction() === undefined ? '' : undefined})
+snippet bar()
+  div(part="root" {...rest} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={fraction() === undefined ? undefined : Math.round(fraction()! * 100)} aria-valuetext={formatValue && fraction() !== undefined ? text() : undefined} data-size={size} data-indeterminate={fraction() === undefined ? '' : undefined})
+    div(part="fill" class={fillOf(tone())} data-tone={tone()} style={fraction() === undefined ? undefined : `width: ${fraction()! * 100}%`} data-indeterminate={fraction() === undefined ? '' : undefined})
+
+if (reading || showValue) && fraction() !== undefined
+  div(part="field")
+    {bar()}
+    span(part="reading" aria-hidden="true")
+      if reading
+        | {reading(text(), held(), max)}
+      else
+        | {text()}
+else
+  {bar()}

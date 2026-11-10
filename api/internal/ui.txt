@@ -2772,6 +2772,17 @@ function themeMode(cookie?: string): Signal<ThemeMode>
 [./lib/theme-mode] ThemeMode
 type ThemeMode = 'light' | 'dark' | 'system'
 
+[./lib/threshold] fillOf
+function fillOf(tone: Tone | undefined): string
+
+[./lib/threshold] Threshold
+interface Threshold
+  tone: Tone
+  upTo: number
+
+[./lib/threshold] thresholdTone
+function thresholdTone(thresholds: Threshold[] | undefined, value: number): Tone | undefined
+
 [./lib/timeline] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
   href?: string | undefined
