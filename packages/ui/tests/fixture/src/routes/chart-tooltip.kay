@@ -33,3 +33,5 @@ main
     LineChart(label="Own padding" labels={['a', 'b', 'c']} formatValue={value => `${value} units per second`} options={{ chartPadding: { top: 2 } }} series={[{ name: 'Read', values: [0, 8, 3] }]})
   article#events
     LineChart(label="Errors" labels={['a', 'b', 'c', 'd']} series={[{ name: 'Errors', values: [1, 4, 2, 3] }]} marks={[{ at: 'b', title: 'nginx reloaded', href: '/changes/1' }, { at: 'b', title: 'cert renewed' }, { at: 2, title: 'config applied', color: 'red' }, { at: 'zzz', title: 'unknown' }, { at: 9, title: 'far' }]})
+  article#events-press
+    LineChart(label="Pressable" labels={['a', 'b']} series={[{ name: 'Errors', values: [1, 4] }]} marks={[{ at: 'zzz', title: 'Lost' }, { at: 'b', title: 'Press me' }]} onMark={(mark, index) => { (window as unknown as { pressed: unknown }).pressed = [mark.title, index] }})

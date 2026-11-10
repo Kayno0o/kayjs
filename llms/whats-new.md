@@ -12,6 +12,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` warns `unguarded-route` for each route a 2.0 start would refuse, on a site with a guard that leaves `requireGuards` unset ([guards](guards.md)).
 - The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
 - kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` ([charts](../packages/ui/llms/charts.md)).
+- kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` or a button when given `onMark` ([charts](../packages/ui/llms/charts.md)).
 
 ## 1.94.0
 

@@ -572,6 +572,18 @@ inBrowser('LineChart events', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart onMark', () => {
+  test('makes a mark a button handing back the mark and its place in marks, a dropped mark before it included', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+    await page.waitFor('#events-press button[data-part="event"]')
+    await page.evaluate(() => document.querySelector<HTMLElement>('#events-press button[data-part="event"]')!.click())
+    expect(await page.evaluate(() => (window as unknown as { pressed: unknown }).pressed)).toEqual(['Press me', 1])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart stacked', () => {
   test('draws each line on the ones below, reads each series\' own value with a total row, and starts the axis at 0', async () => {
     const site = await shared()
