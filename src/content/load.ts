@@ -2,7 +2,7 @@ import type { Mode } from '../project'
 import type { LinkedImage } from './images'
 import type { CompiledMarkdown, Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -229,7 +229,7 @@ export function bodiesFile(base: string, dir: string): string {
   return manifestFile(base, dir).replace(MANIFEST_EXTENSION, '.bodies.json')
 }
 
-const builtBodies = new Map<string, Record<string, string>>()
+const builtBodies = new Map<string, { stamp: number, bodies: Record<string, string> }>()
 
 // The body of a prebuilt entry, read synchronously (from the executable's embedded files too) and kept once for its collection; undefined when no build holds it.
 export function builtBody(dir: string, file: string): string | undefined {
@@ -239,20 +239,24 @@ export function builtBody(dir: string, file: string): string | undefined {
     return undefined
 
   const path = bodiesFile(base, dir)
-  let bodies = builtBodies.get(path)
 
-  if (bodies === undefined) {
-    try {
-      bodies = JSON.parse(readFileSync(path, 'utf8')) as Record<string, string>
-    }
-    catch {
-      bodies = {}
-    }
+  try {
+    // Kept while the file is the one read, so a rebuild into the same folder is read afresh; a file that is not there is tried again next time.
+    const stat = statSync(path, { throwIfNoEntry: false })
 
-    builtBodies.set(path, bodies)
+    if (stat === undefined)
+      return undefined
+
+    let held = builtBodies.get(path)
+
+    if (held?.stamp !== stat.mtimeMs)
+      builtBodies.set(path, held = { stamp: stat.mtimeMs, bodies: JSON.parse(readFileSync(path, 'utf8')) as Record<string, string> })
+
+    return held.bodies[file]
   }
-
-  return bodies[file]
+  catch {
+    return undefined
+  }
 }
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {

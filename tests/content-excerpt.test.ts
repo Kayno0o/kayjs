@@ -232,6 +232,13 @@ describe('the prebuilt manifest', () => {
 
       expect(hello.body).toBe(bodies[hello.file]!)
       expect(hello.body.length).toBeGreaterThan(0)
+
+      // A rebuild into the same folder is read afresh.
+      await Bun.write(bodiesFile(build.dir, 'content/posts'), JSON.stringify({ [hello.file]: 'Rebuilt' }))
+
+      const again = (await collection('content/posts', { schema: posts.options.schema, components: posts.components }).get('hello'))!
+
+      expect(again.body).toBe('Rebuilt')
     }
     finally {
       setContentMode({ dev: false, prebuilt: false })
