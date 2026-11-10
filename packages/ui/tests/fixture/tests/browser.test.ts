@@ -568,15 +568,8 @@ inBrowser('LineChart events', () => {
     await page.waitFor('#events [data-part="tooltipEvent"]')
     expect(await page.evaluate(() => [...document.querySelectorAll('#events [data-part="tooltipEvent"]')].map(item => item.textContent))).toEqual(['nginx reloaded', 'cert renewed'])
     expect(await page.evaluate(() => document.querySelector('#events [role="slider"]')!.getAttribute('aria-valuetext'))).toContain('nginx reloaded; cert renewed')
-    expect(page.errors).toEqual([])
-  }, 120_000)
-})
 
-inBrowser('LineChart onMark', () => {
-  test('makes a mark a button handing back the mark and its place in marks, a dropped mark before it included', async () => {
-    const site = await shared()
-
-    await using page = await site.open('/chart-tooltip')
+    // With onMark a mark is a button handing back the mark and its place in marks, a dropped mark before it included.
     await page.click('#events-press button[data-part="event"]')
     await page.waitUntil(() => (window as unknown as { pressed?: unknown }).pressed !== undefined)
     expect(await page.evaluate(() => (window as unknown as { pressed: unknown }).pressed)).toEqual(['Press me', 1])
