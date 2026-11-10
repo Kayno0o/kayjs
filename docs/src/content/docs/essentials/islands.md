@@ -565,14 +565,19 @@ The server renders the fallback, `false` unless you pass another, as in `mediaQu
 
 ## A page kay does not serve
 
-A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay` (`kay/mount` is the same function), which returns a function that removes it.
+A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay` (`kay/mount` is the same function), which returns a handle: call it, or call its `dispose`, to remove the component, and call `update` to give it other props.
 
 ```ts
 import { mount } from 'kay/mount'
 import Panel from './panel.kay'
 
-const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })
+const panel = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })
+
+panel.update({ title: 'Archive' })
+panel.dispose()
 ```
+
+Pass a function instead of an object, `mount(Panel, element, () => ({ title: title() }))`, and the mount follows the signals it reads, so the panel stays current without `update`.
 
 A mount renders after what the element already holds. Disposing it removes only its own nodes, so several components can share one element.
 

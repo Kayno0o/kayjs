@@ -23,6 +23,7 @@ const ENTRY = `import { mount } from 'kay/mount'
 import Counter from './counter.kay'
 
 export { mount }
+export { signal } from 'kay'
 export { default as Label } from './label.kay'
 export { default as Switch } from './switch.kay'
 
@@ -66,7 +67,7 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
-interface Built { mount: typeof import('../src/runtime/mount').mount, Label: (props: { text: string }) => unknown, Switch: () => unknown }
+interface Built { signal: typeof import('../src/runtime/core').signal, mount: typeof import('../src/runtime/mount').mount, Label: (props: { text: string }) => unknown, Switch: () => unknown }
 
 let builtOnce: Promise<Built> | undefined
 
@@ -143,6 +144,50 @@ describe('a page kay does not serve', () => {
     first()
     third()
     expect(element.innerHTML).toBe('<h1>Title</h1>tail')
+    element.remove()
+  })
+
+  it('updates the props of a mount through its handle, which still disposes when called', async () => {
+    const { mount, Label } = await built()
+    const element = document.createElement('div')
+
+    document.body.append(element)
+    const handle = mount(Label, element, { text: 'one' })
+
+    expect(element.textContent).toBe('one')
+    handle.update({ text: 'two' })
+    await settle()
+    expect(element.textContent).toBe('two')
+
+    handle.dispose()
+    expect(element.innerHTML).toBe('')
+    expect(() => handle.update({ text: 'three' })).not.toThrow()
+    expect(() => handle()).not.toThrow()
+    element.remove()
+  })
+
+  it('follows the signals a props getter reads, and stops once disposed', async () => {
+    const { mount, Label, signal } = await built()
+    const element = document.createElement('div')
+    const text = signal('one')
+
+    document.body.append(element)
+    const handle = mount(Label, element, () => ({ text: text() }))
+
+    expect(element.textContent).toBe('one')
+    text.set('two')
+    await settle()
+    expect(element.textContent).toBe('two')
+
+    handle.update({ text: 'three' })
+    await settle()
+    expect(element.textContent).toBe('three')
+
+    handle()
+    expect(element.innerHTML).toBe('')
+    text.set('four')
+    await settle()
+    expect(element.innerHTML).toBe('')
     element.remove()
   })
 

@@ -684,7 +684,7 @@ interface MinTimeOptions
 type MinTimeRefusal = 'early' | 'expired'
 
 [.] mount
-function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): () => void
+function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): Mounted<P>
 
 [.] navigate
 function navigate(to: { query: Readonly<Record<string, null | number | string | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
@@ -2412,7 +2412,12 @@ function markdownLoaded(): boolean
 function markdownReady(): Promise<void>
 
 [./mount] mount
-function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): () => void
+function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): Mounted<P>
+
+[./mount] Mounted
+interface Mounted<P extends object>
+  dispose: () => void
+  update: (props: P) => void
 
 [./params] integer
 function integer(value: string): number | undefined
