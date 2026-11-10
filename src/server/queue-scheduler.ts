@@ -93,6 +93,7 @@ export class Scheduler {
       serverStarted()
 
     this.#serving = true
+    this.#forgetDrain?.()
     this.#forgetDrain = onDrain(() => this.#beginStop())
     this.#start()
   }
@@ -184,7 +185,7 @@ export class Scheduler {
 
   // A store that notifies wakes the idle workers when another process changes the queue, and again once it is back from a lost connection. A failure leaves the polling as it was.
   async #subscribe(signal: AbortSignal): Promise<void> {
-    if (this.#subscription !== undefined || this.#subscribing === signal)
+    if (signal.aborted || this.#subscription !== undefined || this.#subscribing === signal)
       return
 
     this.#subscribing = signal
@@ -205,6 +206,7 @@ export class Scheduler {
     catch (error) {
       // A store down at the start is asked again, as the workers ask it; the polling covers the time between.
       if (!signal.aborted) {
+        clearTimeout(this.#resubscribe)
         this.#resubscribe = setTimeout(() => void this.#subscribe(signal), RESUBSCRIBE_MS)
         this.#resubscribe.unref()
         kayLog('warn', `queue('${this.#options.name}') could not ask its store to tell it of jobs added by other processes; it polls and tries again`, error)
