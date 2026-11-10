@@ -1,5 +1,6 @@
 import type { Span } from './ast'
 import type { Expansion } from './markdown-block'
+import { fnvHash } from './fnv-hash'
 import { PROBE } from './names'
 
 // A run of generated code copied character for character from the source.
@@ -66,15 +67,15 @@ export class CodeBuilder {
     if (!check)
       return undefined
 
-    const hash = new Bun.CryptoHasher('sha1')
+    let kept = ''
     let at = 0
 
     for (let index = 0; index < this.texts.length; index += 2) {
-      hash.update(this.code.slice(at, this.texts[index])).update('{""}')
+      kept += `${this.code.slice(at, this.texts[index])}{""}`
       at = this.texts[index + 1]!
     }
 
-    return hash.update(this.code.slice(at)).digest('hex')
+    return fnvHash(kept + this.code.slice(at))
   }
 
   // The same code as `addSource`, mapped to nothing: for a copy of a span whose messages the mapped copy already carries.
