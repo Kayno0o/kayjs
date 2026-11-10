@@ -21,7 +21,6 @@ import type { SeoHead } from './seo'
 import type { CutIslands } from './server-islands'
 import type { Revalidation } from './stale-pages'
 import type { Rendered } from './stream'
-import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { newServerIslands, withServerIslands } from '../runtime/html'
 import { unrevivableAction } from '../runtime/island.server'
 import { unansweredLoads } from '../runtime/load-scope'
@@ -46,6 +45,7 @@ import { runGuards } from './guards'
 import { DEFAULT_LANG } from './i18n'
 import { inLiveReads, retryForViewer } from './live'
 import { errorPage } from './overlay'
+import { calmDeadline, pageErrorOf } from './page-error'
 import { chainSetting, pagePrerender } from './page-settings'
 import { pageToken } from './prerendered'
 import { withoutShareToken } from './preview'
@@ -54,9 +54,9 @@ import { chainQuery, queryRules, readQuery, readQueryLeniently } from './query'
 import { editors, Pieced, projectPath, renderDocument, viewOf } from './render-document'
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
-import { recordOf, requestRecord } from './request-record'
+import { requestRecord } from './request-record'
 import { forgetOnces, guardValues, onceOf } from './request-scope'
-import { againstDeadline, requestSignal, RequestTimeoutError, retime } from './request-timeout'
+import { againstDeadline, requestSignal, retime } from './request-timeout'
 import { overHttps } from './request-url'
 import { withResources } from './resources'
 import { askedPath } from './rewrite'
@@ -918,24 +918,6 @@ function keepPersonal({ headers, ctx, prerendering }: Rendering): void {
   markPrivate(headers)
 }
 
-function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
-  if (error instanceof NotFound)
-    return { status: 404, message: 'Not Found' }
-
-  if (error instanceof RequestTimeoutError)
-    return { status: 504, message: dev ? error.message : 'Gateway Timeout' }
-
-  return error instanceof Denied ? { status: error.status, message: error.message, ...error.data !== undefined && { data: error.data } } : describeError(error, dev)
-}
-
-// The error page is answered whatever the clock said: it stops, and `ctx.signal` follows only the client leaving, so a fetch of a layout is not cut by the timeout that brought the page here.
-function calmDeadline(ctx: RequestContext): void {
-  const { request } = ctx
-
-  recordOf(request)?.deadline?.stop()
-  Object.defineProperty(ctx, 'signal', { get: () => request.signal, configurable: true })
-}
-
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
 async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<Response> {
   if (error instanceof Redirect) {
@@ -961,8 +943,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   ;(rendering.ctx as ErrorPageContext).error = pageError
   calmDeadline(rendering.ctx)
 
-  // A status page that fails leaves the error page, which may still render.
-  const html = (first && await renderSpecialPage(first, rendering, loaded, client, options)) ?? (first !== special.error && special.error ? await renderSpecialPage(special.error, rendering, loaded, client, options) : undefined)
+  const html = await renderStatusPage(first, special.error, rendering, loaded, client, options)
 
   if (html !== undefined)
     return respond(rendering, html)
@@ -976,6 +957,13 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   rendering.headers.set('content-type', TEXT['content-type'])
 
   return respond(rendering, pageError.message)
+}
+
+// A status page that fails leaves the error page, which may still render.
+async function renderStatusPage(page: SpecialPage | undefined, fallback: SpecialPage | undefined, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<string | Pieced | ReadableStream<Uint8Array> | undefined> {
+  const html = page && await renderSpecialPage(page, rendering, loaded, client, options)
+
+  return html === undefined && page !== fallback && fallback ? renderSpecialPage(fallback, rendering, loaded, client, options) : html
 }
 
 // Inside its layouts, reusing what their loads returned for the failed page; bare when one of them is what failed.
@@ -1041,17 +1029,4 @@ async function importAll(files: string[], options: RenderOptions): Promise<PageM
 // The editor's own extension's pages, its admin screens say, render no editor over them, nor does what they fail with, whichever page shows it.
 export function withEditor(page: { editorOwn?: true | undefined }, options: RenderOptions): RenderOptions {
   return page.editorOwn === true && options.editor !== undefined ? { ...options, editor: undefined } : options
-}
-
-export function describeError(error: unknown, dev = false): PageError {
-  if (!dev)
-    return { status: 500, message: 'Internal Server Error' }
-
-  if (!(error instanceof Error))
-    return { status: 500, message: String(error) }
-
-  const stack = mappedStack(error)
-  const hint = stack === undefined ? undefined : browserOnlyHint(error, stack)
-
-  return { status: 500, message: hint !== undefined && hint !== '' ? hint : error.message, stack }
 }

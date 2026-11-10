@@ -6,6 +6,7 @@ import { I18N_LINTS } from './i18n-lints'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
 import { nestingLints } from './nesting'
+import { ROUTE_LINTS } from './route-lints'
 import { styleLints } from './style-lints'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
@@ -412,22 +413,6 @@ export const LINTS = {
     // eslint-disable-next-line no-template-curly-in-string
     right: '---\nconst { name } = props<{ name: string }>()\n---\na(href="/users" title={`Hello ${name}`}) Profile',
   },
-  'unguarded-route': {
-    level: 'deny',
-    group: 'security',
-    site: true,
-    summary: 'On a site that guards a route of its own, or with `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app that no `_guard.ts` covers and that does not set `guards: false`: the server answers it 403.',
-    wrong: '// a site with a _guard.ts, or requireGuards: true\n// src/routes/pricing.kay, with no _guard.ts above it',
-    right: '--- server\nexport const page = { guards: false }\n---\nh1 Pricing',
-  },
-  'endpoint-export': {
-    level: 'warn',
-    group: 'code',
-    site: true,
-    summary: 'An endpoint file exporting a name that is no method: only `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`, in capitals, are served, and `page` holds its settings, so `post` or `handler` is never called.',
-    wrong: '// src/routes/hook.json.ts\nexport function post() {\n  return Response.json({ ok: true })\n}',
-    right: '// src/routes/hook.json.ts\nexport function POST() {\n  return Response.json({ ok: true })\n}',
-  },
   'unguarded-tool': {
     level: 'warn',
     group: 'security',
@@ -707,6 +692,7 @@ export const LINTS = {
     wrong: '// src/jobs.ts, imported by no plugin\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)',
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
+  ...ROUTE_LINTS,
   ...DEPRECATED_LINTS,
 } as const satisfies Record<string, Lint>
 

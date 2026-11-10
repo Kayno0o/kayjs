@@ -1,4 +1,6 @@
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { unusedStatusPages } from '../src/check/status-pages'
 import { scanRoutes } from '../src/server/routes'
@@ -112,6 +114,49 @@ describe('unused status pages', () => {
     const routes = await scanRoutes(join(root, 'src/routes'))
     const found = await unusedStatusPages(root, {}, { routes } as never)
 
-    expect(found.map(({ file, message, severity }) => [file.slice(root.length + 1), message, severity])).toEqual([['src/routes/empty/_429.kay', '`empty/_429.kay` is in a directory with no route, so no page renders it', 'warning']])
+    expect(found.map(({ file, message, severity, code }) => [file.slice(root.length + 1), message, severity, code])).toEqual([['src/routes/empty/_429.kay', '`empty/_429.kay` is in a directory with no route, so no page renders it', 'warning', 'unused-status-page']])
+    expect(await unusedStatusPages(root, { lints: { 'unused-status-page': 'allow' } }, { routes } as never)).toEqual([])
   })
+})
+
+describe('status pages in a build', () => {
+  it('serves a status page from `kay build`, and _error for the status with none', async () => {
+    const base = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(base, { recursive: true })
+
+    const root = await mkdtemp(join(base, 'status-build-'))
+
+    try {
+      const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir }))\nconst out: Record<string, unknown> = {}\n\nfor (const path of [\'/a\', \'/e\']) {\n  const response = await app.handle(new Request(`http://localhost${path}`))\n\n  out[path] = [response.status, await response.text()]\n}\n\nconsole.log(JSON.stringify(out))\nprocess.exit(0)\n'
+      const files: Record<string, string> = {
+        'src/routes/_error.kay': special('error'),
+        'src/routes/_403.kay': special('forbidden'),
+        'src/routes/a.kay': gated('ctx.deny(403, \'Members only\')'),
+        'src/routes/e.kay': gated('ctx.deny(418, \'Teapot\')'),
+        'serve.ts': serve,
+      }
+
+      await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+      const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
+      const [buildError, buildCode] = await Promise.all([new Response(build.stderr).text(), build.exited])
+
+      expect(buildError).toBe('')
+      expect(buildCode).toBe(0)
+
+      const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
+      const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+      const answers = JSON.parse(output.trim().split('\n').at(-1)!) as Record<string, [number, string]>
+
+      expect(code).toBe(0)
+      expect(answers['/a']![0]).toBe(403)
+      expect(answers['/a']![1]).toContain('<h1 class="forbidden">forbidden 403 Members only</h1>')
+      expect(answers['/e']![0]).toBe(418)
+      expect(answers['/e']![1]).toContain('<h1 class="error">error 418 Teapot</h1>')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
 })

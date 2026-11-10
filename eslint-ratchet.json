@@ -120,7 +120,7 @@
     "max-lines": 682
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1015
+    "max-lines": 1001
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,
@@ -260,7 +260,7 @@
     "complexity": 94
   },
   "src/server/render.ts": {
-    "max-lines": 731
+    "max-lines": 714
   },
   "src/server/rooms.ts": {
     "max-lines-per-function": 196
