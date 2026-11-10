@@ -382,7 +382,7 @@ export default api().ws('/:room', {
 })
 ```
 
-An island opens it with `socket()`. `send` takes the route's `body`, and `last()` reads the last message reactively. `last()` and `on()` are typed from the route's `response`; a route with a `body` and no `response` gives them as `unknown`, and `kay check` warns about it (`untyped-socket`).
+An island opens it with `socket()`. `send` takes the route's `body`, and `last()` reads the last message reactively. `last()` and `onData()` are typed from the route's `response`; a route with a `body` and no `response` gives them as `unknown`, and `kay check` warns about it (`untyped-socket`).
 
 ```kay
 ---
