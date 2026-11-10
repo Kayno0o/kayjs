@@ -20,7 +20,7 @@ const { value, max = 100, label, fillClass, size = 'md', formatValue, thresholds
   max?: number | undefined
   // Names the meter for screen readers.
   label: string
-  /** @deprecated Use `class={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. */
+  /** @deprecated Use `class={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. No lint: an old prop with no mechanical rewrite to a class map. */
   fillClass?: string | undefined
 
   // Words the value, `(value, max) => '3 of 10 GB'`: screen readers hear it as `aria-valuetext`, and `showValue` and `@reading` draw it.

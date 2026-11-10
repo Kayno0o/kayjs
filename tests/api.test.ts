@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { Glob } from 'bun'
 import { beforeAll, expect, it } from 'bun:test'
 import { breakingKeys, changesOf, INTERNAL, isInternal, isInternalPath, lineDiff, recordBreaking, snapshots, sortUnions, wrap } from '../scripts/api'
+import { DEPRECATED_FILE, deprecatedList, deprecations, problemsOf } from '../scripts/deprecated'
 
 const root = process.cwd()
 
@@ -187,4 +188,38 @@ it('types no prop of a component as any', () => {
   }
 
   expect(found).toEqual([])
+})
+
+// A form on its way out says when it goes and what finds it, so the upgrade page for 2.0 can list it by area.
+it('marks every deprecated export with its removal version and its lint', () => {
+  const found = deprecations(current)
+
+  expect(found.length).toBeGreaterThan(0)
+  expect(found.flatMap(entry => problemsOf(entry).map(problem => `${entry.package} ${entry.entry} ${entry.name} ${problem}`))).toEqual([])
+})
+
+it('keeps api/deprecated.txt as the list of the snapshot markers', () => {
+  expect(readFileSync(DEPRECATED_FILE, 'utf8'), 'run `bun scripts/api.ts --update`').toBe(deprecatedList(deprecations(current)))
+})
+
+it('reads the marker of an export and of a member out of a snapshot', () => {
+  const text = [
+    '[.] Old\n/** @deprecated Use `New`. Removed in 2.0.0. No lint: a type. */\ntype Old = New',
+    '[.] Local\ninterface Local\n  /** @deprecated Read `x`; `deprecated-local-state` rewrites it. Until 1.90. */ pending: () => number\n  ok: boolean',
+    '[.] Bare\n/** @deprecated */\nconst Bare: 1',
+  ].join('\n\n')
+  const found = deprecations(new Map([['api/kay.txt', text]]))
+
+  expect(found.map(({ name, removedIn, lint, noLint }) => ({ name, removedIn, lint, noLint }))).toEqual([
+    { name: 'Old', removedIn: '2.0.0', lint: undefined, noLint: 'a type.' },
+    { name: 'Local.pending', removedIn: '1.90', lint: 'deprecated-local-state', noLint: undefined },
+    { name: 'Bare', removedIn: undefined, lint: undefined, noLint: undefined },
+  ])
+  expect(problemsOf(found[0]!)).toEqual([])
+  expect(problemsOf(found[2]!)).toHaveLength(2)
+})
+
+it('writes a @deprecated tag into the snapshot, and the list says what each line names', () => {
+  expect(deprecatedList([{ package: 'ui', entry: '.', name: 'A', text: 'x. Removed in 2.0.0.', removedIn: '2.0.0', lint: undefined, noLint: 'x' }])).toBe('ui [.] A\t2.0.0\t-\tx. Removed in 2.0.0.\n')
+  expect(current.get('api/kay.txt')).toContain('/** @deprecated The count of writes')
 })

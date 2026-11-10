@@ -18,7 +18,7 @@ interface PaletteBase {
 export interface PaletteLink extends PaletteBase {
   href: string
   newTab?: NewTab | undefined
-  /** @deprecated Use `newTab: true`, which wins when both are given. Removed in 2.0.0. */
+  /** @deprecated Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag. */
   external?: boolean | undefined
 }
 

@@ -103,9 +103,9 @@ export interface Local<Row, Key extends keyof Row> {
   onIssue: (listener: (event: { issue: LocalIssue<Row> }) => void) => () => void
   // Called when a read of the server failed; returns what stops it.
   onError: (listener: (event: { error: ApiError }) => void) => () => void
-  /** @deprecated The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. */
+  /** @deprecated The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */
   pending: () => number
-  /** @deprecated `syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. */
+  /** @deprecated `syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */
   status: () => LocalStatus
   issues: () => readonly LocalIssue<Row>[]
   dismiss: (id: number) => Promise<void>

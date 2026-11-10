@@ -5,9 +5,11 @@ import { Glob } from 'bun'
 import ts from 'typescript'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { BREAKING_FILE } from './breaking'
+import { DEPRECATED_FILE, deprecatedList, deprecations } from './deprecated'
 
 // `bun scripts/api.ts [--update [--breaking|--break=<key>...|--compatible]]`: the public surface of kay and of each library, every `exports` entry's names and their types, as the text files of `api/`.
 // Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records every such difference in `api/breaking.txt` for the release to read, or `--break=<key>` (the key as the refusal prints it, `<package> [<entry>] <name>`, repeatable), which records that one and still refuses any other. `--compatible` accepts a changed export that stays compatible (an optional member added, a type widened) and records nothing, except the ones named with `--break=` in the same run. A removal always needs `--breaking` or its `--break=`.
+// `--update` also writes `api/deprecated.txt`: every export and member marked `@deprecated`, with its removal version and lint (`scripts/deprecated.ts`).
 // What the docs call internal (`INTERNAL`) is written apart, in `api/internal/<package>.txt`, and changes without any flag.
 export const SNAPSHOT_DIR = 'api'
 export const INTERNAL_DIR = `${SNAPSHOT_DIR}/internal`
@@ -141,9 +143,16 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
     // kay's own root is the repo's, which also holds the libraries: a type declared under `packages/` is theirs.
     return file.startsWith(dir) && !file.includes('/node_modules/') && !(dir === root && file.startsWith(`${root}/packages/`))
   })
+  // A `@deprecated` tag, its text on one line, as the comment the snapshot carries ahead of the export or the member.
+  const flag = (symbol: ts.Symbol) => {
+    const tag = symbol.getJsDocTags(checker).find(found => found.name === 'deprecated')
+
+    return tag === undefined ? '' : `/** ${['@deprecated', ts.displayPartsToString(tag.text).replaceAll(WHITESPACE, ' ').replaceAll('*/', '* /').trim()].filter(Boolean).join(' ')} */`
+  }
+  // Sorted by the member's own text, so a marker ahead of it moves nothing.
   const members = (type: ts.Type, at: ts.Node): string[] => type.isUnion()
     ? type.types.map(member => `| { ${members(member, at).join('; ')} }`)
-    : checker.getPropertiesOfType(type).filter(own).map(property => `${property.name}${property.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${show(checker.getTypeOfSymbolAtLocation(property, at))}`).sort()
+    : checker.getPropertiesOfType(type).filter(own).map(property => ({ line: `${property.name}${property.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${show(checker.getTypeOfSymbolAtLocation(property, at))}`, flagged: flag(property) })).sort((a, b) => Number(a.line > b.line) - Number(a.line < b.line)).map(({ line, flagged }) => flagged === '' ? line : `${flagged} ${line}`)
 
   for (const { specifier, file } of entries) {
     const source = program.getSourceFile(shadowed(file))
@@ -205,6 +214,11 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
           lines.push(`type ${exported.name}`)
         }
       }
+
+      const deprecated = flag(symbol)
+
+      if (lines.length > 0 && deprecated !== '')
+        lines.unshift(deprecated)
 
       if (lines.length > 0)
         (isInternal(packageName, specifier, exported.name) ? internalBlocks : blocks).push(`[${specifier}] ${exported.name}\n${lines.join('\n')}`)
@@ -524,6 +538,8 @@ if (import.meta.main) {
 
     for (const path of stale)
       await Bun.file(join(root, path)).delete()
+
+    await Bun.write(join(root, DEPRECATED_FILE), deprecatedList(deprecations(current)))
 
     if (record.length > 0) {
       const recorded = existsSync(join(root, BREAKING_FILE)) ? readFileSync(join(root, BREAKING_FILE), 'utf8').split('\n').filter(Boolean) : []

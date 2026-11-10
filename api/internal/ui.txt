@@ -1508,7 +1508,7 @@ type PaletteEntry = PaletteLink | PaletteAction
 
 [./lib/index] PaletteLink
 interface PaletteLink extends PaletteBase
-  external?: boolean | undefined
+  /** @deprecated Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag. */ external?: boolean | undefined
   group: string
   href: string
   icon?: IconProps | IconSlot | undefined
@@ -1603,6 +1603,7 @@ interface SparkMark
   value: null | number
 
 [./lib/index] SparkTone
+/** @deprecated Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through. */
 type SparkTone = Tone
 
 [./lib/index] StatDelta
@@ -2352,7 +2353,7 @@ function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[]
 
 [./lib/palette] PaletteLink
 interface PaletteLink extends PaletteBase
-  external?: boolean | undefined
+  /** @deprecated Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag. */ external?: boolean | undefined
   group: string
   href: string
   icon?: IconProps | IconSlot | undefined
@@ -2597,6 +2598,7 @@ interface AsyncRowsHooks<Row>
 type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
 
 [./lib/sparkline] SparkTone
+/** @deprecated Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. No lint: a type alias an app imports by name, which editors strike through. */
 type SparkTone = Tone
 
 [./lib/stat] deltaIcon

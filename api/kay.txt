@@ -589,12 +589,12 @@ interface Local<Row, Key extends keyof Row>
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   onIssue: (listener: (event: { issue: LocalIssue<Row>; }) => void) => () => void
   onSync: (listener: (event: { rows: readonly Row[]; }) => void) => () => void
-  pending: () => number
+  /** @deprecated The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */ pending: () => number
   put: (row: Row) => Promise<void>
   remove: (key: Row[Key]) => Promise<void>
   retry: () => void
   rows: () => readonly Row[]
-  status: () => LocalStatus
+  /** @deprecated `syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it. */ status: () => LocalStatus
   sync: () => Promise<void>
   syncStatus: () => LocalSyncStatus
   unsynced: () => number
@@ -1703,7 +1703,7 @@ interface CompileResult
   moduleLines: number[]
   tsx: string
   typeHash?: string | undefined
-  why?: string | undefined
+  /** @deprecated Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source. */ why?: string | undefined
 
 [./compiler] Diagnostic
 interface Diagnostic extends Span

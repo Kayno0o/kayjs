@@ -104,7 +104,7 @@ export interface CompileResult {
   island?: string | undefined
   // What makes the component an island: its kind, name and span in the file.
   cause?: IslandCause | undefined
-  /** @deprecated Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. */
+  /** @deprecated Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source. */
   why?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
