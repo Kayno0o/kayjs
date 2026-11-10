@@ -21,28 +21,47 @@ export function mount<P extends object>(component: (props: P) => unknown, elemen
   const ids = freshPrefix()
   const read = typeof props === 'function' ? props : () => props ?? {}
   let update: ((next: P) => void) | undefined
+  let failure: { error: unknown } | undefined
 
-  const dispose = renderAppended(() => withIds(ids, () => {
-    let live: object | undefined
+  const dispose = renderAppended(() => {
+    try {
+      return withIds(ids, () => {
+        let live: object | undefined
 
-    // The first read gives the props the component renders with, the later ones, of a function's signals, update them.
-    renderEffect(() => {
-      const next = read() as P
+        // The first read gives the props the component renders with, the later ones, of a function's signals, update them.
+        renderEffect(() => {
+          const next = read() as P
 
-      if (update) {
-        update(next)
+          if (update) {
+            update(next)
 
-        return
-      }
+            return
+          }
 
-      const [made, write] = liveProps(next as Record<string, unknown>)
+          // What the app passes is its own, so a prop changes when it is another value, not when it looks alike as decoded island props do.
+          const [made, write] = liveProps(next as Record<string, unknown>, Object.is)
 
-      live = made
-      update = write
-    })
+          live = made
+          update = write
+        })
 
-    return component(live as P)
-  }), element)
+        return component(live as P)
+      })
+    }
+    catch (error) {
+      failure = { error }
+
+      return null
+    }
+  }, element)
+
+  // A component or props function that throws leaves nothing of the mount behind.
+  if (failure) {
+    dispose()
+
+    throw failure.error
+  }
+
   const handle = (() => dispose()) as Mounted<P>
 
   handle.update = next => update?.(next)

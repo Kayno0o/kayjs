@@ -686,6 +686,11 @@ type MinTimeRefusal = 'early' | 'expired'
 [.] mount
 function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): Mounted<P>
 
+[.] Mounted
+interface Mounted<P extends object>
+  dispose: () => void
+  update: (props: P) => void
+
 [.] navigate
 function navigate(to: { query: Readonly<Record<string, null | number | string | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
 function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>

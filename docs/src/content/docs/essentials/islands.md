@@ -577,7 +577,7 @@ panel.update({ title: 'Archive' })
 panel.dispose()
 ```
 
-Pass a function instead of an object, `mount(Panel, element, () => ({ title: title() }))`, and the mount follows the signals it reads, so the panel stays current without `update`.
+Pass a function instead of an object, `mount(Panel, element, () => ({ title: title() }))`, and the mount follows the signals it reads, so the panel stays current without `update`; an `update` on such a mount holds until a signal the function reads changes.
 
 A mount renders after what the element already holds. Disposing it removes only its own nodes, so several components can share one element.
 

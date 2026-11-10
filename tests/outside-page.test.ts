@@ -191,6 +191,40 @@ describe('a page kay does not serve', () => {
     element.remove()
   })
 
+  it('gives the component each other value an update passes, however alike, and reads a removed prop as undefined', async () => {
+    const { mount } = await built()
+    const element = document.createElement('div')
+    const seen: unknown[] = []
+    const Probe = (props: { node?: Element, note?: string }) => {
+      seen.push(props)
+
+      return () => ''
+    }
+    const [first, second] = [document.createElement('div'), document.createElement('div')]
+    const handle = mount<{ node?: Element, note?: string }>(Probe, element, { node: first, note: 'x' })
+    const props = seen[0] as { node?: Element, note?: string }
+
+    expect(props.node).toBe(first)
+    handle.update({ node: second })
+    expect(props.node).toBe(second)
+    expect(props.note).toBeUndefined()
+    handle.dispose()
+  })
+
+  it('leaves nothing in the element when the component or the props function throws', async () => {
+    const { mount, Label } = await built()
+    const element = document.createElement('div')
+
+    element.textContent = 'kept'
+    expect(() => mount(Label, element, () => {
+      throw new Error('no props')
+    })).toThrow('no props')
+    expect(() => mount(() => {
+      throw new Error('no render')
+    }, element, {})).toThrow('no render')
+    expect(element.innerHTML).toBe('kept')
+  })
+
   it('disposes of a mount whose element the app already emptied', async () => {
     const { mount, Switch } = await built()
     const element = document.createElement('div')

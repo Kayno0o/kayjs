@@ -1,11 +1,11 @@
 import { batch, ownSignal } from './reactive'
 
 // Props read through a signal each, so an island marked `persist` the next page gives other props shows them, as a component inside an island does.
-export function liveProps(initial: Record<string, unknown>): [props: object, update: (next: object) => void] {
+export function liveProps(initial: Record<string, unknown>, equals: (a: unknown, b: unknown) => boolean = sameData): [props: object, update: (next: object) => void] {
   const props = {}
   const writes = new Map<string, (value: unknown) => void>()
   const define = (key: string, value: unknown) => {
-    const [read, write] = ownSignal(value, { equals: sameData })
+    const [read, write] = ownSignal(value, { equals })
 
     writes.set(key, write)
     Object.defineProperty(props, key, { get: read, enumerable: true, configurable: true })
