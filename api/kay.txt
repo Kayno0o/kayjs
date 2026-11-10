@@ -3867,7 +3867,7 @@ interface WorkflowStatus
 
 [./server] WorkflowStep
 interface WorkflowStep<Known extends Events>
-  run: <Result>(name: string, work: (signal: AbortSignal) => Promise<Result> | Result) => Promise<Awaited<Result>>
+  run: <Result>(name: string, work: (signal: AbortSignal, step: { key: string; }) => Promise<Result> | Result) => Promise<Awaited<Result>>
   sleep: (wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void>
   waitFor: {
   <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>;

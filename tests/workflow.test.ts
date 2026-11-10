@@ -78,6 +78,29 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(calls).toEqual(['one', 'two', 'two', 'three'])
   })
 
+  it('hands a step the same idempotency key on every run of it, and another to each step', async () => {
+    const store = await open()
+    const keys: string[] = []
+    let fail = true
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      await step.run('same name', (_signal, { key }) => void keys.push(key))
+      await step.run('same name', (_signal, { key }) => {
+        keys.push(key)
+
+        if (fail)
+          throw new Error('boom')
+      })
+    }, { store, backoff: '1s' })
+
+    const id = await flow.start()
+
+    await flow.drain()
+    fail = false
+    later(2000)
+    await flow.drain()
+    expect(keys).toEqual([`${id}:1`, `${id}:2`, `${id}:2`])
+  })
+
   it('does not spend its attempts across steps', async () => {
     const store = await open()
     const seen = new Set<string>()

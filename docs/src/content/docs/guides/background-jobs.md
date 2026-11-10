@@ -335,6 +335,12 @@ The function runs again from its top each time the run is taken, and a finished 
 
 `send(id, event, data)` resolves with whether the run took the event. A run that is not waiting for it yet keeps it for the wait that names it, so `start` followed by `send` works. It keeps 50 such events, dropping and logging the oldest. An event sent while a step is running is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
 
+A step runs at least once, not exactly once: the result is kept after the step's work, so a crash between the two runs the work again. A step that charges a card or sends a mail passes the `key` it is given as the idempotency key, the same on every run of that step.
+
+```ts
+await step.run('charge', async (_signal, { key }) => stripe.charges.create({ amount }, { idempotencyKey: key }))
+```
+
 A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
 
 The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `failedTtl`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }`; `onRetry` and `onError` also get `attempts` and `error`, `onRetry` the `wait` in ms too.

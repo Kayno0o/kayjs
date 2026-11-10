@@ -27,8 +27,8 @@ function waited(event: string, kept: WaitMemo): WaitResult<unknown> {
 }
 
 export interface WorkflowStep<Known extends Events> {
-  // Runs `work` once for the run and keeps its result, a value devalue keeps, in the store: a restart or a retry gets the kept result back instead of running it again. Steps run one at a time, each awaited before the next.
-  run: <Result>(name: string, work: (signal: AbortSignal) => Result | Promise<Result>) => Promise<Awaited<Result>>
+  // Runs `work` for the run and keeps its result, a value devalue keeps, in the store: a restart or a retry gets the kept result back instead of running it again. That is at least once, not exactly once: a crash between the side effect and the write of its result runs `work` again, so give a charge or a mail the `key` of the step, the same on every run of it (the run's id and the step's place), as its idempotency key. Steps run one at a time, each awaited before the next.
+  run: <Result>(name: string, work: (signal: AbortSignal, step: { key: string }) => Result | Promise<Result>) => Promise<Awaited<Result>>
   // Lets the run go for `wait`: nothing holds a process meanwhile, and the code after it runs once the time comes, in whichever process takes the run.
   sleep: (wait: Duration) => Promise<void>
   // Waits for `send(id, event, data)` to this run and resolves with its data; with a `timeout`, resolves with `{ ok: false, error }` when the time comes first.
@@ -249,7 +249,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     const step: WorkflowStep<Known> = {
       async run(label, work) {
-        const { seen } = enter('run', label)
+        const { slot, seen } = enter('run', label)
 
         if (seen)
           return seen.value as never
@@ -257,7 +257,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
         busy = true
 
         try {
-          const value = await work(signal)
+          const value = await work(signal, { key: `${payload.run}:${slot + 1}` })
 
           memo.push({ kind: 'run', name: label, value })
 
