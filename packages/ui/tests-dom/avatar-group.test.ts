@@ -67,8 +67,8 @@ describe('AvatarGroup', () => {
     expect([...panel.querySelectorAll('[data-part=name]')].map(one => one.textContent)).toEqual(['Grace', 'Margaret', 'Dennis'])
     expect([...panel.querySelectorAll('[data-part=row]')].map(row => [row.tagName, row.getAttribute('href')])).toEqual([['A', '/grace'], ['DIV', null], ['DIV', null]])
 
-    // A person with a status is named once, by the avatar, so the written name is hidden from screen readers.
-    expect([...panel.querySelectorAll('[data-part=name]')].map(one => one.getAttribute('aria-hidden'))).toEqual([null, null, null])
+    // A person with a status is named once, by the avatar (here Dennis), so the written name is hidden from screen readers.
+    expect([...panel.querySelectorAll('[data-part=name]')].map(one => one.getAttribute('aria-hidden'))).toEqual([null, null, 'true'])
 
     panel.hidePopover()
     await settle()
