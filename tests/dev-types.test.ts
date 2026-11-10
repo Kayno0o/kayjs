@@ -188,6 +188,28 @@ describe('the type check beside kay dev', () => {
     }
   }, 60_000)
 
+  it('says a write left the tree\'s types as they were for an edit of a template\'s text alone', async () => {
+    const root = await project({ 'src/routes/index.kay': 'h1 Home\np\n' })
+    const types = new TypesProcess(root, undefined)
+
+    try {
+      // A new process has nothing to compare with.
+      await types.write(false, '')
+      expect(types.treeChanged).toBe(true)
+      await types.write(false, '')
+      expect(types.treeChanged).toBe(false)
+      await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home page\np\n')
+      await types.write(false, '')
+      expect(types.treeChanged).toBe(false)
+      await Bun.write(join(root, 'src/routes/index.kay'), '---\nconst a = 1\n---\nh1 Home page\np {a}\n')
+      await types.write(false, '')
+      expect(types.treeChanged).toBe(true)
+    }
+    finally {
+      types.close()
+    }
+  }, 60_000)
+
   it('leaves no process of its group once closed mid-check', async () => {
     const { types, pid } = await midCheck()
 

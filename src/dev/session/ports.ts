@@ -9,7 +9,7 @@ export const MAX_CHANGED_FILES = 200
 export type Phase = 'starting' | 'running' | 'stopping'
 
 // What the process writing or checking the types answers the session with.
-export type TypesWorker = Pick<TypesProcess, 'configuredEntry' | 'problems' | 'loadedModules' | 'loaded' | 'write' | 'close'>
+export type TypesWorker = Pick<TypesProcess, 'configuredEntry' | 'treeChanged' | 'problems' | 'loadedModules' | 'loaded' | 'write' | 'close'>
 
 // The processes, the watcher and the scan the session drives, which a test replaces to drive its races without spawning any.
 export interface DevPorts {

@@ -93,6 +93,8 @@ export interface ShadowTypes {
   locales: string[]
   // What the run found the project serves, which the boot checks read again rather than scan.
   served: ServedProject
+  // Whether the run wrote, replaced or removed a file of the tree other than a component's shadow, whose `typeCode` says whether its types changed.
+  changed: boolean
 }
 
 // What the project serves, which links are checked against.
@@ -111,6 +113,8 @@ export interface ServedProject {
 // The shadow tree as one run writes it: what it did not write is left from an earlier one.
 interface ShadowTree {
   shadows: Map<string, ShadowFile>
+  // Whether a file other than a shadow was written, replaced or removed.
+  changed: boolean
   // At a path, or a name in the tree.
   write: (path: string, text: string) => Promise<void>
   shadow: (shadow: ShadowFile, path: string) => Promise<void>
@@ -187,26 +191,27 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.settings.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.settings.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served, changed: tree.changed }
 }
 
 function shadowTree(dir: string): ShadowTree {
   const shadows = new Map<string, ShadowFile>()
   const written = new Set<string>()
-  const write = async (path: string, text: string) => {
-    const file = resolve(dir, path)
-
-    written.add(file)
-
-    await writeIfChanged(file, text)
-  }
-
-  return {
+  const tree: ShadowTree = {
     shadows,
-    write,
+    changed: false,
+    write: async (path, text) => {
+      const file = resolve(dir, path)
+
+      written.add(file)
+
+      if (await writeIfChanged(file, text))
+        tree.changed = true
+    },
     shadow: async (shadow, path) => {
       shadows.set(path, shadow)
-      await write(path, shadow.tsx)
+      written.add(resolve(dir, path))
+      await writeIfChanged(resolve(dir, path), shadow.tsx)
     },
     link: async (path, target) => {
       const file = resolve(dir, path)
@@ -219,6 +224,7 @@ function shadowTree(dir: string): ShadowTree {
       }
       catch {}
 
+      tree.changed = true
       await rm(file, { recursive: true, force: true })
       await mkdir(dirname(file), { recursive: true })
       await symlink(target, file, 'dir')
@@ -228,9 +234,12 @@ function shadowTree(dir: string): ShadowTree {
       // A kept name is written by another step meanwhile, through a draft `writeAtomically` is about to move into place.
       const stale = [...files, ...links].filter(path => !written.has(path) && !kept.some(name => path === join(dir, name) || (path.startsWith(`${join(dir, name)}.`) && path.endsWith('.tmp'))))
 
+      tree.changed ||= stale.length > 0
       await Promise.all(stale.map(async path => rm(path)))
     },
   }
+
+  return tree
 }
 
 // The project's own components, each compiled with the lints its source sets.
@@ -466,6 +475,7 @@ function redirectChecks(root: string, options: CheckOptions, project: ServedProj
 
 interface ShadowEntry {
   tsx: string
+  typeCode?: string | undefined
   map: ReturnType<SourceMap['toJSON']>
   diagnostics: Diagnostic[]
   typesOnly?: boolean
@@ -532,11 +542,11 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
 
   // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.
   if (cached !== undefined && (typesOnly || cached.typesOnly !== true))
-    return { shadow: { source, file, tsx: cached.tsx, map: mapOf(cached) }, diagnostics: cached.diagnostics, queries, slots }
+    return { shadow: { source, file, tsx: cached.tsx, typeCode: cached.typeCode, map: mapOf(cached) }, diagnostics: cached.diagnostics, queries, slots }
 
   const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, typesOnly, signals, shadowOf })
 
-  const entry: ShadowEntry = { tsx: compiled.shadow.tsx, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
+  const entry: ShadowEntry = { tsx: compiled.shadow.tsx, typeCode: compiled.shadow.typeCode, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
 
   maps.set(entry, compiled.shadow.map)
   memory.set(slot.file, { key: slot.key, value: entry })

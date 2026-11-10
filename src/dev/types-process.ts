@@ -4,7 +4,7 @@ import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { CONFIG_FILE } from '../config'
-import { ANSWER, ENTRY, MODULES, PROBLEMS, WRITE } from './refuse'
+import { ANSWER, ENTRY, MODULES, PROBLEMS, TREE, WRITE } from './refuse'
 
 const TYPES = join(import.meta.dir, 'types.ts')
 // How long the process writing the types waits for the next edit before it exits, so a project left alone holds no memory for it.
@@ -22,6 +22,8 @@ export class TypesProcess {
   configuredEntry: string | undefined
   // The type errors the last `check` answered with, none before one did.
   problems: TypeProblem[] = []
+  // Whether the last write left the tree different from the one before; true when it did not say.
+  treeChanged = true
   // The project modules the running process loaded, as its last answer reported them.
   private modules: Set<string> | undefined
   // `env` is the environment the process starts with, which leaves out what the `.env` files hold so it reads them itself on every start.
@@ -107,6 +109,8 @@ export class TypesProcess {
 
     const child = this.child ?? this.spawn(refuse)
 
+    this.treeChanged = true
+
     try {
       await child.stdin.write(`${command}\n`)
       await child.stdin.flush()
@@ -122,6 +126,9 @@ export class TypesProcess {
 
         if (line.value.startsWith(PROBLEMS))
           this.problems = JSON.parse(line.value.slice(PROBLEMS.length)) as TypeProblem[]
+
+        if (line.value.startsWith(TREE))
+          this.treeChanged = line.value.slice(TREE.length) !== '0'
 
         if (line.value.startsWith(ENTRY))
           this.configuredEntry = line.value.slice(ENTRY.length)

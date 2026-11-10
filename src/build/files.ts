@@ -366,14 +366,16 @@ export async function readText(file: string): Promise<string | undefined> {
   }
 }
 
-export async function writeIfChanged(path: string, content: string) {
+export async function writeIfChanged(path: string, content: string): Promise<boolean> {
   const file = Bun.file(path)
 
   if (await file.exists() && await file.text() === content)
-    return
+    return false
 
   await mkdir(dirname(path), { recursive: true })
   await writeAtomically(path, content)
+
+  return true
 }
 
 // Written under a temporary name and moved into place, so a reader never sees `path` half written, nor one a crash cut short; the temporary file goes whenever it is not moved.

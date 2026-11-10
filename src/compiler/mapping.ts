@@ -34,6 +34,8 @@ export class CodeBuilder {
   code = ''
   readonly mappings: Mapping[] = []
   readonly ranges: RangeMapping[] = []
+  // The generated offsets where the template's static text starts and ends, in pairs.
+  private readonly texts: number[] = []
   private readonly bodyStarts: number[] = []
   private readonly moduleStarts: number[] = []
 
@@ -48,6 +50,31 @@ export class CodeBuilder {
     this.code += text
 
     return this
+  }
+
+  // Notes what `emit` generates as the template's static text, which no type reads.
+  addText(emit: () => void): this {
+    this.texts.push(this.code.length)
+    emit()
+    this.texts.push(this.code.length)
+
+    return this
+  }
+
+  // The generated code without the template's static text: what changes when a type can. Only a check reads it.
+  withoutText(check: boolean | undefined): string | undefined {
+    if (!check)
+      return undefined
+
+    let kept = ''
+    let at = 0
+
+    for (let index = 0; index < this.texts.length; index += 2) {
+      kept += this.code.slice(at, this.texts[index])
+      at = this.texts[index + 1]!
+    }
+
+    return kept + this.code.slice(at)
   }
 
   // The same code as `addSource`, mapped to nothing: for a copy of a span whose messages the mapped copy already carries.

@@ -974,10 +974,7 @@ export class JsxTemplate {
 
       const escaped = part.text.replace(JSX_TEXT_ESCAPES, text => `{${JSON.stringify(text)}}`)
 
-      if (escaped === this.text(part))
-        b.addSource(part)
-      else
-        b.wrap(part, () => b.add(escaped))
+      b.addText(() => escaped === this.text(part) ? b.addSource(part) : b.wrap(part, () => b.add(escaped)))
     }
   }
 

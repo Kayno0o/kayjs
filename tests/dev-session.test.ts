@@ -100,6 +100,8 @@ class FakeServer {
 
 class FakeTypes implements TypesWorker {
   configuredEntry: string | undefined
+  // Whether the next writes leave the tree different, which the real process answers.
+  treeChanged = true
   problems: TypeProblem[] = []
   // The errors each next answer reports, in turn.
   readonly answers: TypeProblem[][] = []
@@ -571,6 +573,71 @@ describe('kay dev\'s session', () => {
       await eventually(() => expect(told()).toEqual([[fresh]]))
       expect(dev.check.writes).toHaveLength(2)
       expect(dev.lines.filter(line => line.includes('types: 1 type error'))).toHaveLength(1)
+      await dev.stop()
+    })
+  })
+
+  describe('an edit leaving the shadow tree as it was', () => {
+    const quiet = async (files: Record<string, string>) => {
+      const dev = await session({ 'tsconfig.json': '{}', ...files })
+
+      await eventually(() => expect(dev.check.writes).toHaveLength(1))
+      dev.types.treeChanged = false
+
+      return dev
+    }
+
+    it('runs no type check for a .kay edit, and one for a tree that came out different', async () => {
+      const dev = await quiet({ 'src/a.kay': 'p a' })
+
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(dev.types.writes).toHaveLength(3))
+      await Bun.sleep(SETTLED_MS * 8)
+      expect(dev.check.writes).toHaveLength(1)
+      dev.types.treeChanged = true
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(dev.check.writes).toHaveLength(2))
+      await dev.stop()
+    })
+
+    it('still checks a code file, whose types the shadow tree does not hold', async () => {
+      const dev = await quiet({ 'src/a.kay': 'p a', 'src/helper.ts': 'export const a = 1' })
+
+      await dev.edit('src/helper.ts')
+      await eventually(() => expect(dev.check.writes).toHaveLength(2))
+      await dev.stop()
+    })
+
+    it('checks a .kay edit that changed no type when the file has errors, which may have moved', async () => {
+      const found = { file: 'src/a.kay', line: 3, column: 1, message: 'bad', report: '' }
+      const dev = await session({ 'tsconfig.json': '{}', 'src/a.kay': 'p a', 'src/b.kay': 'p b' }, ({ check }) => {
+        check.answers.push([found])
+      })
+
+      await eventually(() => expect(dev.check.writes).toHaveLength(1))
+      await eventually(() => expect(dev.lines.some(line => line.includes('type error'))).toBe(true))
+      dev.types.treeChanged = false
+      await dev.edit('src/b.kay')
+      await eventually(() => expect(dev.types.writes).toHaveLength(3))
+      await Bun.sleep(SETTLED_MS * 8)
+      expect(dev.check.writes).toHaveLength(1)
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(dev.check.writes).toHaveLength(2))
+      await dev.stop()
+    })
+
+    it('checks again for an edit during a check, which may have written the tree the write then finds', async () => {
+      let held: PromiseWithResolvers<number> | undefined
+      const dev = await session({ 'tsconfig.json': '{}', 'src/a.kay': 'p a' }, ({ check }) => {
+        held = check.hold('check')
+      })
+
+      await eventually(() => expect(dev.check.writes).toHaveLength(1))
+      dev.types.treeChanged = false
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(dev.types.writes).toHaveLength(3))
+      held!.resolve(0)
+      await eventually(() => expect(dev.check.writes).toHaveLength(2))
       await dev.stop()
     })
   })

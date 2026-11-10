@@ -203,6 +203,8 @@ The server starts as soon as the config is read. The editor types in `.kay/types
 
 It runs after the first start and after each change that can alter a type, a moment after the last save. The errors show at their `.kay` line in the dev tool's Problems tab, which updates without a reload, in [`.kay/dev/errors.json`](#errors-without-a-browser) as `type` errors, and in the terminal, which also says when they are fixed. A project with no `tsconfig.json` is not checked, and `--no-types` turns the check off.
 
+An edit to the text of a template alone, in a file with no type error, alters no type and runs no check.
+
 The terminal shows the address once, then one line per change, with how long it took.
 
 ```text

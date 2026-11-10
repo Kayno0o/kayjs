@@ -47,8 +47,10 @@ export class TypesController {
   // Writes the first tree, which waits for the first server to listen so the page comes first; the editors need it, the page does not.
   private firstTree: (() => void) | undefined
   private treeTimer: Timer | undefined
-  // A write of the tree started since the check began, which makes its answer old.
-  private checkStale = false
+  // How many writes changed what the check reads, which makes the answer of a check begun before the last one old.
+  private treeVersion = 0
+  // Whether the last edits left something the check reads: the first write, a code file or the config, a file with errors, or a tree whose types came out different. A `.kay` edit that changes no type, its static text say, leaves it unset and runs no check.
+  private checkNeeded = true
   private checkFresh = true
   private checkTimer: Timer | undefined
   private checkAgain = false
@@ -85,11 +87,12 @@ export class TypesController {
   }
 
   async write(): Promise<void> {
-    this.checkStale = true
     // Any write of the tree is the first one, so none is left waiting for a server.
     this.firstTree = undefined
     clearTimeout(this.treeTimer)
     this.again = true
+    // A check running reads the tree meanwhile, so it may have written what this write finds already there.
+    this.checkNeeded ||= this.checking !== undefined
     this.writing ??= (async () => {
       while (this.again) {
         this.again = false
@@ -98,6 +101,7 @@ export class TypesController {
         this.fresh = false
         this.refused ||= await regenerateTypes(this.root, { ...this.options, config: this.config }, this.options.refuseConfig === true && !this.started, this.process, fresh)
         this.started = true
+        this.checkNeeded ||= this.process.treeChanged
 
         if (this.editedWhileWriting.splice(0).some(file => this.process.loaded(file))) {
           this.fresh = true
@@ -105,7 +109,12 @@ export class TypesController {
         }
       }
 
-      this.scheduleCheck()
+      if (this.checkNeeded) {
+        this.checkNeeded = false
+        this.treeVersion++
+        this.scheduleCheck()
+      }
+
       this.writing = undefined
     })()
 
@@ -149,6 +158,7 @@ export class TypesController {
 
   async writeFresh(): Promise<void> {
     this.fresh = true
+    this.checkNeeded = true
 
     return this.write()
   }
@@ -157,6 +167,8 @@ export class TypesController {
   followEdit(files: string[]) {
     // A code file the process did not load is read from disk by the write, so only the others need a new process.
     this.fresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || this.process.loaded(file)))
+    // The types of a code file are not in the shadow tree, and an error in a file edited may have moved with it.
+    this.checkNeeded ||= files.length === 0 || files.some(file => !file.endsWith('.kay') || this.problems.some(problem => problem.file === file))
 
     // A write in flight may load a module this edit touched, which its answer reports: checked once it ends.
     if (this.writing !== undefined)
@@ -213,7 +225,8 @@ export class TypesController {
           while (this.checkAgain) {
             this.checkAgain = false
             await this.writing
-            this.checkStale = false
+
+            const version = this.treeVersion
 
             const fresh = this.checkFresh
 
@@ -224,8 +237,11 @@ export class TypesController {
             if (this.phase() === 'stopping')
               break
 
+            // A write in flight tells whether it changed what was checked.
+            await this.writing
+
             // A change came meanwhile, whose check follows and says what holds.
-            if (!this.checkStale && !this.checkAgain) {
+            if (version === this.treeVersion && !this.checkAgain) {
               if (code !== CHECK_SKIPPED) {
                 this.publish(this.checker.problems)
               }

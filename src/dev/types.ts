@@ -1,4 +1,5 @@
 import type { ProbeMemory } from '../check'
+import type { ShadowFile } from '../check/shadow'
 import type { KayConfig } from '../config'
 import type { TypeProblem } from './refuse'
 import { readFileSync, realpathSync } from 'node:fs'
@@ -9,7 +10,7 @@ import { check, configCheckOptions, formatCheckDiagnostic, writeShadowTypes } fr
 import { deriveToolOutputs } from '../check/tool-outputs'
 import { loadConfig } from '../config-loader'
 import { projectPaths } from '../project'
-import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE } from './refuse'
+import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE, TREE } from './refuse'
 
 // Writes the shadow tree of the project for `kay dev`, or types the project as `kay check` does, from the config as it is now, in a process of its own so `kay dev` holds no checker and every module the config imports is read again.
 // It stays up between writes: each line `kay dev` sends but `load` writes the tree once more with the config this process loaded, and the line it answers with is the exit code that write would have had.
@@ -35,6 +36,19 @@ async function currentConfig(quiet = false): Promise<{ config: KayConfig, refuse
 
     return { config: {}, refused: refuse === REFUSE }
   }
+}
+
+// What the shadows' code was at the last write, undefined before one, so a new process always says the tree changed.
+let mapped: string | undefined
+
+function fingerprint(shadows: Map<string, ShadowFile>): string {
+  const hash = new Bun.CryptoHasher('sha1')
+
+  // The shadows are made in parallel, so in no order of their own.
+  for (const [path, { tsx, typeCode }] of [...shadows].sort(([a], [b]) => a < b ? -1 : 1))
+    hash.update(path).update('\0').update(typeCode ?? tsx).update('\0')
+
+  return hash.digest('hex')
 }
 
 // The project's own modules the config and the writes loaded, which a change to needs a new process.
@@ -66,7 +80,12 @@ async function write(): Promise<number> {
 
     const named = entry === '' ? config.entry : entry
 
-    await writeShadowTypes(root!, { ...configCheckOptions(config), entry: named, typesOnly: true })
+    const tree = await writeShadowTypes(root!, { ...configCheckOptions(config), entry: named, typesOnly: true })
+    const print = fingerprint(tree.files)
+
+    // A shadow whose code differs only in the template's static text changes no type.
+    process.stdout.write(`\n${TREE}${Number(tree.changed || print !== mapped)}\n`)
+    mapped = print
 
     if (!refused)
       process.stdout.write(`\n${ENTRY}${projectPaths(root!, { ...config, entry: named }).entry}\n`)

@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
 - kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` ([charts](../packages/ui/llms/charts.md)).
 - kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` or a button when given `onMark` ([charts](../packages/ui/llms/charts.md)).
+- `kay dev` runs no type check after an edit that changes no type: the static text of a `.kay` template, in a file with no type error ([dev server](dev-server.md)).
 
 ## 1.94.0
 
