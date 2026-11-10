@@ -71,7 +71,7 @@ it('classifies what the docs call internal', () => {
   expect(isInternal('ui', './dnd', 'x')).toBe(false)
   expect(isInternal('cms', './room', 'watchRoom')).toBe(true)
   expect(isInternal('cms', './room', 'entryRoom')).toBe(false)
-  expect(isInternal('cms', './form', 'createEntryForm')).toBe(false)
+  expect(isInternal('cms', './form', 'cmsEntryForm')).toBe(false)
 })
 
 it('names only entries and exports that exist', () => {

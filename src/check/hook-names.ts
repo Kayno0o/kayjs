@@ -29,7 +29,7 @@ const HOOK_RENAMES: readonly HookRenames[] = [
   {
     library: 'kayjs-auth',
     from: source => source === '@kaynooo/kayjs-auth' || source.startsWith('@kaynooo/kayjs-auth/'),
-    calls: ['auth', 'authCore', 'createAuth'],
+    calls: ['auth', 'authCore'],
     hooksFile: 'src/auth.ts',
     renames: { onAuthEvent: 'onEvent', onDelete: 'beforeDelete' },
     // `beforeDelete` is cut off after 10 s, refuses on `false` and on a throw, where `onDelete` waited and propagated.
