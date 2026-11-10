@@ -206,7 +206,9 @@ In production, kay warns once at boot when the 404 log (the paths visitors found
 
 Name `sqliteData` or `pgData` in `store` for them to live in the store's database; a `data/not-found.sqlite` from before is moved into it at the next start. With `pgData` the 404 log is in the `kay_missing`, `kay_missing_referrers` and `kay_redirects` tables, shared by every replica.
 
-A store you name in `kay.config.ts` is used as it is. A worker hears what another one wrote within about half a second (a Postgres store tells the others at once), not always at once. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
+A store you name in `kay.config.ts` is used as it is. A worker hears what another one wrote within about half a second (a Postgres store tells the others at once), not always at once.
+
+The Postgres store calls `pg_notify` with every write, so a Postgres-compatible server that lacks it fails the writes: use a real Postgres, or stores of your own. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
 
 The process you start only supervises. A SIGTERM or Ctrl-C reaches every worker, and each one drains as a single server does. A worker that crashes is started again after a short wait, and if they keep dying at boot the whole group stops with exit code 1. Each worker takes about as much memory as one server, so count that before choosing the number. Set `KAY_SECRET` as you would for several replicas.
 

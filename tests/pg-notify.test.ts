@@ -7,9 +7,10 @@ import { Elysia } from 'elysia'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { memoryJobs, pgJobs, queue, shutdown } from '../src/server'
 import { pgCache } from '../src/server/pg-cache'
-import { createDataTables, pgHandle } from '../src/server/pg-data'
+import { createDataTables, pgData, pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
 import { hear } from '../src/server/pg-notify'
+import { disposeOwned } from '../src/server/reload'
 import { serverStarted, serverStopped } from '../src/server/serving'
 import { eventually } from './helpers/eventually'
 import { restoreClock, virtualClock } from './helpers/virtual-clock'
@@ -25,6 +26,13 @@ afterEach(() => {
 })
 
 let names = 0
+
+// How many backends of the test database sit in LISTEN.
+async function listening(sql: SQL): Promise<number> {
+  const rows = await sql<{ count: string }[]>`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid() AND state = 'idle' AND query LIKE 'LISTEN%'`
+
+  return Number(rows[0]!.count)
+}
 
 // A SQL that listens through `listen` and sends no notification of its own.
 function fake(listen: (channel: string, notify: (payload: string) => void, listened?: () => void) => Promise<{ unlisten: () => Promise<void> }>): SQL {
@@ -335,18 +343,81 @@ describe('a Postgres database that notifies', () => {
     const name = `closing-${++names}`
     const jobs = queue<number>(name, async () => undefined, { store: pgJobs(worker!) })
 
-    const listening = async (): Promise<number> => {
-      const rows = await sql<{ count: string }[]>`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid() AND state = 'idle' AND query LIKE 'LISTEN%'`
+    const app = new Elysia().use(jobs).listen(0)
 
-      return Number(rows[0]!.count)
+    await eventually(async () => expect(await listening(sql)).toBe(1))
+    await shutdown(app)
+    await eventually(async () => expect(await listening(sql)).toBe(0))
+  }, 15_000)
+
+  pgIt('releases its LISTEN connection when pgData is closed', async () => {
+    const { sql, url } = await postgres()
+    const data = pgData(url)
+
+    try {
+      await data.live.entries()
+      data.live.subscribe(() => undefined)
+      await eventually(async () => expect(await listening(sql)).toBe(1))
     }
+    finally {
+      await data.close()
+    }
+
+    await eventually(async () => expect(await listening(sql)).toBe(0))
+  }, 15_000)
+
+  pgIt('releases its LISTEN connection when a dev reload closes the pgJobs it opened from a URL', async () => {
+    const { sql, url } = await postgres()
+    const previous = process.env.KAY_DEV_CODE
+
+    process.env.KAY_DEV_CODE = '1'
+
+    try {
+      const subscription = await pgJobs(url).listen!(`reloaded-${++names}`, () => undefined)
+
+      await eventually(async () => expect(await listening(sql)).toBe(1))
+      await disposeOwned(new Set([import.meta.path]))
+      await eventually(async () => expect(await listening(sql)).toBe(0))
+      await subscription.stop()
+    }
+    finally {
+      if (previous === undefined)
+        delete process.env.KAY_DEV_CODE
+      else
+        process.env.KAY_DEV_CODE = previous
+    }
+  }, 15_000)
+
+  pgIt('opens no LISTEN for a lazy queue until it is activated, then starts it on a notification', async () => {
+    const { sql } = await postgres()
+    const [worker, producer] = replicas(2)
+    const name = `lazy-${++names}`
+    const ran = Promise.withResolvers<number>()
+
+    const jobs = queue<number>(name, async (payload) => {
+      ran.resolve(payload)
+    }, { store: pgJobs(worker!), lazy: true })
 
     const app = new Elysia().use(jobs).listen(0)
 
-    await eventually(async () => expect(await listening()).toBe(1))
-    await shutdown(app)
-    await eventually(async () => expect(await listening()).toBe(0))
-  }, 15_000)
+    try {
+      await Bun.sleep(300)
+      expect(await listening(sql)).toBe(0)
+      jobs.activate()
+      await eventually(async () => expect(await listening(sql)).toBe(1))
+      // Past the looks at 1 s and 3 s the next is at 7 s: only a notification starts it sooner.
+      await Bun.sleep(3500)
+
+      const added = performance.now()
+
+      await pgJobs(producer!).add({ id: crypto.randomUUID(), queue: name, payload: stringify(9), attempts: 0, runAt: Date.now() })
+      expect(await ran.promise).toBe(9)
+      expect(performance.now() - added).toBeLessThan(1000)
+    }
+    finally {
+      await shutdown(app)
+    }
+  }, 20_000)
 
   pgIt('lets a live value set in one process reach another in a quiet stretch with its timers stopped', async () => {
     const { sql } = await postgres()
