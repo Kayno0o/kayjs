@@ -13,9 +13,6 @@ Their lints (`deprecated-library-names`, `deprecated-escape-option`) go with the
 - kayjs-mail: `createMailSuppressionTable` is `createMailSuppressionTables` and `mailListTables` is `mailListTableNames`, both of `@kaynooo/kayjs-mail/pg`.
 - kay: `PgJobsSource` of `kay/server` is `PgSource`.
 
-## 1.94.0
-## 1.95.0
-
 ### A component is an island by what it says, and every name is imported
 
 The three forms that 1.92 deprecated are gone, with their lints (`promoted-island`, `island-comment` and `implicit-import`). `kay upgrade` from 1.92 or later has already moved an app off them; one that stayed on them changes by hand.
