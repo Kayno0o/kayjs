@@ -26,6 +26,6 @@ main
   article#line-events
     LineChart(label="Visits" labels={['x', 'y']} series={[{ name: 'Visits', values: [3, 5] }]} marks={[{ at: 'y', title: 'Deployed' }, { at: 'nope', title: 'Lost' }]})
   article#mark-buttons
-    BarChart(label="Backups" labels={['Mon', 'Tue']} series={[{ name: 'Minutes', values: [4, 2] }]} marks={[{ at: 'Mon', title: 'Pressable' }, { at: 'Tue', title: 'Linked', href: '/c' }]} onMark={() => {}})
+    BarChart(label="Backups" labels={['Mon', 'Tue']} series={[{ name: 'Minutes', values: [4, 2] }]} marks={[{ at: 'Mon', title: 'Pressable' }, { at: 'Tue', title: 'Linked', href: '/c' }]} onMark={() => undefined})
   article#mark-plain
     BarChart(label="Backups" labels={['Mon']} series={[{ name: 'Minutes', values: [4] }]} marks={[{ at: 'Mon', title: 'Plain' }]})
