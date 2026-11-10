@@ -521,7 +521,7 @@ const default: { description: string; extension: { import: string; expression: s
 
 [./entry-actions.kay] default
 component default
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>>
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>>
   form: EntryForm
 
 [./entry-body.kay] default
@@ -532,7 +532,7 @@ component default
 component default
   collection: ScreenCollection
   copy?: PairedEntry | undefined
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>> | undefined
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>> | undefined
   entry?: StoredEntry | undefined
   locale?: string | undefined
   prefix: string
@@ -576,7 +576,7 @@ component default
 [./entry-table.kay] default
 component default
   collection: ScreenCollection
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>>
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>>
   prefix: string
   rows: EntryRow[]
   searched: boolean
@@ -646,7 +646,7 @@ function cmsEntryForm({
   prefix, collection, entry, locale, copy, source, denied, review: reviewed
 }: {
   review?: ReviewView | undefined;
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>> | undefined;
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>> | undefined;
   prefix: string;
   collection: ScreenCollection;
   entry?: (() => StoredEntry | undefined) | StoredEntry | undefined;
@@ -662,7 +662,7 @@ interface EntryForm extends FormScope
   canSave: () => boolean
   clearEnd: () => Promise<void>
   collection: ScreenCollection
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>> | undefined
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>> | undefined
   dirty: () => boolean
   drafts: {
   open(entry: CmsDraftEntry, version?: string | undefined): void;
@@ -738,7 +738,7 @@ interface EntryForm extends FormScope
 [./form] FormScope
 interface FormScope
   collection: ScreenCollection
-  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>> | undefined
+  denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>> | undefined
   drafts: {
   open(entry: CmsDraftEntry, version?: string | undefined): void;
   entry(ref: EntryRef): CmsDraftEntry | undefined;

@@ -35,7 +35,7 @@ function formScope(drafts: {
   failure: () => string | undefined;
   rendering: () => boolean;
   pending: () => boolean;
-}, entry: EntryRef, collection: ScreenCollection, problem?: string | undefined, source?: PairedEntry | undefined, denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "upload", string>> | undefined): FormScope
+}, entry: EntryRef, collection: ScreenCollection, problem?: string | undefined, source?: PairedEntry | undefined, denied?: Partial<Record<"delete" | "edit" | "move" | "publish" | "redirects" | "review" | "site" | "upload", string>> | undefined): FormScope
 
 [./room] editorsOf
 function editorsOf(others: readonly CmsMember[], count: number, own: CmsMember): { names: string[]; unnamed: number; }
