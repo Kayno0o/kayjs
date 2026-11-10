@@ -10,6 +10,7 @@ export function lasting(api: string, named: (...args: never[]) => unknown, start
   if (!getOwner())
     warnUnowned(api, named)
 
+  const outer = getOwner()
   const stop = root((dispose) => {
     start()
 
@@ -18,10 +19,18 @@ export function lasting(api: string, named: (...args: never[]) => unknown, start
       onCleanup(() => signal.removeEventListener('abort', dispose))
     }
 
-    return dispose
+    return () => {
+      dispose()
+
+      // The island's list of cleanups lets go of this stop, so a helper started and stopped in a loop holds nothing.
+      const at = outer?.cleanups?.indexOf(stop) ?? -1
+
+      if (at >= 0)
+        outer!.cleanups!.splice(at, 1)
+    }
   })
 
-  if (getOwner())
+  if (outer)
     onCleanup(stop)
 
   return stop

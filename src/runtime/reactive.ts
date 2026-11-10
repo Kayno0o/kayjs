@@ -525,6 +525,9 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
   }
 }
 
+// Whether a page is being rendered on the server, where no effect runs.
+export const serverRenders = (): boolean => typeof KAY_BROWSER === 'undefined' && serverRendering > 0
+
 // Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
 // kept: free
 // A function `fn` returns runs as its cleanup, as one passed to `onCleanup` does.
@@ -546,11 +549,6 @@ export function createEffect(fn: () => void, api: string, named: (...args: never
   enqueue(node)
 }
 
-// Whether a page is being rendered on the server, where no effect runs.
-export function serverRenders(): boolean {
-  return typeof KAY_BROWSER === 'undefined' && serverRendering > 0
-}
-
 // Runs `fn` now, then again whenever what it read changes: what the DOM bindings islands build run on.
 export function renderEffect(fn: () => void): void {
   const node = computation(fn, 'render', false)
@@ -564,10 +562,12 @@ export function onMount(fn: () => void): void {
   createEffect(() => untrack(fn), 'onMount', fn)
 }
 
-// Runs when the computation or root it is registered in runs again or goes away.
+// Runs when the computation or root it is registered in runs again or goes away, at once when that already went away.
 // kept: free
 export function onCleanup(fn: () => void): void {
-  if (owner)
+  if (owner?.state === DISPOSED)
+    fn()
+  else if (owner)
     (owner.cleanups ??= []).push(fn)
   else if (process.env.NODE_ENV !== 'production' && serverRendering === 0)
     warnOnce(`onCleanup() ran with no owner (at module scope, after an await or in a timer), so its function is dropped and never runs. Call it in a component's script or an effect, or inside root().\n${sourceStart(fn)}`)

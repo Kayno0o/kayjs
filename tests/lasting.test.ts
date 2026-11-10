@@ -280,6 +280,44 @@ describe('the handle of a helper that lasts as long as an island', () => {
     expect(seen).toEqual([1])
   })
 
+  it('watch: an onCleanup its callback registers after stopping itself runs at once', () => {
+    const [read, write] = reactive.createSignal(0)
+    const cleaned = mock(() => undefined)
+    let stop: () => void = () => undefined
+
+    island(() => {
+      stop = core.watch(read, () => {
+        stop()
+        reactive.onCleanup(cleaned)
+      })
+    })
+    write(1)
+    reactive.flush()
+    expect(cleaned).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stopped helper leaves no cleanup behind in the island that started it', () => {
+    let owner: { cleanups: unknown[] | undefined } | undefined
+
+    island(() => {
+      owner = reactive.getOwner()
+
+      const before = owner!.cleanups?.length ?? 0
+
+      for (let round = 0; round < 50; round++)
+        core.every('1s', () => undefined, { background: true })()
+
+      expect(owner!.cleanups?.length ?? 0).toBe(before)
+
+      const kept = core.every('1s', () => undefined, { background: true })
+
+      expect(owner!.cleanups!.length).toBe(before + 1)
+      kept()
+      kept()
+      expect(owner!.cleanups!.length).toBe(before)
+    })
+  })
+
   it('starts nothing while the server renders', () => {
     const abort = new AbortController()
     const add = mock(abort.signal.addEventListener.bind(abort.signal))
