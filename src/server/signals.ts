@@ -1,4 +1,5 @@
 import type { RequestContext } from '../runtime'
+import type { ErrorData } from '../runtime/core'
 import { leavesSite } from '../runtime/base'
 import { localizedLink } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
@@ -62,7 +63,7 @@ export class NotFound {}
 export class Denied {
   readonly message: string
 
-  constructor(readonly status: number, message?: string) {
+  constructor(readonly status: number, message?: string, readonly data?: ErrorData) {
     this.message = message ?? nodeHttp().STATUS_CODES[status] ?? 'Denied'
   }
 }
@@ -78,8 +79,8 @@ export function stoppers(request: Request): Pick<RequestContext, 'redirect' | 'n
     notFound: () => {
       throw new NotFound()
     },
-    deny: (code = 403, message) => {
-      throw new Denied(code, message)
+    deny: (code = 403, message, data) => {
+      throw new Denied(code, message, data)
     },
   }
 }

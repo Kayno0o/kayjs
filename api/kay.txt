@@ -25,7 +25,7 @@ interface Action<Input, Output, Honeypot extends string = never>
 [.] ActionContext
 interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined) => never
+  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
   guard: Guarded
   headers: Headers
@@ -227,7 +227,7 @@ type CallResult<Data, Failed> = | { ok: true, data: Data, error?: undefined } | 
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   card: { title: string; image?: string | undefined; name?: string | undefined; }
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined) => never
+  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
   guard: object
   headers: Headers
   locale: string
@@ -352,10 +352,13 @@ interface EndpointSettings
   query?: TSchema
   rateLimit?: RateLimit | RateLimit[] | undefined
 
+[.] ErrorData
+type ErrorData = Register extends { errorData: infer Data } ? Data : unknown
+
 [.] ErrorPageContext
 interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined) => never
+  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
   error: PageError
   guard: object
   headers: Headers
@@ -735,7 +738,7 @@ function optimistic(change: () => void): { undo: () => void; keep: () => void; }
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined) => never
+  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
   guard: Guarded
   headers: Headers
   locale: string
@@ -755,6 +758,7 @@ type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<L
 
 [.] PageError
 interface PageError
+  data?: unknown
   message: string
   stack?: string | undefined
   status: number
@@ -1011,7 +1015,7 @@ interface Register
 [.] RequestContext
 interface RequestContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
-  deny: (status?: number | undefined, message?: string | undefined) => never
+  deny: (status?: number | undefined, message?: string | undefined, data?: unknown) => never
   guard: Guarded
   headers: Headers
   locale: string

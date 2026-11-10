@@ -4,7 +4,7 @@ import type { CookieDeleteOptions } from '../server/cookies'
 import type { CorsOptions } from '../server/cors'
 import type { RateLimit } from './action-shared'
 import type { ByteSize } from './byte-size'
-import type { Deferred, Locals, Redirect, RouteParams } from './checks'
+import type { Deferred, Locals, Redirect, Register, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
@@ -303,9 +303,12 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   redirect: Redirect
   // Stops with a 404, rendering the nearest `_error.kay` for a page.
   notFound: () => never
-  // Ends with that status, 403 unless given, rendering the nearest `_error.kay` with `message` for a page.
-  deny: (status?: number, message?: string) => never
+  // Ends with that status, 403 unless given, rendering the nearest `_<status>.kay` (`_401.kay`, `_403.kay`, `_429.kay`, `_503.kay`), else `_error.kay`, with `message` and `data` for a page: the page reads them as `ctx.error`.
+  deny: (status?: number, message?: string, data?: ErrorData) => never
 }
+
+// What `ctx.deny` hands the error page as `ctx.error.data`: the `errorData` an app sets in `Register`, `unknown` otherwise.
+export type ErrorData = Register extends { errorData: infer Data } ? Data : unknown
 
 // `ctx.once`.
 export type Once = <T>(key: string, load: () => T) => Promise<Awaited<T>>
@@ -334,6 +337,8 @@ export interface PageError {
   status: number
   // The thrown error's message in development; production shows a generic one and logs the real error.
   message: string
+  // What `ctx.deny(status, message, data)` handed over, such as the plan a 403 asks for; its type is the app's `errorData` in `Register`, `unknown` unless it says.
+  data?: ErrorData | undefined
   // Development only.
   stack?: string | undefined
 }

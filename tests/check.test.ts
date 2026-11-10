@@ -2853,6 +2853,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types ctx.error.data of a status page by the app\'s errorData, and what ctx.deny hands it', async () => {
+    const root = await scratchProject({
+      'src/errors.ts': 'declare module \'kay\' {\n  interface Register {\n    errorData: { plan: string }\n  }\n}\n\nexport {}\n',
+      'src/routes/_403.kay': '--- server\nconst plan: string | undefined = ctx.error.data?.plan\nconst nope: number = ctx.error.data?.plan\n---\np {plan} {nope}\n',
+      'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n\nctx.deny(403, \'Upgrade\', { plan: \'pro\' })\nctx.deny(403, \'Upgrade\', { plan: 1 })\n---\np x\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [d.file.slice(root.length + 1), d.line])
+
+      expect(found.sort()).toEqual([['src/routes/_403.kay', 3], ['src/routes/index.kay', 5]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets a link whose start or end is interpolated match any page it may reach', async () => {
     const root = await scratchProject({
       'src/routes/about.kay': 'p about\n',

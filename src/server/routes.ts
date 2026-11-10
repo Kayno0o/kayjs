@@ -6,6 +6,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
+import { STATUS_PAGES, statusPageFile } from '../compiler/status-pages'
 import { TRAILING_SLASH } from '../runtime/base'
 import { reachOver } from './reach'
 
@@ -34,7 +35,7 @@ export function styleChains(routes: Route[]): string[][] {
     chains.push(routeChain(route).files)
 
     for (const special of [route.special, ...route.guards.map(guard => guard.special)]) {
-      for (const page of [special.notFound, special.error]) {
+      for (const page of specialFiles(special)) {
         if (page !== undefined)
           chains.push([...page.layouts, page.file], [page.file])
       }
@@ -123,10 +124,12 @@ export interface RouteMount {
   root?: string | undefined
 }
 
-// The nearest `_404.kay` and `_error.kay` up the directory tree.
+// The nearest `_404.kay`, `_error.kay` and status page (`_401.kay`, `_403.kay`, `_429.kay`, `_503.kay`) up the directory tree.
 export interface SpecialPages {
   notFound?: SpecialPage | undefined
   error?: SpecialPage | undefined
+  // The pages of one status, which take it before `error`.
+  statuses?: Partial<Record<number, SpecialPage>> | undefined
   // The routes directory's own `_card.kay`, which draws the share card in place of kay's fixed layout; only the fallback holds it, as no URL asks for it.
   card?: SpecialPage | undefined
 }
@@ -688,7 +691,13 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
   return {
     notFound: special.notFound && { ...special.notFound, layouts: [] },
     error: special.error && { ...special.error, layouts: [] },
+    ...special.statuses && { statuses: Object.fromEntries(Object.entries(special.statuses).map(([status, page]) => [status, page && { ...page, layouts: [] }])) },
   }
+}
+
+// Every page a failure may render: the 404 page, the error page and the status pages.
+export function specialFiles(special: SpecialPages): (SpecialPage | undefined)[] {
+  return [special.notFound, special.error, ...Object.values(special.statuses ?? {})]
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
@@ -718,7 +727,13 @@ function specialPagesIn(trees: RouteMount[], at: string, read: LayoutsRead): Spe
     return undefined
   }
 
-  return { notFound: nearest(NOT_FOUND), error: nearest(ERROR) }
+  const statuses = Object.fromEntries(STATUS_PAGES.flatMap((status) => {
+    const page = nearest(statusPageFile(status))
+
+    return page === undefined ? [] : [[status, page]]
+  }))
+
+  return { notFound: nearest(NOT_FOUND), error: nearest(ERROR), ...Object.keys(statuses).length > 0 && { statuses } }
 }
 
 // The app's routes, then each library's laid over them, as the lookups above walk them.

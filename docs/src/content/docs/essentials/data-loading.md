@@ -102,7 +102,7 @@ if (post.private && !ctx.locals.user.admin)
 h1 {post.title}
 ```
 
-`notFound()` renders the nearest `_404.kay`. `deny()` renders `_error.kay` with that status and message.
+`notFound()` renders the nearest `_404.kay`. `deny()` renders the page of that status, `_403.kay` for a 403, else `_error.kay`, with that status and message, and the `data` it was given as `ctx.error.data`.
 
 All three throw. At the top of a page they are statements. In a guard or an action you `return` them.
 

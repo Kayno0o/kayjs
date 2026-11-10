@@ -26,6 +26,7 @@ import { patternNames } from './pattern-names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
+import { STATUS_PAGE_FILES } from './status-pages'
 import { outerReads, templateWords } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { unownedEffects } from './unowned-effects'
@@ -121,7 +122,13 @@ const CARD_PAGE = '_card.kay'
 const LAYOUT = '_layout.kay'
 
 // Rendered by the server around or instead of a page, never inside an island.
-export const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE, CARD_PAGE])
+export const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE, CARD_PAGE, ...STATUS_PAGE_FILES])
+
+// `_error.kay` and the status pages, whose `ctx` carries the error they render.
+function isErrorPage(name: string): boolean {
+  return name === ERROR_PAGE || STATUS_PAGE_FILES.has(name)
+}
+
 const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
@@ -270,7 +277,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const pin = file.pin
   const rawCause = island === undefined ? undefined : islandCause(file, script) ?? liveCause(file, script, live)
   const cause = realCause(rawCause, expansion, original)
-  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {

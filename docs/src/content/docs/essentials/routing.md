@@ -158,7 +158,7 @@ A method the file does not export answers 405, and `export const page = { query,
 
 ## Not found and errors
 
-`_404.kay` renders for `ctx.notFound()` and for every URL no page serves. `_error.kay` renders when a page throws, and reads `ctx.error`. `_card.kay` is not an error page: it lays out the [share card](/essentials/head-and-seo#lay-the-card-out-yourself).
+`_404.kay` renders for `ctx.notFound()` and for every URL no page serves. `_error.kay` renders when a page throws, and reads `ctx.error`; `_401.kay`, `_403.kay`, `_429.kay` and `_503.kay` take over for a `ctx.deny` of that status ([status pages](/structure/error#a-page-for-one-status)). `_card.kay` is not an error page: it lays out the [share card](/essentials/head-and-seo#lay-the-card-out-yourself).
 
 ```kay
 --- server

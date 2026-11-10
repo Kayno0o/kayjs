@@ -16,7 +16,7 @@ import { publicEnvFiles, publicEnvModules, publicInFenceMessage } from '../serve
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
-import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
+import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialFiles, specialPagesOf } from '../server/routes'
 import { readToolOutputs } from '../server/tool-outputs'
 import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
 import { pageDirs } from './page-dirs'
@@ -238,7 +238,7 @@ export async function serverParts(project: Project) {
 function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
   const files = new Set<string>()
   const addSpecial = (special: SpecialPages) => {
-    for (const page of [special.notFound, special.error, special.card]) {
+    for (const page of [...specialFiles(special), special.card]) {
       if (page) {
         for (const file of [...page.layouts, page.file])
           files.add(file)

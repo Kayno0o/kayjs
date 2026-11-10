@@ -76,7 +76,7 @@ h1 Todo {id}
 `RequestContext` from `kay` is what a page, a layout, a guard (`GuardContext`), an endpoint (`EndpointContext`) and an action (`ActionContext`) all read, the same in each:
 
 - `request`, `url`, `locale`, `params`, `cookies`, `locals` and `headers`, read as in a page.
-- `redirect(location, status?)`, `notFound()` and `deny(status?, message?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
+- `redirect(location, status?)`, `notFound()` and `deny(status?, message?, data?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
 - `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](guards.md)).
@@ -190,6 +190,7 @@ Pages live in `src/routes/`:
 | `_actions.kay` | A server fence of actions and no template, served behind the guards of its directory and above, which pages and components import by path; see [Actions](actions.md#declaring-an-action). |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
+| `_401.kay`, `_403.kay`, `_429.kay`, `_503.kay` | Rendered with that status for a `ctx.deny` of it in their directory and below, before `_error.kay`, nearest directory first as `_404.kay`; every other status stays `_error.kay`'s. `kay check` reports one in a directory with no route. |
 | `_card.kay` | Only in the routes directory: lays out the 1200x630 share card `shareCard()` links, reading `ctx.card`; see [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself). |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](guards.md). |
 
@@ -267,7 +268,7 @@ The fence's `ctx`:
 - `ctx.cookies`, a `Bun.CookieMap`: `ctx.cookies.get('theme')`; what `set` and `delete` change is sent back, redirects included; what `set` writes is `HttpOnly`, `SameSite=Lax`, `Secure` over https and the `base` as `Path` unless `security: { cookies: false }` ([cookie defaults](server.md#sessions))
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response. A page rendered per request behind any guard, or whose loads or render read the session, `ctx.cookies`, a cookie `persisted` signal or how a form post went, goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN never hands one visitor's page to another, redirects included, unless `ctx.headers` sets a `cache-control` of its own; what an `await` block reads once the page started streaming comes too late to count
-- `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
+- `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_<status>.kay` or `_error.kay` with that status and message, and `data` as `ctx.error.data`
 - They throw and return `never`: `return` it in a function, a guard, an endpoint or an action handler, which a call through a contextually typed `ctx` needs for TypeScript to narrow what follows, and write a plain statement at the top of a page or layout fence; `redirect` answers 302 to a read and 303 to a post unless given a status
 - `ctx.redirect` to a path of a page puts on what a link to it has, in a guard, a page, an action and an endpoint alike: `base`, the page's locale (`/deferred` on an English page is `/en/deferred`, one already under a prefix is not prefixed twice) and the `trailingSlash` spelling (`/deferred/` under `always`, `/deferred` under `never`, as written under `ignore`), so the answer is one response with no slash redirect after it; the query and the hash go along, and a path with an extension, an endpoint's, an API route's, a public file's, an extension's or kay's own, a `.`-segment path and a full URL stay as written. It goes to any full http(s) URL, but a path a browser reads as another host (`//other.example/`, `/\other.example`) is a server error. A `?next=` param goes through `localPath(value, fallback)` from `kay`, which gives `value` when it is a path of this site and `fallback` otherwise: `ctx.redirect(localPath(ctx.query.next, '/account'))`. The path comes back resolved; a backslash, a control character, a path that leaves the site once decoded at any depth (`/%2F/evil.example`, `/%252F/evil.example`) or a malformed escape gives `fallback`.
   - `https://evil.example`, `//evil.example`, `/\evil.example` and a value that is no string all fall back.
@@ -283,7 +284,7 @@ The fence's `ctx`:
 #### Special pages
 
 - The nearest special page wins, wrapped by the layouts of its own directory.
-- `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`.
+- `_error.kay` and the status pages read `ctx.error`: `status`, `message`, the `data` of the `ctx.deny` that ended the page (`ctx.deny(403, 'Upgrade', { plan: 'pro' })`, typed `unknown` unless the app sets `errorData` in `Register`: `declare module 'kay' { interface Register { errorData: { plan: string } } }`) and, in development only, `stack`.
 - Logged and displayed stacks point at `.kay` lines.
 - In production the message is generic and the real error goes to `console.error`.
 - Without an `_error.kay` the response is plain text, and development shows an error page with the stack instead, its frames opening in the editor under `kay dev`.

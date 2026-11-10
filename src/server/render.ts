@@ -925,7 +925,7 @@ function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   if (error instanceof RequestTimeoutError)
     return { status: 504, message: dev ? error.message : 'Gateway Timeout' }
 
-  return error instanceof Denied ? { status: error.status, message: error.message } : describeError(error, dev)
+  return error instanceof Denied ? { status: error.status, message: error.message, ...error.data !== undefined && { data: error.data } } : describeError(error, dev)
 }
 
 // The error page is answered whatever the clock said: it stops, and `ctx.signal` follows only the client leaving, so a fetch of a layout is not cut by the timeout that brought the page here.
@@ -955,7 +955,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 
   // A page that found no entry because its end date passed answers that it is gone for good.
   const pageError: PageError = notFound && askedForEndedEntry() ? { status: 410, message: 'Gone' } : pageErrorOf(error, options.dev)
-  const page = (notFound || (denied && error.status === 404) ? special.notFound : undefined) ?? special.error
+  const page = (notFound || (denied && error.status === 404) ? special.notFound : special.statuses?.[pageError.status]) ?? special.error
 
   rendering.status = pageError.status
   ;(rendering.ctx as ErrorPageContext).error = pageError

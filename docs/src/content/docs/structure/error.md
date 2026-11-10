@@ -5,7 +5,7 @@ description: The page shown when a load or a render throws.
 path: src/routes/_error.kay
 ---
 
-`_error.kay` renders with status 500 when a load or a render throws in its folder and below, and for a 404 with no [`_404.kay`](/structure/not-found). `ctx.deny(403, 'Members only')` renders it too, with that status and message. It reads `ctx.error`.
+`_error.kay` renders with status 500 when a load or a render throws in its folder and below, and for a 404 with no [`_404.kay`](/structure/not-found). `ctx.deny(403, 'Members only')` renders it too, with that status and message, unless a [status page](#a-page-for-one-status) of that status exists. It reads `ctx.error`.
 
 ```kay
 --- server
@@ -15,12 +15,26 @@ h1 Error {status}
 p {message}
 ```
 
-`ctx.error` holds `status`, `message` and, in development only, `stack`. In production the message is generic and the real error goes to `console.error`.
+`ctx.error` holds `status`, `message`, the `data` a `ctx.deny` handed over and, in development only, `stack`. In production the message is generic and the real error goes to `console.error`.
 
 Without an `_error.kay` the response is plain text, and development shows an error page with the stack instead.
 
 The nearest `_error.kay` wins, wrapped by the layouts of its own folder. Each error kay logs also goes to the `observe.onError` option of [`kay.config.ts`](/structure/kay-config). Use it to send errors to an error tracker. It also gets an error a scheduled, background or queued job (once out of attempts) or an `onStop` hook throws, with no request, and an error an island meets in the browser, as a `BrowserError` whose stack points at your `.kay` files in production.
 
 kay waits 10 seconds at most for `onError` after a job or an `onStop` hook, so a tracker that hangs holds neither a queue worker nor a shutdown. An error a hook threw also carries a `source` naming it, such as `cms.onSave`.
+
+## A page for one status
+
+`_401.kay`, `_403.kay`, `_429.kay` and `_503.kay` render for `ctx.deny` with that status, in their folder and below, before `_error.kay`. The nearest one wins, as `_404.kay` does, and every other status keeps `_error.kay`. They read `ctx.error` like it, so a 403 page can say what it asks for:
+
+```kay
+--- server
+// _403.kay, rendered by ctx.deny(403, 'Members only', { plan: 'pro' })
+const plan = ctx.error.data?.plan
+---
+h1 Upgrade to {plan}
+```
+
+`data` is `unknown` until the app names its type: `declare module 'kay' { interface Register { errorData: { plan: string } } }`. `kay check` reports a status page in a folder with no route, as nothing renders it.
 
 <ReadMore href="/essentials/routing#not-found-and-errors">Not found and error pages in the routing guide.</ReadMore>
