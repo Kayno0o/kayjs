@@ -1,6 +1,33 @@
 # MCP endpoint
 
-The reference for `mcp` in `kay.config.ts`; the first steps are in [API routes](api-routes.md#let-an-agent-call-the-app).
+The reference for `mcp` in `kay.config.ts`; the first steps, `mcp: true` and a tool per action, are in [API routes](api-routes.md#let-an-agent-call-the-app).
+
+## Common tasks
+
+### Tell an agent how the tools fit together
+
+Guidance spanning several tools goes in `instructions`, which a client shows its model before any tool description:
+
+```ts
+// kay.config.ts
+export default defineConfig({
+  mcp: { instructions: 'Read French screen text through temtem_resolve first; box entries are addressed by the id temtem_box answers.' },
+})
+```
+
+### Test the endpoint as an agent
+
+```ts
+import { testSite } from 'kay/test'
+
+const site = await testSite()
+
+expect((await site.mcp.initialize()).instructions).toContain('temtem_resolve')
+expect((await site.mcp.tools()).map(tool => tool.name)).toContain('add_note')
+expect(await site.mcp.call('add_note', { title: 'Milk' })).toMatchObject({ isError: false })
+```
+
+## Reference
 
 - `mcp: true` serves Streamable HTTP at `/mcp`, or at `mcp: { path: '/tools' }` under the same rules as the OpenAPI paths, its sign-in metadata then at `/.well-known/oauth-protected-resource/tools`: one JSON-RPC message per `POST`, answered with JSON, `initialize`, `ping`, `tools/list` and `tools/call` only, no resources or prompts. `GET` and `DELETE` answer 405, a notification 202.
 - `mcp: { rateLimit: 60 }` caps the requests one client may send the endpoint a minute, 120 by default, `false` for none, counted in `store.rates` where the app has one so replicas share it; one past it answers 429 with `Retry-After` and `Too many requests; try again in N s`, as an API module does. A call also meets the limits of the action or route it runs.
