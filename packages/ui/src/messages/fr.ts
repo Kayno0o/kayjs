@@ -36,7 +36,7 @@ export default defineMessages({
       previous: 'Diapositive précédente',
       slide: 'Diapositive {n} sur {count}',
     },
-    chipGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
+    chipGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', required: 'Choisissez-en au moins un', retry: 'Réessayer' },
     combobox: {
       create: 'Créer « {text} »',
       empty: 'Aucune correspondance',

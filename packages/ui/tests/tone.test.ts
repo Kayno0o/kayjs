@@ -10,7 +10,7 @@ const TONE_FIELD = /^\s*(?:tones?|cells)\??:(.*)$/
 const STRING = /'[^']*'|"[^"]*"|`[^`]*`/g
 const RECIPE_TONE = /\btone: \{/
 // The part names of a tone group that colours several parts, as Stat's `{ value: 'text-accent' }`.
-const SPELLED_ELSEWHERE = new Set(['value', 'delta', 'root', 'icon', 'label'])
+const SPELLED_ELSEWHERE = new Set(['value', 'delta', 'root', 'icon', 'label', 'bar'])
 
 // tone.ts holds the union itself and sparkline.ts its deprecated alias.
 const files = [...new Glob('*.{kay,ts}').scanSync(SRC)].filter(file => file !== 'tone.ts' && file !== 'sparkline.ts').toSorted()

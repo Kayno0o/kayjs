@@ -41,7 +41,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.bellInbox.*`: `announce` (`New notification: {title}`, announced when one arrives)
 - `ui.breadcrumb.*`: `more` (`Show the hidden pages`, names the button on a phone that lists the crumbs the trail folds)
 - `ui.carousel.*`: `dot` (`Go to slide {n}`), `empty` (`No slides.`), `label` (`Carousel`), `next` (`Next slide`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous slide`), `slide` (`Slide {n} of {count}`)
-- `ui.chipGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `retry` (`Try again`)
+- `ui.chipGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `required` (`Pick at least one`, said when a required group has none picked), `retry` (`Try again`)
 - `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `empty` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recent` (`Recent`), `results` (`{count} results, `1 result` for one`), `search` (`Found`), `searchError` (`The search failed`), `siteSearchError` (`The pages could not be searched`), `siteSearch` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
 - `ui.confirmDelete.*`: `cancel` (`Cancel`), `confirm` (`Confirm`), `delete` (`Delete`), `failure` (`Could not delete.`), `pending` (`Deleting…`), `title` (`Confirm Deletion`)
