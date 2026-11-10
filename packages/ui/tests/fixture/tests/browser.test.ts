@@ -528,6 +528,41 @@ inBrowser('LineChart tooltip', () => {
   }, 120_000)
 })
 
+inBrowser('LineChart events', () => {
+  test('draws a rule per event on its label, links the ones with an href as a tab stop beside the slider, and shows their titles in the tooltip', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-tooltip')
+    await page.waitFor('#events [data-part="event"]')
+
+    const drawn = await page.evaluate(() => {
+      const plot = document.querySelector('#events .kui-line-chart-plot')!.getBoundingClientRect()
+      const events = [...document.querySelectorAll<HTMLElement>('#events [data-part="event"]')].map(item => ({ link: item.tagName === 'A', title: item.getAttribute('aria-label'), x: item.getBoundingClientRect().left + item.getBoundingClientRect().width / 2, tabindex: item.tabIndex, href: item.getAttribute('href') }))
+
+      return { events, left: plot.left, width: plot.width }
+    }) as { events: { link: boolean, title: string | null, x: number, tabindex: number, href: string | null }[], left: number, width: number }
+
+    // Three events fall on a label (the unknown label and the far index are left out); `b` and index 2 sit at a third and two thirds across, and the two on `b` stand apart.
+    expect(drawn.events).toHaveLength(3)
+    expect(drawn.events[0]).toMatchObject({ link: true, title: 'nginx reloaded', tabindex: 0, href: '/changes/1' })
+    expect(drawn.events[1]!.x).toBeGreaterThan(drawn.events[0]!.x + 4)
+    expect(drawn.events[2]!.x).toBeGreaterThan(drawn.events[0]!.x + 20)
+
+    // The slider keeps the arrows: the keyboard on the point `b` shows both titles.
+    await page.evaluate(() => {
+      const slider = document.querySelector<HTMLElement>('#events [role="slider"]')!
+
+      slider.focus()
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    })
+    await page.waitFor('#events [data-part="tooltipEvent"]')
+    expect(await page.evaluate(() => [...document.querySelectorAll('#events [data-part="tooltipEvent"]')].map(item => item.textContent))).toEqual(['nginx reloaded', 'cert renewed'])
+    expect(await page.evaluate(() => document.querySelector('#events [role="slider"]')!.getAttribute('aria-valuetext'))).toContain('nginx reloaded; cert renewed')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart stacked', () => {
   test('draws each line on the ones below, reads each series\' own value with a total row, and starts the axis at 0', async () => {
     const site = await shared()

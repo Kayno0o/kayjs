@@ -97,7 +97,7 @@ export default defineMessages({
       cropText: '{w} sur {h} pixels en {x}, {y}',
       error: 'L\'image n\'a pas pu être chargée.',
     },
-    lineChart: { empty: 'Aucune donnée pour le moment.', rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne', total: 'Total' },
+    lineChart: { empty: 'Aucune donnée pour le moment.', events: 'Événements', rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne', total: 'Total' },
     loadMore: { failure: 'Impossible d\'en charger davantage.', loaded: { one: '{count} de plus chargé', other: '{count} de plus chargés' }, loading: 'Chargement…', more: 'Charger plus', retry: 'Réessayer' },
     markdownEditor: {
       bold: 'Gras',

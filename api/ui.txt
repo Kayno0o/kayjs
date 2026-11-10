@@ -829,6 +829,10 @@ component default
   tick?: string | undefined;
   columns?: string | undefined;
   column?: string | undefined;
+  events?: string | undefined;
+  eventCell?: string | undefined;
+  event?: string | undefined;
+  eventRule?: string | undefined;
   tooltip?: string | undefined;
   axis?: string | undefined;
   axisLabel?: string | undefined;
@@ -844,6 +848,7 @@ component default
   label: string
   labels: string[]
   legend?: boolean | undefined
+  marks?: ChartEvent[] | undefined
   newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
@@ -1721,6 +1726,8 @@ component default
   plot?: string | undefined;
   cursor?: string | undefined;
   dot?: string | undefined;
+  event?: string | undefined;
+  eventRule?: string | undefined;
   band?: string | undefined;
   overlay?: string | undefined;
   empty?: string | undefined;
@@ -1730,6 +1737,7 @@ component default
   swatch?: string | undefined;
   tooltipName?: string | undefined;
   tooltipValue?: string | undefined;
+  tooltipEvent?: string | undefined;
   data?: string | undefined;
   hint?: string | undefined;
   legend?: string | undefined;
@@ -1738,12 +1746,14 @@ component default
 }
   empty?: Element
   emptyLabel?: string | undefined
+  eventsLabel?: string | undefined
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   formatValue?: ((value: number) => string) | undefined
   href?: ((mark: ChartMark) => string | undefined) | undefined
   label: string
   labels: string[]
   legend?: boolean | undefined
+  marks?: ChartEvent[] | undefined
   newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined

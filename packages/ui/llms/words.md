@@ -57,7 +57,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.formDialog.*`: `cancel` (`Cancel`), `failure` (`Could not save.`), `saving` (`Saving…`)
 - `ui.iconPicker.*`: `clear` (`Clear icon selection`), `empty` (`No icons found.`), `error` (`The icons could not be loaded.`), `grid` (`Icons`), `more` (`Show more`), `placeholder` (`Search icons…`), `search` (`Search icons`), `searching` (`Searching…`)
 - `ui.imageCropper.*`: `crop` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`), `error` (`The image could not be loaded.`)
-- `ui.lineChart.*`: `empty` (`No data yet.`), `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`), `total` (`Total`)
+- `ui.lineChart.*`: `empty` (`No data yet.`), `events` (`Events`), `rangeHint` (`Shift with the arrow keys picks a span, Enter applies it, Escape drops it`), `total` (`Total`)
 - `ui.loadMore.*`: `failure` (`Could not load more.`), `loaded` (`{count} more loaded`, announced after a page), `loading` (`Loading more…`), `more` (`Load more`, the `button` form), `retry` (`Try again`)
 - `ui.markdownEditor.*`: `bold` (`Bold`), `bulletList` (`Bulleted list`), `heading` (`Heading`), `image` (`Image`), `italic` (`Italic`), `keysHint` (`Tab indents a list item; Escape then Tab leaves the field.`), `link` (`Link`), `numberedList` (`Numbered list`), `placeholder` (`Write markdown…`), `preview` (`Preview`), `previewFailure` (`The preview could not be shown`), `toolbarFailure` (`The toolbar could not be loaded`), `toolbar` (`Formatting`), `uploadFailure` (`Could not upload the image`)
 - `ui.mediaGallery.*`: `close` (`Close`), `empty` (`No media.`), `item` (`Media {n}`), `next` (`Next`), `open` (`Open full size`), `previous` (`Previous`)

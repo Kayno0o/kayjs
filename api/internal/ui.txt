@@ -597,6 +597,13 @@ function activeMarks(options: {
   leave: (index: number) => void;
 }
 
+[./lib/chart-marks] ChartEvent
+interface ChartEvent
+  at: number | string
+  color?: string | undefined
+  href?: string | undefined
+  title: string
+
 [./lib/chart-marks] ChartMark
 interface ChartMark
   index: number
@@ -606,11 +613,26 @@ interface ChartMark
 [./lib/chart-marks] chartTooltip
 function chartTooltip(): { place(at: { clientX: number; clientY: number; }): string; watch(element: HTMLElement): void; stop(): void; }
 
+[./lib/chart-marks] EVENT_LOOK
+const EVENT_LOOK: {
+  readonly event: "pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center outline-none data-[kind=link]:pointer-events-auto data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground";
+  readonly eventRule: "h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]";
+}
+
 [./lib/chart-marks] markKind
 function markKind(href: string | undefined, selectable: boolean): MarkKind
 
 [./lib/chart-marks] MarkKind
 type MarkKind = 'link' | 'button' | 'image'
+
+[./lib/chart-marks] PlacedEvent
+interface PlacedEvent
+  event: ChartEvent
+  index: number
+  slot: number
+
+[./lib/chart-marks] placeEvents
+function placeEvents(events: readonly ChartEvent[] | undefined, labels: readonly string[]): PlacedEvent[]
 
 [./lib/chart-marks] SparkMark
 interface SparkMark

@@ -97,3 +97,47 @@ export function chartTooltip() {
     },
   }
 }
+
+// An event an app marks on the x axis of a chart with one place per label, such as a change applied between two readings: drawn as a vertical rule at `at`, a label or an index into `labels`, with `title` under the pointer and read to screen readers, and a link when it has an `href`.
+export interface ChartEvent {
+  at: string | number
+  title: string
+  href?: string | undefined
+  // The rule's colour, else `--event-color` or the warning tone.
+  color?: string | undefined
+}
+
+// An event placed on its label: where it falls and, among the events on the same label, which one in line it is, so they stay side by side.
+export interface PlacedEvent {
+  event: ChartEvent
+  index: number
+  slot: number
+}
+
+const numbered = (at: number, count: number) => Number.isInteger(at) && at >= 0 && at < count ? at : -1
+
+// The events that fall on a label, in the order given; one whose `at` is no label or no index of `labels` is left out.
+export function placeEvents(events: readonly ChartEvent[] | undefined, labels: readonly string[]): PlacedEvent[] {
+  const taken = new Map<number, number>()
+  const placed: PlacedEvent[] = []
+
+  for (const event of events ?? []) {
+    const index = typeof event.at === 'number' ? numbered(event.at, labels.length) : labels.indexOf(event.at)
+
+    if (index < 0)
+      continue
+
+    const slot = taken.get(index) ?? 0
+
+    taken.set(index, slot + 1)
+    placed.push({ event, index, slot })
+  }
+
+  return placed
+}
+
+// The look of an event's rule and its hit area, shared by every chart that draws them: the area is the width of a pointer, the rule a dashed line in its middle.
+export const EVENT_LOOK = {
+  event: 'pointer-events-none absolute flex w-2 -translate-x-1/2 justify-center outline-none data-[kind=link]:pointer-events-auto data-[kind=link]:cursor-pointer data-[kind=link]:no-underline focus-visible:outline-2 focus-visible:outline-foreground',
+  eventRule: 'h-full border-l border-dashed border-[var(--event-color,var(--color-warning))]',
+} as const

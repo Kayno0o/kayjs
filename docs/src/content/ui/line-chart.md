@@ -48,6 +48,14 @@ Give the chart a signal or a store and it updates in place on each change. The S
 
 `label` names the chart. Screen readers read every value from a table only they see, one row per label and one column per series (and a total column when stacked), so a series of thousands of points renders as many rows. The plot is one stop in the tab order: the arrows walk the points, Home and End reach either end, chords such as Alt with an arrow stay the browser's, and each step shows the tooltip and announces the point's label and readings.
 
+## Marking events
+
+`marks` draws an event on the x axis, such as a change applied between two readings, so a spike of errors can be read against it: `marks={[{ at: '2026-10-21', title: 'nginx reloaded', href: '/changes/42' }]}`.
+
+`at` is a label or an index into `labels`, and the rule is dashed in the warning tone, or in `color` when the mark has one. Its `title` shows in the tooltip at that point and is read by screen readers, in the table as an extra `Events` column (`eventsLabel` renames it) and in the slider's reading.
+
+With an `href` the rule is a link, so a middle click or a new tab works, and a tab stop of its own: the plot's slider keeps its arrows. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
+
 ## Data and axes
 
 `labels` is the x-axis labels, one per point of every series. `xLabels` draws them under the plot, up to five, spaced by time when every label is a date. `options` is merged over the chart's defaults, for what the props do not cover.
@@ -56,4 +64,4 @@ Give the chart a signal or a store and it updates in place on each change. The S
 
 `href` answers the address a point goes to, from `{ index, label, values }`, or `undefined` for none. A click without a drag on it, or Enter, follows it, in a new tab when it leaves the site; `onSelect`, when given, hears the press in its place, as on the other charts.
 
-`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActive` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no `href` or tooltip block yet.
+`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActive` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no tooltip block yet.

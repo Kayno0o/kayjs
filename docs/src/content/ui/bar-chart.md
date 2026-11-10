@@ -34,6 +34,10 @@ The columns are one tab stop on the latest one, the arrows walking the others an
 
 With no labels, the chart reads `emptyLabel` instead, `No data yet.` by default.
 
+## Marking events
+
+`marks` takes the same events as LineChart's: `marks={[{ at: 'Tue', title: 'Schedule changed', href: '/changes/42' }]}` draws a dashed rule over the column at `at` (a label or an index into `labels`), its `title` joining that column's tooltip and what screen readers read. With an `href` the rule is a link and a tab stop beside the columns. An `at` that is no label is left out, and several on one column stand side by side.
+
 ## Pressing and linking
 
 `onSelect` makes every column a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActive` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.

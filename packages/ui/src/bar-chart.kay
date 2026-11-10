@@ -2,11 +2,11 @@
 import type { JSX, Snippet } from 'kay'
 import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
-import type { ChartMark } from './chart-marks'
+import type { ChartEvent, ChartMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
 import { tabOf } from './outside'
 import type { NewTab } from './outside'
-import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
+import { activeMarks, chartTooltip, EVENT_LOOK, markKind, placeEvents, TOOLTIP_LOOK } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, steppedPoint, valueTicks } from './plot'
 import { wording } from 'kay/words'
@@ -22,6 +22,11 @@ const look = recipe({
     columns: 'absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-lit:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
+    // The events sit over the columns in cells of the same widths, each rule in the middle of its column.
+    events: 'pointer-events-none absolute inset-0 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
+    eventCell: 'relative min-w-0 flex-1',
+    event: `${EVENT_LOOK.event} inset-y-0 left-1/2`,
+    eventRule: EVENT_LOOK.eventRule,
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'ml-10 flex gap-[min(var(--bar-gap,0.25rem),calc(40%/var(--bar-gaps)))]',
     // The first and the last label line up with the plot's edges, so a label wider than its slot spills inward and not out of the figure.
@@ -33,7 +38,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, empty, onSelect, href, newTab, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, marks: events, emptyLabel, empty, onSelect, href, newTab, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -48,6 +53,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   totalLabel?: string | undefined
   // Names each series under the chart; shown by default once there is more than one.
   legend?: boolean | undefined
+  // Events marked on the x axis, such as a change applied between two readings: a dashed rule over the column at `at` (a label, or an index into `labels`), its `title` in that column's tooltip and in what screen readers read, and a link to `href` when given, a tab stop of its own beside the columns. An `at` that is no label is left out, and several on one label stand side by side.
+  marks?: ChartEvent[] | undefined
   // Makes every column a button handing back its label, index and each series' value there; with `href` too, a column that has an address stays a link.
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   // The address a column links to, or `undefined` for none: a middle click, a new tab or a crawler finds it, and a plain click goes through `onSelect` when the app gave one.
@@ -89,9 +96,14 @@ const reading = (item: BarSeries, at: number) => {
 }
 
 // What a bar column reads on hover and focus, and to screen readers: the label, each series' reading and the notes the series carry for it.
+const placed = memo(() => placeEvents(events, labels))
+
+// Side by side with the events on the same column, each a pointer's width further along.
+const eventStyle = (event: ChartEvent, slot: number) => `margin-left: ${slot * 0.5}rem${event.color ? `; --event-color: ${event.color}` : ''}`
+
 const summaries = memo(() => labels.map((_, at) => {
   const total = stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
-  const notes = series.map(item => item.notes?.[at]).filter(Boolean)
+  const notes = [...series.map(item => item.notes?.[at]), ...placed().filter(item => item.index === at).map(item => item.event.title)].filter(Boolean)
 
   return `${headingTexts()[at]}: ${[...series.map(item => `${item.name} ${reading(item, at)}`), ...total].join(', ')}${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`
 }))
@@ -174,6 +186,17 @@ else
           else
             span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
+      if placed().length > 0
+        div(part="events" style={gaps()} aria-hidden={placed().some(item => item.event.href) ? undefined : 'true'})
+          for _, at of labels key={at}
+            span(part="eventCell")
+              for item of placed().filter(entry => entry.index === at) key={item.slot}
+                if item.event.href
+                  a(part="event" {...tabOf(item.event.href, newTab)} href={item.event.href} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item.event, item.slot)})
+                    span(part="eventRule")
+                else
+                  span(part="event" aria-hidden="true" style={eventStyle(item.event, item.slot)})
+                    span(part="eventRule")
     if tooltip && marks.current() !== null && marks.anchor()
       div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}

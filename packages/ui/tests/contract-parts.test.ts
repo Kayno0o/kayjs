@@ -14,7 +14,7 @@ const NATIVE_CHILDREN = new Set(['slot', 'option', 'datalist', 'track', 'script'
 // Structure that is hidden or only layout, by file and tag with how many there are: the data table a chart keeps for screen readers, a date grid's head and body, a Table's spacer and empty rows and a toast's message in its live region.
 const STRUCTURE: Record<string, Record<string, number>> = {
   'date-input.kay': { thead: 1, tbody: 1 },
-  'line-chart.kay': { table: 1, caption: 1, thead: 1, tbody: 1, tr: 2, th: 3, td: 3 },
+  'line-chart.kay': { table: 1, caption: 1, thead: 1, tbody: 1, tr: 2, th: 4, td: 4 },
   'table.kay': { tr: 2, td: 2 },
   'toaster.kay': { span: 4 },
 }

@@ -837,6 +837,23 @@ describe('charts', () => {
     expect(await page('no-bars')).toMatch(/^<p class="kui-bar-chart-empty [^"]*kui-bar-chart [^"]*" data-part="root">No runs<\/p>$/)
   })
 
+  test('BarChart marks events with a rule over their column, a link when they have an href, side by side on one column, leaving out one that is on no label, and reads them with the column', async () => {
+    const bars = await page('bar-events')
+    const events = bars.match(/<(?:a|span) [^>]*data-part="event"[^>]*>/g) ?? []
+
+    expect(events).toHaveLength(3)
+    expect(events[0]).toMatch(/^<a data-part="event" href="\/changes\/2" data-kind="link" aria-label="Schedule changed" data-tooltip="Schedule changed" style="margin-left: 0rem"/)
+    expect(events[1]).toMatch(/aria-hidden="true" style="margin-left: 0.5rem"/)
+    expect(events[2]).toMatch(/style="margin-left: 0rem; --event-color: red"/)
+    expect([...bars.matchAll(/data-part="column" role="img" tabindex="-?\d" aria-label="([^"]+)"/g)].map(match => match[1])).toEqual(['Mon: Minutes 4', 'Tue: Minutes 2; Schedule changed; Disk added', 'Wed: Minutes 8; Retention'])
+    expect([...bars.matchAll(/data-part="eventCell">/g)]).toHaveLength(3)
+  })
+
+  test('LineChart reads its events in the table beside the values, leaving out one that is on no label', async () => {
+    expect((await find('/charts', '#line-events thead th, #line-events tbody td')).map(found => found.text)).toEqual(['Visits', 'Events', '3', '', '5', 'Deployed'])
+    expect(await attributes('/charts', '#line-events [role="slider"]', ['aria-valuetext'])).toEqual([{ 'aria-valuetext': 'y: Visits 5; Deployed' }])
+  })
+
   test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
     const cells = [...graph.matchAll(/<span class="[^"]*" data-part="cell" role="img" tabindex="-?\d" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
