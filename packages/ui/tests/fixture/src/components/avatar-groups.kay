@@ -18,6 +18,7 @@ AvatarGroup#popover(avatars={people} max={2} size="sm" label="Team" onOpenChange
 AvatarGroup#linked(avatars={people} max={3} moreHref="/team" moreLabel={count => `See ${count} more`})
 AvatarGroup#fractional(avatars={people} max={2.7})
 AvatarGroup#nan(avatars={people} max={Number.NaN})
+AvatarGroup#twins(avatars={[{ key: 1, name: 'Ada' }, { key: 2, name: 'Ada' }]} max={5})
 AvatarGroup#under(avatars={people} max={9})
 AvatarGroup#exact(avatars={people} max={5})
 AvatarGroup#custom(avatars={people} max={1})

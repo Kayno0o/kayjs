@@ -112,6 +112,12 @@ describe('AvatarGroup max', () => {
     expect(root.querySelector('#nan [data-part=count]')!.textContent).toBe('+5')
   })
 
+  test('draws two people of one name when each has a key', async () => {
+    const root = await groups()
+
+    expect(root.querySelectorAll('#twins > .kui-avatar')).toHaveLength(2)
+  })
+
   test('overlaps the avatars and the chip, not the status line', async () => {
     const root = await groups()
 

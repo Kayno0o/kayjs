@@ -4,7 +4,7 @@ description: A row of overlapping avatars with a +N chip for the people past a l
 
 <Demo name="avatar-group/basic" />
 
-`avatars` is a list of `{ name, src, label, href, status }`, the props of an Avatar. `max` (4 by default) is how many are drawn; when more are given, a `+N` chip takes the rest and opens a popover listing them, a person with an `href` being a link. `label` names the group for screen readers, and every avatar is named by its `label`, else its name. `size` sets the size of every avatar and of the chip.
+`avatars` is a list of `{ name, src, label, href, status }`, the props of an Avatar. `max` (4 by default) is how many are drawn; when more are given, a `+N` chip takes the rest and opens a popover listing them, a person with an `href` being a link. `label` names the group for screen readers, and every avatar is named by its `label`, else its name. `size` sets the size of every avatar and of the chip. Two people with the same name need a `key` each, which tells their avatars apart.
 
 ## A chip that is a link
 

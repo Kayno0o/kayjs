@@ -13,7 +13,7 @@ const look = recipe({
     image: 'size-full object-cover',
     // Its colours are set inline, seeded by the name.
     initial: 'grid size-full place-items-center text-xs [font-weight:var(--font-weight-semibold)] uppercase',
-    // A dot inside the circle's corner, ringed in its own tone. Online, away and busy are filled, offline is hollow, so the four differ by more than a colour.
+    // The tones are the theme's success, warning, danger and muted, held at 4.5:1 on every ground by tests/theme.test.ts, above the 3:1 a graphic needs. A dot inside the circle's corner, ringed in its own tone. Online, away and busy are filled, offline is hollow, so the four differ by more than a colour.
     status: 'absolute right-[8%] bottom-[8%] size-[30%] rounded-[calc(infinity*1px)] border-solid bg-[var(--_status-color)] [border-color:var(--_status-color)] [border-width:var(--border-width)] data-[presence=online]:[--_status-color:var(--color-success)] data-[presence=away]:[--_status-color:var(--color-warning)] data-[presence=busy]:[--_status-color:var(--color-danger)] data-[presence=offline]:[--_status-color:var(--color-muted)] data-[presence=offline]:bg-surface-strong',
   },
   variants: { size: { xs: { root: 'size-5' }, sm: { root: 'size-6' }, md: '', lg: { root: 'size-12', initial: 'text-base' }, xl: { root: 'size-20', initial: 'text-2xl' } } },

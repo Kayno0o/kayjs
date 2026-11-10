@@ -79,6 +79,7 @@ snippet chip()
       span(part="count" aria-hidden="true") +{hidden().length}
 
 div(part="root" {...rest} role={label ? 'group' : undefined} aria-label={label} aria-busy={source.loading() ? 'true' : undefined})
+  // Workaround for #3229: a `key` cannot read the loop's index, so it is the person's `key`, else the name.
   for entry of shown() key={entry.key ?? entry.name}
     {person(entry, false)}
   if source.loading()
