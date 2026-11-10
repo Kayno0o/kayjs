@@ -23,6 +23,15 @@ export type FieldSize = 'sm' | 'md' | 'lg'
 // The look a TextInput, a Textarea and a Select draw their box with, less its padding and type, which FIELD_BOX and FIELD_SELECT_BOX add; `aria-invalid` turns the line and the focus ring to the danger colour. 'kui-field-input' is the field's name for an app's CSS and the skins, and the hook of the rule that gives the raw controls of a FormField this look. The focus outline doubles the accent border, so focus reads by more than a colour change.
 export const FIELD_LOOK = 'kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]'
 
+// The icon a text box draws inside itself at its start: the `field` wrapping box and icon, and the `icon`. Both start at the box's own padding, scaled by density.
+export const FIELD_ICON = {
+  field: 'relative inline-flex min-w-0 items-center',
+  icon: 'pointer-events-none absolute start-[calc(var(--spacing)*2.5*var(--density))] size-4 shrink-0 text-muted',
+}
+
+// The start padding that makes room for the icon, written important as the size rules set the padding at the same weight.
+export const FIELD_ICON_PAD = 'data-icon:ps-[calc(var(--spacing)*8.5*var(--density))]!'
+
 // What a `size` of `sm` or `lg` changes on a box: the padding, the type and the three variables theme.css builds `--_field-height` from, which a select and a button beside it read. Medium is the base. The numbers are the ones of the `.kui-field-input` size rules in theme.css, for the controls drawn by that class alone, a test holds them together. Written out, as Tailwind reads class names from the source.
 export const FIELD_SIZES = 'data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]'
 

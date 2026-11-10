@@ -886,6 +886,10 @@ component default
   conversation?: string | undefined;
   renameField?: string | undefined | {
     root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
   };
   deleteConfirm?: string | undefined;
   confirm?: string | undefined;

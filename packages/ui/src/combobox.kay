@@ -1,6 +1,6 @@
 --- <Value extends string>
 import type { FieldSize } from './field-look'
-import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
+import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
@@ -9,12 +9,16 @@ import { enabledIndex, exactOption, matchingOptions, offersCreate } from './comb
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
 import { labelText } from './label-text'
+import Icon from './icon.kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
 
 // 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
 const look = recipe({
   parts: {
     root: 'kui-combobox relative inline-flex min-w-0 flex-col',
-    input: 'kui-field-input',
+    input: `kui-field-input min-w-0 flex-1 ${FIELD_ICON_PAD}`,
+    ...FIELD_ICON,
     list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-1 text-sm text-foreground [&[hidden]]:hidden',
     option: 'cursor-pointer px-2 py-1.5 hover:bg-hover aria-selected:bg-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-picked:font-medium data-picked:text-accent',
     optionLabel: 'block',
@@ -24,11 +28,13 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
+const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Drawn inside the input at its start, the text beginning after it, and hidden from screen readers: the `icon` part, inside a `field` part around the input.
+  icon?: IconSlot | IconProps | undefined
   // The listbox's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // A list, filtered as the visitor types, a promise of one, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
@@ -356,28 +362,32 @@ const ref = startRef<HTMLInputElement>((element) => {
 }, rest.ref)
 ---
 div(part="root")
-  input(
-    part="input"
-    {...rest}
-    data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
-    ref={ref}
-    type="text"
-    role="combobox"
-    autocomplete="off"
-    name={carried() ? undefined : name}
-    value={text()}
-    disabled={disabled}
-    list={!remote && !enhanced() ? `${listId}-native` : undefined}
-    aria-label={label}
-    aria-expanded={shown() ? 'true' : 'false'}
-    aria-controls={listId}
-    aria-autocomplete="list"
-    aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
-    onInput={event => type(event.currentTarget.value)}
-    onKeyDown={keyDown}
-    onFocusIn={focusIn}
-    onFocusOut={focusOut}
-  )
+  span(part="field")
+    if icon
+      Icon(icon={icon} part="icon")
+    input(
+      part="input"
+      data-icon={icon ? '' : undefined}
+      {...rest}
+      data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
+      ref={ref}
+      type="text"
+      role="combobox"
+      autocomplete="off"
+      name={carried() ? undefined : name}
+      value={text()}
+      disabled={disabled}
+      list={!remote && !enhanced() ? `${listId}-native` : undefined}
+      aria-label={label}
+      aria-expanded={shown() ? 'true' : 'false'}
+      aria-controls={listId}
+      aria-autocomplete="list"
+      aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
+      onInput={event => type(event.currentTarget.value)}
+      onKeyDown={keyDown}
+      onFocusIn={focusIn}
+      onFocusOut={focusOut}
+    )
   if name && carried() as option
     input(type="hidden" name={name} value={option.value} disabled={disabled})
   if !remote

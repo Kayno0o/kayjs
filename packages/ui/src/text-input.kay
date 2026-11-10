@@ -1,20 +1,25 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
-import { FIELD_BOX, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import { FIELD_BOX, FIELD_ICON, FIELD_ICON_PAD, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { postedValue, recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
+import Icon from './icon.kay'
 
 type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'size'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
+  // Drawn inside the box at its start, the text beginning after it, and hidden from screen readers. A `type="search"` box draws the `search` icon on its own; `false` leaves it out. The icon is the `icon` part, and the box sits in a `field` part only while one is drawn.
+  icon?: IconSlot | IconProps | false | undefined
 }
 
 const look = recipe({
-  parts: { root: `${FIELD_LOOK} ${FIELD_BOX}` },
+  parts: { root: `${FIELD_LOOK} ${FIELD_BOX} ${FIELD_ICON_PAD}`, ...FIELD_ICON },
 })
 
 type AsText = Field & {
@@ -34,7 +39,7 @@ type AsNumber = Field & {
   onChange?: ((value: number | null) => unknown) | undefined
 }
 
-const { size = 'md', invalid, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
+const { size = 'md', invalid, icon, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
 
 // A field with no callback is plain: a refused post of its form, which the server renders it for, gives its value back in place of its own, a password excepted.
 const sent = onInput || onChange || type === 'password' ? undefined : postedValue(rest.name, value)
@@ -43,6 +48,9 @@ let box: HTMLInputElement | undefined
 
 // A number box mid-word, `1,` before its last digit, reports the empty string, which would read as a cleared field: nothing is taken off it until it parses.
 const halfTyped = (input: HTMLInputElement) => input.validity.badInput
+
+// A search box carries the magnifier unless the app passes its own icon or `false`.
+const drawn = () => icon === undefined ? (type === 'search' ? 'search' as const : undefined) : icon || undefined
 
 const spelled = (next: number | string | null) => next === null ? '' : String(next)
 
@@ -89,4 +97,9 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Ele
   onBlur?.(event)
 }
 ---
-input({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} type={type} value={sent ?? untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+if drawn()
+  span(part="field")
+    Icon(icon={drawn()!} part="icon")
+    input(part="root" {...rest} data-icon data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} type={type} value={sent ?? untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+else
+  input(part="root" {...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} type={type} value={sent ?? untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

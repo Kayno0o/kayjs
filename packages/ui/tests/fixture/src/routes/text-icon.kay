@@ -1,0 +1,13 @@
+---
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import '../app.css'
+---
+main
+  TextInput#plain(aria-label="Plain")
+  TextInput#search(type="search" aria-label="Search")
+  TextInput#bare(type="search" icon={false} aria-label="Bare")
+  TextInput#own(icon="globe" aria-label="Own")
+  TextInput#sized(type="search" size="sm" class={{ root: 'w-full', icon: 'text-accent' }} aria-label="Sized")
+  Combobox(icon="search" label="Pick" options={[{ value: 'a', label: 'A' }]})
+  Combobox(label="Nopick" options={[{ value: 'a', label: 'A' }]})

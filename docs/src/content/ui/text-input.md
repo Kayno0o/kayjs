@@ -13,6 +13,12 @@ description: A text field that reports each keystroke and the committed value.
 <Demo name="text-input/types" />
 
 
+## Icon
+
+`icon` draws an icon inside the box at its start. The text begins after it, and screen readers skip it. A `type="search"` box draws the search icon on its own, and `icon={false}` leaves it out. Pass an icon slot name or an imported icon, as a Button takes one; the `icon` part restyles it. Combobox takes `icon` too.
+
+<Demo name="text-input/icon" />
+
 ## Size and invalid
 
 `size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

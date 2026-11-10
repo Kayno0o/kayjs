@@ -1,0 +1,14 @@
+---
+import { signal } from 'kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+const query = signal('')
+---
+.max-w-sm
+  TextInput(
+    type="search"
+    value={query()}
+    onInput={query.set}
+    placeholder="Search"
+    aria-label="Search"
+  )

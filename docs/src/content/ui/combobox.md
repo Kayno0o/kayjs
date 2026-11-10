@@ -8,6 +8,8 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 A label typed whole, with no row chosen, counts as a pick of that option once the input loses focus or Enter is pressed. That Enter only adopts the option, so a form around the input is not submitted by it; the next Enter submits.
 
+`icon` draws an icon inside the input at its start, as a TextInput does.
+
 ## Options loaded as the visitor types
 
 Give `options` a function or a promise instead of a list. A function is called with `{ q }` a moment after the last key, once `minLength` characters (one by default) are typed, and answers the options. An action or an API call wrapped in a function fits; only the latest answer is shown, so a slow answer to an older question never replaces a newer one. A failed call says `failureLabel` in the status line and the list stays closed.

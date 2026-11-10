@@ -10,6 +10,12 @@ const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 [./field-look] FIELD_BOX
 const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
 
+[./field-look] FIELD_ICON
+const FIELD_ICON: { field: string; icon: string; }
+
+[./field-look] FIELD_ICON_PAD
+const FIELD_ICON_PAD: "data-icon:ps-[calc(var(--spacing)*8.5*var(--density))]!"
+
 [./field-look] FIELD_LOOK
 const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"
 
@@ -1012,6 +1018,12 @@ const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 
 [./lib/field-look] FIELD_BOX
 const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
+
+[./lib/field-look] FIELD_ICON
+const FIELD_ICON: { field: string; icon: string; }
+
+[./lib/field-look] FIELD_ICON_PAD
+const FIELD_ICON_PAD: "data-icon:ps-[calc(var(--spacing)*8.5*var(--density))]!"
 
 [./lib/field-look] FIELD_LOOK
 const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"

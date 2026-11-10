@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The space skin's `starfield` draws its dots on a fixed `::before` layer instead of a fixed background, so a long page no longer repaints the viewport on every scroll frame; an app styling `.starfield::before` should know ([setup](../packages/ui/llms/setup.md)).
 - Dialog, SidePanel and FormDialog take `autosave` for fields that save as they are typed: typing no longer locks the close, so a click outside and Escape close the overlay as before anything was typed, and `dirty` still locks it ([kayjs-ui basics](../packages/ui/llms/basics.md)).
 - `RowsField` takes `rowIssues`, a function of the row's place or a record, marking only that row's boxes invalid with its message under the row, and a `@cell` block keeps its control and focus while its row is edited, reading `row` where it is used ([forms](../packages/ui/llms/forms.md#rowsfield)).
+- kayjs-ui: `TextInput` and `Combobox` take `icon`, drawn inside the box at its start with the text after it and hidden from screen readers, and a `type="search"` TextInput draws the search icon on its own (`icon={false}` leaves it out) ([forms](../packages/ui/llms/forms.md)).
 
 ## 1.95.0
 

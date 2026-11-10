@@ -1102,6 +1102,10 @@ component default
 component default
   class?: string | undefined | {
   root?: string | undefined;
+  field?: string | undefined;
+  icon?: string | undefined | {
+    root?: string | undefined;
+  };
   input?: string | undefined;
   list?: string | undefined;
   option?: string | undefined;
@@ -1116,6 +1120,7 @@ component default
   empty?: Element
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
+  icon?: IconProps | IconSlot | undefined
   id?: string | undefined
   invalid?: boolean | undefined
   label?: string | undefined
@@ -1294,6 +1299,10 @@ component default
   root?: string | undefined;
   input?: string | undefined | {
     root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
   };
   panel?: string | undefined | {
     root?: string | undefined;
@@ -1357,7 +1366,16 @@ component default
 
 [./date-time-input.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; input?: string | undefined | { root?: string | undefined; }; }
+  class?: string | undefined | {
+  root?: string | undefined;
+  input?: string | undefined | {
+    root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+}
   disabled?: boolean | undefined
   form?: string | undefined
   invalid?: boolean | undefined
@@ -2238,6 +2256,10 @@ component default
   row?: string | undefined;
   input?: string | undefined | {
     root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
   };
   remove?: string | undefined | {
     root?: string | undefined | {
@@ -2856,8 +2878,8 @@ component default
 
 [./text-input.kay] default
 component default
-  | { class?: string | undefined | { root?: string | undefined; }; invalid?: boolean | undefined; onChange?: ((value: string) => unknown) | undefined; onInput?: ((value: string) => unknown) | undefined; size?: FieldSize | undefined; type?: "date" | "datetime-local" | "email" | "month" | "password" | "search" | "tel" | "text" | "time" | "url" | "week" | undefined; value?: string | undefined }
-  | { class?: string | undefined | { root?: string | undefined; }; invalid?: boolean | undefined; onChange?: ((value: null | number) => unknown) | undefined; onInput?: ((value: null | number) => unknown) | undefined; size?: FieldSize | undefined; type: "number"; value?: null | number | string | undefined }
+  | { class?: string | undefined | { root?: string | undefined; field?: string | undefined; icon?: string | undefined | { root?: string | undefined; }; }; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; onChange?: ((value: string) => unknown) | undefined; onInput?: ((value: string) => unknown) | undefined; size?: FieldSize | undefined; type?: "date" | "datetime-local" | "email" | "month" | "password" | "search" | "tel" | "text" | "time" | "url" | "week" | undefined; value?: string | undefined }
+  | { class?: string | undefined | { root?: string | undefined; field?: string | undefined; icon?: string | undefined | { root?: string | undefined; }; }; icon?: IconProps | IconSlot | false | undefined; invalid?: boolean | undefined; onChange?: ((value: null | number) => unknown) | undefined; onInput?: ((value: null | number) => unknown) | undefined; size?: FieldSize | undefined; type: "number"; value?: null | number | string | undefined }
 
 [./textarea.kay] default
 component default
@@ -2897,7 +2919,15 @@ component default
 
 [./time-input.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined | { root?: string | undefined; }; }
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined;
+    field?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+}
   invalid?: boolean | undefined
   onChange?: ((value: string) => unknown) | undefined
   onInput?: ((value: string) => unknown) | undefined
