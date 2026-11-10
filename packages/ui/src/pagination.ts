@@ -87,3 +87,43 @@ export function openSteps(position: OpenPosition, more: boolean, url: URL | stri
     next: more ? pageHref(url, page + 1, param) : undefined,
   }
 }
+
+// How many pages `total` rows make at `size` a page: none for no rows, and a size under 1 or no number reads as 1.
+export function pageCount(total: number, size: number): number {
+  const rows = Math.max(Math.trunc(total) || 0, 0)
+  const each = Math.max(Math.trunc(size) || 1, 1)
+
+  return Math.ceil(rows / each)
+}
+
+// The rows a page of `total` shows, 1-based and inclusive, `{ from: 0, to: 0 }` when there are none: page 2 of 45 rows at 20 a page is 21 to 40.
+export function pageRange(page: number, total: number, size: number): { from: number, to: number, total: number } {
+  const rows = Math.max(Math.trunc(total) || 0, 0)
+  const each = Math.max(Math.trunc(size) || 1, 1)
+  const at = currentPage(page, pageCount(rows, each))
+
+  return rows === 0 ? { from: 0, to: 0, total: 0 } : { from: (at - 1) * each + 1, to: Math.min(at * each, rows), total: rows }
+}
+
+// The link to a page size: the current URL's path and query with `param` set to it and the page parameter dropped, as a new size starts from the first page.
+export function sizeHref(url: URL | string, size: number, param = 'limit', pageParam = 'page'): string {
+  const query = new URLSearchParams(url === '' ? '' : new URL(url, 'http://localhost').search)
+
+  query.delete(pageParam)
+  query.set(param, String(size))
+
+  return `${url === '' ? '' : new URL(url, 'http://localhost').pathname}?${query}`
+}
+
+// The page numbers or offsets either side of the page on screen of a list whose length is unknown, as `openSteps` links them, for a handler to be given.
+export function openTargets(position: OpenPosition, more: boolean): { previous: number | undefined, next: number | undefined } {
+  if (position.limit !== undefined) {
+    const start = Math.max(Math.trunc(position.offset) || 0, 0)
+
+    return { previous: start > 0 ? Math.max(start - position.limit, 0) : undefined, next: more ? start + position.limit : undefined }
+  }
+
+  const page = Math.max(Math.trunc(position.page) || 1, 1)
+
+  return { previous: page > 1 ? page - 1 : undefined, next: more ? page + 1 : undefined }
+}

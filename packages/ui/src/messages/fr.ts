@@ -25,6 +25,7 @@ export default defineMessages({
       unreadMark: '(non lue)',
     },
     bellInbox: { announce: 'Nouvelle notification : {title}' },
+    breadcrumb: { more: 'Afficher les pages masquées' },
     carousel: {
       dot: 'Aller à la diapositive {n}',
       empty: 'Aucune diapositive.',
@@ -135,7 +136,7 @@ export default defineMessages({
       selected: { one: '{count} sélectionné', other: '{count} sélectionnés' },
     },
     notice: { dismiss: 'Fermer', retry: 'Réessayer' },
-    pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
+    pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent', range: '{from}–{to} sur {total}', size: 'Lignes par page' },
     radioGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
     rangeInput: { from: '{label} de', to: '{label} à' },
     recordButton: {

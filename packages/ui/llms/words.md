@@ -39,6 +39,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.barList.*`: `empty` (`No data yet.`)
 - `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item)
 - `ui.bellInbox.*`: `announce` (`New notification: {title}`, announced when one arrives)
+- `ui.breadcrumb.*`: `more` (`Show the hidden pages`, names the button on a phone that lists the crumbs the trail folds)
 - `ui.carousel.*`: `dot` (`Go to slide {n}`), `empty` (`No slides.`), `label` (`Carousel`), `next` (`Next slide`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous slide`), `slide` (`Slide {n} of {count}`)
 - `ui.chipGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
@@ -64,7 +65,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.menu.*`: `failure` (`Could not load.`, when a menu's entries function fails), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)
 - `ui.notice.*`: `dismiss` (`Dismiss`), `retry` (`Try again`)
-- `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
+- `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`), `range` (`{from}–{to} of {total}`, the summary beside a `total`), `size` (`Rows per page`, names the page sizes)
 - `ui.radioGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.recordButton.*`: `label` (`Record`), `failure` (`The recording could not be sent.`), `recording` (`Recording`), `stopped` (`Recording stopped`), `cancelled` (`Recording cancelled`), `insecure` (`The microphone needs the page opened over https.`), `unsupported` (`This browser cannot record sound.`), `denied` (`The microphone is blocked: allow it for this site in the browser's settings.`), `missing` (`No microphone was found.`), `taken` (`The microphone is in use by another application.`), `failed` (`The microphone could not be opened.`), `lost` (`The microphone was disconnected, so the recording was dropped.`), `empty` (`Nothing was recorded.`); Chat's microphone (kayjs-ai) says the same

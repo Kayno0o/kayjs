@@ -1,0 +1,18 @@
+--- client
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { signal } from 'kay'
+
+const { picks } = props<{ picks: string[] }>()
+const rows = Array.from({ length: 45 }, (_, index) => `Row ${index + 1}`)
+const page = signal(1)
+const size = signal(10)
+const offset = signal(0)
+const shownRows = () => rows.slice((page() - 1) * size(), page() * size())
+---
+ul#rows
+  for row of shownRows() key={row}
+    li {row}
+Pagination#paged(page={page()} total={rows.length} pageSize={size()} sizes={[10, 20]} url="/rows?tag=a" onPage={next => { picks.push(`page ${next}`); page = next }} onSize={next => { picks.push(`size ${next}`); size = next; page = 1 }})
+Pagination#steps(page={page()} more={page() < 5} url="/rows" onPage={next => picks.push(`step ${next}`)})
+Pagination#offset(offset={offset()} limit={20} more url="/rows" onPage={next => { picks.push(`offset ${next}`); offset = next }})
+Pagination#plain(page={2} pages={3} url="/rows")

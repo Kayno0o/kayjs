@@ -260,9 +260,14 @@ describe('Tabs of a query param', () => {
 describe('breadcrumb', () => {
   test('Breadcrumb is a named nav listing the trail, the last item the current page and no link', async () => {
     expect(await attributes('/breadcrumb', '#long nav', ['aria-label'])).toEqual([{ 'aria-label': 'Trail' }])
-    expect((await find('/breadcrumb', '#long li')).map(item => [item.text, attr(item, 'data-middle')])).toEqual([['Home', null], ['…', null], ['Moons', ''], ['Jupiter', null], ['Europa', null]])
-    expect((await find('/breadcrumb', '#long a')).map(link => link.attributes.href)).toEqual(['/', '/moons', '/moons/jupiter'])
+    expect((await find('/breadcrumb', '#long ol > li')).map(item => [attr(item, 'data-part'), attr(item, 'data-middle')])).toEqual([['item', null], ['more', null], ['item', ''], ['item', null], ['item', null]])
+    expect((await find('/breadcrumb', '#long [data-part="item"] a')).map(link => link.attributes.href)).toEqual(['/', '/moons', '/moons/jupiter'])
     expect((await find('/breadcrumb', '#long [aria-current]')).map(found => [found.text, found.tag])).toEqual([['Europa', 'span']])
+  })
+
+  test('the folded crumbs of a long trail are a menu button listing them, a link each', async () => {
+    expect((await attributes('/breadcrumb', '#long [data-part="more"] button', ['aria-label', 'aria-haspopup']))).toEqual([{ 'aria-label': 'Show the hidden pages', 'aria-haspopup': 'menu' }])
+    expect((await find('/breadcrumb', '#long [data-part="more"] a')).map(link => [link.text, link.attributes.href])).toEqual([['Moons', '/moons']])
   })
 
   test('a trail of three items has no ellipsis, and only a structured one writes the BreadcrumbList', async () => {
@@ -930,6 +935,28 @@ describe('Pagination', () => {
     ])
     expect(await strip('/paging', 'steps')).toEqual([['<', '/gallery', null, 'prev'], ['>', '/gallery?page=3', null, 'next']])
     expect((await attributes('/paging', '#steps a', ['aria-label'])).map(one => one['aria-label'])).toEqual(['Back', 'Forward'])
+  })
+
+  test('given a total and a page size, makes the pages, adds the range, and offers each size as a link that drops the page', async () => {
+    expect((await find('/paging', '#total [data-part="range"]')).map(found => found.text)).toEqual(['21–40 of 45'])
+    expect((await find('/paging', '#total [data-part="page"]')).map(found => [found.text, attr(found, 'href')])).toEqual([['1', '/rows?q=a&limit=20'], ['2', '/rows?q=a&page=2&limit=20'], ['3', '/rows?q=a&page=3&limit=20']])
+    expect((await find('/paging', '#total [data-part="sizes"] a')).map(found => [found.text, attr(found, 'href'), attr(found, 'aria-current')])).toEqual([['10', '/rows?q=a&limit=10', null], ['20', '/rows?q=a&limit=20', 'true'], ['50', '/rows?q=a&limit=50', null]])
+    expect((await attributes('/paging', '#total [data-part="sizes"]', ['aria-label', 'role']))).toEqual([{ 'aria-label': 'Rows per page', 'role': 'group' }])
+  })
+
+  test('keeps the sizes of a list that fits one page, so a size picked past the rows can be undone, and draws nothing when no size is smaller than the rows', async () => {
+    expect((await find('/paging', '#total-sized [data-part="range"]')).map(found => found.text)).toEqual(['1–15 of 15'])
+    expect(await find('/paging', '#total-sized [data-part="page"]')).toEqual([])
+    expect((await find('/paging', '#total-sized [data-part="sizes"] a')).map(found => attr(found, 'href'))).toEqual(['/rows?per=10', '/rows?per=25', '/rows?per=50'])
+    expect(await find('/paging', '#total-single nav')).toEqual([])
+  })
+
+  test('words the range from a string filling its placeholders', async () => {
+    expect((await find('/paging', '#total-label [data-part="range"]')).map(found => found.text)).toEqual(['Rows 1 to 10 of 30'])
+  })
+
+  test('writes no handler data on plain links', async () => {
+    expect(await element('/paging', 'total')).not.toContain('data-page')
   })
 
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {

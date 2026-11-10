@@ -26,6 +26,32 @@ Give `page` and `more` instead of `pages`, with `url`. Only Previous and Next ar
 
 Give `offset`, `limit`, `more` and `url` to page by row. Each link sets `?offset=40`, a page holding `limit` rows, and `param` renames the parameter from `offset`.
 
+## Total and page size
+
+Give `total` and `pageSize` in place of `pages` and the pages follow from the rows, with a summary beside the links, `21–40 of 134`. `rangeLabel` words it: a string filling `{from}`, `{to}` and `{total}`, or a function of `{ from, to, total }`.
+
+`sizes` adds a link for each page size, such as `sizes={[10, 25, 50]}`. Each link sets `limitParam`, `limit` by default, and drops the page, so a new size starts from the first page. Read the size from that parameter in the route and pass it back as `pageSize`. The sizes stay while the rows outgrow the smallest, even on one page, so a size picked past the end can be undone.
+
+## In the browser
+
+A list an island pages in memory has no address to change. Give `onPage` and the links answer a click instead: a plain click calls it with the page, or with the offset for a list paged by offset, and the browser does not navigate. Each link keeps its real address, so a middle click or a new tab still opens it. The page on screen is still `page`, so the handler sets it:
+
+```kay
+---
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { signal } from 'kay'
+
+const rows = Array.from({ length: 45 }, (_, index) => `Row ${index + 1}`)
+const page = signal(1)
+---
+ul
+  for row of rows.slice((page() - 1) * 10, page() * 10) key={row}
+    li {row}
+Pagination(page={page()} total={rows.length} pageSize={10} onPage={next => page = next})
+```
+
+`onSize` does the same for the page size links. Only an island can pass a handler, and `url` can be left out. A table does all of this itself with its `pageSize`.
+
 ## Labels
 
 `label` names the navigation for screen readers, `Pagination` by default. `previousLabel` and `nextLabel` word the two links, `Previous` and `Next` by default.

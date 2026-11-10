@@ -35,7 +35,9 @@
 
 ### Pagination
 
-- `Pagination(page pages)` with no `url` links the address the page has, the page parameter set. `@step(direction)` draws the content of Previous and Next (`'previous'` or `'next'`) in place of their words, an icon for instance, and `previousLabel` and `nextLabel` still name the links. It stays a static component of plain links: a handler for a list paged in the browser is not offered, since it would make every `Pagination(of={list})` of a page an island whose props must serialize.
+- `Pagination(page pages)` with no `url` links the address the page has, the page parameter set. `@step(direction)` draws the content of Previous and Next (`'previous'` or `'next'`) in place of their words, an icon for instance, and `previousLabel` and `nextLabel` still name the links. Without a handler it stays a static component of plain links, shipping no script.
+- `onPage(page)` is for a list the app pages in the browser, such as a table or a filtered array in an island: `Pagination(page={page()} pages={pages} onPage={next => page = next})`. Each link keeps its real address (a middle click or a new tab opens it, the page parameter set), and a plain click calls the handler with that page, or with the offset it starts at for a list paged by `offset` and `limit`, with the default prevented; a modified or middle click is the browser's. The page on screen is still `page`, so the handler sets it, and `url` can be left out. Only an island passes a handler, as any handler: a page passing one throws naming the prop. The handler needs the links' wrapper to hear the clicks, the one place the component ships script, only when `onPage` or `onSize` is given.
+- `onSize(size)` does the same for the links of `sizes` (below), called with the size picked.
 
 ### Options from a list or a function
 

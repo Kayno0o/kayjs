@@ -27,6 +27,14 @@ main
     Pagination(page={2} more url="/gallery" previousLabel="Back" nextLabel="Forward")
       @step(direction)
         b {direction === 'previous' ? '<' : '>'}
+  article#total
+    Pagination(page={2} total={45} pageSize={20} sizes={[10, 20, 50]} url="/rows?q=a&page=2&limit=20")
+  article#total-sized
+    Pagination(page={1} total={15} pageSize={50} sizes={[10, 25, 50]} url="/rows?page=3" limitParam="per")
+  article#total-single
+    Pagination(page={1} total={5} pageSize={10} url="/rows")
+  article#total-label
+    Pagination(page={1} total={30} pageSize={10} url="/rows" rangeLabel="Rows {from} to {to} of {total}")
   article#qr
     QrCode(value="https://kaynooo.fr" label="kaynooo.fr" pixels={160})
   article#qr-other

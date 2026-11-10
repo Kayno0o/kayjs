@@ -1,5 +1,50 @@
 import { describe, expect, test } from 'bun:test'
-import { currentPage, offsetHref, openSteps, pageHref, pageItems } from '../src/pagination'
+import { currentPage, offsetHref, openSteps, openTargets, pageCount, pageHref, pageItems, pageRange, sizeHref } from '../src/pagination'
+
+describe('pageCount', () => {
+  test('rounds up, and reads no rows or a size that is no number sanely', () => {
+    expect(pageCount(45, 20)).toBe(3)
+    expect(pageCount(40, 20)).toBe(2)
+    expect(pageCount(0, 20)).toBe(0)
+    expect(pageCount(-5, 20)).toBe(0)
+    expect(pageCount(Number.NaN, 20)).toBe(0)
+    expect(pageCount(5, 0)).toBe(5)
+    expect(pageCount(5, Number.NaN)).toBe(5)
+  })
+})
+
+describe('pageRange', () => {
+  test('gives the rows a page shows, the last one short, and the nearest page for one that does not exist', () => {
+    expect(pageRange(2, 45, 20)).toEqual({ from: 21, to: 40, total: 45 })
+    expect(pageRange(3, 45, 20)).toEqual({ from: 41, to: 45, total: 45 })
+    expect(pageRange(9, 45, 20)).toEqual({ from: 41, to: 45, total: 45 })
+    expect(pageRange(Number.NaN, 45, 20)).toEqual({ from: 1, to: 20, total: 45 })
+  })
+
+  test('is empty with no rows', () => {
+    expect(pageRange(1, 0, 20)).toEqual({ from: 0, to: 0, total: 0 })
+  })
+})
+
+describe('sizeHref', () => {
+  test('sets the size and drops the page, keeping the rest of the query', () => {
+    expect(sizeHref('/rows?q=a&page=3&limit=10', 25)).toBe('/rows?q=a&limit=25')
+    expect(sizeHref(new URL('https://example.com/rows?p=2'), 50, 'per', 'p')).toBe('/rows?per=50')
+  })
+
+  test('links this path with the size alone when the page has no address', () => {
+    expect(sizeHref('', 10)).toBe('?limit=10')
+  })
+})
+
+describe('openTargets', () => {
+  test('gives the page or offset each step goes to, as openSteps links it', () => {
+    expect(openTargets({ page: 3 }, true)).toEqual({ previous: 2, next: 4 })
+    expect(openTargets({ page: 1 }, false)).toEqual({ previous: undefined, next: undefined })
+    expect(openTargets({ offset: 10, limit: 20 }, true)).toEqual({ previous: 0, next: 30 })
+    expect(openTargets({ offset: Number.NaN, limit: 20 }, true)).toEqual({ previous: undefined, next: 20 })
+  })
+})
 
 describe('pageItems', () => {
   test('shows the first and last pages and the current one\'s neighbours, a gap for the pages left out', () => {
