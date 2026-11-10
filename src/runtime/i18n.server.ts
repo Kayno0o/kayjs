@@ -1,7 +1,7 @@
 import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
-import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, onSite, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState, siteDefaultLocale } from './locale-state'
 import { PART_END, PART_START } from './markers'
@@ -64,7 +64,7 @@ export function alternate(target: Locale): string {
   const state = current('alternate()')
 
   if (state.implicit)
-    return state.path
+    return onSite(state.path)
 
   const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
 

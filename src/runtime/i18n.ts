@@ -107,6 +107,7 @@ const localeNames = /* @__PURE__ */ new Map<string, string>()
 const RTL_SCRIPTS: ReadonlySet<string> = /* @__PURE__ */ new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
 // Where a link's path ends and its query or fragment starts.
 const PATH_END = /[?#]/
+const LEADING_SLASHES = /^[/\\]{2,}/
 const SEGMENT_END = /[/?#]/
 const OPTIONAL_MARK = /\?$/
 // Each unit with its length in seconds, a relative time taking the largest one the span reaches.
@@ -438,9 +439,14 @@ export function localizedLink(settings: LocaleSettings, href: string, locale: st
   return page === true ? localePath(settings, href, locale, currentHost) : href
 }
 
+// A path a visitor typed may lead with `//` or `/\`, which a browser reads as another site once nothing precedes it.
+export function onSite(path: string): string {
+  return path.replace(LEADING_SLASHES, '/')
+}
+
 // The path in that locale, translated where the locale names the page its own way: under its prefix, bare for an unprefixed default, or on its own host when locales go by domain.
 export function localePath(settings: LocaleSettings, path: string, locale: string, currentHost?: string): string {
-  const translated = translatedPath(settings, path, locale)
+  const translated = onSite(translatedPath(settings, path, locale))
 
   if (settings.hosts) {
     const host = settings.hosts[locale]

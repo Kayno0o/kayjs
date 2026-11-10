@@ -69,11 +69,11 @@ const LINK_EXPECTED: Record<string, string[]> = {
   'noPages/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/de/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
 }
 const PATH_EXPECTED: Record<string, string[]> = {
-  'path/fr': ['/', '/a-propos', '/a-propos/', '/a-propos?x=1#top', '/a-propos#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
+  'path/fr': ['/', '/a-propos', '/a-propos/', '/a-propos?x=1#top', '/a-propos#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '/x.com/about', '#top', '/about.html', '/store/tea'],
   'back/fr': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
-  'path/en': ['/en', '/en/about-us', '/en/about-us/', '/en/about-us?x=1#top', '/en/about-us#h', '/en/blog', '/en/articles/a', '/en/articles/a/', '/en/articles/a?b#c', '/en/articles/cover.png', '/en/articles/rss.xml', '/en/docs', '/en/docs/a/b', '/en/docs/a/b.pdf', '/en/fr/about', '/en/en/about', '/en/de', '/en/coffee', '/en/coffee', '/en/coffee/', '/en/store', '/en/store/tea', '/en/store/tea/', '/en/nowhere', '/en/blog/a/b', '/en/zz/x', '/en/zz/x.png', '/enabout', '/en//x.com/about', '/en#top', '/en/about.html', '/en/store/tea'],
+  'path/en': ['/en', '/en/about-us', '/en/about-us/', '/en/about-us?x=1#top', '/en/about-us#h', '/en/blog', '/en/articles/a', '/en/articles/a/', '/en/articles/a?b#c', '/en/articles/cover.png', '/en/articles/rss.xml', '/en/docs', '/en/docs/a/b', '/en/docs/a/b.pdf', '/en/fr/about', '/en/en/about', '/en/de', '/en/coffee', '/en/coffee', '/en/coffee/', '/en/store', '/en/store/tea', '/en/store/tea/', '/en/nowhere', '/en/blog/a/b', '/en/zz/x', '/en/zz/x.png', '/enabout', '/en/x.com/about', '/en#top', '/en/about.html', '/en/store/tea'],
   'back/en': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/shop/tea'],
-  'path/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/artikel/a', '/de/artikel/a/', '/de/artikel/a?b#c', '/de/artikel/cover.png', '/de/artikel/rss.xml', '/de/docs', '/de/docs/a/b', '/de/docs/a/b.pdf', '/de/fr/about', '/de/en/about', '/de/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/de/nowhere', '/de/blog/a/b', '/de/zz/x', '/de/zz/x.png', '/deabout', '/de//x.com/about', '/de#top', '/de/about.html', '/de/store/tea'],
+  'path/de': ['/de', '/de/about', '/de/about/', '/de/about?x=1#top', '/de/about#h', '/de/blog', '/de/artikel/a', '/de/artikel/a/', '/de/artikel/a?b#c', '/de/artikel/cover.png', '/de/artikel/rss.xml', '/de/docs', '/de/docs/a/b', '/de/docs/a/b.pdf', '/de/fr/about', '/de/en/about', '/de/de', '/de/café', '/de/caf%C3%A9', '/de/caf%c3%a9/', '/de/shop', '/de/shop/tea', '/de/shop/tea/', '/de/nowhere', '/de/blog/a/b', '/de/zz/x', '/de/zz/x.png', '/deabout', '/de/x.com/about', '/de#top', '/de/about.html', '/de/store/tea'],
   'back/de': ['/', '/about', '/about/', '/about?x=1#top', '/about#h', '/blog', '/blog/a', '/blog/a/', '/blog/a?b#c', '/blog/cover.png', '/blog/rss.xml', '/docs', '/docs/a/b', '/docs/a/b.pdf', '/fr/about', '/en/about', '/de', '/café', '/caf%C3%A9', '/caf%c3%a9/', '/shop', '/shop/tea', '/shop/tea/', '/nowhere', '/blog/a/b', '/zz/x', '/zz/x.png', 'about', '//x.com/about', '#top', '/about.html', '/store/tea'],
 }
 
@@ -1134,5 +1134,47 @@ describe('localized seo defaults', () => {
     expect(manifest.name).toBe('The site')
     expect(manifest.start_url).toBe('/docs/')
     expect(manifest.icons[0]!.src).toBe('/docs/icon-192.png')
+  })
+})
+
+describe('a path the visitor typed with extra slashes', () => {
+  const SETTINGS: LocaleSettings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false, pages: ['/'] }
+  const HOSTILE = ['//evil.com/x', '///evil.com/x', '/\\evil.com/x', '/\\/evil.com', '//\\evil.com', '/%2F/evil.com', '/%5Cevil.com']
+  // A site's own path, or one on a host the site names, never another site: no second slash or backslash right after the first.
+  const ours = /^(?:\/\/x\.(?:fr|com))?\/(?![/\\])/
+
+  it.each(HOSTILE)('localePath gives %s back as a path of the site, for any locale, prefix or host', (path) => {
+    const variants = [SETTINGS, { ...SETTINGS, prefixDefault: true }, { ...SETTINGS, hosts: { fr: 'x.fr', en: 'x.com' } }, { ...SETTINGS, paths: { '/about': { en: '/about-us' } } }]
+
+    for (const settings of variants) {
+      for (const locale of ['fr', 'en'])
+        expect(localePath(settings, path, locale, 'x.fr'), `${locale} ${JSON.stringify(settings)}`).toMatch(ours)
+    }
+  })
+
+  it('keeps the rest of the path as typed once the extra slashes collapse', () => {
+    expect(localePath(SETTINGS, '//evil.com/x?a=1#b', 'fr')).toBe('/evil.com/x?a=1#b')
+    expect(localePath(SETTINGS, '/\\evil.com/x', 'fr')).toBe('/evil.com/x')
+    expect(localePath(SETTINGS, '/%2F/evil.com', 'fr')).toBe('/%2F/evil.com')
+    expect(localePath(SETTINGS, '//evil.com/x', 'en')).toBe('/en/evil.com/x')
+  })
+
+  const served = async (options: { base?: string, trailingSlash?: 'always' | 'never', prefixDefault?: boolean }) => new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, prefixDefault: options.prefixDefault }, ...options.base === undefined ? {} : { base: options.base }, ...options.trailingSlash === undefined ? {} : { trailingSlash: options.trailingSlash } }))
+
+  it.each([
+    ['plain', {}],
+    ['under a base with trailing slashes', { base: '/docs', trailingSlash: 'always' as const }],
+    ['with the default locale prefixed', { prefixDefault: true }],
+  ])('a served page links no other site from its switcher, %s', async (_, options: { base?: string, trailingSlash?: 'always', prefixDefault?: boolean }) => {
+    const server = await served(options)
+
+    for (const path of ['//evil.com/x', '/\\evil.com/x', '/%2F/evil.com']) {
+      const response = await server.handle(new Request(`http://localhost${options.base ?? ''}${path}`))
+      const html = await response.text()
+      const hrefs = [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map(found => found[1]!.replace(options.base ?? '', ''))
+
+      expect(hrefs.length, `${path} ${response.status}`).toBeGreaterThan(0)
+      expect(hrefs.filter(href => (/^[/\\]{2}/).test(href)), `${path}: ${html.slice(0, 600)}`).toEqual([])
+    }
   })
 })
