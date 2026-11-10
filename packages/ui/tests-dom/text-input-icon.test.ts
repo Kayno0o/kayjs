@@ -10,6 +10,7 @@ afterEach(() => {
   mounted?.unmount()
 })
 
+// The box is the TextInput's root, so it is redrawn inside its `field` part when an icon appears; what is typed stays.
 test('a TextInput draws and drops its icon as `icon` and `type` change, keeping what is typed', async () => {
   mounted = await mountComponent(TextIconFlip)
   await settle()
@@ -47,4 +48,28 @@ test('a TextInput draws and drops its icon as `icon` and `type` change, keeping 
   await press('text')
   expect(icon()).toBeNull()
   expect(box().value).toBe('moon')
+})
+
+test('a Combobox draws and drops its icon beside the same input element', async () => {
+  mounted = await mountComponent(TextIconFlip)
+  await settle()
+
+  const root = mounted.root
+  const combo = () => root.querySelector('.kui-combobox')!
+  const input = () => combo().querySelector<HTMLInputElement>('input[role=combobox]')!
+  const first = input()
+
+  expect(combo().querySelector('[data-part=icon]')).toBeNull()
+
+  first.focus()
+  click(root.querySelector('#combo-icon'))
+  await settle()
+  expect(combo().querySelector('[data-part=icon]')?.getAttribute('aria-hidden')).toBe('true')
+  expect(input()).toBe(first)
+  expect(document.activeElement).toBe(first)
+
+  click(root.querySelector('#combo-bare'))
+  await settle()
+  expect(combo().querySelector('[data-part=icon]')).toBeNull()
+  expect(input()).toBe(first)
 })

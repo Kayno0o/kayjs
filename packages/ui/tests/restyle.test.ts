@@ -79,7 +79,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-icon kui-collapsible-section-chevron size-6',
     'kui-icon kui-tree-view-icon size-3',
     'kui-load-more py-6',
-    'kui-field-input data-icon:ps-[calc(var(--spacing)*8.5*var(--density))]! data-icon:min-w-0 data-icon:flex-1 h-11',
+    'kui-field-input data-icon:ps-[calc(var(--spacing)*8.5*var(--density))]! h-11',
   ]
 
   test.each(restyled)('draws class="%s"', (classes) => {

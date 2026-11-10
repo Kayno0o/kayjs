@@ -17,8 +17,8 @@ import type { IconSlot } from './defaults'
 const look = recipe({
   parts: {
     root: 'kui-combobox relative inline-flex min-w-0 flex-col',
-    input: `kui-field-input ${FIELD_ICON_PAD} data-icon:min-w-0 data-icon:flex-1`,
-    ...FIELD_ICON,
+    input: `kui-field-input ${FIELD_ICON_PAD}`,
+    icon: `${FIELD_ICON.icon} top-1/2 -translate-y-1/2`,
     list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-1 text-sm text-foreground [&[hidden]]:hidden',
     option: 'cursor-pointer px-2 py-1.5 hover:bg-hover aria-selected:bg-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-picked:font-medium data-picked:text-accent',
     optionLabel: 'block',
@@ -363,54 +363,30 @@ const ref = startRef<HTMLInputElement>((element) => {
 ---
 div(part="root")
   if icon
-    span(part="field")
-      Icon(icon={icon} part="icon")
-      input(
-        part="input"
-        data-icon
-        {...rest}
-        data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
-        ref={ref}
-        type="text"
-        role="combobox"
-        autocomplete="off"
-        name={carried() ? undefined : name}
-        value={text()}
-        disabled={disabled}
-        list={!remote && !enhanced() ? `${listId}-native` : undefined}
-        aria-label={label}
-        aria-expanded={shown() ? 'true' : 'false'}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
-        onInput={event => type(event.currentTarget.value)}
-        onKeyDown={keyDown}
-        onFocusIn={focusIn}
-        onFocusOut={focusOut}
-      )
-  else
-    input(
-      part="input"
-      {...rest}
-      data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
-      ref={ref}
-      type="text"
-      role="combobox"
-      autocomplete="off"
-      name={carried() ? undefined : name}
-      value={text()}
-      disabled={disabled}
-      list={!remote && !enhanced() ? `${listId}-native` : undefined}
-      aria-label={label}
-      aria-expanded={shown() ? 'true' : 'false'}
-      aria-controls={listId}
-      aria-autocomplete="list"
-      aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
-      onInput={event => type(event.currentTarget.value)}
-      onKeyDown={keyDown}
-      onFocusIn={focusIn}
-      onFocusOut={focusOut}
-    )
+    Icon(icon={icon} part="icon")
+  input(
+    part="input"
+    data-icon={icon ? '' : undefined}
+    {...rest}
+    data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
+    ref={ref}
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    name={carried() ? undefined : name}
+    value={text()}
+    disabled={disabled}
+    list={!remote && !enhanced() ? `${listId}-native` : undefined}
+    aria-label={label}
+    aria-expanded={shown() ? 'true' : 'false'}
+    aria-controls={listId}
+    aria-autocomplete="list"
+    aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
+    onInput={event => type(event.currentTarget.value)}
+    onKeyDown={keyDown}
+    onFocusIn={focusIn}
+    onFocusOut={focusOut}
+  )
   if name && carried() as option
     input(type="hidden" name={name} value={option.value} disabled={disabled})
   if !remote
