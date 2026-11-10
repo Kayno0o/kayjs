@@ -205,6 +205,21 @@ describe('control flow', () => {
     expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i}>{todo.title}</li>}</KayLoopFor></ul>')
   })
 
+  it('hands a loop\'s key function the index after the item, in the browser and the checked output, the server matching no rows', () => {
+    const plain = 'for item, position of items key={item.id ?? position}\n  li {item.name}'
+    const pattern = 'for { id }, i of rows key={`${id}-${i}`}\n  li {id}'
+    const nested = 'for row, i of rows key={row.id}\n  for cell, i of row.cells key={cell.id ?? i}\n    li {i}'
+
+    expect(compileKay(plain, 'test.kay', { output: 'dom' }).tsx).toContain('(item, position) => (item.id ?? position), (')
+    expect(compileKay(pattern, 'test.kay', { output: 'dom' }).tsx).toContain('({ id }, i) => (`${id}-${i}`), (')
+    expect(compileKay(nested, 'test.kay', { output: 'dom' }).tsx).toContain('(row) => (row.id), (')
+    expect(compileKay(nested, 'test.kay', { output: 'dom' }).tsx).toContain('(cell, i) => (cell.id ?? i), (')
+    expect(compileKay(plain, 'test.kay', { output: 'html' }).tsx).not.toContain('item.id ?? position')
+    expect(compileKay(plain, 'test.kay', { output: 'html' }).diagnostics).toEqual([])
+    expect(jsx(plain)).toContain('keyed={(item, position) => (item.id ?? position)}')
+    expect(jsx(pattern)).toContain('keyed={({ id }, i) => (`${id}-${i}`)}')
+  })
+
   it('destructures a loop\'s item through a name of the row\'s own, which a browser reads as the accessor it is and a page as the item', () => {
     const source = 'for [key, value], i of entries key={key}\n  p {key}: {value}'
 

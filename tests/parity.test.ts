@@ -17,6 +17,9 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
   'text': {
     'main.kay': '---\nimport { signal } from \'kay\'\nconst name = signal(\'Ada\')\nconst count = 3\n---\np Hello {name()}, you have {count} items & more < less\np\n  | first line\n  | {name()} second\n  strong bold\n  |  tail\n',
   },
+  'index keys': {
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst rows = signal<{ id?: number, name: string }[]>([{ id: 1, name: \'a\' }, { name: \'b\' }])\n---\nul\n  for row, position of rows() key={row.id ?? position}\n    li {position}:{row.name}\n  for { id, name }, i of rows() key={`${id}-${i}`}\n    li {i}:{name}\n  for row, i of rows() key={i}\n    li {i}:{row.name}\n  for a, i of rows()\n    for b, i of rows() key={b.id ?? i}\n      li {i}\n',
+  },
   'control flow': {
     'main.kay': '---\nimport { signal } from \'kay\'\nconst items = signal([{ id: 1, title: \'One\' }, { id: 2, title: \'Two\' }])\nconst empty: string[] = []\nconst shown = true\n---\nif shown\n  p shown\nelse\n  p hidden\nif !shown\n  p never\nul\n  for item of items()\n    li {item.title}\nul\n  for word of empty key={word}\n    li {word}\n  else\n    li none\nfor item, i of items() key={i}\n  span {i}: {item.title}\n',
   },

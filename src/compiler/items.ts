@@ -214,6 +214,21 @@ export function contentOf(element: ElementNode): Node[] {
   return element.children.filter(child => child.kind !== 'slot')
 }
 
+// The parameters of a loop's key function: the item as the block takes it, then the index when the key reads it, which the browser's key function is handed as the row's place in the list. An index the key leaves alone is no parameter, so none is reported unread.
+export function addKeyParameters(b: CodeBuilder, node: ForNode, src: string): void {
+  b.add('(').addSource(node.item)
+
+  if (node.index && node.key && readsName(src.slice(node.key.start, node.key.end), src.slice(node.index.start, node.index.end)))
+    b.add(', ').addSource(node.index)
+
+  b.add(')')
+}
+
+// Whether an expression names `name` as a variable: not as a property after a dot, nor inside a longer name.
+function readsName(expression: string, name: string): boolean {
+  return new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}(?![\\w$])`).test(expression)
+}
+
 // The parameter a loop's block takes for its row: the item as written, or the row's own name when the item is a pattern.
 export function addRowItem(b: CodeBuilder, node: ForNode): void {
   if (node.row === undefined)

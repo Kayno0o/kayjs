@@ -158,7 +158,7 @@ match post.status
 
 `if user as u` binds the truthy value to `u` for the children.
 
-A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`.
+A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`. The key can read the index too, `for post, i of posts key={post.slug ?? i}`.
 
 A row that moves keeps its focus, its playing video and its loaded iframe in a browser that has `Element.moveBefore`.
 

@@ -583,6 +583,34 @@ describe('loops', () => {
     }
   })
 
+  const mountIndexKeys = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst rows = signal<{ id?: number, name: string }[]>([{ id: 1, name: \'a\' }, { name: \'b\' }])\nconst groups = signal([{ id: 1, cells: [{ name: \'x\' }, { name: \'y\' }] }, { id: 2, cells: [{ name: \'z\' }] }])\n;(globalThis as { setRows?: (next: { id?: number, name: string }[]) => void }).setRows = next => rows.set(next)\n---\nul.plain\n  for row, position of rows() key={row.id ?? position}\n    li {position}:{row.name}\nul.pattern\n  for { id, name }, i of rows() key={`${id}-${i}`}\n    li {i}:{name}\nul.only\n  for row, i of rows() key={i}\n    li {i}:{row.name}\nul.nested\n  for group, i of groups() key={group.id}\n    li\n      for cell, i of group.cells key={cell.name + i}\n        b {i}{cell.name}\n',
+  })
+
+  it('reads the index in a loop\'s key: an id else the position, a pattern with an index, an index alone and nested loops sharing the name', async () => {
+    const { root, dispose } = await mountIndexKeys()
+    const texts = (selector: string) => [...root.querySelectorAll(selector)].map(item => item.textContent)
+    const setRows = (globalThis as unknown as { setRows: (next: { id?: number, name: string }[]) => void }).setRows
+
+    try {
+      expect(texts('.plain li')).toEqual(['0:a', '1:b'])
+      expect(texts('.pattern li')).toEqual(['0:a', '1:b'])
+      expect(texts('.only li')).toEqual(['0:a', '1:b'])
+      expect(texts('.nested li')).toEqual(['0x1y', '0z'])
+
+      const first = root.querySelector('.plain li')!
+
+      setRows([{ id: 1, name: 'a!' }, { name: 'c' }, { name: 'b' }])
+      await settle()
+      expect(texts('.plain li')).toEqual(['0:a!', '1:c', '2:b'])
+      expect(root.querySelector('.plain li')).toBe(first)
+      expect(texts('.only li')).toEqual(['0:a!', '1:c', '2:b'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mountDestructured = site({
     'main.kay': '---\nimport { signal } from \'kay\'\n\nconst rows = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\nconst pairs = signal<[string, number][]>([[\'x\', 1]])\n---\nbutton(onClick={() => { rows.set([{ id: 1, name: \'A\' }, { id: 2, name: \'b\' }]); pairs.set([[\'x\', 1], [\'y\', 2]]) }}) Edit\nul.rows\n  for { id, name }, i of rows() key={id}\n    li {i}:{id}:{name}\nul.pairs\n  for [key, count] of pairs() key={key}\n    li {key}={count}\n',
   })

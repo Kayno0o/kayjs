@@ -346,7 +346,7 @@ export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
   For: {
-    <T>(props: { each: Iterable<T> | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
+    <T>(props: { each: Iterable<T> | null | undefined | false, keyed: (item: T, index: number) => unknown, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
     <T>(props: { each: Iterable<T> | null | undefined | false, keyed: false, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
   }
   staticFor: <T>(each: Iterable<T> | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element

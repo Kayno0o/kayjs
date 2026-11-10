@@ -23,7 +23,7 @@ const entryKey = (entry: unknown) => (entry as [unknown, unknown])[0]
 
 // A `for`: one row per item, matched to the rows of the last render by key, or by position when `keyed` is false.
 // A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
-export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
+export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | null | undefined | false, key: ((item: T, index: number) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
   const region = new Region(element, start, end)
   // The fallback, and whether the loop rendered before, so the rows it makes then play their enter phase.
   const empty = blockIn(region)
@@ -82,7 +82,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       }
 
       built.length = 0
-      rows = claiming() && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, keyed === false ? index : keyed(item)))) : reconcileRows(region, rows, list, keyed, makeRow)
+      rows = claiming() && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, keyed === false ? index : keyed(item, index)))) : reconcileRows(region, rows, list, keyed, makeRow)
 
       if (entering) {
         for (const row of built)
@@ -102,7 +102,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
   })
 }
 
-function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
+function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T, index: number) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
   if (list.length === 0) {
     removeRows(region, previous, true)
 
@@ -138,8 +138,8 @@ function positionalRows<T>(region: Region, previous: Row[], list: readonly T[], 
   return next
 }
 
-function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: (item: T) => unknown, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
-  const keys = list.map(key)
+function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: (item: T, index: number) => unknown, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
+  const keys = list.map((item, index) => key(item, index))
   const update = (row: Row, index: number) => {
     row.setItem(list[index])
     row.setIndex?.(index)

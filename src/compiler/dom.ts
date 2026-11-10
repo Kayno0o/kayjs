@@ -6,7 +6,7 @@ import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
-import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { addGroupChecked, groupValue, staticAttributeText } from './plan'
@@ -265,12 +265,16 @@ export class DomTemplate extends TemplateWriter {
 
     b.add(`KayLoop(${at}, () => (`).addSource(node.each).add('), ')
 
-    if (keying.kind === 'positional')
+    if (keying.kind === 'positional') {
       b.add('false')
-    else if (keying.kind === 'expression')
-      b.add('(').addSource(node.item).add(') => (').addSource(keying.key).add(')')
-    else
+    }
+    else if (keying.kind === 'expression') {
+      addKeyParameters(b, node, this.src)
+      b.add(' => (').addSource(keying.key).add(')')
+    }
+    else {
       b.add(helperName('rowKey'))
+    }
 
     b.add(', (')
     addRowItem(b, node)

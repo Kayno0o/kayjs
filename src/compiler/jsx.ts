@@ -4,7 +4,7 @@ import type { ElementShape } from './plan'
 import type { Sites } from './rewrite-types'
 import { bindsOwnProp, failedBlockOf, handedParts, isSlot, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
-import { addConstValue, addRowItem, contentOf, rowKeying, slotValue } from './items'
+import { addConstValue, addKeyParameters, addRowItem, contentOf, rowKeying, slotValue } from './items'
 import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
@@ -41,7 +41,7 @@ const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
-  private rowKey: { key: Span, index: Span | undefined } | undefined
+  private rowKey: Span | undefined
 
   constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
 
@@ -161,7 +161,7 @@ export class JsxTemplate {
     this.rowKey = undefined
 
     if (rowKey)
-      this.emitKeyRead(rowKey.key, rowKey.index, rest)
+      this.emitKeyRead(rowKey, rest)
     else
       this.emitRoot(rest)
 
@@ -398,13 +398,17 @@ export class JsxTemplate {
 
       b.add('} keyed={')
 
-      if (keying.kind === 'positional')
+      if (keying.kind === 'positional') {
         b.add('false')
-      else if (keying.kind === 'expression')
-        b.add('(').addSource(node.item).add(') => (').addSource(keying.key).add(')')
+      }
+      else if (keying.kind === 'expression') {
+        addKeyParameters(b, node, this.src)
+        b.add(' => (').addSource(keying.key).add(')')
+      }
       // Rows keyed by the item's `id` or the item itself, which any item has.
-      else
+      else {
         b.add('() => 0')
+      }
 
       b.add('}')
 
@@ -486,25 +490,22 @@ export class JsxTemplate {
 
       addRowItem(b, node)
 
-      // A key the loop matches rows by sees the item alone, as the browser's key function does, so the index is declared after it is read.
-      const keyIndex = node.key && !staticLoop && !positional ? node.index : undefined
-
       b.add(') => ')
 
       // The index is a local of the block rather than a parameter, so an index nothing reads is reported as any name is, without `noUnusedParameters`.
-      if (node.index && !keyIndex)
+      if (node.index)
         this.openIndex(node.index, !staticLoop && !positional)
 
       // The key is read in the block, so the type check sees it, and hover and rename reach the key's name.
       if (node.key && node.row !== undefined)
-        this.rowKey = { key: node.key, index: keyIndex }
+        this.rowKey = node.key
 
       if (node.key && node.row === undefined)
-        this.emitKeyRead(node.key, keyIndex, node.children)
+        this.emitKeyRead(node.key, node.children)
       else
         this.emitRoot(node.children)
 
-      b.add(node.index && !keyIndex ? ' })(KayRow(kayEach))' : ')(KayRow(kayEach))')
+      b.add(node.index ? ' })(KayRow(kayEach))' : ')(KayRow(kayEach))')
 
       if (staticLoop) {
         if (node.fallback) {
@@ -533,18 +534,12 @@ export class JsxTemplate {
     this.b.addSource(index).add(` = 0 as number; ${this.src.startsWith('_', index.start) ? `void ${this.src.slice(index.start, index.end)}; ` : ''}return `)
   }
 
-  private emitKeyRead(key: Span, index: Span | undefined, nodes: Node[]) {
+  private emitKeyRead(key: Span, nodes: Node[]) {
     const { b } = this
 
     b.add('(void (').addSource(key).add('), ')
-
-    if (index) {
-      b.add('(() => ')
-      this.openIndex(index, true)
-    }
-
     this.emitRoot(nodes)
-    b.add(index ? ' })())' : ')')
+    b.add(')')
   }
 
   // Nothing here updates, so the loop's callback gets the item and the index themselves rather than `For`'s accessors.
