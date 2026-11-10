@@ -163,13 +163,13 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
 
   // The API modules are read here, as an unset `requireGuards` comes to what the app's own routes, endpoints and API modules guard.
-  options.guardRequirement = guardRequirement(options.requireGuards, setup.routes, setup.endpoints, await setup.api)
-  const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.guardRequirement)
+  const required = guardRequirement(options.requireGuards, setup.routes, setup.endpoints, await setup.api)
+  const routes = await servedRoutes(setup.routes, setup.claimed.routes, required)
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   dropExitListenerOnStop(app)
 
-  const boot = bootOf({ app, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey })
+  const boot = bootOf({ app, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey, required })
   const earlier = knowPages(boot)
   const writes = keptPageWrites(boot)
 

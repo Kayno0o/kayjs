@@ -5,6 +5,7 @@ import { stringify } from 'devalue'
 import { writeShadowTypes } from '../src/check'
 import { exportedEndpoints } from '../src/server/endpoints'
 import { falseKeys, scanEndpoints } from '../src/server/routes'
+import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -109,6 +110,36 @@ describe('requireGuards', () => {
     expect(await exportedEndpoints(dir, endpoints, true)).toEqual({ paths: ['/status.json'], problems: [{ code: 'export-guard', message: 'routes/feed.json.ts: requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it' }] })
     expect((await exportedEndpoints(dir, endpoints, 'routes')).paths).toEqual(['/status.json'])
     expect((await exportedEndpoints(dir, endpoints)).paths.sort()).toEqual(['/feed.json', '/status.json'])
+  })
+
+  it('keeps an open page out of a static export on a site that sets nothing, until the page says guards: false', async () => {
+    const routes = join(dir, 'export/routes')
+
+    await Promise.all([
+      Bun.write(join(routes, 'admin/_guard.ts'), ADMINS),
+      Bun.write(join(routes, 'admin/index.kay'), 'h1 Admin\n'),
+      Bun.write(join(routes, 'index.kay'), 'h1 Home\n'),
+    ])
+    const build = await scratchBuild({ dirs: { routes } })
+    const exportAll = async () => {
+      try {
+        await build.prerender({ dirs: { routes }, requireGuards: undefined }, { exportAll: true })
+
+        return ''
+      }
+      catch (error) {
+        return (error as Error).message
+      }
+    }
+
+    try {
+      expect(await exportAll()).toContain('index.kay: requireGuards is on and no guard covers it')
+      await Bun.write(join(routes, 'index.kay'), `--- server\n${OPEN}---\nh1 Home\n`)
+      expect(await exportAll()).not.toContain('requireGuards is on')
+    }
+    finally {
+      await build.remove()
+    }
   })
 
   it('is reported by kay check, route by route, layouts with actions included', async () => {

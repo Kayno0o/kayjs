@@ -16,7 +16,7 @@ import type { AppHooks } from './server/app-hooks'
 import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
-import type { GuardRequirement } from './server/guard-requirement'
+
 import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
@@ -565,8 +565,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
 // What kay sets on the config it loads, never the app: `publicEnv` is set when `src` holds an `s.Public` field, which sends the browser its environment.
 export interface InternalConfig {
   publicEnv?: boolean | undefined
-  // What `requireGuards` came to once the routes were scanned, which the server reads in its place.
-  guardRequirement?: GuardRequirement | undefined
+
 }
 
 // The config as kay reads it once loaded: what `kay.config.ts` wrote and what kay added.

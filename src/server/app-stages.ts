@@ -6,6 +6,7 @@ import type { ActionOptions } from './actions'
 import type { ServedOptions } from './app'
 import type { ClientBuild } from './client'
 import type { OwnRoutes } from './dev'
+import type { GuardRequirement } from './guard-requirement'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { Writes } from './kept-pages'
@@ -171,6 +172,8 @@ interface BootInput {
   late: LateApp
   mcpAt: string | undefined
   mcpKey: string | false | undefined
+  // What `requireGuards` came to once the routes were scanned.
+  required: GuardRequirement
 }
 
 // What every stage shares, worked out from the setup before the first hook.
@@ -518,8 +521,8 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 }
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
-export function actionOptionsOf({ env, options, setup, late, project }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.guardRequirement ?? options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
+export function actionOptionsOf({ env, options, setup, late, project, required }: Boot, skipBroken: boolean): ActionOptions {
+  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: required, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
@@ -589,7 +592,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
 
 // The OpenAPI document and the MCP endpoint, registered last before the pages.
 export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }: Served, actionOptions: ActionOptions, { openapi, apiAt, servesOpenApi, metadataPaths }: ReturnType<typeof limitBodiesAndClaimApi>): Promise<void> {
-  const { app, env, options, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
+  const { app, env, options, required, setup: { locales }, project: { paths }, mcpAt, mcpKey } = boot
 
   // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
   const document = servesOpenApi || mcpAt !== undefined
@@ -598,7 +601,7 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
 
   // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
   // With no module at all the document stays refused, while the tool list, which holds the actions too, is open: there is no directory to put a guard in.
-  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, (options.guardRequirement ?? options.requireGuards) === true)
+  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, required === true)
 
   if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
