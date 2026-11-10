@@ -846,7 +846,7 @@ describe('kay mcp tools that write', () => {
     expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--format', 'json', './src'])
 
     await call(writer, 'lint', { apply: true })
-    expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--fix', '--format', 'json', '.'])
+    expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--format', 'json', '--fix', '.'])
     expect((await call(writer, 'lint', { paths: ['../x'] })).isError).toBe(true)
   })
 
