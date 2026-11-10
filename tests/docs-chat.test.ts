@@ -61,7 +61,7 @@ describe('the chat button', () => {
 
     for (const html of [home, guide]) {
       expect(html).toContain('kai-launcher-button')
-      expect(html).toContain('data-hydrate="visible"')
+      expect(html).toContain('data-hydrate="idle"')
     }
 
     const moved = await site.fetch('/ask', { redirect: 'manual' })
