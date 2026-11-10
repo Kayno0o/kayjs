@@ -1,7 +1,9 @@
 import type { ExtensionApp, KayConfig, LoadedConfig } from '../config'
 import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
-import type { GuardFile, Route } from '../server/routes'
+import type { ApiModule } from '../server/api-modules'
+import type { GuardRequirement } from '../server/guard-requirement'
+import type { Endpoint, GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
 import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
@@ -22,6 +24,7 @@ import { apiPathOf, mcpPath, openApiPaths, projectApi, RESOURCE_METADATA } from 
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
+import { guardRequirement } from '../server/guard-requirement'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
@@ -101,22 +104,23 @@ export const routes: Command = {
 export async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
   const config = await loadConfig(root)
   const content = await checkContent(root, config.contentConfig, config.site !== undefined)
-  const routes = [...await appRoutes(root, config, content.routes), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...feedRoutes(content.feeds), ...kayRoutes(root, config)]
+  const { routes: routesDir } = projectPaths(root, config)
+  const mounts = routeMounts(root, config.extensions)
+  const [pages, endpoints, modules] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts), projectApi(root, config)])
+  const required = guardRequirement(config.requireGuards, pages, endpoints, modules)
+  const routes = [...await appRoutes(root, config, content.routes, { pages, endpoints, required }), ...await apiRoutes(root, config, modules, required), ...pluginRoutes(config), ...redirectRoutes(config), ...feedRoutes(content.feeds), ...kayRoutes(root, config)]
 
   return { routes, unlisted: unlistedServers(root, config) }
 }
 
-async function appRoutes(root: string, config: KayConfig, collections: CollectionRoute[]): Promise<Listed[]> {
-  const { routes: routesDir } = projectPaths(root, config)
-  const mounts = routeMounts(root, config.extensions)
-  const [pages, endpoints] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts)])
+async function appRoutes(root: string, config: KayConfig, collections: CollectionRoute[], { pages, endpoints, required }: { pages: Route[], endpoints: Endpoint[], required: GuardRequirement }): Promise<Listed[]> {
   const listed: Listed[] = []
   const actionFiles = new Set<string>()
   const settings = config.i18n && routedSettings(localeSettings(config.i18n), pages)
 
   for (const route of pages) {
     const prerendered = await prerenderNote(route, collections)
-    const guards = guardNotes(route.guards, route.open, config)
+    const guards = guardNotes(route.guards, route.open, required)
 
     // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
     for (const [index, copy] of localeCopies(settings, route.pattern).entries())
@@ -132,15 +136,13 @@ async function appRoutes(root: string, config: KayConfig, collections: Collectio
   }
 
   for (const endpoint of endpoints)
-    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), file: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, config), guards: endpoint.guards.map(guard => shown(guard.file)) })
+    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), file: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, required), guards: endpoint.guards.map(guard => shown(guard.file)) })
 
   return listed
 }
 
 // An API module's routes are only known once it runs: one that cannot load is listed by its mount, with why.
-async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
-  const modules = await projectApi(root, config)
-
+async function apiRoutes(root: string, config: KayConfig, modules: ApiModule[], required: GuardRequirement): Promise<Listed[]> {
   if (modules.length > 0)
     await registerLoader(root, config.librarySettings ?? {})
 
@@ -151,7 +153,7 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   for (const module of modules) {
     const guards = module.guards.map(guard => shown(guard.file))
     // A library's module asks no guard of the app, but runs those of its own directory.
-    const notes = guardNotes(module.guards, module.open === true && module.guards.length === 0, config)
+    const notes = guardNotes(module.guards, module.open === true && module.guards.length === 0, required)
 
     try {
       const exported = (await importApi(module.file)).default
@@ -258,11 +260,11 @@ function localeNotes(copy: { locale: string | undefined, host?: string }, settin
   return [copy.host === undefined ? copy.locale : `${copy.locale} at ${copy.host}`]
 }
 
-function guardNotes(guards: GuardFile[] | { file: string }[], open: boolean | undefined, config: KayConfig): string[] {
+function guardNotes(guards: GuardFile[] | { file: string }[], open: boolean | undefined, required: GuardRequirement): string[] {
   if (open)
     return ['open']
 
-  return guards.length === 0 && config.requireGuards ? ['403: no guard under requireGuards'] : []
+  return guards.length === 0 && required !== false ? ['403: no guard under requireGuards'] : []
 }
 
 async function serverOf(file: string) {

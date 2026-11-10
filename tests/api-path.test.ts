@@ -6,7 +6,7 @@ import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
 const KEY = { 'x-key': 'open' }
-const moved = await testSite({ root: 'tests/fixtures/openapi', serve: { apiPath: '/v1' }, openapi: { reference: true }, mcp: true, base: '/shop' })
+const moved = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', serve: { apiPath: '/v1' }, openapi: { reference: true }, mcp: true, base: '/shop' })
 
 afterAll(async () => {
   await moved.close()
@@ -44,7 +44,7 @@ describe('apiPath', () => {
   })
 
   it('keeps /api and sets no meta when left out', async () => {
-    const plain = await testSite({ root: 'tests/fixtures/openapi' })
+    const plain = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi' })
 
     try {
       expect((await plain.fetch('/api/items/1', { headers: KEY })).status).toBe(200)
@@ -86,7 +86,7 @@ describe('apiUrl in a handler', () => {
     try {
       await Bun.write(join(root, 'api/where.ts'), 'import { apiUrl } from \'kay\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', ({ request }) => ({ here: apiUrl(request, \'/\'), item: apiUrl(request, \'/items/:id\', { params: { id: 7 }, query: { q: \'a b\' } }) }))\n')
 
-      const site = await testSite({ root: 'tests/fixtures/openapi', dirs: { api: join(root, 'api') }, serve: { apiPath: '/v1' }, base: '/shop' })
+      const site = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', dirs: { api: join(root, 'api') }, serve: { apiPath: '/v1' }, base: '/shop' })
 
       try {
         expect(await (await site.fetch('/v1/where')).json()).toEqual({ here: '/v1/where', item: '/v1/where/items/7?q=a+b' })

@@ -205,7 +205,7 @@ describe('over a listening server', () => {
       Bun.write(join(dir, 'api/files.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/*\', ({ params }) => \'<p class="api">\' + params[\'*\'])\n'),
     ])
 
-    const wanted = { dirs: { routes, api: join(dir, 'api') }, redirects: { '/old/*': '/new/*' }, prebuilt: false as const, store: { files: storage } }
+    const wanted = { dirs: { routes, api: join(dir, 'api') }, redirects: { '/old/*': '/new/*' }, prebuilt: false as const, requireGuards: false, store: { files: storage } }
     const app = new Elysia().use(await pages(wanted))
     const client = await builtClient(wanted)
     const asset = (await readdir(client.dir)).find(file => file.endsWith('.js'))!

@@ -3,31 +3,30 @@ import type { ServedProject } from './shadow-types'
 import { lintLevel } from '../compiler/lints'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { guardRequirement } from '../server/guard-requirement'
 
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
 // On a site with `requireGuards`, what the server answers 403 for: each page, layout with actions, endpoint and API module of the app no guard covers that does not set `guards: false`.
-// A site that leaves `requireGuards` unset but guards some route gets its routes (not layouts or action modules) as warnings, for what a 2.0 start would refuse; `requireGuards: false` keeps it quiet.
+// A site that leaves `requireGuards` unset but guards some route of its own is held to it for its routes alone (not layouts or action modules), as its start refuses them; `requireGuards: false` keeps it open.
 export async function unguardedRoutes(options: CheckOptions, { routes, endpoints, apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-route', options.lints)
 
-  if (options.requireGuards === false || level === 'allow')
+  const required = guardRequirement(options.requireGuards, routes, endpoints, apiModules)
+
+  if (required === false || level === 'allow')
     return []
 
-  const upcoming = options.requireGuards === undefined
-
-  // Guards a library mounts on its own routes say nothing of the app's: only the app's own guarded routes mark a site that has started to guard.
-  if (upcoming && ![...routes, ...endpoints, ...apiModules].some(route => route.open !== true && route.guards.length > 0))
-    return []
+  const unset = options.requireGuards === undefined
 
   const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({
     file,
     line: 1,
     column: 1,
-    message: upcoming ? message.replace('the server refuses', 'a 2.0 start would refuse') : message,
-    help: upcoming ? `${help}, or set \`requireGuards: false\` to keep it open` : help,
+    message,
+    help: unset ? `${help}, or set \`requireGuards: false\` to keep it open` : help,
     code: 'unguarded-route',
-    severity: level === 'warn' || upcoming ? 'warning' : 'error',
+    severity: level === 'warn' ? 'warning' : 'error',
   })
   const found: CheckDiagnostic[] = []
   const layouts = new Map<string, boolean>()
@@ -51,8 +50,8 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
     }
   }
 
-  // Layouts and action modules are not routes: a site that has not asked for `requireGuards` is told of its routes alone.
-  for (const [layout, guarded] of upcoming ? [] : layouts) {
+  // Layouts and action modules are not routes: a site that leaves `requireGuards` unset is told of its routes alone.
+  for (const [layout, guarded] of required === 'routes' ? [] : layouts) {
     const source = guarded ? '' : await Bun.file(layout).text()
     const actions = guarded ? [] : analyzeServer(source, parseKay(source).server)?.actionNames ?? []
 

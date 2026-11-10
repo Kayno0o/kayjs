@@ -8,6 +8,7 @@ import type { ActionOptions } from './actions'
 import type { RouteBodyLimit } from './body'
 import type { CorsRule } from './cors'
 import type { EndpointVerb } from './endpoint-verbs'
+import type { GuardRequirement } from './guard-requirement'
 import type { LoadedGuard } from './guards'
 import type { Unmatched } from './page-routes'
 import type { Endpoint } from './routes'
@@ -125,7 +126,7 @@ async function timedOut(request: Request, { onError }: ActionOptions, run: () =>
   }
 }
 
-async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): Promise<ServedEndpoint> {
+async function loadEndpoint(endpoint: Endpoint, required: GuardRequirement | undefined): Promise<ServedEndpoint> {
   const module = await importModule<Record<string, unknown>>(endpoint.file)
   const handlers = new Map(ENDPOINT_VERBS.flatMap(verb => typeof module[verb] === 'function' ? [[verb, module[verb] as Handler] as const] : []))
 
@@ -351,7 +352,7 @@ function responseOf(endpoint: ServedEndpoint, verb: string, body: unknown): Resp
 }
 
 // The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file. A file with no GET has no page to write.
-export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: boolean): Promise<{ paths: string[], problems: ExportProblem[] }> {
+export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: GuardRequirement): Promise<{ paths: string[], problems: ExportProblem[] }> {
   const paths: string[] = []
   const problems: ExportProblem[] = []
 
@@ -362,7 +363,7 @@ export async function exportedEndpoints(root: string, endpoints: Endpoint[], req
       if (endpoint.guards.length > 0)
         throw new KayError('export-guard', 'a guard covers it, and only a server can run one per request')
 
-      if (required === true && endpoint.open !== true)
+      if ((required === true || required === 'routes') && endpoint.open !== true)
         throw new KayError('export-guard', 'requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
 
       const module = await importModule<{ GET?: unknown }>(endpoint.file)

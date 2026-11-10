@@ -1,6 +1,7 @@
 import type { InternalConfig, KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from './client'
+import type { GuardRequirement } from './guard-requirement'
 import type { ServedRoute } from './guards'
 import type { ClaimedFile } from './public'
 import type { Redirect } from './redirects'
@@ -20,6 +21,7 @@ import { claimEndpoints } from './endpoint-claims'
 import { holdPublicEnv } from './env'
 import { PUBLIC_ENV_PATH, publicEnvFiles, publicInFenceMessage } from './env-state'
 import { faviconSource, MANIFEST, manifestJson } from './favicon'
+import { guardRequirement } from './guard-requirement'
 import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { dropExitListenerOnStop } from './lifecycle'
@@ -46,7 +48,7 @@ export interface PagesOptions extends KayConfig {
 export type ServedOptions = PagesOptions & InternalConfig
 
 // The routes with their guards loaded.
-async function servedRoutes(routes: Route[], pages: ServedRoute[], required: boolean | undefined): Promise<ServedRoute[]> {
+async function servedRoutes(routes: Route[], pages: ServedRoute[], required: GuardRequirement): Promise<ServedRoute[]> {
   return Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
 }
 
@@ -159,7 +161,10 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
   const setup = await setupPages(project, loadClient, false, late.spell, scanned => refuseScanned(project, scanned), exported)
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
-  const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.requireGuards)
+
+  // The API modules are read here, as an unset `requireGuards` comes to what the app's own routes, endpoints and API modules guard.
+  options.guardRequirement = guardRequirement(options.requireGuards, setup.routes, setup.endpoints, await setup.api)
+  const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.guardRequirement)
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
   dropExitListenerOnStop(app)

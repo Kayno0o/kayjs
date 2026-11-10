@@ -31,7 +31,7 @@ async function serve(root: string, variant: Variant): Promise<Elysia> {
   let app = served.get(key)
 
   if (app === undefined) {
-    app = (async () => new Elysia().use(await pages({ root, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined })))()
+    app = (async () => new Elysia().use(await pages({ requireGuards: false, root, prebuilt: false, security: false, base: base || undefined, trailingSlash, dev, site: configured, proxy: proxy === 'declared' ? { header: 'x-real-ip' } : undefined })))()
     served.set(key, app)
   }
 

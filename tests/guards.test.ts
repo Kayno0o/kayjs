@@ -16,6 +16,7 @@ describe('requireGuards', () => {
   let dir = ''
   let required: Awaited<ReturnType<typeof pages>>
   let optional: Awaited<ReturnType<typeof pages>>
+  let unset: Awaited<ReturnType<typeof pages>>
 
   const status = async (app: typeof required, path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${path}`, { headers }))).status
   const post = async (file: string, name: string, headers: Record<string, string> = {}, app = required) => {
@@ -54,7 +55,8 @@ describe('requireGuards', () => {
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'secret\')\n'),
     ])
     required = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, requireGuards: true })
-    optional = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+    optional = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, requireGuards: false })
+    unset = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -105,6 +107,7 @@ describe('requireGuards', () => {
     const endpoints = await scanEndpoints(join(dir, 'routes'))
 
     expect(await exportedEndpoints(dir, endpoints, true)).toEqual({ paths: ['/status.json'], problems: [{ code: 'export-guard', message: 'routes/feed.json.ts: requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it' }] })
+    expect((await exportedEndpoints(dir, endpoints, 'routes')).paths).toEqual(['/status.json'])
     expect((await exportedEndpoints(dir, endpoints)).paths.sort()).toEqual(['/feed.json', '/status.json'])
   })
 
@@ -122,29 +125,45 @@ describe('requireGuards', () => {
     expect(await reported(false)).toEqual([])
   })
 
-  it('is reported by kay check as a warning on a site that sets nothing but guards some routes, naming what a 2.0 start would refuse', async () => {
+  it('is reported by kay check as an error on a site that sets nothing but guards some routes, naming what its start refuses', async () => {
     const reported = async (requireGuards?: boolean) => (await writeShadowTypes(dir, { dirs: { routes: 'routes', api: 'api' }, requireGuards })).problems.filter(found => found.code === 'unguarded-route')
-    const unset = await reported()
+    const found = await reported()
 
-    // Routes alone: a layout's or module's actions are not routes a start would refuse.
-    expect(unset.map(found => [relative(dir, found.file), found.severity])).toEqual([['routes/index.kay', 'warning'], ['routes/feed.json.ts', 'warning'], ['api/notes.ts', 'warning']])
-    expect(unset.every(found => found.message.includes('so a 2.0 start would refuse'))).toBe(true)
+    // Routes alone: a layout's or module's actions are not routes a start with no setting refuses.
+    expect(found.map(problem => [relative(dir, problem.file), problem.severity])).toEqual([['routes/index.kay', 'error'], ['routes/feed.json.ts', 'error'], ['api/notes.ts', 'error']])
+    expect(found.every(problem => problem.message.endsWith('so the server refuses it') || problem.message.endsWith('so the server refuses its routes'))).toBe(true)
+    expect(found.every(problem => problem.help?.includes('requireGuards: false'))).toBe(true)
     expect(await reported(false)).toEqual([])
   })
 
-  it('says nothing on a site no route of which has a guard', async () => {
+  it('refuses at a start with no setting the routes kay check names, and serves the rest', async () => {
+    expect(await status(unset, '/')).toBe(403)
+    expect(await status(unset, '/feed.json')).toBe(403)
+    expect(await status(unset, '/api/notes')).toBe(403)
+    expect(await status(unset, '/login')).toBe(200)
+    expect(await status(unset, '/status.json')).toBe(200)
+    expect(await status(unset, '/api/health')).toBe(200)
+    expect(await status(unset, '/admin', { 'x-admin': '1' })).toBe(200)
+    // Routes alone: the actions of a layout or module no guard covers stay open, as kay check does not name them.
+    expect(await post('_layout.kay', 'leave', {}, unset)).toBe(200)
+    expect(await post('news/_layout.kay', 'subscribe', {}, unset)).toBe(200)
+    expect(await post('staff/_layout.kay', 'promote', {}, unset)).toBe(403)
+  })
+
+  it('says nothing, and serves every route, on a site no route of which has a guard', async () => {
     const bare = await scratchDir('unguarded-bare-')
 
     try {
       await Bun.write(join(bare, 'routes/index.kay'), 'h1 Home\n')
       expect((await writeShadowTypes(bare, { dirs: { routes: 'routes', api: 'api' } })).problems.filter(found => found.code === 'unguarded-route')).toEqual([])
+      expect(await status(await pages({ root: bare, dirs: { routes: 'routes', api: 'api' }, prebuilt: false }), '/')).toBe(200)
     }
     finally {
       await rm(bare, { recursive: true, force: true })
     }
   })
 
-  it('leaves a site without it as it was', async () => {
+  it('leaves a site with requireGuards false as it was', async () => {
     expect(await status(optional, '/')).toBe(200)
     expect(await status(optional, '/feed.json')).toBe(200)
     expect(await status(optional, '/api/notes')).toBe(200)

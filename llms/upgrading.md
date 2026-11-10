@@ -34,6 +34,10 @@ Their lints (`deprecated-stream-types`, `deprecated-stream-on`, `deprecated-hook
 - Form, FormDialog and SaveForm `onSaved` is `onSave`, ContactForm and SubscribeForm `onSent` is `onSend`, AudioPlayer `onEnded` is `onEnd`, and the call that does a SaveForm's save is `save`, no longer `onSave`.
 - IconPicker's `search(query, limit, offset)` is `icons={({ q, limit, offset }) => ...}`.
 - The image resizer answers `/_kay/images` only: a link to `/_kay/image` is a 404, so rewrite one an app wrote by hand.
+### A route no guard covers is refused once the site has a guard
+
+With `requireGuards` unset, a site that declares a guard of its own (a `_guard.ts` or an `api()` guard, not a library's) now answers 403 on each page, endpoint and API module no guard covers, where it served them. A site with no guard at all starts as before, and `requireGuards: true` and `false` mean what they did. `kay check` already reports each such route as `unguarded-route`, now an error: add the guard, set `guards: false` on a route anyone may reach, or set `requireGuards: false` in kay.config.ts to keep every route open. A scaffolded `requireGuards: true` next to a root `_guard.ts` can go; no lint carries it, as `kay check` names each route. ([guards](guards.md))
+
 ### A cookie an app sets is hardened by default
 
 A cookie set with `ctx.cookies.set` (a page, endpoint, guard or action) or by an `api()` route is now `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, where it was Bun's plain `Path=/` with neither `HttpOnly` nor `Secure`, unless the call gives the option itself. No lint can see it. A cookie a script reads from `document.cookie` needs `{ httpOnly: false }` on its `set`; to keep the old headers for every cookie, set `security: { cookies: false }` in kay.config.ts. A scaffolded `security: { cookies: {} }` is now the default and can go ([server](server.md#sessions)).

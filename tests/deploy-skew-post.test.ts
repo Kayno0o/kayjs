@@ -3,7 +3,7 @@ import { testSite } from '../src/test'
 
 describe('a native post answered by a page', () => {
   it('marks the document of a post that came back to a page rendering an error, as it does the one of a rendered failure', async () => {
-    const site = await testSite({ root: 'tests/fixtures/site' })
+    const site = await testSite({ requireGuards: false, root: 'tests/fixtures/site' })
 
     try {
       const post = async (back: string) => site.fetch(`/_kay/action/src/routes/index.kay/add?kay_back=${encodeURIComponent(back)}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost' }, body: 'title=' })

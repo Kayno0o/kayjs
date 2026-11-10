@@ -3,6 +3,7 @@ import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { AwaitNote } from '../runtime/html'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { GuardRequirement } from './guard-requirement'
 import type { LocaleCopy } from './i18n'
 import type { ListedParams } from './prerendered'
 import type { Scan, Stop } from './pure-page'
@@ -25,8 +26,9 @@ import { projectApi } from './api-modules'
 import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
-import { localeCopies, stateFor } from './i18n'
+import { guardRequirement } from './guard-requirement'
 
+import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
@@ -153,8 +155,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (!manifest)
     throw new KayError('export-no-client-build', 'kay: no client build to add prerendered pages to; run buildClient first')
 
+  const { source, mounts, routes, endpoints, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
+
   const dir = join(output, PRERENDERED_DIR)
-  const { source, mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   options.routes?.push(...routes)
   countStandInReads(STAND_IN_READS)
@@ -202,7 +205,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const inferred = pageSetting(module, 'prerender') === undefined && prerender !== undefined
 
     if (options.exportAll)
-      refuseServerOnly(route, module, config.requireGuards)
+      refuseServerOnly(route, module, guardRequirement(config.requireGuards, routes, endpoints))
 
     // A static export takes a page without params as it is, and so does a page holding a server island: what is not one is the same for everyone.
     const listed = (options.exportAll === true || marked || auto) && prerender === undefined && route.params.length === 0 ? true : prerender
@@ -249,7 +252,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
       const refusal: { read?: RequestReadError } = {}
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged(refusal) }, prerendering: true, awaits, guarded: guardedPage(route, config.requireGuards) })
+      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged(refusal) }, prerendering: true, awaits, guarded: guardedPage(route, guardRequirement(config.requireGuards, routes, endpoints)) })
       const inLocale = async (awaits?: AwaitNote[]) => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), async () => render(awaits))
       // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
       // Taken in the order the pages are judged in, as rendering one at a time took them.
@@ -427,7 +430,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (response.status === 200 && !auto) {
           const noindex = chainSetting(chain, 'noindex') === true
-          const indexed = config.search === true && !noindex && !guardedPage(route, config.requireGuards)
+          const indexed = config.search === true && !noindex && !guardedPage(route, guardRequirement(config.requireGuards, routes, endpoints))
 
           const sitemap = pageSetting(module, 'sitemap')
 
@@ -537,7 +540,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     kayLog('warn', message(paths[0]!, paths.length > 1 ? ` and ${paths.length - 1} more page${paths.length > 2 ? 's' : ''}` : ''))
 
   const apiProblems: ExportProblem[] = options.exportAll ? (await projectApi(root, config)).map(module => ({ code: 'export-api-module', message: `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file` })) : []
-  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), config.requireGuards)).problems : []
+  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), guardRequirement(config.requireGuards, routes, endpoints))).problems : []
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
@@ -588,17 +591,17 @@ function awaitFindings(awaits: AwaitNote[], root: string): AwaitFinding[] {
   return findings
 }
 
-// Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.
-function guardedPage(route: Route, required: boolean | undefined): boolean {
-  return route.guards.length > 0 || (required === true && route.open !== true)
+// Whether a guard answers for the page, a site requiring guards refusing one no guard covers: its words stay out of the public search index.
+function guardedPage(route: Route, required: GuardRequirement): boolean {
+  return route.guards.length > 0 || (required !== false && route.open !== true)
 }
 
 // What only a server can do: a guard decides per request, and an action takes a post.
-function refuseServerOnly(route: Route, module: Record<string, unknown>, required: boolean | undefined): void {
+function refuseServerOnly(route: Route, module: Record<string, unknown>, required: GuardRequirement): void {
   if (route.guards.length > 0)
     throw new KayError('export-guard', 'kay: a guard covers it, and only a server can run one per request')
 
-  if (required === true && route.open !== true)
+  if (required !== false && route.open !== true)
     throw new KayError('export-guard', 'kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
 
   const action = Object.keys(module).find(name => isAction(module[name]))

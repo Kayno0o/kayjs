@@ -593,6 +593,7 @@ describe('kay build --static', () => {
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
     try {
+      await Bun.write(join(fixture, 'kay.config.ts'), (await Bun.file(join(fixture, 'kay.config.ts')).text()).replace('  site: ', '  requireGuards: false,\n  site: '))
       await Bun.write(join(guarded, '_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n')
       await Bun.write(join(guarded, 'index.kay'), 'h1 Members\n')
       await Bun.write(join(tags, '[tag].kay'), 'h1 Tag\n')

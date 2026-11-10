@@ -195,11 +195,11 @@ await Promise.all(Object.entries(files).map(async ([path, source]) => {
 
 const dirs = { routes: relative(process.cwd(), join(dir, 'src/routes')), api: relative(process.cwd(), join(dir, 'src/api')), components: relative(process.cwd(), join(dir, 'src/components')) }
 const sites = {
-  plain: await testSite({ dirs, styles: true }),
-  dev: await testSite({ dirs, dev: true, styles: true }),
-  mounted: await testSite({ dirs, base: '/blog', trailingSlash: 'always', styles: true }),
-  compressed: await testSite({ dirs, styles: true, serve: { compress: true } }),
-  localized: await testSite({ dirs, styles: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(dir, 'src/messages') } }),
+  plain: await testSite({ requireGuards: false, dirs, styles: true }),
+  dev: await testSite({ requireGuards: false, dirs, dev: true, styles: true }),
+  mounted: await testSite({ requireGuards: false, dirs, base: '/blog', trailingSlash: 'always', styles: true }),
+  compressed: await testSite({ requireGuards: false, dirs, styles: true, serve: { compress: true } }),
+  localized: await testSite({ requireGuards: false, dirs, styles: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(dir, 'src/messages') } }),
 }
 const { calls } = await import(join(dir, 'src/api/data.ts')) as { calls: { items: number, entry: number } }
 const SCRIPT = /<script type="application\/json" data-kay-resources>(.*?)<\/script>/s

@@ -200,7 +200,7 @@ describe('seo head', () => {
     process.env.SITE_URL = '/x'
 
     try {
-      expect((await loadConfig('tests/fixtures/seo')).site).toBe('/x')
+      expect((await loadConfig(resolve('tests/fixtures/seo'))).site).toBe('/x')
     }
     finally {
       if (before === undefined)

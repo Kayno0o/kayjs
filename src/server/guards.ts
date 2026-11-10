@@ -1,4 +1,5 @@
 import type { Guard, GuardContext } from '../runtime'
+import type { GuardRequirement } from './guard-requirement'
 import type { GuardFile, LayoutAccess, Route, SpecialPages } from './routes'
 import { KayError } from '../compiler/errors'
 import { importModule } from './bundle'
@@ -23,7 +24,7 @@ export interface Refusal {
   error: unknown
 }
 
-export async function loadGuards(route: Route, required = false): Promise<ServedRoute> {
+export async function loadGuards(route: Route, required: GuardRequirement = false): Promise<ServedRoute> {
   const layoutGuards = await Promise.all((route.layoutAccess ?? []).map(async access => ({ ...access, guards: await Promise.all(access.guards.map(loadGuard)) })))
 
   const actionGuards = route.actionAccess && await Promise.all(route.actionAccess.map(async access => ({ ...access, guards: await Promise.all(access.guards.map(loadGuard)) })))
@@ -31,11 +32,11 @@ export async function loadGuards(route: Route, required = false): Promise<Served
   return { ...route, layoutGuards, ...actionGuards && { actionGuards }, guards: requiredGuards(await Promise.all(route.guards.map(loadGuard)), route, route.special, required) }
 }
 
-// What a site with `requireGuards` answers on a route of its own that no guard covers and that did not set `guards: false`.
+// What a site requiring guards answers on a route of its own that no guard covers and that did not set `guards: false`.
 export const unguarded: Guard = ({ deny }) => deny(403, 'No guard covers this route')
 
-export function requiredGuards(guards: LoadedGuard[], route: { file: string, open?: true | undefined }, special: SpecialPages, required: boolean | undefined): LoadedGuard[] {
-  return required === true && guards.length === 0 && route.open !== true ? [{ file: route.file, special, check: unguarded }] : guards
+export function requiredGuards(guards: LoadedGuard[], route: { file: string, open?: true | undefined }, special: SpecialPages, required: GuardRequirement | undefined): LoadedGuard[] {
+  return (required === true || required === 'routes') && guards.length === 0 && route.open !== true ? [{ file: route.file, special, check: unguarded }] : guards
 }
 
 export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {

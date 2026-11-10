@@ -11,6 +11,7 @@ import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { CorsOptions } from './cors'
 import type { Flash } from './flash'
+import type { GuardRequirement } from './guard-requirement'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
@@ -100,7 +101,7 @@ export interface ActionOptions {
   i18n: I18n
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
-  requireGuards?: boolean | undefined
+  requireGuards?: GuardRequirement | undefined
   // `serve.timeout` in milliseconds.
   timeout?: number | undefined
   // How a redirect is spelled, with the trailing slash its page has.
@@ -316,7 +317,7 @@ interface ActionPage {
 
 // Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.
 // A page's actions read its params, a layout's those of every page it wraps.
-function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<string, ActionPage & { guards: LoadedGuard[] }> {
+function actionFiles(routes: ServedRoute[], required: GuardRequirement | undefined): Map<string, ActionPage & { guards: LoadedGuard[] }> {
   const files = new Map<string, ActionPage & { guards: LoadedGuard[] }>()
 
   for (const route of routes) {
@@ -337,7 +338,7 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
       const access = index < route.layouts.length ? route.layoutGuards?.[index] : route.actionGuards?.[index - route.layouts.length]
       const { guards, open } = file === route.file ? route : access ?? { guards: [{ file, special: route.special, check: unguarded }] }
 
-      files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required), routes: [route], params: route.params })
+      files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required === true), routes: [route], params: route.params })
     }
   }
 

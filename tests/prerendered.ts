@@ -60,7 +60,7 @@ export async function scratchBuild(config: KayConfig = {}, manifestOnly = false,
 
   const client = async () => (await readClient(root, dir))!
   const project = (config: KayConfig) => {
-    const resolved = resolveProject(root, config)
+    const resolved = resolveProject(root, { requireGuards: false, ...config })
 
     return { ...resolved, paths: { ...resolved.paths, output: dir } }
   }
@@ -72,7 +72,7 @@ export async function scratchBuild(config: KayConfig = {}, manifestOnly = false,
     prerender: async (config, options, built) => prerenderPages(project(config), built ?? await client(), options),
     serve: async (options = {}) => {
       const mode = modeOf({ prebuilt: true, ...options })
-      const resolved = resolveProject(root, { ...await withConfig(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+      const resolved = resolveProject(root, { ...await withConfig(root, { requireGuards: false, ...options }), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
 
       return servePages({ ...resolved, paths: { ...resolved.paths, output: dir } }, client)
     },

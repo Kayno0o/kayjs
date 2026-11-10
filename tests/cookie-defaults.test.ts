@@ -47,7 +47,7 @@ describe('cookie defaults', () => {
       Bun.write(join(dir, 'api/gone.ts'), GONE),
     ])
 
-    const base = { root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false }
+    const base = { root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, requireGuards: false }
 
     servers.plain = await pages({ ...base, security: false })
     servers.off = await pages({ ...base, security: { cookies: false } })
@@ -185,7 +185,7 @@ describe('cookie defaults', () => {
   })
 
   it('keeps plain-http localhost working under kay dev', async () => {
-    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, dev: true, security: { cookies: {} } })
+    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, requireGuards: false, dev: true, security: { cookies: {} } })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
   })
@@ -219,7 +219,7 @@ describe('cookie defaults', () => {
       setSite(undefined)
     }
 
-    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, dev: true })
+    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, requireGuards: false, dev: true })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
     expect((await cookies('off', '/cookie')).set[0]).toBe('theme=dark; Path=/; SameSite=Lax')

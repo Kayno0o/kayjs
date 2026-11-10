@@ -88,7 +88,7 @@ async function i18nLinks(): Promise<Size> {
 async function servedPage(fixture: string, path: string): Promise<Size> {
   const root = await copyOf(fixture, join(ROOT, 'tests/fixtures', fixture))
 
-  await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
+  await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, requireGuards: false })\n')
   process.env.NODE_ENV = 'production'
   await build([root], { NODE_ENV: 'production' })
 

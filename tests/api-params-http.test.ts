@@ -31,7 +31,7 @@ describe('an api route with a params schema over real HTTP', () => {
     ['dev', '', { dev: true }],
     ['a base and trailing slash', '', { base: '/app', trailingSlash: 'always' as const }],
   ])('reads the params as the schema types them in %s', async (_name, base, options) => {
-    const served = await pages({ dirs: { routes: ROUTES, api: join(dir, 'api') }, prebuilt: true, ...options })
+    const served = await pages({ requireGuards: false, dirs: { routes: ROUTES, api: join(dir, 'api') }, prebuilt: true, ...options })
 
     served.listen({ port: 0, hostname: '127.0.0.1' })
 

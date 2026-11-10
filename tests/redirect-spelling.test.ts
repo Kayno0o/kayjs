@@ -21,7 +21,7 @@ interface Variant { base: string, trailingSlash: Slash, locales: boolean, dev: b
 async function serve({ base, trailingSlash, locales, dev }: Variant): Promise<Elysia> {
   const i18n: I18nConfig | undefined = locales ? { locales: ['fr', 'en'], defaultLocale: 'fr', messages } : undefined
 
-  return new Elysia().use(await pages({ root: 'tests/fixtures/redirect-spelling', prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
+  return new Elysia().use(await pages({ requireGuards: false, root: 'tests/fixtures/redirect-spelling', prebuilt: false, security: false, site: 'https://x.example', i18n, base: base || undefined, trailingSlash, dev }))
 }
 
 // Where `to` sends a visit, posted or read the way each `way` does, from the page in `locale`; the answer as the browser would read it, with the base taken off.
@@ -154,7 +154,7 @@ describe('a redirect on a site whose root catch-all page could take any path', (
 
   for (const dev of [false, true]) {
     it(`spells a page and leaves what else serves the path as written, ${dev ? 'dev' : 'production'}`, async () => {
-      const app = new Elysia().use(await pages({ root: 'tests/fixtures/redirect-shadow', prebuilt: false, security: false, trailingSlash: 'always', dev, extensions: [extension] }))
+      const app = new Elysia().use(await pages({ requireGuards: false, root: 'tests/fixtures/redirect-shadow', prebuilt: false, security: false, trailingSlash: 'always', dev, extensions: [extension] }))
 
       const where = async (to: string) => {
         const response = await app.handle(new Request(`http://localhost/bounce/?to=${encodeURIComponent(to)}`))
@@ -186,7 +186,7 @@ describe('the dev tool\'s guard outcome', () => {
 
 describe('the dev tool\'s guard outcome in a render', () => {
   // A redirect answers without a page, so no dev tool carries its outcome: a denial is the refusal a dev render shows.
-  const served = async (dev: boolean) => new Elysia().use(await pages({ root: 'tests/fixtures/guard-outcome', prebuilt: false, security: false, site: 'https://x.example', dev }))
+  const served = async (dev: boolean) => new Elysia().use(await pages({ requireGuards: false, root: 'tests/fixtures/guard-outcome', prebuilt: false, security: false, site: 'https://x.example', dev }))
   const visit = async (dev: boolean) => (await served(dev)).handle(new Request('http://localhost/gated', { headers: { accept: 'text/html' } }))
 
   it('names what the refusing guard did in a dev render', async () => {

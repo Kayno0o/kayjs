@@ -324,7 +324,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ root, dirs: { routes }, dev: true, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
+      const dev = await pages({ root, dirs: { routes }, dev: true, requireGuards: false, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
       const visit = async (path: string, headers: Record<string, string> = {}) => {
         const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
         const block = REQUEST_BLOCK.exec(await response.text())

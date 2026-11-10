@@ -9,8 +9,8 @@ const api = 'tests/fixtures/mcp/src/api'
 const HEADER = 'x-upstream-key'
 const KEY = 'secret-key'
 
-const keyed = await testSite({ dirs: { routes, api }, mcp: true, islands: false, proxy: { key: HEADER }, proxyKey: KEY })
-const plain = await testSite({ dirs: { routes, api }, islands: false, proxy: { key: HEADER } })
+const keyed = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, proxy: { key: HEADER }, proxyKey: KEY })
+const plain = await testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxy: { key: HEADER } })
 const { addNote } = await import(resolve(import.meta.dir, 'fixtures/mcp/src/routes/index.kay')) as { addNote: Action<{ title: string }, { title: string }> }
 
 describe('testSite({ proxyKey })', () => {
@@ -34,13 +34,13 @@ describe('testSite({ proxyKey })', () => {
   })
 
   it('trims the key it sends', async () => {
-    const padded = await testSite({ dirs: { routes, api }, islands: false, proxy: { key: HEADER }, proxyKey: ` ${KEY} ` })
+    const padded = await testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxy: { key: HEADER }, proxyKey: ` ${KEY} ` })
 
     expect((await padded.fetch('/')).status).toBe(200)
   })
 
   it('boots a keyed and a plain site at once, each its own', async () => {
-    const [a, b] = await Promise.all([testSite({ dirs: { routes, api }, islands: false, proxy: { key: HEADER }, proxyKey: KEY }), testSite({ dirs: { routes, api }, islands: false, proxy: { key: HEADER } })])
+    const [a, b] = await Promise.all([testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxy: { key: HEADER }, proxyKey: KEY }), testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxy: { key: HEADER } })])
 
     expect((await a.fetch('/', { headers: { [HEADER]: '' } })).status).toBe(403)
     expect((await b.fetch('/', { headers: { [HEADER]: '' } })).status).toBe(200)
@@ -51,7 +51,7 @@ describe('testSite({ proxyKey })', () => {
       let message = ''
 
       try {
-        await testSite({ dirs: { routes, api }, islands: false, proxy: { key: HEADER }, ...options })
+        await testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxy: { key: HEADER }, ...options })
       }
       catch (error) {
         message = (error as Error).message
@@ -65,7 +65,7 @@ describe('testSite({ proxyKey })', () => {
     let message = ''
 
     try {
-      await testSite({ dirs: { routes, api }, islands: false, proxyKey: KEY })
+      await testSite({ requireGuards: false, dirs: { routes, api }, islands: false, proxyKey: KEY })
     }
     catch (error) {
       message = (error as Error).message

@@ -25,7 +25,7 @@ const ROOT = 'tests/fixtures/site'
 type Named = ReturnType<typeof s.Object<{ name: ReturnType<typeof s.String> }>>
 // A 1x1 PNG, which Elysia's `t.File({ type: 'image/png' })` recognises from its bytes.
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
-const site = await testSite({ root: ROOT, locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
+const site = await testSite({ requireGuards: false, root: ROOT, locals: request => ({ user: request.headers.get('x-user') ?? undefined }) })
 // Imported once the site is up, which registers the `.kay` loader this process needs.
 const { add } = await import(join(import.meta.dir, 'fixtures/site/src/routes/index.kay')) as { add: Action<{ title: string }, number> }
 const { schedule, leak } = await import(join(import.meta.dir, 'fixtures/site/src/routes/events.kay')) as {
@@ -53,7 +53,7 @@ describe('kay/test', () => {
     GlobalRegistrator.register()
 
     try {
-      const echo = await testSite({ root: ROOT, use: [new Elysia().get('/echo', ({ headers }) => headers['x-user'] ?? 'nobody')] })
+      const echo = await testSite({ requireGuards: false, root: ROOT, use: [new Elysia().get('/echo', ({ headers }) => headers['x-user'] ?? 'nobody')] })
 
       expect(await (await echo.fetch('/echo', { headers: { 'x-user': 'ada' } })).text()).toBe('ada')
       expect((await site.submit(add, { title: 'Sent under a DOM' })).html).toContain('Sent under a DOM</a></li>')
@@ -336,7 +336,7 @@ describe('kay/test', () => {
 
 describe('testSite under a base', () => {
   it('throws the redirect of a called action with the base on its location', async () => {
-    const mounted = await testSite({ root: ROOT, base: '/app' })
+    const mounted = await testSite({ requireGuards: false, root: ROOT, base: '/app' })
 
     try {
       const { promote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as { promote: Action<{ name: string }, string> }
@@ -351,7 +351,7 @@ describe('testSite under a base', () => {
 
 describe('testSite in development', () => {
   it('serves its pages as kay dev does with dev: true, and as production otherwise', async () => {
-    const dev = await testSite({ root: ROOT, dev: true })
+    const dev = await testSite({ requireGuards: false, root: ROOT, dev: true })
 
     try {
       expect((await dev.fetch('/_kay/dev/patch.js')).status).toBe(200)

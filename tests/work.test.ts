@@ -18,7 +18,7 @@ const ROUTE = '/_kay/action/src/routes/work.kay'
 const PAGE = './fixtures/production/src/routes/work.kay'
 const WORK = /<script type="application\/json" data-kay-work>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(resolve(ROOT)), navigation: true }
-const app = await servePages(resolveProject(resolve(ROOT), { security: false }), async () => client)
+const app = await servePages(resolveProject(resolve(ROOT), { security: false, requireGuards: false }), async () => client)
 
 async function challenges(): Promise<Record<string, string>> {
   const html = await (await app.handle(new Request('http://localhost/work'))).text()

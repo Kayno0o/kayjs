@@ -183,7 +183,7 @@ describe.skipIf(skipBrowser)('kay a11y on a site', () => {
   let clean: string
 
   beforeAll(async () => {
-    root = await project('a11y-site-', 'export default { base: \'/app\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }\n', {
+    root = await project('a11y-site-', 'export default { base: \'/app\', requireGuards: false, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }\n', {
       'index.kay': 'head\n  title Accueil\nmain\n  h1 Accueil\n',
       'about.kay': 'head\n  title About\nmain\n  h1 About\n  img(src="/pixel.png")\n',
       'items/[id].kay': '--- server\nexport const page = { prerender: [{ id: \'1\' }, { id: \'2\' }] }\n---\nhead\n  title Item\nmain\n  h1 Item\n',

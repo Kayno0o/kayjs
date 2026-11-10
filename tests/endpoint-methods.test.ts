@@ -45,7 +45,7 @@ beforeAll(async () => {
   dir = await scratchDir('endpoint-methods-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
-  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false } as const
+  const base = { root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false } as const
 
   plain = await pages(base)
   mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })

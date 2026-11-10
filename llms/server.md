@@ -166,12 +166,12 @@ h1 Sign in
 
 ### Refuse every route no guard covers
 
-`requireGuards: true` in kay.config.ts fails closed, a page or endpoint no guard covers answering 403:
+Once a site has a guard of its own, a page, endpoint or API module no guard covers answers 403 with no setting, unless it sets `guards: false`; `requireGuards: true` extends that to a site with no guard yet and to the actions of layouts, and `requireGuards: false` turns it off:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ requireGuards: true })
+export default defineConfig({ requireGuards: true }) // false keeps every route open
 ```
 
 ## Reference

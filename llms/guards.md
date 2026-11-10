@@ -37,8 +37,8 @@
 - `export const page = { guards: false }` runs none of the guards above a page or its actions, a sign-in page under a root guard asking for a session; in a layout, none above its actions; in an endpoint, none above it.
 - An API module does so with `api({ guards: false })`.
 - Both are read from the source as written, as `layouts: false` is, so `kay check` and `kay dev` report a `guards` or `layouts` held in a variable, an expression or a spread rather than ignore it.
-- `requireGuards` left unset, on a site with at least one guard, makes `kay check` warn `unguarded-route` for each page, endpoint or API module of the app (a library's routes and layout actions excepted) that a 2.0 start (where it defaults to true) would refuse; `requireGuards: false` keeps it quiet.
-- `requireGuards: true` in kay.config.ts fails closed: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay build --static` refuses to write such a page or endpoint.
+- `requireGuards` left unset, on a site with at least one guard of its own, answers 403 for each page, endpoint or API module of the app that no guard covers (a library's routes, layouts and action modules excepted), and `kay check` reports each as an `unguarded-route` error; a site with no guard at all stays open, and `requireGuards: false` keeps a site that mixes them open.
+- `requireGuards: true` in kay.config.ts fails closed everywhere, a layout's and an `_actions.kay`'s actions included: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay build --static` refuses to write such a page or endpoint.
 - A layout a library mounts asks no guard of its actions, which still run the guards above it, and the OpenAPI document is served when every module is open.
 - `kay check` reports each one as `unguarded-route`.
 - A library's routes keep the guards it gives them.

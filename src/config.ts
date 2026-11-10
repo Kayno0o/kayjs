@@ -16,6 +16,7 @@ import type { AppHooks } from './server/app-hooks'
 import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
+import type { GuardRequirement } from './server/guard-requirement'
 import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
@@ -71,7 +72,7 @@ export interface KayConfig extends AppHooks {
   security?: SecurityConfig | false | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
   proxy?: ProxyConfig | number | boolean | undefined
-  // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
+  // Left out, a site with a guard of its own answers 403 on each page, endpoint and API module no `_guard.ts` covers unless it sets `guards: false`, in its `page` or its `api()` options, and a site with no guard stays open. `true` asks it of every site and of the actions of layouts and `_actions.kay` files too, `false` turns it off; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one, an endpoint file setting its own in `page.cors`: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
   cors?: CorsOptions | undefined
@@ -564,6 +565,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
 // What kay sets on the config it loads, never the app: `publicEnv` is set when `src` holds an `s.Public` field, which sends the browser its environment.
 export interface InternalConfig {
   publicEnv?: boolean | undefined
+  // What `requireGuards` came to once the routes were scanned, which the server reads in its place.
+  guardRequirement?: GuardRequirement | undefined
 }
 
 // The config as kay reads it once loaded: what `kay.config.ts` wrote and what kay added.

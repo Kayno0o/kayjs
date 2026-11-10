@@ -1043,8 +1043,8 @@ describe('kay new', () => {
         if (variant.has('server') && variant.has('docker'))
           expect({ features, site: contents['compose.prod.yaml']!.includes('SITE_URL: ${SITE_URL:?set SITE_URL}'), example: contents['.env.example']!.split('\n').includes('SITE_URL=') }).toEqual({ features, site: true, example: true })
 
-        // An app behind a sign-in fails closed: a route added later without a guard answers 403 until it has one.
-        expect({ features, requireGuards: contents['kay.config.ts']!.includes('\n  requireGuards: true,') }).toEqual({ features, requireGuards: variant.has('auth') })
+        // An app behind a sign-in fails closed with no setting: its root guard is a guard of its own, so a route added later without one of its own answers 403 until it has a guard or sets `guards: false`.
+        expect({ features, requireGuards: contents['kay.config.ts']!.includes('requireGuards'), rootGuard: 'src/routes/_guard.ts' in contents }).toEqual({ features, requireGuards: false, rootGuard: variant.has('auth') })
 
         if (variant.has('auth')) {
           const dockerfile = contents.Dockerfile
@@ -1194,7 +1194,7 @@ describe('kay build --compile', () => {
       'node_modules/build-stamp/index.d.ts': 'declare const stamp: () => import(\'bun\').BunPlugin\nexport default stamp\n',
       'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
       'node_modules/build-stamp/binding.txt': 'stamp',
-      'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
+      'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], requireGuards: false, lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
     }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
     // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
     await Promise.all([

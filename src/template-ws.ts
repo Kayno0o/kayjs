@@ -8,7 +8,7 @@ import { api } from 'kay/server'
 
 let online = 0
 
-// Served at /api/online: every open connection hears how many there are.${has('auth') ? ' Open to everyone: the site\'s requireGuards would otherwise close it.' : ''}
+// Served at /api/online: every open connection hears how many there are.${has('auth') ? ' Open to everyone: the root guard would otherwise close it.' : ''}
 export default api(${has('auth') ? '{ guards: false }' : ''}).ws('/', {
   response: s.Object({ online: s.Number() }),
   open(ws) {

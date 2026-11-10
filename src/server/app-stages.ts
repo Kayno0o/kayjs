@@ -519,7 +519,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late, project }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
+  return { skipBroken, toolOutputs: setup.source.toolOutputs(project.root, project.paths.output), dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.guardRequirement ?? options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions, unmatched: late.unmatched }
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
@@ -598,7 +598,7 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
 
   // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
   // With no module at all the document stays refused, while the tool list, which holds the actions too, is open: there is no directory to put a guard in.
-  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
+  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.guardRequirement ?? options.requireGuards)
 
   if (servesOpenApi && document && openapi !== undefined)
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
