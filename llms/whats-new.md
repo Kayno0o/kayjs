@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.95.0
 
 - A page opens its one live connection once the islands it hydrates as it loads have all subscribed, however late their code arrives, instead of a second one when an island is slow ([live values](live-values.md)).
 - kay 1.95 no longer makes a component an island for the function or block it passes one (`island-prop` is the answer, with `--- island` its fix), reads `// kay-island` and `// kay-static` as comments, and adds no import for a `kay` value or `t` used without one, which is a type error: the deprecations `promoted-island`, `island-comment` and `implicit-import` are removed ([Islands](islands.md#islands), [Every name is imported](components.md#every-name-is-imported)).
