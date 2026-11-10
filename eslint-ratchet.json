@@ -3,7 +3,7 @@
     "complexity": 70
   },
   "packages/ai/src/chat-session.ts": {
-    "max-lines-per-function": 506,
+    "max-lines-per-function": 503,
     "complexity": 41
   },
   "packages/ai/src/loop.ts": {

@@ -120,6 +120,21 @@ interface Replacement {
 
 const MAX_RETRIES = 5
 
+// What a failed transcription shows: nothing for a redirect, the browser leaving, nor for one the chat left meanwhile; else the server's refusal or the voice's own label.
+function unheard(error: unknown, voice: ChatVoice, left: boolean): string | undefined {
+  if (error instanceof ActionRedirectError)
+    return undefined
+
+  console.error(error)
+
+  if (left)
+    return undefined
+
+  const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
+
+  return refusal === undefined || refusal === '' ? voice.failedLabel : refusal
+}
+
 // The turns of a Chat and the reply under way, which is idle, waiting (the call is out, no word yet), streaming, then ended, when what arrived joins the history. Every transition is here, apart from the DOM: the component draws it and wires its events.
 export function createChatSession(options: ChatSessionOptions) {
   const { attachments } = options
@@ -178,13 +193,7 @@ export function createChatSession(options: ChatSessionOptions) {
       return undefined
     }
     catch (error) {
-      // A redirect is the browser leaving: nothing failed.
-      if (error instanceof ActionRedirectError || (console.error(error), heardIn !== left))
-        return undefined
-
-      const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
-
-      return refusal === undefined || refusal === '' ? voice.failedLabel : refusal
+      return unheard(error, voice, heardIn !== left)
     }
   }
 
