@@ -101,15 +101,12 @@
     "max-lines": 652
   },
   "src/compiler/codegen.ts": {
-    "max-lines": 923,
-    "complexity": 98
+    "max-lines": 866,
+    "complexity": 90
   },
   "src/compiler/dom.ts": {
     "max-lines-per-function": 170,
     "complexity": 57
-  },
-  "src/compiler/expression.ts": {
-    "complexity": 47
   },
   "src/compiler/html.ts": {
     "max-lines": 772,
@@ -117,13 +114,19 @@
     "complexity": 82
   },
   "src/compiler/index.ts": {
-    "complexity": 112
+    "complexity": 103
   },
   "src/compiler/jsx.ts": {
-    "max-lines": 689
+    "max-lines": 685
   },
   "src/compiler/lints.ts": {
+    "max-lines": 1109
+>>>>>>> 1b719ae (docs: the 1.95 drops sit under the 1.95.0 and Unreleased headings of main)
+=======
     "max-lines": 1126
+=======
+    "max-lines": 1109
+>>>>>>> 1b719ae (docs: the 1.95 drops sit under the 1.95.0 and Unreleased headings of main)
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,
@@ -134,7 +137,7 @@
   },
   "src/compiler/validate.ts": {
     "max-lines": 666,
-    "complexity": 50
+    "complexity": 47
   },
   "src/content/edit-entries.ts": {
     "max-lines": 630

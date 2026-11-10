@@ -33,7 +33,7 @@ A hook given to `ask(prompt, { onSuccess })` no longer replaces the one of `ai()
 
 `onSaved` is `onSave` on Form, FormDialog and SaveForm, `onSent` is `onSend` on ContactForm and SubscribeForm, and `onEnded` is `onEnd` on AudioPlayer, each told what it was told. The old names work until 1.95, run after the new ones when both are set (also when the new one throws), and `kay check` flags them in a template as `deprecated-hook-names`; `kay upgrade` renames them, a shorthand `{onSaved}` becoming `onSave={onSaved}`. An element with a spread is reported with no fix.
 
-SaveForm's `onSave` was the call that does the save for an editor with no `action` (`SaveForm(dirty={changed()} onSave={run})`), and is `save` now, as `onSave` hears an `action`'s result. An `onSave` with no `action` is still read as the call that does the save until 1.95, and `kay check` offers `save` for it when the SaveForm has no `action` and no spread. `kay upgrade` does not apply that one: an `on*` attribute made the component an island and `save` does not, so `kay check` reports `promoted-island` until the component is marked `--- island`.
+SaveForm's `onSave` was the call that does the save for an editor with no `action` (`SaveForm(dirty={changed()} onSave={run})`), and is `save` now, as `onSave` hears an `action`'s result. An `onSave` with no `action` is still read as the call that does the save until 1.95, and `kay check` offers `save` for it when the SaveForm has no `action` and no spread. `kay upgrade` does not apply that one: an `on*` attribute made the component an island and `save` does not, so `kay check` reports `island-prop` until the component is marked `--- island`.
 
 An `onSave` beside an `action` used to replace the `action`, and now only hears its result: the form calls the `action` and the function is told the result. `kay check` warns, with no fix, about one that takes no parameter, which was the old call; write `save` for it and drop the `action`. It cannot tell a reference or a function reading its parameter from the new hook, and leaves those alone.
 
@@ -129,9 +129,6 @@ Every other source reads `pending()` as a boolean and `status()` as `idle|loadin
 What a component passes never makes it an island any more. `kay upgrade` runs the fixes below, and `kay check` reports the rest.
 
 - `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` compute the same on both sides. A component whose only `kay` value is one of them is static now, with the same markup, and no lint says so; `kay explain island <file>` gives a role.
-- `promoted-island` (deprecated, since 1.92) and `island-prop` report a static component handing an island a function, a class instance or a block with parameters. `--- island` in place of `---` is the fix, applied where the value is always a function. A component promoted on some renders only, a prop typed `T | (() => T)` or an island inside an `if`, is offered the fix and not given it, as `--- island` would hydrate it on every page: pick `--- island`, or pass data and keep it static. Promotion stops in 1.95.
-- `// kay-island` and `// kay-static` are `island-comment` (deprecated, since 1.92): `kay upgrade` writes `--- island` and `--- static`. `--- static` makes anything that would turn the component into an island the error `static-pin`.
-- `implicit-import` (deprecated, since 1.92) reports a `kay` value or `t` used with no import. `kay upgrade` writes the line; `kay check --fix` also writes the import of any `kay/*` name in a `.ts` file. The compiler stops adding them in 1.95.
 
 ### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
 
