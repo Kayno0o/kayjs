@@ -15,6 +15,7 @@ export const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [c
 // What a group marks while its message shows: the fields of the group, which take `aria-invalid`, not the buttons of a picker.
 const FIELDS = 'input:not([type="hidden"]), select, textarea'
 const SPACES = /\s+/
+const ITEM = /^(?:\.\d+|\[\d+\])$/
 
 // The fields whose `aria-required` or `required` was set here, not by the page.
 const requiredByUs = new WeakSet<HTMLElement>()
@@ -319,6 +320,13 @@ export function fieldIssues(name: () => string | undefined, issue: () => string 
   return () => list().map(item => item.message)
 }
 
+// The first refusal of an item of the array a field holds, `tags.1` or `tags[1]`, which an action's handler gives a single entry of a list (a schema's own refusal comes under the field's name): shown under the list's field as its own message.
+function itemRefusal(all: Record<string, string>, field: string): string | undefined {
+  const key = Object.keys(all).find(name => name.startsWith(field) && ITEM.test(name.slice(field.length)))
+
+  return key === undefined ? undefined : all[key]
+}
+
 // One message of a field, and whether the form gave it: the page's own `issue` is not, and a form's message the page's `issue` repeats is the page's.
 export interface FieldIssue {
   message: string
@@ -329,7 +337,7 @@ export interface FieldIssue {
 export function fieldIssueList(name: () => string | undefined, issue: () => string | undefined): () => FieldIssue[] {
   const refused = formIssues.use()
   const held = formErrors()
-  const read = (field: string) => refused ? refused()[field] : held(field)
+  const read = (field: string) => refused ? (refused()[field] ?? itemRefusal(refused(), field)) : held(field)
 
   return () => {
     const field = name()

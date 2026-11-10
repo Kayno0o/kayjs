@@ -18,6 +18,12 @@ Without `onChange` the field keeps its rows itself. Give it a `name` and each co
 RowsField(rows={addresses()} columns={columns} label="Addresses" rowIssues={index => problems()[index]} onChange={addresses.set})
 ```
 
+Inside a Form, FormDialog or SaveForm you pass nothing: an action's refusal of a cell is read from the form and shown under its row instead of as a toast.
+
+A handler's `errors` keyed `<name>_<key>.<n>` or `<name>_<key>[n]` mark that cell of row `n` (from 0), `<name>.<n>` or `<name>[n]` marks the whole row, and a schema refusal of an array column, which comes under the bare `<name>_<key>`, marks that column and shows under the first row. `size` sets the size of every box, and a `@cell` block reads it as `column.size`.
+
+A FormField around MultiSelect or a Combobox picking several shows a refusal of one item, keyed `<name>.<n>` or `<name>[n]`, as the field's own message.
+
 ## Numbers, selects and other cells
 
 A column of `type: 'number'` is a number box; the row keeps the figure as text, `''` once emptied. For anything else, mark the column `cell: true` and draw it in the `@cell(column, row, index, set)` block: a Select of units, a checkbox, a Combobox. `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box.

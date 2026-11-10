@@ -2,9 +2,11 @@
 import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
 import { defaultKept, onFormReset } from './form-reset'
-import { effect, flush, memo, postedValues, recipe, signal, uid, untrack } from 'kay'
+import { effect, flush, formErrors, memo, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
+import type { FieldSize } from './field-look'
 import { FIELD_MESSAGE } from './field-look'
+import { formIssues } from './forms'
 import { labelText } from './label-text'
 import Button from './button.kay'
 import IconButton from './icon-button.kay'
@@ -20,13 +22,14 @@ const look = recipe({
     input: 'min-w-0',
     remove: '',
     issue: `${FIELD_MESSAGE.issue} col-span-full`,
+    issueItem: 'block',
     add: 'self-start',
   },
 })
 
 const NONE: never[] = []
 
-const { rows = NONE, style, columns, label, name, invalid, rowIssues, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
+const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssues, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
   style?: string | undefined
   // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
   rows?: readonly Row[] | undefined
@@ -36,7 +39,9 @@ const { rows = NONE, style, columns, label, name, invalid, rowIssues, onChange, 
   label: string
   // Marks the field as refused: its text boxes in the danger colour, with `aria-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
   invalid?: boolean | undefined
-  // What a row is refused for, its text boxes drawn invalid and the message shown under the row, linked to its boxes with `aria-describedby`: a function of the row's place (from 0) or a record by place, `undefined` or `''` for a row with no issue. A cell drawn by `@cell` gets the row's issue as the block's fifth argument.
+  // The size of every text box, `md` by default; a cell drawn by `@cell` reads it as `column.size`.
+  size?: FieldSize | undefined
+  // What a row is refused for, its text boxes drawn invalid and the message shown under the row, linked to its boxes with `aria-describedby`: a function of the row's place (from 0) or a record by place, `undefined` or `''` for a row with no issue. A cell drawn by `@cell` gets the row's issue as the block's fifth argument. Inside a Form, FormDialog or SaveForm an action's refusal is read as well, so it shows under its row instead of as a toast: `<name>_<key>.<n>` or `<name>_<key>[n]` marks that cell of row n (from 0), `<name>.<n>` or `<name>[n]` the row, and a bare `<name>_<key>`, which a schema refusal of an array column comes under, marks that column and shows under the first row.
   rowIssues?: ((index: number) => string | undefined) | Record<number, string | undefined> | undefined
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
   name?: string | undefined
@@ -47,7 +52,7 @@ const { rows = NONE, style, columns, label, name, invalid, rowIssues, onChange, 
   onRemove?: ((row: Row, index: number) => unknown) | undefined
   // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; name the control by `${column.label} ${index + 1}` for screen readers, and read its value off `row[column.key]`.
   // The cell is drawn once per row and keeps its control while the row is edited: `issue` (`invalid`, `message` and the `id` of the message under the row, for `aria-describedby`) reads the same way, and `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is drawn again only when the row's place changes.
-  cell?: Snippet<[column: { key: string, label: string, name: string | undefined }, row: Row, index: number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
+  cell?: Snippet<[column: { key: string, label: string, name: string | undefined, size: FieldSize }, row: Row, index: number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
   // The fewest rows: Remove stops there. The most: Add stops there.
   min?: number | undefined
   max?: number | undefined
@@ -99,17 +104,57 @@ const issuesBase = uid()
 const placeOf = (id: number) => ids().indexOf(id)
 const rowOf = (id: number) => current()[placeOf(id)]
 const textOf = (id: number, key: string) => rowOf(id)?.[key] ?? ''
-const issueOf = (id: number): string | undefined => {
-  const at = placeOf(id)
+const refused = formIssues.use()
+const held = formErrors()
+const refusal = (key: string | undefined) => key === undefined ? undefined : (refused ? refused()[key] : held(key)) || undefined
+const givenFor = (at: number) => {
   const found = typeof rowIssues === 'function' ? rowIssues(at) : rowIssues?.[at]
 
   return found === undefined || found === '' ? undefined : found
 }
+// What an action refused the row at `at` with, by the key it came under: its cells' (`<name>_<key>.<n>`, `<name>_<key>[n]`, and the bare `<name>_<key>` for the first row), then the row's own (`<name>.<n>`, `<name>[n]`).
+function refusalsOf(at: number): { key: string, message: string, column: string | undefined }[] {
+  const keys = [
+    ...columns.flatMap((column) => {
+      const post = postName(column)
+
+      return post === undefined ? [] : [`${post}.${at}`, `${post}[${at}]`, ...at === 0 ? [post] : []].map(key => ({ key, column: column.key as string | undefined }))
+    }),
+    ...name === undefined ? [] : [`${name}.${at}`, `${name}[${at}]`].map(key => ({ key, column: undefined as string | undefined })),
+  ]
+
+  return keys.flatMap(({ key, column }) => {
+    const message = refusal(key)
+
+    return message === undefined ? [] : [{ key, message, column }]
+  })
+}
+// Every message under the row, the editor's `rowIssues` first.
+function messagesOf(id: number): { key: string | undefined, message: string }[] {
+  const at = placeOf(id)
+  const given = givenFor(at)
+
+  return [...given === undefined ? [] : [{ key: undefined, message: given }], ...refusalsOf(at)]
+}
+const issueOf = (id: number): string | undefined => {
+  const all = messagesOf(id)
+
+  return all.length === 0 ? undefined : all.map(item => item.message).join(' ')
+}
+// Whether the cell of `column` in row `id` is refused: by the field, the editor's row issue, an action's refusal of the row, of the cell, or of the column.
+function refusedCell(id: number, column: { key: string, name?: string | undefined }): boolean {
+  if (invalid === true)
+    return true
+
+  const at = placeOf(id)
+
+  return givenFor(at) !== undefined || refusal(postName(column)) !== undefined || refusalsOf(at).some(item => item.column === undefined || item.column === column.key)
+}
 
 // The cell block is called once per row and place, not on each edit: a call made from the template would track the row it is handed, so every keystroke drew its control again and lost the focus. The row it gets reads the current one where the block uses it.
-function drawCell(id: number, column: { key: string, label: string }) {
+function drawCell(id: number, column: { key: string, label: string, name?: string | undefined }) {
   const issue = {
-    get invalid() { return invalid === true || issueOf(id) !== undefined },
+    get invalid() { return refusedCell(id, column) },
     get message() { return issueOf(id) },
     get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
   }
@@ -126,7 +171,7 @@ function drawCell(id: number, column: { key: string, label: string }) {
     },
   })
 
-  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column) }, view, at, text => edit(placeOf(id), column.key, text), issue))
+  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, at, text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)
@@ -200,9 +245,11 @@ div(part="root" {...rest} ref={element => root = element} role="group" aria-labe
         if column.cell === true && cell
           | {drawCell(id, column)}
         else if column.type === 'number'
-          TextInput(part="input" type="number" name={postName(column)} invalid={invalid || issueOf(id) !== undefined} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={figure => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
+          TextInput(part="input" type="number" name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={figure => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
         else
-          TextInput(part="input" type={column.type} name={postName(column)} invalid={invalid || issueOf(id) !== undefined} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={text => edit(placeOf(id), column.key, text)})
+          TextInput(part="input" type={column.type} name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={text => edit(placeOf(id), column.key, text)})
       IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(placeOf(id))} disabled={current().length <= min} onClick={() => drop(placeOf(id))})
-      p(part="issue" id={`${issuesBase}_${id}`} aria-live="polite" hidden={issueOf(id) === undefined}) {issueOf(id)}
+      p(part="issue" id={`${issuesBase}_${id}`} aria-live="polite" hidden={issueOf(id) === undefined})
+        for item of messagesOf(id) key={item.key ?? item.message}
+          span(part="issueItem" data-field={item.key}) {item.message}
   Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})

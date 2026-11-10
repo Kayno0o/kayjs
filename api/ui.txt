@@ -2248,6 +2248,7 @@ component default
   key: string;
   label: string;
   name: string | undefined;
+  size: FieldSize;
 }, row: Row, index: number, set: (value: string) => void, issue: {
   readonly invalid: boolean;
   readonly message: string | undefined;
@@ -2271,6 +2272,7 @@ component default
     };
   };
   issue?: string | undefined;
+  issueItem?: string | undefined;
   add?: string | undefined | {
     root?: string | undefined | {
       root?: string | undefined;
@@ -2302,6 +2304,7 @@ component default
   removeLabel?: ((index: number) => string) | string | undefined
   rowIssues?: ((index: number) => string | undefined) | Record<number, string | undefined> | undefined
   rows?: readonly Row[] | undefined
+  size?: FieldSize | undefined
   style?: string | undefined
 
 [./save-form.kay] default
