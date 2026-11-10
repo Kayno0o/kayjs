@@ -8,7 +8,7 @@ description: The trail from the top of the site to the page on screen, as links.
 
 ## On a phone
 
-From four items on, a narrow screen shows the first item, an ellipsis and the last two. The middle comes back above the small breakpoint.
+From four items on, a narrow screen shows the first item, a menu button and the last two. The button lists the crumbs that were folded as links, and `moreLabel` names it. The middle comes back above the small breakpoint.
 
 ## Search engines
 

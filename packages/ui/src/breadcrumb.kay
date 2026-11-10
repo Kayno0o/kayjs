@@ -6,8 +6,10 @@ import { tabOf } from './outside'
 import type { NewTab } from './outside'
 import BreadcrumbHead from './internal/breadcrumb-head.kay'
 import Icon from './icon.kay'
+import Menu from './menu.kay'
+import { wording } from 'kay/words'
 
-// 'kui-breadcrumb' stays as the component's name for an app's CSS; the separators between items are drawn by theme.css. On a phone the middle of a long trail gives way to an ellipsis.
+// 'kui-breadcrumb' stays as the component's name for an app's CSS; the separators between items are drawn by theme.css. On a phone the middle of a long trail gives way to a menu button listing it.
 const look = recipe({
   parts: {
     root: 'kui-breadcrumb block',
@@ -20,7 +22,7 @@ const look = recipe({
   },
 })
 
-const { items, label, structured = false, item, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { items, label, structured = false, item, moreLabel = wording('ui.breadcrumb.more', 'Show the hidden pages'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   // The trail, the top of the site first and the page on screen last. Every item but the last is a link when it has an `href`; the last is marked as the current page and never a link.
   items: readonly (Pick<NavItem, 'label' | 'icon'> & { href?: string | undefined, newTab?: NewTab | undefined })[]
   // Draws the text of each item in place of its `label`: `@item(item)`, given the item. The `icon` it names is still drawn before it, and the structured data keeps the `label`.
@@ -29,11 +31,15 @@ const { items, label, structured = false, item, ...rest } = props<Omit<JSX.Intri
   label: string
   // Describes the trail to search engines as a `BreadcrumbList` in the head, each `href` made absolute by the site's origin (`site` in kay.config.ts, which it then needs).
   structured?: boolean | undefined
+  // Names the button that lists the crumbs a phone folds, from four items on.
+  moreLabel?: string | undefined
 }>()
 
 const last = () => items.length - 1
 // From four items on, a phone keeps the first and the last two: the middle gives way to an ellipsis.
 const collapses = () => items.length > 3
+// The folded crumbs as the menu lists them, a link each, a crumb with no `href` a disabled entry as it is plain text in the trail.
+const folded = () => items.slice(1, -2).map(({ label, href, newTab, icon }) => ({ label, disabled: href === undefined, ...href !== undefined && { href }, ...newTab !== undefined && { newTab }, ...icon !== undefined && { icon } }))
 ---
 snippet inside(crumb: (typeof items)[number])
   if crumb.icon
@@ -49,7 +55,8 @@ nav(part="root" {...rest} aria-label={label})
   ol(part="list")
     for crumb, index of items key={index}
       if collapses() && index === 1
-        li(part="more" aria-hidden="true") …
+        li(part="more")
+          Menu(label={moreLabel} icon="more" size="xs" items={folded()})
       li(part="item" data-middle={collapses() && index > 0 && index < last() - 1 ? '' : undefined})
         if index < last() && crumb.href !== undefined
           a(part="link" href={crumb.href} {...tabOf(crumb.href, crumb.newTab)})

@@ -6,6 +6,7 @@ import ExpandableTable from '../tests/fixture/src/components/expandable-table.ka
 import FeatureTable from '../tests/fixture/src/components/feature-table.kay'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
 import ListedTable from '../tests/fixture/src/components/listed-table.kay'
+import PagedTable from '../tests/fixture/src/components/paged-table.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
 import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
 import TableComponent from '../tests/fixture/src/components/table.kay'
@@ -825,5 +826,63 @@ describe('Table columns, caption and scroll region', () => {
           delete (proto as unknown as Record<string, unknown>)[name]
       }
     }
+  })
+})
+
+describe('Table with a pageSize', () => {
+  const pagedRows = (root: HTMLElement) => [...root.querySelectorAll('tbody [data-part="cellBody"]')].map(cell => cell.textContent)
+  const pagerLink = (root: HTMLElement, text: string) => [...root.querySelectorAll('[data-part="pager"] a')].find(found => found.textContent?.trim() === text) ?? null
+
+  test('draws one page of the rows with the pages and a summary under them, and a click on a page shows it and reports it', async () => {
+    const changes: string[] = []
+
+    mounted = await mountComponent(PagedTable, { changes })
+
+    expect(pagedRows(mounted.root)).toHaveLength(10)
+    expect(pagedRows(mounted.root)[0]).toBe('Item 01')
+    expect(mounted.root.querySelector('[data-part="pager"] [data-part="range"]')?.textContent).toBe('1–10 of 25')
+
+    click(pagerLink(mounted.root, '3'))
+    await settle()
+    expect(pagedRows(mounted.root)).toEqual(['Item 21', 'Item 22', 'Item 23', 'Item 24', 'Item 25'])
+    expect(mounted.root.querySelector('[data-part="pager"] [data-part="range"]')?.textContent).toBe('21–25 of 25')
+    expect(changes).toEqual(['3/10'])
+  })
+
+  test('a size link changes how many rows a page holds and starts again from the first page', async () => {
+    const changes: string[] = []
+
+    mounted = await mountComponent(PagedTable, { changes })
+    click(pagerLink(mounted.root, '2'))
+    await settle()
+    click(pagerLink(mounted.root, '20'))
+    await settle()
+    expect(pagedRows(mounted.root)).toHaveLength(20)
+    expect(pagedRows(mounted.root)[0]).toBe('Item 01')
+    expect(changes).toEqual(['2/10', '1/20'])
+  })
+
+  test('a sort or a typed filter starts again from the first page, and the pages count the rows the filter keeps', async () => {
+    const changes: string[] = []
+
+    mounted = await mountComponent(PagedTable, { changes, filter: true })
+    click(pagerLink(mounted.root, '2'))
+    await settle()
+    expect(pagedRows(mounted.root)[0]).toBe('Item 11')
+
+    const box = mounted.root.querySelector('input[type="search"]') as HTMLInputElement
+
+    box.value = 'Item 2'
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    expect(pagedRows(mounted.root)).toHaveLength(6)
+    expect(mounted.root.querySelector('[data-part="pager"]')).toBeNull()
+
+    box.value = ''
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    click(header(mounted.root, 0).querySelector('button'))
+    await settle()
+    expect(pagedRows(mounted.root)[0]).toBe('Item 01')
   })
 })

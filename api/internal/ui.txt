@@ -798,13 +798,13 @@ function withinBounds(iso: string, min?: string | undefined, max?: string | unde
 function zonedInstant(text: string): string
 
 [./lib/defaults] AddedSlot
-type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'microphone' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
+type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'microphone' | 'more' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
 
 [./lib/defaults] default
 const default: UiSettings
 
 [./lib/defaults] IconSlot
-type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/defaults] NavLink
 interface NavLink extends NavItem
@@ -1307,7 +1307,7 @@ interface IconQuery extends OptionsQuery
   q: string
 
 [./lib/index] IconSlot
-type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/index] infiniteList
 function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
@@ -2287,6 +2287,12 @@ type OpenPosition = { page: number, offset?: never, limit?: never } | { page?: n
 [./lib/pagination] openSteps
 function openSteps(position: OpenPosition, more: boolean, url: URL | string, param?: string | undefined): { previous: string | undefined; next: string | undefined; }
 
+[./lib/pagination] openTargets
+function openTargets(position: OpenPosition, more: boolean): { previous: number | undefined; next: number | undefined; }
+
+[./lib/pagination] pageCount
+function pageCount(total: number, size: number): number
+
 [./lib/pagination] PagedList
 interface PagedList
   href: (page: number) => string
@@ -2301,6 +2307,12 @@ function pageHref(url: URL | string, page: number, param?: string): string
 
 [./lib/pagination] pageItems
 function pageItems(page: number, pages: number, siblings?: number): ("gap" | number)[]
+
+[./lib/pagination] pageRange
+function pageRange(page: number, total: number, size: number): { from: number; to: number; total: number; }
+
+[./lib/pagination] sizeHref
+function sizeHref(url: URL | string, size: number, param?: string, pageParam?: string): string
 
 [./lib/paging] pageFields
 function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }

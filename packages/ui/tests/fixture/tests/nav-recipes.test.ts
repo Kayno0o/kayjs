@@ -19,19 +19,19 @@ afterAll(async () => {
 const inBrowser = describe.skipIf(path === undefined && (process.env.CI ?? '') === '')
 
 inBrowser('navigation recipes in the browser', () => {
-  test('Breadcrumb keeps its ellipsis and middle items to a phone, and draws a separator between the others', async () => {
+  test('Breadcrumb keeps its menu button and middle items to a phone, and draws a separator between the others', async () => {
     const site = await shared()
     const read = async (width: number) => {
       await using page = await site.open('/nav-recipes', { width })
       const seen = await page.evaluate(() => {
         const shown = (element: Element) => getComputedStyle(element).display !== 'none'
-        const items = [...document.querySelectorAll('#crumbs [data-part=item]')]
+        const items = [...document.querySelectorAll('#crumbs ol > [data-part=item]')]
 
         return {
           more: shown(document.querySelector('#crumbs [data-part=more]')!),
           items: items.map(shown),
           // The separator is the ::before of every shown item or ellipsis that has a sibling before it.
-          separators: [...document.querySelectorAll('#crumbs [data-part=list] > li')].map(item => getComputedStyle(item, '::before').content),
+          separators: [...document.querySelectorAll('#crumbs ol[data-part=list] > li')].map(item => getComputedStyle(item, '::before').content),
         }
       })
 
@@ -46,7 +46,7 @@ inBrowser('navigation recipes in the browser', () => {
     expect(phone.items).toEqual([true, false, true, true])
     expect(desktop.more).toBe(false)
     expect(desktop.items).toEqual([true, true, true, true])
-    // The first has no separator; every item after it draws one, the ellipsis included.
+    // The first has no separator; every item after it draws one, the menu button included.
     expect(phone.separators[0]).toBe('none')
     expect(phone.separators.slice(1).every(content => content !== 'none' && content !== 'normal')).toBe(true)
     expect(desktop.separators[0]).toBe('none')

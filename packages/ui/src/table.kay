@@ -9,6 +9,8 @@ import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
+import Pagination from './pagination.kay'
+import { currentPage, pageCount } from './pagination'
 import Popover from './popover.kay'
 import Select from './select.kay'
 import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
@@ -64,6 +66,8 @@ const look = recipe({
     skeletonCell: 'px-3 py-2.5 @max-[30rem]/table:block @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
     skeletonBar: 'block h-[1em] w-full animate-pulse bg-surface-strong motion-reduce:animate-none',
     status: 'sr-only',
+    // The Pagination under the rows of a table with a `pageSize`, kept in view like the filter bar.
+    pager: 'sticky left-0 border-solid border-t-[length:var(--border-width)] border-border px-3 py-2',
     // A row that is a link or a button: the first cell holds an anchor or a button stretched over the whole row.
     rowLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     rowButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
@@ -75,7 +79,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -179,6 +183,12 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   rowHref?: ((row: Row) => string | undefined) | undefined
   // Makes each row a button, or hears the click of a link row (call `event.preventDefault()` to follow the link yourself).
   onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined
+  // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. Not for a `list` or a `virtual` table, which page or window their rows themselves.
+  pageSize?: number | undefined
+  // The sizes to offer under the rows of a table with a `pageSize`, such as `[10, 25, 50]`; the one on screen is marked.
+  pageSizes?: readonly number[] | undefined
+  // Called with the page and the size after each change to either, a click on a page or a size; the page restarts at 1 when the size changes.
+  onPageChange?: ((page: number, size: number) => unknown) | undefined
   // Names a row's link or button: `Open <first column's text>`.
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
@@ -188,6 +198,9 @@ if ((rest as { onSelect?: unknown }).onSelect !== undefined)
 
 if (expandable && virtual)
   throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
+
+if (pageSize !== undefined && (virtual || list))
+  throw new Error('kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
 const tableId = uid()
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
@@ -359,9 +372,38 @@ const endpoint = memo(() => {
   return typeof value === 'string' ? value : undefined
 })
 
+const pageNow = signal(1)
+const sizeNow = signal(pageSize ?? 0)
+
+effect(() => sizeNow = pageSize ?? 0)
+
+// A sort or a filter shows the rows from their first page again.
+effect(() => {
+  current()
+  typed()
+  fieldsNow()
+  pageNow = 1
+})
+
+// The page as one that exists, as rows leave or the size grows.
+const pageShown = memo(() => currentPage(pageNow(), pageCount(shown().length, sizeNow())))
+const paging = () => pageSize !== undefined && sizeNow() > 0
+const pageRows = () => paging() ? shown().slice((pageShown() - 1) * sizeNow(), pageShown() * sizeNow()) : shown()
+
+function goTo(next: number) {
+  pageNow = next
+  onPageChange?.(next, sizeNow())
+}
+
+function resize(size: number) {
+  sizeNow = size
+  pageNow = 1
+  onPageChange?.(1, size)
+}
+
 // Without `virtual` every row is drawn; with it the others stand for room above and below.
 const windowed = virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: () => 48, overscan: () => 8 }) : undefined
-const drawn = memo(() => windowed ? windowed.rows() : shown())
+const drawn = memo(() => windowed ? windowed.rows() : pageRows())
 let box: HTMLElement | undefined
 let body: HTMLElement | undefined
 
@@ -558,5 +600,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {footer(column)}
               else
                 | {column.footer ?? ''}
+  if paging() && !skeleton()
+    Pagination(part="pager" page={pageShown()} total={shown().length} pageSize={sizeNow()} sizes={pageSizes} onPage={goTo} onSize={resize})
   if list
     LoadMore(list={list})

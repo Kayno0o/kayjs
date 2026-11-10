@@ -66,6 +66,10 @@ A `filter` adds a search box. On a table over a `list` it filters on the server 
 
 When the page holds only a part of the rows, give `exportable` an address: the button links it with the sort as `sort` and `direction` and the typed filter text under `filterParam` (`q` without one), and your endpoint answers with `toCsv(rows, columns)`, which the package exports. The same goes for a table over a `list`: the plain button exports the rows loaded so far.
 
+## Pages
+
+`pageSize` draws the rows a page at a time with a Pagination under them: a summary such as `21–40 of 134` beside the pages. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. `pageSizes` adds links that change the size, and `onPageChange(page, size)` hears each change. A table over a `list` or a `virtual` one cannot take a `pageSize`, as they page or window their rows themselves.
+
 ## Many rows
 
 `virtual` draws only the rows in view, with room above and below standing for the others, so ten thousand rows and more stay light. The table scrolls in a box of its own, 70vh tall unless `--table-height` says otherwise, with its headers kept on top. Rows are measured as they draw, stacked cards included, and the table tells screen readers its real row count and each row's position.

@@ -148,7 +148,7 @@ interface IconQuery extends OptionsQuery
   q: string
 
 [.] IconSlot
-type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [.] infiniteList
 function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
@@ -929,6 +929,7 @@ component default
   item?: ((item: Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; }) => Element) | undefined
   items: readonly (Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; })[]
   label: string
+  moreLabel?: string | undefined
   structured?: boolean | undefined
 
 [./button.kay] default
@@ -2096,10 +2097,51 @@ component default
 
 [./pagination.kay] default
 component default
-  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: never }
-  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
-  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
-  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
+  | { class?: string | undefined | {
+  root?: string | undefined;
+  step?: string | undefined;
+  range?: string | undefined;
+  gap?: string | undefined;
+  page?: string | undefined;
+  sizes?: string | undefined;
+  size?: string | undefined;
+}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; onPage?: ((page: number) => unknown) | undefined; onSize?: ((size: number) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: never }
+  | { class?: string | undefined | {
+  root?: string | undefined;
+  step?: string | undefined;
+  range?: string | undefined;
+  gap?: string | undefined;
+  page?: string | undefined;
+  sizes?: string | undefined;
+  size?: string | undefined;
+}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((page: number) => unknown) | undefined; onSize?: ((size: number) => unknown) | undefined; page: number; pageSize?: never; pages: number; param?: string | undefined; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: URL | string | undefined }
+  | { class?: string | undefined | {
+  root?: string | undefined;
+  step?: string | undefined;
+  range?: string | undefined;
+  gap?: string | undefined;
+  page?: string | undefined;
+  sizes?: string | undefined;
+  size?: string | undefined;
+}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((page: number) => unknown) | undefined; onSize?: ((size: number) => unknown) | undefined; page: number; pageSize: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total: number; url?: URL | string | undefined }
+  | { class?: string | undefined | {
+  root?: string | undefined;
+  step?: string | undefined;
+  range?: string | undefined;
+  gap?: string | undefined;
+  page?: string | undefined;
+  sizes?: string | undefined;
+  size?: string | undefined;
+}; label?: string | undefined; limit?: never; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; onPage?: ((page: number) => unknown) | undefined; onSize?: ((size: number) => unknown) | undefined; page: number; pageSize?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: URL | string | undefined }
+  | { class?: string | undefined | {
+  root?: string | undefined;
+  step?: string | undefined;
+  range?: string | undefined;
+  gap?: string | undefined;
+  page?: string | undefined;
+  sizes?: string | undefined;
+  size?: string | undefined;
+}; label?: string | undefined; limit: number; limitParam?: string | undefined; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; onPage?: ((page: number) => unknown) | undefined; onSize?: ((size: number) => unknown) | undefined; page?: never; pageSize?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; rangeLabel?: ((range: { from: number; to: number; total: number; }) => string) | string | undefined; siblings?: number | undefined; sizeLabel?: string | undefined; sizes?: readonly number[] | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; total?: never; url?: URL | string | undefined }
 
 [./popover.kay] default
 component default
@@ -2820,7 +2862,16 @@ component default
   foot?: string | undefined;
   footRow?: string | undefined;
   footCell?: string | undefined;
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; label?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onScrollChange?: ((scrolls: boolean) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+  pager?: string | undefined | {
+    root?: string | undefined;
+    step?: string | undefined;
+    range?: string | undefined;
+    gap?: string | undefined;
+    page?: string | undefined;
+    sizes?: string | undefined;
+    size?: string | undefined;
+  };
+}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; label?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onPageChange?: ((page: number, size: number) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onScrollChange?: ((scrolls: boolean) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -2874,7 +2925,16 @@ component default
   foot?: string | undefined;
   footRow?: string | undefined;
   footCell?: string | undefined;
-}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; label?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onScrollChange?: ((scrolls: boolean) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+  pager?: string | undefined | {
+    root?: string | undefined;
+    step?: string | undefined;
+    range?: string | undefined;
+    gap?: string | undefined;
+    page?: string | undefined;
+    sizes?: string | undefined;
+    size?: string | undefined;
+  };
+}; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; label?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onPageChange?: ((page: number, size: number) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onScrollChange?: ((scrolls: boolean) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default

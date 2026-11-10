@@ -61,7 +61,7 @@ test('rating follows value and invalid', async () => {
 })
 
 test('breadcrumb follows the length of its items', async () => {
-  const { before, after } = await flip(root => root.querySelectorAll('#crumbs [data-part="item"]').length)
+  const { before, after } = await flip(root => root.querySelectorAll('#crumbs ol > [data-part="item"]').length)
 
   expect(before).toBe(2)
   expect(after).toBe(5)
