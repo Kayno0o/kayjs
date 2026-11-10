@@ -10,7 +10,7 @@ import { pagePrerender, routedCollections } from '../src/server/page-settings'
 import { scratchDir } from './scratch'
 
 const schema = t.Object({ title: t.String(), date: t.Optional(t.Date()), tags: t.Optional(t.Array(t.String())) })
-const entry = (slug: string, data: Record<string, unknown>, url?: string) => ({ slug, data, headings: [], words: 0, readingTime: 0, Content: () => html('<p>Body</p>'), file: `${slug}.md`, ...url !== undefined && { url } })
+const entry = (slug: string, data: Record<string, unknown>, url?: string) => ({ slug, data, headings: [], words: 0, readingTime: 0, Content: () => html('<p>Body</p>'), excerpt: '', body: '', html: '<p>Body</p>', file: `${slug}.md`, ...url !== undefined && { url } })
 
 describe('a feed that implies what the collection holds', () => {
   it('takes its title from the collection, then the export name humanized', () => {

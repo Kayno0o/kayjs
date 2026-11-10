@@ -31,3 +31,13 @@ export function checkPublishField(name: string, schema: TSchema, field: string, 
   if (node === undefined || !holdsDate(node))
     throw new KayError('config-invalid', `kay: the collection ${name}'s ${option} names ${field}, which is not an s.Date() field of its schema`)
 }
+
+// The `modified` option as a way to read file times, when it names one rather than a schema field of that name.
+export function modifiedMode(options: { modified?: string | undefined, schema: TSchema }): 'mtime' | 'git' | undefined {
+  const { modified } = options
+
+  if (modified !== 'mtime' && modified !== 'git')
+    return undefined
+
+  return (options.schema as { properties?: Record<string, unknown> }).properties?.[modified] === undefined ? modified : undefined
+}

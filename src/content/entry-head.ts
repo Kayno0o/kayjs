@@ -1,5 +1,6 @@
 import type { HeadTag } from '../runtime/head'
 import type { Collection, Entry } from './index'
+import { descriptionOf } from './excerpt'
 
 // The fields an entry's page date is read from, after the collection's `publishAt`.
 const DATE_FIELDS = ['date', 'publishedAt', 'published']
@@ -24,11 +25,11 @@ export function entryPublished(collection: DateFields, entry: Entry<unknown>): D
   return [collection.options.publishAt, ...DATE_FIELDS].map(field => field === undefined ? undefined : dateOf(data[field])).find(date => date !== undefined)
 }
 
-// When an entry last changed: the collection's `modified` field, or undefined for an entry with none.
+// When an entry last changed: the collection's `modified` field, its file's time or last commit for `'mtime'` and `'git'`, or undefined for an entry with none.
 export function entryModified(collection: DateFields, entry: Entry<unknown>): Date | undefined {
   const { modified } = collection.options
 
-  return modified === undefined ? undefined : dateOf(dataOf(entry)[modified])
+  return modified === undefined ? undefined : dateOf(entry.modified) ?? dateOf(dataOf(entry)[modified])
 }
 
 export function dataOf(entry: Entry<unknown>): Record<string, unknown> {
@@ -44,7 +45,7 @@ function meta(key: 'name' | 'property', name: string, content: string): HeadTag 
 export function entryHead(collection: Collection<unknown>, entry: Entry<unknown>): HeadTag[] {
   const data = dataOf(entry)
   const title = text(data.title)
-  const description = text(data.description)
+  const description = text(data.description) ?? descriptionOf(entry.excerpt)
   const published = entryPublished(collection, entry)
   const modified = entryModified(collection, entry)
 

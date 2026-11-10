@@ -24,6 +24,7 @@ import { pageEtag } from '../server/prerendered'
 import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
+import { modifiedMode } from './drafts'
 import { entries, registerCollections } from './edit'
 import { defaultFeedItem, FEED_TYPES, feedDocument, feedItem, feedPaths, renderedBody, resolvedFeed } from './feed'
 import { isCollection } from './index'
@@ -129,7 +130,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
     if (collection.dir === undefined)
       continue
 
-    const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
+    const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true, modified: modifiedMode(collection.options) }), collection.options.schema, collection.options.migrations)
 
     try {
       const decoded = await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
@@ -186,7 +187,7 @@ export async function contentProblems(root: string, config?: string, site = true
     read.push(resolve(dirname(read[0]!), collection.dir))
 
     try {
-      const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true }), collection.options.schema, collection.options.migrations)
+      const entries = migrateEntries(collection.name, await loadEntries(collection.dir, { ...markdownOf(collection.options), live: true, localized: collection.options.localized === true, modified: modifiedMode(collection.options) }), collection.options.schema, collection.options.migrations)
 
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
@@ -227,7 +228,7 @@ async function slugsOf(collection: Collection<unknown>): Promise<Set<string> | u
   const localized = collection.options.localized === true
 
   try {
-    const found = await loadEntries(dir, { ...markdownOf(collection.options), live: true, localized })
+    const found = await loadEntries(dir, { ...markdownOf(collection.options), live: true, localized, modified: modifiedMode(collection.options) })
 
     return new Set(found.map(entry => localized ? entry.slug.slice(entry.slug.indexOf('/') + 1) : entry.slug))
   }

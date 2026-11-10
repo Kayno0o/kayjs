@@ -44,6 +44,8 @@ An entry has `slug`, `data`, `headings` for a table of contents, and `Content`, 
 
 Entries marked as drafts show in development only. That means under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 
+An entry also has `excerpt`, its first paragraph as plain text, or every paragraph before a `<!-- more -->` line you write to mark the end of the lead. It has `body`, the Markdown as written without its frontmatter, and `html`, what `Content` renders, as a string for a feed, a search index or an API. A paragraph inside a component is not in the excerpt. The excerpt and `html` are worked out the first time you read them, so entries you never read them on cost nothing.
+
 An entry also has `words` and `readingTime`, counted from the text the page shows. `readingTime` is in minutes, at 230 words a minute (`markdown.readingSpeed` in `kay.config.ts` changes it), and never less than 1 for a body with words.
 
 ```kay
@@ -132,6 +134,10 @@ A page at the route that reads the cookies, the query, a session or preview mode
 The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`, which must be a `Date` field: a text date gets nothing) makes `og:type` an `article` with an `article:published_time`.
 
 A `modified` option naming another `Date` field adds `article:modified_time` and gives the sitemap a `lastmod` for each entry's URL.
+
+`modified: 'mtime'` or `modified: 'git'` needs no field. `'mtime'` uses the file's time and `'git'` the date of the file's last commit, read with one `git log` for the whole folder. A file git does not know, such as an untracked one or any file outside a repository, falls back to its time. The date is also `entry.modified`. A shallow clone has one commit, so build with the full history when you use `'git'`. A loader's entries have no file, so they get no date.
+
+An entry with no `description` takes its excerpt, cut at a word under 160 characters, so a page gets a description without anyone writing one.
 
 Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
 

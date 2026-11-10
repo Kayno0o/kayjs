@@ -1800,7 +1800,7 @@ interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boo
   live?: boolean | undefined
   localized?: boolean | undefined
   migrations?: Migration[] | undefined
-  modified?: DateField<(Schema & { params: []; })["static"]> | undefined
+  modified?: "git" | "mtime" | DateField<(Schema & { params: []; })["static"]> | undefined
   order?: NumberField<(Schema & { params: []; })["static"]> | undefined
   preprocess?: MarkdownPreprocess | undefined
   publishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
@@ -1867,10 +1867,14 @@ function entries(name: string, filter?: EntryFilter): Promise<SourceEntry[]>
 [./content] Entry
 interface Entry<Data>
   Content: Component
+  body: string
   data: Data
+  excerpt: string
   file: string
   headings: Heading[]
+  html: string
   locale?: string | undefined
+  modified?: Date | undefined
   readingTime: number
   slug: string
   translations?: readonly string[] | undefined

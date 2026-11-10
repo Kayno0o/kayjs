@@ -18,8 +18,9 @@ import { child, html, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { previewing, previewState, sharedDraft } from '../runtime/preview'
-import { checkPublishField, isDraft, publishTime } from './drafts'
+import { checkPublishField, isDraft, modifiedMode, publishTime } from './drafts'
 import { entryPath } from './entry-route'
+import { excerptOf } from './excerpt'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
 import { contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
@@ -61,8 +62,16 @@ export interface Entry<Data> {
   readingTime: number
   // Renders a Markdown entry's body, the kay components it uses included; renders nothing for a data file.
   Content: Component
+  // The first paragraph of a Markdown entry's body as plain text, or all its paragraphs before a `<!-- more -->` marker; empty for a data file or a body with no paragraph. A marker in a loader's untrusted body is lost to the sanitizer, so it gives its first paragraph. Worked out on first read.
+  readonly excerpt: string
+  // A Markdown entry's body as written, frontmatter left out; empty for a data file and for an entry a loader gave as `html`.
+  body: string
+  // What `Content` renders, as a string, components included, for an RSS item, a search index or a JSON API; empty for a data file. Rendered on first read.
+  readonly html: string
   // The file, relative to the project root; a loaded entry's collection name and slug, `posts/hello`.
   file: string
+  // When the file last changed, with the collection's `modified` set to `'mtime'` or `'git'`; not set for a loader's entry, or without that setting, where the `modified` field is read from `data`.
+  modified?: Date | undefined
   // In a localized collection, the locale whose folder holds the entry, the default one's when it stands in for a locale lacking it.
   locale?: string | undefined
   // In a localized collection, the locales with an entry of this slug, or of the same `translationKey` field when the entries set one, its own included.
@@ -161,8 +170,8 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   publishAt?: DateField<Static<Schema>> | undefined
   // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering 410 Gone when its code calls `ctx.notFound()` after `get()` found nothing for the ended entry, or what the app chose otherwise (a redirect); a redirect from the path wins over the 410. An entry without one never ends; `kay dev` and preview mode keep showing it.
   unpublishAt?: DateField<Static<Schema>> | undefined
-  // A date field, `'updatedAt'`, holding when an entry last changed: the sitemap's `lastmod` of its page unless the page sets one, the entry page's `article:modified_time` and the feed's `updated`. An entry without one has no modified time.
-  modified?: DateField<Static<Schema>> | undefined
+  // A date field, `'updatedAt'`, holding when an entry last changed: the sitemap's `lastmod` of its page unless the page sets one, the entry page's `article:modified_time` and the feed's `updated`. An entry without one has no modified time. `'mtime'` takes the time of the entry's file, `'git'` the date of its last commit, from one `git log` for the folder: a file git does not know (untracked, or outside a repository) takes its mtime, and a loader's entry has none. A schema field named `mtime` or `git` is read as a field.
+  modified?: DateField<Static<Schema>> | 'mtime' | 'git' | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
   order?: NumberField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by `order`, else by slug.
@@ -242,7 +251,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   if (unpublishAt !== undefined)
     checkPublishField(name, options.schema, unpublishAt, 'unpublishAt')
 
-  if (options.modified !== undefined)
+  if (options.modified !== undefined && modifiedMode(options) === undefined)
     checkPublishField(name, options.schema, options.modified, 'modified')
 
   if (options.feed && [options.feed.format ?? 'rss'].flat().length === 0)
@@ -320,7 +329,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const fromFolder = async () => {
-    loading ??= (async () => decode(migrateEntries(name, await loadEntries(source as string, { ...markdownOf(options), localized }), options.schema, migrations)))()
+    loading ??= (async () => decode(migrateEntries(name, await loadEntries(source as string, { ...markdownOf(options), localized, modified: modifiedMode(options) }), options.schema, migrations)))()
 
     try {
       return await loading
@@ -567,7 +576,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
       const fromHtml = typeof safe === 'string' ? { segments: [safe], headings: [], words: countWords(safe) } : undefined
       const compiled = typeof body === 'string' ? await bodies.compile(slug, body) : fromHtml
 
-      entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
+      entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words, ...typeof body === 'string' && { body } })
     }
     catch (error) {
       problems.push({ file, line: error instanceof MarkdownError ? error.line : 1, message: problemMessage(error) })
@@ -682,7 +691,7 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
   const split = entry.slug.indexOf('/')
   const words = entry.words ?? 0
 
-  return {
+  const made: Omit<Entry<Data>, 'excerpt' | 'html'> = {
     ...localized && { locale: entry.slug.slice(0, split) },
     slug: localized ? entry.slug.slice(split + 1) : entry.slug,
     data,
@@ -690,8 +699,22 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     words,
     readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / readingSpeed)),
     Content: () => render(segments, components, entry.file, imageSizes),
+    body: entry.body ?? '',
     file: entry.file,
+    ...entry.modified !== undefined && { modified: new Date(entry.modified) },
   }
+
+  // Not enumerable, so spreading an entry or listing its keys renders nothing.
+  return Object.defineProperties(made, {
+    excerpt: { get: memo(() => excerptOf(segments)) },
+    html: { get: memo(() => render(segments, components, entry.file, imageSizes).t) },
+  }) as Entry<Data>
+}
+
+function memo<Value>(make: () => Value): () => Value {
+  let made: { value: Value } | undefined
+
+  return () => (made ??= { value: make() }).value
 }
 
 // The markup of the segments, each component called as a template calls it: its props, and what it wraps as `children`.

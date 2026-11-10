@@ -943,7 +943,7 @@ function closingBrace(text: string, from: number): number {
   return -1
 }
 
-function decode(text: string): string {
+export function decode(text: string): string {
   return text.replace(ENTITY, entity => DECODED[entity]!)
 }
 

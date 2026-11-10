@@ -15,6 +15,7 @@ import { imageColors } from '../server/image-color'
 import { projectSource } from '../server/source'
 import { linkImages, statOf } from './images'
 import { compileMarkdown, MarkdownError, markdownHooks, markdownSource, problemMessage, splitFrontmatter } from './markdown'
+import { modifiedTimes } from './modified'
 import { ContentError } from './validate'
 
 type ContentMode = Pick<Mode, 'dev' | 'prebuilt'>
@@ -28,6 +29,10 @@ export interface RawEntry {
   // The line each top-level field sits on, for the error that refuses it.
   lines: Record<string, number>
   segments?: Segment[] | undefined
+  // The Markdown body as written, frontmatter left out.
+  body?: string | undefined
+  // When the file last changed, as ISO text, with the collection's `modified` set to `'mtime'` or `'git'`; set as the entries are read, never kept in the entry cache.
+  modified?: string | undefined
   headings?: Heading[] | undefined
   // Absent from entries a build wrote before words were counted.
   words?: number | undefined
@@ -47,11 +52,12 @@ const ENTRY_FILES = new Bun.Glob('**/*.{md,json,yaml,yml}')
 const EXTENSION = /\.(?:md|json|ya?ml)$/
 const INDEX = /(?:^|\/)index$/
 const BACKSLASH = /\\/g
+const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)+/
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 7
+const CACHE_VERSION = 8
 
 // What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
 interface CachedEntry {
@@ -196,6 +202,8 @@ export interface LoadOptions extends MarkdownSettings {
   // Always read the files, as the build does.
   live?: boolean | undefined
   localized?: boolean | undefined
+  // Fills each entry's `modified` from its file's time or its last commit.
+  modified?: 'mtime' | 'git' | undefined
 }
 
 // The entries `kay build` compiled ahead when there are some, read from their files otherwise.
@@ -233,7 +241,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
 }
 
 async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>): Promise<RawEntry[]> {
-  const { localized = false, headingLinks = true } = markdown
+  const { localized = false, headingLinks = true, modified } = markdown
   const root = rootOf()
   const absolute = collectionFolder(dir)
   const cacheDir = projectCache(root, 'content')
@@ -241,6 +249,7 @@ async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
+  const times = new Map<string, { name: string, mtime: number }>()
 
   await mkdir(cacheDir, { recursive: true })
   await sweepLegacy(cacheDir)
@@ -257,6 +266,8 @@ async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>
 
       const [cached, { mtimeMs, size }] = await Promise.all([readCached(cacheFile), stat(path)])
       const stamp = `${mtimeMs}:${size}`
+
+      times.set(file, { name, mtime: mtimeMs })
 
       // Neither read nor hashed again while its file is as the cache saw it.
       if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file && cached.at - mtimeMs > STAMP_SETTLED_MS) {
@@ -313,7 +324,12 @@ async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>
   if (problems.length > 0)
     throw new ContentError(problems)
 
-  return entries
+  if (modified === undefined)
+    return entries
+
+  const changed = await modifiedTimes(modified, absolute, times)
+
+  return entries.map(entry => ({ ...entry, modified: changed.get(entry.file) }))
 }
 
 // What the cache holds for a loader collection's bodies: each slug's source hash and what it compiled to.
@@ -595,6 +611,7 @@ async function compileEntry(name: string, file: string, source: string, where: {
     file,
     data,
     lines,
+    body: body.replace(LEADING_BLANK_LINES, ''),
     segments,
     headings: compiled.headings,
     words: compiled.words,
