@@ -26,7 +26,7 @@ The rest by topic, each file read whole with one command:
 - [Texts and languages](llms/words.md): the `ui.*` messages that word every default text, and the page's locale in charts
 - [Infinite lists, LoadMore and a Table over them](llms/infinite-list.md): infiniteList, LoadMore, patching a loaded row, an action as the source, the server filter and sort of a Table(list), async rows, busy and row links on Table and VirtualList
 - [Charts and MapView](llms/charts.md): LineChart, BarChart, ScatterChart, MapView, ContributionGraph, Sparkline, StatusStrip
-- [Drag and drop, galleries and image tools](llms/charts-drag-and-media.md): Sortable, Board, DropTargets, MediaGallery, Carousel, AudioPlayer, Masonry, WhenVisible, VirtualList, ZoomPane, ImageCropper, MediaGallery, Carousel, AudioPlayer, Masonry, WhenVisible, VirtualList, ZoomPane, ImageCropper
+- [Drag and drop, galleries and image tools](llms/charts-drag-and-media.md): Sortable, Board, DropTargets, MediaGallery, Carousel, AudioPlayer, Masonry, WhenVisible, VirtualList, ZoomPane, ImageCropper
 
 ## A `style` on a root
 

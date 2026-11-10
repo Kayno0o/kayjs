@@ -63,6 +63,22 @@ describe('llms.txt and its docs', () => {
     expect(files.filter(file => Bun.file(join(root, file)).size >= MAX_DOC_BYTES).map(file => `${file}: ${Bun.file(join(root, file)).size}`)).toEqual([])
   })
 
+  it('lists no name twice in one topic line of an llms.txt', async () => {
+    const files = ['llms.txt', ...new Bun.Glob('packages/*/llms.txt').scanSync({ cwd: root })]
+    const repeated: string[] = []
+
+    for (const file of files) {
+      for (const line of (await Bun.file(join(root, file)).text()).split('\n')) {
+        const names = line.slice(line.indexOf('): ') + 3).split(', ').map(name => name.trim())
+
+        if (line.includes('): ') && names.length !== new Set(names).size)
+          repeated.push(`${file}: ${line.slice(0, 60)}`)
+      }
+    }
+
+    expect(repeated).toEqual([])
+  })
+
   it('links each library\'s llms.txt from llms.txt, and each library ships its llms.txt and llms/', async () => {
     const index = await Bun.file(join(root, 'llms.txt')).text()
 
