@@ -144,7 +144,7 @@ A library's own guard names the locals it reads with `guard<{ auth: Auth }>(...)
 
 ### Basic auth
 
-- `basicAuth({ user, password, realm })` from `kay/server` is a guard as a `_guard.ts` default export, in `src/api/` or `src/routes/`: `export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD })`.
+- `basicAuth({ user, password, realm, rateLimit })` from `kay/server` is a guard as a `_guard.ts` default export, in `src/api/` or `src/routes/`: `export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD })`. A client sending wrong credentials is limited, 10 every 5 minutes unless `rateLimit: { max, window }` says otherwise (`false` for none): past it the answer is 429 with `Retry-After`, a right password too until the window closes.
 - A request without the right `Authorization: Basic` header answers 401 with `WWW-Authenticate: Basic realm="<realm>", charset="UTF-8"`, `realm` being `Restricted` unless given (printable ASCII, quoted for you).
 - While `user` or `password` is `undefined` or empty, every request is refused (and one warning logged), so a missing environment variable never opens the route.
 - The header is read as RFC 7617 has it: the scheme in any case, base64 of UTF-8, the first colon ending the user, so a password may hold colons and a user may not (refused at boot). A malformed header is a refusal, never an error.

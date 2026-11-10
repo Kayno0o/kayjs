@@ -45,7 +45,7 @@ export default basicAuth({ user: process.env.TRACKER_USER, password: process.env
 
 A request without the right credentials gets a 401 and a `WWW-Authenticate` header, so a browser asks for them. While the user or the password is unset, every request is refused, so a missing environment variable never opens the route. The password is compared in constant time.
 
-Basic sends the password with every request. Serve it over https, and add a `rateLimit` to the guard against guessing.
+Basic sends the password with every request, so serve it over https. Against guessing, `basicAuth` counts the wrong credentials of each client: after 10 in 5 minutes it answers 429 with `Retry-After`, a right password included until the window closes. Pass `rateLimit: { max: 5, window: '15m' }` to change that, or `rateLimit: false` to turn it off. A `rateLimit` on the route counts the requests the guard refuses too.
 
 ## Errors
 

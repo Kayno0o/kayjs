@@ -1,6 +1,8 @@
 import type { Guard } from '../runtime/core'
+import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
+import { clientAddress, limiter, rateKey } from './protection'
 import { sameText } from './seal'
 
 export interface BasicAuthOptions {
@@ -10,7 +12,11 @@ export interface BasicAuthOptions {
   password: string | undefined
   // Named in the browser's sign-in dialog, `Restricted` by default; printable ASCII.
   realm?: string | undefined
+  // The wrong credentials a client may send, `max` every `window`, 10 every 5 minutes by default; past that it gets 429 with `Retry-After`, a right password included until the window closes. Counted per client address, in the app's `store.rates`; `false` turns it off.
+  rateLimit?: { max: number, window: Duration } | false | undefined
 }
+
+const FAILURES = { max: 10, window: '5m' } as const
 
 const SCHEME = /^basic +(\S+) *$/i
 const BASE64 = /^[A-Z0-9+/]+={0,2}$/i
@@ -42,7 +48,7 @@ function credentialsOf(header: string | null): { user: string, password: string 
 // A guard for HTTP Basic, for a device that only speaks it: `export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD, realm: 'voyager' })` in a `_guard.ts` of `src/api/` or `src/routes/`.
 // It answers 401 with `WWW-Authenticate` to a request without the right credentials, and to every request while either is unset, so a missing environment variable never opens the route.
 export function basicAuth(options: BasicAuthOptions): Guard {
-  const { user, password, realm = 'Restricted' } = options
+  const { user, password, realm = 'Restricted', rateLimit = FAILURES } = options
 
   if (UNPRINTABLE.test(realm))
     throw new KayError('config-invalid', 'kay: the realm of basicAuth is printable ASCII only, so it can be a header value')
@@ -53,12 +59,19 @@ export function basicAuth(options: BasicAuthOptions): Guard {
   const challenge = `Basic realm="${realm.replace(/["\\]/g, '\\$&')}", charset="UTF-8"`
   const configured = user !== undefined && user !== '' && password !== undefined && password !== ''
   let warned = false
+  const failures = rateLimit === false ? undefined : limiter({ ...rateLimit, name: `basicAuth:${realm}` })
 
-  return ({ request, headers, deny }) => {
+  return async ({ request, headers, deny }) => {
     const refuse = (): never => {
       headers.set('www-authenticate', challenge)
 
       return deny(401)
+    }
+
+    const tooMany = (window: { resetAt: number }): never => {
+      headers.set('retry-after', String(Math.max(1, Math.ceil((window.resetAt - Date.now()) / 1000))))
+
+      return deny(429)
     }
 
     if (!configured) {
@@ -75,7 +88,22 @@ export function basicAuth(options: BasicAuthOptions): Guard {
     const userMatches = sameText(given?.user ?? '', user)
     const passwordMatches = sameText(given?.password ?? '', password)
 
-    if (given === undefined || !userMatches || !passwordMatches)
-      return refuse()
+    const wrong = given === undefined || !userMatches || !passwordMatches
+
+    if (failures === undefined)
+      return wrong ? refuse() : undefined
+
+    const client = rateKey(clientAddress(request, null))
+
+    // A wrong guess counts, and the one past the limit gets the 429; a right one meets the 429 too once the limit of failures is reached, so a guess made after that tells nothing.
+    if (wrong) {
+      const window = await failures.hit(client)
+
+      return window.count > failures.max ? tooMany(window) : refuse()
+    }
+
+    const window = await failures.peek(client)
+
+    return window && window.count >= failures.max ? tooMany(window) : undefined
   }
 }

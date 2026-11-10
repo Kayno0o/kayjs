@@ -81,9 +81,9 @@ describe('a rate limit on an API module', () => {
     expect(refused.headers.get('access-control-allow-origin')).toBe(APP)
   })
 
-  it('counts after the guards, so a refused caller costs the allowance of none', async () => {
-    expect(await statuses(bare, '/api/guarded', 4)).toEqual([401, 401, 401, 401])
-    expect(await statuses(bare, '/api/guarded', 2, { headers: { authorization: 'x' } })).toEqual([200, 429])
+  it('counts a caller the guards refuse too, answering 429 in place of the refusal once the allowance is spent', async () => {
+    expect(await statuses(bare, '/api/guarded', 3)).toEqual([401, 429, 429])
+    expect(await statuses(bare, '/api/guarded', 1, { headers: { authorization: 'x' } })).toEqual([429])
   })
 
   it('leaves Elysia parsing no cookie, query or header on a route that reads none', async () => {

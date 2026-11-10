@@ -1,3 +1,4 @@
+import type { Server } from 'bun'
 import type { Context, TSchema, ValidationError } from 'elysia'
 import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
@@ -192,6 +193,10 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (cors)
         guarded.onBeforeHandle(({ request }) => request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
 
+      // A module with no limit of its own or of a route has nothing to count.
+      const limited = moduleLimits.length > 0 || routeRates.size > 0
+      const overLimit = async (request: Request, route: string, server: Server<unknown> | null, locals: () => Locals) => apiOverLimit(request, route, server, locals, moduleLimits, routeRates, options)
+
       // The guards are kay's call, so what they log carries the request; the handler runs in Elysia's.
       // With no guard and no cors rule nothing runs in the request's scope, so only the cross-site check is left.
       if (guards.length === 0 && !cors) {
@@ -204,31 +209,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           ;(context as { guard?: unknown }).guard = guardValues(context.request)
 
-          return refused
+          // A refused request counts too, so a password is not guessed at full speed; over the limit it gets the 429 in place of the refusal.
+          return refused !== undefined && limited ? await overLimit(context.request, context.route, context.server, () => ({ ...context }) as unknown as Locals) ?? refused : refused
         })
       }
 
-      // After the guards, so a caller they refuse costs no allowance and a `key` reads what they set up; a module with no limit of its own or of a route has nothing to count.
-      if (moduleLimits.length > 0 || routeRates.size > 0) {
-        guarded.onBeforeHandle(async (context) => {
-          const route = withoutSlash(context.route)
-          const limits = [...moduleLimits, ...routeRates.get(`${context.request.method} ${route}`) ?? routeRates.get(`${context.request.method === 'HEAD' ? 'GET' : 'ALL'} ${route}`) ?? routeRates.get(`ALL ${route}`) ?? []]
-
-          if (limits.length === 0)
-            return undefined
-
-          const request = context.request
-          const wait = await answeringRequest(request, async () => inApiLocale(request, options, async () => apiLimitWait(limits, request, context.server, () => ({
-            request,
-            locale: contextLocale(options),
-            get cookies() {
-              return cookieJar(request).cookies
-            },
-            locals: { ...context } as unknown as Locals,
-          }))))
-
-          return wait === undefined ? undefined : tooManyRequests(wait)
-        })
+      // After the guards, so a `key` reads what they set up.
+      if (limited) {
+        guarded.onBeforeHandle(async context => overLimit(context.request, context.route, context.server, () => ({ ...context }) as unknown as Locals))
       }
 
       const mounting = guarded
@@ -649,6 +637,26 @@ function holdsBigint(value: unknown, seen = new WeakSet<object>()): boolean {
   seen.add(value)
 
   return Object.values(value).some(item => holdsBigint(item, seen))
+}
+
+// The 429 of the module's and the route's `rateLimit` when the request is over one, counting it.
+async function apiOverLimit(request: Request, matched: string, server: Server<unknown> | null, locals: () => Locals, moduleLimits: { name: string, limit: RateLimit }[], routeRates: Map<string, { name: string, limit: RateLimit }[]>, options: ActionOptions): Promise<Response | undefined> {
+  const route = withoutSlash(matched)
+  const limits = [...moduleLimits, ...routeRates.get(`${request.method} ${route}`) ?? routeRates.get(`${request.method === 'HEAD' ? 'GET' : 'ALL'} ${route}`) ?? routeRates.get(`ALL ${route}`) ?? []]
+
+  if (limits.length === 0)
+    return undefined
+
+  const wait = await answeringRequest(request, async () => inApiLocale(request, options, async () => apiLimitWait(limits, request, server, () => ({
+    request,
+    locale: contextLocale(options),
+    get cookies() {
+      return cookieJar(request).cookies
+    },
+    locals: locals(),
+  }))))
+
+  return wait === undefined ? undefined : tooManyRequests(wait)
 }
 
 // The limits of a module or a route, each counted under its own name: the first under the place's, the others under their place in the list.

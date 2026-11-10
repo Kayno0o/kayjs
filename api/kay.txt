@@ -2597,6 +2597,7 @@ function basicAuth(options: BasicAuthOptions): Guard
 [./server] BasicAuthOptions
 interface BasicAuthOptions
   password: string | undefined
+  rateLimit?: false | undefined | { max: number; window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   realm?: string | undefined
   user: string | undefined
 

@@ -60,8 +60,9 @@ describe('basicAuth', () => {
     ['the user and password swapped', encode('p@ss:owntracks')],
     ['a header with a raw non-ASCII byte', 'Basic café'],
     ['a NUL in the credentials', encode('owntracks\0:p@ss:word')],
-  ])('answers 401 to %s', async (_, header) => {
-    expect(await attempt(guard, header)).toMatchObject({ status: 401 })
+  ])('answers 401 to %s', async (label, header) => {
+    // A realm of its own, as the failures of every guard of one realm count together.
+    expect(await attempt(basicAuth({ user: 'owntracks', password: 'p@ss:word', realm: label }), header)).toMatchObject({ status: 401 })
   })
 
   it('compares UTF-8 credentials, a lookalike not matching', async () => {
@@ -169,5 +170,108 @@ describe('basicAuth as a guard of a directory', () => {
     expect((await fetchAt(localized, '/fr/private', encode('owntracks:secret'))).status).toBe(200)
     expect((await fetchAt(localized, '/private')).status).toBe(401)
     expect((await fetchAt(localized, '/api/track', undefined, 'POST')).status).toBe(401)
+  })
+})
+
+describe('basicAuth failures', () => {
+  const right = encode('owntracks:secret')
+  const wrong = encode('owntracks:guess')
+
+  // Every call of a test comes from its own address, through the proxy the app trusts.
+  const from = (address: string, authorization?: string) => ({ headers: { 'x-forwarded-for': address, ...authorization === undefined ? {} : { authorization } } })
+  let dir = ''
+  let app: Awaited<ReturnType<typeof pages>>
+
+  beforeAll(async () => {
+    dir = await scratchDir('basic-auth-limit-')
+
+    const guard = (realm: string, extra = '') => `import { basicAuth } from 'kay/server'\n\nexport default basicAuth({ user: 'owntracks', password: 'secret', realm: '${realm}'${extra} })\n`
+
+    await Promise.all([
+      // The route's own limit alone counts here: the guard has none.
+      Bun.write(join(dir, 'routes/gated/_guard.ts'), guard('gated', ', rateLimit: false')),
+      Bun.write(join(dir, 'routes/gated/data.txt.ts'), 'export const page = { rateLimit: { max: 3, window: \'1m\' } }\n\nexport const GET = () => \'data\'\n'),
+      Bun.write(join(dir, 'api/gated/_guard.ts'), guard('api-gated', ', rateLimit: false')),
+      Bun.write(join(dir, 'api/gated/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ rateLimit: { max: 3, window: \'1m\' } }).get(\'/\', () => \'data\')\n'),
+      // The default limit of failures, and a custom one.
+      Bun.write(join(dir, 'routes/lock/_guard.ts'), guard('lock')),
+      Bun.write(join(dir, 'routes/lock/index.kay'), 'h1 Lock\n'),
+      Bun.write(join(dir, 'api/lock/_guard.ts'), guard('api-lock')),
+      Bun.write(join(dir, 'api/lock/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'data\')\n'),
+      Bun.write(join(dir, 'routes/tight/_guard.ts'), guard('tight', ', rateLimit: { max: 2, window: \'1m\' }')),
+      Bun.write(join(dir, 'routes/tight/index.kay'), 'h1 Tight\n'),
+      Bun.write(join(dir, 'routes/free/_guard.ts'), guard('free', ', rateLimit: false')),
+      Bun.write(join(dir, 'routes/free/index.kay'), 'h1 Free\n'),
+    ])
+    app = await pages({ requireGuards: false, root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, proxy: { hops: 1 } })
+  })
+
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  const get = async (path: string, address: string, authorization?: string) => app.handle(new Request(`http://localhost${path}`, from(address, authorization)))
+
+  it.each(['/gated/data.txt', '/api/gated'])('counts the requests the guards of %s refuse against its rateLimit', async (path) => {
+    const address = `10.0.0.${path.length}`
+
+    expect([(await get(path, address)).status, (await get(path, address, wrong)).status, (await get(path, address)).status]).toEqual([401, 401, 401])
+
+    const limited = await get(path, address, wrong)
+
+    expect(limited.status).toBe(429)
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+    // The right password is over the limit too, and another client is not.
+    expect((await get(path, address, right)).status).toBe(429)
+    expect((await get(path, `10.1.0.${path.length}`, right)).status).toBe(200)
+  })
+
+  it('lets a right password through after failures while under the limit of the route', async () => {
+    const address = '10.0.1.1'
+
+    expect((await get('/gated/data.txt', address, wrong)).status).toBe(401)
+    expect((await get('/gated/data.txt', address, right)).status).toBe(200)
+  })
+
+  it.each(['/lock', '/api/lock'])('limits the wrong passwords of %s per client by default', async (path) => {
+    const address = `10.0.2.${path.length}`
+
+    for (let attempts = 0; attempts < 10; attempts++)
+      expect((await get(path, address, wrong)).status).toBe(401)
+
+    const limited = await get(path, address, wrong)
+
+    expect(limited.status).toBe(429)
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect((await get(path, address, right)).status).toBe(429)
+    expect((await get(path, `10.0.3.${path.length}`, right)).status).toBe(200)
+  })
+
+  it('passes a right password after failures under the limit, and does not count it', async () => {
+    const address = '10.0.4.1'
+
+    for (let attempts = 0; attempts < 2; attempts++)
+      expect((await get('/tight', address, wrong)).status).toBe(401)
+
+    // The second failure left the count at the max: the next one, right or wrong, is over.
+    expect((await get('/tight', '10.0.4.2', wrong)).status).toBe(401)
+
+    for (let attempts = 0; attempts < 5; attempts++)
+      expect((await get('/tight', '10.0.4.2', right)).status).toBe(200)
+
+    expect((await get('/tight', address, right)).status).toBe(429)
+  })
+
+  it('counts the client the trusted proxy forwards, not the proxy', async () => {
+    for (let attempts = 0; attempts < 3; attempts++)
+      await get('/tight', '10.0.5.1', wrong)
+
+    expect((await get('/tight', '10.0.5.1', right)).status).toBe(429)
+    expect((await get('/tight', '10.0.5.2', right)).status).toBe(200)
+  })
+
+  it('takes rateLimit: false as no limit', async () => {
+    for (let attempts = 0; attempts < 30; attempts++)
+      expect((await get('/free', '10.0.6.1', wrong)).status).toBe(401)
+
+    expect((await get('/free', '10.0.6.1', right)).status).toBe(200)
   })
 })

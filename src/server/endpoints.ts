@@ -212,8 +212,9 @@ async function respond(endpoint: ServedEndpoint, context: EndpointRequest, param
 
   const passed = await passGuards(endpoint.guards, context, params, options)
 
+  // A request the guards refuse counts against the limits too, and over them it gets the 429 in place of the refusal.
   if (passed instanceof Response)
-    return markedPrivate(passed, request)
+    return markedPrivate(endpoint.limits.length === 0 ? passed : await limited(endpoint, context, options) ?? passed, request)
 
   if (!handler)
     return markedPrivate(request.method === 'OPTIONS' ? new Response(null, { status: 204, headers: { allow: allow.join(', ') } }) : new Response('Method Not Allowed', { status: 405, headers: { 'content-type': TEXT, 'allow': allow.join(', ') } }), request)

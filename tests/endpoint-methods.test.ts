@@ -205,11 +205,9 @@ describe('the settings of an endpoint file', () => {
     expect((await call(wide, '/shared.txt', { headers })).headers.get('access-control-allow-origin')).toBe(ORIGIN)
   })
 
-  it('counts no allowance for a caller the guards refuse', async () => {
-    for (let attempt = 0; attempt < 3; attempt++)
-      expect((await call(plain, '/guarded/limited.txt', { method: 'POST' })).status).toBe(401)
-
-    expect((await call(plain, '/guarded/limited.txt', { method: 'POST', headers: { authorization: 'x' } })).body).toBe('counted')
+  it('counts a caller the guards refuse against the allowance, and answers 429 in place of the refusal once it is spent', async () => {
+    expect((await call(plain, '/guarded/limited.txt', { method: 'POST' })).status).toBe(401)
+    expect((await call(plain, '/guarded/limited.txt', { method: 'POST' })).status).toBe(429)
     expect((await call(plain, '/guarded/limited.txt', { method: 'POST', headers: { authorization: 'x' } })).status).toBe(429)
   })
 
