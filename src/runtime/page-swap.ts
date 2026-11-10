@@ -43,10 +43,6 @@ export async function go(url: URL, swap: Swap): Promise<void> {
 
   // Another click on the link of a page being fetched is the same visit: it joins the swap under way instead of fetching the page again.
   if (joins(url, swap)) {
-    // A second link to the same page, a footer beside a nav link, takes the mark over.
-    if (swap.link)
-      markPending(swap.link)
-
     await inFlight.asked
 
     return

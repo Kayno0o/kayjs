@@ -1742,6 +1742,37 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       }
     })
 
+    it('hands the mark to a second link to the same page clicked while the first swap is under way, and clears it at the end', async () => {
+      const own = await open('/watched')
+
+      try {
+        const { promise: held, resolve: release } = Promise.withResolvers<void>()
+        const pending = async () => own.evaluate(() => [...document.querySelectorAll('[data-pending]')].map(link => link.className))
+
+        await own.route(`${origin}/second`, async (request) => {
+          await held
+
+          try {
+            await request.continue()
+          }
+          catch {}
+        })
+        await own.click('a.second')
+        await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
+        expect(await pending()).toEqual(['second'])
+        // A link click never joins the swap under way (`joins()` compares `transition`, which only `navigate()` leaves unset), so it starts its own: the link clicked last holds the mark and the first lets it go.
+        await own.click('a.again')
+        expect(await pending()).toEqual(['again'])
+        release()
+        await own.waitFor('h1', { text: 'Second' })
+        await settled(own)
+        expect(await pending()).toEqual([])
+      }
+      finally {
+        own.close()
+      }
+    })
+
     it('clears the mark of a link that survives the swap, one in a persisted island', async () => {
       const own = await open('/query')
 

@@ -12,6 +12,7 @@ h1 Watched
 Watcher(persist away={away})
 a.two(href="/watched-two") Two
 a.second(href="/second") Second
+a.again(href="/second") Again
 form.away(action={away})
   button.post Post
 div#section(style="height: 3000px")
