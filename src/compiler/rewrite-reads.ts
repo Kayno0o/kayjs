@@ -361,7 +361,7 @@ export function rowReadOnly(name: string) {
 }
 
 // `{ todo }` cannot become `{ todo() }`, so a shorthand property spells its key out first.
-// The members a keyed loop's `keyed={(item) => item.a.b}` reads off its item, when `row` is that loop's row: none for a key that is the item itself.
+// The members a keyed loop's `keyed={(item, index) => item.a.b}` (the index only when the key reads it) reads off its item, when `row` is that loop's row: none for a key that is the item itself.
 export function loopKey(row: Path<ArrowFunctionExpression>, name: string): string[] | undefined {
   const loop = row.parentPath?.parentPath?.node
 

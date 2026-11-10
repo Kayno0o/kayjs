@@ -584,7 +584,7 @@ describe('loops', () => {
   })
 
   const mountIndexKeys = site({
-    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst rows = signal<{ id?: number, name: string }[]>([{ id: 1, name: \'a\' }, { name: \'b\' }])\nconst groups = signal([{ id: 1, cells: [{ name: \'x\' }, { name: \'y\' }] }, { id: 2, cells: [{ name: \'z\' }] }])\n;(globalThis as { setRows?: (next: { id?: number, name: string }[]) => void }).setRows = next => rows.set(next)\n---\nul.plain\n  for row, position of rows() key={row.id ?? position}\n    li {position}:{row.name}\nul.pattern\n  for { id, name }, i of rows() key={`${id}-${i}`}\n    li {i}:{name}\nul.only\n  for row, i of rows() key={i}\n    li {i}:{row.name}\nul.nested\n  for group, i of groups() key={group.id}\n    li\n      for cell, i of group.cells key={cell.name + i}\n        b {i}{cell.name}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst rows = signal<{ id?: number, name: string }[]>([{ id: 1, name: \'a\' }, { name: \'b\' }])\nconst groups = signal([{ id: 1, cells: [{ name: \'x\' }, { name: \'y\' }] }, { id: 2, cells: [{ name: \'z\' }] }])\n;(globalThis as { setRows?: (next: { id?: number, name: string }[]) => void }).setRows = next => rows.set(next)\n---\nul.plain\n  for row, position of rows() key={row.id ?? position}\n    li {position}:{row.name}\nul.pattern\n  for { id, name }, i of rows() key={`${id}-${i}`}\n    li {i}:{name}\nul.only\n  for row, i of rows() key={i}\n    li {i}:{row.name}\nul.set\n  for row, i of new Set(rows()) key={row.name + i}\n    li {i}{row.name}\nul.nested\n  for group, i of groups() key={group.id}\n    li\n      for cell, i of group.cells key={cell.name + i}\n        b {i}{cell.name}\n',
   })
 
   it('reads the index in a loop\'s key: an id else the position, a pattern with an index, an index alone and nested loops sharing the name', async () => {
@@ -597,6 +597,7 @@ describe('loops', () => {
       expect(texts('.pattern li')).toEqual(['0:a', '1:b'])
       expect(texts('.only li')).toEqual(['0:a', '1:b'])
       expect(texts('.nested li')).toEqual(['0x1y', '0z'])
+      expect(texts('.set li')).toEqual(['0a', '1b'])
 
       const first = root.querySelector('.plain li')!
 
@@ -605,6 +606,12 @@ describe('loops', () => {
       expect(texts('.plain li')).toEqual(['0:a!', '1:c', '2:b'])
       expect(root.querySelector('.plain li')).toBe(first)
       expect(texts('.only li')).toEqual(['0:a!', '1:c', '2:b'])
+      expect(texts('.set li')).toEqual(['0a!', '1c', '2b'])
+
+      // An id equal to a later place is the same key as that place's: the older row of the pair goes, the list still draws.
+      setRows([{ id: 1, name: 'p' }, { name: 'q' }])
+      await settle()
+      expect(texts('.plain li')).toEqual(['0:p', '1:q'])
     }
     finally {
       await dispose()

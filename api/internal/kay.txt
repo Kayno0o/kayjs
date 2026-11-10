@@ -54,7 +54,7 @@ interface TemplateHelpers
   For: {
   <T>(props: {
     each: Iterable<T> | false | null | undefined;
-    keyed: (item: T) => unknown;
+    keyed: (item: T, index: number) => unknown;
     fallback?: Element;
     children: Element;
   }): Element;
@@ -421,7 +421,7 @@ function awaited(element: Node | null, start: Node | null, end: Node | null, val
 function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
 
 [./dom-loop] loop
-function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
+function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T, index: number) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
 
 [./dom-loop] rowKey
 function rowKey(item: unknown): unknown

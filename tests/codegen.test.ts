@@ -220,6 +220,17 @@ describe('control flow', () => {
     expect(jsx(pattern)).toContain('keyed={({ id }, i) => (`${id}-${i}`)}')
   })
 
+  it('adds the index to a key function only when the key reads that name as a variable', () => {
+    const dom = (source: string) => compileKay(source, 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom('for item, position of items key={item.position}\n  li {position}')).toContain('(item) => (item.position), (')
+    expect(dom('for item, position of items key={item.id}\n  li {position}')).toContain('(item) => (item.id), (')
+    expect(dom('for item, $i of items key={item.id ?? $i}\n  li {$i}')).toContain('(item, $i) => (item.id ?? $i), (')
+    expect(dom('for item, _i of items key={item.id ?? _i}\n  li {item.id}')).toContain('(item, _i) => (item.id ?? _i), (')
+    expect(jsx('for item, position of items key={item.position}\n  li {position}')).toContain('keyed={(item) => (item.position)}')
+    expect(compileKay('for item, position of items key={item.id ?? position}\n  li {item.id}', 'test.kay', { check: true }).diagnostics).toEqual([])
+  })
+
   it('destructures a loop\'s item through a name of the row\'s own, which a browser reads as the accessor it is and a page as the item', () => {
     const source = 'for [key, value], i of entries key={key}\n  p {key}: {value}'
 
