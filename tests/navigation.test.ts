@@ -1792,8 +1792,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
         expect(await pending()).toEqual(['next'])
         release()
+        await own.waitUntil(() => location.search === '?page=2')
         await settled(own)
-        expect(await own.evaluate(() => location.search)).toBe('?page=2')
         expect(await pending()).toEqual([])
       }
       finally {
