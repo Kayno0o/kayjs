@@ -218,7 +218,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
 }
 
 // Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()`, the Web Vitals visitors reported, the notifications and push subscriptions of a person and the `store.kv` values in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
-// The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them (`kay_kv` included, which a database made before 1.88 lacks). Replicas hear each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
+// The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them (`kay_kv` included, which a database made before 1.88 lacks). Replicas hear each other's invalidations, live values and queued jobs within a second through NOTIFY (one extra connection per serving process listens), and poll as the fallback, within about half a second; a database that refuses LISTEN, as a pooler in transaction mode may, is polled alone.
 // A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` keeps a room's state.
 export function pgData(source: PgSource) {
   const db = connectionOf(source)

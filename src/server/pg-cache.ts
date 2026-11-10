@@ -6,6 +6,7 @@ import { DEPS_PREFIX, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrac
 import { kayLog } from '../runtime/log'
 import { rowsOf } from './pg-jobs'
 import { limitedStore } from './pg-limit'
+import { wakeOf } from './pg-notify'
 import { closeWith, EVENT_TTL_MS, eventWindow, POLL_MS, pollerOf } from './pg-poll'
 import { NOW } from './pg-sql'
 
@@ -93,7 +94,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     if (listeners.length === 0)
       return
 
-    polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed' }, true)
+    polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed', listen: 'cache' }, true)
   }
 
   const store: CacheStore = {
@@ -159,7 +160,10 @@ export function pgCache(pg: PgHandle): CacheStore {
 
       const db = await pg.db()
 
-      await rowsOf(db.unsafe(`INSERT INTO kay_events (origin, message, at) VALUES ($1, $2, ${NOW})`, [PROCESS, message]))
+      const [channel, payload] = wakeOf('cache')
+
+      // The statement notifies as it commits, so a process woken finds the event.
+      await rowsOf(db.unsafe(`WITH published AS (INSERT INTO kay_events (origin, message, at) VALUES ($1, $2, ${NOW}) RETURNING id) SELECT pg_notify($3, $4) FROM published`, [PROCESS, message, channel, payload]))
       await rowsOf(db.unsafe(`DELETE FROM kay_events WHERE at < ${NOW} - ${EVENT_TTL_MS}`))
     },
     subscribe(listener) {

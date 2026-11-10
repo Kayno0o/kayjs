@@ -3,9 +3,10 @@ import type { KayErrorOptions } from '../compiler/errors'
 import type { PgHandle } from './pg-data'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
-import { delayAfter, pollClock } from '../runtime/poll-backoff'
+import { delayAfter, LISTENED_IDLE_MS, MAX_IDLE_MS, pollClock } from '../runtime/poll-backoff'
 import { outsideRequest } from './clean-context'
 import { startedStatements, trackStatements } from './pg-jobs'
+import { hear } from './pg-notify'
 import { onReload } from './reload'
 
 // How often a process reads what the others wrote while there is activity (see `delayAfter` for how it slows down when idle), and how long a message is kept for one that reads late.
@@ -118,6 +119,8 @@ export interface PollTask {
   backoff?: boolean
   // What the log says when a streak of failed runs begins.
   failed: string
+  // The kind of write whose notification (a `LISTEN` of the database) runs the task at once, and lets a `backoff` one wait up to `LISTENED_IDLE_MS` between runs once notifications are known to arrive. The writes send it with `wakeOf`; a database that refuses or never delivers leaves the polling as it was.
+  listen?: string
 }
 
 interface Entry {
@@ -130,6 +133,9 @@ interface Entry {
   began: number
   // A held task keeps its base rate, as a watcher waits on its next change.
   held: boolean
+  // Whether a notification came while it ran, which a run ending does not push back.
+  poked: boolean
+  hearing: { delivering: () => boolean } | undefined
 }
 
 export type Stop = (() => void) & { wake: () => void, hold: (held: boolean) => void }
@@ -154,6 +160,9 @@ export function pollerOf(pg: PgHandle): Poller {
 
 // Tasks due within this of each other share a tick, so stores started a few milliseconds apart still reach the database once.
 const GROUP_MS = 25
+
+// How long after a subscription that could not reach the database the next try comes.
+const RETRY_SUBSCRIBE_MS = 5000
 
 function createPoller(pg: PgHandle): Poller {
   const entries = new Set<Entry>()
@@ -181,7 +190,7 @@ function createPoller(pg: PgHandle): Poller {
         entry.quiet = outcome === 'heard' ? 0 : entry.quiet + 1
 
         if (entry.task.backoff)
-          entry.next = entry.began + (entry.held ? entry.task.every : delayAfter(entry.task.every, entry.quiet))
+          entry.next = entry.began + (entry.held ? entry.task.every : delayAfter(entry.task.every, entry.quiet, entry.hearing?.delivering() === true ? LISTENED_IDLE_MS : MAX_IDLE_MS))
       }
     }
     catch (error) {
@@ -193,6 +202,12 @@ function createPoller(pg: PgHandle): Poller {
     }
     finally {
       entry.running = false
+
+      if (entry.poked) {
+        entry.poked = false
+        entry.next = pollClock.now()
+      }
+
       schedule()
     }
   }
@@ -222,10 +237,50 @@ function createPoller(pg: PgHandle): Poller {
 
   return {
     add(task, now) {
-      const entry: Entry = { task, next: now ? 0 : pollClock.now() + task.every, running: false, failing: false, quiet: 0, began: 0, held: false }
+      const entry: Entry = { task, next: now ? 0 : pollClock.now() + task.every, running: false, failing: false, quiet: 0, began: 0, held: false, poked: false, hearing: undefined }
 
       entries.add(entry)
       schedule()
+
+      // Another process wrote: read now, however long the task has slept.
+      const poke = () => {
+        entry.quiet = 0
+
+        if (entry.running) {
+          entry.poked = true
+
+          return
+        }
+
+        entry.next = 0
+        schedule()
+      }
+
+      let ended = false
+      let subscription: Awaited<ReturnType<typeof hear>> | undefined
+      let retry: ReturnType<typeof setTimeout> | undefined
+
+      const subscribe = async () => {
+        try {
+          const subscribed = await hear(await pg.db(), task.listen as string, undefined, poke)
+
+          // Stopped while it connected.
+          if (ended)
+            await subscribed.stop()
+          else
+            subscription = entry.hearing = subscribed
+        }
+        catch {
+          // The database is down: the polling logs it, and the subscription is tried again.
+          if (!ended) {
+            retry = setTimeout(() => void subscribe(), RETRY_SUBSCRIBE_MS)
+            retry.unref()
+          }
+        }
+      }
+
+      if (task.listen !== undefined)
+        void subscribe()
 
       const wake = () => {
         entry.quiet = 0
@@ -240,7 +295,10 @@ function createPoller(pg: PgHandle): Poller {
       }
 
       return Object.assign(() => {
+        ended = true
         entries.delete(entry)
+        clearTimeout(retry)
+        void subscription?.stop()
         schedule()
       }, {
         wake,

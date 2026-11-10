@@ -2,10 +2,12 @@
 // A write of this process, a new watcher or the first use of a store snaps it back to the base rate; what another process writes is heard within `MAX_IDLE_MS` at the latest.
 export const QUIET_POLLS = 8
 export const MAX_IDLE_MS = 5000
+// Where a read backs off to once the database notifies on every write (Postgres `LISTEN`) and a notification came through: the read is then only the fallback of a lost one.
+export const LISTENED_IDLE_MS = 30_000
 
 // The delay before the next read, after `quiet` reads in a row that heard nothing.
-export function delayAfter(every: number, quiet: number): number {
-  return quiet < QUIET_POLLS ? every : Math.min(MAX_IDLE_MS, every * 2 ** (quiet - QUIET_POLLS + 1))
+export function delayAfter(every: number, quiet: number, ceiling = MAX_IDLE_MS): number {
+  return quiet < QUIET_POLLS ? every : Math.min(ceiling, every * 2 ** (quiet - QUIET_POLLS + 1))
 }
 
 // The clock the pollers run on, which a test replaces to move a minute in no time.

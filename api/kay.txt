@@ -2800,6 +2800,7 @@ interface JobStore extends StoreBase
   fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => MaybePromise<boolean | void>
   failed: (queue: string, limit?: number | undefined) => MaybePromise<StoredJob[]>
   jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => MaybePromise<StoredJob[]>) | undefined
+  listen?: ((queue: string, wake: () => void) => Promise<{ stop: () => Promise<void>; delivering: () => boolean; }>) | undefined
   live?: ((queue: string, now: number, limit?: number | undefined) => MaybePromise<StoredJobState[]>) | undefined
   lock: (name: string, slot: number) => MaybePromise<boolean>
   nextRunAt: (queue: string) => MaybePromise<number | undefined>

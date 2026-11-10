@@ -20,7 +20,7 @@ import { stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
 import { inMemory } from './memory-mark'
 import { forgetShownJobs, showJobs } from './queue-live'
-import { forgetDrain, inFlightWork, POLL_MS, Scheduler } from './queue-scheduler'
+import { forgetDrain, inFlightWork, LISTENED_IDLE_POLL, POLL_MS, Scheduler } from './queue-scheduler'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -88,6 +88,7 @@ export interface JobStore extends StoreBase {
   nextRunAt: (queue: string) => MaybePromise<number | undefined>
   // True for the first caller naming this lock and slot, in any process: a schedule's run happens once.
   lock: (name: string, slot: number) => MaybePromise<boolean>
+  listen?: ((queue: string, wake: () => void) => Promise<{ stop: () => Promise<void>, delivering: () => boolean }>) | undefined // Calls `wake` when another process changes the queue, so an idle worker looks at once instead of at its next poll; `delivering` tells whether that is known to work, and the queue then polls less often. A store without it is polled alone.
 }
 
 export interface QueueOptions<Payload> {
@@ -182,7 +183,7 @@ const PURGE_MS = 60 * 60 * 1000
 // A store that fails marking a finished job is asked this many times, waiting a little longer between each, before the job is left to be taken again.
 const COMPLETE_TRIES = 3
 const COMPLETE_RETRY_MS = 100
-// The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
+// The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst, unless the store notifies (`pgJobs` does, through LISTEN) and then only a lost notification does.
 const DEFAULT_IDLE_POLL = '10s'
 const DEFAULT_PATH = 'data/jobs.sqlite'
 
@@ -619,8 +620,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     throw new KayError('config-invalid', `kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
 
   const ownStore = () => options.store ?? defaultJobStore()
-  const { live } = options
-  const shown = live === undefined || live === false ? undefined : showJobs(name, ownStore, live === true ? undefined : live as (payload: unknown, job: LiveJob) => unknown)
+  const shown = options.live === undefined || options.live === false ? undefined : showJobs(name, ownStore, options.live === true ? undefined : options.live as (payload: unknown, job: LiveJob) => unknown)
   const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
   // The job's payload for a hook, undefined when no hook is set to read it or the stored text cannot be read: a job never fails for its hooks.
@@ -953,7 +953,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
   }
 
-  const scheduler = new Scheduler({ name, concurrency, idlePoll, lazy: options.lazy === true, store, run: runOne, purge: purgeFailed })
+  const scheduler = new Scheduler({ name, concurrency, idlePoll, listenedPoll: options.idlePoll === undefined ? LISTENED_IDLE_POLL : idlePoll, lazy: options.lazy === true, store, run: runOne, purge: purgeFailed })
 
   // Unnamed, so Elysia never takes two queues for one plugin.
   const plugin = new Elysia()

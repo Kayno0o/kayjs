@@ -4,9 +4,12 @@ import { kayLog } from '../runtime/log'
 import { outsideRequest } from './clean-context'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain } from './drain'
+import { serverStarted, serverStopped } from './serving'
 
 // How soon an idle queue looks again after a job, the first wait of its backoff.
 export const POLL_MS = 1000
+// The longest an idle queue waits between looks once its store notifies and a notification came through, unless `idlePoll` was given.
+export const LISTENED_IDLE_POLL = 60_000
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 
@@ -18,6 +21,8 @@ interface SchedulerOptions {
   concurrency: number
   // The longest wait between looks at the store while the queue is idle.
   idlePoll: number
+  // The same while the store's notifications are known to arrive.
+  listenedPoll: number
   lazy: boolean
   store: () => JobStore
   // Claims one due job and runs it, false when none was due.
@@ -46,6 +51,9 @@ export class Scheduler {
   #controller: AbortController | undefined
   #workers: Promise<void>[] = []
   #forgetDrain: (() => void) | undefined
+  // What the store tells of changes by other processes, while the workers run.
+  #subscription: { stop: () => Promise<void>, delivering: () => boolean } | undefined
+  #subscribing = 0
   // The worker looking for jobs while the queue is idle sleeps until its next look, woken when this process enqueues a job or retries one.
   readonly #pollers = new Set<() => void>()
   // The others sleep until a claim leaves no worker looking, which wakes one of them to take over.
@@ -79,6 +87,7 @@ export class Scheduler {
   // The server started: the workers start unless the queue waits to be activated.
   serve(): void {
     this.#serving = true
+    serverStarted()
     this.#forgetDrain = onDrain(() => this.#beginStop())
     this.#start()
   }
@@ -91,9 +100,14 @@ export class Scheduler {
   // The server stopped: the workers end, a run in flight winding down first.
   async stop(): Promise<void> {
     this.#forgetDrain?.()
+
+    if (this.#serving)
+      serverStopped()
+
     this.#serving = false
     this.#beginStop()
     await Promise.all(this.#workers)
+    await this.#unsubscribe()
     this.#controller = undefined
     this.#workers = []
     this.#state = 'stopped'
@@ -160,6 +174,48 @@ export class Scheduler {
     this.#state = 'running'
     // Started from whichever request first woke a lazy queue, the workers must not keep that visitor's request for every job after.
     this.#workers = outsideRequest(() => Array.from({ length: this.#options.concurrency }, async () => this.#work(started.signal)))
+    void this.#subscribe(started.signal)
+  }
+
+  // A store that notifies wakes the idle workers when another process changes the queue, and again once it is back from a lost connection. A failure leaves the polling as it was.
+  async #subscribe(signal: AbortSignal): Promise<void> {
+    if (this.#subscription !== undefined || this.#subscribing > 0)
+      return
+
+    this.#subscribing++
+
+    try {
+      const listen = this.#options.store().listen
+
+      if (listen === undefined)
+        return
+
+      const subscription = await listen(this.#options.name, this.wake)
+
+      if (signal.aborted || this.#subscription !== undefined)
+        await subscription.stop()
+      else
+        this.#subscription = subscription
+    }
+    catch (error) {
+      kayLog('warn', `queue('${this.#options.name}') could not ask its store to tell it of jobs added by other processes; it polls`, error)
+    }
+    finally {
+      this.#subscribing--
+    }
+  }
+
+  async #unsubscribe(): Promise<void> {
+    const subscription = this.#subscription
+
+    this.#subscription = undefined
+
+    try {
+      await subscription?.stop()
+    }
+    catch {
+      // The store went first.
+    }
   }
 
   #beginStop(): void {
@@ -190,7 +246,7 @@ export class Scheduler {
   }
 
   async #work(signal: AbortSignal): Promise<void> {
-    const { name, idlePoll, store, purge } = this.#options
+    const { name, store, purge } = this.#options
     let outageWait = 0
 
     while (!signal.aborted) {
@@ -229,7 +285,7 @@ export class Scheduler {
 
           const wait = next === undefined ? this.#idleWait : Math.min(this.#idleWait, Math.max(0, next - Date.now()))
 
-          this.#idleWait = Math.min(this.#idleWait * 2, idlePoll)
+          this.#idleWait = Math.min(this.#idleWait * 2, this.#subscription?.delivering() === true ? this.#options.listenedPoll : this.#options.idlePoll)
           await sleep(wait, signal, this.#pollers)
         }
         finally {

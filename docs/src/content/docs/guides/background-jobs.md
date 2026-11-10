@@ -181,7 +181,7 @@ A job enqueued while the one with its key runs is dropped, even if its data is n
 
 Jobs wait in a SQLite file shared by the server processes on one machine. Under `bun test` they stay in memory, and `site.runJobs()` from `kay/test` runs them. It also waits for a job a worker already started, so the test sees what that job did. A `queue.enqueue()` your action started without awaiting is waited for too; one a timer has not started yet is not.
 
-An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`.
+An idle queue looks for a job from one worker. A job another process enqueued waits 10 seconds at worst, the default `idlePoll`. On Postgres the other process tells the idle workers, and the job starts within a second; `idlePoll` is then only the fallback for a lost notification, 60 seconds unless you set it.
 
  A job enqueued in the same process still runs at once, and a retry is picked up when due.
 
@@ -249,7 +249,9 @@ export default defineConfig({
 
 It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTableNames` from `kay/server`. The tables include the ones of the 404 log and of the redirects added while the site runs.
 
-Replicas learn of each other's invalidations, live values and room messages by polling, within about half a second (5 seconds on an idle server), so nothing needs LISTEN and a pooler in front of Postgres works, except for building a missing index, which needs a session connection.
+Replicas learn of each other's invalidations, live values, room messages and queued jobs within a second. Each write sends a `NOTIFY` that names only what changed, and every serving process holds one extra connection that `LISTEN`s for it and then reads the store. Polling stays as the fallback, so a lost notification costs a slower read, never the write.
+
+If the database refuses `LISTEN`, or a pooler in transaction mode accepts it and delivers nothing, the store polls alone, within about half a second (5 seconds on an idle server), and logs one warning. A pooler in front of Postgres works, except for building a missing index, which needs a session connection.
 
 A database belongs to one app. The first app to start on it records its `package.json` name, and a different app starting on the same database stops with an error naming both, because they would otherwise share queues, cached values, live values and rooms. Give each app a database of its own. If you renamed the app, start it once with `KAY_ADOPT_DATABASE=<old name>` to take the database over.
 

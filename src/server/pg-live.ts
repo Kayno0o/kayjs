@@ -4,6 +4,7 @@ import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
+import { wakeOf } from './pg-notify'
 import { closeWith, DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
 
@@ -77,7 +78,8 @@ export function pgLive(pg: PgHandle): LiveStore {
 
         await db.begin(async (tx) => {
           await change(tx)
-          await query(tx, `INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW})`, [self, eventId, eventKey])
+          // Notified as the transaction commits, so a process woken finds the row and its event.
+          await query(tx, `WITH written AS (INSERT INTO kay_live_events (origin, id, key, at) VALUES ($1, $2, $3, ${NOW}) RETURNING seq) SELECT pg_notify($4, $5) FROM written`, [self, eventId, eventKey, ...wakeOf('live')])
           await query(tx, `DELETE FROM kay_live_events WHERE at < ${NOW} - ${EVENT_TTL_MS}`)
         })
       }, DB_TIMEOUT_MS, 'the write'))
@@ -276,7 +278,7 @@ export function pgLive(pg: PgHandle): LiveStore {
       if (polling !== undefined || closed)
         return
 
-      polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed' }, false)
+      polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.size > 0 && !closed, run: poll, failed: 'reading the live values the other processes set failed', listen: 'live' }, false)
 
       if (held)
         polling.hold(true)

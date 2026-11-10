@@ -2,6 +2,7 @@ import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { limitedStore } from './pg-limit'
+import { hear } from './pg-notify'
 import { onReload } from './reload'
 
 interface PgJobRow {
@@ -375,7 +376,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
 
       // A holder that completes between the refused insert and the read leaves the key free: insert again.
       for (let tries = 0; tries < LOST_KEY_TRIES; tries++) {
-        const inserted = await rowsOf<{ id: string }>(db`INSERT INTO kay_jobs (id, queue, payload, attempts, run_at, job_key) VALUES (${job.id}, ${job.queue}, ${job.payload}, ${job.attempts}, ${job.runAt}::bigint, ${job.key ?? null}) ON CONFLICT DO NOTHING RETURNING id`)
+        const inserted = await rowsOf<{ id: string }>(db`WITH added AS (INSERT INTO kay_jobs (id, queue, payload, attempts, run_at, job_key) VALUES (${job.id}, ${job.queue}, ${job.payload}, ${job.attempts}, ${job.runAt}::bigint, ${job.key ?? null}) ON CONFLICT DO NOTHING RETURNING id, queue) SELECT id, pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM added`)
 
         if (inserted.length === 1 || job.key === undefined)
           return undefined
@@ -402,12 +403,12 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     async retry(id, runAt, error, until) {
       const db = await open()
 
-      return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id`)).length === 1
+      return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET run_at = ${runAt}::bigint, held_until = NULL, error = ${error} WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id, queue) SELECT id, pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM moved`)).length === 1
     },
     async release(id, until, runAt) {
       const db = await open()
 
-      await db`UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1, run_at = coalesce(${runAt ?? null}::bigint, run_at) WHERE id = ${id} AND held_until = ${until}::bigint`
+      await db`WITH moved AS (UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1, run_at = coalesce(${runAt ?? null}::bigint, run_at) WHERE id = ${id} AND held_until = ${until}::bigint RETURNING queue) SELECT pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM moved`
     },
     async progress(id, until, progress) {
       const db = await open()
@@ -418,9 +419,9 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
       const db = await open()
 
       if ('until' in guard)
-        return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at), attempts = 1 WHERE id = ${id} AND NOT failed AND held_until = ${guard.until}::bigint RETURNING id`)).length === 1
+        return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at), attempts = 1 WHERE id = ${id} AND NOT failed AND held_until = ${guard.until}::bigint RETURNING id, queue) SELECT id, pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM moved`)).length === 1
 
-      return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at) WHERE id = ${id} AND NOT failed AND payload = ${guard.payload} AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) RETURNING id`)).length === 1
+      return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at) WHERE id = ${id} AND NOT failed AND payload = ${guard.payload} AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) RETURNING id, queue) SELECT id, pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM moved`)).length === 1
     },
     async state(queue, ref) {
       const db = await open()
@@ -456,7 +457,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
       const db = await open()
 
       try {
-        return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET failed = false, attempts = 0, run_at = ${runAt}::bigint, held_until = NULL WHERE id = ${id} AND failed RETURNING id`)).length === 1
+        return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET failed = false, attempts = 0, run_at = ${runAt}::bigint, held_until = NULL WHERE id = ${id} AND failed RETURNING id, queue) SELECT id, pg_notify('kay_wake', 'jobs' || chr(10) || queue) FROM moved`)).length === 1
       }
       catch (error) {
         // A live job took the key of the failed one since: the unique index refuses both being live.
@@ -489,5 +490,12 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     },
   }
 
-  return limitedStore(store, 'the jobs store', { ready: open, slow: ['failed', 'jobs'] })
+  // Wakes the idle workers of this process when another process (or this one) changes the queue; the polling stays as the fallback.
+  const listen: JobStore['listen'] = async (queue, wake) => {
+    const subscription = await hear(await open(), 'jobs', queue, wake)
+
+    return { stop: subscription.stop, delivering: subscription.delivering }
+  }
+
+  return Object.assign(limitedStore(store, 'the jobs store', { ready: open, slow: ['failed', 'jobs'] }), { listen })
 }

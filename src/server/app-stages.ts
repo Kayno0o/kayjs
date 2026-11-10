@@ -87,6 +87,7 @@ import { kayApiPrefixes, movedApiPrefixes, READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
 import { keepCookiesPrivate, securityHeaders, setSecurityHeaders } from './security'
+import { serverStarted, serverStopped } from './serving'
 import { setSiteFacts } from './site-facts'
 import { serveSitemap } from './sitemap'
 import { markPageStale, trackPrerendered } from './stale-pages'
@@ -406,6 +407,8 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
 // `kay dev` restarts the process on every change, so it has nothing to wait for.
 export function stopOnSignals({ app, options, lifecycle }: Boot): void {
   app.onStart(refuseProcessKey)
+  app.onStart(serverStarted)
+  app.onStop(serverStopped)
   stopOnSignal(app, lifecycle, options.serve?.shutdownTimeout)
 }
 
