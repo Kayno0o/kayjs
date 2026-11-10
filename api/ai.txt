@@ -39,8 +39,6 @@ interface AiOptions extends AskHooks, Resilience, ModelsOptions
   key?: ((request: Request) => Promise<string | undefined> | string | undefined) | undefined
   models?: Record<string, NamedModel> | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  onFinish?: Hook<FinishHookCall> | undefined
-  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onStep?: Hook<Step> | undefined
   onSuccess?: Hook<FinishHookCall> | undefined
   onToolCall?: Hook<AiToolCall> | undefined
@@ -101,8 +99,6 @@ interface Asked
 interface AskHooks
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  onFinish?: Hook<FinishHookCall> | undefined
-  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onStep?: Hook<Step> | undefined
   onSuccess?: Hook<FinishHookCall> | undefined
   onToolCall?: Hook<AiToolCall> | undefined
@@ -124,8 +120,6 @@ interface AskOptions extends AskHooks, Resilience
   maxTokens?: number | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  onFinish?: Hook<FinishHookCall> | undefined
-  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onStep?: Hook<Step> | undefined
   onSuccess?: Hook<FinishHookCall> | undefined
   onToolCall?: Hook<AiToolCall> | undefined
@@ -609,8 +603,6 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   maxTokens?: number | undefined
   model?: string | undefined
   onError?: Hook<ErrorHookCall> | undefined
-  onFinish?: Hook<FinishHookCall> | undefined
-  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   onStep?: Hook<Step> | undefined
   onSuccess?: Hook<FinishHookCall> | undefined
   onToolCall?: Hook<AiToolCall> | undefined

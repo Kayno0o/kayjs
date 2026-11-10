@@ -252,7 +252,7 @@ export interface ToolRequest {
 // Answers whether the visitor agreed to a call; only `true` lets it run.
 export type Confirm = (call: ToolRequest) => boolean | Promise<boolean>
 
-// What `onRequest` is given before the provider is called: the messages (with their attachments) and the system prompt as the ask has them, the model chosen, and the options of the ask.
+// What `beforeRequest` is given before the provider is called: the messages (with their attachments) and the system prompt as the ask has them, the model chosen, and the options of the ask.
 export interface RequestHookCall {
   messages: AiMessage[]
   system: string | undefined
@@ -260,13 +260,13 @@ export interface RequestHookCall {
   options: AskOptions
 }
 
-// What `onRequest` returns to change the request: the messages and system prompt to send instead; a field left out stays as it was, and `system: undefined` sends none.
+// What `beforeRequest` returns to change the request: the messages and system prompt to send instead; a field left out stays as it was, and `system: undefined` sends none.
 export interface RequestHookChange {
   messages?: AiMessage[] | undefined
   system?: string | undefined
 }
 
-// What `onFinish` is given once a reply ended: its text, the tokens (undefined when the provider gave none), one entry per request, why it stopped, and whether it was stopped (by `reply.stop()`, an aborted request or a reader that left) rather than ending on its own.
+// What `onSuccess` is given once a reply ended: its text, the tokens (undefined when the provider gave none), one entry per request, why it stopped, and whether it was stopped (by `reply.stop()`, an aborted request or a reader that left) rather than ending on its own.
 export interface FinishHookCall {
   text: string
   usage: Usage | undefined
@@ -292,10 +292,7 @@ export interface AskHooks {
   onSuccess?: Hook<FinishHookCall> | undefined
   // Called when the reply fails, with the error its readers get, and for each failed request that was retried or fell back.
   onError?: Hook<ErrorHookCall> | undefined
-  // `beforeRequest` before 1.92, still run, after it.
-  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
-  // `onSuccess` before 1.92, still run, after it.
-  onFinish?: Hook<FinishHookCall> | undefined
+
 }
 
 // How a request that fails before streaming anything is asked again: an `unavailable`, `rate-limited`, `timeout` or `network` error is retried, a refused key or request never is.

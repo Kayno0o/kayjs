@@ -13,27 +13,6 @@ const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 
 // Menu's `items` took `danger: true` for a destructive entry until `tone: 'danger'` replaced it, deprecated since 1.92.
 const MENU_TAG = 'menu'
-// IconPicker's `search(query, limit, offset)` is a function `icons` handed `{ q, limit, offset }` since 1.92.
-const ICON_PICKER_TAG = 'icon-picker'
-
-// The kayjs-ui callbacks renamed in 1.92 to follow the hook convention (`llms/hooks.md`): `onX` after a transition X in its base form, never a participle. SaveForm is apart, as its own `onSave` was the call that does the save, which `save` is now.
-const NO_PARAMETER_FUNCTION = /^\s*(?:async\s+)?(?:\(\s*\)\s*=>|function\s*(?:\w+\s*)?\(\s*\))/
-
-// A name the table holds itself, not one an object inherits (`constructor`, `toString`).
-function ownName(table: Readonly<Record<string, Readonly<Record<string, string>>>>, file: string, name: string): string | undefined {
-  const row = Object.hasOwn(table, file) ? table[file] : undefined
-
-  return row !== undefined && Object.hasOwn(row, name) ? row[name] : undefined
-}
-
-const HOOK_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'form': { onSaved: 'onSave' },
-  'form-dialog': { onSaved: 'onSave' },
-  'save-form': { onSaved: 'onSave' },
-  'contact-form': { onSent: 'onSend' },
-  'subscribe-form': { onSent: 'onSend' },
-  'audio-player': { onEnded: 'onEnd' },
-}
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -855,7 +834,7 @@ class Validator {
     return type?.kind === 'static' ? type.text : undefined
   }
 
-  // Type checking only: the kayjs-ui and kayjs-ai props and blocks an app still writes under a name they had before their renames.
+  // Type checking only: the kayjs-ui props an app still writes in a form they replaced.
   private deprecatedUiNames(element: ElementNode): void {
     const file = this.uiComponents.get(element.name)
 
@@ -868,60 +847,9 @@ class Validator {
 
       const name = this.text(attribute.name)
 
-      if (file === ICON_PICKER_TAG && name === 'search' && attribute.kind === 'expression') {
-        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'icons')
-        const wrap = (expression: string) => `({ q, limit, offset }) => (${expression})(q, limit, offset)`
-        const edits = attribute.shorthand ? [{ ...attribute.shorthand, text: `icons={${wrap('search')}}` }] : [{ start: attribute.name.start, end: attribute.name.end, text: 'icons' }, { start: attribute.expression.start, end: attribute.expression.end, text: wrap(this.text(attribute.expression).trim()) }]
-
-        this.lint(attribute.name, 'deprecated-icon-picker-search', '`search` on an `IconPicker` is a function `icons` since kayjs-ui 1.92, handed `{ q, limit, offset }`: one prop for a set, a promise and an action', named ? { help: 'Drop `search`, `icons` is there' } : { help: 'Write `icons={({ q, limit, offset }) => ...}`', fixes: [{ title: 'Write `icons`', edits, safe: true }] })
-
-        continue
-      }
-
       if (file === MENU_TAG && name === 'items' && attribute.kind === 'expression') {
         for (const { property, toned } of dangerFlags(this.text(attribute.expression), attribute.expression.start))
           this.lint(property, 'deprecated-menu-danger', '`danger: true` in the `items` of a `Menu` is `tone: \'danger\'`, the one way every component names a meaning', toned ? { help: 'Drop `danger: true`, the `tone` beside it wins' } : { help: 'Write `tone: \'danger\'`', fixes: [{ title: 'Write `tone: \'danger\'`', edits: [{ start: property.start, end: property.end, text: 'tone: \'danger\'' }], safe: true }] })
-
-        continue
-      }
-
-      const hookRenamed = ownName(HOOK_RENAMES, file, name)
-      const saveCall = file === 'save-form' && name === 'onSave'
-
-      if (hookRenamed !== undefined || saveCall) {
-        const to = saveCall ? 'save' : hookRenamed!
-        const others = new Set(element.attributes.filter(other => other.kind !== 'spread').map(other => this.text(other.name)))
-        const spread = element.attributes.some(other => other.kind === 'spread')
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${to}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: to }
-
-        // `onSave` of a SaveForm with an `action` hears its result since 1.92, where it replaced the `action`: a function taking no parameter is the old call, which the form no longer makes instead of the action. A reference, or a function reading its parameter, is left alone, as it may be the new hook.
-        if (saveCall && others.has('action')) {
-          if (attribute.kind === 'expression' && NO_PARAMETER_FUNCTION.test(this.text(attribute.expression)))
-            this.lint(attribute.name, 'deprecated-hook-names', `\`onSave\` beside an \`action\` on \`${element.name}\` only hears the action's result since kayjs-ui 1.92: if this was the call that does the save, write it \`save\``, { help: 'If it does the save, write `save` and drop the `action`; if it hears the result, nothing changes' })
-
-          continue
-        }
-
-        // Without an `action` (and no spread that may hold one), `onSave` is the call that does the save. The rename changes the component's role: an `on*` attribute makes it an island, `save` leaves it to the build, so the fix is not applied by `kay upgrade`.
-        if (saveCall && (spread || others.has('save')))
-          continue
-
-        const why = saveCall ? `\`onSave\` on \`${element.name}\` is \`save\` since kayjs-ui 1.92, the call that does the save, where \`onSave\` hears an \`action\`'s result` : `\`${name}\` on \`${element.name}\` is \`${to}\` since kayjs-ui 1.92, so every hook is \`onX\` after a transition, in its base form`
-        // `onSaved` beside an `onSave` is renamed once that one is `save`; with a spread the rename may clash with a prop it holds.
-        const blocked = !saveCall && (others.has(to) || spread)
-
-        if (blocked) {
-          const renameFirst = file === 'save-form' && !others.has('action')
-          const clash = renameFirst ? 'Rename `onSave` to `save` first, then write `onSave` here' : `Drop \`${name}\`, \`${to}\` is there`
-          const help = others.has(to) ? clash : `Write \`${to}\` by hand: a spread beside it may hold one`
-
-          this.lint(attribute.name, 'deprecated-hook-names', why, { help })
-        }
-        else {
-          this.lint(attribute.name, 'deprecated-hook-names', why, { help: saveCall ? 'Write `save`; the component may then need `--- island`, as an `on*` attribute made it one' : `Write \`${to}\``, fixes: [{ title: `Write \`${to}\``, edits: [edit], safe: !saveCall }] })
-        }
-
-        continue
       }
     }
   }

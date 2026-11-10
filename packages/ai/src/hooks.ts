@@ -4,9 +4,9 @@ import { configError, dispatch, hookContext, refuse } from 'kay/library'
 import { answersAsFake } from './fake'
 
 const SLOT = Symbol.for('kayjs-ai.hooks')
-const NAMES = ['beforeRequest', 'onRequest', 'onStep', 'onToolCall', 'onSuccess', 'onFinish', 'onError'] as const
+const NAMES = ['beforeRequest', 'onStep', 'onToolCall', 'onSuccess', 'onError'] as const
 
-// The hooks an ask runs, each one's list in order: `ai()`'s first, then the ask's, a hook under its name before 1.92 after the one under its new name.
+// The hooks an ask runs, each one's list in order: `ai()`'s first, then the ask's.
 export interface Hooks {
   beforeRequest: readonly BeforeHook<RequestHookCall, RequestHookChange>[]
   onStep: readonly Hook<Step>[]
@@ -63,10 +63,10 @@ export function hooksFor(options: AskHooks, provider: Provider): Hooks {
 
   const global: AskHooks = fake ? {} : set
   const hooks = {
-    beforeRequest: listed(global.beforeRequest, global.onRequest, options.beforeRequest, options.onRequest),
+    beforeRequest: listed(global.beforeRequest, options.beforeRequest),
     onStep: listed(global.onStep, options.onStep),
     onToolCall: listed(global.onToolCall, options.onToolCall),
-    onSuccess: listed(global.onSuccess, global.onFinish, options.onSuccess, options.onFinish),
+    onSuccess: listed(global.onSuccess, options.onSuccess),
     onError: listed(global.onError, options.onError),
   }
 

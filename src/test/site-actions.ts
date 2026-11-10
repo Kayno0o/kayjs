@@ -55,7 +55,7 @@ function isStream(value: unknown): value is Connection<unknown> & Settles {
 async function streamedValues(stream: Connection<unknown> & Settles, url: string): Promise<unknown[]> {
   const values: unknown[] = []
 
-  stream.on(value => void values.push(value))
+  stream.onData(({ value }) => void values.push(value))
 
   const status = await new Promise<ConnectionStatus>(resolve => stream[SETTLED](resolve))
 

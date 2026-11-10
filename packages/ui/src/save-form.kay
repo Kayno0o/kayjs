@@ -3,7 +3,7 @@ import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { carrySchema, effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import type { FormValidation } from './forms'
-import { hear } from './internal/hear'
+
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
@@ -11,7 +11,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSave, onSaved, onError, onDiscard, dirty, save, status, failureLabel, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
+const { action, refused, saved, onSave, onError, onDiscard, dirty, save, status, failureLabel, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `save` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `save` rejects.
@@ -29,10 +29,8 @@ const { action, refused, saved, onSave, onSaved, onError, onDiscard, dirty, save
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // Toasted as a success once the action has run.
   saved?: string | undefined
-  // What the action returned, for the page to patch into what it shows. The form is clean again once it has run. With no `action`, `onSave` is still what `save` is, a function that does the save (deprecated, works until 1.95).
+  // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
   onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
-  // Deprecated: `onSave`. Works until 1.95.
-  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. For logging, or to scroll to the first bad field.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
@@ -73,12 +71,7 @@ let baseline = ''
 
 formIssues.provide(issues)
 
-// Before 1.92 `onSave` was the call that does the save, which `save` is now: an `onSave` with no `action` is still read that way, as `onSave` hears an `action`'s result.
-function custom(): (() => Promise<unknown>) | undefined {
-  return save ?? (action ? undefined : onSave as (() => Promise<unknown>) | undefined)
-}
-
-if (validate !== false && action && !custom())
+if (validate !== false && action && !save)
   carrySchema(action)
 
 // Follows `confirm`, which a parent may set after mount.
@@ -204,11 +197,11 @@ async function submit(event: SubmitEvent) {
   if (busy() || !form || !(dirty ?? snapshot() !== baseline))
     return
 
-  if ((!action && !custom()) || saveDisabled)
+  if ((!action && !save) || saveDisabled)
     return
 
   // Before any question is asked: a form the schema refuses is not worth one.
-  if (action && !custom() && validate !== false && !(await checkSent(form, action, issues, failureText(), checking)))
+  if (action && !save && validate !== false && !(await checkSent(form, action, issues, failureText(), checking)))
     return
 
   if (confirm !== undefined && !sure) {
@@ -224,7 +217,7 @@ async function submit(event: SubmitEvent) {
   const adopt = values()
   let done: Awaited<ReturnType<typeof callAction>>
 
-  const run = custom()
+  const run = save
 
   if (run) {
     saving = true
@@ -257,7 +250,7 @@ async function submit(event: SubmitEvent) {
     toast.success(saved)
 
   if (!run)
-    hear(() => onSave?.(done.result as Answer<Success<Output>>), () => onSaved?.(done.result as Answer<Success<Output>>))
+    onSave?.(done.result as Answer<Success<Output>>)
 }
 
 // The form's methods are called through its prototype, as a control named `requestSubmit` or `reset` takes their place on the form.

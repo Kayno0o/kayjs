@@ -26,7 +26,7 @@ describe('pruning accounts never verified', () => {
       store: options.store ?? memoryAuth(),
       site: 'https://site.test',
       defaultRoles: ['editor'],
-      onDelete: ({ user }) => {
+      beforeDelete: ({ user }) => {
         deleted.push(user.id)
       },
       email: { mailer: { send: () => undefined }, links: LINKS, requireVerified: options.requireVerified ?? true, ...options.unverifiedMaxAge === undefined ? {} : { unverifiedMaxAge: options.unverifiedMaxAge } },

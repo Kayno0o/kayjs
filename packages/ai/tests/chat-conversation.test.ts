@@ -14,7 +14,7 @@ type Status = ReturnType<ActionStream<unknown>['status']>
 // A stream the test drives: what it sends and how it ends.
 function fakeStream() {
   const status = signal<Status>('open')
-  const listeners = new Set<(value: string | Progress) => void>()
+  const listeners = new Set<(event: { value: string | Progress }) => void>()
   const waiting = new Set<() => void>()
   let last: string | Progress | undefined
 
@@ -31,11 +31,11 @@ function fakeStream() {
     pending: () => false,
     error: () => undefined,
     retry: () => undefined,
-    onData: () => () => undefined,
+
     onOpen: () => () => undefined,
     onError: () => () => undefined,
     onClose: () => () => undefined,
-    on: (listener) => {
+    onData: (listener) => {
       listeners.add(listener)
 
       return () => listeners.delete(listener)
@@ -57,7 +57,7 @@ function fakeStream() {
       last = value
 
       for (const listener of listeners)
-        listener(value)
+        listener({ value })
     },
     end(state: 'done' | 'failed') {
       settle(state)

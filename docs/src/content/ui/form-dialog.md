@@ -53,7 +53,7 @@ FormDialog(
     input.kui-field-input(name="title" value={title()})
 ```
 
-The dialog calls `action` with the form's data. `onSave` (`onSaved` before 1.92, which works until 1.95) hears what the action returned. Give each control the `name` of its field in the action's schema. When the action refuses a field, its message shows on the [FormField](/ui/form-field) with that `name` and the dialog stays open. `onSave` receives what the action returned, then the dialog closes.
+The dialog calls `action` with the form's data. `onSave` hears what the action returned. Give each control the `name` of its field in the action's schema. When the action refuses a field, its message shows on the [FormField](/ui/form-field) with that `name` and the dialog stays open. `onSave` receives what the action returned, then the dialog closes.
 
 ## Checking as you type
 

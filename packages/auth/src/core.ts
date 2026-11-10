@@ -91,7 +91,7 @@ export interface BareUser<Data extends object = Record<string, unknown>> {
   data: Data
 }
 
-// A user with the provider accounts linked to them, `providers` holding the id each gave: what `auth.user()`, `requireUser()` and the app's hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onEvent`) receive.
+// A user with the provider accounts linked to them, `providers` holding the id each gave: what `auth.user()`, `requireUser()` and the app's hooks (`onSignUp`, `onProviderProfile`, `beforeDelete`, `onExport`, `admin`, `onEvent`) receive.
 export interface User<Data extends object = Record<string, unknown>> extends BareUser<Data> {
   providers: Record<string, { id: string }>
 }
@@ -176,14 +176,14 @@ export interface Core {
   userData?: UserDataRules | undefined
   // Asked before the erase, with the user and who acts when it is not them: a refusal keeps the account.
   beforeDelete?: ((user: User, actor: User | null) => Promise<AuthFailure<'refused'> | undefined>) | undefined
-  onDelete?: ((user: User) => void | Promise<void>) | undefined
+
   // Seconds a guest is kept once their sessions are gone.
   guestMaxAge: number
   // Seconds an account registered and never verified is kept, where unverified accounts cannot sign in; for good when undefined.
   unverifiedMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
+
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated', sweep?: Maintenance | undefined } | undefined

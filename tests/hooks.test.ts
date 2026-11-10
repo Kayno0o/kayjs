@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, it, jest } from 'bun:test'
 import { refuse } from '../src/runtime'
 import { RefusedError } from '../src/runtime/refuse'
-import { decide, hookContext, notify } from '../src/server/library'
+import { decide, dispatch, hookContext } from '../src/server/library'
 import { answeringRequest } from '../src/server/log'
 import { useAppOnError } from '../src/server/report'
 import { nameUser } from '../src/server/request-user'
@@ -100,12 +100,12 @@ describe('hookContext', () => {
   })
 })
 
-describe('notify', () => {
+describe('dispatch', () => {
   it('runs the hooks in order with the event and a context, skipping undefined ones', async () => {
     const seen: string[] = []
     const gate = deferred()
 
-    const run = notify('t.order', [
+    const run = dispatch('t.order', [
       ({ id, context }) => {
         seen.push(`a${id}${context.request === undefined}`)
       },
@@ -131,7 +131,7 @@ describe('notify', () => {
     const told: unknown[] = []
 
     nameUser(request, () => 'user-2')
-    await answeringRequest(request, async () => notify('t.context', [({ context }) => {
+    await answeringRequest(request, async () => dispatch('t.context', [({ context }) => {
       told.push(context.request, context.userId, context.userAgent)
     }], {}))
 
@@ -142,7 +142,7 @@ describe('notify', () => {
     const boom = new Error('boom')
     const seen: number[] = []
 
-    await notify('t.throw', [
+    await dispatch('t.throw', [
       () => {
         throw boom
       },
@@ -163,7 +163,7 @@ describe('notify', () => {
     const seen: string[] = []
     const gate = deferred()
 
-    const run = notify('t.slow', [
+    const run = dispatch('t.slow', [
       async () => {
         await gate.promise
         seen.push('slow')
@@ -193,7 +193,7 @@ describe('notify', () => {
     jest.useFakeTimers()
 
     const gate = deferred()
-    const run = notify('t.late-throw', [async () => {
+    const run = dispatch('t.late-throw', [async () => {
       await gate.promise
 
       throw new Error('late')
@@ -216,7 +216,7 @@ describe('notify', () => {
     const gate = deferred()
     const done = deferred()
 
-    await notify('t.detached', [async () => {
+    await dispatch('t.detached', [async () => {
       await gate.promise
       seen.push('done')
       done.resolve()
@@ -231,7 +231,7 @@ describe('notify', () => {
   it('reports a detached hook that throws', async () => {
     const next = nextReport()
 
-    await notify('t.detached-throw', [() => {
+    await dispatch('t.detached-throw', [() => {
       throw new Error('x')
     }], {}, { detached: true })
 
@@ -241,7 +241,7 @@ describe('notify', () => {
   it('reports under the request being answered', async () => {
     const request = new Request('http://localhost/')
 
-    await answeringRequest(request, async () => notify('t.request', [() => {
+    await answeringRequest(request, async () => dispatch('t.request', [() => {
       throw new Error('x')
     }], {}))
 

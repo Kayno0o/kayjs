@@ -286,7 +286,7 @@ describe('deleting the account', () => {
   test('needs the password, deletes the user, tells the app and signs out', async () => {
     const deleted: User[] = []
     const { ada, browser, store } = await registered({
-      onDelete: ({ user }) => {
+      beforeDelete: ({ user }) => {
         deleted.push(user)
       },
     })
@@ -301,7 +301,7 @@ describe('deleting the account', () => {
   })
 
   test('an admin whose deletion fails keeps their roles', async () => {
-    const app = testApp({ admin: 'admin', onDelete: () => {
+    const app = testApp({ admin: 'admin', beforeDelete: () => {
       throw new Error('app down')
     } })
     const ids: string[] = []
@@ -316,20 +316,20 @@ describe('deleting the account', () => {
       browsers.push(browser)
     }
 
-    expect((await browsers[0]!.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect(await browsers[0]!.call('account.delete', { password: PASSWORD })).toMatchObject({ ok: false, error: { status: 500 } })
     expect((await app.store.users.get(ids[0]!))?.roles).toEqual(['admin'])
   })
 
-  test('an onDelete that throws leaves the account in place, to delete again', async () => {
+  test('a beforeDelete that throws leaves the account in place, to delete again', async () => {
     let fail = true
     const { ada, store } = await registered({
-      onDelete: () => {
+      beforeDelete: () => {
         if (fail)
           throw new Error('app down')
       },
     })
 
-    expect((await ada.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect(await ada.call('account.delete', { password: PASSWORD })).toMatchObject({ ok: false, error: { status: 500 } })
     expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
 

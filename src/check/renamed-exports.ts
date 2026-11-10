@@ -245,10 +245,3 @@ export async function renamedTypes(root: string, options: CheckOptions, config: 
     }
   })
 }
-
-const OLD_HOOK_HELPER = /\b(?:notify|NotifyOptions)\b/
-
-// `notify` and `NotifyOptions` imported from `kay/library`: `dispatch` and `DispatchOptions`, so `notify` names only the inbox of `kay/server`.
-export async function hookDispatch(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-hook-dispatch', modules: { 'kay/library': { notify: 'dispatch', NotifyOptions: 'DispatchOptions' } }, needle: OLD_HOOK_HELPER, since: '1.92', until: '1.95' })
-}

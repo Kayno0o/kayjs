@@ -3,23 +3,9 @@ import type { Node, Program } from '../compiler/estree'
 import { lintLevel } from '../compiler/lints'
 import { unwrapped } from '../compiler/object-literal'
 import { importsOf, walk } from './ast'
-import { renamedTypes, scan } from './renamed-exports'
+import { scan } from './renamed-exports'
 
-const SINCE = '1.92'
-const UNTIL = '1.95'
-const ON = /\bon\b/
 const ON_OPEN = /\bonOpen\b/
-const VALUE = /\bvalue\b/
-
-// The types of `kay` renamed when `stream()` came down to one return type and a connection base.
-export const STREAM_TYPES: Readonly<Record<string, Readonly<Record<string, string>>>> = { kay: { EventReader: 'Connection', StreamRun: 'Stream' } }
-
-const OLD_STREAM_TYPE = /\b(?:EventReader|StreamRun)\b/
-
-// `EventReader` and `StreamRun` imported from `kay`: the fix renames the import and every use of it.
-export async function streamTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-stream-types', modules: STREAM_TYPES, needle: OLD_STREAM_TYPE, since: SINCE, until: UNTIL })
-}
 
 function annotated(param: Node): boolean {
   const { typeAnnotation } = param as { typeAnnotation?: Node | null }
@@ -151,67 +137,6 @@ export async function streamOpen(root: string, options: CheckOptions): Promise<C
           return
 
         report(here, base + end, message, help, null)
-      })
-    }
-  })
-}
-
-// `.on(fn)` of a stream or a socket, `.onData(({ value }) => ...)` since 1.92: the one hook every source hands its data through.
-// Only a receiver the file binds once to a call of `stream` or `socket` from `kay` is known to be one, as `kay check` reads no types; an arrow of one parameter gets `{ value: parameter }`, any other callback is wrapped, and a spread, or a callback naming `value` itself, is reported with no fix.
-export async function streamOn(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-stream-on', options.lints) === 'allow')
-    return []
-
-  return scan(root, options, 'deprecated-stream-on', ON, ({ parsed, report }) => {
-    for (const { ast, base, text } of parsed) {
-      const receivers = sourceReceivers(ast, bindings(ast))
-
-      walk(ast, (node) => {
-        if (node.type !== 'CallExpression' || node.optional || node.callee.type !== 'MemberExpression' || node.callee.computed)
-          return
-
-        const { object, property } = node.callee
-
-        if (object.type !== 'Identifier' || !receivers.has(object.name) || property.type !== 'Identifier' || property.name !== 'on' || node.arguments.length !== 1)
-          return
-
-        const [argument] = node.arguments as [Node]
-        const rename = { start: base + property.start, end: base + property.end, text: 'onData' }
-        const message = '`.on(fn)` of a stream or a socket is `.onData(({ value }) => ...)` since 1.92, the one hook every source hands its data through; the old name works until 1.95'
-        const help = 'write `.onData(({ value }) => ...)`'
-
-        if (argument.type === 'SpreadElement') {
-          report(rename.start, rename.end, message, help, null)
-
-          return
-        }
-
-        const source = text.slice(argument.start, argument.end)
-
-        if (argument.type === 'ArrowFunctionExpression' && argument.params.length === 0) {
-          report(rename.start, rename.end, message, help, [rename])
-
-          return
-        }
-
-        const [param] = argument.type === 'ArrowFunctionExpression' ? argument.params : []
-
-        if (argument.type === 'ArrowFunctionExpression' && argument.params.length === 1 && param && param.type !== 'RestElement' && !annotated(param)) {
-          const written = text.slice(param.start, param.end)
-          const parenthesized = text.slice(argument.start, param.start).includes('(')
-
-          report(rename.start, rename.end, message, help, [rename, { start: base + param.start, end: base + param.end, text: parenthesized ? `{ value: ${written} }` : `({ value: ${written} })` }].toSorted((a, b) => a.start - b.start))
-
-          return
-        }
-
-        if (VALUE.test(source)) {
-          report(rename.start, rename.end, message, help, null)
-
-          return
-        }
-
-        report(rename.start, rename.end, message, help, [rename, { start: base + argument.start, end: base + argument.end, text: argument.type === 'Identifier' ? `({ value }) => ${source}(value)` : `({ value }) => (${source})(value)` }])
       })
     }
   })

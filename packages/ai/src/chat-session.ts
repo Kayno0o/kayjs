@@ -562,7 +562,7 @@ export function createChatSession(options: ChatSessionOptions) {
         return
       }
 
-      stream.on(value => show(value, current))
+      stream.onData(({ value }) => show(value, current))
       streaming.set(stream)
     }
     catch (error) {

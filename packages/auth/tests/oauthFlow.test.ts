@@ -605,7 +605,7 @@ describe('reporting a failed OAuth sign-in', () => {
   function reported() {
     const heard: string[] = []
     const app = setup({
-      onAuthEvent: (info) => {
+      onEvent: (info) => {
         if (info.event === 'sign-in-failed')
           heard.push(`${info.user.id}:${info.method}`)
       },

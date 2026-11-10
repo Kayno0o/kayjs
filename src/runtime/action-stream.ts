@@ -116,7 +116,6 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
         })
       }
     },
-    on,
     ...connectionHooks(link, opened.on, undefined, on),
     close,
     ended: ended(link),

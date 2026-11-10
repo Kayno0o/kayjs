@@ -399,7 +399,7 @@ interface AuthHookContext extends HookContext
   actor: User<Record<string, unknown>> | null
 
 [.] AuthHooks
-type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onEvent' | 'beforeDelete' | 'onSignUp' | 'profileFields'>>
+type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onEvent' | 'beforeDelete' | 'onSignUp' | 'profileFields'>>
 
 [.] AuthMailer
 interface AuthMailer
@@ -453,8 +453,6 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   name?: string | undefined
   oauth?: Record<string, OAuthApp> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
-  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
   onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
@@ -1382,7 +1380,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onAuthEvent" | "onDelete" | "onEvent" | "onSignUp" | "profileFields">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onEvent" | "onSignUp" | "profileFields">>;
 }>) | undefined
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: false | undefined
@@ -1390,8 +1388,6 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   name?: string | undefined
   oauth?: Record<string, OAuthApp | PresetApp | true> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
-  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
   onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined

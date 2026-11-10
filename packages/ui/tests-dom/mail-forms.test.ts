@@ -9,47 +9,6 @@ let mounted: Mounted | undefined
 afterEach(() => mounted?.unmount())
 
 describe('ContactForm and SubscribeForm', () => {
-  test('onSent is heard when onSend throws', async () => {
-    const heard: string[] = []
-    const listener = (event: ErrorEvent) => event.preventDefault()
-
-    window.addEventListener('error', listener)
-
-    try {
-      mounted = await mountComponent(MailForms, {
-        onSend: () => {
-          heard.push('send')
-
-          throw new Error('first')
-        },
-        onError: () => undefined,
-        old: { contact: { onSent: () => heard.push('sent') } },
-      })
-      click(mounted.root.querySelector('#sent'))
-      await settle()
-    }
-    finally {
-      window.removeEventListener('error', listener)
-    }
-
-    expect(heard).toEqual(['send', 'sent'])
-  })
-
-  test('onSent still hears the result, after onSend', async () => {
-    const heard: string[] = []
-
-    mounted = await mountComponent(MailForms, {
-      onSend: (data: unknown) => heard.push(`send ${String(data)}`),
-      onError: () => undefined,
-      onSubscribed: (data: unknown) => heard.push(`subscribe ${String(data)}`),
-      old: { contact: { onSent: (data: unknown) => heard.push(`sent ${String(data)}`) }, subscribe: { onSent: (data: unknown) => heard.push(`subscribed ${String(data)}`) } },
-    })
-    click(mounted.root.querySelector('#sent'))
-    await settle()
-
-    expect(heard).toEqual(['send ok', 'sent ok', 'subscribe ok', 'subscribed ok'])
-  })
-
   test('onSend runs once on success and the sent block replaces the notice', async () => {
     const sent: unknown[] = []
     const failures: unknown[] = []

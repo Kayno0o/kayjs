@@ -36,7 +36,7 @@ Save calls the action. It does nothing while the form is clean or a save is unde
 
 A failure keeps the bar dirty. A refused field shows its message on its [FormField](/ui/form-field) and takes the focus. Any other message is toasted, as in a FormDialog, and `refused` words a handler's refusals. Edits made while the save runs stay unsaved.
 
-A save toasts `saved` when given, calls `onSave` with what the action returned and leaves the form clean. Before 1.92 `onSave` was the call that does the save, which is `save` now: an `onSave` on a SaveForm with no `action` still does the save until 1.95, and `onSaved` is the old name of the hook that hears the result.
+A save toasts `saved` when given, calls `onSave` with what the action returned and leaves the form clean. The call that does the save for an editor with no `action` is `save`.
 
 When a save is refused or fails, `onError` is called first with `{ error }`, before the toast. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw. Use it to log the failure or scroll to the first bad field.
 

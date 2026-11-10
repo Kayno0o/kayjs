@@ -22,6 +22,5 @@ AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={ch
   @actions(chapter, index)
     button.act(type="button") {`Like ${chapter.title} ${index}`}
 AudioPlayer#plain(src="/plain.mp3")
-AudioPlayer#legacy(src="/legacy.mp3" onEnd={() => { events?.push('ended'); if (events?.includes('boom')) throw new Error('first') }} {...{ onEnded: () => events?.push('legacy ended') }})
 button#jump(type="button" onClick={() => seconds = 45}) Jump
 button#late(type="button" onClick={() => seconds = 90}) Late

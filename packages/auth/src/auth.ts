@@ -81,16 +81,14 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
   // Called before a user is deleted, with `{ user, context }`, to delete the app's own records for them or to keep the account: `false`, or throwing `refuse(message)`, refuses, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. A throw of any other kind refuses with 500 and is reported with source `auth.beforeDelete`. An account no one asked to delete, a stale guest or unverified one, stays and is tried again the next run.
   beforeDelete?: ((event: { user: User, context: AuthHookContext }) => void | false | Promise<void | false>) | undefined
-  /** @deprecated Since 1.92, `beforeDelete`; the old name works until 1.95, and runs after `beforeDelete`, before the erase, a throw keeping the account. */
-  onDelete?: ((event: { user: User }) => void | Promise<void>) | undefined
+
   // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `beforeDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
   exportData?: ((event: { user: User }) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. A throw is logged and reported with source `auth.onEvent`. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
-  /** @deprecated Since 1.92, `onEvent`; the old name works until 1.95. */
-  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
+
   // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
   audit?: boolean | { maxAge?: Duration, ip?: 'full' | 'truncated' } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.

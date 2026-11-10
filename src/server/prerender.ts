@@ -26,7 +26,7 @@ import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readMan
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
-import { LEGACY_IMAGE_ROUTE } from './image-route'
+
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
@@ -67,7 +67,7 @@ const STAND_IN_READS = {
 }
 
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
-export const IMAGE_LINK = new RegExp(`=(?:"[^"]*|'[^']*)(?:${RegExp.escape(IMAGE_ROUTE)}|${RegExp.escape(LEGACY_IMAGE_ROUTE)})\\?`)
+export const IMAGE_LINK = new RegExp(`=(?:"[^"]*|'[^']*)${RegExp.escape(IMAGE_ROUTE)}\\?`)
 
 // The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
 export class ExportError extends Error {

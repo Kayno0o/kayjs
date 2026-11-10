@@ -779,7 +779,7 @@ describe('kay mcp tools that write', () => {
   })
 
   it('fixes a deprecated form only with apply, and previews it before', async () => {
-    const source = '--- server\nimport type { EventReader } from \'kay\'\n\nexport const last = (reader: EventReader<number>) => reader.last()\n---\np x\n'
+    const source = '--- server\nimport { local } from \'kay\'\n\nconst notes = local({ key: \'id\', read: () => [] })\n\nexport const waiting = () => notes.pending()\n---\np x\n'
 
     await Bun.write(join(app, 'src/routes/theme.kay'), source)
 
@@ -789,7 +789,7 @@ describe('kay mcp tools that write', () => {
     expect(await Bun.file(join(app, 'src/routes/theme.kay')).text()).toBe(source)
 
     await call(writer, 'fix', { apply: true })
-    expect(await Bun.file(join(app, 'src/routes/theme.kay')).text()).toContain('Connection<number>')
+    expect(await Bun.file(join(app, 'src/routes/theme.kay')).text()).toContain('notes.unsynced()')
   })
 
   it('previews adding a feature with nothing installed, and refuses a feature list that smuggles a flag', async () => {

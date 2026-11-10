@@ -22,16 +22,6 @@ async function submit(root: HTMLElement) {
 }
 
 describe('Form', () => {
-  test('onSaved still hears the result, after onSave', async () => {
-    const heard: string[] = []
-    const root = await form({ add: async (input: { title: string }) => input.title, onSave: (title: string) => heard.push(`save ${title}`), old: { onSaved: (title: string) => heard.push(`saved ${title}`) } })
-
-    root.querySelector<HTMLInputElement>('#title')!.value = 'Hello'
-    await submit(root)
-
-    expect(heard).toEqual(['save Hello', 'saved Hello'])
-  })
-
   test('calls the action with its fields, toasts saved and hands the result to onSave', async () => {
     const saved: string[] = []
     const root = await form({ add: async (input: { title: string }) => input.title, onSave: (title: string) => saved.push(title) })

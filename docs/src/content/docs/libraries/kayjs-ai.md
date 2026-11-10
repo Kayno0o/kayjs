@@ -663,7 +663,7 @@ Each gets the `context` of the request being answered.
 
 `beforeRequest` may return `{ messages, system }` to send those instead, return `false`, or throw an `AiError` to refuse the ask before anything is sent or counted. The others only notify: a throw in one is logged and the reply goes on.
 
-The same names in `ask(..., { onSuccess })` run after the one of `ai()` for that ask, they do not replace it. `onRequest` and `onFinish` are the names before 1.92 and work until 1.95. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
+The same names in `ask(..., { onSuccess })` run after the one of `ai()` for that ask, they do not replace it. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
 
 <ReadMore href="/llms/kayjs-ai-hooks">What each hook gets, and when it runs.</ReadMore>
 

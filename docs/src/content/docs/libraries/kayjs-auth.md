@@ -508,7 +508,7 @@ The pieces behind `auth.hasRole` and `auth.gate()` are exported for an app that 
 
 ## Events and the audit log
 
-`onEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban. It was `onAuthEvent` before 1.92, which works until 1.95 and which `kay upgrade` renames.
+`onEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
 
 ```ts
 authCore({
@@ -557,7 +557,6 @@ if (found.ok) {
 
 It can keep the account: return `false`, or throw `refuse('Ada has open orders', { status: 409 })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
 
-`onDelete` is the name before 1.92 and runs after `beforeDelete`.
 - `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves.
 - `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 

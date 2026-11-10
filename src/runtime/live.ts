@@ -129,8 +129,7 @@ export interface Socket<Send, Receive> extends Source<SocketStatus> {
   last: () => Receive | undefined
   // `failed` when the server closed it with a code from 4000 to 4999, its `error().status` the code minus 4000; any other drop reconnects.
   status: () => SocketStatus
-  // Called with every message received; returns what stops it.
-  on: (listener: (message: Receive) => void) => () => void
+
   // Called with `{ value }` for every message received, the shape every source hands its data in; returns what stops it.
   onData: (listener: (event: { value: Receive }) => void) => () => void
   // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again, or refetches what it missed (`reconnected` is true after the first open). Returns what stops it.
@@ -149,8 +148,7 @@ export interface Connection<T> extends Source<ConnectionStatus> {
   last: () => T | undefined
   // `idle` until a stream opened with `start: false` starts, `done` once it ran to its end, `failed` when it was refused or its source threw, `closed` once `close()` was called.
   status: () => ConnectionStatus
-  // Called with every value received; returns what stops it.
-  on: (listener: (value: T) => void) => () => void
+
   // Called with `{ value }` for every value received, the shape every source hands its data in; returns what stops it.
   onData: (listener: (event: { value: T }) => void) => () => void
   // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. A streaming action's answer is open before a listener can attach, so for it this runs after `retry()` only. Returns what stops it.
@@ -269,7 +267,6 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
       if (!closed && !current)
         link.retry()
     },
-    on: link.on,
     ...connectionHooks(link, opened.on, hooks),
     close: () => {
       closed = true
@@ -304,7 +301,7 @@ export function resumeHeaders(lastEventId: string | undefined): Record<string, s
 // An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; a GET stream also waits out a 502, 503 or 504, as a server or proxy restarting answers, and with `retryRefused` any response that is not ok is tried again after the backoff too.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value and its last id.
 // It gives the connection to build `ended()` and the hooks on (`connectionHooks()`), which a caller needing neither, a live value, does not carry.
-export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): Omit<Connection<T>, 'ended' | 'onData' | 'onError' | 'onClose'> & { link: ReturnType<typeof connection<T>>, start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
+export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): Omit<Connection<T>, 'ended' | 'onData' | 'onError' | 'onClose'> & { link: ReturnType<typeof connection<T>>, on: (listener: (value: T) => void) => () => void, start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
   let run: AbortController | undefined
   let started = false
   let lastId: string | undefined
@@ -556,10 +553,6 @@ export interface Stream<T, Options = Record<never, never>> extends Connection<T>
   start: (...[options]: Optional<Options>) => void
 }
 
-// The names before `Connection` and `Stream`, which work until 1.95: `kay check` renames them (`deprecated-stream-types`).
-export type EventReader<T> = Connection<T>
-export type StreamRun<T, Options> = Stream<T, Options>
-
 // An async iterable read as it arrives, from the moment the island is in the page.
 function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>, hooks?: ConnectionHooks<unknown>): Stream<unknown> {
   const link = connection<unknown>(() => void read(), false)
@@ -608,7 +601,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>, hooks?
   onMount(start)
   onCleanup(close)
 
-  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
+  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), ...connectionHooks(link, opened.on, hooks), ended: ended(link), close, start }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.

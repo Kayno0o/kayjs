@@ -6,7 +6,7 @@ import Form from '@kaynooo/kayjs-ui/form.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // `add` stands in for the server: it answers the saved title, or throws the messages a schema refusal carries.
-const { add: call, onSave, onError, refused, old } = props<{ old?: Record<string, unknown> | undefined, add: (input: { title: string }) => Promise<string | { errors: Record<string, string> } | { data: unknown }>, onSave: (title: string) => void, onError?: ((failure: { error: unknown }) => unknown) | undefined, refused?: ((data: never) => Record<string, string> | string | undefined) | undefined }>()
+const { add: call, onSave, onError, refused } = props<{ add: (input: { title: string }) => Promise<string | { errors: Record<string, string> } | { data: unknown }>, onSave: (title: string) => void, onError?: ((failure: { error: unknown }) => unknown) | undefined, refused?: ((data: never) => Record<string, string> | string | undefined) | undefined }>()
 
 const pending = signal(false)
 const last = signal<ActionError | undefined>(undefined)
@@ -39,7 +39,7 @@ const add = Object.assign(async (form: FormData) => {
   error: (field = '') => last()?.errors[field],
 }) as unknown as Action<{ title: string }, string | Failure<never>>
 ---
-Form(action={add} failureLabel="Could not add" saved="Added." onSave={onSave} onError={onError} refused={refused} {...old})
+Form(action={add} failureLabel="Could not add" saved="Added." onSave={onSave} onError={onError} refused={refused})
   FormField(label="Title" name="title")
     input#title(name="title")
   FormField(label="Slug" name="slug")

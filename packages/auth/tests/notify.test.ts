@@ -18,7 +18,7 @@ async function verified() {
     site: 'https://site.test',
     name: 'Site',
     email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false },
-    onAuthEvent: (info) => {
+    onEvent: (info) => {
       events.push(info)
     },
   })
@@ -111,7 +111,7 @@ describe('changes to what protects the account', () => {
   test('an unverified address is never mailed a notice, though the app still hears of it', async () => {
     const mails: Mail[] = []
     const events: AuthEvent[] = []
-    const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false }, onAuthEvent: ({ event }) => void events.push(event) })
+    const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false }, onEvent: ({ event }) => void events.push(event) })
     const ada = browser()
 
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })

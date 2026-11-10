@@ -5,7 +5,7 @@ import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
-import { hear } from './internal/hear'
+
 import { tabOf } from './outside'
 import { rangeTrack } from './range-track'
 import { attempt } from './toast'
@@ -47,7 +47,7 @@ const look = recipe({
   },
 })
 
-const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onEnded, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
+const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnd, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
   // The audio file or stream.
   src: string
   // Names the audio on the lock screen, with the chapter playing as the song when there are chapters.
@@ -70,8 +70,7 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   onPause?: (() => unknown) | undefined
   // Called when it plays to its end.
   onEnd?: (() => unknown) | undefined
-  // Deprecated: `onEnd`. Works until 1.95.
-  onEnded?: (() => unknown) | undefined
+
   // Called with `{ error }` (and the `event` of the audio element), the `MediaError` when the file or stream fails to load or the `DOMException` when the browser refuses to play, beside the `failureLabel` toast of a refused play.
   onError?: ((failure: { error: MediaError | DOMException | null, event?: Event }) => unknown) | undefined
   // What the browser loads before the first play; the audio's length is known with `metadata`, a stream's may not be.
@@ -121,7 +120,7 @@ const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter,
 function finished() {
   playing = false
 
-  hear(() => onEnd?.(), () => onEnded?.())
+  onEnd?.()
 }
 
 function echoed(seconds: number) {

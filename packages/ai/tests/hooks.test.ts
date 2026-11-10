@@ -336,16 +336,11 @@ describe('the hook convention', () => {
     expect(errors).toHaveLength(1)
   })
 
-  it('runs beforeRequest, the onRequest it was before 1.92, then the ask\'s, each seeing what the one before changed', async () => {
+  it('runs the beforeRequest of ai(), then the ask\'s, each seeing what the one before changed', async () => {
     const provider = echo()
     const seen: string[] = []
 
     ai({
-      onRequest: ({ system }) => {
-        seen.push(`old ${system}`)
-
-        return { system: 'old' }
-      },
       beforeRequest: ({ system }) => {
         seen.push(`new ${system}`)
 
@@ -357,23 +352,23 @@ describe('the hook convention', () => {
       seen.push(`own ${system}`)
     } })
 
-    expect(seen).toEqual(['new asked', 'old new', 'own old'])
-    expect(provider.seen.system).toEqual(['old'])
+    expect(seen).toEqual(['new asked', 'own new'])
+    expect(provider.seen.system).toEqual(['new'])
   })
 
-  it('still runs onFinish beside onSuccess, and tells neither of a failed reply', async () => {
+  it('tells onSuccess of a finished reply and not of a failed one', async () => {
     const heard: string[] = []
     const broken: Provider = { name: 'broken', model: 'm', async* stream() {
       throw new AiError('invalid', 'no')
     } }
 
-    ai({ onSuccess: () => heard.push('success'), onFinish: () => heard.push('finish') })
+    ai({ onSuccess: () => heard.push('success') })
 
     await ask('hi', { provider: echo() })
-    expect(heard).toEqual(['success', 'finish'])
+    expect(heard).toEqual(['success'])
 
     await expect(Promise.resolve(ask('hi', { provider: broken }))).rejects.toThrow('no')
-    expect(heard).toEqual(['success', 'finish'])
+    expect(heard).toEqual(['success'])
   })
 
   it('reports a hook that throws with its source and still runs the next one', async () => {

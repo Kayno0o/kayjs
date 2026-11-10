@@ -21,13 +21,19 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
     store,
     guests: { maxAge: '1d' },
     organizations: { roles: { owner: [], member: [] }, owner: 'owner' },
-    onAuthEvent: (info) => {
+    onEvent: (info) => {
       heard.push(info)
     },
-    beforeDelete: ({ user }) => options.beforeDelete?.(user),
-    onDelete: async ({ user }) => {
+    beforeDelete: async ({ user }) => {
+      const refused = options.beforeDelete?.(user)
+
+      if (refused === false)
+        return false
+
       deleted.push(user.id)
       await options.onDelete?.(user)
+
+      return undefined
     },
   })
   const start = Date.now()

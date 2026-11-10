@@ -212,7 +212,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     ...metricsOf(config.metrics) === undefined ? [] : [kay(metricsOf(config.metrics)?.path ?? METRICS_PATH, 'metrics')],
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
-    kay(IMAGE_ROUTE, 'image resizer (`/_kay/image` before 1.92, answered until 1.95)'),
+    kay(IMAGE_ROUTE, 'image resizer'),
     kay(CARD_ROUTE, 'share cards'),
     kay(`${FILES_ROUTE}*`, 'stored files'),
     kay(ERROR_REPORTS, 'browser error reports', 'POST'),

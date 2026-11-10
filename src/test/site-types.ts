@@ -131,7 +131,7 @@ export interface McpCall {
   status: number
 }
 
-export type Received<Client> = Client extends { on: (listener: (value: infer Value) => void) => unknown } ? Value : never
+export type Received<Client> = Client extends { onData: (listener: (event: { value: infer Value }) => void) => unknown } ? Value : never
 
 export type TestSocket<Client> = Client & {
   // Every message received so far, in order.

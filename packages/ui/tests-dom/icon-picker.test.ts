@@ -3,7 +3,7 @@ import type { IconChoice } from '../src/icon-picker'
 import { afterEach, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
-import DeprecatedSearch from '../src/icon-picker.kay'
+
 import IconPicker from '../tests/fixture/src/components/icon-picker.kay'
 import { click, clock } from './dom'
 
@@ -323,20 +323,4 @@ test('icons takes a function handed the page wanted, a promise of a set, and onL
   mounted = await mountComponent(IconPicker, { icons: Promise.resolve(SET.slice(0, 2)), onChange: (name: string) => changes.push(name) })
   await settle()
   expect(mounted.root.querySelectorAll('[data-part=option]').length).toBe(2)
-})
-
-test('the deprecated search prop still pages like a function icons', async () => {
-  const asked: [string, number, number][] = []
-
-  mounted = await mountComponent(DeprecatedSearch, {
-    search: async (query: string, limit: number, offset: number) => {
-      asked.push([query, limit, offset])
-
-      return found(query, limit, offset)
-    },
-    onChange: (name: string) => changes.push(name),
-  })
-  await settle()
-
-  expect(asked).toEqual([['', 50, 0]])
 })

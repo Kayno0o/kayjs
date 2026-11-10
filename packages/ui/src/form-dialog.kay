@@ -4,7 +4,7 @@ import { carrySchema, effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import type { FormValidation } from './forms'
-import { hear } from './internal/hear'
+
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, validate = false, onFocusOut, refused, onSave, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, validate = false, onFocusOut, refused, onSave, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -33,8 +33,7 @@ const { open, title, heading, action, submitLabel, savingLabel = wording('ui.for
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
   onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
-  // Deprecated: `onSave`. Works until 1.95.
-  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
+
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. The dialog stays open.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
   // The left end of the footer, for a delete button.
@@ -97,7 +96,7 @@ async function submit(event: SubmitEvent) {
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
   // The dialog closes whatever the hooks do: the save went through.
   try {
-    hear(() => onSave?.(done.result), () => onSaved?.(done.result))
+    onSave?.(done.result)
   }
   finally {
     onOpenChange(false)

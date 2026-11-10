@@ -1,15 +1,12 @@
 ---
 import type { Action, FormFailure } from 'kay'
 import { effect, untrack } from 'kay'
-import { hear } from './hear'
 
-// Reports how a form posting to `action` went to the app, drawing nothing. ContactForm and SubscribeForm render it only when given `onSend`, `onSent` or `onError`, so a form that asks for neither stays static and ships no JavaScript.
+// Reports how a form posting to `action` went to the app, drawing nothing. ContactForm and SubscribeForm render it only when given `onSend` or `onError`, so a form that asks for neither stays static and ships no JavaScript.
 // The callbacks are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which the forms rendering this would then be even with no callback given.
-const { action, whenSent, whenSentOld, whenRefused } = props<{
+const { action, whenSent, whenRefused } = props<{
   action: Action<never, unknown>
   whenSent?: ((data: unknown) => unknown) | undefined
-  // The deprecated `onSent`, heard after `whenSent` even when that one throws.
-  whenSentOld?: ((data: unknown) => unknown) | undefined
   whenRefused?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
 }>()
 
@@ -17,7 +14,7 @@ effect(() => {
   const done = action.succeeded()
 
   if (done) {
-    untrack(() => hear(() => whenSent?.(done.data), () => whenSentOld?.(done.data)))
+    untrack(() => whenSent?.(done.data))
   }
 })
 

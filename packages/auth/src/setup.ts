@@ -305,12 +305,12 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
     beforeDelete: deleteHook(options.beforeDelete),
-    onDelete: hooked(options.onDelete, user => ({ user })),
+
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
     onExport: hooked(options.exportData, user => ({ user })),
     onEvent: options.onEvent,
-    onAuthEvent: options.onAuthEvent,
+
     organizations: options.organizations && organizationsCore(options.organizations, access),
     pruned: { at: 0 },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },

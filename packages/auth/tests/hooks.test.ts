@@ -23,15 +23,11 @@ async function logging<Result>(run: () => Promise<Result>): Promise<{ result: Re
 }
 
 describe('onEvent', () => {
-  test('hears what onAuthEvent hears, with an AuthHookContext, and both run when both are set', async () => {
+  test('hears the account\'s events, with an AuthHookContext', async () => {
     const heard: AuthEventInfo[] = []
-    const old: string[] = []
     const { browser } = testApp({
       onEvent: (info) => {
         heard.push(info)
-      },
-      onAuthEvent: ({ event }) => {
-        old.push(event)
       },
     })
 
@@ -40,26 +36,21 @@ describe('onEvent', () => {
 
     const failed = heard.find(info => info.event === 'sign-in-failed')
 
-    expect(old).toEqual(heard.map(info => info.event))
     expect(failed).toMatchObject({ method: 'password', user: { email: 'ada@example.com' }, context: { ip: '10.0.0.1', userAgent: 'Firefox', actor: null } })
   })
 
-  test('a throw is reported with its source, the sign-in and the audit entry stand, and the next hook still runs', async () => {
-    const next: string[] = []
+  test('a throw is reported with its source, and the sign-in and the audit entry stand', async () => {
     const { browser, store } = testApp({
       audit: true,
       onEvent: () => {
         throw new Error('down')
-      },
-      onAuthEvent: ({ event }) => {
-        next.push(event)
       },
     })
     const ada = browser()
     const { logged } = await logging(async () => ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }))
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(next).toEqual(['signed-in'])
+
     expect((await store.audit!.list({ limit: 10 })).map(entry => entry.event)).toEqual(['signed-in'])
     expect(logged).toContainEqual(['error', 'auth.onEvent failed', expect.objectContaining({ message: 'down' }), undefined, 'kay'])
   })
@@ -129,33 +120,27 @@ describe('beforeDelete', () => {
     expect((await store.users.get(adminId))?.roles).toEqual(['admin'])
   })
 
-  test('is told the user and the context, the admin as actor, and onDelete runs after it', async () => {
+  test('is told the user and the context, the admin as actor', async () => {
     const told: [string, string | null | undefined][] = []
-    const order: string[] = []
     const { admin, grace, store } = await registered({
       beforeDelete: ({ user, context }) => {
-        order.push('beforeDelete')
         told.push([user.email!, context.actor?.email])
-      },
-      onDelete: () => {
-        order.push('onDelete')
       },
     })
 
     expect(await grace.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await admin.call('admin.deleteUser', (await store.users.findByEmail('ada@example.com'))!.id)).toEqual({ ok: true })
     expect(told).toEqual([['grace@example.com', undefined], ['ada@example.com', 'root@example.com']])
-    expect(order).toEqual(['beforeDelete', 'onDelete', 'beforeDelete', 'onDelete'])
   })
 
-  test('onDelete keeps its meaning: a throw keeps the account', async () => {
+  test('a throw keeps the account', async () => {
     const { ada, store } = await registered({
-      onDelete: () => {
+      beforeDelete: () => {
         throw new Error('app down')
       },
     })
 
-    expect((await ada.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect(await ada.call('account.delete', { password: PASSWORD })).toMatchObject({ ok: false, error: { status: 500 } })
     expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
   })
 })

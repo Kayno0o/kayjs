@@ -24,6 +24,17 @@ The three forms that 1.92 deprecated are gone, with their lints (`promoted-islan
 - The `IslandProp` and `FunctionProp` types of `kay` take one type parameter less, as a lint name was their second.
 - `compileKay` no longer returns `promote`, its `cause` has no `target`, and `analyzeScript` takes no template reads.
 
+### The stream, hook, image route and callback forms 1.92 deprecated are gone
+
+Their lints (`deprecated-stream-types`, `deprecated-stream-on`, `deprecated-hook-dispatch`, `deprecated-hook-names`, `deprecated-icon-picker-search`) go with them: run `kay upgrade` on 1.94 first and it rewrites every one that has a safe fix.
+
+- The old stream types `EventReader` and `StreamRun` are `Connection` and `Stream`; `.on(fn)` of a stream or a socket is `.onData(({ value }) => ...)`.
+- `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`.
+- kayjs-auth's `onAuthEvent` is `onEvent` and its `onDelete` is `beforeDelete`, which can refuse; kayjs-ai's `onRequest` is `beforeRequest` and its `onFinish` is `onSuccess`.
+- Form, FormDialog and SaveForm `onSaved` is `onSave`, ContactForm and SubscribeForm `onSent` is `onSend`, AudioPlayer `onEnded` is `onEnd`, and the call that does a SaveForm's save is `save`, no longer `onSave`.
+- IconPicker's `search(query, limit, offset)` is `icons={({ q, limit, offset }) => ...}`.
+- The image resizer answers `/_kay/images` only: a link to `/_kay/image` is a 404, so rewrite one an app wrote by hand.
+
 ## 1.94.0
 
 ### The old names and import paths 1.90 deprecated are gone

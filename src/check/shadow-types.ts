@@ -37,7 +37,7 @@ import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-import { hookNames } from './hook-names'
+
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 
@@ -46,11 +46,11 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { hookDispatch } from './renamed-exports'
+
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 
 import { untypedSockets } from './socket-routes'
-import { streamOn, streamOpen, streamTypes } from './stream-on'
+import { streamOpen } from './stream-on'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 import { uiTypes } from './ui-types'
@@ -145,15 +145,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-
-  async ({ root, options }) => hookDispatch(root, options),
-
-  async ({ root, options }) => streamTypes(root, options),
-  async ({ root, options }) => streamOn(root, options),
   async ({ root, options }) => streamOpen(root, options),
   async ({ root, options }) => localState(root, options),
-
-  async ({ root, options }) => hookNames(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

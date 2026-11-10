@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import SaveFormControls from '../tests/fixture/src/components/save-form-controls.kay'
-import SaveFormLegacy from '../tests/fixture/src/components/save-form-legacy.kay'
+
 import SaveFormMoment from '../tests/fixture/src/components/save-form-moment.kay'
 import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
 import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
@@ -605,33 +605,6 @@ describe('SaveForm driven by signals', () => {
     expect(status(root)).toBe('No unsaved change.')
     expect(root.querySelector('.kui-toast')?.textContent).toContain('Saved.')
     expect(leaves()).toBe(false)
-  })
-
-  test('an onSave with no action is still the call that does the save, and onSaved is not heard', async () => {
-    const calls: string[] = []
-
-    mounted = await mountComponent(SaveFormLegacy, { old: { onSave: async () => {
-      calls.push('saved')
-    }, onSaved: () => calls.push('heard') } })
-
-    const { root } = mounted
-
-    root.querySelector<HTMLInputElement>('#name')!.value = 'Grace'
-    root.querySelector('form')!.requestSubmit()
-    await settle()
-
-    expect(calls).toEqual(['saved'])
-  })
-
-  test('onSaved is heard after onSave with an action', async () => {
-    const heard: string[] = []
-
-    mounted = await mountComponent(SaveFormComponent, { save: async (input: { name: string }) => input.name, onSave: (name: string) => heard.push(`save ${name}`), onDiscard: () => undefined, old: { onSaved: (name: string) => heard.push(`saved ${name}`) } })
-    type(mounted.root, 'Grace')
-    mounted.root.querySelector('form')!.requestSubmit()
-    await settle()
-
-    expect(heard).toEqual(['save Grace', 'saved Grace'])
   })
 
   test('a clean editor calls nothing, a new one saves with no change', async () => {

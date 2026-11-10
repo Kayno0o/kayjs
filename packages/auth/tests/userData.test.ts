@@ -268,7 +268,7 @@ describe('app data and provider ids on the user', () => {
   test('the auth event hook sees the provider id', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const seen: unknown[] = []
-    const { browser } = setup({ onAuthEvent: (info: { user: User }) => void seen.push(info.user.providers) })
+    const { browser } = setup({ onEvent: (info: { user: User }) => void seen.push(info.user.providers) })
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
@@ -276,7 +276,7 @@ describe('app data and provider ids on the user', () => {
     expect(seen.at(-1)).toEqual({ discord: { id: '1' } })
   })
 
-  test('an event reads no identities without onAuthEvent, and a failing read keeps the audit entry', async () => {
+  test('an event reads no identities without onEvent, and a failing read keeps the audit entry', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser, store } = setup({ audit: true, profileFields: undefined })
     const ada = browser()
@@ -286,7 +286,7 @@ describe('app data and provider ids on the user', () => {
 
     expect(listed).not.toHaveBeenCalled()
 
-    const failing = setup({ audit: true, profileFields: undefined, onAuthEvent: () => undefined })
+    const failing = setup({ audit: true, profileFields: undefined, onEvent: () => undefined })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
 
     spyOn(failing.store.identities, 'listByUser').mockImplementation(async () => {

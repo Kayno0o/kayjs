@@ -248,7 +248,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'form-field': { label: 'Name', hint: 'As shown', children: '' },
   'hover-card': {},
   'icon-button': { icon, label: 'Add' },
-  'icon-picker': { search: async () => new Promise<never[]>(() => undefined), searchLabel: 'Search icons' },
+  'icon-picker': { icons: async () => new Promise<never[]>(() => undefined), searchLabel: 'Search icons' },
   'icon': { icon, label: 'Add' },
   'image-cropper': { src: '/map.png' },
   'line-chart': { labels: ['a', 'b'], series: [{ name: 'Visits', values: [1, 2] }], label: 'Visits' },

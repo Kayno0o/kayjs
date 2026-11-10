@@ -2,14 +2,14 @@
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { recipe, signal } from 'kay'
 import type { FormValidation } from './forms'
-import { hear } from './internal/hear'
+
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-form-grid' } })
 
-const { action, refused, saved, onSave, onSaved, onError, onFocusOut, failureLabel, validate = false, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'onSubmit' | 'onError'> & {
+const { action, refused, saved, onSave, onError, onFocusOut, failureLabel, validate = false, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'onSubmit' | 'onError'> & {
   // The page's action the form calls with its fields, which posts it as a plain form without JavaScript: the messages it refuses a field with show on the FormField of that `name`, and the first invalid field takes the focus.
   action: Action<never, Output>
   // Toasted when the call fails other than on a field.
@@ -22,8 +22,7 @@ const { action, refused, saved, onSave, onSaved, onError, onFocusOut, failureLab
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows.
   onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
-  // Deprecated: `onSave`. Works until 1.95.
-  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
+
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
 }>()
@@ -57,7 +56,7 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  hear(() => onSave?.(done.result), () => onSaved?.(done.result))
+  onSave?.(done.result)
 }
 
 async function leave(event: FocusEvent) {

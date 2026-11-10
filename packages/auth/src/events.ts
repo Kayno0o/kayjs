@@ -156,7 +156,7 @@ export async function impersonatorOf(state: RequestState): Promise<string | unde
   return state.via() === 'bearer' ? undefined : (await state.session.get('auth'))?.impersonator?.user
 }
 
-// Hands `event` to the app's `onEvent` and `onAuthEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
+// Hands `event` to the app's `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
 // While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
 export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
   const impersonator = await impersonatorOf(state)
@@ -167,12 +167,12 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
 
 // `report` for what happens outside a request, as a hand-over when a prune deletes an account: `where` is empty, so the entry names no address or browser.
 export async function reportFrom(core: Core, where: { address: string, userAgent: string }, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
-  if (core.onEvent || core.onAuthEvent) {
+  if (core.onEvent) {
     try {
       const user = await linkedUser(core, record)
       const context: EventContext = { ...await authContext(actor ? await linkedUser(core, actor) : null), ip: where.address, userAgent: where.userAgent }
 
-      await dispatch('auth.onEvent', [core.onEvent, core.onAuthEvent] as never, { event, user, ...eventFields(event, detail) }, { context })
+      await dispatch('auth.onEvent', [core.onEvent] as never, { event, user, ...eventFields(event, detail) }, { context })
     }
     catch (error) {
       log.error(`onEvent failed for ${event}`, error)

@@ -554,8 +554,8 @@ describe('a room\'s response schema', () => {
   const untyped = api().ws('/:room', { body: s.Object({ text: s.String() }), message: () => undefined })
 
   it('types an island socket\'s messages as the rooms send them, and accepts anything at runtime', () => {
-    const typed: Same<Parameters<Parameters<SocketOf<typeof chat, '/:room'>['on']>[0]>[0], Message> = true
-    const loose: Same<Parameters<Parameters<SocketOf<typeof untyped, '/:room'>['on']>[0]>[0], Message> = false
+    const typed: Same<Parameters<Parameters<SocketOf<typeof chat, '/:room'>['onData']>[0]>[0]['value'], Message> = true
+    const loose: Same<Parameters<Parameters<SocketOf<typeof untyped, '/:room'>['onData']>[0]>[0]['value'], Message> = false
 
     expect([typed, loose]).toEqual([true, false])
     expect([chat, untyped]).toHaveLength(2)

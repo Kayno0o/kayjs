@@ -37,7 +37,7 @@
   - Typing a letter focuses the next entry whose label starts with what was typed (700 ms buffer); a repeated letter cycles. A heading is a `role="group"` over the entries up to the next heading or rule, and radios sharing a `radioGroup` sit in a group of their own (`aria-owns`, a `group` part). `@item(entry)` is handed any `MenuItem`: an action, checkbox, radio or submenu.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(icons={({ q, limit, offset }) => findIcons({ query: q, limit, offset })} value={post.icon} name="icon" onChange={icon.set})`:
-  - A search that rejects is logged and shown as `failureLabel` (the wording key keeps its name, `ui.iconPicker.error`), the last grid kept. `onSearch(query)`, `onLoad(icons, query)` and `onError({ error, query })` hear the searches. The old `search(query, limit, offset)` prop works until 1.95 (`deprecated-icon-picker-search`).
+  - A search that rejects is logged and shown as `failureLabel` (the wording key keeps its name, `ui.iconPicker.error`), the last grid kept. `onSearch(query)`, `onLoad(icons, query)` and `onError({ error, query })` hear the searches.
   - A search box over a grid of the icons a function `icons` returns for `{ q, limit, offset }`, from the `offset`th on, as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as in the example. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
 
     ```ts

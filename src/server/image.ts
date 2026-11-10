@@ -22,7 +22,7 @@ import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './av
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
 import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
-import { LEGACY_IMAGE_ROUTE } from './image-route'
+
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -463,7 +463,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, revalidatedCopies(negotiated, varied))))
   }
 
-  app.get(IMAGE_ROUTE, resize).get(LEGACY_IMAGE_ROUTE, resize)
+  app.get(IMAGE_ROUTE, resize)
 
   // The color of a runtime image shown until it loads, read once per version of the file in the background and kept by the `src` pages give `image()`. A private image, a stored one and an AVIF, which is costly to decode, get none.
   async function learnColor(src: string, version: string, path: string, own: { animated: boolean, format: string }): Promise<void> {

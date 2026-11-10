@@ -61,7 +61,7 @@ describe('failure messages', () => {
 
   test('IconPicker says failureLabel', async () => {
     for (const [props, said] of [[{ failureLabel: 'New' }, 'New'], [{}, 'The icons could not be loaded.']] as const) {
-      mounted = await mountComponent(await library('icon-picker'), { search: async () => Promise.reject(new Error('down')), ...props })
+      mounted = await mountComponent(await library('icon-picker'), { icons: async () => Promise.reject(new Error('down')), ...props })
       await settle()
       expect(mounted.root.textContent).toContain(said)
       mounted.unmount()

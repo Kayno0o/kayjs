@@ -4,7 +4,7 @@ import type { DevKit, DevTab, DevTool } from './dev-tool'
 const BUILT_EVENT = 'kay-dev-built'
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
 const OVERSIZED = 4
-const IMAGE_ROUTES = new Set(['/_kay/images', '/_kay/image'])
+const IMAGE_ROUTES = new Set(['/_kay/images'])
 const SVG_TYPE = /^image\/svg\+xml\s*(?:;|$)/i
 // The files `kay build` wrote for the variants.
 const IMAGE_FILES = '/_kay/images/'

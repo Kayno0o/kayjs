@@ -30,4 +30,4 @@ The picker takes a function, so it renders inside an island.
 
 ## A fixed set
 
-`icons` also takes a list of `{ name, icon }` or a promise of one. The text typed filters it by name and it is paged like an answer, so a small set needs no action. The old `search(query, limit, offset)` prop works until 1.95; `kay upgrade` rewrites it.
+`icons` also takes a list of `{ name, icon }` or a promise of one. The text typed filters it by name and it is paged like an answer, so a small set needs no action.

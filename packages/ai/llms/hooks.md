@@ -39,7 +39,7 @@ A hook that only notifies (all but `beforeRequest`) is called as the event happe
 
 ### The names before 1.92
 
-`onRequest` is `beforeRequest` and `onFinish` is `onSuccess`; they still work until 1.95 and run after the new name when both are set (`deprecated-hook-names`, with a `kay upgrade` fix). `onError` was told the error itself and is now told `{ error, context }`.
+`onError` is told `{ error, context }`, where it was told the error itself before 1.92.
 
 ### The fake
 

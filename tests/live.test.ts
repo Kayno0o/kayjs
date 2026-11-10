@@ -605,7 +605,7 @@ describe('stream() started from a handler', () => {
     const lines = root(() => stream(chat, '/lines', { method: 'post', start: false }))
     const values: string[] = []
 
-    lines.on(line => void values.push(line))
+    lines.onData(({ value }) => void values.push(value))
     lines.start({ body: { file: new File(['a\nb'], 'lines.txt'), prefix: '> ' } })
     await until(() => lines.status() === 'done')
     expect(values).toEqual(['> a', '> b'])
@@ -1654,7 +1654,7 @@ describe('stream() over an async iterable', () => {
     }))
     const heard: number[] = []
 
-    reader.on(value => heard.push(value))
+    reader.onData(({ value }) => heard.push(value))
     flush()
     await until(() => reader.status() === 'done')
 

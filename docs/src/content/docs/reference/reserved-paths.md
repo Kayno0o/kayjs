@@ -9,7 +9,7 @@ kay reads some files and folders of a project by name, and serves some routes un
 
 A file kay reads for one thing is singular: `server.ts`, `auth.ts`, `mail.ts`, `ui.ts`, `context.ts`, `env.ts`, `theme.ts`. A folder holding one file per page, plugin, template, matcher or catalog is plural: `routes/`, `plugins/`, `mails/`, `messages/`, `params/`. A mass noun or an acronym stays as it is: `api/`, `content/`, `db/`. A file inside a plural folder is named after what it holds, as `plugins/jobs.ts` or `mails/welcome.kay`.
 
-A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/card`, and a folder of files is `/_kay/<nouns>/`, such as `/_kay/assets/`. The image resizer sits beside its variants under one prefix, `/_kay/images` for the endpoint and `/_kay/images/<file>` for the files `kay build` wrote. Its name before 1.92, `/_kay/image`, still answers until 1.95.
+A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/card`, and a folder of files is `/_kay/<nouns>/`, such as `/_kay/assets/`. The image resizer sits beside its variants under one prefix, `/_kay/images` for the endpoint and `/_kay/images/<file>` for the files `kay build` wrote.
 
 ## Files and folders
 

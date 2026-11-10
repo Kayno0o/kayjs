@@ -249,7 +249,6 @@ interface Connection<T> extends Source<ConnectionStatus>
   ended: () => Promise<T | undefined>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
-  on: (listener: (value: T) => void) => () => void
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -382,9 +381,6 @@ function escapeHtml(text: string): string
 
 [.] EventHandler
 type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
-
-[.] EventReader
-type EventReader<T> = Connection<T>
 
 [.] EventStream
 type EventStream<T> = Response & { readonly [EVENTS]: T }
@@ -1233,7 +1229,6 @@ interface Socket<Send, Receive> extends Source<SocketStatus>
   close: () => void
   error: () => ApiError<unknown> | undefined
   last: () => Receive | undefined
-  on: (listener: (message: Receive) => void) => () => void
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: Receive; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -1276,7 +1271,6 @@ interface Stream<T, Options = Record<never, never>> extends Connection<T>
   ended: () => Promise<T | undefined>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
-  on: (listener: (value: T) => void) => () => void
   onClose: (listener: (event: { status: "closed" | "done" | "failed"; }) => void) => () => void
   onData: (listener: (event: { value: T; }) => void) => () => void
   onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
@@ -1290,9 +1284,6 @@ interface Stream<T, Options = Record<never, never>> extends Connection<T>
 type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
   path: infer Path, node: infer Node
 } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
-
-[.] StreamRun
-type StreamRun<T, Options> = Stream<T, Options>
 
 [.] StreamStartOptions
 type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>

@@ -64,13 +64,13 @@ export async function deletionImpact(state: RequestState): Promise<DeletionImpac
   return { deleted: owned.filter(organization => organization.alone).map(organization => organization.name), blocked: owned.filter(organization => !organization.alone).map(organization => organization.name) }
 }
 
-// Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's `beforeDelete` is asked first and can refuse, and its records go before the erase, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
+// Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's `beforeDelete` is asked first and can refuse, and its records go before the erase, so a `beforeDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
 // For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out to them, only to the new owner of an organization handed over.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.
 export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
   const erased = await eraseThen(core, record, true)
 
-  // Kept as an `onDelete` that throws keeps it: the caller leaves the account to be tried again.
+  // Kept as a `beforeDelete` that refuses keeps it: the caller leaves the account to be tried again.
   if (!erased.ok)
     throw new Error(`beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
 }
@@ -108,7 +108,6 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, acto
   const owners = await owning(core, record)
   const pseudonym = crypto.randomUUID()
 
-  await core.onDelete?.(await linkedUser(core, record))
   const identities = await store.identities.listByUser(record.id)
 
   if (identities.length > 0) {

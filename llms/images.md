@@ -131,7 +131,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - The URL is signed with a key the build keeps beside the client build and never serves, so nobody can have the site draw a title of their own; whitespace runs read as one space and a title is cut at 200 characters before it is signed.
 - Each distinct title is one more card file, so a page titled by what visitors type, such as a search, draws one card per query.
 - `kay build` writes the cards its prerendered pages ask for as files, which a static export links, refusing one on an image from `images.dirs`; one on an image from `images.remote` is drawn from a download.
-- Variants are served by `/_kay/images?src=...&w=...`, which answers only those widths, `&crop=16x9` for a cut one and `?src=...&card` for the share card. The route was `/_kay/image` before 1.92 and still answers, for cached pages and links an app wrote, until 1.95.
+- Variants are served by `/_kay/images?src=...&w=...`, which answers only those widths, `&crop=16x9` for a cut one and `?src=...&card` for the share card.
 - `kay build` writes every variant of every imported image, and the cut ones, share cards and widths under 320 its prerendered pages ask for, served as files with a year of immutable caching; development makes them on request, kept in `.kay/cache/images`.
 Images stored at runtime, images looked up by `images.resolve` and `images.guard`, and images on another host (`images.remote`) are in [Images uploaded at runtime and from other hosts](images-runtime-and-remote.md#runtime-and-remote-images).
 

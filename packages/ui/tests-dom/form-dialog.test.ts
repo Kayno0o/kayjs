@@ -25,16 +25,6 @@ function submit(root: HTMLElement) {
 }
 
 describe('FormDialog', () => {
-  test('onSaved still hears the result, after onSave', async () => {
-    const heard: string[] = []
-
-    mounted = await mountComponent(FormDialogComponent, { save: async (input: { name: string }) => input.name, plain: false, onSave: (name: string) => heard.push(`save ${name}`), old: { onSaved: (name: string) => heard.push(`saved ${name}`) } })
-    submit(mounted.root)
-    await settle()
-
-    expect(heard).toEqual(['save Ada', 'saved Ada'])
-  })
-
   test('calls the action with the form\'s fields, hands back what it returned, and closes emptied', async () => {
     const calls: { name: string }[] = []
     const root = await formDialog(async (input) => {

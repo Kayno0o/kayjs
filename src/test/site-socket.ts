@@ -1,4 +1,4 @@
-import type { Connection, ConnectionHooks } from '../runtime/live'
+import type { ConnectionHooks } from '../runtime/live'
 import type { SiteScope } from './site-scope'
 import type { TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
@@ -80,7 +80,7 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
       const init = streamRequest(options)
       const reader = readEvents(async (signal, lastEventId) => send(url, { ...init, headers: { ...init.headers, ...resumeHeaders(lastEventId), ...options?.headers }, signal }), init.method === 'GET')
-      const tested = Object.assign(reader, connectionHooks(reader.link, reader.onOpen, options as ConnectionHooks<never> | undefined), inbox(reader))
+      const tested = Object.assign(reader, connectionHooks(reader.link, reader.onOpen, options as ConnectionHooks<never> | undefined), inbox({ onData: listener => reader.on(value => listener({ value })) }))
       const finished = new Promise<unknown[]>((resolve) => {
         reactiveRoot(dispose => effect(() => {
           const status = reader.status()
@@ -102,12 +102,12 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
 }
 
 // Keeps every message a client receives, for a test to read in order.
-function inbox<T>(client: Pick<Connection<T>, 'on'>): { received: T[], next: () => Promise<T> } {
+function inbox<T>(client: { onData: (listener: (event: { value: T }) => void) => () => void }): { received: T[], next: () => Promise<T> } {
   const received: T[] = []
   const waiting: ((value: T) => void)[] = []
   let read = 0
 
-  client.on((value) => {
+  client.onData(({ value }) => {
     received.push(value)
 
     const waiter = waiting.shift()

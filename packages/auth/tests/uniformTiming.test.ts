@@ -48,10 +48,10 @@ function from(address: string, body: unknown) {
 }
 
 describe('sign-in answers in the same time for a held address and a free one', () => {
-  test('a failed password sign-in does not wait for onAuthEvent, held address or not', async () => {
+  test('a failed password sign-in does not wait for onEvent, held address or not', async () => {
     const slow = gate()
     let armed = false
-    const app = testApp({ onAuthEvent: async () => {
+    const app = testApp({ onEvent: async () => {
       if (armed)
         await slow.closed
     } })
@@ -86,7 +86,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
 
   test('the event of a failed sign-in is still reported once the request is over', async () => {
     const heard: string[] = []
-    const app = testApp({ audit: true, onAuthEvent: ({ event }) => {
+    const app = testApp({ audit: true, onEvent: ({ event }) => {
       heard.push(event)
     } })
 
@@ -102,7 +102,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   })
 
   test('a throwing hook after the response is logged, not raised', async () => {
-    const app = testApp({ onAuthEvent: (info) => {
+    const app = testApp({ onEvent: (info) => {
       if (info.event === 'sign-in-failed')
         throw new Error('hook down')
     } })
@@ -131,7 +131,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   test('the lockout answer does not wait on the holder\'s notice, held address or not', async () => {
     const slow = gate()
     const box = mailbox()
-    const app = testApp({ rateLimit: { signInAccountAll: { max: 1, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onAuthEvent: async (info) => {
+    const app = testApp({ rateLimit: { signInAccountAll: { max: 1, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, onEvent: async (info) => {
       if (info.event === 'sign-in-locked')
         await slow.closed
     } })
@@ -198,7 +198,7 @@ describe('registering under requireVerified', () => {
         await slow.closed
         ran.push(`signed-up:${user.email}`)
       }
-    }, onDelete: async ({ user }) => {
+    }, beforeDelete: async ({ user }) => {
       if (armed) {
         await slow.closed
         ran.push(`deleted:${user.email}`)
@@ -270,7 +270,7 @@ describe('confirming an address with a password', () => {
 describe('a replaced unverified account whose erase fails', () => {
   test('stays listed as stale, so the sweep erases it later', async () => {
     let failing = true
-    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, onDelete: () => {
+    const app = testApp({ site: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS }, beforeDelete: () => {
       if (failing)
         throw new Error('hook down')
     } })

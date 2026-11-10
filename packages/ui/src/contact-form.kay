@@ -12,7 +12,7 @@ import { OUTSIDE } from './outside'
 
 const look = recipe({ parts: { root: 'kui-contact-form flex flex-col items-start gap-4', consent: 'kui-contact-consent flex flex-col gap-1', privacy: 'kui-contact-privacy text-xs', consentBox: '', issues: FIELD_MESSAGE.issues, issue: FIELD_MESSAGE.issue } })
 
-const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.email', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.message', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submit', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sent', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consent', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacy', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6, onSend, onSent, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
+const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.email', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.message', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submit', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sent', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consent', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacy', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6, onSend, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
   // The action `contactForm(mail)` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
   action: Action<never, unknown>
   // The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language, English and French, which these replace.
@@ -26,8 +26,7 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
   sent?: Snippet
   // Called once the message went out, with what the action returned: for an analytics conversion, closing a dialog around the form or a redirect.
   onSend?: ((data: unknown) => unknown) | undefined
-  // Deprecated: `onSend`. Works until 1.95.
-  onSent?: ((data: unknown) => unknown) | undefined
+
   // Called when the post was refused or failed, with the messages by field (the whole form's under ''), the status and the failure's data; the notice and the field messages still show.
   onError?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
   // The consent checkbox, drawn when the action asks for one (`consent: true` in `contactForm`), and the link after it to the privacy page, drawn when `privacy` is given.
@@ -64,8 +63,8 @@ form(part="root" {...rest} action={action} novalidate)
       a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   Button(type="submit" tone="accent" label={submitLabel})
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
-  if onSend || onSent || onError
-    FormOutcome(action={action} whenSent={onSend as never} whenSentOld={onSent as never} whenRefused={onError as never})
+  if onSend || onError
+    FormOutcome(action={action} whenSent={onSend as never} whenRefused={onError as never})
   if action.succeeded()
     if sent
       | {sent}

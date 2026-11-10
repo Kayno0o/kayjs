@@ -120,7 +120,7 @@
     "max-lines": 685
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1091
+    "max-lines": 1047
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,
@@ -130,7 +130,7 @@
     "max-lines": 1097
   },
   "src/compiler/validate.ts": {
-    "max-lines": 666,
+    "max-lines": 617,
     "complexity": 47
   },
   "src/content/edit-entries.ts": {
@@ -197,7 +197,7 @@
     "complexity": 50
   },
   "src/runtime/live.ts": {
-    "max-lines": 826
+    "max-lines": 821
   },
   "src/runtime/local.ts": {
     "max-lines": 677

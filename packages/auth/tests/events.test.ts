@@ -16,7 +16,7 @@ afterEach(() => {
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const events: AuthEventInfo[] = []
   const app = testApp({
-    onAuthEvent: (info) => {
+    onEvent: (info) => {
       events.push(info)
     },
     ...options,
@@ -29,10 +29,10 @@ function from(address: string, body: unknown) {
   return { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address, 'user-agent': 'Firefox' }, body: JSON.stringify(body) }
 }
 
-describe('onAuthEvent', () => {
+describe('onEvent', () => {
   function listen(options: Parameters<typeof testApp>[0] = {}) {
     const heard: AuthEventInfo[] = []
-    const app = testApp({ onAuthEvent: (info) => {
+    const app = testApp({ onEvent: (info) => {
       heard.push(info)
     }, ...options })
     // The event and its fields, who it happened to and where from set aside.
@@ -85,9 +85,9 @@ describe('onAuthEvent', () => {
     expect(said().at(-1)).toEqual(['sign-in-failed', { method: 'two-factor' }])
   })
 
-  test('an onAuthEvent that throws is logged as auth.onEvent, and the sign-in goes on', async () => {
+  test('an onEvent that throws is logged as auth.onEvent, and the sign-in goes on', async () => {
     const { browser } = testApp({
-      onAuthEvent: () => {
+      onEvent: () => {
         throw new Error('down')
       },
     })
@@ -245,7 +245,7 @@ describe('the audit log', () => {
 })
 
 describe('impersonation', () => {
-  test('what an admin does as a user names the admin as the actor, to `onAuthEvent` and in the audit log', async () => {
+  test('what an admin does as a user names the admin as the actor, to `onEvent` and in the audit log', async () => {
     const { browser, store, events } = setup({ admin: 'admin', audit: true, organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
     const ada = browser()
     const root = browser()

@@ -17,7 +17,7 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
   const heard: AuthEventInfo[] = []
   const app = testApp({
     admin: 'admin',
-    onAuthEvent: (info) => {
+    onEvent: (info) => {
       heard.push(info)
     },
     ...options,
@@ -287,7 +287,7 @@ describe('admin', () => {
       audit: true,
       site: 'https://site.test',
       email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
-      onDelete: ({ user }: { user: User }) => {
+      beforeDelete: ({ user }: { user: User }) => {
         deleted.push(user)
       },
     })
