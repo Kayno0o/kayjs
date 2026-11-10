@@ -12,34 +12,34 @@ await plugin(kay())
 // Each fixture is a `main.kay` rendered with no props, beside the components it imports. Every one holds a signal, so the server renders it as an island, markers included.
 const FIXTURES: Record<string, Record<string, string | Blob>> = {
   'attributes': {
-    'main.kay': '---\nconst label = signal(\'Main & co\')\nconst extra = \'wide\'\nconst off = false\nconst rest = { \'data-a\': 1, \'title\': \'from spread\' }\n---\ndiv#main.card(class={extra} title="a &amp; b <c>" data-n={2} hidden={off} aria-label={label()})\n  span(class="x" {...rest}) spread\n  input(type="text" value={label()} disabled)\n  br\n  a(href="/about" target="_blank") About\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst label = signal(\'Main & co\')\nconst extra = \'wide\'\nconst off = false\nconst rest = { \'data-a\': 1, \'title\': \'from spread\' }\n---\ndiv#main.card(class={extra} title="a &amp; b <c>" data-n={2} hidden={off} aria-label={label()})\n  span(class="x" {...rest}) spread\n  input(type="text" value={label()} disabled)\n  br\n  a(href="/about" target="_blank") About\n',
   },
   'text': {
-    'main.kay': '---\nconst name = signal(\'Ada\')\nconst count = 3\n---\np Hello {name()}, you have {count} items & more < less\np\n  | first line\n  | {name()} second\n  strong bold\n  |  tail\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst name = signal(\'Ada\')\nconst count = 3\n---\np Hello {name()}, you have {count} items & more < less\np\n  | first line\n  | {name()} second\n  strong bold\n  |  tail\n',
   },
   'control flow': {
-    'main.kay': '---\nconst items = signal([{ id: 1, title: \'One\' }, { id: 2, title: \'Two\' }])\nconst empty: string[] = []\nconst shown = true\n---\nif shown\n  p shown\nelse\n  p hidden\nif !shown\n  p never\nul\n  for item of items()\n    li {item.title}\nul\n  for word of empty key={word}\n    li {word}\n  else\n    li none\nfor item, i of items() key={i}\n  span {i}: {item.title}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst items = signal([{ id: 1, title: \'One\' }, { id: 2, title: \'Two\' }])\nconst empty: string[] = []\nconst shown = true\n---\nif shown\n  p shown\nelse\n  p hidden\nif !shown\n  p never\nul\n  for item of items()\n    li {item.title}\nul\n  for word of empty key={word}\n    li {word}\n  else\n    li none\nfor item, i of items() key={i}\n  span {i}: {item.title}\n',
   },
   'components': {
-    'main.kay': '---\nimport Card from \'./card.kay\'\n\nconst title = signal(\'Card title\')\n---\nCard.big(title={title()} class="outlined")\n  @actions\n    button Save\n  p Body of {title()}\nCard(title="Bare")\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst title = signal(\'Card title\')\n---\nCard.big(title={title()} class="outlined")\n  @actions\n    button Save\n  p Body of {title()}\nCard(title="Bare")\n',
     'card.kay': '---\nconst { title, class: className } = props<{ title: string, class?: string }>()\n---\nsection(class={className})\n  h2 {title}\n  slot\n  footer\n    slot actions\n      span no actions\n',
   },
   'styles and fields': {
-    'main.kay': '---\nconst color = signal(\'red\')\nconst on = true\nconst text = \'Some <text>\'\n---\np(style={{ color: color(), \'font-size\': \'2px\' }}) styled\np(style="margin: 0") plain\ninput(type="checkbox" checked={on})\ntextarea(name="body") {text}\nselect(name="pick")\n  option(value="a") A\n  option(value="b" selected) B\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst color = signal(\'red\')\nconst on = true\nconst text = \'Some <text>\'\n---\np(style={{ color: color(), \'font-size\': \'2px\' }}) styled\np(style="margin: 0") plain\ninput(type="checkbox" checked={on})\ntextarea(name="body") {text}\nselect(name="pick")\n  option(value="a") A\n  option(value="b" selected) B\n',
   },
   'values': {
-    'main.kay': '---\nconst picked = signal(\'b\')\nconst zero = 0\nconst nothing = null\nconst markup = \'<em>raw</em>\'\nconst yes = true\nconst list = [\'x\', \'y\']\n---\nselect(value={picked()})\n  option(value="a") A\n  option(value="b") B\ndiv(innerHTML={markup})\np(data-zero={zero} data-null={nothing} aria-hidden={yes} hidden={yes} aria-busy={false}) values\ninput(type="number" value={zero})\ntextarea(value={picked()})\np {nothing}{list}{zero}{yes}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst picked = signal(\'b\')\nconst zero = 0\nconst nothing = null\nconst markup = \'<em>raw</em>\'\nconst yes = true\nconst list = [\'x\', \'y\']\n---\nselect(value={picked()})\n  option(value="a") A\n  option(value="b") B\ndiv(innerHTML={markup})\np(data-zero={zero} data-null={nothing} aria-hidden={yes} hidden={yes} aria-busy={false}) values\ninput(type="number" value={zero})\ntextarea(value={picked()})\np {nothing}{list}{zero}{yes}\n',
   },
   'images and links': {
-    'main.kay': '---\nconst src = signal(\'/photo.png\')\nconst href = \'/docs\'\n---\nimg(src={src()} alt="Photo" width="40" height="30")\nimg(src={src()} alt="" sizes="50vw")\nimg(src="/static.png" alt="")\na(href={href}) Docs\na(href="https://example.com" rel="noopener") Out\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst src = signal(\'/photo.png\')\nconst href = \'/docs\'\n---\nimg(src={src()} alt="Photo" width="40" height="30")\nimg(src={src()} alt="" sizes="50vw")\nimg(src="/static.png" alt="")\na(href={href}) Docs\na(href="https://example.com" rel="noopener") Out\n',
   },
   'merged classes': {
-    'main.kay': '---\nimport Box from \'./box.kay\'\nimport Tagged from \'./tagged.kay\'\n\nconst active = signal(true)\nconst rest = { class: \'from-spread\', id: \'spread\' }\n---\ndiv.a(class={{ on: active(), off: !active() }})\ndiv.a(class="b" {...rest})\nBox.shorthand(class={active() ? \'yes\' : \'no\'})\nBox.shorthand({...rest})\nTagged.a({...rest} class={{ on: active() }})\nTagged.a(class={active() ? \'z\' : undefined})\nTagged({...rest} class={undefined})\nTagged({...{}} class={undefined})\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Box from \'./box.kay\'\nimport Tagged from \'./tagged.kay\'\n\nconst active = signal(true)\nconst rest = { class: \'from-spread\', id: \'spread\' }\n---\ndiv.a(class={{ on: active(), off: !active() }})\ndiv.a(class="b" {...rest})\nBox.shorthand(class={active() ? \'yes\' : \'no\'})\nBox.shorthand({...rest})\nTagged.a({...rest} class={{ on: active() }})\nTagged.a(class={active() ? \'z\' : undefined})\nTagged({...rest} class={undefined})\nTagged({...{}} class={undefined})\n',
     'tagged.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\np(title={`[${className}]`})\n',
     'box.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) box\n',
   },
   'handlers and forms': {
-    'main.kay': '---\nimport Box from \'./box.kay\'\n\nconst count = signal(0)\nconst rest = { id: \'spread\', title: \'from spread\' }\nconst extra = signal(\'wide\')\n---\ndiv(onClick={() => count.set(count() + 1)} {...rest}) clicks {count()}\nform(action={\'/save\'} {...rest})\n  input(name="q")\nform(action={\'/save\'} method="get" {...rest})\n  input(name="q")\nBox.tag(class={extra()} {...rest})\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Box from \'./box.kay\'\n\nconst count = signal(0)\nconst rest = { id: \'spread\', title: \'from spread\' }\nconst extra = signal(\'wide\')\n---\ndiv(onClick={() => count.set(count() + 1)} {...rest}) clicks {count()}\nform(action={\'/save\'} {...rest})\n  input(name="q")\nform(action={\'/save\'} method="get" {...rest})\n  input(name="q")\nBox.tag(class={extra()} {...rest})\n',
     'box.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) box\n',
   },
   'slots': {
@@ -216,19 +216,19 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
     ].join('\n'),
   },
   'untrusted spread': {
-    'main.kay': '---\nconst count = signal(0)\nconst data = { title: \'ok\', ONCLICK: \'alert(1)\', onmouseover: \'alert(1)\', \'x" onfocus="alert(1)\': 1, srcdoc: \'<script>alert(1)</script>\' }\n---\np {count()}\ndiv({...data})\niframe(title="frame" {...data})\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst data = { title: \'ok\', ONCLICK: \'alert(1)\', onmouseover: \'alert(1)\', \'x" onfocus="alert(1)\': 1, srcdoc: \'<script>alert(1)</script>\' }\n---\np {count()}\ndiv({...data})\niframe(title="frame" {...data})\n',
   },
   'leading newlines': {
-    'main.kay': '---\nconst count = signal(0)\nconst text = \'\\nfirst\'\n---\np {count()}\npre {text}\ntextarea {text}\ntextarea(value={text})\npre\n  | static\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst text = \'\\nfirst\'\n---\np {count()}\npre {text}\ntextarea {text}\ntextarea(value={text})\npre\n  | static\n',
   },
   'style values': {
-    'main.kay': '---\nconst count = signal(0)\nconst hostile = \'red;background:url(//evil/x)\'\nconst fine = \'url("data:image/png;base64,AAA") no-repeat\'\n---\np {count()}\np(style={{ color: hostile, \'background\': fine, \'width};a\': \'1px\', \'--gap\': \'2px\' }}) object\np(style:color={hostile} style:height={\'3px\'}) pairs\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst hostile = \'red;background:url(//evil/x)\'\nconst fine = \'url("data:image/png;base64,AAA") no-repeat\'\n---\np {count()}\np(style={{ color: hostile, \'background\': fine, \'width};a\': \'1px\', \'--gap\': \'2px\' }}) object\np(style:color={hostile} style:height={\'3px\'}) pairs\n',
   },
   'allowed URL schemes': {
-    'main.kay': '---\nconst count = signal(0)\nconst schemes = [\'https://a.test/\', \'mailto:a@b.test\', \'tel:+33123\', \'sms:+33123\', \'/rel\', \'rel/x\', \'?q=1\', \'#top\', \'//cdn.test/x\', \'blob:https://a.test/1\', \'ftp://a.test/f\', \'foo:bar\', \'data:image/png;base64,AAA\', \'data:image/svg+xml,<svg/>\', \'java\\tscript:alert(1)\']\n---\np {count()}\nfor scheme of schemes key={scheme}\n  a(href={scheme}) link\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst schemes = [\'https://a.test/\', \'mailto:a@b.test\', \'tel:+33123\', \'sms:+33123\', \'/rel\', \'rel/x\', \'?q=1\', \'#top\', \'//cdn.test/x\', \'blob:https://a.test/1\', \'ftp://a.test/f\', \'foo:bar\', \'data:image/png;base64,AAA\', \'data:image/svg+xml,<svg/>\', \'java\\tscript:alert(1)\']\n---\np {count()}\nfor scheme of schemes key={scheme}\n  a(href={scheme}) link\n',
   },
   'consts': {
-    'main.kay': '---\nconst cents = signal(1250)\n---\nconst price = cents() / 100\np Price {price}\nconst { a, b } = { a: 1, b: 2 }\np {a} and {b}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nconst cents = signal(1250)\n---\nconst price = cents() / 100\np Price {price}\nconst { a, b } = { a: 1, b: 2 }\np {a} and {b}\n',
   },
 }
 
