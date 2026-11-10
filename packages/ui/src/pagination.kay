@@ -89,14 +89,14 @@ const { of, page, pages, total, pageSize, offset, limit, more, url, param, sibli
 
   // Draws the content of Previous and Next in place of their words, such as an icon: `@step(direction)`, `direction` being `'previous'` or `'next'`. The labels still name the links.
   step?: Snippet<[direction: 'previous' | 'next']> | undefined
-  // For a list the app pages in the browser, with no address to change: called with the page a plain click on a link picks, or with the offset it starts at for a list paged by offset. Each link keeps its real address, so a middle click or a new tab still opens it. The page on screen stays what `page` says, which the handler sets. Passed from an island, as any handler is.
-  onPage?: ((page: number) => unknown) | undefined
+  // For a list the app pages in the browser, with no address to change: called with the page a plain click on a link picks, or with the offset it starts at for a list paged by offset, and the click event. Each link keeps its real address, so a middle click or a new tab still opens it, and a handler returning `false` lets the browser follow the link too. The page on screen is kept by the component and follows `page` when the app changes it, or is the app's alone by setting `page` in the handler. Passed from an island, as any handler is.
+  onPage?: ((page: number, event: MouseEvent) => unknown) | undefined
   // The page sizes to offer beside a `total`, a link each that sets `limitParam` and drops the page: `sizes={[10, 25, 50]}`. The size on screen is `pageSize`, which the page reads from the same parameter.
   sizes?: readonly number[] | undefined
   // The query parameter holding the page size, `limit` by default.
   limitParam?: string | undefined
-  // Called with the size a plain click on a size link picks, as `onPage` is for a page.
-  onSize?: ((size: number) => unknown) | undefined
+  // Called with the size a plain click on a size link picks and the event, as `onPage` is for a page.
+  onSize?: ((size: number, event: MouseEvent) => unknown) | undefined
   // Names the sizes for screen readers, `Rows per page` by default.
   sizeLabel?: string | undefined
   // The summary beside a `total`: a string filling `{from}`, `{to}` and `{total}`, or a function of `{ from, to, total }`.
@@ -121,8 +121,8 @@ const href = (target: number) => of ? of.href(target) : pageHref(base(), target,
 const position = () => limit === undefined ? { page: page ?? 1 } : { offset: offset ?? 0, limit }
 const steps = () => more === undefined ? undefined : openSteps(position(), more, base(), param)
 const targets = () => more === undefined ? undefined : openTargets(position(), more)
-// What a handler is given for a link, left off when there is none, so a Pagination of plain links writes nothing extra.
-const given = (target: number | undefined) => onPage && target !== undefined ? target : undefined
+// What a handler is given for a link, written on every link so the wrapper of a Pagination with a handler finds it.
+const given = (target: number | undefined) => target
 const summary = () => {
   if (total === undefined)
     return undefined
@@ -179,10 +179,9 @@ snippet body
       if sized()
         div(part="sizes" role="group" aria-label={sizeLabel})
           for size of sizes! key={size}
-            a(part="size" href={sizeHref(base(), size, limitParam, param)} data-size={onSize ? size : undefined} aria-current={size === pageSize ? 'true' : undefined}) {size}
+            a(part="size" href={sizeHref(base(), size, limitParam, param)} data-size={size} aria-current={size === pageSize ? 'true' : undefined}) {size}
 if onPage || onSize
-  // The cast keeps `kay check` from reading this static component as handing an island a function: only an island renders it with a handler.
-  PageClicks(whenPage={onPage as never} whenSize={onSize as never})
-    {body()}
+  // The island keeps the page on screen and hears the clicks, drawing this Pagination again inside itself without the handlers. Its props are not typed as this one's, and the casts keep `kay check` from reading this static component as handing an island a function: only an island renders it with a handler.
+  PageClicks(whenPage={onPage as never} whenSize={onSize as never} of={of as never} page={page as never} offset={offset as never} pages={pages as never} total={total as never} pageSize={pageSize as never} limit={limit as never} more={more as never} url={url as never} param={param} siblings={siblings} step={step as never} sizes={sizes as never} limitParam={limitParam} sizeLabel={sizeLabel} rangeLabel={rangeLabel as never} label={label} previousLabel={previousLabel} nextLabel={nextLabel} rest={rest as never})
 else
   {body()}

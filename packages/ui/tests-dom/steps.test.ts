@@ -68,4 +68,10 @@ test('with a url a clickable step stays a link: a plain click calls onSelect, a 
   links[1]!.dispatchEvent(plain)
   links[1]!.dispatchEvent(modified)
   expect([plain.defaultPrevented, modified.defaultPrevented, picks]).toEqual([true, false, ['review']])
+
+  // A handler answering `false` lets the browser follow the link.
+  const followed = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+  links[0]!.dispatchEvent(followed)
+  expect([followed.defaultPrevented, picks]).toEqual([false, ['review', 'account']])
 })

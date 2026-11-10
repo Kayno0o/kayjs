@@ -16,3 +16,5 @@ Pagination#paged(page={page()} total={rows.length} pageSize={size()} sizes={[10,
 Pagination#steps(page={page()} more={page() < 5} url="/rows" onPage={next => picks.push(`step ${next}`)})
 Pagination#offset(offset={offset()} limit={20} more url="/rows" onPage={next => { picks.push(`offset ${next}`); offset = next }})
 Pagination#plain(page={2} pages={3} url="/rows")
+Pagination#own(page={1} pages={4} url="/rows" onPage={next => picks.push(`own ${next}`)})
+Pagination#cancel(page={1} pages={4} url="/rows" onPage={next => { picks.push(`cancel ${next}`); return next === 3 ? false : undefined }})

@@ -79,7 +79,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -183,11 +183,16 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   rowHref?: ((row: Row) => string | undefined) | undefined
   // Makes each row a button, or hears the click of a link row (call `event.preventDefault()` to follow the link yourself).
   onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined
-  // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first, which `onPageChange` hears. The pager is drawn once the table runs in the browser, and `pageSizes` does nothing without a `pageSize`. Not for a `list` or a `virtual` table, which page or window their rows themselves.
+  // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first, which `onPageChange` hears. The page and a size picked from `pageSizes` are kept in the address, under `pageParam` and `limitParam`, so the server draws the page a link or a shared URL names and the pager's links open it. `pageSizes` does nothing without a `pageSize`. Not for a `list` or a `virtual` table, which page or window their rows themselves.
   pageSize?: number | undefined
-  // The sizes to offer under the rows of a table with a `pageSize`, such as `[10, 25, 50]`; the one on screen is marked.
+  // The sizes to offer under the rows of a table with a `pageSize`, such as `[10, 25, 50]`; the one on screen is marked, and one the address names is taken only when listed here.
   pageSizes?: readonly number[] | undefined
-  // Called with the page and the size after each change to either, a click on a page or a size; the page restarts at 1 when the size changes.
+  // The page on screen, from 1, which the app holds: the table then leaves the address alone and the app sets it from `onPageChange`. Left out, the table keeps the page itself, in the address.
+  page?: number | undefined
+  // The query parameters holding the page and the page size, `page` and `limit` by default, which the pager's links set.
+  pageParam?: string | undefined
+  limitParam?: string | undefined
+  // Called with the page and the size after each change to either, a click on a page or a size or a sort or a filter starting again from the first page; the page restarts at 1 when the size changes.
   onPageChange?: ((page: number, size: number) => unknown) | undefined
   // Names a row's link or button: `Open <first column's text>`.
   openRowLabel?: ((row: Row) => string) | undefined
@@ -216,7 +221,7 @@ const typed = filterParam === undefined ? signal('') : persisted(filterParam, ''
 // kay-allow once-read-prop: the extra fields are read when the table is created
 const extra = fields ?? []
 // The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
-const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam])
+const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]])
 
 for (const field of extra) {
   if (taken.has(field.key))
@@ -372,25 +377,41 @@ const endpoint = memo(() => {
   return typeof value === 'string' ? value : undefined
 })
 
-const ready = signal(false)
+// The page and the size live in the address like the sort does, read from the request on the server, unless the app holds the page itself.
+// kay-allow once-read-prop: whether the table pages is decided when it is made
+const keptPage = pageSize === undefined ? undefined : persisted(pageParam, '', { storage: 'query', history: 'push' })
+const keptSize = pageSize === undefined ? undefined : persisted(limitParam, '', { storage: 'query' })
+const pageNow = () => page ?? (Number(keptPage?.()) || 1)
 
-onMount(() => ready = true)
+const sizeNow = () => {
+  const asked = Number(keptSize?.())
 
-const pageNow = signal(1)
-const sizeNow = signal(pageSize ?? 0)
+  return asked > 0 && pageSizes?.includes(asked) ? asked : pageSize ?? 0
+}
 
-effect(() => sizeNow = pageSize ?? 0)
+let restarted = false
 
-// A sort or a filter shows the rows from their first page again, which `onPageChange` hears like a click.
+// A sort or a filter shows the rows from their first page again, which `onPageChange` hears like a click. The first run is the page loading, which keeps the page the address names.
 effect(() => {
   current()
   typed()
   fieldsNow()
 
-  if (untrack(pageNow) !== 1) {
-    pageNow = 1
-    untrack(() => onPageChange?.(1, sizeNow()))
+  if (!restarted) {
+    restarted = true
+
+    return
   }
+
+  untrack(() => {
+    if (pageNow() === 1)
+      return
+
+    if (page === undefined)
+      keptPage?.set('')
+
+    onPageChange?.(1, sizeNow())
+  })
 })
 
 // The page as one that exists, as rows leave or the size grows.
@@ -399,13 +420,18 @@ const paging = () => pageSize !== undefined && sizeNow() > 0
 const pageRows = () => paging() ? shown().slice((pageShown() - 1) * sizeNow(), pageShown() * sizeNow()) : shown()
 
 function goTo(next: number) {
-  pageNow = next
+  if (page === undefined)
+    keptPage?.set(next > 1 ? String(next) : '')
+
   onPageChange?.(next, sizeNow())
 }
 
 function resize(size: number) {
-  sizeNow = size
-  pageNow = 1
+  keptSize?.set(size === pageSize ? '' : String(size))
+
+  if (page === undefined)
+    keptPage?.set('')
+
   onPageChange?.(1, size)
 }
 
@@ -608,8 +634,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {footer(column)}
               else
                 | {column.footer ?? ''}
-  // Drawn once the table runs in the browser: the links of a pager written by the server would address a `?page=` the table never reads.
-  if paging() && !skeleton() && ready()
-    Pagination(part="pager" page={pageShown()} total={shown().length} pageSize={sizeNow()} sizes={pageSizes} onPage={goTo} onSize={resize})
+  if paging() && !skeleton()
+    Pagination(part="pager" page={pageShown()} total={shown().length} pageSize={sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={goTo} onSize={resize})
   if list
     LoadMore(list={list})

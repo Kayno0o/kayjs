@@ -1,0 +1,13 @@
+--- island
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Item {
+  id: number
+  name: string
+}
+
+const rows: Item[] = Array.from({ length: 25 }, (_, index) => ({ id: index + 1, name: `Item ${String(index + 1).padStart(2, '0')}` }))
+const columns: Column<Item>[] = [{ key: 'name', header: 'Name' }]
+---
+Table(columns={columns} rows={rows} rowKey={item => item.id} pageSize={10} pageSizes={[10, 20]})

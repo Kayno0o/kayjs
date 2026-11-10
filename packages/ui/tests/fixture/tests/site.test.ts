@@ -885,6 +885,16 @@ describe('charts', () => {
   })
 })
 
+describe('Table pageSize', () => {
+  test('the server draws the page and size the address names, the pager linking the others', async () => {
+    expect((await find('/paged-rows?page=2&limit=10', 'tbody [data-part="cellBody"]')).map(found => found.text)[0]).toBe('Item 11')
+    expect((await find('/paged-rows?page=2&limit=20', 'tbody [data-part="cellBody"]')).map(found => found.text)).toHaveLength(5)
+    expect((await find('/paged-rows?page=2', '[data-part="pager"] [data-part="range"]')).map(found => found.text)).toEqual(['11–20 of 25'])
+    expect((await find('/paged-rows?page=2', '[data-part="pager"] [data-part="page"]')).map(found => attr(found, 'href'))).toEqual(['/paged-rows', '/paged-rows?page=2', '/paged-rows?page=3'])
+    expect((await find('/paged-rows?page=3&limit=7', 'tbody [data-part="cellBody"]')).map(found => found.text)[0]).toBe('Item 21')
+  })
+})
+
 describe('Pagination', () => {
   // Each step and page of a strip, in order: its text, where it links, whether it is the current page and its rel.
   const strip = async (path: string, id: string) => (await find(path, `#${id} nav > *`)).map(found => [found.text, attr(found, 'href'), attr(found, 'aria-current'), attr(found, 'rel')])
@@ -953,10 +963,6 @@ describe('Pagination', () => {
 
   test('words the range from a string filling its placeholders', async () => {
     expect((await find('/paging', '#total-label [data-part="range"]')).map(found => found.text)).toEqual(['Rows 1 to 10 of 30'])
-  })
-
-  test('writes no handler data on plain links', async () => {
-    expect(await element('/paging', 'total')).not.toContain('data-page')
   })
 
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {

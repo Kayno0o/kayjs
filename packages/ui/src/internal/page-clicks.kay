@@ -1,15 +1,44 @@
 ---
-import { recipe } from 'kay'
+import { effect, recipe, signal } from 'kay'
+import type { Snippet } from 'kay'
+import type { PagedList } from '../pagination'
+import Pagination from '../pagination.kay'
 
 const look = recipe({ parts: { root: '' } })
 
-// The callbacks are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which a Pagination would then be on every page.
-const { whenPage, whenSize } = props<{
-  whenPage?: ((page: number) => unknown) | undefined
-  whenSize?: ((size: number) => unknown) | undefined
+// The handlers are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which a Pagination would then be on every page. The Pagination's other props arrive as they were given, and `rest` holds the attributes it takes for its nav.
+const { whenPage, whenSize, of, page, offset, rest, pages, total, pageSize, limit, more, url, param, siblings, step, sizes, limitParam, sizeLabel, rangeLabel, label, previousLabel, nextLabel } = props<{
+  whenPage?: ((page: number, event: MouseEvent) => unknown) | undefined
+  whenSize?: ((size: number, event: MouseEvent) => unknown) | undefined
+  of?: PagedList | undefined
+  page?: number | undefined
+  offset?: number | undefined
+  rest?: Record<string, unknown> | undefined
+  pages?: number | undefined
+  total?: number | undefined
+  pageSize?: number | undefined
+  limit?: number | undefined
+  more?: boolean | undefined
+  url?: string | URL | undefined
+  param?: string | undefined
+  siblings?: number | undefined
+  step?: Snippet<[direction: 'previous' | 'next']> | undefined
+  sizes?: readonly number[] | undefined
+  limitParam?: string | undefined
+  sizeLabel?: string | undefined
+  rangeLabel?: string | ((range: { from: number, to: number, total: number }) => string) | undefined
+  label?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
 }>()
 
-// A plain click on a page or size link goes to the handler; a modified or middle one is left to the browser, which opens the link's real address.
+// The page or offset the app says, which the island keeps from there: a click moves it, and a new one from the app replaces it.
+const start = () => of?.page ?? page ?? offset ?? 1
+const held = signal(start())
+
+effect(() => held = start())
+
+// A plain click on a page or size link goes to the handler; a modified or middle one is left to the browser, which opens the link's real address. A handler answering `false` lets the browser follow the link as well.
 function pick(event: MouseEvent) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
@@ -19,17 +48,27 @@ function pick(event: MouseEvent) {
   if (!link)
     return
 
-  const handler = link.dataset.size === undefined ? whenPage : whenSize
+  const size = link.dataset.size !== undefined
+  const handler = size ? whenSize : whenPage
   const value = Number(link.dataset.size ?? link.dataset.page)
 
   if (!handler || Number.isNaN(value))
     return
 
+  if (handler(value, event) === false)
+    return
+
   event.preventDefault()
-  void handler(value)
+
+  if (!size)
+    held = value
 }
+
+// The page or offset on screen goes where the Pagination was given one. Its props are a union of variants this island cannot tell apart, so each is handed over cast.
+const shownOf = () => of ? { ...of, page: held() } : undefined
+const shownPage = () => of || offset !== undefined ? undefined : held()
+const shownOffset = () => offset === undefined ? undefined : held()
 ---
-// Wraps a Pagination's navigation only when it was given a handler, so one of plain links stays static and ships no script.
 // kay-allow unreachable-click -- the click comes from a link inside, which the keyboard follows
 div(part="root" style="display: contents" onClick={pick})
-  slot
+  Pagination({...rest} of={shownOf() as never} page={shownPage() as never} offset={shownOffset() as never} pages={pages as never} total={total as never} pageSize={pageSize as never} limit={limit as never} more={more as never} url={url as never} param={param} siblings={siblings} step={step as never} sizes={sizes} limitParam={limitParam} sizeLabel={sizeLabel} rangeLabel={rangeLabel} label={label} previousLabel={previousLabel} nextLabel={nextLabel})

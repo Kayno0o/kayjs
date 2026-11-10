@@ -849,6 +849,49 @@ describe('Table with a pageSize', () => {
     expect(changes).toEqual(['3/10'])
   })
 
+  test('reads the page and the size from the address, a size only when it is one offered, and writes them there on a click', async () => {
+    visit('http://localhost/items?tag=a&page=2&limit=20')
+
+    const changes: string[] = []
+
+    mounted = await mountComponent(PagedTable, { changes })
+    expect(pagedRows(mounted.root)).toEqual(['Item 21', 'Item 22', 'Item 23', 'Item 24', 'Item 25'])
+    expect(mounted.root.querySelector('[data-part="pager"] [data-part="range"]')?.textContent).toBe('21–25 of 25')
+    expect(pagerLink(mounted.root, '1')?.getAttribute('href')).toBe('/items?tag=a&limit=20')
+    expect(changes).toEqual([])
+
+    click(pagerLink(mounted.root, '1'))
+    await settle()
+    expect(pagedRows(mounted.root)).toHaveLength(20)
+    expect(new URL(window.location.href).searchParams.get('page')).toBeNull()
+    expect(new URL(window.location.href).searchParams.get('tag')).toBe('a')
+    click(pagerLink(mounted.root, '10'))
+    await settle()
+    expect(pagedRows(mounted.root)).toHaveLength(10)
+    // The size the table starts from is the default, so it is left out of the address.
+    expect(new URL(window.location.href).searchParams.get('limit')).toBeNull()
+  })
+
+  test('takes a size the address names only when it is offered, and a page past the end as the last', async () => {
+    visit('http://localhost/items?page=9&limit=7')
+    mounted = await mountComponent(PagedTable, { changes: [] })
+    expect(pagedRows(mounted.root)).toEqual(['Item 21', 'Item 22', 'Item 23', 'Item 24', 'Item 25'])
+  })
+
+  test('with a page of the app\'s own, shows it, leaves the address alone, and reports a click for the app to set', async () => {
+    visit('http://localhost/items?page=3')
+
+    const changes: string[] = []
+
+    mounted = await mountComponent(PagedTable, { changes, page: 2 })
+    expect(pagedRows(mounted.root)[0]).toBe('Item 11')
+    click(pagerLink(mounted.root, '3'))
+    await settle()
+    expect(changes).toEqual(['3/10'])
+    expect(pagedRows(mounted.root)[0]).toBe('Item 11')
+    expect(new URL(window.location.href).searchParams.get('page')).toBe('3')
+  })
+
   test('a size link changes how many rows a page holds and starts again from the first page', async () => {
     const changes: string[] = []
 

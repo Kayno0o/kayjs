@@ -95,14 +95,49 @@ test('a list of unknown length gives the page or the offset it steps to', async 
   expect(picks).toEqual(['step 2', 'offset 20', 'offset 0'])
 })
 
+test('without the app setting page, the component keeps the page a click picked, and follows the app when it sets one', async () => {
+  const picks: string[] = []
+
+  mounted = await mountComponent(PagedList, { picks })
+
+  const current = () => [...mounted!.root.querySelectorAll('#own [aria-current="page"]')].map(found => found.textContent)
+
+  expect(current()).toEqual(['1'])
+  click(link(mounted.root, '#own [data-part="page"]', '3'))
+  await settle()
+  expect(current()).toEqual(['3'])
+  expect(link(mounted.root, '#own [data-part="step"]', 'Previous')?.getAttribute('href')).toBe('/rows?page=2')
+  click(link(mounted.root, '#own [data-part="step"]', 'Next'))
+  await settle()
+  expect(current()).toEqual(['4'])
+  expect(picks).toEqual(['own 3', 'own 4'])
+})
+
+test('a handler returning false lets the browser follow the link, and the page stays where the app has it', async () => {
+  const picks: string[] = []
+
+  mounted = await mountComponent(PagedList, { picks })
+
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+
+  link(mounted.root, '#cancel [data-part="page"]', '3')!.dispatchEvent(event)
+  await settle()
+  expect(event.defaultPrevented).toBe(false)
+  expect(picks).toEqual(['cancel 3'])
+  expect(mounted.root.querySelector('#cancel [aria-current="page"]')?.textContent).toBe('1')
+
+  const other = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+
+  link(mounted.root, '#cancel [data-part="page"]', '2')!.dispatchEvent(other)
+  expect(other.defaultPrevented).toBe(true)
+})
+
 test('links of a Pagination with no handler are left alone', async () => {
   const picks: string[] = []
 
   mounted = await mountComponent(PagedList, { picks })
 
   const plain = link(mounted.root, '#plain [data-part="page"]', '3')!
-
-  expect(plain.hasAttribute('data-page')).toBe(false)
 
   const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
 

@@ -68,7 +68,9 @@ When the page holds only a part of the rows, give `exportable` an address: the b
 
 ## Pages
 
-`pageSize` draws the rows a page at a time with a Pagination under them: a summary such as `21–40 of 134` beside the pages. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. `pageSizes` adds links that change the size, and `onPageChange(page, size)` hears each change. A table over a `list` or a `virtual` one cannot take a `pageSize`, as they page or window their rows themselves.
+`pageSize` draws the rows a page at a time with a Pagination under them: a summary such as `21–40 of 134` beside the pages. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. `pageSizes` adds links that change the size, and `onPageChange(page, size)` hears each change.
+
+The page and size are kept in the address, `?page=` and `?limit=` (`pageParam` and `limitParam` rename them), so the server draws the page a link or a shared URL names. Give `page` to hold the page yourself: the table then leaves the address alone and you set `page` from `onPageChange`. A table over a `list` or a `virtual` one cannot take a `pageSize`, as they page or window their rows themselves.
 
 ## Many rows
 

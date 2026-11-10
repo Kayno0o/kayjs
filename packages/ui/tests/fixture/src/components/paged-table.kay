@@ -7,8 +7,8 @@ interface Item {
   name: string
 }
 
-const { changes, filter } = props<{ changes: string[], filter?: boolean }>()
+const { changes, filter, page } = props<{ changes: string[], filter?: boolean, page?: number }>()
 const rows: Item[] = Array.from({ length: 25 }, (_, index) => ({ id: index + 1, name: `Item ${String(index + 1).padStart(2, '0')}` }))
 const columns: Column<Item>[] = [{ key: 'name', header: 'Name', sortValue: item => item.name, defaultDirection: 'asc' }]
 ---
-Table(columns={columns} rows={rows} rowKey={item => item.id} pageSize={10} pageSizes={[10, 20]} filter={filter ? ['name'] : undefined} onPageChange={(page, size) => changes.push(`${page}/${size}`)})
+Table(columns={columns} rows={rows} rowKey={item => item.id} pageSize={10} pageSizes={[10, 20]} page={page} filter={filter ? ['name'] : undefined} onPageChange={(page, size) => changes.push(`${page}/${size}`)})

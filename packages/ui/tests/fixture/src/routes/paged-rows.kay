@@ -1,0 +1,5 @@
+---
+import PagedRows from '../components/paged-rows.kay'
+---
+main
+  PagedRows

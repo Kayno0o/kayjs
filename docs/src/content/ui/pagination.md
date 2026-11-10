@@ -34,7 +34,9 @@ Give `total` and `pageSize` in place of `pages` and the pages follow from the ro
 
 ## In the browser
 
-A list an island pages in memory has no address to change. Give `onPage` and the links answer a click instead: a plain click calls it with the page, or with the offset for a list paged by offset, and the browser does not navigate. Each link keeps its real address, so a middle click or a new tab still opens it. The page on screen is still `page`, so the handler sets it:
+A list an island pages in memory has no address to change. Give `onPage` and the links answer a click instead: a plain click calls it with the page, or with the offset for a list paged by offset, and the event, and the browser does not navigate.
+
+Each link keeps its real address, so a middle click or a new tab still opens it, and a handler returning `false` lets the browser follow the link too. The component keeps the page on screen itself and follows `page` when you change it, so setting `page` in the handler is optional:
 
 ```kay
 ---
