@@ -231,6 +231,15 @@ describe('control flow', () => {
     expect(compileKay('for item, position of items key={item.id ?? position}\n  li {item.id}', 'test.kay', { check: true }).diagnostics).toEqual([])
   })
 
+  it('checks a static loop whose key reads the index, as a page renders it once', () => {
+    const page = '--- server\nconst items = [{ id: 1 }, { id: undefined }]\n---\nfor item, i of items key={item.id ?? i}\n  li {i}'
+    const checked = compileKay(page, 'src/routes/index.kay', { check: true })
+
+    expect(checked.diagnostics).toEqual([])
+    expect(checked.tsx).toContain('KayStaticFor(')
+    expect(checked.tsx).toContain('(void (item.id ?? i)')
+  })
+
   it('destructures a loop\'s item through a name of the row\'s own, which a browser reads as the accessor it is and a page as the item', () => {
     const source = 'for [key, value], i of entries key={key}\n  p {key}: {value}'
 
