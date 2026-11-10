@@ -320,7 +320,7 @@ export function fieldIssues(name: () => string | undefined, issue: () => string 
   return () => list().map(item => item.message)
 }
 
-// The first refusal of an item of the array a field holds, `tags.1` or `tags[1]`, which an action's handler gives a single entry of a list (a schema's own refusal comes under the field's name): shown under the list's field as its own message.
+// The first refusal of an item of the array a field holds, `tags.1` or `tags[1]`, which an action's handler gives a single entry of a list (a schema's own refusal comes under the field's name): shown under the list's field as its own message; with several refused items, the first key of the refusal wins.
 function itemRefusal(all: Record<string, string>, field: string): string | undefined {
   const key = Object.keys(all).find(name => name.startsWith(field) && ITEM.test(name.slice(field.length)))
 

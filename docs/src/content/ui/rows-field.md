@@ -22,6 +22,8 @@ Inside a Form, FormDialog or SaveForm you pass nothing: an action's refusal of a
 
 A handler's `errors` keyed `<name>_<key>.<n>` or `<name>_<key>[n]` mark that cell of row `n` (from 0), `<name>.<n>` or `<name>[n]` marks the whole row, and a schema refusal of an array column, which comes under the bare `<name>_<key>`, marks that column and shows under the first row. `size` sets the size of every box, and a `@cell` block reads it as `column.size`.
 
+Refusals are matched to rows by place, so they stay where they are shown until the next send, even if a row is removed meanwhile.
+
 A FormField around MultiSelect or a Combobox picking several shows a refusal of one item, keyed `<name>.<n>` or `<name>[n]`, as the field's own message.
 
 ## Numbers, selects and other cells
