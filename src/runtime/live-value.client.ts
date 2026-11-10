@@ -2,7 +2,7 @@ import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-
 import { withBase } from './base'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
-import { loadingIslands, pageData } from './page-data'
+import { islandsLoaded, pageData } from './page-data'
 import { isHydrating, onCleanup, ownSignal, tracking, untrack, whenHydrated } from './reactive'
 import { decodeServerValue } from './wire'
 
@@ -157,16 +157,14 @@ function settle(): void {
   settling = setTimeout(() => void syncAfterIslands(), SETTLE_MS)
 }
 
-async function loaded(): Promise<void> {
-  while (loadingIslands.length > 0)
-    await Promise.allSettled(loadingIslands.splice(0))
-}
-
 // The keys of every island hydrating as the page loads are read before the connection opens, however late their code arrives, so a page costs one connection; one that subscribes later still moves it.
 async function syncAfterIslands(): Promise<void> {
   const mine = settling
 
-  await Promise.race([loaded(), new Promise(resolve => setTimeout(resolve, ISLANDS_MS))])
+  let giveUp: ReturnType<typeof setTimeout> | undefined
+
+  await Promise.race([islandsLoaded(), new Promise(resolve => giveUp = setTimeout(resolve, ISLANDS_MS))])
+  clearTimeout(giveUp)
 
   // A key that changed meanwhile settled again, and that one syncs.
   if (settling === mine)

@@ -1,0 +1,11 @@
+---
+import Nav from '../components/nav.kay'
+import Online from '../components/online.kay'
+import RoomBadge from '../components/room-badge.kay'
+import RoomUsers from '../components/room-users.kay'
+---
+Nav
+h1 Staggered
+Online
+RoomBadge(id="green")
+RoomUsers(id="lobby")

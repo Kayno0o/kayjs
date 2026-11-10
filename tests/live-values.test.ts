@@ -548,8 +548,12 @@ const ISLAND_DELAY_MS = 400
 
 // Answers the chunk of the room island late, so it hydrates after the island beside it.
 async function delayRoomIsland(page: TestPage): Promise<void> {
-  await page.route('/_kay/room-users-*', async (request) => {
-    await Bun.sleep(ISLAND_DELAY_MS)
+  await delayChunk(page, 'room-users', ISLAND_DELAY_MS)
+}
+
+async function delayChunk(page: TestPage, chunk: string, ms: number): Promise<void> {
+  await page.route(`/_kay/${chunk}-*`, async (request) => {
+    await Bun.sleep(ms)
     await request.continue()
   })
 }
@@ -612,6 +616,22 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '77 online')
     expect(connections).toHaveLength(1)
     expect(page.errors).toEqual([])
+  })
+
+  it('opens one connection for islands that subscribe one after the other while the page waits for the last', async () => {
+    connections.length = 0
+
+    await using page = await site.open('/about')
+
+    await delayChunk(page, 'room-badge', 150)
+    await delayChunk(page, 'room-users', ISLAND_DELAY_MS)
+    await page.goto('/staggered')
+    live.room.set('green', { id: 'green', users: 3 })
+    await page.waitUntil(() => document.querySelector('p.badge')?.textContent === '3 at green')
+    await page.waitUntil(() => document.querySelector('p.users') !== null)
+    live.room.set('lobby', { id: 'lobby', users: 2 })
+    await page.waitUntil(() => document.querySelector('p.users')?.textContent === '2 in lobby')
+    expect(connections).toHaveLength(1)
   })
 
   it('carries the values of a page a link swaps in on one connection, however late its islands hydrate', async () => {

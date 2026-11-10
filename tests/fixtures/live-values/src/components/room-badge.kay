@@ -1,0 +1,6 @@
+---
+import { room } from '../live'
+
+const { id } = props<{ id: string }>()
+---
+p.badge(data-room={id}) {room(id).users} at {id}
