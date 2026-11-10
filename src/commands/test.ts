@@ -3,7 +3,7 @@ import { readFileSync, statSync } from 'node:fs'
 import process from 'node:process'
 import { mapPosition } from '../build/sourcemap'
 import { transformKay } from '../build/transform'
-import { projectRoot } from './command'
+import { asksForHelp, printDocument, projectRoot, takeFormat } from './command'
 
 // A `.kay` position in Bun's report, the path absolute.
 const KAY_POSITION = /(\/[^\s()]+\.kay):(\d+):(\d+)/g
@@ -14,18 +14,34 @@ const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
 // A watching run clears the screen itself, which only a terminal does, so it keeps the terminal.
 const WATCHING = new Set(['--watch', '--hot'])
 
+const HELP = `kay test runs bun test in the project with --isolate (each file gets its own test database) and kay/test/preload, and points the .kay positions Bun reports at the lines of the source; every argument is bun test's and its exit code is the answer.
+--format json prints one JSON document on stdout, { ok, exitCode, pass, fail, skip, tests, files }, and the report goes to stderr.
+
+bun test's own help follows.
+`
+// The totals of Bun's summary: `3 pass`, `1 fail`, `Ran 4 tests across 2 files.`
+const SUMMARY_COUNT = /^\s*(\d+) (pass|fail|skip|todo)\s*$/gm
+const SUMMARY_RAN = /Ran (\d+) tests? across (\d+) files?/
+
 // Runs `bun test` in the project with what a kay project's tests need, so nothing but a test script is written: each file in modules of its own (`--isolate`, which gives each file its own test database), `kay/test/preload` loaded, and the `.kay` positions Bun reports pointed at the lines of the source.
 export const test: Command = {
   usage: 'test [bun test arguments]...',
-  options: {},
+  options: { format: { type: 'string' } },
   positionals: Infinity,
-  // Every argument is `bun test`'s, `--watch`, `--changed` and `--help` included.
-  normalize: args => ['--', ...args],
-  run: async ({ positionals }) => {
-    const root = projectRoot('test')
+  // Every argument is `bun test`'s, `--watch`, `--changed` and `--help` included, but `--format json|text`.
+  normalize: takeFormat,
+  run: async ({ values, positionals }) => {
+    const json = values.format === 'json'
+    const root = projectRoot('test', '.', json ? 'json' : 'text')
 
     if (root === undefined)
       return 1
+
+    if (asksForHelp(positionals)) {
+      console.log(HELP)
+
+      return Bun.spawn([process.execPath, 'test', '--help'], { cwd: root, stdio: ['inherit', 'inherit', 'inherit'] }).exited
+    }
 
     const watching = positionals.some(argument => WATCHING.has(argument))
     const color = (process.stdout.isTTY || process.stderr.isTTY) && process.env.NO_COLOR === undefined && process.env.FORCE_COLOR === undefined
@@ -49,7 +65,24 @@ export const test: Command = {
       if (!watching) {
         const mapper = framesIn(root)
 
-        await Promise.all([relay(child.stdout as ReadableStream<Uint8Array>, process.stdout, mapper), relay(child.stderr as ReadableStream<Uint8Array>, process.stderr, mapper)])
+        // Under --format json stdout holds the document alone, so the report goes to stderr.
+        const report = json ? process.stderr : process.stdout
+        const seen: string[] = []
+        const tee = (line: string) => {
+          seen.push(line)
+
+          return mapper(line)
+        }
+
+        await Promise.all([relay(child.stdout as ReadableStream<Uint8Array>, report, tee), relay(child.stderr as ReadableStream<Uint8Array>, process.stderr, tee)])
+
+        if (json) {
+          const exitCode = await child.exited
+
+          printDocument(summaryOf(seen.join('\n'), exitCode))
+
+          return exitCode
+        }
       }
 
       return await child.exited
@@ -59,6 +92,20 @@ export const test: Command = {
         process.off(signal, handler)
     }
   },
+}
+
+// The totals of a finished run, read from Bun's summary lines.
+function summaryOf(report: string, exitCode: number) {
+  const counts = { pass: 0, fail: 0, skip: 0, todo: 0 }
+
+  const plain = report.replaceAll(COLOUR_CODES, '')
+
+  for (const [, count, kind] of plain.matchAll(SUMMARY_COUNT))
+    counts[kind as keyof typeof counts] = Number(count)
+
+  const [, tests, files] = SUMMARY_RAN.exec(plain) ?? []
+
+  return { ok: exitCode === 0, exitCode, ...counts, tests: Number(tests ?? 0), files: Number(files ?? 0) }
 }
 
 // Writes what a closed pipe (`kay test | head`) refuses to nowhere.

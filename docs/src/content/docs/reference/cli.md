@@ -654,6 +654,8 @@ kay lint --fix --cache       # ESLint, with the types it reads written first
 
 `kay test` runs `bun test` with every file in modules of its own and `kay/test/preload` loaded, and passes its arguments on, so `kay test --watch` and `kay test tests/cart.test.ts` work. A project needs no `bunfig.toml` for it. A failure is reported at the line of the `.kay` file. The `test` script of a new project is `kay test`.
 
+`kay test --format json` prints one JSON document, `{ ok, exitCode, pass, fail, skip, tests, files }`, with the report on stderr, and `kay lint --format json` prints ESLint's JSON. `kay lint --help` and `kay test --help` open with a line on what kay adds, then print the tool's own help.
+
 `kay fmt` keeps the `.class` shorthand while a line fits in 120 characters. When an element's classes make its line longer, it writes them as a `class` attribute inside the parentheses, over several lines when the list is long, so a long Tailwind list reads as a block.
 
 In an app whose stylesheet imports Tailwind, `kay fmt` also puts the shorthand's classes in Tailwind's order, the one the Tailwind rules of `@kaynooo/eslint` use, and keeps a class Tailwind does not know where it stands, first. When it moves the classes into a `class` attribute, the words already in that attribute are sorted with them as one list. The editor's format does the same.

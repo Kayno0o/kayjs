@@ -144,9 +144,9 @@ kay fmt --check
   - What the template cannot hold is listed on stderr as `line N: ...` and left out: an attribute JSX cannot name (`@click`, `:class`), a `lang` on `html` (set it in `kay.config.ts`), the attributes of `body` and a web component's `<slot>` (kept as a comment, as kay's `slot` renders a wrapper's children). HTML that needs an end tag it lacks (an unclosed `<p>` or `<li>`) fails with exit 1.
   - `--format json` prints `{ code, notes }` on one line. It takes no `--check` and one file at most. The docs site has the same conversion in a box ([Migrating from HTML](https://kayjs.kaynooo.fr/migrating/from-html)).
 - `kay lint [keslint arguments]...`:
-  - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
+  - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; `--help` opens with a kay line before keslint's, `--format json` is ESLint's JSON document and any other `--format` value is keslint's; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
 - `kay test [bun test arguments]...`:
-  - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer (see [Testing](testing.md)).
+  - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer, `--help` opens with a kay line before `bun test`'s, and `--format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` alone on stdout with the report on stderr (see [Testing](testing.md)).
 - `kay types [dir] [--format text|json] [--quiet]`:
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
 - `kay/compiler`, for a tool that reads `.kay` source outside kay, is in [Compiling a component](compiler-api.md).

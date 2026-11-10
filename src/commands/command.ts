@@ -17,6 +17,7 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 const COMMAND_DATA = /[%\r\n]/g
 const COMMAND_PROPERTY = /[%\r\n:,]/g
 const PORT = /^\d{1,5}$/
+const FORMAT_VALUE = /^--format=(.*)$/
 const COMMAND_WORDS = /^[a-z][\w-]*(?: [a-z][\w-]*(?= [<[-]|$))*/
 // What the console writes to stdout.
 const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
@@ -46,6 +47,7 @@ const OPTION_HELP: Record<string, string> = {
   'deny-warnings': 'fail on warnings too',
   'dir': 'the project folder',
   'dry-run': 'print what would change and write nothing',
+  'editor': 'the editors to set up, comma separated (helix, zed), or none',
   'entry': 'the server entry, when it is not the project\'s own',
   'example': 'the example file to compare with',
   'file': 'the database file',
@@ -119,8 +121,8 @@ export const SHARED_REFUSALS: Record<string, Partial<Record<SharedOption, string
   'explain': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
   'docs': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
   'types': { 'dry-run': GENERATED_ONLY },
-  'lint': { 'quiet': PASSES_ON, 'format': PASSES_ON, 'dry-run': PASSES_ON },
-  'test': { 'quiet': PASSES_ON, 'format': PASSES_ON, 'dry-run': PASSES_ON },
+  'lint': { 'quiet': PASSES_ON, 'dry-run': PASSES_ON },
+  'test': { 'quiet': PASSES_ON, 'dry-run': PASSES_ON },
   'i18n missing': { 'dry-run': READS_ONLY },
   'editor install': { quiet: LISTS_ONLY },
   'lsp': { 'quiet': PROTOCOL, 'format': PROTOCOL, 'dry-run': PROTOCOL },
@@ -327,6 +329,33 @@ export function problemCounts(problems: { severity: 'error' | 'warning' }[]): { 
   const warnings = problems.filter(problem => problem.severity === 'warning').length
 
   return { errors: problems.length - warnings, warnings }
+}
+
+// What `kay lint` and `kay test` take of `--format` before they pass every other argument on: `json` or `text` is kay's, any other value (an ESLint formatter) stays the tool's.
+export function takeFormat(args: string[]): string[] {
+  const rest: string[] = []
+  let format: string | undefined
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!
+    const separate = arg === '--format'
+    const given = separate ? args[index + 1] : FORMAT_VALUE.exec(arg)?.[1]
+
+    if (given === 'json' || given === 'text') {
+      format = given
+      index += separate ? 1 : 0
+    }
+    else {
+      rest.push(arg)
+    }
+  }
+
+  return [...format === undefined ? [] : ['--format', format], '--', ...rest]
+}
+
+// Whether the arguments ask for the tool's own help.
+export function asksForHelp(args: string[]): boolean {
+  return args.includes('--help') || args.includes('-h')
 }
 
 // A command's whole answer under `--format json`, alone on stdout and on one line.
