@@ -1710,6 +1710,37 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       }
     })
 
+    it('marks the followed link data-pending until the swap ends, one link at a time', async () => {
+      const own = await open('/watched')
+
+      try {
+        const { promise: held, resolve: release } = Promise.withResolvers<void>()
+        const pending = async () => own.evaluate(() => [...document.querySelectorAll('[data-pending]')].map(link => link.className))
+
+        await own.route(`${origin}/second`, async (request) => {
+          await held
+
+          try {
+            await request.continue()
+          }
+          catch {}
+        })
+        expect(await pending()).toEqual([])
+        await own.click('a.second')
+        await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
+        expect(await pending()).toEqual(['second'])
+        // The next link takes the mark over.
+        await own.click('a.two')
+        await own.waitFor('h1', { text: 'Watched two' })
+        release()
+        await settled(own)
+        expect(await pending()).toEqual([])
+      }
+      finally {
+        own.close()
+      }
+    })
+
     it('fires start and navigate for the page a post redirects to', async () => {
       const own = await open('/posted')
 

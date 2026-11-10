@@ -15,7 +15,7 @@ button(onClick={() => navigate('/todos')}) Todos
 
 ### Show a loader, cancel or react while a page loads
 
-`navigation` from `kay` follows the swap, so a top bar is a few lines in an island:
+kayjs-ui's `NavigationProgress` is that top bar, once in the layout ([page layout](../packages/ui/llms/page-layout-palette-and-trees.md)). `navigation` from `kay` follows the swap, so a bar of your own is a few lines in an island, and the link followed carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script:
 
 ```kay
 ---

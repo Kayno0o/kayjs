@@ -47,6 +47,7 @@ import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 import Meter from '@kaynooo/kayjs-ui/meter.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import NavigationProgress from '@kaynooo/kayjs-ui/navigation-progress.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
@@ -162,6 +163,7 @@ export const COMPONENTS = {
   'menu': Menu,
   'meter': Meter,
   'multi-select': MultiSelect,
+  'navigation-progress': NavigationProgress,
   'notice': Notice,
   'page-header': PageHeader,
   'page-section': PageSection,
@@ -260,6 +262,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'menu': { items: [{ label: 'Edit', onSelect: noop }], label: 'Actions', icon },
   'meter': { value: 3, max: 10, label: 'Disk' },
   'multi-select': { options, label: 'Planets', value: ['mars'] },
+  'navigation-progress': { pending: true },
   'notice': { children: 'Saved' },
   'page-header': { title: 'Moons', description: 'Every moon' },
   'page-section': { title: 'Moons', children: 'Phobos' },

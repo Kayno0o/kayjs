@@ -2022,6 +2022,15 @@ component default
   value?: readonly Value[] | undefined
   valueLabels?: Readonly<Record<string, string>> | undefined
 
+[./navigation-progress.kay] default
+component default
+  class?: string | undefined | { root?: string | undefined; bar?: string | undefined; }
+  delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  onHide?: (() => unknown) | undefined
+  onShow?: (() => unknown) | undefined
+  pending?: boolean | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
+
 [./notice.kay] default
 component default
   actions?: Element

@@ -1,0 +1,53 @@
+---
+import type { Duration, JSX } from 'kay'
+import { durationMs, effect, navigation, onCleanup, recipe, signal, untrack } from 'kay'
+
+// A thin bar over the top of the page, sliding while a page is fetched. It is decorative: the swap already sets `aria-busy` on `<html>`. Held still and part-filled under reduced motion, as Progress is.
+const look = recipe({
+  parts: {
+    root: 'kui-navigation-progress pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden',
+    bar: 'h-full w-2/5 animate-[kui-progress-slide_1.4s_ease-in-out_infinite] motion-reduce:animate-none',
+  },
+  // The bar's colour, `accent` by default.
+  variants: { tone: { accent: { bar: 'bg-accent' }, neutral: { bar: 'bg-foreground' }, success: { bar: 'bg-success' }, warning: { bar: 'bg-warning' }, danger: { bar: 'bg-danger' }, info: { bar: 'bg-info' } } },
+  defaults: { tone: 'accent' },
+})
+
+const { pending, delay = '150ms', onShow, onHide, tone = 'accent', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // Whether a page is on its way, left to `navigation.pending()` unless given: a bar for some other wait, or a test, sets it.
+  pending?: boolean | undefined
+  // How long a wait lasts before the bar shows, so a page that comes at once draws nothing; `150ms` by default.
+  delay?: Duration | undefined
+  // Called when the bar shows, after the delay.
+  onShow?: (() => unknown) | undefined
+  // Called when a bar that showed hides, the wait being over.
+  onHide?: (() => unknown) | undefined
+}>()
+
+const shown = signal(false)
+let timer: ReturnType<typeof setTimeout> | undefined
+
+onCleanup(() => clearTimeout(timer))
+
+effect(() => {
+  const waiting = pending ?? navigation.pending()
+
+  clearTimeout(timer)
+
+  if (waiting) {
+    timer = setTimeout(() => {
+      shown = true
+      onShow?.()
+    }, durationMs(delay))
+
+    return
+  }
+
+  if (untrack(() => shown())) {
+    shown = false
+    onHide?.()
+  }
+})
+---
+div(part="root" {...rest} aria-hidden="true" hidden={!shown()} data-tone={tone})
+  div(part="bar")

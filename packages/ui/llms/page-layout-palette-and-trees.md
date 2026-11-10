@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-### PageHeader, PageSection, CollapsibleSection, Accordion, Widget, CardRow, SidePanel, Toolbar, SplitLayout
+### PageHeader, PageSection, CollapsibleSection, Accordion, Widget, CardRow, SidePanel, Toolbar, SplitLayout, NavigationProgress
 
 ```kay
 PageSection(title="Moons")
@@ -35,6 +35,7 @@ PageSection(title="Moons")
   - Below `md`, `detailOpen` shows the detail pane in the list's place.
   - `resizableList` adds a handle on the list's right edge, a `separator` dragged with the pointer or moved 20px at a time with the arrow keys, between 180px and 560px. `listWidthKey` keeps the width in a `persisted` cookie of that name, written when a drag or key press settles, which the server reads: the page is drawn at the kept width from the first paint, 260px otherwise. A width an earlier version kept in `localStorage` under the same key moves to the cookie once.
   - It renders inside an island, since its panes are blocks and its handle has handlers.
+- `NavigationProgress`: a thin bar fixed over the top of the page while the next page is fetched, once in the layout with no props: it follows `navigation.pending()`, shows after `delay` (`150ms` by default, so a page that comes at once draws nothing) and hides when the page is in place. `pending` replaces `navigation.pending()`, `tone` colours the bar (`accent` default), `onShow()` and `onHide()` hear it, and the parts are `root` and `bar`. It is `aria-hidden`, the swap's `aria-busy` on `<html>` being what screen readers hear, and the slide stops under `prefers-reduced-motion`. The link a visit follows carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script.
 
 ### CommandPalette
 

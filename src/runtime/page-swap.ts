@@ -82,6 +82,15 @@ function joins(url: URL, swap: Swap): boolean {
   return (swap.intent === 'visit' || swap.intent === 'query') && flight.intent === swap.intent && flight.href === url.href && flight.replace === swap.replace && flight.scroll === swap.scroll && flight.transition === swap.transition
 }
 
+// The link a visit follows carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script; one swap holds it at a time.
+let pendingLink: Element | undefined
+
+function markPending(link: Element | undefined): void {
+  pendingLink?.removeAttribute('data-pending')
+  pendingLink = link
+  link?.setAttribute('data-pending', '')
+}
+
 async function swapTo(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
 
@@ -143,7 +152,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   const navigating = swap.intent !== 'refresh'
 
   if (navigating)
-    began(url)
+    began(url, swap.link)
 
   try {
     let page: FetchedPage
@@ -224,6 +233,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   finally {
     if (isCurrent()) {
       document.documentElement.removeAttribute('aria-busy')
+      markPending(undefined)
       // The swap is over, shown or given up: nothing is owed.
       inFlight.owed = undefined
 
@@ -237,8 +247,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   }
 }
 
-// Tells the app a swap to another page began: the `loading` state and `kay:navigate-start` on `document`.
-function began(url: URL): void {
+// Tells the app a swap to another page began: the `loading` state and `kay:navigate-start` on `document`, and the link followed marked pending.
+function began(url: URL, link: Element | undefined): void {
+  markPending(link)
   navigation.phase?.('loading', url)
   document.dispatchEvent(new CustomEvent('kay:navigate-start', { detail: { url: url.href } }))
 }

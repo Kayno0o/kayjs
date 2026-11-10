@@ -1,0 +1,11 @@
+---
+import { signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import NavigationProgress from '@kaynooo/kayjs-ui/navigation-progress.kay'
+
+const waiting = signal(false)
+---
+.relative.h-16.overflow-hidden.rounded-lg.border.border-border.p-4
+  // In an app it sits in the layout with no props, following the page swap; here `pending` stands for one and `absolute` keeps it inside the box.
+  NavigationProgress(pending={waiting()} delay="0ms" class="absolute")
+  Button(label={waiting() ? 'Stop' : 'Start a wait'} onClick={() => waiting = !waiting()})
