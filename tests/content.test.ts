@@ -132,6 +132,69 @@ describe('the content mode', () => {
   })
 })
 
+// A few lines of nested anchors, each level naming the one before nine times.
+function aliasBomb(levels: number): string {
+  const lines = ['a0: &a0 [x, x]']
+
+  for (let level = 1; level < levels; level++)
+    lines.push(`a${level}: &a${level} [${Array.from<string>({ length: 9 }).fill(`*a${level - 1}`).join(', ')}]`)
+
+  return lines.join('\n')
+}
+
+describe('YAML anchors and aliases in an entry', () => {
+  async function problemsOf(files: Record<string, string>): Promise<string> {
+    const root = await mkdtemp(join(tmpdir(), 'kay-content-alias-'))
+    const before = contentPlace()
+
+    try {
+      await Promise.all(Object.entries(files).map(async ([name, text]) => Bun.write(join(root, name), text)))
+      setContentPlace(root, root)
+
+      await loadEntries('posts', { live: true })
+
+      return ''
+    }
+    catch (error) {
+      return (error as Error).message
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+
+  it('refuses a bomb in a markdown entry\'s frontmatter, and in a data entry, as an entry problem', async () => {
+    const started = performance.now()
+    const message = await problemsOf({ 'posts/a.md': `---\ntitle: A\n${aliasBomb(9)}\n---\n\nbody\n`, 'posts/b.yaml': `title: B\n${aliasBomb(6)}\n` })
+
+    expect(message).toContain('posts/a.md')
+    expect(message).toContain('posts/b.yaml')
+    expect(message).toContain('anchors and aliases expand')
+    expect(performance.now() - started).toBeLessThan(5000)
+  })
+
+  it('keeps an entry that shares a few values, merge keys included', async () => {
+    const message = await problemsOf({ 'posts/a.md': '---\ntitle: A\nbase: &base\n  color: red\n  size: 2\nfirst:\n  <<: *base\n  size: 3\nsecond: *base\nlist: [*base, *base]\n---\n\nbody\n' })
+
+    expect(message).toBe('')
+  })
+
+  it('refuses a merge key that spreads a bomb', async () => {
+    const message = await problemsOf({ 'posts/a.md': `---\ntitle: A\n${aliasBomb(5)}\nwide: &wide {p: *a4, q: *a4, r: *a4, s: *a4, t: *a4, u: *a4}\nspread:\n  <<: *wide\n  v: *a4\n---\n\nbody\n` })
+
+    expect(message).toContain('anchors and aliases expand')
+  })
+
+  it('says what a self-referencing alias is, at its line', async () => {
+    const message = await problemsOf({ 'posts/a.md': '---\ntitle: A\nnode: &loop\n  again: *loop\n---\n\nbody\n' })
+
+    expect(message).toContain('posts/a.md')
+    expect(message).toContain('points at a node that contains it')
+    expect(message).not.toContain('cyclic')
+  })
+})
+
 describe('the compile cache of entries', () => {
   it('keeps one file per entry however often it changes, drops the files of earlier versions, and compiles again only what changed', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-content-cache-'))

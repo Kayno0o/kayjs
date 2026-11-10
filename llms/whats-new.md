@@ -22,6 +22,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([components](components.md#effects-and-lifecycle)).
 - A `required` FormField and `describeField({ required })` write the native `required` as well as `aria-required`, server-rendered, and RadioGroup, Segmented, Rating, Checkbox, Toggle and ChipGroup take a typed `required` ([FormField](../packages/ui/llms/forms-and-steps.md)).
 
+- A request an API route's or an endpoint file's guards refuse now counts against its `rateLimit`, and over the limit gets 429 in place of the refusal, so a password is no longer guessed at full speed; `basicAuth` also limits wrong credentials per client, 10 every 5 minutes, with its own `rateLimit` option (`false` turns it off) ([rate limits](rate-limits.md), [API routes](api-routes.md)).
+- `localePath()`, `localize()` and `alternate()` collapse a leading `//` or `/\` of the path they get, so a language switcher on a path the visitor typed never links to another site ([locales](locales.md)).
+- A YAML anchor bomb or an alias pointing at its own node in an entry's frontmatter or data file is refused as an entry problem, instead of exhausting memory at build ([content](content.md)).
+
 ## 1.95.0
 
 - A page opens its one live connection once the islands it hydrates as it loads have all subscribed, however late their code arrives, instead of a second one when an island is slow ([live values](live-values.md)).

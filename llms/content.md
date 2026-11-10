@@ -190,7 +190,7 @@ div(innerHTML={markdownHtml(text())})
 
 ### Collections
 
-A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema.
+A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema. YAML anchors and aliases and merge keys work, but one that expands to more than 100,000 extra values, or points at a node containing it, is an entry problem naming the file.
 
 The project declares its collections in `src/content.config.ts`, or the module `contentConfig` names in kay.config.ts, each folder relative to that module:
 

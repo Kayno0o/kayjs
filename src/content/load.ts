@@ -618,12 +618,61 @@ function parseJson(text: string): unknown {
 
 // `line` is the file's line the text starts on, which the error is named at, moved down to the top-level field that fails on its own.
 function parseYaml(text: string, line: number): unknown {
+  let value: unknown
+
   try {
-    return Bun.YAML.parse(text)
+    value = Bun.YAML.parse(text)
   }
   catch (error) {
     throw new MarkdownError(`the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`, line + failingField(text))
   }
+
+  checkAliases(value, line)
+
+  return value
+}
+
+// The values the aliases of one YAML text may add on top of what it writes out.
+const MOST_ALIASED_VALUES = 100_000
+
+// Bun.YAML hands an aliased node back shared, so a few lines of nested anchors parse at once and then expand to gigabytes once the entry is written out as JSON. A shared node is sized once and each later reference to it counts as the values it adds.
+function checkAliases(value: unknown, line: number): void {
+  const sizes = new Map<object, number>()
+  const open = new Set<object>()
+  let added = 0
+
+  const size = (node: unknown): number => {
+    if (typeof node !== 'object' || node === null)
+      return 1
+
+    const known = sizes.get(node)
+
+    if (known !== undefined) {
+      added += known
+
+      if (added > MOST_ALIASED_VALUES)
+        throw new MarkdownError(`the YAML anchors and aliases expand to more than ${MOST_ALIASED_VALUES} extra values; write the repeated part out instead of aliasing it`, line)
+
+      return known
+    }
+
+    if (open.has(node))
+      throw new MarkdownError('an alias in the YAML points at a node that contains it, which no entry can hold', line)
+
+    open.add(node)
+
+    let total = 1
+
+    for (const child of Object.values(node))
+      total += size(child)
+
+    open.delete(node)
+    sizes.set(node, total)
+
+    return total
+  }
+
+  size(value)
 }
 
 // Bun.YAML names no position, so the first top-level field that does not parse alone is the one blamed: its line within the text, 0 when each parses alone and only together they fail.
