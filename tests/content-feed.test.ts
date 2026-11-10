@@ -30,6 +30,16 @@ describe('a feed that implies what the collection holds', () => {
     expect(() => item(entry('c', { date: new Date() }))).toThrow('no `title`')
   })
 
+  it('describes an item by its own description, else by the entry\'s excerpt, else by nothing', () => {
+    const posts = collection({ name: 'described', load: () => [] }, { schema, route: '/d/:slug', feed: { path: '/a.xml' } })
+    const item = defaultFeedItem(posts)
+    const date = new Date('2026-01-01')
+
+    expect(item({ ...entry('a', { title: 'A', date, description: 'Mine' }), excerpt: 'Lead.' }).description).toBe('Mine')
+    expect(item({ ...entry('b', { title: 'B', date }), excerpt: 'Lead.' }).description).toBe('Lead.')
+    expect(item(entry('c', { title: 'C', date })).description).toBeUndefined()
+  })
+
   it('writes the modified time, the body, the categories and the image in each format, links under the mount point', () => {
     const entries = [entry('a', { title: 'A', date: new Date('2026-01-01') }, '/blog/a')]
     const feed = { path: '/blog/rss.xml', title: 'Blog', content: true, item: () => ({ title: 'A <b>', path: '/blog/a', date: new Date('2026-01-01'), updated: new Date('2026-01-03'), categories: ['x & y'], image: '/img/a.webp', author: 'Me' }) }

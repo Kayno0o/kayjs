@@ -359,6 +359,8 @@ await site.content.reset({
 
 A loaded collection's seed is kept in memory. Its `load`, `get` and `count` read it, and its `save` and `remove`, where it has them, change it. Your database or API is never touched.
 
+To test a component that takes an entry as a prop with no site behind it, `testEntry(data, members?)` from `kay/test` builds one with every member filled in, and `members` sets the ones the test cares about, such as `slug` or `excerpt`.
+
 ## Reading the log
 
 `site.logs` lists what the server logged since the test began, in order: the messages kay and libraries wrote, those your code writes with `logFrom`, and the request lines when your `log` option logs them. It is emptied before each test of a site made at the top of a file.

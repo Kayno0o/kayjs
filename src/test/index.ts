@@ -64,6 +64,7 @@ import { assertKayWritable } from './writable'
 
 export { browse, browserPath } from './browser'
 export type { ContentSeed, SeedEntry, TestContent } from './content'
+export { testEntry } from './content'
 export type { CookieJar } from './cookies'
 export { cookieJar } from './cookies'
 export type { Interactions } from './interact'

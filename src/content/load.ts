@@ -2,6 +2,7 @@ import type { Mode } from '../project'
 import type { LinkedImage } from './images'
 import type { CompiledMarkdown, Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
 import type { ContentProblem } from './validate'
+import { readFileSync } from 'node:fs'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -52,6 +53,7 @@ const ENTRY_FILES = new Bun.Glob('**/*.{md,json,yaml,yml}')
 const EXTENSION = /\.(?:md|json|ya?ml)$/
 const INDEX = /(?:^|\/)index$/
 const BACKSLASH = /\\/g
+const MANIFEST_EXTENSION = /\.json$/
 const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)+/
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
@@ -220,6 +222,37 @@ export async function loadEntries(dir: string, { live = false, ...markdown }: Lo
 
 export function manifestFile(base: string, dir: string): string {
   return join(base, CONTENT_DIR, `${dir.replace(BACKSLASH, '/').replaceAll('/', '~')}.json`)
+}
+
+// The Markdown bodies of a collection's entries by file, which the build writes beside its manifest so the server holds none until an entry's `body` is read.
+export function bodiesFile(base: string, dir: string): string {
+  return manifestFile(base, dir).replace(MANIFEST_EXTENSION, '.bodies.json')
+}
+
+const builtBodies = new Map<string, Record<string, string>>()
+
+// The body of a prebuilt entry, read synchronously (from the executable's embedded files too) and kept once for its collection; undefined when no build holds it.
+export function builtBody(dir: string, file: string): string | undefined {
+  const base = projectSource().contentBuild(rootOf(), contentMode().prebuilt, output)
+
+  if (base === undefined)
+    return undefined
+
+  const path = bodiesFile(base, dir)
+  let bodies = builtBodies.get(path)
+
+  if (bodies === undefined) {
+    try {
+      bodies = JSON.parse(readFileSync(path, 'utf8')) as Record<string, string>
+    }
+    catch {
+      bodies = {}
+    }
+
+    builtBodies.set(path, bodies)
+  }
+
+  return bodies[file]
 }
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {

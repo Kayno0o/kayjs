@@ -23,7 +23,7 @@ import { entryPath } from './entry-route'
 import { excerptOf } from './excerpt'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
-import { contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
+import { builtBody, contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
 import { countWords, MarkdownError, problemMessage, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
@@ -64,8 +64,8 @@ export interface Entry<Data> {
   Content: Component
   // The first paragraph of a Markdown entry's body as plain text, or all its paragraphs before a `<!-- more -->` marker; empty for a data file or a body with no paragraph. A marker in a loader's untrusted body is lost to the sanitizer, so it gives its first paragraph. Worked out on first read.
   readonly excerpt: string
-  // A Markdown entry's body as written, frontmatter left out; empty for a data file and for an entry a loader gave as `html`.
-  body: string
+  // A Markdown entry's body as written, frontmatter left out; empty for a data file and for an entry a loader gave as `html`. A built server reads it from a file of its own when first asked, so an app that never reads it holds none.
+  readonly body: string
   // What `Content` renders, as a string, components included, for an RSS item, a search index or a JSON API; empty for a data file. Rendered on first read.
   readonly html: string
   // The file, relative to the project root; a loaded entry's collection name and slug, `posts/hello`.
@@ -268,7 +268,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     const { readingSpeed, imageSizes } = markdownOf(options)
 
     try {
-      return withUrls(name, decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes)), routePattern)
+      return withUrls(name, decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized, readingSpeed, imageSizes, typeof source === 'string' ? source : undefined)), routePattern)
     }
     catch (error) {
       throw typeof source === 'string' ? withMigrationHint(error, migrations) : error
@@ -686,12 +686,12 @@ function noteTranslationUrls<Data>(found: Entry<Data>, paired: Map<string, Map<s
   ;(state.entryUrls ??= new Map()).set(found.url, urls)
 }
 
-function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined): Entry<Data> {
+function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined, dir: string | undefined): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')
   const words = entry.words ?? 0
 
-  const made: Omit<Entry<Data>, 'excerpt' | 'html'> = {
+  const made: Omit<Entry<Data>, 'excerpt' | 'html' | 'body'> = {
     ...localized && { locale: entry.slug.slice(0, split) },
     slug: localized ? entry.slug.slice(split + 1) : entry.slug,
     data,
@@ -699,7 +699,6 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     words,
     readingTime: words === 0 ? 0 : Math.max(1, Math.round(words / readingSpeed)),
     Content: () => render(segments, components, entry.file, imageSizes),
-    body: entry.body ?? '',
     file: entry.file,
     ...entry.modified !== undefined && { modified: new Date(entry.modified) },
   }
@@ -707,6 +706,8 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
   // Not enumerable, so spreading an entry or listing its keys renders nothing.
   return Object.defineProperties(made, {
     excerpt: { get: memo(() => excerptOf(segments)) },
+    // A prebuilt folder's bodies are in a file of their own, which a server that never reads one never opens.
+    body: { get: memo(() => entry.body ?? (dir === undefined ? undefined : builtBody(dir, entry.file)) ?? '') },
     html: { get: memo(() => render(segments, components, entry.file, imageSizes).t) },
   }) as Entry<Data>
 }

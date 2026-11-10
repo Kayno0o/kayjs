@@ -97,7 +97,7 @@ export function defaultFeedItem(dates: { options: { publishAt?: string | undefin
     const tags = [data.tags, data.categories].find(Array.isArray)
     const categories = tags?.filter((tag): tag is string => typeof tag === 'string')
 
-    return { title, date, ...updated && { updated }, description: text(data.description), author: text(data.author), ...categories && categories.length > 0 && { categories }, image: text(data.image) ?? text(data.cover) }
+    return { title, date, ...updated && { updated }, description: text(data.description) ?? text(entry.excerpt), author: text(data.author), ...categories && categories.length > 0 && { categories }, image: text(data.image) ?? text(data.cover) }
   }
 }
 

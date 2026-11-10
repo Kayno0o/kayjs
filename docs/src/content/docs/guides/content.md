@@ -44,7 +44,11 @@ An entry has `slug`, `data`, `headings` for a table of contents, and `Content`, 
 
 Entries marked as drafts show in development only. That means under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 
-An entry also has `excerpt`, its first paragraph as plain text, or every paragraph before a `<!-- more -->` line you write to mark the end of the lead. It has `body`, the Markdown as written without its frontmatter, and `html`, what `Content` renders, as a string for a feed, a search index or an API. A paragraph inside a component, a quote or a list item is not in the excerpt. The excerpt and `html` are worked out the first time you read them, so entries you never read them on cost nothing.
+An entry also has `excerpt`, its first paragraph as plain text, or every paragraph before a `<!-- more -->` line you write to mark the end of the lead.
+
+It also has `body`, the Markdown as written without its frontmatter, and `html`, what `Content` renders, as a string for a feed, a search index or an API.
+
+A paragraph inside a component, a quote (nested ones too) or a list item is not in the excerpt. The excerpt, `body` and `html` are worked out the first time you read them, so entries you never read them on cost nothing: a built server keeps the bodies in a file of its own and opens it only when one is read.
 
 An entry also has `words` and `readingTime`, counted from the text the page shows. `readingTime` is in minutes, at 230 words a minute (`markdown.readingSpeed` in `kay.config.ts` changes it), and never less than 1 for a body with words.
 
@@ -346,7 +350,7 @@ export const posts = collection('content/posts', {
 })
 ```
 
-With a `route` on the collection, `item`, `title` and `path` in the items can all be left out: the feed links each entry's `url`, takes the title from the collection's `title` option, and reads each item's `title`, `description`, `author`, `tags`, `image` and date from the entry's fields. See [Entry URLs](#entry-urls).
+With a `route` on the collection, `item`, `title` and `path` in the items can all be left out: the feed links each entry's `url`, takes the title from the collection's `title` option, and reads each item's `title`, `description` (the entry's excerpt when it has none), `author`, `tags`, `image` and date from the entry's fields. See [Entry URLs](#entry-urls).
 
 ```ts
 export const posts = collection('content/posts', {

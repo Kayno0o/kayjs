@@ -1,16 +1,20 @@
+import type { Collection } from '../src/content'
 import type { PreviewState } from '../src/runtime/preview'
 import { mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { collection } from '../src/content'
 import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
-import { contentPlace, setContentPlace } from '../src/content/load'
+import { bodiesFile, contentPlace, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import { writeContentManifests } from '../src/content/server'
 import { html } from '../src/runtime/html'
 import { setPreviewScope } from '../src/runtime/preview'
+import { testEntry } from '../src/test'
+import { scratchBuild } from './prerendered'
 
 const schema = t.Object({ title: t.String(), description: t.Optional(t.String()), updatedAt: t.Optional(t.Date()) })
 
@@ -56,8 +60,9 @@ describe('an entry\'s excerpt', () => {
     expect(await excerptOf('')).toBe('')
   })
 
-  it('leaves the paragraphs of a quote or a loose list out', async () => {
+  it('leaves the paragraphs of a quote or a loose list out, nested quotes too', async () => {
     expect(await excerptOf('> quoted\n\nOne.\n')).toBe('One.')
+    expect(await excerptOf('> outer\n>\n> > inner\n>\n> back in the outer one\n\nOne.\n')).toBe('One.')
     expect(await excerptOf('- a\n\n- b\n\nOne.\n')).toBe('One.')
   })
 
@@ -201,5 +206,45 @@ describe('modified: \'mtime\' and \'git\'', () => {
     const loaded = collection({ name: 'plain-rows', load: () => [{ slug: 'a', data: { title: 'A' } }] }, { schema, modified: 'mtime' })
 
     expect((await loaded.get('a'))!.modified).toBeUndefined()
+  })
+})
+
+describe('the prebuilt manifest', () => {
+  it('keeps the Markdown bodies in a file of their own, read when an entry\'s body is', async () => {
+    const root = resolve('tests/fixtures/content')
+    const config = 'src/content.config.ts'
+    const build = await scratchBuild({ contentConfig: config }, false, root)
+
+    try {
+      await writeContentManifests(root, build.dir, config)
+
+      const manifest = await Bun.file(manifestFile(build.dir, 'content/posts')).json() as { file: string, body?: string }[]
+      const bodies = await Bun.file(bodiesFile(build.dir, 'content/posts')).json() as Record<string, string>
+
+      expect(manifest.length).toBeGreaterThan(0)
+      expect(manifest.some(entry => 'body' in entry)).toBe(false)
+      expect(Object.keys(bodies).sort()).toEqual(manifest.map(entry => entry.file).sort())
+
+      setContentMode({ dev: false, prebuilt: true }, build.dir)
+
+      const { posts } = await import(resolve(root, config)) as { posts: Collection<unknown> }
+      const hello = (await posts.get('hello'))!
+
+      expect(hello.body).toBe(bodies[hello.file]!)
+      expect(hello.body.length).toBeGreaterThan(0)
+    }
+    finally {
+      setContentMode({ dev: false, prebuilt: false })
+      await build.remove()
+    }
+  })
+})
+
+describe('testEntry', () => {
+  it('fills every member of an entry a component takes, and lets a test set the ones it names', () => {
+    const entry = testEntry({ title: 'T' }, { slug: 'hi', excerpt: 'Lead.' })
+
+    expect(entry).toMatchObject({ slug: 'hi', data: { title: 'T' }, excerpt: 'Lead.', body: '', html: '', headings: [], words: 0, readingTime: 0, file: 'hi.md' })
+    expect(testEntry({}).slug).toBe('entry')
   })
 })

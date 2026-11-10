@@ -1,4 +1,4 @@
-import type { Collection, ContentLoader, LoadedEntry } from '../content'
+import type { Collection, ContentLoader, Entry, LoadedEntry } from '../content'
 import { existsSync } from 'node:fs'
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
@@ -6,6 +6,7 @@ import { KayError } from '../compiler/errors'
 import { entrySource } from '../content'
 import { contentPlace, redirectFolders } from '../content/load'
 import { namedCollections } from '../content/server'
+import { html } from '../runtime/html'
 import { scratchDir } from './scratch'
 
 // An entry a test puts in a collection: a loaded collection's `slug` is the one its loader gives (`fr/launch` in a localized collection), here split into `locale` and `slug`.
@@ -334,4 +335,11 @@ export async function testContent(root: string, config: string | undefined): Pro
       }
     },
   }
+}
+
+// An entry as a component takes it as a prop, for a test of a component with no collection behind it: every member filled, the ones a test names set as it gives them.
+export function testEntry<Data>(data: Data, members: Partial<Omit<Entry<Data>, 'data'>> = {}): Entry<Data> {
+  const slug = members.slug ?? 'entry'
+
+  return { slug, data, headings: [], words: 0, readingTime: 0, Content: () => html(''), excerpt: '', body: '', html: '', file: `${slug}.md`, ...members }
 }

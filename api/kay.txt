@@ -4125,6 +4125,9 @@ interface TestContent
   seed: (name: string, entries: SeedEntry[]) => Promise<void>
   write: (name: string, file: string, text: string) => Promise<void>
 
+[./test] testEntry
+function testEntry<Data>(data: Data, members?: Partial<Omit<Entry<Data>, "data">>): Entry<Data>
+
 [./test] TestOptions
 interface TestOptions extends PagesOptions
   actions?: ActionsConfig | undefined

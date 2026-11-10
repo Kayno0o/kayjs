@@ -132,7 +132,7 @@ describe('a page that matches its collection\'s route', () => {
     expect(text('rss')).toContain('<category>x</category><category>y</category>')
     expect(text('rss')).toContain('<enclosure url="https://x.example/site/a.png" length="0" type="image/png"/>')
     expect(text('rss')).toContain('<lastBuildDate>Mon, 05 Jan 2026 00:00:00 GMT</lastBuildDate>')
-    expect(text('atom')).toContain('<updated>2026-01-05T00:00:00.000Z</updated><published>2026-01-01T00:00:00.000Z</published><content type="html">')
+    expect(text('atom')).toContain('<updated>2026-01-05T00:00:00.000Z</updated><published>2026-01-01T00:00:00.000Z</published><summary>body link</summary><content type="html">')
 
     const json = JSON.parse(text('json')) as { version: string, items: Record<string, unknown>[] }
 

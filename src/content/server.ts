@@ -28,7 +28,7 @@ import { modifiedMode } from './drafts'
 import { entries, registerCollections } from './edit'
 import { defaultFeedItem, FEED_TYPES, feedDocument, feedItem, feedPaths, renderedBody, resolvedFeed } from './feed'
 import { isCollection } from './index'
-import { contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
+import { bodiesFile, contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
 import { referencesIn } from './references'
 import { ContentError, decodeEntries } from './validate'
@@ -143,7 +143,11 @@ export async function writeContentManifests(root: string, clientBase: string, co
       throw withMigrationHint(error, collection.options.migrations)
     }
 
-    await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
+    // The Markdown bodies go in a file of their own, read only when an entry's `body` is.
+    const bodies = Object.fromEntries(entries.flatMap(entry => entry.body === undefined ? [] : [[entry.file, entry.body]]))
+
+    await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries.map(({ body: _body, ...rest }) => rest)))
+    await Bun.write(bodiesFile(clientBase, collection.dir), JSON.stringify(bodies))
     count += entries.length
   }
 
