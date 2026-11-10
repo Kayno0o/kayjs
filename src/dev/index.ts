@@ -418,10 +418,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       await types.write()
     }
   }
-  // A start failing part way stops what it started, and gives the terminal its lines back, before the error goes on.
+  // A start failing part way stops what it started, and gives the terminal its lines back, before the error goes on: the start's own error, even should the stop fail too.
   catch (error) {
     verified.resolve()
-    await stop()
+    await Promise.allSettled([stop()])
 
     throw error
   }
