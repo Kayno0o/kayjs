@@ -220,4 +220,22 @@ describe('the postgres loader\'s watch', () => {
     expect((await posts.all()).map(post => post.data.title)).toEqual(['Edited'])
     expect(reads).toBe(2)
   })
+
+  postgresTest('a save, a move and a removal each notify the channel the other processes listen on', async () => {
+    admin ??= new SQL(Object.assign(new URL(url), { pathname: '/postgres' }).href)
+    sql ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 2 })
+
+    const heard: string[] = []
+    const listener = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 1 })
+    const registration = await listener.listen('kay_wake', payload => void heard.push(payload))
+    const loader = pgLoader({ name: 'notified', source: sql, table: 'notified', watch: false })
+
+    await loader.save!({ slug: 'a', data: { title: 'A' } })
+    await loader.saveMany!([{ slug: 'a', data: { title: 'B' } }])
+    await loader.remove!({ slug: 'a' })
+    await until(() => heard.length >= 3)
+    expect(heard).toEqual(['cms\nnotified', 'cms\nnotified', 'cms\nnotified'])
+    await registration.unlisten()
+    await listener.close()
+  })
 })

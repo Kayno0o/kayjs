@@ -1,9 +1,10 @@
 import type { SQL } from 'bun'
 import type { ContentLoader, LoadedEntry } from 'kay/content'
+import type { Subscription } from 'kay/library'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { ContentChangedError, contentKey } from 'kay/content'
-import { appDatabase, configError, durationSeconds, invalidateLocally, onKeysInvalidated, outsideRequest } from 'kay/library'
+import { appDatabase, configError, delayAfter, durationSeconds, invalidateLocally, LISTENED_IDLE_MS, onKeysInvalidated, outsideRequest, pollClock } from 'kay/library'
 import { log } from '../log'
 
 // Where a SQLite loader keeps its table when the app's store names no SQLite file.
@@ -62,7 +63,7 @@ export interface LoaderOptions {
   table?: string | undefined
   // How long the entries are served before the next read refreshes them, as `collection()` loaders keep them.
   ttl?: ContentLoader['ttl']
-  // How often the loader looks for a change another process or a hand edit made, so this process serves it without a restart or a `ttl`: `'1s'` for SQLite and `'2s'` for Postgres by default, `false` to look no more. A save made here is not looked for again.
+  // How often the loader looks for a change another process or a hand edit made, so this process serves it without a restart or a `ttl`: `'1s'` for SQLite and `'2s'` for Postgres by default, `false` to look no more. A quiet collection is looked at less often, up to every 5 s, or every 30 s on Postgres once its notifications arrive, which also wake a look at once for a save of another process. A save made here is not looked for again.
   watch?: ContentLoader['ttl'] | false | undefined
 }
 
@@ -168,49 +169,104 @@ export function scopeOf(database: string | object): string {
 const running = new Map<string, () => void>()
 
 // Looks at a `signature` of what the database holds for the collection every `watch` interval, and drops the collection's entries when it changed, as a save made here does, so every process serving it follows the others' saves and a hand edit. Each process finds a change by itself, so the drop is not broadcast; one a save here or a broadcast from another process already dropped is taken as known, not found again. `force` asks for a reading even where the database says nothing moved. `scope` tells databases apart that hold collections of one name.
-export function watcher(name: string, scope: string, watch: LoaderOptions['watch'], fallback: string, signature: (force: boolean) => string | Promise<string>): Watcher {
+export function watcher(name: string, scope: string, watch: LoaderOptions['watch'], fallback: string, signature: (force: boolean) => string | Promise<string>, listen?: (wake: () => void) => Promise<Subscription>): Watcher {
   const every = watch === false ? undefined : Math.min(MAX_INTERVAL_MS, Math.ceil(durationSeconds(watch ?? fallback, `the loader ${name}'s watch`) * 1000))
   const id = `${scope}\u0000${name}`
   let known: string | undefined
-  let timer: ReturnType<typeof setInterval> | undefined
+  let started = false
+  let stopped = false
+  let timer: unknown
   let looking = false
+  let again = false
+  // Looks that found nothing in a row, which spread the next ones out.
+  let quiet = 0
+  let subscription: Subscription | undefined
   // Moves with each `settle`, so a look that began before one does not overwrite what it stored.
   let epoch = 0
   // True while this watcher's own drop runs, which its listener must not take for a save.
   let dropping = false
 
-  const look = async () => {
+  const arm = (ms: number) => {
+    pollClock.clearTimeout(timer)
+    timer = outsideRequest(() => pollClock.setTimeout(() => void look(), ms))
+  }
+
+  // Looks again after the base interval, or later while nothing changes: a database that notifies every write only needs a slow look for a notification lost on the way.
+  const rearm = () => {
+    if (every === undefined || stopped)
+      return
+
+    const idle = delayAfter(every, quiet, subscription?.delivering() === true ? LISTENED_IDLE_MS : undefined)
+
+    arm(Math.max(every, idle))
+  }
+
+  // Whether the database held something new, or a save of this process moved the state meanwhile.
+  const compare = async (): Promise<boolean> => {
+    const before = epoch
+    const now = await signature(false)
+
+    if (before !== epoch)
+      return true
+
+    if (now === known)
+      return false
+
+    known = now
+    dropping = true
+
+    try {
+      invalidateLocally(contentKey(name))
+    }
+    finally {
+      dropping = false
+    }
+
+    return true
+  }
+
+  async function look(): Promise<void> {
     if (looking)
       return
 
     looking = true
 
+    let moved = false
+
     try {
-      const before = epoch
-      const now = await signature(false)
-
-      if (before === epoch && now !== known) {
-        known = now
-        dropping = true
-
-        try {
-          invalidateLocally(contentKey(name))
-        }
-        finally {
-          dropping = false
-        }
-      }
+      moved = await compare()
     }
     catch {
-      // The next interval looks again; a database that is down fails the entries' own reads loudly.
+      // The next look tries again; a database that is down fails the entries' own reads loudly.
     }
     finally {
       looking = false
     }
+
+    quiet = moved ? 0 : quiet + 1
+
+    // A wake came while this look ran, which may have read before the write.
+    if (again) {
+      again = false
+      hurry(0)
+    }
+    else {
+      rearm()
+    }
+  }
+
+  // Back to the base rate, the next look at most `ms` away.
+  function hurry(ms: number): void {
+    quiet = 0
+
+    if (looking)
+      again = true
+    else if (started && !stopped)
+      arm(ms)
   }
 
   const settle = async () => {
-    if (timer === undefined)
+    if (!started)
       return
 
     epoch++
@@ -221,19 +277,33 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
     catch {
       // The next look finds the difference, if any, and drops the entries once more.
     }
+
+    if (every !== undefined)
+      hurry(every)
   }
 
   return {
     start: async () => {
-      if (every === undefined || timer !== undefined)
+      if (every === undefined || started)
         return
 
-      known = await signature(true)
-      running.get(id)?.()
-      timer = outsideRequest(() => setInterval(() => void look(), every))
-      timer.unref()
+      started = true
 
-      const mine = timer
+      try {
+        subscription = await listen?.(() => hurry(0))
+        known = await signature(true)
+      }
+      catch (error) {
+        started = false
+        void subscription?.stop()
+        subscription = undefined
+
+        throw error
+      }
+
+      running.get(id)?.()
+      rearm()
+
       // A drop of the collection's own entries made elsewhere, a save here or one another process broadcast, already shows in the database: the next look must not report it again.
       const stopHearing = onKeysInvalidated((_, dropped) => {
         if (!dropping && dropped(contentKey(name)))
@@ -243,8 +313,10 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
       })
 
       running.set(id, () => {
-        clearInterval(mine)
+        stopped = true
+        pollClock.clearTimeout(timer)
         stopHearing()
+        void subscription?.stop()
       })
     },
     settle,

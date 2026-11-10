@@ -2,6 +2,7 @@ import type { ContentLoader } from 'kay/content'
 import type { PgSource } from 'kay/library'
 import type { CmsSeedEntry, LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
+import { hear, wakeOf } from 'kay/library'
 import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { CmsSeedEntry, LoaderOptions }
@@ -57,7 +58,19 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
     }
 
     return fingerprint
-  })
+  }, async wake => hear(clientOf(sqlOf()), 'cms', name, wake))
+
+  // Tells the other processes watching the collection to look now, instead of at their next slow look; a failure is only a later look.
+  const settled = async (client: Runner) => {
+    try {
+      await client.unsafe('SELECT pg_notify($1, $2)', [...wakeOf('cms', name)])
+    }
+    catch {
+      // The watchers' fallback look finds the write.
+    }
+
+    await watching.settle()
+  }
 
   const open = async (): Promise<SQL> => {
     const client = clientOf(sqlOf())
@@ -138,8 +151,10 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
       return row === undefined ? undefined : loadedOf(row)
     },
     save: async (entry) => {
-      await upsert(await database(), entry, entry.create === true)
-      await watching.settle()
+      const sql = await database()
+
+      await upsert(sql, entry, entry.create === true)
+      await settled(sql)
     },
     saveMany: async (entries) => {
       const sql = await database()
@@ -149,13 +164,13 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
         for (const entry of entries.toSorted((a, b) => placeOf(a) < placeOf(b) ? -1 : 1))
           await upsert(tx, entry, false)
       })
-      await watching.settle()
+      await settled(sql)
     },
     remove: async (entry) => {
       const sql = await database()
 
       await sql.unsafe(`DELETE FROM ${table} WHERE collection = $1 AND place = $2`, [name, placeOf(entry)])
-      await watching.settle()
+      await settled(sql)
     },
   }
 }
