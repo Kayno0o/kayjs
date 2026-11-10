@@ -666,11 +666,16 @@ describe('optimistic changes of calls in flight', () => {
 })
 
 describe('keepalive', () => {
+  const sizes: number[] = []
+
   function keepaliveSent(): (boolean | undefined)[] {
     const sent: (boolean | undefined)[] = []
 
+    sizes.length = 0
+
     mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => {
       sent.push(init?.keepalive)
+      sizes.push(new TextEncoder().encode(init?.body as string).byteLength)
 
       return new Response(stringify('ok'), { headers: { 'content-type': 'application/json' } })
     }) as unknown as typeof fetch))
@@ -694,5 +699,15 @@ describe('keepalive', () => {
     await stub({ text: 'x'.repeat(64 * 1024) }, { keepalive: true })
     await stub({ text: 'é'.repeat(40 * 1024) }, { keepalive: true })
     expect(sent).toEqual([undefined, undefined])
+  })
+
+  it('stays on for a body of exactly 64 KB', async () => {
+    const sent = keepaliveSent()
+    const stub = actionStub('/_kay/action/keep') as unknown as Call
+
+    await stub({ text: '' }, { keepalive: true })
+    await stub({ text: 'x'.repeat(64 * 1024 - sizes[0]!) }, { keepalive: true })
+    expect(sizes[1]).toBe(64 * 1024)
+    expect(sent).toEqual([true, true])
   })
 })

@@ -135,6 +135,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
     await using saver = await site.open('/keepalive')
 
+    // Records what each post asked of fetch, which survives the navigation.
+    await saver.evaluate(() => {
+      const original = window.fetch.bind(window)
+
+      window.fetch = async (input, init) => {
+        if (init?.method === 'POST') {
+          const seen = JSON.parse(sessionStorage.getItem('keepalive') ?? '[]') as boolean[]
+
+          seen.push(init.keepalive === true)
+          sessionStorage.setItem('keepalive', JSON.stringify(seen))
+        }
+
+        return original(input, init)
+      }
+    })
     await saver.click('button.big')
     await saver.waitFor('p.big-saved', { text: String(70 * 1024) })
     expect(kept()).toContain(`long:${70 * 1024}`)
@@ -144,6 +159,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     await saver.waitUntil(() => location.pathname === '/')
     await Bun.sleep(300)
     expect(kept()).toContain('short')
+    // The big body went without keepalive, the short one from pagehide with it.
+    expect(await saver.evaluate(() => JSON.parse(sessionStorage.getItem('keepalive') ?? '[]') as boolean[])).toEqual([false, true])
     expect(saver.errors).toEqual([])
   })
 
