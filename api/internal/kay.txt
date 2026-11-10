@@ -906,6 +906,9 @@ function defineContext<Loaders extends Record<string, (request: Request) => unkn
   [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>;
 }>
 
+[./library] delayAfter
+function delayAfter(every: number, quiet: number, ceiling?: number): number
+
 [./library] dismissMissing
 function dismissMissing(path: string, file?: string | undefined): Promise<boolean>
 function dismissMissing(paths: readonly string[], file?: string | undefined): Promise<number>
@@ -964,6 +967,9 @@ interface FetchPublicOptions
 
 [./library] GENERATE_SECRET
 const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
+
+[./library] hear
+function hear(db: SQL, kind: string, name: string | undefined, wake: () => void): Promise<Subscription>
 
 [./library] Highlighter
 type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
@@ -1114,6 +1120,9 @@ interface LimiterOptions
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
+[./library] LISTENED_IDLE_MS
+const LISTENED_IDLE_MS: 30000
+
 [./library] localizedEntry
 function localizedEntry(root: string, config: Pick<KayConfig, "contentConfig" | "i18n">, collection: string, slug: string): Promise<LocalizedEntry>
 
@@ -1150,6 +1159,9 @@ interface MaintenanceOptions
 
 [./library] matchLocale
 function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
+
+[./library] MAX_IDLE_MS
+const MAX_IDLE_MS: 5000
 
 [./library] MaybePromise
 type MaybePromise<T> = T | Promise<T>
@@ -1212,6 +1224,9 @@ function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, sig
 
 [./library] PgSource
 type PgSource = SQL | { sql: SQL } | string
+
+[./library] pollClock
+const pollClock: { now: () => number; setTimeout(run: () => void, ms: number): unknown; clearTimeout(timer: unknown): void; }
 
 [./library] PresenceView
 type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
@@ -1310,6 +1325,11 @@ function sourceHash(text: string): string
 [./library] stoppers
 function stoppers(request: Request): Pick<RequestContext<Record<string, string>, object>, "deny" | "notFound" | "redirect">
 
+[./library] Subscription
+interface Subscription
+  delivering: () => boolean
+  stop: () => Promise<void>
+
 [./library] ToolResult
 interface ToolResult
   content: Content[]
@@ -1351,6 +1371,9 @@ function validLocale(tag: string): boolean
 
 [./library] viewPresenceWith
 function viewPresenceWith(next: PresenceView): () => void
+
+[./library] wakeOf
+function wakeOf(kind: string, name?: string | undefined): [channel: string, payload: string]
 
 [./library] weakSecrets
 function weakSecrets(secrets: string[]): boolean
@@ -1461,7 +1484,8 @@ const AUTH_MAIL_ENGLISH: {
   readonly 'token-created': { ...#94575c89 (5 lines)
   readonly 'signed-out-everywhere': { ...#c9455c2f (5 lines)
   readonly 'account-deleted': { ...#594d411e (5 lines)
-  readonly 'organization-handed-over': { ...#b0df7a7f (6 lines)
+  readonly 'organization-handed-over': { ...#82946754 (5 lines)
+  readonly 'impersonation-started': { ...#ba72e400 (6 lines)
 
 [./library/auth-mails] AUTH_MAIL_FRENCH
 const AUTH_MAIL_FRENCH: {
@@ -1554,7 +1578,8 @@ const AUTH_MAIL_FRENCH: {
   readonly 'token-created': { ...#fecb3eed (5 lines)
   readonly 'signed-out-everywhere': { ...#e9a57f47 (5 lines)
   readonly 'account-deleted': { ...#396e5e90 (5 lines)
-  readonly 'organization-handed-over': { ...#89b11890 (6 lines)
+  readonly 'organization-handed-over': { ...#53ce3d04 (5 lines)
+  readonly 'impersonation-started': { ...#7f3bea99 (6 lines)
 
 [./library/auth-mails] AUTH_MAIL_SAMPLES
 const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "code" | "detail" | "url">>>
@@ -1563,7 +1588,7 @@ const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "code"
 const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
 
 [./library/auth-mails] AUTH_NOTICE_KINDS
-const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "account-deleted", "organization-handed-over"]
+const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "account-deleted", "organization-handed-over", "impersonation-started"]
 
 [./library/auth-mails] AuthLinkKind
 type AuthLinkKind = typeof AUTH_LINK_KINDS[number]

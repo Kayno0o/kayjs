@@ -56,7 +56,9 @@ export interface SignedIn {
   // Set when a passkey signed in, which counts as two factors for `twoFactor.require`.
   passkey?: boolean
   // The admin's own sign-in while they act as this user, put back when they stop.
-  impersonator?: Omit<SignedIn, 'impersonator'>
+  impersonator?: Omit<SignedIn, 'impersonator' | 'until'>
+  // When an impersonation ends whatever the activity, in milliseconds since the epoch.
+  until?: number
 }
 
 // An OAuth app registered at a provider: `{ provider: discordProvider(), clientId, clientSecret }`.

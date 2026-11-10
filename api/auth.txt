@@ -1,10 +1,10 @@
 [.] AcceptResult
 type AcceptResult<Role extends string = string> = {
   ok: true, membership: Membership<Role>
-} | AuthFailed<'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>
+} | AuthFailed<'signed-out' | 'impersonating' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>
 
 [.] ActivityEvent
-type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
+type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
 [.] AdminAuditLogResult
 type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | AuthFailed<'forbidden' | 'two-factor-required'>
@@ -789,7 +789,7 @@ interface ConsentFields
 [.] CreateOrganizationResult
 type CreateOrganizationResult<Role extends string = string> = {
   ok: true, membership: Membership<Role>
-} | AuthFailed<'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>
+} | AuthFailed<'signed-out' | 'impersonating' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>
 
 [.] CreateTokenResult
 type CreateTokenResult = { ok: true, token: string, id: string } | AuthFailed<ProofFailure | TokenProblem>
@@ -927,7 +927,7 @@ const defaultTemplates: Templates
 type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
 
 [.] DeleteOrganizationResult
-type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationFailure | 'impersonating'>
+type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationWriteFailure>
 
 [.] DeleteResult
 type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'refused'>
@@ -1094,7 +1094,7 @@ interface InvitationRecord
 [.] InviteResult
 type InviteResult<Role extends string = string> = {
   ok: true, invitation: Invitation<Role>
-} | AuthFailed<OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>
+} | AuthFailed<OrganizationWriteFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>
 
 [.] IssueTokenResult
 type IssueTokenResult = { ok: true, token: string, id: string } | AuthFailed<TokenProblem | 'token' | 'not-found' | 'banned'>
@@ -1180,7 +1180,7 @@ interface MemberRecord
   userId: string
 
 [.] MemberResult
-type MemberResult = { ok: true } | AuthFailed<OrganizationFailure | 'unknown-role' | 'last-owner'>
+type MemberResult = { ok: true } | AuthFailed<OrganizationWriteFailure | 'unknown-role' | 'last-owner'>
 
 [.] Membership
 interface Membership<Role extends string = string>
@@ -1365,6 +1365,9 @@ interface OrganizationsOptions<OrgRole extends string, Role extends string>
   owner: NoInfer<OrgRole>
   param?: string | undefined
   roles: Record<OrgRole, NoInfer<OrgRole>[]>
+
+[.] OrganizationWriteFailure
+type OrganizationWriteFailure = OrganizationFailure | 'impersonating'
 
 [.] OwnOptions
 interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions
@@ -1620,7 +1623,7 @@ type RegisterResult = {
 } | AuthRejected<RegisterErrors> | AuthFailed<'limited' | 'captcha' | 'off'>
 
 [.] RejectInvitationResult
-type RejectInvitationResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
+type RejectInvitationResult = { ok: true } | AuthFailed<'signed-out' | 'impersonating' | 'not-found'>
 
 [.] RenamePasskeyResult
 type RenamePasskeyResult = { ok: true } | AuthFailed<'signed-out' | 'not-found' | 'invalid-name'>
@@ -1645,7 +1648,7 @@ type ResetPasswordResult = LinkResult | AuthRejected<{ password: PasswordProblem
 type RevokeGrantResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 [.] RevokeInvitationResult
-type RevokeInvitationResult = { ok: true } | AuthFailed<OrganizationFailure>
+type RevokeInvitationResult = { ok: true } | AuthFailed<OrganizationWriteFailure>
 
 [.] RevokePasskeyResult
 type RevokePasskeyResult = { ok: true } | AuthFailed<ProofFailure | 'not-found' | 'last-way-in'>
@@ -1780,7 +1783,7 @@ type UnlinkResult = { ok: true } | AuthFailed<ProofFailure | 'not-linked' | 'las
 type UpdateLocaleResult = { ok: true } | AuthFailed<'signed-out' | 'invalid-locale'>
 
 [.] UpdateOrganizationResult
-type UpdateOrganizationResult = { ok: true, organization: Organization } | AuthFailed<OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'>
+type UpdateOrganizationResult = { ok: true, organization: Organization } | AuthFailed<OrganizationWriteFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'>
 
 [.] User
 interface User<Data extends object = Record<string, unknown>> extends BareUser<Data>

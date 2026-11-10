@@ -10,8 +10,11 @@ import { auditEntries, report } from './events'
 import { failed } from './failure'
 import { provedLately } from './proof'
 import { lacksTwoFactor } from './requiredTwoFactor'
+import { securityNotice } from './securityNotice'
 import { openSession, revokeBearerTokens } from './sessions'
 
+// An impersonation ends this long after it starts, however busy it is.
+const IMPERSONATION_MAX_AGE_MS = 30 * 60_000
 const USER_PAGE_MAX = 200
 const BAN_REASON_MAX_LENGTH = 500
 
@@ -287,7 +290,7 @@ export async function adminAuditLog(state: RequestState, query: { userId?: strin
 
 export type ImpersonateResult = { ok: true } | AuthFailed<AdminFailure | 'stale' | 'self' | 'admin' | 'banned'>
 
-// Signs this browser in as `userId`, the admin's own sign-in kept for `admin.stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
+// Signs this browser in as `userId`, the admin's own sign-in kept for `admin.stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, nothing is written to the user's organizations, another admin cannot be impersonated, it ends after 30 minutes, and the user is mailed.
 export async function impersonate(state: RequestState, userId: string): Promise<ImpersonateResult> {
   const acting = await changingAdmin(state)
   const own = await state.session.get('auth')
@@ -314,12 +317,12 @@ export async function impersonate(state: RequestState, userId: string): Promise<
   await state.session.unset('authChallenge')
   await state.session.regenerate()
 
-  const session = await openSession(state.core, record, state.address, state.userAgent)
+  const session = await openSession(state.core, record, state.address, state.userAgent, IMPERSONATION_MAX_AGE_MS / 1000)
 
   // Signed in at 0, so nothing asking for a recent sign-in passes.
-  await state.session.set('auth', { user: record.id, version: record.sessionVersion, at: 0, session, impersonator: own })
+  await state.session.set('auth', { user: record.id, version: record.sessionVersion, at: 0, session, impersonator: own, until: Date.now() + IMPERSONATION_MAX_AGE_MS })
   state.adopt(record)
-  await report(state, record, 'impersonation-started', undefined, actor)
+  await securityNotice(state, record, 'impersonation-started', undefined, undefined, actor)
 
   return { ok: true }
 }

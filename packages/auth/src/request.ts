@@ -627,10 +627,13 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return live?.record ?? null
   }
 
-  // Whether the admin behind an impersonation still is one, signed in as themselves; true when there is none.
+  // Whether the admin behind an impersonation still is one, signed in as themselves, within its fixed lifetime; true when there is none.
   private async genuine(signedIn: SignedIn): Promise<boolean> {
     if (!signedIn.impersonator)
       return true
+
+    if (signedIn.until !== undefined && Date.now() >= signedIn.until)
+      return false
 
     const actor = await this.core.store.users.get(signedIn.impersonator.user)
 

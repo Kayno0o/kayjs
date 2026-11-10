@@ -561,7 +561,7 @@ if (found.ok) {
 
 It can keep the account: return `false`, or throw `refuse('Ada has open orders', { status: 409 })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
 
-- `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves.
+- `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves. The user is mailed that an admin signed in as them, the impersonation ends after 30 minutes whatever the activity, and while it lasts every write to the user's organizations is refused with `impersonating`.
 - `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.

@@ -27,7 +27,7 @@ export type { AuthMailer, AuthMailMessage, MailContent, MailData, MailingSubscri
 export * from './memoryStore'
 export * from './oauth'
 export type { LinkProviderResult, OAuthFailure } from './oauth/flow'
-export type { AcceptResult, AuthMember, CreateOrganizationResult, DeleteOrganizationResult, Invitation, InviteResult, ListInvitationsResult, ListMembersResult, MemberResult, Membership, Organization, OrganizationFailure, OrganizationsOptions, RejectInvitationResult, RevokeInvitationResult, UpdateOrganizationResult } from './organizations'
+export type { AcceptResult, AuthMember, CreateOrganizationResult, DeleteOrganizationResult, Invitation, InviteResult, ListInvitationsResult, ListMembersResult, MemberResult, Membership, Organization, OrganizationFailure, OrganizationsOptions, OrganizationWriteFailure, RejectInvitationResult, RevokeInvitationResult, UpdateOrganizationResult } from './organizations'
 export type { AuthHooks, OwnOptions, PresetApp, StoreUrl } from './own'
 export { auth } from './pages'
 export type { AuthExtensionOptions, AuthFeatures, AuthModule, AuthPages, AuthPagesConfig, AuthPagesOptions, PluginOf, ProfileField, ProfileFieldView, ProfileOptions, ProfileProblem } from './pages'

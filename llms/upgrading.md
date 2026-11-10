@@ -10,6 +10,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### An `Entry` has `excerpt`, `body` and `html`
 
 An `Entry` literal in an app's tests, passed to a component as a prop, is a type error without them: build it with `testEntry(data, members?)` from `kay/test`, which fills every member and takes the ones a test names.
+### An impersonating admin is held to 30 minutes, and mails the user
+
+- kayjs-auth: every organization write (`create`, `update`, `invite`, `revokeInvitation`, `acceptInvitation`, `rejectInvitation`, `setMemberRoles`, `removeMember`, `leave`, `delete`) answers `impersonating` while an admin acts as the user, so an `admin.impersonate` flow that edited organizations is refused, and a `switch` on the failure code now sees the new one (`OrganizationWriteFailure`).
+- `impersonation-started` is now a notice kind (`SecurityEvent`) mailed to the user: an app with its own `templates`, or a mailer switching on `mail.kind` exhaustively, handles it or falls back to the built-in. An impersonation ends after 30 minutes, signing the browser out.
 
 ### A Menu entry's `danger` and a toast's `type` are gone
 

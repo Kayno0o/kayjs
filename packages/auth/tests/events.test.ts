@@ -255,7 +255,6 @@ describe('impersonation', () => {
     await store.users.update(admin.id, { roles: ['admin'] })
     await ada.call('organizations.create', { name: 'Acme' })
     await root.call('admin.impersonate', user.id)
-    await root.call('organizations.create', { name: 'Support' })
     await root.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
     await root.call('admin.stopImpersonating')
 
@@ -264,14 +263,13 @@ describe('impersonation', () => {
     expect(heard).toEqual([
       ['organization-created', 'ada@example.com', null],
       ['impersonation-started', 'ada@example.com', 'root@example.com'],
-      ['organization-created', 'ada@example.com', 'root@example.com'],
       ['signed-out-everywhere', 'ada@example.com', 'root@example.com'],
       ['impersonation-ended', 'ada@example.com', 'root@example.com'],
     ])
 
-    const logged = (await store.audit!.list({ userId: user.id, limit: 50 })).filter(entry => entry.event === 'organization-created').map(entry => entry.actorId)
+    const logged = (await store.audit!.list({ userId: user.id, limit: 50 })).filter(entry => entry.event === 'signed-out-everywhere').map(entry => entry.actorId)
 
-    expect(logged.sort()).toEqual([admin.id, null].sort())
+    expect(logged).toEqual([admin.id])
   })
 
   test('an admin acting as a user neither deletes their organizations nor downloads their data', async () => {

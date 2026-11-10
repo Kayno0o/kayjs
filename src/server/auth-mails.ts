@@ -4,7 +4,7 @@ import type { Duration } from '../runtime/duration'
 
 // A link to follow or a code to type, then news of a change to the account.
 export const AUTH_LINK_KINDS = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists'] as const
-export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over'] as const
+export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over', 'impersonation-started'] as const
 
 export type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
 export type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
@@ -50,6 +50,7 @@ export const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData,
   'signed-out-everywhere': {},
   'account-deleted': {},
   'organization-handed-over': { detail: 'Acme' },
+  'impersonation-started': {},
 }
 
 // A link's lines: `lasts` is how long it works when kayjs-auth sends no figure, empty to leave it unsaid.
@@ -106,6 +107,7 @@ export const AUTH_MAIL_ENGLISH = {
   'signed-out-everywhere': { subject: 'Signed out everywhere on {site}', lead: 'Your {site} account was signed out everywhere: every session and access token it had has ended.', ending: NOT_YOU },
   'account-deleted': { subject: 'Account deleted on {site}', lead: 'Your {site} account was deleted.', ending: CONTACT_SITE },
   'organization-handed-over': { subject: 'You own an organization on {site}', lead: 'You are now an owner of {detail} on {site}: its only owner\'s account was deleted.', ending: CONTACT_SITE },
+  'impersonation-started': { subject: 'An administrator signed in as you on {site}', lead: 'An administrator of {site} signed in as you for up to 30 minutes, to help with your account. They cannot change your organizations or your sign-in methods meanwhile.', ending: CONTACT_SITE },
 } as const satisfies AuthMailWording
 
 const NOT_YOU_FR = 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.'
@@ -144,6 +146,7 @@ export const AUTH_MAIL_FRENCH = {
   'signed-out-everywhere': { subject: 'Déconnexion partout sur {site}', lead: 'Votre compte {site} a été déconnecté partout : toutes ses sessions et tous ses jetons d\'accès ont pris fin.', ending: NOT_YOU_FR },
   'account-deleted': { subject: 'Compte supprimé sur {site}', lead: 'Votre compte {site} a été supprimé.', ending: CONTACT_SITE_FR },
   'organization-handed-over': { subject: 'Vous dirigez une organisation sur {site}', lead: 'Vous êtes désormais propriétaire de {detail} sur {site} : le compte de son seul propriétaire a été supprimé.', ending: CONTACT_SITE_FR },
+  'impersonation-started': { subject: 'Un administrateur s\'est connecté en tant que vous sur {site}', lead: 'Un administrateur de {site} s\'est connecté en tant que vous pour 30 minutes au plus, afin de vous aider avec votre compte. Il ne peut modifier ni vos organisations ni vos moyens de connexion pendant ce temps.', ending: CONTACT_SITE_FR },
 } as const satisfies AuthMailWording
 
 // The wording by language, the ones kayjs-auth and kayjs-mail ship.
