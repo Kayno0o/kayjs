@@ -70,6 +70,12 @@ The conversation of a `remember` chat is what the visitor wrote, so tell them.
 
 Every SQLite file kay creates is readable by the server's user alone.
 
+## Third parties the browser contacts
+
+kayjs-ui's `MapView` draws its map from tiles that the visitor's browser fetches from OpenStreetMap's server, `tile.openstreetmap.org`, which the OpenStreetMap Foundation runs. That server sees each visitor's address and which part of the map they look at.
+
+A page with a map therefore belongs in your privacy notice, with OpenStreetMap named as a recipient. To avoid the transfer, point `tiles` at a provider you have an agreement with or at a tile server of your own (see [Tiles in MapView](/ui/map-view#tiles)).
+
 ## Erasing a person
 
 Delete the app's own rows, then what kay keeps for them.

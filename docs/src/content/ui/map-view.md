@@ -40,6 +40,14 @@ MapView(label="Route" markers={stops} onMarkerClick={(stop, index) => selected =
 
 `tiles` is the tile layer's URL template and `attribution` the credit shown in the corner, OpenStreetMap's by default. Set the two together, and `maxZoom` to what the tiles reach. The map follows a change to any of them.
 
+The default tiles are OpenStreetMap's public server, which each visitor's browser contacts, so it sees their address. To use your own tile server, or a provider you have an agreement with, give its template, with `{z}`, `{x}` and `{y}` for the tile:
+
+```kay
+MapView(label="Our offices" markers={offices} tiles="https://tiles.example.com/{z}/{x}/{y}.png" attribution="Map data from Example Tiles" maxZoom={18})
+```
+
+The attribution is HTML, so it can link to the source and to the licence the tiles ask you to credit. Once the tiles come from your own host, the visitor's browser contacts no third party for the map.
+
 Raster tiles are drawn light, so while the map's colour scheme is dark, whether from the system or a `data-theme` around it, a filter darkens them. `--map-tiles-dark` replaces that filter, and `none` keeps the tiles light. A tile set of its own for dark goes in `darkTiles`, drawn in place of `tiles` with no filter and credited with `darkAttribution`, the `attribution` by default.
 
 ## Look and screen readers

@@ -145,6 +145,10 @@ export async function archive(scan: File) {
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteSessions`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteSessions`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
 
+### Third parties the browser contacts
+
+- kayjs-ui `MapView` loads its tiles from OpenStreetMap's server (`tile.openstreetmap.org`, run by the OpenStreetMap Foundation) by default, so each visitor's address and the tiles asked for reach it, and the notice names it. `tiles` and `attribution` point the map at a provider the app has an agreement with or at a tile server of its own: [MapView tiles](../packages/ui/llms/charts.md).
+
 ### Stored files
 
 - `files.put` tells a JPEG, PNG, WebP, AVIF or HEIC by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped (an AVIF or HEIC has its non-picture items and boxes blanked in place); any other format is stored as it came, and a JPEG, PNG, WebP, AVIF or HEIC it cannot read through is refused with `image-invalid` unless `keepMetadata` is set.
