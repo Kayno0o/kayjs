@@ -55,4 +55,3 @@ export const mail = mailer({
 ## Reference
 
 - Types: `EventSecrets`, `Suppression`, `StoredSuppression` (what a `SuppressionStore` keeps, `suppressedAt` in milliseconds), `SuppressionReason`, `MailReply`, `ReplyAttachment`.
-- Not understood yet: Amazon SES (SNS notifications need the signing certificate fetched).
