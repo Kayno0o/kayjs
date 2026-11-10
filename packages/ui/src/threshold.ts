@@ -10,7 +10,7 @@ export interface Threshold {
 const FILLS: Record<Tone, string> = { neutral: 'bg-muted', accent: 'bg-accent', success: 'bg-success', warning: 'bg-warning', danger: 'bg-danger', info: 'bg-info' }
 
 export function thresholdTone(thresholds: Threshold[] | undefined, value: number): Tone | undefined {
-  return thresholds?.toSorted((a, b) => a.upTo - b.upTo).find(step => value <= step.upTo)?.tone
+  return (thresholds && [...thresholds].sort((a, b) => a.upTo - b.upTo))?.find(step => value <= step.upTo)?.tone
 }
 
 export function fillOf(tone: Tone | undefined): string {
