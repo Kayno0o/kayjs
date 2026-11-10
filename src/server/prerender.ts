@@ -27,7 +27,6 @@ import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readMan
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { guardRequirement } from './guard-requirement'
-
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
@@ -158,6 +157,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const { source, mounts, routes, endpoints, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   const dir = join(output, PRERENDERED_DIR)
+  const required = guardRequirement(config.requireGuards, routes, endpoints, await projectApi(root, config))
 
   options.routes?.push(...routes)
   countStandInReads(STAND_IN_READS)
@@ -205,7 +205,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const inferred = pageSetting(module, 'prerender') === undefined && prerender !== undefined
 
     if (options.exportAll)
-      refuseServerOnly(route, module, guardRequirement(config.requireGuards, routes, endpoints))
+      refuseServerOnly(route, module, required)
 
     // A static export takes a page without params as it is, and so does a page holding a server island: what is not one is the same for everyone.
     const listed = (options.exportAll === true || marked || auto) && prerender === undefined && route.params.length === 0 ? true : prerender
@@ -252,7 +252,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
       const refusal: { read?: RequestReadError } = {}
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged(refusal) }, prerendering: true, awaits, guarded: guardedPage(route, guardRequirement(config.requireGuards, routes, endpoints)) })
+      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged(refusal) }, prerendering: true, awaits, guarded: guardedPage(route, required) })
       const inLocale = async (awaits?: AwaitNote[]) => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), async () => render(awaits))
       // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
       // Taken in the order the pages are judged in, as rendering one at a time took them.
@@ -430,7 +430,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (response.status === 200 && !auto) {
           const noindex = chainSetting(chain, 'noindex') === true
-          const indexed = config.search === true && !noindex && !guardedPage(route, guardRequirement(config.requireGuards, routes, endpoints))
+          const indexed = config.search === true && !noindex && !guardedPage(route, required)
 
           const sitemap = pageSetting(module, 'sitemap')
 
@@ -540,7 +540,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     kayLog('warn', message(paths[0]!, paths.length > 1 ? ` and ${paths.length - 1} more page${paths.length > 2 ? 's' : ''}` : ''))
 
   const apiProblems: ExportProblem[] = options.exportAll ? (await projectApi(root, config)).map(module => ({ code: 'export-api-module', message: `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file` })) : []
-  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), guardRequirement(config.requireGuards, routes, endpoints))).problems : []
+  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), required)).problems : []
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
@@ -552,8 +552,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const dictionary = options.exportAll || config.serve?.compressionDictionary === false || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
 
   await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyles > 0 && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
-  client.pages = new Map(Object.entries(pages))
-  client.dictionary = dictionary
+  Object.assign(client, { pages: new Map(Object.entries(pages)), dictionary })
 
   return Object.keys(pages).length
 }

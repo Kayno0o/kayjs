@@ -261,7 +261,7 @@ A call goes through the whole app, as a fetch from a browser would. Guards still
 
 The list of tools sits behind `src/api/_guard.ts`, as the OpenAPI document does. An anonymous caller gets a 401 when that guard refuses them. Calling a name that is not a tool is refused the same way, so names cannot be probed.
 
-Set `requireGuards` to refuse the list unless the guards cover every API module.
+Set `requireGuards: true` to refuse the list unless the guards cover every API module.
 
 A call that is refused is not a protocol error. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
 

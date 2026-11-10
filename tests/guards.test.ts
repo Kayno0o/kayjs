@@ -300,6 +300,34 @@ describe('the OpenAPI document on a site requiring guards', () => {
     expect(await status({ 'x-admin': '1' })).toBe(200)
   })
 
+  it('is served on a site that sets nothing, whose guarded API modules refuse their own routes alone', async () => {
+    const mixed = join(dir, 'mixed/api')
+
+    await Promise.all([
+      Bun.write(join(mixed, 'a/_guard.ts'), ADMINS),
+      Bun.write(join(mixed, 'a/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'a\')\n'),
+      Bun.write(join(mixed, 'b/_guard.ts'), ADMINS.replace('x-admin', 'x-other')),
+      Bun.write(join(mixed, 'b/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'b\')\n'),
+    ])
+    const status = async (requireGuards?: boolean) => (await (await pages({ root: dir, dirs: { routes: 'routes', api: mixed }, prebuilt: false, openapi: true, ...requireGuards !== undefined && { requireGuards } })).handle(new Request('http://localhost/api/openapi.json'))).status
+
+    expect(await status()).toBe(200)
+    expect(await status(true)).toBe(403)
+  })
+
+  it('leaves a site open when only a library\'s modules are guarded and nothing is set', async () => {
+    const lib = join(dir, 'solo/api')
+
+    await Promise.all([
+      Bun.write(join(lib, '_guard.ts'), ADMINS),
+      Bun.write(join(lib, 'm.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'m\')\n'),
+    ])
+    const app = await pages({ root: dir, dirs: { routes: 'routes', api: join(dir, 'none') }, prebuilt: false, extensions: [{ name: 'solo', api: { dir: lib, prefix: 'solo' } }] })
+
+    expect((await app.handle(new Request('http://localhost/'))).status).toBe(200)
+    expect((await app.handle(new Request('http://localhost/api/solo/m'))).status).toBe(403)
+  })
+
   it('stays behind the guards of a library\'s modules, which a library leaves open, and is served when every module is open', async () => {
     const lib = join(dir, 'lib/api')
     const LIB_GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-lib\'))\n    deny(403)\n})\n'

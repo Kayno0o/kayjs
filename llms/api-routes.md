@@ -163,7 +163,7 @@ export default api()
 - `kay check` leaves that to the boot, which `kay build` runs, since listing the routes takes running the modules.
 - Cookies get the `security.cookies` defaults ([Sessions](server.md#sessions)).
 - `api({ guards: false })` runs none of the guards above the module, as a public webhook under a guarded directory needs.
-- On a site with `requireGuards`, a module no guard covers answers 403 unless it sets `guards: false` ([Guards](guards.md)).
+- On a site that guards some route, a module no guard covers answers 403 unless it sets `guards: false` ([Guards](guards.md)).
 - A library's API modules, laid over `src/api` under a prefix by its extension, serve as if they were the app's, behind its guards, an app module at the same path replacing one (see [Extensions](component-libraries.md#extensions)).
 - A websocket upgrade, or a request other than GET, HEAD and OPTIONS, another site's page sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403 once the guards let it through, since a browser lets any page open a websocket or post a form to any host with the user's cookies.
 - A request carrying neither header, such as a webhook, goes through.
