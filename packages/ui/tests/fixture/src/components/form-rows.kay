@@ -7,7 +7,7 @@ import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // The action refuses with the `errors` it is given, as a handler's refusal of a row cell does.
-const { errors } = props<{ errors: Record<string, string> }>()
+const { errors, empty = false } = props<{ errors: Record<string, string>, empty?: boolean }>()
 const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity', type: 'number' as const }]
 const last = signal<ActionError | undefined>(undefined)
 
@@ -25,7 +25,7 @@ const add = Object.assign(async () => {
 }) as unknown as Action<unknown, string>
 ---
 Form(action={add} failureLabel="Could not add")
-  RowsField#lines(rows={[{ name: 'A', qty: '1' }, { name: 'B', qty: '2' }]} columns={columns} name="line" label="Lines" size="sm")
+  RowsField#lines(rows={empty ? [] : [{ name: 'A', qty: '1' }, { name: 'B', qty: '2' }]} columns={columns} name="line" label="Lines" size="sm")
   FormField(label="Tags" name="tags")
     input#tags(name="tags")
   button#submit(type="submit") Save

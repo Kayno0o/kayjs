@@ -56,3 +56,13 @@ test('a refusal of one item of a list shows under the FormField of the list', as
 
   expect(root.querySelector('[data-field=tags]')?.textContent).toBe('Not a tag')
 })
+
+test('a bare column refusal on a field with no rows has no row to show under, so it is toasted', async () => {
+  mounted = await mountComponent(FormRows, { errors: { line_name: 'Taken' }, empty: true })
+  click(mounted.root.querySelector('#submit'))
+  await settle()
+
+  expect(mounted.root.querySelectorAll('#lines [data-part=row]').length).toBe(0)
+  expect(mounted.root.querySelector('#lines [data-field]')).toBeNull()
+  expect(mounted.root.textContent).toContain('Taken')
+})
