@@ -77,14 +77,14 @@ describe('kay doctor', () => {
     const result = await doctor(root, [], { PORT: port })
 
     expect(result.code, result.stderr).toBe(0)
-    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database'])
+    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database', 'complete'])
     expect(result.checks.every(check => check.ok)).toBe(true)
 
     const text = Bun.spawnSync([process.execPath, cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH!, PORT: port } })
     const lines = text.stdout.toString().trimEnd().split('\n')
 
     expect(text.exitCode).toBe(0)
-    expect(lines).toHaveLength(9)
+    expect(lines).toHaveLength(10)
     expect(lines.every(line => line.startsWith('ok ') || line.startsWith('warn'))).toBe(true)
   })
 
@@ -144,7 +144,7 @@ describe('kay doctor', () => {
     expect(result.code).toBe(1)
     expect(result.check('config').ok).toBe(false)
     expect(result.check('config').message).toContain('boom in the config')
-    expect(result.checks).toHaveLength(9)
+    expect(result.checks).toHaveLength(10)
     expect(result.check('bun').ok).toBe(true)
   })
 

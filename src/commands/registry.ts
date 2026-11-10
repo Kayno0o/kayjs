@@ -38,6 +38,7 @@ export const COMMANDS: Entry[] = [
   own('routes', 'list the routes', async () => (await import('./routes')).routes),
   own('not-found', 'list the paths that answered 404, and redirect them', async () => (await import('./not-found')).notFound),
   own('env', 'check and write the environment variables', async () => (await import('./env')).env),
+  own('completion', 'print the shell completion script for bash, zsh or fish', async () => (await import('./completion')).completion),
   own('doctor', 'check the machine and the project', async () => (await import('./doctor')).doctor),
   own('explain', 'explain a lint, an error or a group of lints', async () => (await import('./explain')).explain),
   own('docs', 'search and read the documentation', async () => (await import('./docs')).docs),

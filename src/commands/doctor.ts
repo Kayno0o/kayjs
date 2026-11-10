@@ -17,6 +17,7 @@ import { readManifest } from '../server/client'
 import { buildingWithoutEnv } from '../server/env-state'
 import { localeSettings } from '../server/i18n'
 import { formatOption, isPort, printDocument, projectRoot, withStdoutOnStderr } from './command'
+import { completionCheck } from './completion'
 import { listEnv } from './env'
 
 export interface Check {
@@ -97,6 +98,7 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
     await buildCheck(root),
     await browserCheck(),
     await databaseCheck(dotenv.DATABASE_URL),
+    completionCheck(),
   ]
 }
 

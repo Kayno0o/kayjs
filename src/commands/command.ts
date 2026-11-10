@@ -117,6 +117,7 @@ export const SHARED_REFUSALS: Record<string, Partial<Record<SharedOption, string
   'routes': { 'dry-run': READS_ONLY },
   'not-found': { quiet: LISTS_ONLY },
   'env': { 'dry-run': 'it already writes nothing unless --write is given' },
+  'completion': { 'quiet': LISTS_ONLY, 'format': 'prints a shell script', 'dry-run': READS_ONLY },
   'doctor': { 'dry-run': READS_ONLY },
   'explain': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
   'docs': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },

@@ -31,6 +31,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay upgrade [dir] [--dry-run] [--quiet] [--format json]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay not-found [dir]` | List the old URLs visitors hit and found nothing at, and turn one into a redirect |
+| `kay completion <bash\|zsh\|fish>` | Print the script that completes kay's commands and options in that shell |
 | `kay doctor [dir]` | Check Bun, versions, config, environment, port and build, and say how to fix each failure |
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
@@ -509,6 +510,20 @@ A last `kay check --fix` applies any other quick fix, such as moving a Dockerfil
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
+## kay completion
+
+```sh
+kay completion fish > ~/.config/fish/completions/kay.fish
+```
+
+`kay completion bash`, `zsh` or `fish` prints the script that has the shell complete kay's commands, options and their values, asking `kay __complete` for each word. Install it once:
+
+- fish: save it as `~/.config/fish/completions/kay.fish`, as above.
+- bash: add `source <(kay completion bash)` to `~/.bashrc`.
+- zsh: add `source <(kay completion zsh)` to `~/.zshrc`, after `compinit`.
+
+`kay doctor` tells you when your shell has none.
+
 ## kay doctor
 
 ```sh
@@ -529,6 +544,7 @@ kay doctor --port 4000
 | `build` | `.kay/client` or `.kay/dev` was built by another kay, which `kay build` or a restart of `kay dev` fixes |
 | `browser` | Never fails: warns when no Chrome or Chromium is found (`BUN_CHROME_PATH`, the PATH or Playwright's cache), which `kay screenshot`, `kay a11y` and `testSite({ browser })` need |
 | `database` | `DATABASE_URL`, from the shell or `.env`, does not answer: a Postgres url gets a `select 1` within 3 seconds, a `sqlite://` file must open read-only (one not created yet passes). Unset passes |
+| `complete` | Never fails: warns, with the line to add, when the shell named in `SHELL` has no [`kay completion`](#kay-completion) set up |
 
 `--format json` prints `{ checks }`, each with its `name`, `ok`, `message`, `warning` on an ok check worth a look and, on a failure, its `fix`.
 
