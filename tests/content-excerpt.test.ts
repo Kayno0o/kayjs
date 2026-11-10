@@ -90,6 +90,15 @@ describe('an entry\'s excerpt', () => {
     expect((await rows.get('b'))!.html).toContain('<!-- more -->')
     expect((await rows.get('b'))!.html).not.toContain('kay-more-marker')
     expect((await rows.get('f'))!.excerpt).toBe('One.')
+
+    const glued = collection({ name: 'glued-rows', load: () => [
+      { slug: 'a', data: { title: 'A' }, body: 'Lead\n<!-- more -->\nRest\n' },
+      { slug: 'b', data: { title: 'B' }, body: 'Lead *one*.\n\n<!-- more -->\nRest\n' },
+    ] }, { schema })
+
+    expect((await glued.get('a'))!.excerpt).toBe('Lead')
+    expect((await glued.get('b'))!.excerpt).toBe('Lead one.')
+    expect((await glued.get('b'))!.html).toBe('<p>Lead <em>one</em>.</p>\n<!-- more -->\n<p>Rest</p>\n')
     expect((await rows.get('h'))!.excerpt).toBe('One. Two.')
   })
 

@@ -63,7 +63,8 @@ export function descriptionOf(excerpt: string): string | undefined {
 const KEPT_MARKER = 'kay-more-marker-7f3a'
 const MARKER_LINE = /^[ \t]{0,3}<!--\s*more\s*-->[ \t]*$/
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/
-const KEPT_PARAGRAPH = new RegExp(`<p>${KEPT_MARKER}</p>\\n?`, 'g')
+// The paragraph the marker's line landed in: all of it when the line stood alone, else the lines around it, which a marker with no blank line next to it joins.
+const KEPT_PARAGRAPH = new RegExp(`<p>((?:(?!</p>)[\\s\\S])*?)\\n?${KEPT_MARKER}\\n?((?:(?!</p>)[\\s\\S])*?)</p>\\n?`, 'g')
 
 // The Markdown with each marker on a line of its own, outside a code fence, written as the paragraph that survives a sanitizer; the line count stays, so a component's error keeps its line.
 export function keepMarker(markdown: string): string {
@@ -92,5 +93,5 @@ export function keepMarkerHtml(markup: string): string {
 
 // The sanitized HTML with its kept markers written as the comment again.
 export function restoreMarker(markup: string): string {
-  return markup.replace(KEPT_PARAGRAPH, '<!-- more -->\n').replaceAll(KEPT_MARKER, '')
+  return markup.replace(KEPT_PARAGRAPH, (_, before: string, after: string) => `${before === '' ? '' : `<p>${before}</p>\n`}<!-- more -->\n${after === '' ? '' : `<p>${after}</p>\n`}`).replaceAll(KEPT_MARKER, '')
 }
