@@ -94,4 +94,13 @@ describe('forgetLocalMirrors', () => {
     expect(first).toContain('Secure')
     expect(forgetLocalMirrors(request)).not.toBe(first)
   })
+
+  it('gives a person the same value each time, another person another, and names no one', () => {
+    const request = new Request('https://x.example/')
+    const ada = forgetLocalMirrors(request, 'user-ada')
+
+    expect(forgetLocalMirrors(request, 'user-ada')).toBe(ada)
+    expect(forgetLocalMirrors(request, 'user-bob')).not.toBe(ada)
+    expect(ada).not.toContain('ada')
+  })
 })

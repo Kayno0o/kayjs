@@ -48,3 +48,5 @@ Say an action answers `ctx.fail(409, row)` with the row it holds when a write st
 ## Signing out
 
 The rows belong to the person who is signed in. kayjs-auth does this on sign-out. For a sign-out of your own, add the cookie `forgetLocalMirrors(request)` gives to the response. The next page that uses a collection empties the rows and the unsent writes, even offline.
+
+A sign-in does the same when it is another person: kayjs-auth adds the cookie at every sign-in, and `forgetLocalMirrors(request, person)` does it for your own, with the person's id as `person`. The same person signing in again keeps their rows and unsent writes, so a session that expired mid-trip loses nothing. A tab that is already open checks the cookie before each sync, so a write someone else queued is never sent under the new person.

@@ -2773,7 +2773,7 @@ interface FileStore extends StoreBase
   write: (key: string, data: Blob) => Promise<void>
 
 [./server] forgetLocalMirrors
-function forgetLocalMirrors(request: Request): string
+function forgetLocalMirrors(request: Request, person?: string | undefined): string
 
 [./server] forgetPushDevice
 function forgetPushDevice(request: Request, user: string): Promise<void>

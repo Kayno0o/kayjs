@@ -2,6 +2,7 @@ import { RETRY_LATER } from '../runtime/local-status'
 import { appStore } from './app-store'
 import { overHttps } from './request-url'
 import { userOf } from './request-user'
+import { appSecrets } from './stamp'
 
 // Sent by a `local()` collection with every write it replays: a retry of a write the server already ran gets the first answer back instead of running the action again.
 export const WRITE_HEADER = 'x-kay-write'
@@ -151,6 +152,10 @@ const CLEAR_COOKIE = 'kay_local_clear'
 const CLEAR_MAX_AGE = 31_536_000
 
 // The `Set-Cookie` that tells this browser to forget every `local()` mirror it holds: a sign-out adds it to its answer, and the next page using a collection empties its mirror and its queue, offline too. The value is new each time, and the cookie names no one and opens nothing.
-export function forgetLocalMirrors(request: Request): string {
-  return new Bun.Cookie(CLEAR_COOKIE, crypto.randomUUID(), { path: '/', sameSite: 'lax', secure: overHttps(request), maxAge: CLEAR_MAX_AGE }).serialize()
+// A sign-in passes `person`, the id of who signs in: the value is then a hash of it, the same each time for the same person, so the mirror is emptied when another person (or none) held it before and kept for the same person signing in again.
+export function forgetLocalMirrors(request: Request, person?: string): string {
+  // Keyed with the app's secret, so the value cannot be matched to an id by hashing guesses; rotating the secret empties the mirrors once.
+  const value = person === undefined ? crypto.randomUUID() : new Bun.CryptoHasher('sha256', appSecrets()?.[0] ?? '').update(`kay-local:${person}`).digest('hex').slice(0, 32)
+
+  return new Bun.Cookie(CLEAR_COOKIE, value, { path: '/', sameSite: 'lax', secure: overHttps(request), maxAge: CLEAR_MAX_AGE }).serialize()
 }

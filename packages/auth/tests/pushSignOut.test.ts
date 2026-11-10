@@ -62,6 +62,21 @@ describe('signing out with push', () => {
     expect(second!.slice(0, second!.indexOf(';'))).not.toBe(first!.slice(0, first!.indexOf(';')))
   })
 
+  it('tags each sign-in with its person, so a browser keeps its mirrors for the same person and empties them for another', async () => {
+    const tag = () => site.cookies.get('kay_local_clear')
+
+    await authTest(site).signInAs({ email: 'ada2@example.com', username: 'Ada2' })
+
+    const ada = tag()
+
+    expect(ada).toBeTruthy()
+    // Her session expired and she signed in again.
+    await authTest(site).signInAs({ email: 'ada2@example.com', username: 'Ada2' })
+    expect(tag()).toBe(ada)
+    await authTest(site).signInAs({ email: 'bob@example.com', username: 'Bob' })
+    expect(tag()).not.toBe(ada)
+  })
+
   it('leaves everything alone for a browser that never subscribed', async () => {
     const grace = await authTest(site).signInAs({ email: 'grace@example.com', username: 'Grace' })
 

@@ -476,12 +476,10 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     // Settled elsewhere: a read of the server that began before is older than the queue.
     this.changes++
 
-    if (message === this.c) {
+    if (message === this.c)
       await this.reload()
-    }
-    else if (message === 'answered') {
+    else if (message === 'answered')
       await this.sync()
-    }
   }
 
   private noticed(offline: boolean): void {
@@ -594,10 +592,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     await this.ready
 
     const db = await database()
-    const tx = db.transaction(['rows', 'outbox', 'issues'], 'readwrite')
+    const tx = db.transaction(['rows', 'outbox', 'issues', 'meta'], 'readwrite')
 
     this.changes++
+    this.token = clearToken() || this.token
     await this.wipe(tx, true)
+    tx.objectStore('meta').put({ c: this.c, version: this.options.version ?? 1, cleared: this.token })
     await finished(tx)
     await this.reload()
     announce(this.c)
@@ -620,6 +620,10 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     let moved = false
 
     await quiet(async () => locked(async () => {
+      // Another tab signed someone in or out since this collection started: what it holds was not theirs, so none of it is sent or read as theirs.
+      if (clearToken() !== '' && clearToken() !== this.token)
+        await this.clear()
+
       moved = await this.advance()
 
       if (refresh && !this.offline && !this.paused)
@@ -658,9 +662,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       return
     }
 
-    if (this.offline) {
+    if (this.offline)
       this.timer = setTimeout(() => void this.sync(), RETRY_MS[Math.min(this.failures++, RETRY_MS.length - 1)])
-    }
   }
 
   private async first(): Promise<Entry | undefined> {
@@ -694,9 +697,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
           continue
       }
 
-      if (!await this.apply(entry)) {
+      if (!await this.apply(entry))
         break
-      }
 
       moved = true
     }

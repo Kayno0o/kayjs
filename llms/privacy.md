@@ -111,7 +111,7 @@ export async function archive(scan: File) {
 - `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge` (a duration), an hour by default, ended by `clear()`.
 - `theme` (kayjs-ui `ThemeToggle`, `themeMode`, `scheme`, or the name given to their `cookie`): `system`, `light` or `dark`, readable by scripts so the server renders the scheme the visitor picked; a preference, so necessary, a year.
 - `kay_push_device` (`push()`): a hash naming the push subscription this browser made, `httpOnly`, set when it subscribes, so sign-out drops that device alone; necessary, a year.
-- `kay_local_clear` (`local()`): a random value, readable by scripts, set only when the app calls `forgetLocalMirrors(request)` at sign-out; the next page using a collection empties the browser's mirror and queue when it changed; necessary, a year, names no one.
+- `kay_local_clear` (`local()`): a random value at sign-out, or at sign-in a hash of the person's id (kayjs-auth, or `forgetLocalMirrors(request, person)`), readable by scripts; the next page using a collection empties the browser's mirror and queue when it changed; necessary, a year, names no one.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
 ### Browser storage

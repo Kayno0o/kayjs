@@ -309,6 +309,52 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     expect((await server()).saves).toBe(0)
   }, 60_000)
 
+  it('keeps the queue for the same person signing in again and drops it for another', async () => {
+    const page = await opened()
+    const as = async (person: string) => page.evaluate((value) => {
+      document.cookie = `kay_local_clear=${value}; path=/`
+    }, person)
+
+    await as('person-a')
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+    await page.route('/_kay/action/*', async request => request.abort())
+    await write(page, 'button.add', 'a wrote')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+    // A's session expired and A signed in again: same value.
+    await as('person-a')
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent !== 'loading')
+
+    expect((await stored(page)).outbox).toHaveLength(1)
+    // B signed in after A's session expired.
+    await as('person-b')
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent !== 'loading')
+
+    expect((await stored(page)).outbox).toEqual([])
+    expect(await page.count('li.note')).toBe(0)
+  }, 60_000)
+
+  it('drops a queued write in an open tab when another tab signs in someone else, and never sends it', async () => {
+    const page = await opened()
+
+    await page.offline()
+    await write(page, 'button.add', 'before the other tab')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '1')
+    await page.evaluate(() => {
+      document.cookie = 'kay_local_clear=person-b; path=/'
+    })
+    // The tab's own sync, as its `online` event or coming back to the page runs it, with no reload.
+    await page.evaluate(() => {
+      dispatchEvent(new Event('online'))
+    })
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note') === null)
+
+    expect((await stored(page)).outbox).toEqual([])
+    expect((await server()).saves).toBe(0)
+  }, 60_000)
+
   // Full Chrome's offline emulation cuts the page off and leaves its service worker online; chrome-headless-shell's cuts the worker off too, so the worker cannot send the write. The CI job on full Chrome runs it.
   it.skipIf((/headless-shell/).test(path ?? ''))('has the worker send a write queued with the page offline, and the page settles it from that answer', async () => {
     const page = await worker!.open('/')

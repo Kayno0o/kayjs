@@ -565,6 +565,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session, ...method === 'passkey' && { passkey: true } })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
+    // The mirrors of whoever held this browser before, an expired session's included, are emptied unless it was this person.
+    this.cookies.push(forgetLocalMirrors(this.request, record.id))
     // Browser-only (`remember: false`) leaves it a session cookie like the session's; else it lasts as long as the session can, since the session's own cookie is renewed with use.
     this.markBrowser(!record.guest, remember === false ? undefined : durationSeconds(this.session.settings.absoluteMaxAge, 'the session absoluteMaxAge'))
     await noteSignIn(this[STATE], record)
