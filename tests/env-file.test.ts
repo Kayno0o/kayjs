@@ -1,7 +1,7 @@
 import { chmod, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { compareEnv } from '../src/commands/env-compare'
 import { s } from '../src/runtime/schema'
 import { defineEnv } from '../src/server'
@@ -68,7 +68,45 @@ describe('a defineEnv string read from <NAME>_FILE', () => {
     const path = join(dir, 'absent')
 
     expect(() => defineEnv(s.Object({ API_KEY: s.String() }), { API_KEY_FILE: path })).toThrow(`API_KEY_FILE ${path}`)
-    expect(() => defineEnv(s.Object({ API_KEY: s.Optional(s.String()) }), { API_KEY_FILE: path })).toThrow('API_KEY_FILE')
+  })
+
+  it('leaves an optional field unset with one warning naming the file, whatever is wrong with it', async () => {
+    const dir = await folder({ 'empty': '', 'blank': ' \n', 'locked': 'secret', 'sub/file': 'x' })
+    const paths = [join(dir, 'absent'), join(dir, 'empty'), join(dir, 'blank'), join(dir, 'sub')]
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    await chmod(join(dir, 'locked'), 0o000)
+
+    if (process.getuid?.() !== 0)
+      paths.push(join(dir, 'locked'))
+
+    try {
+      for (const path of paths) {
+        warn.mockClear()
+        expect(defineEnv(s.Object({ API_KEY: s.Optional(s.String()) }), { API_KEY_FILE: path }).API_KEY).toBeUndefined()
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(String(warn.mock.calls[0]?.[0])).toContain(`API_KEY_FILE ${path}`)
+      }
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('applies the default of an optional field whose file is missing, and keeps refusing a required one', async () => {
+    const dir = await folder()
+    const path = join(dir, 'absent')
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(defineEnv(s.Object({ A: s.Optional(s.String({ default: 'dflt' })) }), { A_FILE: path }).A).toBe('dflt')
+    }
+    finally {
+      warn.mockRestore()
+    }
+
+    expect(() => defineEnv(s.Object({ A: s.String({ requiredInProduction: true }) }), { A_FILE: path, NODE_ENV: 'production' })).toThrow('A_FILE')
+    expect(() => defineEnv(s.Object({ A: s.Optional(s.String({ requiredInProduction: true })) }), { A_FILE: path, NODE_ENV: 'production' })).toThrow('A_FILE')
   })
 
   it('fails at boot for a file that cannot be read, a folder or one with no permission', async () => {

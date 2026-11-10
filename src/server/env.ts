@@ -61,7 +61,7 @@ function readSecretFile(name: string, file: string, path: string): string {
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
 // A field marked `s.Public` reaches islands as `publicEnv` from `kay`, with no config key; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused.
-// A string field, `s.Public` ones apart, also reads `<NAME>_FILE`, the path of a file holding the value, trimmed and read once, as a compose secret hands it; both set, or a file that cannot be read or is empty, stops the boot naming them.
+// A string field, `s.Public` ones apart, also reads `<NAME>_FILE`, the path of a file holding the value, trimmed and read once, as a compose secret hands it; both set, or a file that cannot be read or is empty, stops the boot naming them, unless the field is `s.Optional`, which is left unset with one warning naming the file.
 // A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
 export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>) {
   recordEnv(declared, defineEnv)
@@ -80,18 +80,19 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
       if (value !== undefined && value !== '')
         throw new KayError('env-invalid', `kay: ${name} and ${file} are both set; set one, the value or the path of the file holding it`)
 
-      // A build runs without the server's secrets, so a file it cannot read leaves the variable unset, as a missing variable is.
-      if (!building()) {
-        input[name] = readSecretFile(name, file, path)
-
-        continue
-      }
+      // A build runs without the server's secrets, so a file it cannot read leaves the variable unset, as a missing variable is; so does a field the app marks `s.Optional`, which then says so once.
+      const field = declared.properties[name] as object
+      const tolerant = building() || (OPTIONAL in field && (field as { requiredInProduction?: unknown }).requiredInProduction !== true)
 
       try {
         input[name] = readSecretFile(name, file, path)
       }
-      catch {
-        // Left unset, for the schema to judge as it does a missing variable.
+      catch (error) {
+        if (!tolerant)
+          throw error
+
+        if (!building())
+          console.warn(`${(error as Error).message}; ${name} is left unset`)
       }
 
       continue
