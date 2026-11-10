@@ -8,6 +8,7 @@ import { outsideRequest } from './clean-context'
 import { startedStatements, trackStatements } from './pg-jobs'
 import { hear } from './pg-notify'
 import { onReload } from './reload'
+import { isServing, onServingChange } from './serving'
 
 // How often a process reads what the others wrote while there is activity (see `delayAfter` for how it slows down when idle), and how long a message is kept for one that reads late.
 export const POLL_MS = 500
@@ -161,6 +162,13 @@ export function pollerOf(pg: PgHandle): Poller {
 // Tasks due within this of each other share a tick, so stores started a few milliseconds apart still reach the database once.
 const GROUP_MS = 25
 
+// A notification reads at once, but never sooner than this after the last read began, so a burst of writes (the process's own included) does not turn the poll into a loop.
+const POKE_GAP_MS = 100
+
+function pokedAt(entry: { began: number }): number {
+  return Math.max(pollClock.now(), entry.began + POKE_GAP_MS)
+}
+
 // How long after a subscription that could not reach the database the next try comes.
 const RETRY_SUBSCRIBE_MS = 5000
 
@@ -205,7 +213,7 @@ function createPoller(pg: PgHandle): Poller {
 
       if (entry.poked) {
         entry.poked = false
-        entry.next = pollClock.now()
+        entry.next = pokedAt(entry)
       }
 
       schedule()
@@ -252,17 +260,31 @@ function createPoller(pg: PgHandle): Poller {
           return
         }
 
-        entry.next = 0
+        entry.next = Math.min(entry.next, pokedAt(entry))
         schedule()
       }
 
       let ended = false
+      let forgetServing: (() => void) | undefined
       let subscription: Awaited<ReturnType<typeof hear>> | undefined
       let retry: ReturnType<typeof setTimeout> | undefined
 
-      const subscribe = async () => {
+      const subscribe = async (kind: string) => {
+        // Reaching the database is left to the first poll until a server runs, as a build or a script using a store connects to nothing.
+        if (!isServing()) {
+          forgetServing ??= onServingChange(() => {
+            if (isServing() && !ended) {
+              forgetServing?.()
+              forgetServing = undefined
+              void subscribe(kind)
+            }
+          })
+
+          return
+        }
+
         try {
-          const subscribed = await hear(await pg.db(), task.listen as string, undefined, poke)
+          const subscribed = await hear(await pg.db(), kind, undefined, poke)
 
           // Stopped while it connected.
           if (ended)
@@ -273,14 +295,14 @@ function createPoller(pg: PgHandle): Poller {
         catch {
           // The database is down: the polling logs it, and the subscription is tried again.
           if (!ended) {
-            retry = setTimeout(() => void subscribe(), RETRY_SUBSCRIBE_MS)
+            retry = setTimeout(() => void subscribe(kind), RETRY_SUBSCRIBE_MS)
             retry.unref()
           }
         }
       }
 
       if (task.listen !== undefined)
-        void subscribe()
+        void subscribe(task.listen)
 
       const wake = () => {
         entry.quiet = 0
@@ -298,6 +320,7 @@ function createPoller(pg: PgHandle): Poller {
         ended = true
         entries.delete(entry)
         clearTimeout(retry)
+        forgetServing?.()
         void subscription?.stop()
         schedule()
       }, {

@@ -10,6 +10,8 @@ import { serverStarted, serverStopped } from './serving'
 export const POLL_MS = 1000
 // The longest an idle queue waits between looks once its store notifies and a notification came through, unless `idlePoll` was given.
 export const LISTENED_IDLE_POLL = 60_000
+// How long after a failed subscription the queue asks its store again.
+const RESUBSCRIBE_MS = 5000
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 
@@ -53,7 +55,8 @@ export class Scheduler {
   #forgetDrain: (() => void) | undefined
   // What the store tells of changes by other processes, while the workers run.
   #subscription: { stop: () => Promise<void>, delivering: () => boolean } | undefined
-  #subscribing = 0
+  #subscribing: AbortSignal | undefined
+  #resubscribe: ReturnType<typeof setTimeout> | undefined
   // The worker looking for jobs while the queue is idle sleeps until its next look, woken when this process enqueues a job or retries one.
   readonly #pollers = new Set<() => void>()
   // The others sleep until a claim leaves no worker looking, which wakes one of them to take over.
@@ -86,8 +89,10 @@ export class Scheduler {
 
   // The server started: the workers start unless the queue waits to be activated.
   serve(): void {
+    if (!this.#serving)
+      serverStarted()
+
     this.#serving = true
-    serverStarted()
     this.#forgetDrain = onDrain(() => this.#beginStop())
     this.#start()
   }
@@ -179,10 +184,10 @@ export class Scheduler {
 
   // A store that notifies wakes the idle workers when another process changes the queue, and again once it is back from a lost connection. A failure leaves the polling as it was.
   async #subscribe(signal: AbortSignal): Promise<void> {
-    if (this.#subscription !== undefined || this.#subscribing > 0)
+    if (this.#subscription !== undefined || this.#subscribing === signal)
       return
 
-    this.#subscribing++
+    this.#subscribing = signal
 
     try {
       const listen = this.#options.store().listen
@@ -198,14 +203,22 @@ export class Scheduler {
         this.#subscription = subscription
     }
     catch (error) {
-      kayLog('warn', `queue('${this.#options.name}') could not ask its store to tell it of jobs added by other processes; it polls`, error)
+      // A store down at the start is asked again, as the workers ask it; the polling covers the time between.
+      if (!signal.aborted) {
+        this.#resubscribe = setTimeout(() => void this.#subscribe(signal), RESUBSCRIBE_MS)
+        this.#resubscribe.unref()
+        kayLog('warn', `queue('${this.#options.name}') could not ask its store to tell it of jobs added by other processes; it polls and tries again`, error)
+      }
     }
     finally {
-      this.#subscribing--
+      if (this.#subscribing === signal)
+        this.#subscribing = undefined
     }
   }
 
   async #unsubscribe(): Promise<void> {
+    clearTimeout(this.#resubscribe)
+
     const subscription = this.#subscription
 
     this.#subscription = undefined

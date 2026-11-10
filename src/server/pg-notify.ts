@@ -92,7 +92,13 @@ class Notifier {
       return
 
     try {
-      const registration = await outsideRequest(async () => this.#db.listen(CHANNEL, payload => this.#heard(payload), () => this.#listened++ === 0 ? this.#probeIt() : this.#caughtUp()))
+      const registration = await outsideRequest(async () => this.#db.listen(CHANNEL, payload => this.#heard(payload), () => {
+        // A subscription that begins, again after a close included, reads once for what was written while none ran.
+        if (this.#listened++ === 0)
+          this.#probeIt()
+
+        this.#caughtUp()
+      }))
 
       // Every reader left while it connected.
       if (this.#readers.size === 0)
@@ -174,6 +180,10 @@ class Notifier {
     clearTimeout(this.#retry)
     this.#retry = undefined
     await this.#opening
+
+    // Serving came back (or a reader arrived) while it connected: the subscription stays.
+    if (this.#readers.size > 0 && isServing())
+      return
 
     const registration = this.#registration
 

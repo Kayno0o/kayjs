@@ -1,10 +1,11 @@
 import type { SQL } from 'bun'
 
+import type { JobStore } from '../src/server'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { logSink, setLogSink } from '../src/runtime/log'
-import { pgJobs, queue, shutdown } from '../src/server'
+import { memoryJobs, pgJobs, queue, shutdown } from '../src/server'
 import { pgCache } from '../src/server/pg-cache'
 import { createDataTables, pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
@@ -135,11 +136,11 @@ describe('the notification subscription of a database', () => {
 
     const subscription = await hear(db, 'live', undefined, () => void woken++)
 
-    // The first acknowledgement is the start: nothing was missed before it.
-    listened()
-    expect(woken).toBe(0)
+    // The start reads once for what was written before it, and so does each return.
     listened()
     expect(woken).toBe(1)
+    listened()
+    expect(woken).toBe(2)
     await subscription.stop()
   })
 
@@ -193,6 +194,8 @@ describe('a Postgres database that notifies', () => {
     const subscription = await store.listen!('mails', () => void woken.push(1))
 
     await eventually(() => expect(subscription.delivering()).toBe(true))
+    // The start woke it once.
+    woken.length = 0
     await pgJobs(writer!).add({ id: crypto.randomUUID(), queue: 'mails', payload: stringify(1), attempts: 0, runAt: Date.now() })
     await eventually(() => expect(woken.length).toBeGreaterThan(0))
 
@@ -252,7 +255,7 @@ describe('a Postgres database that notifies', () => {
     const subscription = await pgJobs(reader!).listen!('killed', () => void woken.push(1))
 
     await eventually(() => expect(subscription.delivering()).toBe(true))
-    expect(woken).toHaveLength(0)
+    woken.length = 0
 
     // Every other session of the database goes, the listening one included.
     await sql`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`
@@ -296,6 +299,36 @@ describe('a Postgres database that notifies', () => {
     }
   }, 15_000)
 
+  it('asks the store to listen again when it could not at the start, and stops when the queue does', async () => {
+    const calls = { listen: 0, stop: 0 }
+    const sink = logSink()
+
+    setLogSink(() => undefined)
+
+    const store: JobStore = {
+      ...memoryJobs(),
+      listen: async () => {
+        if (++calls.listen === 1)
+          throw new Error('the database is down')
+
+        return { stop: async () => void calls.stop++, delivering: () => true }
+      },
+    }
+
+    const jobs = queue<number>(`resubscribe-${++names}`, async () => undefined, { store })
+    const app = new Elysia().use(jobs).listen(0)
+
+    try {
+      await eventually(() => expect(calls.listen).toBe(2), 8000)
+    }
+    finally {
+      await shutdown(app)
+      setLogSink(sink)
+    }
+
+    expect(calls.stop).toBe(1)
+  }, 15_000)
+
   pgIt('stops listening with the queue, and a second start listens once', async () => {
     const { sql } = await postgres()
     const [worker] = replicas(1)
@@ -329,12 +362,12 @@ describe('a Postgres database that notifies', () => {
     await reader.entries()
     await writer.entries()
     reader.subscribe((id, key, text) => void heard.push(`${id}/${key}/${text}`))
-    await clock.advance(0)
+    await clock.advance(150)
 
     // No poll fires on its own: only the notification can bring the read.
     await eventually(async () => {
       await writer.set('app:room', 'a', '[1]')
-      await clock.advance(0)
+      await clock.advance(150)
       expect(heard).toContain('app:room/a/[1]')
     })
     reader.stop?.()
@@ -356,21 +389,21 @@ describe('a Postgres database that notifies', () => {
 
     await eventually(() => expect(published.delivering()).toBe(true))
     await writer.publish!('page:/b')
-    await eventually(() => expect(heard).toEqual(['told']))
+    await eventually(() => expect(heard).toContain('told'))
     heard.length = 0
     await published.stop()
     reader.subscribe?.(message => void heard.push(message))
-    await clock.advance(0, true)
+    await clock.advance(150, true)
     // The first poll of the reader starts after the events already there.
     await eventually(async () => {
-      await clock.advance(0, true)
+      await clock.advance(150, true)
       expect(await reader.keys()).toEqual([])
     })
 
     // Another process's event: the stores of one test process share their origin, which a store hears nothing from.
     await eventually(async () => {
       await writerSql!.unsafe(`WITH published AS (INSERT INTO kay_events (origin, message, at) VALUES ('elsewhere', '{"keys":["a"]}', floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint) RETURNING id) SELECT pg_notify('kay_wake', 'cache') FROM published`)
-      await clock.advance(0, true)
+      await clock.advance(150, true)
       expect(heard).toContain('{"keys":["a"]}')
     })
   })
