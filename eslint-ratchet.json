@@ -120,13 +120,7 @@
     "max-lines": 685
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1109
->>>>>>> 1b719ae (docs: the 1.95 drops sit under the 1.95.0 and Unreleased headings of main)
-=======
-    "max-lines": 1126
-=======
-    "max-lines": 1109
->>>>>>> 1b719ae (docs: the 1.95 drops sit under the 1.95.0 and Unreleased headings of main)
+    "max-lines": 1091
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,
