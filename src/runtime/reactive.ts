@@ -2,6 +2,7 @@
 // Writes apply at once; effects that depend on what changed run batched in a microtask, or right away through `flush()`.
 
 import type { Setter, Signal } from './core'
+import { sourceStart, warnOnce } from './warn-once'
 
 type Equals<T> = false | ((previous: T, next: T) => boolean)
 
@@ -109,7 +110,6 @@ let reporter: (error: unknown, island?: string) => void = error => console.error
 let hydrating = 0
 let afterHydration: (() => void)[] = []
 
-const WHITESPACE = /\s+/g
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
 export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [read: () => T, write: (next: T) => void] {
@@ -537,13 +537,18 @@ export function createEffect(fn: () => void, api: string, named: (...args: never
   if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
     return
 
-  if (process.env.NODE_ENV !== 'production' && !owner)
-    warnOnce(`${api}() ran with no owner (at module scope, after an await or in a timer), so nothing ever stops it: it lives until the page goes. Call it in a component's script, or inside root() and call its dispose when done.\n${sourceStart(named)}`)
+  warnUnowned(api, named)
 
   const node = computation(fn, 'user', false)
 
   node.state = DIRTY
   enqueue(node)
+}
+
+// Development only: a helper called with no owner, which nothing but its own handle ever stops.
+export function warnUnowned(api: string, named: (...args: never[]) => unknown): void {
+  if (process.env.NODE_ENV !== 'production' && !owner && (typeof KAY_BROWSER !== 'undefined' || serverRendering === 0))
+    warnOnce(`${api}() ran with no owner (at module scope, after an await or in a timer), so nothing ever stops it: it lives until the page goes. Call it in a component's script, or inside root() and call its dispose when done.\n${sourceStart(named)}`)
 }
 
 // Runs `fn` now, then again whenever what it read changes: what the DOM bindings islands build run on.
@@ -566,17 +571,6 @@ export function onCleanup(fn: () => void): void {
     (owner.cleanups ??= []).push(fn)
   else if (process.env.NODE_ENV !== 'production' && serverRendering === 0)
     warnOnce(`onCleanup() ran with no owner (at module scope, after an await or in a timer), so its function is dropped and never runs. Call it in a component's script or an effect, or inside root().\n${sourceStart(fn)}`)
-}
-
-const warned = new Set<string>()
-
-// Development only: one console warning per message.
-function warnOnce(message: string): void {
-  if (warned.has(message))
-    return
-
-  warned.add(message)
-  console.warn(`[kay] ${message}`)
 }
 
 // Reads signals without making the current computation depend on them.
@@ -624,10 +618,6 @@ export function root<T>(fn: (dispose: () => void) => T): T {
 // What names an effect in a report: its function's name, else the start of its source.
 function effectName(node: Computation): string {
   return sourceStart(node.fn)
-}
-
-function sourceStart(fn: (...args: never[]) => unknown): string {
-  return fn.name || fn.toString().replace(WHITESPACE, ' ').slice(0, 80)
 }
 
 // Runs every effect whose sources changed, now.

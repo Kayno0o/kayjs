@@ -1,3 +1,4 @@
+import { lasting } from './lasting'
 import { onCleanup, onMount } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -8,9 +9,13 @@ export interface FollowLogOptions {
   threshold?: number | undefined
   // The items of the list as a selector inside the container, the first one showing being the one kept in place; its direct children by default.
   items?: string | undefined
+  // Stops following when aborted, as calling the result does.
+  signal?: AbortSignal | undefined
 }
 
+// Called, it stops following and leaves the container as it is.
 export interface FollowLog {
+  (): void
   // Scrolls to the bottom and follows again, as a chat does when the reader sends a message from higher up; nothing before the island mounted.
   toBottom: () => void
 }
@@ -39,16 +44,16 @@ function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined
   return items[low]
 }
 
-// Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server. Its `toBottom()` takes the reader back to the bottom and follows again.
+// Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server. Its `toBottom()` takes the reader back to the bottom and follows again, and calling it, or aborting `options.signal`, stops following before the island ends.
 // kept: free
 export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): FollowLog {
   let bottom: (() => void) | undefined
-  const log: FollowLog = { toBottom: () => bottom?.() }
+  const toBottom = () => bottom?.()
 
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return log
+    return Object.assign(() => undefined, { toBottom })
 
-  onMount(() => {
+  const stop = lasting('followLog', toBottom, () => onMount(() => {
     const element = typeof container === 'function' ? container() : container
 
     // A DOM simulator without ResizeObserver mounts the island with nothing followed, as `elementSize` does.
@@ -143,7 +148,7 @@ export function followLog(container: Element | (() => Element | null | undefined
       changes.disconnect()
       resizes.disconnect()
     })
-  })
+  }), options.signal)
 
-  return log
+  return Object.assign(stop, { toBottom })
 }

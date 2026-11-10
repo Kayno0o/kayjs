@@ -43,7 +43,7 @@ export type { BeforeNavigate, NavigateEvent, NavigationState } from './navigatio
 export { navigation, onBeforeNavigate, onNavigate } from './navigation-state'
 export type { PersistStorage } from './persist'
 export * from './persisted'
-export type { Presence } from './presence'
+export type { Presence, PresenceOptions } from './presence'
 export { presence } from './presence'
 export { editing, previewing } from './preview'
 export type { PushEnableResult, PushState, PushSubscribeResult } from './push'

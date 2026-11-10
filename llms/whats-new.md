@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay lint --help` and `kay test --help` open with what kay adds, then print keslint's and `bun test`'s help; `kay test --format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` as one document with the report on stderr, `kay lint --format json` hands keslint ESLint's JSON, and `kay new --help` describes `--editor` ([commands](check-and-tools.md)).
 - A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
 - A call whose action redirects rejects with `ActionRedirectError` (its `location`) once the browser has gone there, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
+- `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([components](components.md#effects-and-lifecycle)).
 
 ## 1.95.0
 

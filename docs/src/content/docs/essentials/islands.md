@@ -64,6 +64,22 @@ The effect and its cleanups live until `stop()` is called, and `root` returns wh
 
 An effect made with no owner, at the top of a module, after an `await` or in a timer, is never stopped, and an `onCleanup` there is dropped. In development kay logs a warning naming the call, once. A function an effect returns runs as its cleanup, so `effect(() => { const timer = setInterval(poll, 1000); return () => clearInterval(timer) })` needs no `onCleanup`.
 
+### Stopping a helper early
+
+`every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` last as long as the island, and each returns what stops it sooner, as `mount` and `onNavigate` do. Calling it twice does nothing. Each also takes `{ signal }`, an `AbortSignal`, which stops it when aborted: a helper given a signal that is already aborted starts nothing, and `listen` takes it as one of the options of `addEventListener`.
+
+```ts
+import { every, listen } from 'kay'
+
+const stop = every('3s', refresh)
+const abort = new AbortController()
+
+listen(window, 'online', refresh, { signal: abort.signal })
+// later: stop() and abort.abort()
+```
+
+`followLog` and `presence` return an object that is also this function, so `log.toBottom()` and `room.others()` keep working. After `room()`, `others()` is empty and `count()` is 0, and the page stops asking for the room.
+
 ## See which components are islands
 
 `kay build` lists every island under the JavaScript it ships. Each line gives the first thing that made it one, such as `onClick, line 4` or `bind:value, line 9`.

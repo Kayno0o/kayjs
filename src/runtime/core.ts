@@ -9,6 +9,7 @@ import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
+import { lasting } from './lasting'
 import { createEffect, createSignal, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 import { tabVisible } from './visibility'
 
@@ -42,13 +43,15 @@ export interface EveryOptions {
   immediate?: boolean | undefined
   // Keeps running while the tab is hidden, which it pauses for otherwise and catches up with as the tab shows again.
   background?: boolean | undefined
+  // Stops it when aborted, as the function it returns does.
+  signal?: AbortSignal | undefined
 }
 
-// Runs `run` every `interval` while the island lives, and while `options.while` holds: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
+// Runs `run` every `interval` while the island lives, and while `options.while` holds, until the function it returns is called or `options.signal` aborts: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
 // Nothing runs while the server renders or the tab is hidden, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
 // An interval that is not a positive duration throws.
 // kept: free
-export function every(interval: Duration, run: () => unknown, options?: EveryOptions): void {
+export function every(interval: Duration, run: () => unknown, options?: EveryOptions): () => void {
   const ms = typeof interval === 'string' ? durationMs(interval) : Number.NaN
   let paused = false
 
@@ -56,7 +59,7 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
   if (!(ms >= 1 && ms <= MAX_TIMER))
     throw new Error(`kay: every() takes a duration of 1 ms to 24 days such as '3s' or '250ms', not ${typeof interval === 'string' ? JSON.stringify(interval) : String(interval)}`)
 
-  createEffect(() => {
+  return lasting('every', run, () => createEffect(() => {
     if (options?.while && !options.while()) {
       paused = false
 
@@ -91,37 +94,42 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
       void tick()
 
     paused = false
-  }, 'every', run)
+  }, 'every', run), options?.signal)
 }
 
 export interface WatchOptions {
   // Runs `run` on the first read too, `previous` being undefined then.
   immediate?: boolean | undefined
+  // Stops it when aborted, as the function it returns does.
+  signal?: AbortSignal | undefined
 }
 
 // Runs `run` whenever `source` gives a new value, not on its first read, handed the value it gave before: `watch(turn, (next, previous) => ...)`.
 // The first read is the island's effects' first run, once its render is done: a write the script makes before then is part of it.
-// Only `source` is tracked, never what `run` reads, and a value equal to the last one runs nothing; nothing runs while the server renders.
+// Only `source` is tracked, never what `run` reads, and a value equal to the last one runs nothing; nothing runs while the server renders. Returns what stops it before the island ends, which `options.signal` does too.
 // kept: free
-export function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: WatchOptions & { immediate?: false | undefined }): void
-export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void
-export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void {
+export function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: WatchOptions & { immediate?: false | undefined }): () => void
+export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): () => void
+export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): () => void {
   // A memo, so a read that gives the same value again reruns nothing, and what `run` registered with `onCleanup` stays.
-  const value = memo(source, { equals: Object.is })
   let first = true
   let previous: T | undefined
 
-  createEffect(() => {
-    const next = value()
-    const before = previous
-    const runs = !first || options?.immediate === true
+  return lasting('watch', run, () => {
+    const value = memo(source, { equals: Object.is })
 
-    first = false
-    previous = next
+    createEffect(() => {
+      const next = value()
+      const before = previous
+      const runs = !first || options?.immediate === true
 
-    if (runs)
-      untrack(() => run(next, before))
-  }, 'watch', run)
+      first = false
+      previous = next
+
+      if (runs)
+        untrack(() => run(next, before))
+    }, 'watch', run)
+  }, options?.signal)
 }
 
 // `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
@@ -146,12 +154,13 @@ type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? Do
 
 // Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
 // In a `.kay` file the compiler hands `target` over as a function, so `listen(window, ...)` never reads `window` on the server; a `.ts` module writes `listen(() => window, ...)`. A target read from a signal listens to its new value as it changes.
+// Returns what stops it before the island ends, which the `signal` of its options does too.
 // The handler runs under the owner `listen` was called in, so a stream it starts closes with that island or block.
 // kept: free
-export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): void {
+export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): () => void {
   const owner = getOwner()
 
-  createEffect(() => {
+  return lasting('listen', handler, () => createEffect(() => {
     const at = typeof target === 'function' ? target() : target
 
     if (!at)
@@ -161,7 +170,7 @@ export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & st
 
     at.addEventListener(type, listener, options)
     onCleanup(() => at.removeEventListener(type, listener, options))
-  }, 'listen', handler)
+  }, 'listen', handler), typeof options === 'object' ? options.signal : undefined)
 }
 
 // A writable signal that follows `source`: an island edits it locally, and it takes `source`'s value again whenever that changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.

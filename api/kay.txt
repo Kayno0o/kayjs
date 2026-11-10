@@ -388,12 +388,13 @@ type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target
 type EventStream<T> = Response & { readonly [EVENTS]: T }
 
 [.] every
-function every(interval: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, run: () => unknown, options?: EveryOptions | undefined): void
+function every(interval: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, run: () => unknown, options?: EveryOptions | undefined): () => void
 
 [.] EveryOptions
 interface EveryOptions
   background?: boolean | undefined
   immediate?: boolean | undefined
+  signal?: AbortSignal | undefined
   while?: (() => boolean) | undefined
 
 [.] ExtensionServersOf
@@ -433,6 +434,7 @@ interface FollowLog
 [.] FollowLogOptions
 interface FollowLogOptions
   items?: string | undefined
+  signal?: AbortSignal | undefined
   threshold?: number | undefined
 
 [.] formErrors
@@ -462,7 +464,7 @@ type GuardContext<Own extends object = object, Guarded extends object = object> 
 }
 
 [.] guardLeave
-function guardLeave(dirty: () => boolean, options?: LeaveGuardOptions): void
+function guardLeave(dirty: () => boolean, options?: LeaveGuardOptions): () => void
 
 [.] GuardValue
 type GuardValue<G> = G extends (...args: never[]) => infer Returned ? PlainObject<Exclude<Awaited<Returned>, void | undefined>> : object
@@ -519,12 +521,13 @@ type Lastmod = Date | string | number
 [.] LeaveGuardOptions
 interface LeaveGuardOptions
   confirm?: ((to: URL) => Promise<boolean> | boolean) | undefined
+  signal?: AbortSignal | undefined
 
 [.] linked
 function linked<T>(source: () => T): Signal<T>
 
 [.] listen
-function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: (() => T | null | undefined) | T, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: AddEventListenerOptions | boolean | undefined): void
+function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: (() => T | null | undefined) | T, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: AddEventListenerOptions | boolean | undefined): () => void
 
 [.] live
 function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
@@ -835,13 +838,17 @@ type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefine
 }
 
 [.] presence
-function presence(): Presence<null>
-function presence<Member = null>(room: string, member?: Member | undefined): Presence<Member>
+function presence(options?: PresenceOptions | undefined): Presence<null>
+function presence<Member = null>(room: string, member?: Member | undefined, options?: PresenceOptions | undefined): Presence<Member>
 
 [.] Presence
 interface Presence<Member>
   count: () => number
   others: () => Member[]
+
+[.] PresenceOptions
+interface PresenceOptions
+  signal?: AbortSignal | undefined
 
 [.] previewing
 function previewing(): boolean
@@ -1197,7 +1204,7 @@ type ServerOfModule<Module, Name extends string> = Module extends Record<Name, i
 type Setter<T> = (next: T | ((current: T) => T)) => void
 
 [.] shortcut
-function shortcut(keys: (() => null | string | undefined) | string, handler: (event: KeyboardEvent) => void, options?: ShortcutOptions): void
+function shortcut(keys: (() => null | string | undefined) | string, handler: (event: KeyboardEvent) => void, options?: ShortcutOptions): () => void
 
 [.] ShortcutOptions
 interface ShortcutOptions
@@ -1205,6 +1212,7 @@ interface ShortcutOptions
   on?: (() => Element | null | undefined) | Element | undefined
   preventDefault?: boolean | undefined
   repeat?: boolean | undefined
+  signal?: AbortSignal | undefined
 
 [.] signal
 function signal<T>(): Signal<T | undefined>
@@ -1358,12 +1366,13 @@ type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<R
 function untrack<T>(fn: () => T): T
 
 [.] watch
-function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: (WatchOptions & { immediate?: false | undefined; }) | undefined): void
-function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions | undefined): void
+function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: (WatchOptions & { immediate?: false | undefined; }) | undefined): () => void
+function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions | undefined): () => void
 
 [.] WatchOptions
 interface WatchOptions
   immediate?: boolean | undefined
+  signal?: AbortSignal | undefined
 
 [.] webPush
 const webPush: { state: () => PushState; enable(): Promise<PushEnableResult>; subscribe(): Promise<PushSubscribeResult>; unsubscribe(): Promise<boolean>; }

@@ -1,4 +1,5 @@
 import type { LeaveGuard } from './navigation'
+import { lasting } from './lasting'
 import { leaveGuards, navigation } from './navigation'
 import { effect, onCleanup } from './reactive'
 
@@ -8,6 +9,8 @@ declare const KAY_BROWSER: true | undefined
 export interface LeaveGuardOptions {
   // Asked before the page is left for `to`, an app's own dialog resolving once answered; `window.confirm` by default.
   confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
+  // Stops guarding when aborted, as the function it returns does.
+  signal?: AbortSignal | undefined
 }
 
 const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
@@ -15,28 +18,30 @@ const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 // Only while one holds unsaved changes is the page listened for unloading: a `beforeunload` listener can keep it out of the back-forward cache.
 const dirtyGuards = new Set<LeaveGuard>()
 
-// Asks before the page is left while `dirty` holds, for as long as the island lives: a link of the app, `navigate()` and going back or forward ask the guard, a reload, closing the tab or another site's link get the browser's own prompt.
+// Asks before the page is left while `dirty` holds, for as long as the island lives or until the function it returns is called or `options.signal` aborts: a link of the app, `navigate()` and going back or forward ask the guard, a reload, closing the tab or another site's link get the browser's own prompt.
 // kept: free
-export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}): void {
+export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return
+    return () => undefined
 
   const guard: LeaveGuard = { dirty, confirm: options.confirm ?? askLeave }
 
-  leaveGuards.add(guard)
-  effect(() => {
-    if (dirty())
-      dirtyGuards.add(guard)
-    else
-      dirtyGuards.delete(guard)
+  return lasting('guardLeave', dirty, () => {
+    leaveGuards.add(guard)
+    effect(() => {
+      if (dirty())
+        dirtyGuards.add(guard)
+      else
+        dirtyGuards.delete(guard)
 
-    listenUnload()
-  })
-  onCleanup(() => {
-    leaveGuards.delete(guard)
-    dirtyGuards.delete(guard)
-    listenUnload()
-  })
+      listenUnload()
+    })
+    onCleanup(() => {
+      leaveGuards.delete(guard)
+      dirtyGuards.delete(guard)
+      listenUnload()
+    })
+  }, options.signal)
 }
 
 function askLeave(): boolean {

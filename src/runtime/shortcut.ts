@@ -1,3 +1,4 @@
+import { lasting } from './lasting'
 import { effect, onCleanup, onMount } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -12,6 +13,8 @@ export interface ShortcutOptions {
   repeat?: boolean | undefined
   // Cancels the browser's own action for the key, as `mod+s` saving the page; true by default.
   preventDefault?: boolean | undefined
+  // Stops it when aborted, as the function it returns does.
+  signal?: AbortSignal | undefined
 }
 
 interface Parsed {
@@ -97,20 +100,20 @@ function label(parsed: Parsed): string {
   return [parsed.ctrl && 'Control', parsed.meta && 'Meta', parsed.alt && 'Alt', parsed.shift && 'Shift', key].filter(Boolean).join('+')
 }
 
-// Runs `handler` when `keys` is pressed, `keys` following the signals a function reads (`null` binds nothing), for as long as the island lives: `mod+s` is Cmd+S on macOS and iOS and Ctrl+S elsewhere, `ctrl`, `meta`, `alt` and `shift` name a modifier, and a key is a character, `escape`, `enter`, `arrowup` or `space`.
+// Runs `handler` when `keys` is pressed, `keys` following the signals a function reads (`null` binds nothing), for as long as the island lives, or until the function it returns is called or `options.signal` aborts: `mod+s` is Cmd+S on macOS and iOS and Ctrl+S elsewhere, `ctrl`, `meta`, `alt` and `shift` name a modifier, and a key is a character, `escape`, `enter`, `arrowup` or `space`.
 // Nothing happens on the server, while composing text with an IME, or when something handled the event first, so the innermost of two bindings on one key wins when it prevents the default.
 // kept: free
-export function shortcut(keys: string | (() => string | null | undefined), handler: (event: KeyboardEvent) => void, options: ShortcutOptions = {}): void {
+export function shortcut(keys: string | (() => string | null | undefined), handler: (event: KeyboardEvent) => void, options: ShortcutOptions = {}): () => void {
   // Checked on the server too, so a misspelt spec fails the render rather than the hydration.
   if (typeof keys === 'string')
     parse(keys, false)
 
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return
+    return () => undefined
 
   const apple = isApple()
 
-  onMount(() => {
+  return lasting('shortcut', handler, () => onMount(() => {
     const scope = typeof options.on === 'function' ? options.on() : options.on
 
     // An `on` still undefined or null when the island mounted binds nothing, rather than the whole page.
@@ -123,7 +126,7 @@ export function shortcut(keys: string | (() => string | null | undefined), handl
       if (spec !== undefined && spec !== null && spec !== '')
         bind(parse(spec, apple), scope ?? window, scope ?? undefined, handler, options)
     })
-  })
+  }), options.signal)
 }
 
 // Listens for the shortcut on `target` until the computation it runs in is cleaned up.
