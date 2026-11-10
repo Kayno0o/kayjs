@@ -14,9 +14,12 @@ export function lasting(api: string, named: (...args: never[]) => unknown, start
   const stop = root((dispose) => {
     start()
 
+    // An abort stops it as the returned function does, letting go of the island's hold on it too.
     if (signal) {
-      signal.addEventListener('abort', dispose, { once: true })
-      onCleanup(() => signal.removeEventListener('abort', dispose))
+      const aborted = () => stop()
+
+      signal.addEventListener('abort', aborted, { once: true })
+      onCleanup(() => signal.removeEventListener('abort', aborted))
     }
 
     return () => {

@@ -315,6 +315,15 @@ describe('the handle of a helper that lasts as long as an island', () => {
       kept()
       kept()
       expect(owner!.cleanups!.length).toBe(before)
+
+      for (let round = 0; round < 50; round++) {
+        const abort = new AbortController()
+
+        core.every('1s', () => undefined, { background: true, signal: abort.signal })
+        abort.abort()
+      }
+
+      expect(owner!.cleanups?.length ?? 0).toBe(before)
     })
   })
 
