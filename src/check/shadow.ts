@@ -38,9 +38,9 @@ export interface ShadowFile {
   tsx: string
   map: SourceMap
   // The offsets in `tsx` where a line of a fence's body starts, which the generated code indents one level.
-  // The code without the template's static text, which no type reads.
-  typeCode?: string | undefined
   bodyLines?: number[] | undefined
+  // A hash of the code without the template's static text, which no type reads.
+  typeHash?: string | undefined
   // The offsets where a line of a statement copied to the module level starts, which the generated code leaves as the file has it.
   moduleLines?: number[] | undefined
 }
@@ -124,11 +124,11 @@ export function compileShadow(root: string, file: string, source: string, { rout
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slots = outerSlots(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, typeCode, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, outerGuards: guardTypes(file, source, routesDir, mounts, moved ? shadowDir : dirname(file)), check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
+  const { tsx, map, bodyLines, moduleLines, typeHash, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, outerGuards: guardTypes(file, source, routesDir, mounts, moved ? shadowDir : dirname(file)), check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
-  return { shadow: { source, file, tsx, map, bodyLines, moduleLines, typeCode }, queries, slots, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
+  return { shadow: { source, file, tsx, map, bodyLines, moduleLines, typeHash }, queries, slots, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
 }
 
 // Where the shadow in `shadowDir` imports the context module of the package `file` belongs to, if it declares one.

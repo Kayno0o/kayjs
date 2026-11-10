@@ -61,20 +61,20 @@ export class CodeBuilder {
     return this
   }
 
-  // The generated code without the template's static text: what changes when a type can. Only a check reads it.
-  withoutText(check: boolean | undefined): string | undefined {
+  // A hash of the generated code with each run of the template's static text made one empty string, which keeps the count of a component's children: what changes when a type can. Only a check reads it.
+  typeHash(check: boolean | undefined): string | undefined {
     if (!check)
       return undefined
 
-    let kept = ''
+    const hash = new Bun.CryptoHasher('sha1')
     let at = 0
 
     for (let index = 0; index < this.texts.length; index += 2) {
-      kept += this.code.slice(at, this.texts[index])
+      hash.update(this.code.slice(at, this.texts[index])).update('{""}')
       at = this.texts[index + 1]!
     }
 
-    return kept + this.code.slice(at)
+    return hash.update(this.code.slice(at)).digest('hex')
   }
 
   // The same code as `addSource`, mapped to nothing: for a copy of a span whose messages the mapped copy already carries.

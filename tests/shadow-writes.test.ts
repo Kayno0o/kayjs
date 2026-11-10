@@ -42,21 +42,23 @@ describe('writing the shadow tree again', () => {
   it('keeps the code of a shadow without its static text the same through an edit of that text alone', async () => {
     const root = await scratchDir('shadow-type-code-')
     const page = join(root, 'src/routes/index.kay')
-    const typeCode = async (source: string) => {
+    const typeHash = async (source: string) => {
       await Bun.write(page, source)
 
       const { files, changed } = await writeShadowTypes(root, { typesOnly: true })
       const shadow = [...files.values()].find(({ file }) => file === page)!
 
-      return { code: shadow.typeCode, tsx: shadow.tsx, changed }
+      return { code: shadow.typeHash, tsx: shadow.tsx, changed }
     }
 
     await Bun.write(join(root, 'tsconfig.json'), '{}\n')
 
-    const first = await typeCode('---\nconst name = "a"\n---\nh1 Home\np {name}\n')
-    const text = await typeCode('---\nconst name = "a"\n---\nh1 Home page\np {name}\n')
-    const code = await typeCode('---\nconst name = 1\n---\nh1 Home page\np {name}\n')
-    const same = await typeCode('---\nconst name = 1\n---\nh1 Home page\np {name}\n')
+    const first = await typeHash('---\nconst name = "a"\n---\nh1 Home\np {name}\n')
+    const text = await typeHash('---\nconst name = "a"\n---\nh1 Home page\np {name}\n')
+    const code = await typeHash('---\nconst name = 1\n---\nh1 Home page\np {name}\n')
+    const same = await typeHash('---\nconst name = 1\n---\nh1 Home page\np {name}\n')
+    // A text part beside an expression makes a component's children several.
+    const parts = await typeHash('---\nconst name = 1\n---\nh1 Home page\np hi {name}\n')
 
     expect(first.code).toBeDefined()
     expect(text.tsx).not.toBe(first.tsx)
@@ -66,6 +68,7 @@ describe('writing the shadow tree again', () => {
     expect(first.changed).toBe(true)
     expect(text.changed).toBe(false)
     expect(same.changed).toBe(false)
+    expect(parts.code).not.toBe(same.code)
   })
 
   it('leaves out what only `kay check` reports when asked for the types alone, and makes it again, whole, for a check', async () => {

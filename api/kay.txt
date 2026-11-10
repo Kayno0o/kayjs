@@ -1681,7 +1681,7 @@ interface CompileResult
   map: SourceMap
   moduleLines: number[]
   tsx: string
-  typeCode?: string | undefined
+  typeHash?: string | undefined
   why?: string | undefined
 
 [./compiler] Diagnostic

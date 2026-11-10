@@ -45,8 +45,8 @@ function fingerprint(shadows: Map<string, ShadowFile>): string {
   const hash = new Bun.CryptoHasher('sha1')
 
   // The shadows are made in parallel, so in no order of their own.
-  for (const [path, { tsx, typeCode }] of [...shadows].sort(([a], [b]) => a < b ? -1 : 1))
-    hash.update(path).update('\0').update(typeCode ?? tsx).update('\0')
+  for (const [path, { tsx, typeHash }] of [...shadows].sort(([a], [b]) => a < b ? -1 : 1))
+    hash.update(path).update('\0').update(typeHash ?? tsx).update('\0')
 
   return hash.digest('hex')
 }
@@ -80,11 +80,16 @@ async function write(): Promise<number> {
 
     const named = entry === '' ? config.entry : entry
 
+    // A write that fails halfway leaves a tree no print stands for.
+    const before = mapped
+
+    mapped = undefined
+
     const tree = await writeShadowTypes(root!, { ...configCheckOptions(config), entry: named, typesOnly: true })
     const print = fingerprint(tree.files)
 
     // A shadow whose code differs only in the template's static text changes no type.
-    process.stdout.write(`\n${TREE}${Number(tree.changed || print !== mapped)}\n`)
+    process.stdout.write(`\n${TREE}${Number(tree.changed || print !== before)}\n`)
     mapped = print
 
     if (!refused)

@@ -93,7 +93,7 @@ export interface ShadowTypes {
   locales: string[]
   // What the run found the project serves, which the boot checks read again rather than scan.
   served: ServedProject
-  // Whether the run wrote, replaced or removed a file of the tree other than a component's shadow, whose `typeCode` says whether its types changed.
+  // Whether the run wrote, replaced or removed a file of the tree other than a component's shadow, whose `typeHash` says whether its types changed.
   changed: boolean
 }
 
@@ -475,7 +475,7 @@ function redirectChecks(root: string, options: CheckOptions, project: ServedProj
 
 interface ShadowEntry {
   tsx: string
-  typeCode?: string | undefined
+  typeHash?: string | undefined
   map: ReturnType<SourceMap['toJSON']>
   diagnostics: Diagnostic[]
   typesOnly?: boolean
@@ -542,11 +542,11 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
 
   // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.
   if (cached !== undefined && (typesOnly || cached.typesOnly !== true))
-    return { shadow: { source, file, tsx: cached.tsx, typeCode: cached.typeCode, map: mapOf(cached) }, diagnostics: cached.diagnostics, queries, slots }
+    return { shadow: { source, file, tsx: cached.tsx, typeHash: cached.typeHash, map: mapOf(cached) }, diagnostics: cached.diagnostics, queries, slots }
 
   const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, typesOnly, signals, shadowOf })
 
-  const entry: ShadowEntry = { tsx: compiled.shadow.tsx, typeCode: compiled.shadow.typeCode, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
+  const entry: ShadowEntry = { tsx: compiled.shadow.tsx, typeHash: compiled.shadow.typeHash, map: compiled.shadow.map.toJSON(), diagnostics: compiled.diagnostics, ...typesOnly && { typesOnly } }
 
   maps.set(entry, compiled.shadow.map)
   memory.set(slot.file, { key: slot.key, value: entry })

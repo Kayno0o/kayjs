@@ -97,8 +97,8 @@ export interface CompileResult {
   bodyLines: number[]
   // Those of the statements copied to the module level.
   moduleLines: number[]
-  // Set when checking: `tsx` without the template's static text, which stays the same through an edit no type reads.
-  typeCode?: string | undefined
+  // Set when checking: a hash of `tsx` with the template's static text left out, which stays the same through an edit no type reads.
+  typeHash?: string | undefined
   // Set when the component is interactive and renders as an island.
   island?: string | undefined
   // What makes the component an island: its kind, name and span in the file.
@@ -357,7 +357,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     map: expansion ? final.builder.map().expanded(expansion) : final.builder.map(),
     bodyLines: final.builder.bodyLines,
     moduleLines: final.builder.moduleLines,
-    typeCode: final.builder.withoutText(options.check),
+    typeHash: final.builder.typeHash(options.check),
     island,
     cause,
     why: cause && describeCause(cause),
