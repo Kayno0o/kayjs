@@ -91,6 +91,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('gives focus back to where it was when Escape dismisses the only toast', async () => {
+    const page = await site.open('/shell')
+
+    await page.click('#saved')
+    await page.waitFor('.kui-toast')
+    await page.press('t', { modifiers: ['Alt'] })
+    await page.waitUntil(() => document.activeElement?.closest('.kui-toast') !== null && document.activeElement?.closest('.kui-toast') !== undefined)
+    await page.press('Escape')
+    await page.waitUntil(() => document.querySelector('.kui-toast') === null)
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe('saved')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('keeps a page that mounts its own Toaster showing each toast once', async () => {
     const page = await site.open('/toast-a')
 

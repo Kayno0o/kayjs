@@ -87,6 +87,18 @@ effect(() => {
     element.showPopover()
 })
 
+// Where focus was before it entered the toasts, for Escape to give it back once none is left to take it.
+const before: { element: HTMLElement | null } = { element: null }
+
+function focused(event: FocusEvent) {
+  const from = event.relatedTarget as HTMLElement | null
+
+  if (from && !toaster()?.contains(from))
+    before.element = from
+
+  holdToasts('focus', true)
+}
+
 shortcut(() => hotkey ? `alt+${hotkey}` : null, (event) => {
   const button = owns() ? toaster()?.querySelector<HTMLElement>('button:not(:disabled)') : null
 
@@ -94,6 +106,10 @@ shortcut(() => hotkey ? `alt+${hotkey}` : null, (event) => {
     return
 
   event.preventDefault()
+
+  if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
+    before.element = document.activeElement
+
   button.focus()
 }, { preventDefault: false })
 
@@ -141,7 +157,11 @@ function dismissed(event: KeyboardEvent) {
   const next = (element.nextElementSibling ?? element.previousElementSibling)?.querySelector('button')
 
   dismissToast(Number(element.dataset.id), 'user')
-  next?.focus()
+
+  if (next)
+    next.focus()
+  else if (before.element?.isConnected)
+    before.element.focus()
 }
 ---
 // Screen readers hear a toast from regions kept in the page, which a message joining reads out: a live region shown only as it fills, as the toaster is, is often not read.
@@ -158,7 +178,7 @@ if owns()
       if item.description
         span {` ${item.description}`}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
-  div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
+  div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={focused} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
       div(part="toast" data-id={item.id} data-tone={item.tone} onKeyDown={dismissed})
         if toast
