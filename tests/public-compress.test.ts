@@ -351,7 +351,7 @@ describe('a public file changed under a running server', () => {
 
     await writeFile(path, MEDIUM)
 
-    const app = await pages({ dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true })
+    const app = await pages({ requireGuards: false, dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true })
     const unknown = await get(app, '/never-there.json')
 
     expect((await get(app, '/bare.json')).status).toBe(200)
@@ -563,7 +563,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
       await writeFile(path, MEDIUM)
 
-      const app = await pages({ dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true, ...options })
+      const app = await pages({ requireGuards: false, dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true, ...options })
 
       expect((await get(app, `/${name}`)).status, name).toBe(200)
       await rm(path)
