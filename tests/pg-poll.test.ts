@@ -73,6 +73,25 @@ describe('the shared event poller', () => {
     expect(counter.calls()).toBe(stopped)
   })
 
+  it('slows a `listened` task only where notifications arrive, and a plain backoff one anywhere', async () => {
+    const clock = virtualClock()
+    const poller = pollerOf(counted({ db: async () => ({}) as SQL }).handle)
+    const runs = { listened: 0, always: 0 }
+    const task = (key: keyof typeof runs, backoff: true | 'listened') => ({ every: 40, backoff, wanted: () => true, run: async () => void runs[key]++, failed: 'reading failed' })
+    const removals = [poller.add(task('listened', 'listened'), false), poller.add(task('always', true), false)]
+
+    // No LISTEN here, so nothing delivers: the first keeps its rate through twenty quiet reads while the second doubles its delay after eight.
+    for (let step = 1; step <= 20; step++) {
+      await clock.advance(40)
+      await eventually(() => expect(runs.listened).toBe(step))
+    }
+
+    for (const remove of removals)
+      remove()
+
+    expect(runs.always).toBeLessThan(runs.listened)
+  })
+
   it('gives up on work that takes longer than its limit, and lets work within it answer', async () => {
     await expect(timeLimited(async () => Bun.sleep(300), 30, 'the read')).rejects.toThrow('the read took more than 0.03 seconds')
     await expect(timeLimited(async () => 'done', 30, 'the read')).resolves.toBe('done')
@@ -263,7 +282,7 @@ describe('the shared event poller', () => {
     // The window the poll rhythm is measured over, on the real clock as the stores' backed off tasks and the database answer in their own time.
     await Bun.sleep(1100)
 
-    // Rooms poll every 250ms, so four or five ticks; three separate timers would reach the database about twice that.
+    // Rooms poll every 250ms until they have found nothing eight times, so four or five ticks; three separate timers would reach the database about twice that.
     expect(counter.calls() - before).toBeLessThanOrEqual(7)
     expect(counter.calls() - before).toBeGreaterThanOrEqual(3)
     live.stop?.()

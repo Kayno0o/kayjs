@@ -116,8 +116,8 @@ export interface PollTask {
   wanted: () => boolean
   // Resolves 'busy' when it did not read because its last run is still going: that is neither a success nor a failure, so a streak of failed runs goes on. Resolves 'heard' when it read something, which keeps a task with `backoff` at its base rate.
   run: (db: SQL) => Promise<void | 'busy' | 'heard'>
-  // Whether the task polls less often after runs that heard nothing, back at `every` on a `wake`.
-  backoff?: boolean
+  // Whether the task polls less often after runs that heard nothing, back at `every` on a `wake`. `'listened'` does so only once notifications are known to arrive, so a database that delivers none is polled at `every` throughout.
+  backoff?: boolean | 'listened'
   // What the log says when a streak of failed runs begins.
   failed: string
   // The kind of write whose notification (a `LISTEN` of the database) runs the task at once, and lets a `backoff` one wait up to `LISTENED_IDLE_MS` between runs once notifications are known to arrive. The writes send it with `wakeOf`; a database that refuses or never delivers leaves the polling as it was.
@@ -197,8 +197,12 @@ function createPoller(pg: PgHandle): Poller {
         entry.failing = false
         entry.quiet = outcome === 'heard' ? 0 : entry.quiet + 1
 
-        if (entry.task.backoff)
-          entry.next = entry.began + (entry.held ? entry.task.every : delayAfter(entry.task.every, entry.quiet, entry.hearing?.delivering() === true ? LISTENED_IDLE_MS : MAX_IDLE_MS))
+        const listened = entry.hearing?.delivering() === true
+
+        const backoff = entry.task.backoff ?? false
+
+        if (backoff === 'listened' ? listened : backoff)
+          entry.next = entry.began + (entry.held ? entry.task.every : delayAfter(entry.task.every, entry.quiet, listened ? LISTENED_IDLE_MS : MAX_IDLE_MS))
       }
     }
     catch (error) {

@@ -239,7 +239,7 @@
     "max-lines-per-function": 201
   },
   "src/server/pg-rooms.ts": {
-    "max-lines-per-function": 308
+    "max-lines-per-function": 289
   },
   "src/server/prerender.ts": {
     "max-lines-per-function": 268,

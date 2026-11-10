@@ -1,11 +1,13 @@
 import type { SQL } from 'bun'
 import type { Duration } from '../runtime/duration'
 import type { PgHandle } from './pg-data'
+import type { Stop } from './pg-poll'
 import type { RoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { outsideRequest } from './clean-context'
 import { limited } from './pg-limit'
+import { wakeOf } from './pg-notify'
 import { closeWith, eventWindow, pollerOf } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
 
@@ -40,6 +42,9 @@ async function logged(what: string, work: Promise<unknown>): Promise<void> {
   }
 }
 
+// What tells two reads of a room's members apart.
+const signature = (members: Own[]): string => members.map(entry => `${entry.connection}\0${entry.member}`).toSorted().join('\n')
+
 const SQLSTATE = /^[0-9A-Z]{5}$/
 
 // Whether Postgres itself refused a statement (an SQLSTATE code), as against a connection lost or a call given up on.
@@ -49,27 +54,11 @@ const refused = (error: unknown): boolean => SQLSTATE.test(String((error as { er
 const LOCK_ATTEMPTS = 3
 const LOCK_NOT_AVAILABLE = '55P03'
 
-// Presence rooms in Postgres: a message published in one replica reaches the members connected to the others within `poll`, `'250ms'` by default; a bare number throws.
-// A replica reads the members of the rooms it holds a connection in or asked `members` about, so one it asks about for the first time lists the others' members from its next poll. A replica that stops without leaving has its members dropped once it has not been heard from for 10 seconds.
-// A room's state is a row of `kay_room_state`, changed under a lock per room so replicas updating one room take turns, and goes with the room's last member; `state` and `update` answer with promises, so `rooms({ store })` over it gives `Rooms`.
-export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomStore {
-  const pollMs = poll === undefined ? DEFAULT_POLL : optionMs(poll, '`pgRooms` poll')
-  const self = crypto.randomUUID()
-  const own = new Map<string, Own>()
-  // The members of the other replicas, by room, as of the last poll.
-  const remote = new Map<string, Own[]>()
-  // The rooms to read the members of, with when each was last asked about.
-  const watched = new Map<string, number>()
-  const listeners = new Set<Listener>()
+// The store's writes in the order they were made.
+function writeQueue(pg: PgHandle) {
   let tail: Promise<void> = Promise.resolve()
   let queued = 0
   let overflowing = false
-  const events = eventWindow()
-  let stopReadingTask: (() => void) | undefined
-  let reading = false
-  let beating: ReturnType<typeof setInterval> | undefined
-  let pruned = 0
-  let closed = false
 
   // Runs work once the ones queued before it did, in the order they were made, and gives its result, or its error, to the caller: a state is read and changed after the members written before it.
   // A caller waiting for the result gets it within one limit however many writes are queued before: `covering` has the limit run from the call, and the work given up on is cancelled as it starts. A write nobody awaits has its own limit once its turn comes.
@@ -124,10 +113,37 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     })()
   }
 
+  return { ordered, enqueue }
+}
+
+// Presence rooms in Postgres: a message published, a member joining or leaving in one replica reaches the others through `NOTIFY` at once, and by a poll every `poll`, `'250ms'` by default, as the fallback; a bare number throws. Once notifications are known to arrive, a poll that finds nothing new backs off to 30 seconds.
+// A replica reads the members of the rooms it holds a connection in or asked `members` about, so one it asks about for the first time lists the others' members from its next poll. A replica that stops without leaving has its members dropped once it has not been heard from for 10 seconds.
+// A room's state is a row of `kay_room_state`, changed under a lock per room so replicas updating one room take turns, and goes with the room's last member; `state` and `update` answer with promises, so `rooms({ store })` over it gives `Rooms`.
+export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomStore {
+  const pollMs = poll === undefined ? DEFAULT_POLL : optionMs(poll, '`pgRooms` poll')
+  const self = crypto.randomUUID()
+  const own = new Map<string, Own>()
+  // The members of the other replicas, by room, as of the last poll.
+  const remote = new Map<string, Own[]>()
+  // The rooms to read the members of, with when each was last asked about.
+  const watched = new Map<string, number>()
+  const listeners = new Set<Listener>()
+  const events = eventWindow()
+  let stopReadingTask: Stop | undefined
+  let reading = false
+  let beating: ReturnType<typeof setInterval> | undefined
+  let pruned = 0
+  let closed = false
+
+  const { ordered, enqueue } = writeQueue(pg)
   const ownRooms = () => new Set([...own.values()].map(entry => entry.room))
 
   // Marks a room as asked about now, forgetting the ones asked about longest ago past `MAX_WATCHED`, the rooms this process holds kept.
   const watch = (room: string) => {
+    // A room read for the first time is read at the base rate, however long the poll has slept.
+    if (!watched.has(room))
+      stopReadingTask?.wake()
+
     watched.delete(room)
     watched.set(room, Date.now())
 
@@ -158,16 +174,27 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     await query(db, 'DELETE FROM kay_room_state s WHERE NOT EXISTS (SELECT 1 FROM kay_room_members m WHERE m.room = s.room)')
   }
 
+  // Tells the other replicas to read the rooms again, as a write changed what they read; delivered on commit, so it follows the statement it names.
+  const wake = async (db: SQL) => {
+    await query(db, 'SELECT pg_notify($1, $2)', wakeOf('rooms'))
+  }
+
   // Drops the members of replicas gone quiet and the messages past `KEPT`.
   const prune = async (db: SQL) => {
-    await query(db, `DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ${NOW} - ${EXPIRY})`)
+    const gone = await query(db, `DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ${NOW} - ${EXPIRY}) RETURNING 1`)
+
     await query(db, `DELETE FROM kay_room_processes WHERE seen <= ${NOW} - ${EXPIRY}`)
     await dropStates(db)
     await query(db, `DELETE FROM kay_room_messages WHERE at <= ${NOW} - ${KEPT}`)
+
+    // A replica that stopped without leaving is noticed here, so the others need not poll to find it.
+    if (gone.length > 0)
+      await wake(db)
   }
 
   const upsert = async (db: SQL, room: string, connection: string, member: string, at: number) => {
     await query(db, 'INSERT INTO kay_room_members (room, connection, process, member, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member', [escaped(room), connection, self, member, at])
+    await wake(db)
   }
 
   const beat = () => {
@@ -189,6 +216,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
   const readRooms = async (db: SQL, names: string[]) => {
     const rows = await query<{ room: string, connection: string, member: string, at: string }>(db, `SELECT m.room, m.connection, m.member, m.at FROM kay_room_members m JOIN kay_room_processes p ON p.process = m.process WHERE m.room = ANY($1::text[]) AND m.process <> $2 AND p.seen > ${NOW} - ${EXPIRY}`, [names.map(escaped), self])
     const byRoom = new Map<string, Own[]>()
+    let changed = false
 
     for (const row of rows) {
       const room = unescaped(row.room)
@@ -196,8 +224,14 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       byRoom.set(room, [...byRoom.get(room) ?? [], { room, connection: row.connection, member: row.member, at: Number(row.at) }])
     }
 
-    for (const room of names)
-      remote.set(room, byRoom.get(room) ?? [])
+    for (const room of names) {
+      const next = byRoom.get(room) ?? []
+
+      changed ||= signature(remote.get(room) ?? []) !== signature(next)
+      remote.set(room, next)
+    }
+
+    return changed
   }
 
   const readMembers = async (db: SQL) => {
@@ -211,12 +245,12 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     }
 
     if (watched.size === 0)
-      return
+      return false
 
     const names = [...watched.keys()]
 
     try {
-      await readRooms(db, names)
+      return await readRooms(db, names)
     }
     catch (error) {
       // A lost connection or a timeout is the poller's to log and retry.
@@ -227,10 +261,11 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       kayLog('error', 'reading the members of the other processes failed; reading the rooms one by one', error)
 
       const held = ownRooms()
+      let changed = false
 
       for (const room of names) {
         try {
-          await readRooms(db, [room])
+          changed = await readRooms(db, [room]) || changed
         }
         catch (single) {
           if (!refused(single))
@@ -243,12 +278,15 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
             watched.delete(room)
         }
       }
+
+      return changed
     }
   }
 
+  // Whether a message not read before was found.
   const readMessages = async (db: SQL) => {
     if (listeners.size === 0)
-      return
+      return false
 
     const from = events.from()
 
@@ -258,8 +296,10 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
 
       events.start([Number(latest?.id ?? 0)])
 
-      return
+      return false
     }
+
+    let found = false
 
     // Ordered by the table column: a bare `id` is the text of the select list, where '100' sorts before '99'.
     for (const row of await query<{ id: string, room: string, text: string, skipped: string | null, recipient: string | null }>(db, 'SELECT id::text, room, text, skipped, recipient FROM kay_room_messages WHERE id > $1::bigint AND process <> $2 ORDER BY kay_room_messages.id', [from, self])) {
@@ -269,6 +309,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
         continue
 
       events.note(id)
+      found = true
 
       for (const listener of listeners) {
         try {
@@ -279,6 +320,8 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
         }
       }
     }
+
+    return found
   }
 
   const stopReading = () => {
@@ -287,7 +330,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     events.forget()
   }
 
-  const read = async (db: SQL): Promise<void | 'busy'> => {
+  const read = async (db: SQL): Promise<void | 'busy' | 'heard'> => {
     // A restarted reading does not begin while the one given up on is still running.
     if (reading)
       return 'busy'
@@ -297,18 +340,21 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     try {
       // The messages are read even when the members could not be, so a room the database refuses does not silence the others.
       let failure: unknown
+      let changed = false
 
       try {
-        await readMembers(db)
+        changed = await readMembers(db)
       }
       catch (error) {
         failure = error
       }
 
-      await readMessages(db)
+      const found = await readMessages(db)
 
       if (failure !== undefined)
         throw failure
+
+      return changed || found ? 'heard' : undefined
     }
     finally {
       reading = false
@@ -336,7 +382,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     const wanted = !closed && (listeners.size > 0 || watched.size > 0)
 
     if (wanted && stopReadingTask === undefined) {
-      stopReadingTask = pollerOf(pg).add({ every: pollMs, wanted: () => !closed, run: read, failed: 'reading the rooms of the other processes failed' }, true)
+      stopReadingTask = pollerOf(pg).add({ every: pollMs, backoff: 'listened', wanted: () => !closed, run: read, failed: 'reading the rooms of the other processes failed', listen: 'rooms' }, true)
     }
     else if (!wanted && stopReadingTask !== undefined) {
       stopReading()
@@ -358,6 +404,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       sync()
       enqueue('removing a member from the rooms store', async (db) => {
         await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [escaped(room), connection])
+        await wake(db)
         // Under the room's lock, so an update storing a state for the member that just left finishes first; a lock not given in time is asked for again rather than left to the next prune.
         for (let attempt = 1; ; attempt++) {
           try {
@@ -409,7 +456,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       const now = Date.now()
 
       enqueue('publishing to the rooms store', async (db) => {
-        await query(db, `INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES ($1, $2, $3, $4, $5, ${NOW})`, [escaped(room), text, self, recipients.except ?? null, recipients.to ?? null])
+        await query(db, `WITH written AS (INSERT INTO kay_room_messages (room, text, process, skipped, recipient, at) VALUES ($1, $2, $3, $4, $5, ${NOW}) RETURNING id) SELECT pg_notify($6, $7) FROM written`, [escaped(room), text, self, recipients.except ?? null, recipients.to ?? null, ...wakeOf('rooms')])
 
         // A process only publishing has no beat, so its publishes prune, as often as a beat would.
         if (beating === undefined && now - pruned >= HEARTBEAT) {
@@ -450,6 +497,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
         await logged('leaving the rooms store', ordered(async (db) => {
           await query(db, 'DELETE FROM kay_room_members WHERE process = $1', [self])
           await dropStates(db)
+          await wake(db)
         }))
       }
     },

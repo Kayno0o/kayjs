@@ -10,6 +10,7 @@ import { pgCache } from '../src/server/pg-cache'
 import { createDataTables, pgData, pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
 import { hear } from '../src/server/pg-notify'
+import { pgRooms } from '../src/server/pg-rooms'
 import { disposeOwned } from '../src/server/reload'
 import { serverStarted, serverStopped } from '../src/server/serving'
 import { eventually } from './helpers/eventually'
@@ -443,6 +444,44 @@ describe('a Postgres database that notifies', () => {
     })
     reader.stop?.()
     writer.stop?.()
+  })
+
+  pgIt('lets a room message and a member of one process reach another with its timers stopped', async () => {
+    const { sql } = await postgres()
+
+    await createDataTables(sql)
+
+    const clock = virtualClock()
+    const [readerSql, writerSql] = replicas(2)
+    const reader = pgRooms(pgHandle(readerSql!))
+    const writer = pgRooms(pgHandle(writerSql!))
+    const heard: string[] = []
+
+    reader.subscribe((room, text) => void heard.push(`${room}/${text}`))
+    reader.members('lobby')
+    await clock.advance(150)
+
+    // No poll fires on its own: only the notification can bring the read.
+    await eventually(async () => {
+      writer.publish('lobby', 'hi', {})
+      await clock.advance(150)
+      expect(heard).toContain('lobby/hi')
+    })
+
+    writer.add('lobby', 'tab-1', 'ada')
+    await eventually(async () => {
+      await clock.advance(150)
+      expect(reader.members('lobby')).toEqual(['ada'])
+    })
+
+    writer.remove('lobby', 'tab-1')
+    await eventually(async () => {
+      await clock.advance(150)
+      expect(reader.members('lobby')).toEqual([])
+    })
+
+    await reader.close?.()
+    await writer.close?.()
   })
 
   pgIt('lets a cache invalidation published in one process reach another with its timers stopped', async () => {
