@@ -74,6 +74,15 @@ test('breadcrumb marks the middle of a trail that grows past three items, and th
   expect(after).toEqual({ middle: 2, current: 'Page 4' })
 })
 
+test('breadcrumb folds its middle crumbs into a menu of links, labelled for screen readers', async () => {
+  const { after } = await flip(root => ({
+    label: root.querySelector('#crumbs [data-part="more"] button')?.getAttribute('aria-label'),
+    links: [...root.querySelectorAll('#crumbs [data-part="more"] a')].map(link => [link.textContent?.trim(), link.getAttribute('href')]),
+  }))
+
+  expect(after).toEqual({ label: 'Show the hidden pages', links: [['Page 1', '/p1'], ['Page 2', '/p2']] })
+})
+
 test('pagination follows the number of pages', async () => {
   const { before, after } = await flip(root => [...root.querySelectorAll('#pages a')].map(link => link.textContent?.trim()))
 

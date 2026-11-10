@@ -30,7 +30,7 @@ Give `offset`, `limit`, `more` and `url` to page by row. Each link sets `?offset
 
 Give `total` and `pageSize` in place of `pages` and the pages follow from the rows, with a summary beside the links, `21–40 of 134`. `rangeLabel` words it: a string filling `{from}`, `{to}` and `{total}`, or a function of `{ from, to, total }`.
 
-`sizes` adds a link for each page size, such as `sizes={[10, 25, 50]}`. Each link sets `limitParam`, `limit` by default, and drops the page, so a new size starts from the first page. Read the size from that parameter in the route and pass it back as `pageSize`. The sizes stay while the rows outgrow the smallest, even on one page, so a size picked past the end can be undone.
+`sizes` adds a link for each page size, such as `sizes={[10, 25, 50]}`. Each link sets `limitParam`, `limit` by default, and drops the page, so a new size starts from the first page. Read the size from that parameter in the route and pass it back as `pageSize`. The sizes stay while the rows outgrow the smallest, even on one page, so a size picked past the end can be undone. A single page still shows its summary.
 
 ## In the browser
 

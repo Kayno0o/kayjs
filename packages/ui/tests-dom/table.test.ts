@@ -876,7 +876,8 @@ describe('Table with a pageSize', () => {
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
     expect(pagedRows(mounted.root)).toHaveLength(6)
-    expect(mounted.root.querySelector('[data-part="pager"]')).toBeNull()
+    expect(mounted.root.querySelector('[data-part="pager"] [data-part="range"]')?.textContent).toBe('1–6 of 6')
+    expect(changes).toEqual(['2/10', '1/10'])
 
     box.value = ''
     box.dispatchEvent(new Event('input', { bubbles: true }))

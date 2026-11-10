@@ -944,11 +944,11 @@ describe('Pagination', () => {
     expect((await attributes('/paging', '#total [data-part="sizes"]', ['aria-label', 'role']))).toEqual([{ 'aria-label': 'Rows per page', 'role': 'group' }])
   })
 
-  test('keeps the sizes of a list that fits one page, so a size picked past the rows can be undone, and draws nothing when no size is smaller than the rows', async () => {
+  test('keeps the sizes of a list that fits one page, so a size picked past the rows can be undone, and draws the summary alone when no size is smaller than the rows', async () => {
     expect((await find('/paging', '#total-sized [data-part="range"]')).map(found => found.text)).toEqual(['1–15 of 15'])
     expect(await find('/paging', '#total-sized [data-part="page"]')).toEqual([])
     expect((await find('/paging', '#total-sized [data-part="sizes"] a')).map(found => attr(found, 'href'))).toEqual(['/rows?per=10', '/rows?per=25', '/rows?per=50'])
-    expect(await find('/paging', '#total-single nav')).toEqual([])
+    expect((await find('/paging', '#total-single nav > *')).map(found => found.text)).toEqual(['1–5 of 5'])
   })
 
   test('words the range from a string filling its placeholders', async () => {

@@ -183,7 +183,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   rowHref?: ((row: Row) => string | undefined) | undefined
   // Makes each row a button, or hears the click of a link row (call `event.preventDefault()` to follow the link yourself).
   onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined
-  // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. Not for a `list` or a `virtual` table, which page or window their rows themselves.
+  // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first, which `onPageChange` hears. The pager is drawn once the table runs in the browser, and `pageSizes` does nothing without a `pageSize`. Not for a `list` or a `virtual` table, which page or window their rows themselves.
   pageSize?: number | undefined
   // The sizes to offer under the rows of a table with a `pageSize`, such as `[10, 25, 50]`; the one on screen is marked.
   pageSizes?: readonly number[] | undefined
@@ -372,17 +372,25 @@ const endpoint = memo(() => {
   return typeof value === 'string' ? value : undefined
 })
 
+const ready = signal(false)
+
+onMount(() => ready = true)
+
 const pageNow = signal(1)
 const sizeNow = signal(pageSize ?? 0)
 
 effect(() => sizeNow = pageSize ?? 0)
 
-// A sort or a filter shows the rows from their first page again.
+// A sort or a filter shows the rows from their first page again, which `onPageChange` hears like a click.
 effect(() => {
   current()
   typed()
   fieldsNow()
-  pageNow = 1
+
+  if (untrack(pageNow) !== 1) {
+    pageNow = 1
+    untrack(() => onPageChange?.(1, sizeNow()))
+  }
 })
 
 // The page as one that exists, as rows leave or the size grows.
@@ -600,7 +608,8 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {footer(column)}
               else
                 | {column.footer ?? ''}
-  if paging() && !skeleton()
+  // Drawn once the table runs in the browser: the links of a pager written by the server would address a `?page=` the table never reads.
+  if paging() && !skeleton() && ready()
     Pagination(part="pager" page={pageShown()} total={shown().length} pageSize={sizeNow()} sizes={pageSizes} onPage={goTo} onSize={resize})
   if list
     LoadMore(list={list})

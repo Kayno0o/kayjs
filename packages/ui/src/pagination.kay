@@ -133,7 +133,8 @@ const summary = () => {
 }
 // Sizes are offered while the list outgrows the smallest, so one picked past the rows still shows the others.
 const sized = () => total !== undefined && sizes !== undefined && sizes.length > 0 && total > Math.min(...sizes)
-const drawn = () => count() > 1 || sized()
+// One page of rows still draws its summary, `1–5 of 5`.
+const drawn = () => count() > 1 || sized() || (total !== undefined && total > 0)
 
 ---
 // Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island. With a handler they sit in a wrapper that hears the clicks, the one island.
