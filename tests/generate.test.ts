@@ -449,7 +449,7 @@ for (const ui of [true, false]) {
     await admin.unsafe(`CREATE DATABASE ${name}`)
 
     try {
-      const migrate = Bun.spawn([join(repo, 'node_modules/.bin/pg-orm'), 'generate', 'init'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } })
+      const migrate = Bun.spawn([join(repo, 'node_modules/.bin/pg-orm'), 'generate'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MIGRATE_DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } })
       const [generated, errors] = await Promise.all([new Response(migrate.stdout).text(), new Response(migrate.stderr).text(), migrate.exited])
 
       expect({ generated: generated.includes('Generated'), errors }).toEqual({ generated: true, errors: expect.not.stringContaining('rror') })
