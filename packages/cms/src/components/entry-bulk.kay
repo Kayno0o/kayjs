@@ -65,14 +65,14 @@ async function run(action: BulkAction): Promise<void> {
 ---
 if actions.has('publish') && drafts() && fitting('publish').length > 0
   if blocked().publish !== undefined
-    Refused(label={wording('cms.entry.publish', 'Publish')} reason={blocked().publish})
+    Refused(label={wording('cms.entry.publish', 'Publish')} ariaLabel={wording('cms.bulk.publishAria', fitting('publish').length === 1 ? 'Publish 1 selected entry' : 'Publish {count} selected entries', { count: fitting('publish').length })} reason={blocked().publish})
   else
-    Button(label={wording('cms.entry.publish', 'Publish')} onClick={() => run('publish')})
+    Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.bulk.publishAria', fitting('publish').length === 1 ? 'Publish 1 selected entry' : 'Publish {count} selected entries', { count: fitting('publish').length })} onClick={() => run('publish')})
 if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0 && blocked().publish !== undefined
-  Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={blocked().publish})
+  Refused(label={wording('cms.entry.unpublish', 'Unpublish')} ariaLabel={wording('cms.bulk.unpublishAria', fitting('unpublish').length === 1 ? 'Unpublish 1 selected entry' : 'Unpublish {count} selected entries', { count: fitting('unpublish').length })} reason={blocked().publish})
 else if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
-  ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
+  ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} aria-label={wording('cms.bulk.unpublishAria', fitting('unpublish').length === 1 ? 'Unpublish 1 selected entry' : 'Unpublish {count} selected entries', { count: fitting('unpublish').length })} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
 if actions.has('delete') && blocked().delete !== undefined
-  Refused(label={wording('cms.bulk.delete', 'Delete')} reason={blocked().delete} tone="danger")
+  Refused(label={wording('cms.bulk.delete', 'Delete')} ariaLabel={wording('cms.bulk.deleteAria', rows.length === 1 ? 'Delete 1 selected entry' : 'Delete {count} selected entries', { count: rows.length })} reason={blocked().delete} tone="danger")
 else if actions.has('delete')
-  ConfirmDelete(triggerLook="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})
+  ConfirmDelete(triggerLook="button" label={wording('cms.bulk.delete', 'Delete')} aria-label={wording('cms.bulk.deleteAria', rows.length === 1 ? 'Delete 1 selected entry' : 'Delete {count} selected entries', { count: rows.length })} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})

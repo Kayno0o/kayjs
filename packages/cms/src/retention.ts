@@ -5,6 +5,7 @@ import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
 import { log } from './log'
+import { forgetReviewer, pruneReviews } from './review'
 import { placeOf, pruneRevisions } from './revisions'
 import { settings } from './settings'
 import { isRow, purge, trashRevision } from './trash'
@@ -131,6 +132,8 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
         next.activity = { oldest }
     }
 
+    await pruneReviews(name, cutoff)
+
     const pruned = await pruneRevisions(name, cutoff, everything ? undefined : [...new Set([...(await entries(name)).map(placeOf), ...places])])
 
     // A full sweep that failed to prune leaves the day for the next one to try again.
@@ -210,7 +213,7 @@ export async function eraseHistory(ref: EntryRef): Promise<number> {
   return erased
 }
 
-// Rewrites an editor's name to `Former editor` in the trash, the revisions and the activity log of every loaded collection, for an editor who asked to be forgotten. Returns how many rows changed.
+// Rewrites an editor's name to `Former editor` in the trash, the revisions, the activity log and the reviews of every loaded collection, for an editor who asked to be forgotten. Returns how many rows changed.
 export async function forgetEditor(name: string): Promise<number> {
   let changed = 0
 
@@ -237,6 +240,8 @@ export async function forgetEditor(name: string): Promise<number> {
         changed++
       }
     }
+
+    changed += await forgetReviewer(collection, name, FORGOTTEN)
   }
 
   return changed

@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import type { ScreenCollection } from '../src/kay/contract'
+import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import type { TrashScreen } from '../src/screens'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
@@ -74,6 +74,42 @@ test('Restore asks first, then posts the entry\'s id to the trash API and says s
   expect(String(url)).toContain('/trash/notes/200/restore')
   expect(init.method).toBe('POST')
   expect(document.body.textContent).toContain('Restored')
+})
+
+test('each Restore and Erase for good is named with its entry, refused or not', async () => {
+  const root = await open(rows)
+  const names = (label: string) => [...root.querySelectorAll('button')].filter(item => item.textContent?.trim() === label).map(item => item.getAttribute('aria-label')).filter(Boolean)
+
+  expect(names('Restore')).toEqual(['Restore Two', 'Restore One'])
+  expect(names('Erase for good')).toEqual(['Erase Two for good', 'Erase One for good'])
+  mounted?.unmount()
+
+  mounted = await mountComponent(WithToaster, { trash: { collection: NOTES, rows, denied: { delete: 'No' } } })
+  await settle()
+
+  const refused = [...mounted.root.querySelectorAll('button[disabled]')]
+
+  expect(refused.map(item => item.getAttribute('aria-label'))).toEqual(['Erase Two for good', 'Erase One for good'])
+})
+
+test('each Restore of a version is named with its date', async () => {
+  const entry = { slug: 'hello', version: 'v1', data: {} } as unknown as StoredEntry
+  const change = { key: 'title', label: 'Title', before: 'a', after: 'b' }
+
+  mounted = await mountComponent(WithToaster, { versions: { collection: NOTES, entry, rows: [
+    { revision: 3, savedAt: new Date(Date.UTC(2026, 2, 3, 9, 30)), verb: 'update', changes: [change], current: true },
+    { revision: 2, savedAt: new Date(Date.UTC(2026, 1, 2, 9, 30)), verb: 'update', changes: [change], current: false },
+    { revision: 1, savedAt: new Date(Date.UTC(2026, 0, 1, 9, 30)), verb: 'add', changes: [], current: false },
+    { revision: 0, verb: 'original', changes: [], current: false },
+  ] } })
+  await settle()
+
+  const names = [...mounted.root.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Restore').map(item => item.getAttribute('aria-label'))
+
+  expect(names).toHaveLength(3)
+  expect(new Set(names).size).toBe(3)
+  expect(names[0]).toMatch(/^Restore the version of .*2026/)
+  expect(names[2]).toBe('Restore this version')
 })
 
 test('a refused restore toasts why', async () => {

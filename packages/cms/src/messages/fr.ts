@@ -1,4 +1,5 @@
 import { defineMessages } from 'kay/i18n'
+import kayEntry from '../fr-entry-messages'
 
 // The French of every `cms.*` key the screens and the editor look up, which a site on a French page gets with no setup and overrides key by key in its own `src/messages/fr.ts`.
 export default defineMessages({
@@ -60,11 +61,14 @@ export default defineMessages({
     },
     bulk: {
       delete: 'Supprimer',
+      deleteAria: { one: 'Supprimer {count} entrée sélectionnée', other: 'Supprimer {count} entrées sélectionnées' },
       deleted: { one: '{count} entrée supprimée', other: '{count} entrées supprimées' },
       deleteMessage: { one: 'Supprimer {count} entrée ? C\'est définitif.', other: 'Supprimer {count} entrées ? C\'est définitif.' },
       failed: { one: '{count} entrée n\'a pas pu être modifiée', other: '{count} entrées n\'ont pas pu être modifiées' },
       failedWhy: { one: '{count} entrée n\'a pas pu être modifiée : {reason}', other: '{count} entrées n\'ont pas pu être modifiées, la première : {reason}' },
       published: { one: '{count} entrée publiée', other: '{count} entrées publiées' },
+      publishAria: { one: 'Publier {count} entrée sélectionnée', other: 'Publier {count} entrées sélectionnées' },
+      unpublishAria: { one: 'Dépublier {count} entrée sélectionnée', other: 'Dépublier {count} entrées sélectionnées' },
       unpublished: { one: '{count} entrée dépubliée', other: '{count} entrées dépubliées' },
       unpublishMessage: { one: 'Dépublier {count} entrée ? Les visiteurs ne la verront plus tant que vous ne l\'aurez pas publiée à nouveau.', other: 'Dépublier {count} entrées ? Les visiteurs ne les verront plus tant que vous ne les aurez pas publiées à nouveau.' },
     },
@@ -97,10 +101,8 @@ export default defineMessages({
       empty: 'Rien sur cette page ne vient d\'une collection.',
       hide: 'Masquer l\'éditeur',
       leaveFailure: 'Impossible de quitter le mode édition',
-      browseOff: 'Modifier de nouveau la page',
       browseOn: 'Parcourir la page : les liens et les menus fonctionnent',
       leaving: 'Sortie…',
-      markingOff: 'Ne plus entourer chaque champ',
       markingOn: 'Entourer chaque champ de la page',
       open: 'Modifier cette page',
       rebuilding: 'Votre dernier enregistrement n\'est pas encore arrivé sur le site, qui montre l\'ancien contenu jusqu\'à sa reconstruction.',
@@ -238,7 +240,9 @@ export default defineMessages({
       takes: 'Accepte {types}.',
       upTo: 'Jusqu\'à {size}.',
       upload: 'Envoyer',
+      uploadDone: '{name} envoyé',
       uploadMany: 'Envoyer des fichiers',
+      uploadStarted: 'Envoi de {name}',
       uploading: 'Envoi {percent}\u00A0%',
     },
     guard: {
@@ -250,6 +254,7 @@ export default defineMessages({
       notYours: 'Votre rôle ne modifie que les entrées que vous avez écrites',
       outOfReach: 'Votre rôle n\'a pas accès à cette collection',
       signedOut: 'Connectez-vous pour continuer',
+      siteOnly: 'Votre rôle n\'a pas accès aux écrans de tout le site',
       unplaced: 'Le cms ne peut pas situer cette requête parmi ses routes',
     },
     history: {
@@ -267,6 +272,8 @@ export default defineMessages({
       publish: 'Publiée',
       restore: 'Restaurée depuis une version antérieure',
       restoreFailure: 'Impossible de restaurer',
+      restoreAria: 'Restaurer cette version',
+      restoreDatedAria: 'Restaurer la version du {date}',
       restoreButton: 'Restaurer',
       restoreMessage: 'Restaurer cette version ? Elle est enregistrée comme une nouvelle version, et la version actuelle reste dans l\'historique.',
       restored: 'Restaurée',
@@ -571,6 +578,7 @@ export default defineMessages({
       noMatchHint: 'Aucune entrée ne correspond à la recherche et au filtre.',
       publish: 'Publier {title}',
       published: 'Publié',
+      unpublish: 'Dépublier {title}',
       scheduled: 'Programmé pour {at}',
       status: 'Statut',
       title: 'Titre',
@@ -585,12 +593,14 @@ export default defineMessages({
       empty: 'La corbeille est vide',
       emptyHint: 'Une entrée supprimée d\'ici est conservée un temps, pour pouvoir la rétablir.',
       erase: 'Effacer définitivement',
+      eraseAria: 'Effacer {title} définitivement',
       eraseFailure: 'Impossible d\'effacer',
       eraseMessage: 'Effacer {title} définitivement ? Elle quitte la corbeille, ses versions et le journal d\'activité, sans retour possible.',
       erased: 'Effacée',
       gone: 'Cette entrée n\'est plus dans la corbeille',
       open: 'Corbeille',
       pageTitle: 'Corbeille - {collection}',
+      restoreAria: 'Rétablir {title}',
       restoreMessage: 'Rétablir {title} ? Elle revient sous son identifiant.',
     },
     upload: {
@@ -628,21 +638,5 @@ export default defineMessages({
       variants: 'Variantes',
     },
   },
-  // The texts kay words for a refused field of an entry, which the editor shows: they are kay's own, shipped here so a French site needs nothing for them.
-  kay: {
-    entry: {
-      data: 'Les données',
-      format: '{field} n\'est pas au format {format}',
-      item: '{field}, élément {n}',
-      pattern: '{field} n\'a pas la forme attendue',
-      required: '{field} est obligatoire',
-      tooBig: '{field} doit valoir {max} au plus',
-      tooFewItems: '{field} : au moins {min} éléments',
-      tooLong: '{field} accepte {max} caractères au plus',
-      tooManyItems: '{field} : {max} éléments au plus',
-      tooShort: '{field} demande au moins {min} caractères',
-      tooSmall: '{field} doit valoir {min} au moins',
-      type: '{field} n\'est pas valide',
-    },
-  },
+  kay: kayEntry,
 })

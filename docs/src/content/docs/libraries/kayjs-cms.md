@@ -127,7 +127,7 @@ A new entry is written with the field set to the person, and a save never change
 
 The server checks both on every route, not just in the screens. A person with several roles can do what any one of them allows. A role written as a list still reaches everything, so an existing config works unchanged.
 
-What belongs to the whole site, the redirects, renaming a file in the media library and the unused uploads, needs a role without these limits. Renaming an entry rewrites the entries that point at it, so it is refused unless the role may change every one of them.
+What belongs to the whole site, the redirects, renaming a file in the media library and the unused uploads, needs a role without these limits. The Media and Unused uploads screens answer 403 to a limited role, and their links show disabled with the reason as a tooltip. Renaming an entry rewrites the entries that point at it, so it is refused unless the role may change every one of them.
 
 Once any role is limited, a person whose roles are not listed reaches nothing. A save is checked against the entry of the locale its body names, and a collection that fails to read refuses the save rather than counting as empty. A restore from history keeps the writer the entry has now.
 
@@ -655,7 +655,7 @@ A collection kept by `sqliteLoader` or `pgLoader` remembers what editors save. E
 
 You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 
-`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, the first time a few minutes after it starts, and `maxAge` (a year by default, `false` for no limit) says how old a version or an activity event may get.
+`cms({ history: { revisions: 100, trash: '7d' } })` keeps more or fewer saves, or the trash for another time (`trash: false` keeps none), and `cms({ history: false })` turns it off. The server drops the trash and the old versions by itself every hour, the first time a few minutes after it starts, and `maxAge` (a year by default, `false` for no limit) says how old a version, an activity event or a review may get.
 
 Each hour it reads the trash and the activity only when something in them can have expired, and once a day it reads all of the history to find a version that lost its place in the list.
 
@@ -663,7 +663,7 @@ To leave one collection out, give it `history: false` in `collections`: `cms({ c
 
 A loader of your own gets the same by giving a `sibling(kind)` function that returns a loader for a hidden collection in its store. Folder collections keep no history of their own: their files are in git.
 
-A deleted entry may hold a visitor's data, and the history holds the names of your editors, which is personal data. When someone asks you to erase theirs, delete the entry, then press Erase for good on its line in the trash: it leaves the trash, its versions and the activity log. For an editor, `forgetEditor(name)` replaces their name with `Former editor` in all three.
+A deleted entry may hold a visitor's data, and the history holds the names of your editors, which is personal data. When someone asks you to erase theirs, delete the entry, then press Erase for good on its line in the trash: it leaves the trash, its versions and the activity log. For an editor, `forgetEditor(name)` replaces their name with `Former editor` in all three and in the review log of a collection that has one.
 
 ### Seeing what editors did
 

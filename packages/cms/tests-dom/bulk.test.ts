@@ -274,3 +274,36 @@ test('a rename that left an entry unpointed tells which', async () => {
   await until(() => text().includes('Renamed, but Books: Engine could not be pointed at the new slug'))
   expect(text()).toContain('Renamed, but Books: Engine could not be pointed at the new slug')
 })
+
+test('the bulk buttons say how many entries they act on, refused or not', async () => {
+  const { root } = await openBar([row('a'), row('b'), row('live', { draft: false })])
+
+  expect(button(root, 'Publish')!.getAttribute('aria-label')).toBe('Publish 2 selected entries')
+  expect(button(root, 'Unpublish')!.getAttribute('aria-label')).toBe('Unpublish 1 selected entry')
+  expect(button(root, 'Delete')!.getAttribute('aria-label')).toBe('Delete 3 selected entries')
+  mounted?.unmount()
+
+  mounted = await mountComponent(WithToaster, { bar: { collection: POSTS, rows: [row('a'), row('live', { draft: false })], actions: new Set(['publish', 'unpublish', 'delete']), clear: () => undefined, denied: { publish: 'No', delete: 'No' } } })
+  await settle()
+  expect(button(mounted.root, 'Publish')!.getAttribute('aria-label')).toBe('Publish 1 selected entry')
+  expect(button(mounted.root, 'Unpublish')!.getAttribute('aria-label')).toBe('Unpublish 1 selected entry')
+  expect(button(mounted.root, 'Delete')!.getAttribute('aria-label')).toBe('Delete 2 selected entries')
+})
+
+test('a refused row action carries the row\'s name as the allowed one does', async () => {
+  mounted = await mountComponent(WithToaster, { table: { collection: POSTS, rows: [row('a', { title: 'Alpha' }), row('live', { title: 'Live', draft: false })], denied: { publish: 'No', edit: 'No' } } })
+  await settle()
+
+  const names = [...mounted.root.querySelectorAll('.kcms-row-actions button')].map(item => item.getAttribute('aria-label'))
+
+  expect(names).toContain('Publish Alpha')
+  expect(names).toContain('Unpublish Live')
+  expect(names).toContain('Duplicate Alpha')
+  expect(names).toContain('Duplicate Live')
+})
+
+test('an allowed Unpublish names its entry too', async () => {
+  mounted = await mountComponent(WithToaster, { table: { collection: POSTS, rows: [row('live', { title: 'Live', draft: false })] } })
+  await settle()
+  expect(mounted.root.querySelector('.kcms-row-actions button[aria-label="Unpublish Live"]')).not.toBeNull()
+})

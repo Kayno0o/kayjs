@@ -459,6 +459,33 @@ test('an image previews with its alt text, which is edited in place, shown only 
   expect(optional.querySelector('label.kcms-file-alt input')?.hasAttribute('aria-required')).toBe(false)
 })
 
+test('an upload says when it starts and when it landed, to a screen reader, and a refused one says nothing but its error', async () => {
+  const request = globalThis.XMLHttpRequest
+
+  Object.assign(globalThis, { XMLHttpRequest: SlowRequest })
+  SlowRequest.instances = []
+
+  try {
+    const root = await openFile('')
+
+    await drop(root, new File([new Uint8Array(10)], 'new.png', { type: 'image/png' }))
+    await until(() => said() === 'Uploading new.png')
+    SlowRequest.instances[0]!.onload?.()
+    await until(() => said() === 'new.png uploaded')
+    expect(root.querySelector('a.kcms-file-link')?.getAttribute('href')).toBe(UPLOADED)
+
+    Object.assign(globalThis, { XMLHttpRequest: RefusingRequest })
+    root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
+    await settle()
+    await drop(root, new File([new Uint8Array(10)], 'bad.png', { type: 'image/png' }))
+    await until(() => root.querySelector('.kcms-file-error') !== null)
+    expect(said()).not.toBe('bad.png uploaded')
+  }
+  finally {
+    Object.assign(globalThis, { XMLHttpRequest: request })
+  }
+})
+
 test('the field says what it takes: the types, the most it weighs and the pixels an image needs', async () => {
   const root = await openFile('', { upload: { accept: ['image/png', 'image/svg+xml'], maxSize: 2 * 1024 * 1024, minWidth: 800, minHeight: 600 } })
 

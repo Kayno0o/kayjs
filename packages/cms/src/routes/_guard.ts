@@ -10,19 +10,25 @@ import { settings } from '../settings'
 // The screens of a collection, below the prefix: its list, an entry, a new entry, its trash, an entry's history.
 const COLLECTION_SCREEN = /^\/(?:collections|new|trash|history)\/([^/]+)/
 
-// The collection a screen's path names, whatever the base and the slashes before the prefix; undefined for a screen of none, and for a path the prefix is not in, which is then refused as the API refuses one it cannot place.
-function screenCollection(ctx: GuardContext): string | undefined | null {
+// The screens of the site rather than of a collection, which a role limited to collections or to its own entries does not reach.
+const SITE_SCREEN = /^\/(?:media|uploads)$/
+
+// The path below the prefix, whatever the base and the slashes before the prefix; empty for the prefix itself, and null for a path the prefix is not in, which is then refused as the API refuses one it cannot place.
+function belowPrefix(ctx: GuardContext): string | null {
   const { prefix } = settings()
   const path = routePath(ctx.url)
-  const at = prefix === '/' ? 0 : path.indexOf(`${prefix}/`)
 
   if (path === prefix)
-    return undefined
+    return ''
 
-  if (at < 0)
-    return null
+  const at = prefix === '/' ? 0 : path.indexOf(`${prefix}/`)
 
-  const [, name] = COLLECTION_SCREEN.exec(path.slice(at + (prefix === '/' ? 0 : prefix.length))) ?? []
+  return at < 0 ? null : path.slice(at + (prefix === '/' ? 0 : prefix.length))
+}
+
+// The collection a screen's path names; undefined for a screen of none.
+function screenCollection(below: string): string | undefined {
+  const [, name] = COLLECTION_SCREEN.exec(below) ?? []
 
   try {
     return name === undefined ? undefined : decodeURIComponent(name)
@@ -48,14 +54,19 @@ export default guard(async (ctx) => {
     throw error
   }
 
-  // A role limited to some collections opens no other collection's screens.
-  const named = settings().roles === undefined ? undefined : screenCollection(ctx)
+  const below = settings().roles === undefined ? undefined : belowPrefix(ctx)
 
-  if (named === null)
+  if (below === null)
     return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))
+
+  // A role limited to some collections opens no other collection's screens, nor the site's.
+  const named = below === undefined ? undefined : screenCollection(below)
 
   if (named !== undefined && !await may(ctx, 'read', { collection: named }))
     return forbidden(ctx, 'read', { collection: named })
+
+  if (below !== undefined && SITE_SCREEN.test(below) && !await may(ctx, 'read'))
+    return forbidden(ctx, 'site')
 
   // The edit cookie this browser holds is an editor's from here on, so the on-page editor is told the names too.
   admitEditor(ctx)

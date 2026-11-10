@@ -1,23 +1,25 @@
 ---
 import type { Denials } from '../src/access'
 import type { AddedRedirect, MissingRow } from '../src/missing'
-import type { ScreenCollection } from '../src/kay/contract'
+import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
-import type { TrashScreen } from '../src/screens'
+import type { HistoryRow, TrashScreen } from '../src/screens'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import AddedRedirects from '../src/components/added-redirects.kay'
 import EntryBulk from '../src/components/entry-bulk.kay'
+import EntryHistory from '../src/components/entry-history.kay'
 import EntryTable from '../src/components/entry-table.kay'
 import EntryTrash from '../src/components/entry-trash.kay'
 import MissingPaths from '../src/components/missing-paths.kay'
 
 // A screen of the redirects or of an entries list with the toaster beside it, in one bundle, so the toasts a failure raises show where a test can read them.
-const { rows, redirects, bar, table, trash } = props<{
+const { rows, redirects, bar, table, trash, versions } = props<{
   rows?: MissingRow[]
   redirects?: AddedRedirect[]
   bar?: { collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void, denied?: Denials }
   table?: { collection: ScreenCollection, rows: EntryRow[], denied?: Denials }
-  trash?: { collection: ScreenCollection, rows: TrashScreen['rows'] }
+  trash?: { collection: ScreenCollection, rows: TrashScreen['rows'], denied?: Denials }
+  versions?: { collection: ScreenCollection, entry: StoredEntry, rows: HistoryRow[] }
 }>()
 ---
 Toaster
@@ -30,4 +32,6 @@ if bar
 if table
   EntryTable(prefix="/admin" collection={table.collection} rows={table.rows} searched={false} denied={table.denied})
 if trash
-  EntryTrash(collection={trash.collection} rows={trash.rows})
+  EntryTrash(collection={trash.collection} rows={trash.rows} denied={trash.denied})
+if versions
+  EntryHistory(prefix="/admin" collection={versions.collection} entry={versions.entry} rows={versions.rows})

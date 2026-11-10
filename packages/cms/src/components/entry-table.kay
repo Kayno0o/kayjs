@@ -149,23 +149,23 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         if actions.has('move')
           if row.move as place
             if denied.move as reason
-              Refused(label={wording('cms.table.moveUp', 'Up')} reason={reason})
-              Refused(label={wording('cms.table.moveDown', 'Down')} reason={reason})
+              Refused(label={wording('cms.table.moveUp', 'Up')} ariaLabel={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} reason={reason})
+              Refused(label={wording('cms.table.moveDown', 'Down')} ariaLabel={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} reason={reason})
             else
               Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
               Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if actions.has('publish') && row.draft && collection.draftField !== undefined
           if deniedFor(row).publish as reason
-            Refused(label={wording('cms.entry.publish', 'Publish')} reason={reason})
+            Refused(label={wording('cms.entry.publish', 'Publish')} ariaLabel={wording('cms.table.publish', 'Publish {title}', { title: row.title })} reason={reason})
           else
             Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publish', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
         if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && deniedFor(row).publish !== undefined
-          Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={deniedFor(row).publish})
+          Refused(label={wording('cms.entry.unpublish', 'Unpublish')} ariaLabel={wording('cms.table.unpublish', 'Unpublish {title}', { title: row.title })} reason={deniedFor(row).publish})
         else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
-          ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
+          ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} aria-label={wording('cms.table.unpublish', 'Unpublish {title}', { title: row.title })} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
           if deniedFor(row).edit as reason
-            Refused(label={wording('cms.table.duplicate', 'Duplicate')} reason={reason})
+            Refused(label={wording('cms.table.duplicate', 'Duplicate')} ariaLabel={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} reason={reason})
           else
             Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('rename') && !collection.single && row.problem === undefined

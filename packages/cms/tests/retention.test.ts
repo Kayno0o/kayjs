@@ -10,6 +10,7 @@ import { hiddenOf, SWEEP_MARKER } from '../src/hidden'
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { restoreTrashed } from '../src/restore'
 import { eraseHistory, forgetEditor, startSweeping, sweepHistory } from '../src/retention'
+import { reviewsOf, writeReview } from '../src/review'
 import * as revisions from '../src/revisions'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
@@ -429,6 +430,50 @@ describe('forgetEditor', () => {
 
       expect((row!.data as { author: string }).author).toBe('Ada')
     }
+  })
+})
+
+describe('the review log', () => {
+  const place = (slug: string) => ({ collection: 'notes', slug })
+  const step = (verb: 'submit' | 'approve', at: number, by = 'Ada') => ({ at, verb, by, note: `from ${by}` })
+
+  test('keeps a waiting review but drops its steps past the retention, and the review of an approved entry left with none', async () => {
+    const now = Date.now()
+
+    await writeReview(place('waiting'), { status: 'review', by: 'Ada', events: [step('submit', now - 400 * DAY), step('submit', now - DAY)] })
+    await writeReview(place('settled'), { status: 'approved', by: 'Ada', events: [step('submit', now - 500 * DAY), step('approve', now - 450 * DAY, 'Grace')] })
+    await writeReview(place('recent'), { status: 'approved', by: 'Ada', events: [step('approve', now - DAY)] })
+
+    await sweepHistory()
+
+    const reviews = await reviewsOf('notes')
+
+    expect([...reviews.keys()].toSorted()).toEqual(['recent', 'waiting'])
+    expect(reviews.get('waiting')).toMatchObject({ status: 'review', events: [{ at: now - DAY }] })
+    expect(reviews.get('waiting')!.events).toHaveLength(1)
+  })
+
+  test('forgetEditor strips the name from the sender and the steps, and the sender\'s id, and leaves the others', async () => {
+    const at = Date.now()
+
+    await writeReview(place('draft'), { status: 'sent-back', by: 'Ada', byId: 'u1', events: [step('submit', at), step('approve', at, 'Grace')] })
+    await writeReview(place('other'), { status: 'review', by: 'Grace', byId: 'u2', events: [step('submit', at, 'Grace')] })
+
+    expect(await forgetEditor('Ada')).toBe(1)
+
+    const reviews = await reviewsOf('notes')
+
+    expect(reviews.get('draft')).toEqual({ status: 'sent-back', by: 'Former editor', events: [{ at, verb: 'submit', by: 'Former editor', note: 'from Ada' }, { at, verb: 'approve', by: 'Grace', note: 'from Grace' }] })
+    expect(reviews.get('other')).toEqual({ status: 'review', by: 'Grace', byId: 'u2', events: [{ at, verb: 'submit', by: 'Grace', note: 'from Grace' }] })
+    expect(await forgetEditor('Ada')).toBe(0)
+  })
+
+  test('forgetEditor names a step\'s editor in a review whose sender is another', async () => {
+    const at = Date.now()
+
+    await writeReview(place('draft'), { status: 'review', by: 'Grace', byId: 'u2', events: [step('submit', at, 'Grace'), { at, verb: 'send-back', by: 'Ada' }] })
+    expect(await forgetEditor('Ada')).toBe(1)
+    expect((await reviewsOf('notes')).get('draft')).toEqual({ status: 'review', by: 'Grace', byId: 'u2', events: [{ at, verb: 'submit', by: 'Grace', note: 'from Grace' }, { at, verb: 'send-back', by: 'Former editor' }] })
   })
 })
 

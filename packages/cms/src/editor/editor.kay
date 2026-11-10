@@ -808,8 +808,8 @@ SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === u
     Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
     if dock() && canSide(room().width)
       IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
-    IconButton(icon={outline} label={marking() ? wording('cms.editor.markingOff', 'Stop outlining every field') : wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
-    IconButton(icon={browse} label={browsing() ? wording('cms.editor.browseOff', 'Edit the page again') : wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
+    IconButton(icon={outline} label={wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
+    IconButton(icon={browse} label={wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
   Dialog(open={confirming()} title={wording('cms.editor.stop', 'Stop editing')} size="sm" onOpenChange={shown => confirming = shown})
     @footer
       Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})

@@ -4,6 +4,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { announce } from '@kaynooo/kayjs-ui/announce'
 import { guardLeave, signal } from 'kay'
 import { sizeText, wording } from 'kay/words'
 import { atLeast, notTaken, typeName } from '../upload-text'
@@ -108,10 +109,12 @@ async function send(files: File[]): Promise<void> {
   try {
     for (const file of many ? files : files.slice(0, 1)) {
       sent = 0
+      announce(wording('cms.file.uploadStarted', 'Uploading {name}', { name: file.name }))
 
       try {
         const landed = await uploadFile(collection, file, { progress: share => sent = share, signal: cancel.signal, limits: upload })
 
+        announce(wording('cms.file.uploadDone', '{name} uploaded', { name: file.name }))
         onChange(landed.path, landed.width !== undefined && landed.height !== undefined ? { width: landed.width, height: landed.height } : undefined)
       }
       catch (error) {

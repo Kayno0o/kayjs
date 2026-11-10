@@ -221,6 +221,63 @@ export async function reviewsOf(collection: string): Promise<Map<string, Review>
   return found
 }
 
+// Rewrites each review of a loaded collection's store that `change` alters, reading its row again first as a save may have changed it since the listing; a review it turns into `undefined` is removed. Returns how many rows changed. A folder's reviews are files of the repository, which this does not rewrite.
+async function amendReviews(collection: string, change: (review: Review) => Review | undefined): Promise<number> {
+  const store = storeOf(collection)
+
+  if (store?.save === undefined || store.remove === undefined)
+    return 0
+
+  let changed = 0
+
+  for (const row of await store.load({ preview: true })) {
+    const listed = parse(row.data)
+
+    if (listed === undefined || JSON.stringify(change(listed)) === JSON.stringify(listed))
+      continue
+
+    const current = parse((await rowOf(store, row.slug))?.data)
+    const amended = current && change(current)
+
+    if (current === undefined || JSON.stringify(amended) === JSON.stringify(current))
+      continue
+
+    if (amended === undefined)
+      await store.remove({ slug: row.slug })
+    else
+      await store.save({ slug: row.slug, data: amended })
+
+    changed++
+  }
+
+  return changed
+}
+
+// Drops the steps of a collection's reviews older than `cutoff`, as the activity log is pruned, and the review of an entry left with none once it is approved. A review still waiting keeps its status.
+export async function pruneReviews(collection: string, cutoff: number): Promise<number> {
+  return amendReviews(collection, (review) => {
+    const events = review.events.filter(event => event.at >= cutoff)
+
+    return events.length === 0 && review.status === 'approved' ? undefined : { ...review, events }
+  })
+}
+
+// Replaces an editor's name in a collection's reviews, who sent a draft and who took each step, and drops the id of the sender it was matched to.
+export async function forgetReviewer(collection: string, name: string, replacement: string): Promise<number> {
+  return amendReviews(collection, (review) => {
+    if (review.by !== name && !review.events.some(event => event.by === name))
+      return review
+
+    const { byId, ...rest } = review
+
+    return {
+      ...rest,
+      ...review.by === name ? { by: replacement } : { ...byId !== undefined && { byId } },
+      events: review.events.map(event => event.by === name ? { ...event, by: replacement } : event),
+    }
+  })
+}
+
 // Writes the review of an entry, or removes it for `undefined`. Throws when the state cannot be written, which the caller answers with.
 export async function writeReview(ref: EntryRef, review: Review | undefined, { author, verb = 'review' }: { author?: Identity | undefined, verb?: string } = {}): Promise<void> {
   const place = placeOf(ref)

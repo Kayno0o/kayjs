@@ -463,6 +463,31 @@ describe('the screens', () => {
     expect(await opens('/elsewhere/collections/pages')).toBe(false)
   })
 
+  test('refuse the media and unused-uploads screens to a role limited by collections or to its own entries', async () => {
+    const sitewide = ['/admin/media', '/admin/uploads', '//admin//media/']
+
+    configureRoles({ blogger: { collections: ['posts'] }, boss: [] })
+
+    for (const path of sitewide) {
+      expect(await opens(path), path).toBe(false)
+      expect(await opens(path, { id: 'u3', roles: ['boss'] }), path).toBe(true)
+    }
+
+    configureRoles({ blogger: { own: 'author' }, boss: [] })
+
+    for (const path of sitewide)
+      expect(await opens(path), path).toBe(false)
+  })
+
+  test('leave the media and unused-uploads screens open when no role is limited, or the app lists none', async () => {
+    configureRoles({ blogger: ['publish'] })
+    expect(await opens('/admin/media')).toBe(true)
+    expect(await opens('/admin/uploads')).toBe(true)
+
+    configure({ guard: () => undefined, prefix: '/admin' })
+    expect(await opens('/admin/media')).toBe(true)
+  })
+
   test('open every collection to a role of the array form', async () => {
     configureRoles({ blogger: ['publish'] })
     expect(await opens('/admin/collections/pages')).toBe(true)
@@ -488,6 +513,21 @@ describe('what the screens tell a person', () => {
     expect(ownerKey({ id: undefined, name: 'Ann', held: [], email: 'a@b.c' })).toBe('a@b.c')
     expect(ownerKey({ name: 'Ann', held: [] })).toBe('Ann')
     expect(ownerKey(undefined)).toBe('')
+  })
+
+  test('says the site-wide screens are out of reach of a role limited to collections or to its own entries', async () => {
+    const { denials } = await import('../src/access')
+
+    configureRoles({ blogger: { collections: ['posts'] }, owner: { own: 'author' }, boss: [], plain: ['publish'] })
+
+    expect((await denials(as(me))).site).toContain('does not reach')
+    expect((await denials(as({ id: 'u2', roles: ['owner'] }))).site).toContain('does not reach')
+    expect((await denials(as({ id: 'u3', roles: ['boss'] }))).site).toBeUndefined()
+    // A collection's own screens say nothing of the site's.
+    expect((await denials(as(me), { collection: 'posts' })).site).toBeUndefined()
+
+    configure({ guard: () => undefined })
+    expect((await denials(as(me))).site).toBeUndefined()
   })
 })
 

@@ -96,7 +96,7 @@ test('the toggle outlines every marked field, stays after a reload, and shows on
 
   await page.reload()
   await page.waitUntil(() => document.querySelectorAll('.kcms-mark').length >= 2)
-  expect(await page.evaluate(() => document.querySelector('button[aria-pressed="true"]')?.getAttribute('aria-label'))).toBe('Stop outlining every field')
+  expect(await page.evaluate(() => document.querySelector('button[aria-pressed="true"]')?.getAttribute('aria-label'))).toBe('Outline every field of the page')
 }, 60_000)
 
 test('a screen with no hover has the outlines on until the editor turns them off', async () => {
@@ -231,7 +231,8 @@ test('browsing lets a link work and takes the outlines, tab stops and clicks off
   await page.click(TITLE)
   expect(await page.evaluate(() => [document.querySelector('h1')!.hasAttribute('contenteditable'), document.querySelector('#kcms-marker-menu') === null])).toEqual([false, true])
 
-  await page.click('button[aria-label="Edit the page again"]')
+  // The same button, now pressed, takes the editing back.
+  await page.click(`${BROWSE}[aria-pressed="true"]`)
   await page.waitUntil(() => document.querySelector('h1')!.getAttribute('tabindex') === '0' && document.querySelectorAll('.kcms-mark').length >= 2)
   await page.click(TITLE)
   await page.waitUntil((selector: string) => document.querySelector(selector)!.getAttribute('contenteditable') === 'plaintext-only', undefined, TITLE)

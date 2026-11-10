@@ -213,7 +213,7 @@ export function ownerStamps(member: Member | undefined, collection: string, entr
 }
 
 // The things the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles. `edit` is set for what they may not change at all, `move` for reordering a collection.
-export type Denials = Partial<Record<CmsAction | 'edit' | 'move', string>>
+export type Denials = Partial<Record<CmsAction | 'edit' | 'move' | 'site', string>>
 
 function deniedTo(member: Member | undefined, target: Target = {}): Denials {
   const { roles } = settings()
@@ -221,6 +221,10 @@ function deniedTo(member: Member | undefined, target: Target = {}): Denials {
 
   if (roles === undefined)
     return found
+
+  // `site` is set for the screens of the site rather than of a collection, the media library and the unused uploads.
+  if (target.collection === undefined && !allows(member, 'read', target))
+    found.site = refusal('site')
 
   for (const action of ACTIONS) {
     if (!allows(member, action, target))
@@ -258,7 +262,10 @@ export async function memberOfRequest(request: Request): Promise<Member | undefi
 }
 
 // The reason for what a person may not do; for `read` and `edit`, whether the collection is out of their reach or the entry is another's.
-function refusal(doing: Doing, reachable = false): string {
+function refusal(doing: Doing | 'site', reachable = false): string {
+  if (doing === 'site')
+    return wording('cms.guard.siteOnly', 'Your role does not reach the screens of the whole site')
+
   if (doing === 'read')
     return wording('cms.guard.outOfReach', 'Your role does not reach this collection')
 
@@ -276,7 +283,7 @@ export async function may(ctx: GuardContext, doing: Doing, target?: Target): Pro
   return settings().roles === undefined || allows(await memberOf(ctx), doing, target)
 }
 
-export function forbidden(ctx: GuardContext, doing: Doing, target?: Target): never {
+export function forbidden(ctx: GuardContext, doing: Doing | 'site', target?: Target): never {
   return ctx.deny(403, refusal(doing, doing === 'edit' && target !== undefined && allows(known.get(ctx.request), 'read', target)))
 }
 

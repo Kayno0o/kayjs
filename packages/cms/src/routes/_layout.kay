@@ -41,8 +41,12 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
         Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
       else
         a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
-      a(href={screenPath(prefix, '/media')}) {wording('cms.admin.media', 'Media')}
-      a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
+      if denied.site as reason
+        Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.admin.media', 'Media')}
+        Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.admin.uploads', 'Unused uploads')}
+      else
+        a(href={screenPath(prefix, '/media')}) {wording('cms.admin.media', 'Media')}
+        a(href={screenPath(prefix, '/uploads')}) {wording('cms.admin.uploads', 'Unused uploads')}
     a.kcms-admin-site(href={localize('/')}) {wording('cms.admin.viewSite', 'View the site')}
     if member
       .kcms-admin-who
