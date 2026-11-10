@@ -317,7 +317,7 @@ pgDescribe('idle Postgres stores', () => {
     values.stop?.()
   })
 
-  pgIt('hear a write another replica made after idling, and a use brings the base rate back', async () => {
+  pgIt('hear a write another replica made after idling; a read or write leaves the poll idle, a new subscription brings the base rate back', async () => {
     await freshTables()
 
     const [one, two] = replicas(2)
@@ -342,10 +342,17 @@ pgDescribe('idle Postgres stores', () => {
     await publishedByOther(two!, '{"keys":["y"]}')
     await secondLive.set('app:idle', '', '[2]')
     await first.get('x')
+    await first.set('x', '[1]', Date.now() + 60_000)
     firstLive.hold?.(true)
     await clock.advance(500, true)
-    expect(heard).toEqual(['{"keys":["x"]}', '{"keys":["y"]}'])
+    expect(heard).toEqual(['{"keys":["x"]}'])
     expect(changes).toEqual(['app:idle:[1]', 'app:idle:[2]'])
+
+    const later = heardBy(first)
+
+    await clock.advance(500, true)
+    expect(heard).toEqual(['{"keys":["x"]}', '{"keys":["y"]}'])
+    expect(later).toEqual(['{"keys":["y"]}'])
     firstLive.stop?.()
     secondLive.stop?.()
   })

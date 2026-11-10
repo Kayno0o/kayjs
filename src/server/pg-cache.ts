@@ -74,7 +74,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     return heard ? 'heard' : undefined
   }
 
-  // Started by the first listener, which the app's setup or a call naming the store adds, so a module naming the store connects to nothing in a build or a check, and a replica that never used the cache still hears an invalidation that marks a prerendered page stale. A later call brings a slowed poll back to its base rate.
+  // Started by the first listener, which the app's setup or a call naming the store adds, so a module naming the store connects to nothing in a build or a check, and a replica that never used the cache still hears an invalidation that marks a prerendered page stale. Only a new subscription brings a slowed poll back to its base rate; a plain read or write leaves it idle.
   const start = () => {
     if (closed)
       return
@@ -85,13 +85,7 @@ export function pgCache(pg: PgHandle): CacheStore {
       trackStore(self)
     }
 
-    if (polling !== undefined) {
-      polling.wake()
-
-      return
-    }
-
-    if (listeners.length === 0)
+    if (polling !== undefined || listeners.length === 0)
       return
 
     polling = pollerOf(pg).add({ every: POLL_MS, backoff: true, wanted: () => listeners.length > 0, run: poll, failed: 'reading what the other processes invalidated failed', listen: 'cache' }, true)
@@ -169,6 +163,7 @@ export function pgCache(pg: PgHandle): CacheStore {
     subscribe(listener) {
       listeners.push(listener)
       start()
+      polling?.wake()
     },
   }
 
