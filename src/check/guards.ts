@@ -7,7 +7,7 @@ import { analyzeServer } from '../compiler/script'
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
 // On a site with `requireGuards`, what the server answers 403 for: each page, layout with actions, endpoint and API module of the app no guard covers that does not set `guards: false`.
-// A site that leaves `requireGuards` unset but guards some route gets the same list as warnings, for what a 2.0 start would refuse; `requireGuards: false` keeps it quiet.
+// A site that leaves `requireGuards` unset but guards some route gets its routes (not layouts or action modules) as warnings, for what a 2.0 start would refuse; `requireGuards: false` keeps it quiet.
 export async function unguardedRoutes(options: CheckOptions, { routes, endpoints, apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-route', options.lints)
 
