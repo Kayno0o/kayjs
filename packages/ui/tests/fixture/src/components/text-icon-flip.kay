@@ -1,0 +1,14 @@
+---
+import { signal } from 'kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+const kind = signal<'text' | 'search'>('text')
+const icon = signal<'globe' | false | undefined>(undefined)
+const typed = signal('')
+---
+TextInput#box(type={kind()} icon={icon()} value={typed()} onInput={typed.set} aria-label="Flip")
+button#search(onClick={() => kind = 'search'}) Search
+button#text(onClick={() => kind = 'text'}) Text
+button#globe(onClick={() => icon = 'globe'}) Globe
+button#none(onClick={() => icon = false}) None
+button#auto(onClick={() => icon = undefined}) Auto
