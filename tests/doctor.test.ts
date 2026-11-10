@@ -70,6 +70,20 @@ function hasIpv6(): boolean {
 }
 
 describe('kay doctor', () => {
+  it('warns, never fails, while the shell in SHELL has no kay completion', async () => {
+    const home = await scratchDir('doctor-shell-')
+    const root = await project()
+    const port = String(freePort())
+    const bare = await doctor(root, [], { PORT: port, SHELL: '/bin/bash', HOME: home, XDG_CONFIG_HOME: '' })
+
+    expect(bare.check('complete')).toMatchObject({ ok: true, warning: true, fix: expect.stringContaining('source <(kay completion bash)') })
+    expect(bare.code, bare.stderr).toBe(0)
+
+    await Bun.write(join(home, '.bashrc'), 'source <(kay completion bash)\n')
+
+    expect((await doctor(root, [], { PORT: port, SHELL: '/bin/bash', HOME: home, XDG_CONFIG_HOME: '' })).check('complete').warning).toBeUndefined()
+  })
+
   it('passes a healthy project, one check per line in the same order in text and JSON, exiting 0', async () => {
     const root = await project()
     // The port is a free one rather than 3000, which a developer's own app may hold.
