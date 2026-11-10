@@ -9,6 +9,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A component exports `island = { hydrate, persist }` from its `--- module` fence for the defaults it wants wherever it is used, a parent's own `hydrate` and `persist` winning ([islands](islands.md#hydrate-an-island-later)). kayjs-ai `ChatLauncher` is an island by it, persisted and hydrating with its chat when the browser is idle; a static page or layout giving it a function or a block with parameters gets `island-prop` from `kay check`, as for any island, its fix writing `--- island`.
 - An `s.Optional` env field whose `<NAME>_FILE` names a missing, unreadable or empty file is left unset with one warning naming the file, instead of stopping the boot; a required field still stops it ([environment](environment.md)).
 - On Postgres (`pgData`, `pgJobs`) a write reaches the other processes at once: a job enqueued in one starts in another idle one within a second, and a live value or an `invalidate` reaches another worker's clients within a second after a quiet stretch, through `LISTEN`/`NOTIFY` (one extra connection per serving process). Polling stays as the fallback, and a database that refuses `LISTEN` keeps it alone ([jobs](queues.md))
+- `kay check` warns `unguarded-route` for each route a 2.0 start would refuse, on a site with a guard that leaves `requireGuards` unset ([guards](guards.md)).
+- The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
 
 ## 1.94.0
 

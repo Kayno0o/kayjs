@@ -99,7 +99,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unknown-tool-label` | warn | code | A key of a `toolLabels` object on `Chat` that names no tool of the project (an export in snake case, a `tool.name` or the name of a `tool()`), whose calls show the raw name. |
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `endpoint-export` | warn | code | An endpoint file exporting a name that is no method (`post`, `handler`), which the server never calls |
-| `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
+| `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false`; a warning while it is unset on a site with a guard, for what a 2.0 start would refuse |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `island-marker` | deny | islands | `--- island` on a page, layout or special page, which are never islands |
 | `island-prop` | deny | islands | A component that is not an island passing one a value its type says cannot be sent: a function, a block with parameters, a symbol or an object holding one; `--- island` on the component is the fix |

@@ -7,13 +7,27 @@ import { analyzeServer } from '../compiler/script'
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
 // On a site with `requireGuards`, what the server answers 403 for: each page, layout with actions, endpoint and API module of the app no guard covers that does not set `guards: false`.
+// A site that leaves `requireGuards` unset but guards some route gets the same list as warnings, for what a 2.0 start would refuse; `requireGuards: false` keeps it quiet.
 export async function unguardedRoutes(options: CheckOptions, { routes, endpoints, apiModules }: ServedProject): Promise<CheckDiagnostic[]> {
   const level = lintLevel('unguarded-route', options.lints)
 
-  if (options.requireGuards !== true || level === 'allow')
+  if (options.requireGuards === false || level === 'allow')
     return []
 
-  const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({ file, line: 1, column: 1, message, help, code: 'unguarded-route', severity: level === 'warn' ? 'warning' : 'error' })
+  const upcoming = options.requireGuards === undefined
+
+  if (upcoming && ![...routes, ...endpoints, ...apiModules].some(route => route.guards.length > 0))
+    return []
+
+  const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({
+    file,
+    line: 1,
+    column: 1,
+    message: upcoming ? message.replace('the server refuses', 'a 2.0 start would refuse') : message,
+    help: upcoming ? `${help}, or set \`requireGuards: false\` to keep it open` : help,
+    code: 'unguarded-route',
+    severity: level === 'warn' || upcoming ? 'warning' : 'error',
+  })
   const found: CheckDiagnostic[] = []
   const layouts = new Map<string, boolean>()
   const modules = new Set<string>()

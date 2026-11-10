@@ -122,6 +122,27 @@ describe('requireGuards', () => {
     expect(await reported(false)).toEqual([])
   })
 
+  it('is reported by kay check as a warning on a site that sets nothing but guards some routes, naming what a 2.0 start would refuse', async () => {
+    const reported = async (requireGuards?: boolean) => (await writeShadowTypes(dir, { dirs: { routes: 'routes', api: 'api' }, requireGuards })).problems.filter(found => found.code === 'unguarded-route')
+    const unset = await reported()
+
+    expect(unset.map(found => [relative(dir, found.file), found.severity])).toEqual((await reported(true)).map(found => [relative(dir, found.file), 'warning']))
+    expect(unset.every(found => found.message.includes('so a 2.0 start would refuse'))).toBe(true)
+    expect(await reported(false)).toEqual([])
+  })
+
+  it('says nothing on a site no route of which has a guard', async () => {
+    const bare = await scratchDir('unguarded-bare-')
+
+    try {
+      await Bun.write(join(bare, 'routes/index.kay'), 'h1 Home\n')
+      expect((await writeShadowTypes(bare, { dirs: { routes: 'routes', api: 'api' } })).problems.filter(found => found.code === 'unguarded-route')).toEqual([])
+    }
+    finally {
+      await rm(bare, { recursive: true, force: true })
+    }
+  })
+
   it('leaves a site without it as it was', async () => {
     expect(await status(optional, '/')).toBe(200)
     expect(await status(optional, '/feed.json')).toBe(200)
