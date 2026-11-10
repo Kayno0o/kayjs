@@ -273,7 +273,7 @@
   },
   "dependencies": {
     "@jsquash/avif": "2.1.1",
-    "@kaynooo/cli-kit": "0.40.0",
+    "@kaynooo/cli-kit": "0.41.0",
     "@kaynooo/utils": "^3.1.0",
     "@resvg/resvg-js": "^2.6.2",
     "axe-core": "^4.14.0",

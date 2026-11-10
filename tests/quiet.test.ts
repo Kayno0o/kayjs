@@ -190,7 +190,7 @@ describe('usage on a refusal', () => {
     expect(help.code).toBe(0)
     expect(help.stdout).toStartWith('Usage: kay build [dir]')
     expect(help.stdout).toContain('[--no-cache]')
-    expect(help.stdout).toContain('--no-cache         build without what earlier builds left in .kay/cache')
+    expect(help.stdout).toMatch(/--no-cache +build without what earlier builds left in \.kay\/cache/)
     expect(help.stdout).not.toContain('kay start')
   })
 

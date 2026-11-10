@@ -6,7 +6,7 @@
       "name": "kay",
       "dependencies": {
         "@jsquash/avif": "2.1.1",
-        "@kaynooo/cli-kit": "0.40.0",
+        "@kaynooo/cli-kit": "0.41.0",
         "@kaynooo/utils": "^3.1.0",
         "@resvg/resvg-js": "^2.6.2",
         "axe-core": "^4.14.0",
@@ -17,9 +17,9 @@
         "typescript7": "npm:typescript@^7.0.2",
       },
       "devDependencies": {
-        "@babel/parser": "7.29.7",
-        "@babel/traverse": "7.29.10",
-        "@babel/types": "7.29.11",
+        "@babel/parser": "^7.29.7",
+        "@babel/traverse": "^7.29.10",
+        "@babel/types": "^7.29.11",
         "@fontsource/inter": "^5.3.0",
         "@happy-dom/global-registrator": "^21.0.4",
         "@iconify-json/tabler": "^1.2.42",
@@ -273,7 +273,7 @@
 
     "@jsquash/avif": ["@jsquash/avif@2.1.1", "", { "dependencies": { "wasm-feature-detect": "^1.2.11" } }, "sha512-LMRxd0fMgfCLtobDh0/sFYJMMiRJTNYSEEWvRDKXlAeZ08t3gI5V+1thIT0XjXJ+SVG7Zug9B0XPyx0Ti5VRNA=="],
 
-    "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.40.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.40.0/cli-kit-0.40.0.tgz", { "dependencies": { "@kaynooo/utils": "3.0.0" } }, "sha512-u9XpUKACZOC/igs950iQBGUuL9bXIqul6gkEdB3N95O2TnQgn7ihobx2tAPhPbYBcc5Xraa/v7EnL0MjZgViEw=="],
+    "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.41.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.41.0/cli-kit-0.41.0.tgz", { "dependencies": { "@kaynooo/utils": "3.0.0" } }, "sha512-or46sCRLeGXvLADaltb+APMXgDfkpYsG8uz7rDT00tuIwzsjNdBDt345Nnz0CgpviJnbzUVYgVdLVmT0YIF7VQ=="],
 
     "@kaynooo/eslint": ["@kaynooo/eslint@7.1.6", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Feslint/-/7.1.6/eslint-7.1.6.tgz", { "dependencies": { "@e18e/eslint-plugin": "^0.8.0", "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2", "@eslint/markdown": "^8.0.3", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/eslint-plugin": "^8.67.0", "@typescript-eslint/parser": "^8.67.0", "eslint-config-flat-gitignore": "^2.3.0", "eslint-flat-config-utils": "^3.2.0", "eslint-merge-processors": "^2.0.0", "eslint-plugin-antfu": "^3.2.3", "eslint-plugin-better-tailwindcss": "^4.7.0", "eslint-plugin-format": "^2.0.1", "eslint-plugin-import-lite": "^0.6.0", "eslint-plugin-jsonc": "^3.4.1", "eslint-plugin-no-only-tests": "^3.4.0", "eslint-plugin-perfectionist": "^5.10.1", "eslint-plugin-regexp": "^3.2.0", "eslint-plugin-toml": "^1.5.0", "eslint-plugin-unicorn": "^73.0.0", "eslint-plugin-unused-imports": "^4.4.1", "eslint-plugin-yml": "^3.8.1", "globals": "^17.11.0", "toml-eslint-parser": "^1.0.3", "yaml-eslint-parser": "^2.1.0" }, "peerDependencies": { "eslint": "^10.7.0" }, "bin": { "keslint": "dist/bin.js" } }, "sha512-18Cj2f7NyF9OWMpO9oiVTH1SVA/JfZBhPATAF/Au8ou1aFIrZUfVKjpbEhmrNYvM9WljPaYyMNsKphamkYzWzQ=="],
 
