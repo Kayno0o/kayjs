@@ -1123,6 +1123,7 @@ function sanitizeHtml(markup: string, options?: SanitizeOptions | undefined): Sa
 interface SanitizeOptions
   attributes?: Record<string, string[]> | undefined
   base?: string | undefined
+  lazyImages?: boolean | undefined
   relativeUrls?: boolean | undefined
   tags?: string[] | undefined
 

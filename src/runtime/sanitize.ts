@@ -15,6 +15,8 @@ export interface SanitizeOptions {
   // The address the markup was fetched from, `article.url`: every kept URL, such as an `href`, a `src` or each of a `srcset`'s, is resolved against it as a browser would, a relative or `//host` one included, and dropped when it does not resolve to an http(s) or `mailto:` URL.
   // A `base` that is not an absolute http(s) URL drops every relative URL, and replaces `relativeUrls`.
   base?: string | undefined
+  // Writes `loading="lazy"` on every kept `img` with no `loading` of its own, whether or not `loading` is among its allowed attributes; one the markup gives a `loading`, when allowed, keeps it.
+  lazyImages?: boolean | undefined
 }
 
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.
@@ -40,12 +42,14 @@ interface Rewrite {
   relative?: boolean | undefined
   base?: URL | null | undefined
   leaves?: ((href: string) => boolean) | undefined
+  lazy?: boolean | undefined
 }
 
 interface Allowed {
   tags: ReadonlySet<string>
   attributes: Record<string, readonly string[]>
   relative?: boolean | undefined
+  lazy?: boolean | undefined
 }
 
 // Made on first use, so an island build reaching `trustHtml` alone leaves it out.
@@ -178,6 +182,9 @@ function openingTag(tag: string, attributes: string | undefined, allowedNames: r
     }
   }
 
+  if (tag === 'img' && rewrite.lazy === true && !written.has('loading'))
+    written.set('loading', 'lazy')
+
   let apart = false
 
   if (tag === 'a' && written.has('href')) {
@@ -228,7 +235,7 @@ function allowed(options: SanitizeOptions | undefined): Allowed {
     attributes[tag.toLowerCase()] = [...attributes[tag.toLowerCase()] ?? [], ...names.map(name => name.toLowerCase())]
   }
 
-  resolved.set(options, found = { tags, attributes, relative: options.relativeUrls })
+  resolved.set(options, found = { tags, attributes, relative: options.relativeUrls, lazy: options.lazyImages })
 
   return found
 }
@@ -309,8 +316,8 @@ export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtm
 
 // `sanitizeHtml`, its links leaving the site opening in a new tab or not: a content body gets that from the page rendering it.
 export function sanitizeMarkup(markup: string, options: SanitizeOptions | undefined, opensApart: boolean): SafeHtml {
-  const { tags, attributes: keptAttributes, relative } = allowed(options)
-  const rewrite: Rewrite = { relative, base: baseOf(options), leaves: opensApart ? leavingSite() : undefined }
+  const { tags, attributes: keptAttributes, relative, lazy } = allowed(options)
+  const rewrite: Rewrite = { relative, lazy, base: baseOf(options), leaves: opensApart ? leavingSite() : undefined }
   const source = withoutDropped(markup)
   const open: string[] = []
   let result = ''

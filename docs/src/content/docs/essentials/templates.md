@@ -305,6 +305,8 @@ For markup fetched from elsewhere, such as a feed's body, pass the address it ca
 
 A URL that does not resolve to a web or mail address is dropped, and so is every relative URL when `base` is not an absolute http(s) address. An `#anchor` in the markup then points at the original page, and opens in a new tab. `base` replaces `relativeUrls`, and its credentials, if any, are copied into every URL.
 
+`lazyImages: true` marks every kept picture `loading="lazy"`, so a long body loads its images as the reader scrolls. `loading` need not be in the allowed attributes, and a picture that keeps its own `loading` keeps it as written.
+
 <ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 
 ## Draw an icon or a component chosen by a value

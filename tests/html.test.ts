@@ -264,6 +264,20 @@ describe('trustHtml', () => {
   })
 })
 
+describe('sanitizeHtml with lazyImages', () => {
+  const lazy = { lazyImages: true, tags: ['img'], attributes: { img: [] as string[] } }
+
+  it('writes loading=lazy on an img, allowed or not', () => {
+    expect(String(sanitizeHtml('<img src="https://x.test/a.png">', { ...lazy, attributes: { img: [] } }))).toBe('<img loading="lazy">')
+    expect(String(sanitizeHtml('<img src="https://x.test/a.png">', { ...lazy, attributes: { img: ['src'] } }))).toBe('<img src="https://x.test/a.png" loading="lazy">')
+    expect(String(sanitizeHtml('<img src="https://x.test/a.png">', { tags: ['img'], attributes: { img: ['src'] } }))).toBe('<img src="https://x.test/a.png">')
+  })
+
+  it('keeps a loading the markup gives', () => {
+    expect(String(sanitizeHtml('<img src="https://x.test/a.png" loading="eager">', { ...lazy, attributes: { img: ['src', 'loading'] } }))).toBe('<img src="https://x.test/a.png" loading="eager">')
+  })
+})
+
 describe('sanitizeHtml with relativeUrls', () => {
   const keep = { relativeUrls: true, tags: ['img'], attributes: { img: ['src'] } }
   const clean = (markup: string) => String(sanitizeHtml(markup, keep))
