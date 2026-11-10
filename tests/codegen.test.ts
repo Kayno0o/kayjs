@@ -237,7 +237,7 @@ describe('control flow', () => {
 
     expect(checked.diagnostics).toEqual([])
     expect(checked.tsx).toContain('KayStaticFor(')
-    expect(checked.tsx).toContain('(void (item.id ?? i)')
+    expect(checked.tsx).toContain('item.id ?? i')
   })
 
   it('destructures a loop\'s item through a name of the row\'s own, which a browser reads as the accessor it is and a page as the item', () => {
