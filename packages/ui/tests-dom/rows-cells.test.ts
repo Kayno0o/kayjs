@@ -155,3 +155,37 @@ test('removing a middle row leaves the controls of the others as they are, and a
   expect(last.querySelector('input[type=number]')).toBe(qty)
   expect(last.querySelector('select')!.getAttribute('aria-label')).toBe('Unit 2')
 })
+
+test('rowIssues given as a record by place marks that row only', async () => {
+  const { root } = await quote()
+  const [first, second] = [...root.querySelectorAll('#recorded [data-part=row]')]
+
+  expect([...first!.querySelectorAll('input')].map(input => input.getAttribute('aria-invalid'))).toEqual([null, null, null])
+  expect([...second!.querySelectorAll('input')].map(input => input.getAttribute('aria-invalid'))).toEqual(['true', 'true', 'true'])
+  expect(second!.querySelector('[data-part=issue]')!.textContent).toBe('Bad B')
+  expect(first!.querySelector('[data-part=issue]')!.hasAttribute('hidden')).toBe(true)
+})
+
+test('a reset brings the rows back, the cells keep working and the issues follow the rows', async () => {
+  const { root } = await quote()
+
+  click(root.querySelector('#lines [data-part=add]'))
+  await settle()
+
+  const added = root.querySelectorAll('#lines [data-part=row]')[1]!
+  const qty = added.querySelector<HTMLInputElement>('input[type=number]')!
+
+  qty.value = '500'
+  qty.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(root.querySelectorAll('#lines [data-part=issue]:not([hidden])')).toHaveLength(1)
+
+  click(root.querySelector('#reset'))
+  await settle()
+  expect(root.querySelectorAll('#lines [data-part=row]')).toHaveLength(1)
+  expect(root.querySelectorAll('#lines [data-part=issue]:not([hidden])')).toHaveLength(0)
+
+  choose(root.querySelector('#lines select')!, 'kg')
+  await settle()
+  expect(out(root)).toEqual([{ name: 'Cable', qty: '2', unit: 'kg' }])
+})

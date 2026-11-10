@@ -15,3 +15,5 @@ form#quote
       Select(invalid={issue.invalid} aria-describedby={issue.id} name={column.name} aria-label={`${column.label} ${index + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
   button#reset(type="reset") Reset
 p#out {JSON.stringify(lines())}
+form#record
+  RowsField#recorded(rows={[{ name: 'A', qty: '1', unit: 'm' }, { name: 'B', qty: '2', unit: 'm' }]} columns={columns} name="rec" label="Recorded" rowIssues={{ 1: 'Bad B' }})
