@@ -3,7 +3,7 @@ import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
 import { effect, onMount, postedValue, recipe, signal, untrack } from 'kay'
 import { localDateTime, sameInstant, zonedInstant } from './date'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 import TextInput from './text-input.kay'
 
 const look = recipe({ parts: { root: 'kui-date-time-input inline-flex min-w-0 items-center', input: 'min-w-0 flex-1 tabular-nums' } })
@@ -47,7 +47,7 @@ effect(() => {
     box.defaultValue = localDateTime(start)
 })
 
-const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
+const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
 
 function heard(text: string) {
   const next = zonedInstant(text)

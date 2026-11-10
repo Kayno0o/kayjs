@@ -1,5 +1,6 @@
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
+import { linkChoice } from './choice-link'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
 type Held = string | number | null
@@ -93,5 +94,8 @@ export function controlledRadios({ control, input, options, value, name, onChang
 
   onFormReset(() => root, resetting.reset)
 
-  return { group, picked, busy, ref: startRef<HTMLElement>(element => root = element, appRef), pick }
+  return { group, picked, busy, ref: startRef<HTMLElement>((element) => {
+    root = element
+    linkChoice(element)
+  }, appRef), pick }
 }

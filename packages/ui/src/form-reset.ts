@@ -1,4 +1,5 @@
 import { onCleanup, onMount } from 'kay'
+import { warnUnnamed } from './unnamed'
 
 const HOLD = 'kui-hold-defaults'
 
@@ -18,6 +19,14 @@ export function startRef<Target extends Element>(first: (element: Target) => voi
     if (typeof app === 'function')
       (app as (element: Target) => void)(element)
   }
+}
+
+// `startRef` for the element of a field a person types in or picks from, which warns in development when nothing names it.
+export function fieldRef<Target extends HTMLElement>(first: (element: Target) => void, app?: unknown): (element: Target) => void {
+  return startRef<Target>((element) => {
+    first(element)
+    warnUnnamed(element)
+  }, app)
 }
 
 // For a control that holds itself busy while the app answers a change: a reset meeting it mid-change waits for that change to settle, then restores the defaults, so it is neither dropped nor lost under the change's own answer.

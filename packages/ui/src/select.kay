@@ -9,7 +9,7 @@ import { changeAccepted } from './change'
 import { loadOptions } from './options-source'
 import { paramChange } from './param-change'
 import { paramPick } from './param-value'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 import { wording } from 'kay/words'
 
 // The padding is the rule's, in theme.css: a skin's chevron gives the right side more room, which a utility here would take back.
@@ -178,7 +178,7 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
     submitNow(event.currentTarget)
 }
 
-const ref = startRef<HTMLSelectElement>((element) => {
+const ref = fieldRef<HTMLSelectElement>((element) => {
   box = element
   seed()
   keepInvalid(element, () => invalid)

@@ -74,7 +74,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 const prefix = uid()
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field. The description sits beside the label, not inside it, so the option is named by its label alone.
-div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+div(part="root" {...rest} ref={ref} role="radiogroup" data-kui-choice="" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-busy={busy() || source.loading() ? 'true' : undefined})
   for option, index of list() key={option.value}
     div(part="radio")
       label(part="choice")

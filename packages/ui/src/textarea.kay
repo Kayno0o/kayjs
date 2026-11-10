@@ -4,7 +4,7 @@ import type { JSX } from 'kay'
 import { FIELD_BOX, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { postedValue, recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 
 const look = recipe({
   parts: { root: `${FIELD_LOOK} ${FIELD_BOX}` },
@@ -41,7 +41,7 @@ const { heard, sync } = controlledValue({
 })
 
 // The box starts once: its default is what it was first drawn with.
-const ref = startRef<HTMLTextAreaElement>((element) => {
+const ref = fieldRef<HTMLTextAreaElement>((element) => {
   const start = untrack(() => sent ?? value)
 
   box = element

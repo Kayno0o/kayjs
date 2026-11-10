@@ -3,7 +3,7 @@ import type { FieldSize } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import { effect, memo, onMount, postedValue, recipe, signal, untrack } from 'kay'
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 import Icon from './icon.kay'
 import Popover from './popover.kay'
 import TextInput from './text-input.kay'
@@ -82,7 +82,7 @@ const first = () => firstDay ?? firstDayOf(pageLocale())
 const weeks = memo(() => monthWeeks(cursor(), first()))
 const names = memo(() => weekdays(pageLocale(), first()))
 
-const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
+const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
 
 // Whether a day cannot be chosen, outside the bounds or refused by the app.
 const refusedDay = (iso: string) => disabledDay?.(iso) === true

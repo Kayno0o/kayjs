@@ -1,6 +1,7 @@
 import { markInvalid, uid } from 'kay'
+import { controlOf } from '../choice-link'
 import { FIELD_MESSAGE, liveElements } from '../field-look'
-import { CONTROL, fieldsOf } from '../forms'
+import { fieldsOf } from '../forms'
 
 const SPACES = /\s+/
 
@@ -23,7 +24,7 @@ function controlsOf(field: Element, name: string): HTMLElement[] | undefined {
     if (parent.tagName === 'FIELDSET')
       return fieldsOf(parent.getAttribute('data-kui-field')!)
 
-    const control = parent.querySelector(':scope > label')?.querySelector<HTMLElement>(CONTROL)
+    const control = controlOf(parent.querySelector(':scope > label'))
 
     return control ? [control] : []
   }

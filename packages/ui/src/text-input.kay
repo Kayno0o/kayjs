@@ -6,7 +6,7 @@ import type { IconSlot } from './defaults'
 import { FIELD_BOX, FIELD_ICON, FIELD_ICON_PAD, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { postedValue, recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 import Icon from './icon.kay'
 
 type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'size'> & {
@@ -55,7 +55,7 @@ const drawn = () => icon === undefined ? (type === 'search' ? 'search' as const 
 const spelled = (next: number | string | null) => next === null ? '' : String(next)
 
 // The value it starts with is what a reset goes back to; a client-rendered box has only set it as a property, which no reset reads.
-const ref = startRef<HTMLInputElement>((input) => {
+const ref = fieldRef<HTMLInputElement>((input) => {
   const start = untrack(() => sent ?? value)
 
   box = input

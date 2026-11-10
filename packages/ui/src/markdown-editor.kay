@@ -6,7 +6,7 @@ import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
 import { fieldInvalid, keepInvalid } from './field-look'
-import { startRef } from './form-reset'
+import { fieldRef } from './form-reset'
 import { enterEdit, escaped, headingEdit, imageEdit, indentEdit, linkEdit, listEdit, TOOLBAR_ACTIONS, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
 
@@ -60,7 +60,7 @@ const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar =
 
 const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
-const ref = startRef<HTMLTextAreaElement>((element) => {
+const ref = fieldRef<HTMLTextAreaElement>((element) => {
   area = element
   keepInvalid(element, () => invalid)
   element.defaultValue = untrack(() => value)

@@ -6,6 +6,7 @@ import { effect, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
 import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import { linkChoice } from './choice-link'
 import Icon from './icon.kay'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
@@ -122,7 +123,10 @@ function toggle(input: HTMLInputElement, option: Value) {
   void pick(list().map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
 }
 
-const ref = startRef<HTMLElement>(element => root = element, rest.ref)
+const ref = startRef<HTMLElement>((element) => {
+  root = element
+  linkChoice(element)
+}, rest.ref)
 
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
@@ -151,7 +155,7 @@ effect(() => {
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 snippet chips()
-  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+  div(part="root" {...rest} ref={ref} role="group" data-kui-choice="" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
     for option of list() key={option.value}
       label(part="chip")
         input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-required={required ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})

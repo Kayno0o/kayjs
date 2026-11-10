@@ -1,0 +1,22 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]
+---
+main
+  FormField#f-radio(label="Size" hint="Pick one" issue="Required" required)
+    RadioGroup#radio(options={options} name="size")
+  FormField#f-segmented(label="View" hint="Pick one" issue="Required")
+    Segmented#segmented(label="View mode" options={options} name="view")
+  FormField#f-chips(label="Tags" hint="Pick some" issue="Required")
+    ChipGroup#chips(label="Tags" options={options} name="tags")
+  FormField#f-rating(label="Score" hint="Pick a score" issue="Required")
+    Rating#rating(label="Score" name="score")
+  FormField#f-grouped(label="Grouped" group issue="Required")
+    RadioGroup#grouped(options={options} name="grouped" label="Grouped")
+  FormField#f-quiet(label="Quiet")
+    RadioGroup#quiet(options={options} name="quiet")

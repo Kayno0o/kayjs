@@ -1,5 +1,6 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
 import { ActionError, ActionRedirectError, ApiError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
+import { CHOICE, CONTROL, controlOf } from './choice-link'
 import { liveElements } from './field-look'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
@@ -10,8 +11,7 @@ export const fieldNamed = createContext<(() => string | undefined) | undefined>(
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
 export const formIssues = createContext<(() => Record<string, string>) | undefined>(undefined)
 
-// What a FormField's label names in its slot: the first control taking focus.
-export const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contenteditable], [tabindex]'
+export { CONTROL, controlOf }
 // What a group marks while its message shows: the fields of the group, which take `aria-invalid`, not the buttons of a picker.
 const FIELDS = 'input:not([type="hidden"]), select, textarea'
 const SPACES = /\s+/
@@ -24,6 +24,8 @@ const nativeByUs = new WeakSet<HTMLElement>()
 export interface FieldLinks {
   // Marks the field's frame, for the link to find its control: a `ref` would make the component an island.
   frame: string
+  // The id of the label's text, which names a choice group.
+  label: string
   hint: string
   issues: string
   // What describes the field: the hint, and the messages while there are any.
@@ -35,7 +37,7 @@ export interface FieldLinks {
 // A group has no control of its own: while a message shows, each field in it is marked invalid and described by the message, so `focusInvalid` reaches the group's first field.
 // The control is the page's own markup: the server hands it the ids as it renders, and inside an island the browser keeps the link as the messages change; drawn here rather than in the component, which stays static on a page of its own.
 export function fieldLinks(group: () => boolean, hint: () => boolean, messages: () => readonly unknown[], required: () => boolean = () => false): FieldLinks {
-  const links: FieldLinks = { frame: uid(), hint: uid(), issues: uid(), described: () => [hint() ? links.hint : undefined, messages().length > 0 ? links.issues : undefined].filter(id => id !== undefined) }
+  const links: FieldLinks = { frame: uid(), label: uid(), hint: uid(), issues: uid(), described: () => [hint() ? links.hint : undefined, messages().length > 0 ? links.issues : undefined].filter(id => id !== undefined) }
 
   // A static page renders the field outside any island, where nothing drops the effect as an island's server render does.
   if (typeof document === 'undefined') {
@@ -77,10 +79,15 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
 
     const ours = links.described()
     const invalid = messages().length > 0
-    const control = document.querySelector(`[data-kui-field="${links.frame}"] > label`)?.querySelector<HTMLElement>(CONTROL)
+    const control = controlOf(document.querySelector(`[data-kui-field="${links.frame}"] > label`))
 
     if (!control)
       return
+
+    const choice = control.matches(CHOICE)
+
+    if (choice && !control.hasAttribute('aria-label') && !control.hasAttribute('aria-labelledby'))
+      control.setAttribute('aria-labelledby', links.label)
 
     const own = (control.getAttribute('aria-describedby') ?? '').split(SPACES).filter(id => id !== '' && id !== links.hint && id !== links.issues)
     const all = [...own, ...ours]
@@ -90,7 +97,7 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
     else
       control.removeAttribute('aria-describedby')
 
-    if (required())
+    if (required() && (!choice || control.getAttribute('role') === 'radiogroup'))
       requireField(control, false)
     else
       unrequireField(control)

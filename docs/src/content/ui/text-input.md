@@ -23,6 +23,10 @@ description: A text field that reports each keystroke and the committed value.
 
 `size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.
 
+## Naming a field
+
+A screen reader announces a box nothing names by its type alone. Give it a `label` through a FormField, or an `aria-label`, `aria-labelledby` or wrapping `label` of your own. In development, the browser logs one console warning for each kind of field drawn with no name, for TextInput and the other field components alike.
+
 ## After a refused post
 
 Inside a form posting to an action, a field with no `value` and no `onInput` takes what a refused post sent, so a page working without JavaScript shows it again. So do Textarea, Select, RadioGroup, Segmented, ChipGroup, MultiSelect, Checkbox, Toggle, DateTimeInput, DateRangeInput, Combobox, RowsField and IconPicker. A field named like a secret is never refilled. Every field control takes `invalid`, which draws the danger line.

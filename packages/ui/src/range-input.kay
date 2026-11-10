@@ -5,6 +5,7 @@ import type { JSX } from 'kay'
 import type { RangeValue } from './range'
 import { effect, recipe, untrack } from 'kay'
 import { onFormReset, startRef } from './form-reset'
+import { linkChoice } from './choice-link'
 import { rangeFrom } from './range'
 import { wording } from 'kay/words'
 
@@ -59,6 +60,7 @@ function commit() {
 }
 const lowRef = startRef<HTMLInputElement>((element) => {
   low = element
+  linkChoice(element.closest<HTMLElement>('[data-kui-choice]'))
   keepInvalid(element, () => invalid)
   element.defaultValue = untrack(() => value[0]?.toString() ?? '')
 })
@@ -71,7 +73,7 @@ const highRef = startRef<HTMLInputElement>((element) => {
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of.
 onFormReset(() => low, commit)
 ---
-div(part="root" {...rest} role="group" aria-label={label})
+div(part="root" {...rest} role="group" data-kui-choice="" aria-label={label})
   input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? wording('ui.rangeInput.from', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
   span(part="separator" aria-hidden="true") -
   input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? wording('ui.rangeInput.to', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})

@@ -72,7 +72,7 @@ else
   div(part="root" {...rest} data-kui-field={links.frame} data-compact={small() ? '' : undefined})
     label(part="label")
       span(part="head")
-        span(part="text")
+        span(part="text" id={links.label})
           | {label}
           if required
             span(part="required" aria-hidden="true") *

@@ -6,7 +6,7 @@ import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
 import { afterPause, isRemote, searchOptions } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
-import { defaultKept, onFormReset, startRef } from './form-reset'
+import { defaultKept, fieldRef, onFormReset } from './form-reset'
 import { wording } from 'kay/words'
 import { labelText } from './label-text'
 import Icon from './icon.kay'
@@ -356,7 +356,7 @@ onFormReset(() => input, () => {
   active = -1
 })
 
-const ref = startRef<HTMLInputElement>((element) => {
+const ref = fieldRef<HTMLInputElement>((element) => {
   input = element
   keepInvalid(element, () => invalid)
 }, rest.ref)

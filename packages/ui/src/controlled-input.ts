@@ -1,6 +1,6 @@
 import { effect, signal, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import { fieldRef, onFormReset, resetWhenIdle } from './form-reset'
 
 interface Options<Value extends boolean | number | string, Box extends HTMLInputElement> {
   // The control's name in a logged failure of its `onChange`.
@@ -46,7 +46,7 @@ export function controlledInput<Value extends boolean | number | string, Box ext
   })
 
   // The control starts once: its default is what it was first drawn with, not what the parent holds now.
-  const ref = startRef<Box>((element) => {
+  const ref = fieldRef<Box>((element) => {
     box = element
     setDefault(element, untrack(value))
     start?.(element)

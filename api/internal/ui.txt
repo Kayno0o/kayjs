@@ -665,6 +665,18 @@ const TOOLTIP_LOOK: "pointer-events-none fixed top-0 left-0 z-50 flex w-max max-
 [./lib/chartist] loaders
 const loaders: Loaders
 
+[./lib/choice-link] CHOICE
+const CHOICE: "[data-kui-choice]"
+
+[./lib/choice-link] CONTROL
+const CONTROL: "input:not([type=\"hidden\"]), select, textarea, button, [contenteditable], [tabindex]"
+
+[./lib/choice-link] controlOf
+function controlOf(label: Element | null | undefined): HTMLElement | null
+
+[./lib/choice-link] linkChoice
+function linkChoice(root: HTMLElement | null | undefined): void
+
 [./lib/claim] claim
 function claim(job: "toaster" | "tooltips", fallback?: boolean): () => boolean
 
@@ -1080,6 +1092,9 @@ const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-inval
 [./lib/form-reset] defaultKept
 function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value
 
+[./lib/form-reset] fieldRef
+function fieldRef<Target extends HTMLElement>(first: (element: Target) => void, app?: unknown): (element: Target) => void
+
 [./lib/form-reset] holdDefaults
 function holdDefaults(form: HTMLFormElement): () => void
 
@@ -1111,6 +1126,9 @@ function checkSent(form: HTMLFormElement, action: Validating, issues: Signal<Rec
 [./lib/forms] CONTROL
 const CONTROL: "input:not([type=\"hidden\"]), select, textarea, button, [contenteditable], [tabindex]"
 
+[./lib/forms] controlOf
+function controlOf(label: Element | null | undefined): HTMLElement | null
+
 [./lib/forms] FieldIssue
 interface FieldIssue
   form: boolean
@@ -1131,6 +1149,7 @@ interface FieldLinks
   frame: string
   hint: string
   issues: string
+  label: string
 
 [./lib/forms] fieldNamed
 const fieldNamed: Context<(() => string | undefined) | undefined>
@@ -2961,6 +2980,9 @@ function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: Reado
 
 [./lib/ui-defaults] uiDefaults
 const uiDefaults: UiSettings
+
+[./lib/unnamed] warnUnnamed
+function warnUnnamed(element: Probe): void
 
 [./lib/virtual] INITIAL_VIEWPORT
 const INITIAL_VIEWPORT: 640
