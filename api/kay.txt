@@ -199,6 +199,7 @@ type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
 [.] CallOptions
 interface CallOptions<Output = unknown>
   headers?: Record<string, string> | undefined
+  keepalive?: boolean | undefined
   onError?: ((event: { error: ApiError<unknown>; }) => unknown) | undefined
   onSettled?: ((event: { data?: Output | undefined; error?: ApiError<unknown> | undefined; }) => unknown) | undefined
   onStart?: ((event: { input: unknown; }) => unknown) | undefined

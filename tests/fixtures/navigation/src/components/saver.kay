@@ -1,0 +1,23 @@
+---
+import { onMount, signal } from 'kay'
+import { noteDown } from '../routes/keepalive.kay'
+
+const big = signal('')
+
+async function saveBig() {
+  big = (await noteDown({ text: 'x'.repeat(70 * 1024) }, { keepalive: true })).length.toString()
+}
+
+onMount(() => {
+  const leave = () => {
+    void noteDown({ text: 'short' }, { keepalive: true })
+  }
+
+  window.addEventListener('pagehide', leave)
+
+  return () => window.removeEventListener('pagehide', leave)
+})
+---
+button.big(onClick={saveBig}) Save a big body
+p.saver Saves as the page goes
+p.big-saved {big()}

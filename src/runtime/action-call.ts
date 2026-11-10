@@ -306,7 +306,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
               timedOut = true
               limit.abort(new DOMException(`The server did not answer within ${String(timeoutOption)}`, 'TimeoutError'))
             }, timeout)
-          }, left, caller, key === undefined ? options?.headers : { 'idempotency-key': key, ...options?.headers })
+          }, left, caller, { key, options })
 
           break
         }
@@ -461,9 +461,16 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   ) as unknown as TrackedCall<never, unknown>
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller, extra?: Record<string, string>): Promise<Output> {
+// What a browser lets a `keepalive` request carry. Only a text body is measured: a form may hold files of any size.
+const KEEPALIVE_LIMIT = 64 * 1024
+
+function fits(body: unknown): boolean {
+  return typeof body === 'string' && new TextEncoder().encode(body).byteLength <= KEEPALIVE_LIMIT
+}
+
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller, call?: { key?: string | undefined, options?: CallOptions | undefined }): Promise<Output> {
   const { headers, body } = encodeCall(input)
-  const sent: Record<string, string> = { ...extra, ...headers }
+  const sent: Record<string, string> = { ...call?.key !== undefined && { 'idempotency-key': call.key }, ...call?.options?.headers, ...headers }
 
   // A test or a script calling it has no page.
   if (typeof location !== 'undefined')
@@ -489,7 +496,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
       sentOnce()
 
     try {
-      return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } }))
+      return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal }, ...call?.options?.keepalive && fits(body) && { keepalive: true } }))
     }
     catch (error) {
       if (typeof error === 'object' && error !== null)

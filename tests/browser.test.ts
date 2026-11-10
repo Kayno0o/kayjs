@@ -130,6 +130,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(costly.errors).toEqual([])
   })
 
+  it('sends an action call made from pagehide with keepalive, and a body over 64 KB as a plain post', async () => {
+    const kept = () => (globalThis as { keptByPagehide?: string[] }).keptByPagehide ?? []
+
+    await using saver = await site.open('/keepalive')
+
+    await saver.click('button.big')
+    await saver.waitFor('p.big-saved', { text: String(70 * 1024) })
+    expect(kept()).toContain(`long:${70 * 1024}`)
+    await saver.evaluate(() => {
+      location.assign('/')
+    })
+    await saver.waitUntil(() => location.pathname === '/')
+    await Bun.sleep(300)
+    expect(kept()).toContain('short')
+    expect(saver.errors).toEqual([])
+  })
+
   it('sends a form again with the fresh challenge it is refused with, after an island\'s call or a failed post spent the page\'s', async () => {
     await using costly = await site.open('/costly')
 

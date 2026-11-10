@@ -162,7 +162,7 @@
   },
   "src/runtime/action-call.ts": {
     "max-lines-per-function": 188,
-    "complexity": 57
+    "complexity": 54
   },
   "src/runtime/cache.ts": {
     "max-lines": 627

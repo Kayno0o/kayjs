@@ -664,3 +664,35 @@ describe('optimistic changes of calls in flight', () => {
     expect(value()).toBe(3)
   })
 })
+
+describe('keepalive', () => {
+  function keepaliveSent(): (boolean | undefined)[] {
+    const sent: (boolean | undefined)[] = []
+
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => {
+      sent.push(init?.keepalive)
+
+      return new Response(stringify('ok'), { headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof fetch))
+
+    return sent
+  }
+
+  it('reaches fetch when the call asks for it', async () => {
+    const sent = keepaliveSent()
+    const stub = actionStub('/_kay/action/keep') as unknown as Call
+
+    await stub({ a: 1 }, { keepalive: true })
+    await stub({ a: 1 })
+    expect(sent).toEqual([true, undefined])
+  })
+
+  it('is left off for a body past 64 KB, which is posted as a plain fetch', async () => {
+    const sent = keepaliveSent()
+    const stub = actionStub('/_kay/action/keep') as unknown as Call
+
+    await stub({ text: 'x'.repeat(64 * 1024) }, { keepalive: true })
+    await stub({ text: 'é'.repeat(40 * 1024) }, { keepalive: true })
+    expect(sent).toEqual([undefined, undefined])
+  })
+})

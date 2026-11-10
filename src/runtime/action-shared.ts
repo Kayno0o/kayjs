@@ -354,6 +354,8 @@ export interface CallOptions<Output = unknown> {
   signal?: AbortSignal | undefined
   // Headers sent with the call, which the handler reads from `ctx.request`; the ones kay sets itself win.
   headers?: Record<string, string> | undefined
+  // Lets the post outlive the page, for a call made from `pagehide` or `beforeunload`: it is passed to `fetch` as `keepalive`. A browser caps such a body at 64 KB, so a JSON body past it is sent without, as is a call carrying files or a form.
+  keepalive?: boolean | undefined
 }
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.

@@ -388,6 +388,7 @@ A string names a load of the page instead, the binding of a top-level `const car
 ### Waiting, trying again and knowing how it went
 
 - `timeout: '5s'` aborts a post the server has not answered in that time. The call rejects with a `TimeoutError` and `pending()` clears. The time counts from the post, not from the wait in a queue.
+- `keepalive: true` lets a call made while the page unloads (from `pagehide` or `beforeunload`) reach the server, as `fetch`'s `keepalive` does: `save(state, { keepalive: true })`. Browsers cap such a body at 64 KB, so a bigger one is sent as a plain post, as is a call with files or a form.
 - `retry: 2` posts again, up to twice, after a failure that cannot have run the handler: a 503, or a post that failed before it was sent. `retry: { times: 2, delay: '1s', when: error => error.status === 429 }` sets the pause, which doubles each time, and which failures are worth another try.
 - A timeout, a 504 or a network failure after the post was sent needs a `when`, as the handler may have run. A redirect and an abort are never tried again, whatever `when` says.
 - Every try of a call sends the same `Idempotency-Key` header. The handler reads it from `ctx.request` to tell a repeat from a new call.
