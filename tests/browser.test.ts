@@ -139,7 +139,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     await saver.evaluate(() => {
       const original = window.fetch.bind(window)
 
-      window.fetch = async (input, init) => {
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         if (init?.method === 'POST') {
           const seen = JSON.parse(sessionStorage.getItem('keepalive') ?? '[]') as boolean[]
 
@@ -148,7 +148,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
         }
 
         return original(input, init)
-      }
+      }) as typeof fetch
     })
     await saver.click('button.big')
     await saver.waitFor('p.big-saved', { text: String(70 * 1024) })
