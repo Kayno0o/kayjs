@@ -10,8 +10,6 @@ export interface MenuItemBase {
   icon?: IconSlot | IconProps
   // Colours the entry, such as `danger` for a destructive one.
   tone?: Tone | undefined
-  /** @deprecated Use `tone: 'danger'`, which wins when both are given. Removed in 2.0.0. */
-  danger?: boolean
   disabled?: boolean
   // Text hinting the key combination that does the same elsewhere, such as `Ctrl+S`, drawn at the end of the row. It binds nothing: kay's `shortcut()` does.
   shortcut?: string | undefined

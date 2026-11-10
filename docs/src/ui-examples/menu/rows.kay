@@ -13,7 +13,7 @@ function entries(file: string): MenuEntry[] {
     {
       label: 'Delete',
       icon: 'delete',
-      danger: true,
+      tone: 'danger',
       onSelect: () => files.set(list => list.filter(name => name !== file)),
     },
   ]

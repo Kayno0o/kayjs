@@ -6,13 +6,7 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
-import { dangerFlags } from './menu-danger'
 import { kayCtxImport } from './script-shared'
-
-const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
-
-// Menu's `items` took `danger: true` for a destructive entry until `tone: 'danger'` replaced it, deprecated since 1.92.
-const MENU_TAG = 'menu'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -187,8 +181,6 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
-  // The names bound to a kayjs-ui component, by the component's file, for `deprecatedUiNames`.
-  private uiComponents = new Map<string, string>()
   // The name of the props the script left out of its destructuring: a plain object, whose members are values.
   private restName: string | undefined
 
@@ -198,15 +190,6 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
-    this.uiComponents = new Map()
-
-    for (const binding of [...script.imports, ...(server?.imports ?? [])]) {
-      const match = binding.imported === 'default' && !binding.typeOnly ? UI_SOURCE.exec(binding.source) : null
-
-      if (match)
-        this.uiComponents.set(binding.local, match[1]!)
-    }
-
     this.restName = script.props?.rest && this.text(script.props.rest)
     this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
 
@@ -457,10 +440,6 @@ class Validator {
   private elementIn(element: ElementNode, foreign: boolean): void {
     if (this.options.check && !element.component)
       this.accessibility(element)
-
-    if (this.options.check && element.component) {
-      this.deprecatedUiNames(element)
-    }
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
       this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
@@ -832,26 +811,6 @@ class Validator {
     const type = element.attributes.find(candidate => candidate.kind === 'static' && this.text(candidate.name) === 'type')
 
     return type?.kind === 'static' ? type.text : undefined
-  }
-
-  // Type checking only: the kayjs-ui props an app still writes in a form they replaced.
-  private deprecatedUiNames(element: ElementNode): void {
-    const file = this.uiComponents.get(element.name)
-
-    if (file === undefined)
-      return
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread')
-        continue
-
-      const name = this.text(attribute.name)
-
-      if (file === MENU_TAG && name === 'items' && attribute.kind === 'expression') {
-        for (const { property, toned } of dangerFlags(this.text(attribute.expression), attribute.expression.start))
-          this.lint(property, 'deprecated-menu-danger', '`danger: true` in the `items` of a `Menu` is `tone: \'danger\'`, the one way every component names a meaning', toned ? { help: 'Drop `danger: true`, the `tone` beside it wins' } : { help: 'Write `tone: \'danger\'`', fixes: [{ title: 'Write `tone: \'danger\'`', edits: [{ start: property.start, end: property.end, text: 'tone: \'danger\'' }], safe: true }] })
-      }
-    }
   }
 
   private text(span: Span): string {

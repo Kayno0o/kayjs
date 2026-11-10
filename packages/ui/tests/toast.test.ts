@@ -4,7 +4,7 @@ import { callAction } from '../src/forms'
 import { attempt, dismissToast, holdToasts, messageOf, toast, toasts } from '../src/toast'
 
 function shown() {
-  return toasts().map(({ message, type }) => ({ message, type }))
+  return toasts().map(({ message, tone }) => ({ message, tone }))
 }
 
 beforeEach(() => {
@@ -18,19 +18,19 @@ afterEach(() => {
 })
 
 describe('toast', () => {
-  test('queues each message with its type, in order', () => {
+  test('queues each message with its tone, in order', () => {
     toast.success('Saved')
     toast.error('Refused')
 
-    expect(shown()).toEqual([{ message: 'Saved', type: 'success' }, { message: 'Refused', type: 'error' }])
+    expect(shown()).toEqual([{ message: 'Saved', tone: 'success' }, { message: 'Refused', tone: 'danger' }])
   })
 
-  test('carries the tone of its type, a failed call being a danger, and the deprecated type beside it', () => {
+  test('carries the tone of its method, a failed call being a danger', () => {
     toast.error('Refused')
     toast.success('Saved')
     toast.info('Copied')
 
-    expect(toasts().map(({ tone, type }) => [tone, type])).toEqual([['danger', 'error'], ['success', 'success'], ['info', 'info']])
+    expect(toasts().map(({ tone }) => tone)).toEqual(['danger', 'success', 'info'])
   })
 
   test('takes any tone, the method giving its own by default, and a danger one keeps an error\'s guard', () => {
@@ -40,7 +40,7 @@ describe('toast', () => {
     toast.info('Failed', { tone: 'danger' })
     toast.info('Failed', { tone: 'danger' })
 
-    expect(toasts().map(({ tone, type }) => [tone, type])).toEqual([['warning', 'info'], ['neutral', 'info'], ['accent', 'info'], ['danger', 'error']])
+    expect(toasts().map(({ tone }) => tone)).toEqual(['warning', 'neutral', 'accent', 'danger'])
   })
 
   test('dismisses one toast by its id', () => {
@@ -48,7 +48,7 @@ describe('toast', () => {
     toast.info('second')
     dismissToast(toasts()[0]!.id)
 
-    expect(shown()).toEqual([{ message: 'second', type: 'info' }])
+    expect(shown()).toEqual([{ message: 'second', tone: 'info' }])
   })
 })
 
@@ -233,7 +233,7 @@ describe('a toast\'s time', () => {
 describe('attempt', () => {
   test('toasts the failure instead of throwing, and resolves to undefined', async () => {
     expect(await attempt(async () => Promise.reject(new Error('refused')), 'Could not save')).toBeUndefined()
-    expect(shown()).toEqual([{ message: 'Could not save', type: 'error' }])
+    expect(shown()).toEqual([{ message: 'Could not save', tone: 'danger' }])
   })
 
   test('toasts what `refused` reads from the handler\'s refusal, or a refusal of the whole call, before `failure`', async () => {
@@ -326,7 +326,7 @@ describe('attempt', () => {
   test('takes its messages as options, toasting `success` once the call goes through', async () => {
     expect(await attempt(async () => undefined, { failure: 'Could not save', success: 'Saved' })).toBe(true)
     expect(await attempt(async () => Promise.reject(new ActionError(409, '', {}, { error: 'Taken' })), { failure: 'Could not save', success: 'Saved', refused: (data: { error: string }) => data.error })).toBeUndefined()
-    expect(shown()).toEqual([{ message: 'Saved', type: 'success' }, { message: 'Taken', type: 'error' }])
+    expect(shown()).toEqual([{ message: 'Saved', tone: 'success' }, { message: 'Taken', tone: 'danger' }])
   })
 
   describe('over a call() that throws ApiError', () => {
@@ -537,7 +537,7 @@ describe('toast.update', () => {
     const id = toast.info('Saving', { duration: false })
 
     expect(toast.update(id, { message: 'Saved', tone: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } })).toBe(true)
-    expect(toasts()).toMatchObject([{ id, message: 'Saved', tone: 'success', type: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } }])
+    expect(toasts()).toMatchObject([{ id, message: 'Saved', tone: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } }])
 
     toast.update(id, { action: null })
 
@@ -596,7 +596,7 @@ describe('toast.promise', () => {
     const done = await toast.promise(async () => Promise.reject(new Error('nope')), { loading: 'Saving', error: thrown => `Failed: ${(thrown as Error).message}` })
 
     expect(done).toBeUndefined()
-    expect(toasts()).toMatchObject([{ message: 'Failed: nope', tone: 'danger', type: 'error' }])
+    expect(toasts()).toMatchObject([{ message: 'Failed: nope', tone: 'danger' }])
   })
 
   test('without success the loading toast just closes, and a closed one still gets the outcome', async () => {
@@ -634,7 +634,7 @@ describe('toast.update conventions', () => {
     const id = toast.info('Checking', { duration: false })
 
     expect(toast.update(id, { message: 'Offline', tone: 'danger' })).toBe(true)
-    expect(shown()).toEqual([{ message: 'Offline', type: 'error' }])
+    expect(shown()).toEqual([{ message: 'Offline', tone: 'danger' }])
   })
 
   test('during a hold the new clock waits, and a release restarts it from what it has', () => {

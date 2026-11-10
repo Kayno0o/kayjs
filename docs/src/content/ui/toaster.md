@@ -14,7 +14,7 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 ## How long it stays
 
-`toast.info('Copied', { duration: '3s' })` sets how long a toast stays. `false` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, any of `neutral`, `accent`, `success`, `warning`, `danger` or `info`, and `toast.warning(...)` pushes a warning one; the info toast takes `--color-info`. `type` is the deprecated name of the tone, with `error` for `danger`.
+`toast.info('Copied', { duration: '3s' })` sets how long a toast stays. `false` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, any of `neutral`, `accent`, `success`, `warning`, `danger` or `info`, and `toast.warning(...)` pushes a warning one; the info toast takes `--color-info`.
 
 ## A second line, markup and what happened to it
 

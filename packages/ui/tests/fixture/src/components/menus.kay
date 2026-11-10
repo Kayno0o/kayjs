@@ -5,11 +5,10 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 
-// Entries and triggers by `tone`, and the `danger` flag an entry still takes.
+// Entries and triggers by `tone`.
 const items: MenuEntry[] = [
   { label: 'Tone', tone: 'danger', onSelect: () => undefined },
-  { label: 'Old', danger: true, onSelect: () => undefined },
-  { label: 'Wins', tone: 'neutral', danger: true, onSelect: () => undefined },
+  { label: 'Neutral', tone: 'neutral', onSelect: () => undefined },
   { label: 'Plain', onSelect: () => undefined },
 ]
 const at = signal({ x: 0, y: 0 })

@@ -6,9 +6,6 @@ import { answerMessage } from './internal/answer-message'
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
 export type ToastTone = Tone
 
-/** @deprecated The old name of a toast's tone, `error` for `danger`: read `Toast.tone`. Removed in 2.0.0. */
-export type ToastType = 'error' | 'success' | 'info'
-
 // A button in a toast for the obvious next step of its message: busy while `run`'s promise is pending, the toast dismissed once it settles, a rejection logged.
 // With an `href` it is a link to that page: a click runs `run` first when there is one (not awaited, the navigation goes on), then closes the toast with the reason `action`, as the toast outlives a page swap.
 export type ToastAction = { label: string, run: () => unknown, href?: undefined } | { label: string, href: string, run?: (() => unknown) | undefined }
@@ -29,10 +26,7 @@ export interface Toast {
   outcome?: boolean | undefined
   // Called once the toast has gone, with why.
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
-  // A toast pushed by hand with only a `type` takes its tone from it.
-  tone?: ToastTone | undefined
-  /** @deprecated Read `tone`, where `error` is `danger`. Removed in 2.0.0, when a toast is `{ id, message, tone }`. */
-  type: ToastType
+  tone: ToastTone
 }
 
 export interface ToastOptions {
@@ -133,21 +127,14 @@ function askedMs(duration: Duration | false | undefined): number | undefined {
   return duration === undefined ? undefined : durationMs(duration)
 }
 
-const TYPE_OF_TONE: Partial<Record<Tone, ToastType>> = { danger: 'error', success: 'success' }
-
-// The deprecated `type` follows the tone: a danger is an error, a success a success and every other tone an info.
-function typeOf(tone: Tone): ToastType {
-  return TYPE_OF_TONE[tone] ?? 'info'
-}
-
-// How long a toast of this type stays unless asked otherwise: an error has no clock.
-function clockOf(duration: Duration | false | undefined, type: ToastType): number {
+// How long a toast of this tone stays unless asked otherwise: a danger has no clock.
+function clockOf(duration: Duration | false | undefined, tone: Tone): number {
   const asked = askedMs(duration)
 
   if (asked !== undefined && !Number.isNaN(asked) && asked >= 0)
     return asked
 
-  return type === 'error' ? Number.POSITIVE_INFINITY : DURATION_MS
+  return tone === 'danger' ? Number.POSITIVE_INFINITY : DURATION_MS
 }
 
 interface PushOptions extends ToastOptions {
@@ -156,24 +143,22 @@ interface PushOptions extends ToastOptions {
 }
 
 // An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
-function sameError(type: ToastType, message: string | Snippet, except?: number): Toast | undefined {
-  return type === 'error' ? untrack(toasts).find(shown => shown.id !== except && shown.type === 'error' && shown.message === message) : undefined
+function sameError(tone: Tone, message: string | Snippet, except?: number): Toast | undefined {
+  return tone === 'danger' ? untrack(toasts).find(shown => shown.id !== except && shown.tone === 'danger' && shown.message === message) : undefined
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string | Snippet, method: ToastType, { duration, action, tone: chosen, description, loading, outcome, onDismiss }: PushOptions): number {
-  const tone: Tone = chosen ?? (method === 'error' ? 'danger' : method)
-  const type = typeOf(tone)
-
-  const open = sameError(type, message)
+function push(message: string | Snippet, method: Tone, { duration, action, tone: chosen, description, loading, outcome, onDismiss }: PushOptions): number {
+  const tone = chosen ?? method
+  const open = sameError(tone, message)
 
   if (open !== undefined)
     return open.id
 
   const id = nextId++
-  const timer: Timer = { remaining: clockOf(duration, type), started: Date.now() }
+  const timer: Timer = { remaining: clockOf(duration, tone), started: Date.now() }
 
-  untrack(() => toasts.set(list => [...list, { id, message, description, action, tone, type, loading, outcome, onDismiss }]))
+  untrack(() => toasts.set(list => [...list, { id, message, description, action, tone, loading, outcome, onDismiss }]))
   timers.set(id, timer)
 
   if (holds.size === 0)
@@ -202,14 +187,14 @@ function update(id: number, patch: ToastPatch): boolean {
     return false
 
   const tone = patch.tone ?? current.tone
-  const next: Toast = { ...current, tone, type: tone === undefined ? current.type : typeOf(tone) }
+  const next: Toast = { ...current, tone }
 
   for (const key of ['message', 'description', 'action', 'loading', 'outcome', 'onDismiss'] as const) {
     if (patch[key] !== undefined)
       Object.assign(next, { [key]: patch[key] ?? undefined })
   }
 
-  if (sameError(next.type, next.message, id) !== undefined) {
+  if (sameError(next.tone, next.message, id) !== undefined) {
     dismissToast(id)
 
     return true
@@ -221,7 +206,7 @@ function update(id: number, patch: ToastPatch): boolean {
 
   if (timer !== undefined && ('tone' in patch || 'duration' in patch || 'loading' in patch)) {
     clearTimeout(timer.handle)
-    timer.remaining = clockOf(patch.duration, next.type)
+    timer.remaining = clockOf(patch.duration, next.tone)
     timer.started = Date.now()
 
     if (holds.size === 0)
@@ -266,7 +251,7 @@ async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, su
 
     // `loading` is named so the clock starts afresh, the loading toast having none.
     if (!update(id, { message, tone, loading: false, outcome: true, duration: options.duration, description: description ?? null, action: action ?? null }))
-      push(message, tone === 'danger' ? 'error' : 'success', { tone, duration: options.duration, description, action, outcome: true })
+      push(message, tone, { tone, duration: options.duration, description, action, outcome: true })
   }
 
   let value: T
@@ -287,10 +272,10 @@ async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, su
 
 // Each shows a message and answers its id, for `dismissToast` or `toast.update` to reach it.
 export const toast = {
-  error: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'error', options),
+  error: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'danger', options),
   success: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'success', options),
   info: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'info', options),
-  warning: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'info', { tone: 'warning', ...options }),
+  warning: (message: string | Snippet, options: ToastOptions = {}) => push(message, 'warning', options),
   update,
   promise,
 }

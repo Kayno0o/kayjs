@@ -20,7 +20,7 @@ const items: MenuEntry[] = [
   { label: 'Rename', onSelect: () => onAction('rename') },
   { label: 'Archive', disabled: true, onSelect: () => onAction('archive') },
   'separator',
-  { label: 'Delete', icon: 'delete', danger: true, onSelect: () => onAction('delete') },
+  { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: () => onAction('delete') },
 ]
 ---
 RangeInput#range(label="Hours" min={0} max={24} onChange={onRange})

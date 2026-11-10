@@ -1177,51 +1177,6 @@ describe('an extension satisfying missing-alt', () => {
   })
 })
 
-describe('deprecated-menu-danger', () => {
-  const imports = 'import Menu from \'@kaynooo/kayjs-ui/menu.kay\'\nimport Other from \'./other.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'menu-danger.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-menu-danger').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('writes tone danger for each entry flagged danger in a Menu', () => {
-    expect(found('Menu(label="x" items={[{ label: \'Rename\' }, { label: \'Delete\', danger: true, onSelect: remove }]})')).toEqual([{ at: 'danger: true', fix: ['danger: true->tone: \'danger\''] }])
-    expect(found('Menu(label="x" items={[{ label: "A", "danger": true }, \'separator\', { label: "B", danger: true }]})')).toHaveLength(2)
-  })
-
-  it('reports an entry that names a tone with no fix, and leaves the rest alone', () => {
-    expect(found('Menu(label="x" items={[{ label: \'Delete\', tone: \'warning\', danger: true }]})')).toEqual([{ at: 'danger: true', fix: undefined }])
-    expect(found('Menu(label="x" items={[{ label: \'Delete\', danger: false }, { label: \'B\', tone: \'danger\' }]})')).toEqual([])
-    expect(found('Menu(label="x" items={rows})')).toEqual([])
-    expect(found('Other(items={[{ label: \'Delete\', danger: true }]})')).toEqual([])
-  })
-
-  it('reaches entries through map callbacks, ternaries and casts, never an entry\'s own values', () => {
-    expect(found('Menu(label="x" items={rows.map(row => ({ label: row, danger: true }))})')).toHaveLength(1)
-    expect(found('Menu(label="x" items={rows.map(row => { return { label: row, danger: true } })})')).toHaveLength(1)
-    expect(found('Menu(label="x" items={[...base, ok ? { label: "A", danger: true } : "separator"] as MenuEntry[]})')).toHaveLength(1)
-    expect(found('Menu(label="x" items={[{ label: "a", onSelect: () => notify({ danger: true }) }]})')).toEqual([])
-    expect(found('Menu(label="x" items={[{ label: "a", data: { danger: true } }]})')).toEqual([])
-  })
-
-  it('reports an entry that spreads or computes a key with no fix', () => {
-    expect(found('Menu(label="x" items={[{ ...base, danger: true }]})')).toEqual([{ at: 'danger: true', fix: undefined }])
-    expect(found('Menu(label="x" items={[{ [key]: 1, danger: true }]})')).toEqual([{ at: 'danger: true', fix: undefined }])
-  })
-
-  it('leaves nothing to report once the fix is applied', () => {
-    const source = '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="x" items={rows.map(row => ({ label: row, danger: true }))})\n'
-    const first = compileKay(source, 'menu-danger.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-menu-danger')
-    const edits = first.flatMap(d => d.fixes?.[0]?.edits ?? []).toSorted((a, b) => b.start - a.start)
-    const fixed = edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
-
-    expect(fixed).toContain('tone: \'danger\'')
-    expect(compileKay(fixed, 'menu-danger.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-menu-danger')).toEqual([])
-  })
-})
-
 describe('unreturned-fail', () => {
   const server = (body: string) => `--- server\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
   const found = (body: string) => lints(server(body)).filter(d => d.code === 'unreturned-fail')

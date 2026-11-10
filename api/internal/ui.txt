@@ -1360,7 +1360,6 @@ interface MediaItem
 [./lib/index] MenuAction
 interface MenuAction extends MenuItemBase
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   disabled?: boolean
   href?: string | undefined
   icon?: IconProps | IconSlot
@@ -1374,7 +1373,6 @@ interface MenuAction extends MenuItemBase
 interface MenuCheckbox extends MenuItemBase
   checked?: boolean | undefined
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
@@ -1397,7 +1395,6 @@ type MenuItem = MenuAction | MenuCheckbox | MenuRadio | MenuSubmenu
 [./lib/index] MenuItemBase
 interface MenuItemBase
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   disabled?: boolean
   icon?: IconProps | IconSlot
   label: string
@@ -1408,7 +1405,6 @@ interface MenuItemBase
 interface MenuRadio extends MenuItemBase
   checked?: boolean | undefined
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
@@ -1694,8 +1690,7 @@ interface Toast
   message: Element
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   outcome?: boolean | undefined
-  tone?: Tone | undefined
-  type: ToastType
+  tone: Tone
 
 [./lib/index] ToastAction
 type ToastAction = { label: string, run: () => unknown, href?: undefined } | { label: string, href: string, run?: (() => unknown) | undefined }
@@ -1743,9 +1738,6 @@ function toasts(): Toast[]
 
 [./lib/index] ToastTone
 type ToastTone = Tone
-
-[./lib/index] ToastType
-type ToastType = 'error' | 'success' | 'info'
 
 [./lib/index] toCsv
 function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
@@ -2039,7 +2031,6 @@ function headingOf(entry: MenuEntry): MenuHeading | undefined
 [./lib/menu] MenuAction
 interface MenuAction extends MenuItemBase
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   disabled?: boolean
   href?: string | undefined
   icon?: IconProps | IconSlot
@@ -2053,7 +2044,6 @@ interface MenuAction extends MenuItemBase
 interface MenuCheckbox extends MenuItemBase
   checked?: boolean | undefined
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
@@ -2084,7 +2074,6 @@ type MenuItem = MenuAction | MenuCheckbox | MenuRadio | MenuSubmenu
 [./lib/menu] MenuItemBase
 interface MenuItemBase
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   disabled?: boolean
   icon?: IconProps | IconSlot
   label: string
@@ -2095,7 +2084,6 @@ interface MenuItemBase
 interface MenuRadio extends MenuItemBase
   checked?: boolean | undefined
   closeOnSelect?: boolean | undefined
-  danger?: boolean
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
@@ -2826,8 +2814,7 @@ interface Toast
   message: Element
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   outcome?: boolean | undefined
-  tone?: Tone | undefined
-  type: ToastType
+  tone: Tone
 
 [./lib/toast] ToastAction
 type ToastAction = { label: string, run: () => unknown, href?: undefined } | { label: string, href: string, run?: (() => unknown) | undefined }
@@ -2875,9 +2862,6 @@ function toasts(): Toast[]
 
 [./lib/toast] ToastTone
 type ToastTone = Tone
-
-[./lib/toast] ToastType
-type ToastType = 'error' | 'success' | 'info'
 
 [./lib/tone] Tone
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'

@@ -706,14 +706,6 @@ export const LINTS = {
     wrong: '// src/jobs.ts, imported by no plugin\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)',
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
-  'deprecated-menu-danger': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.92',
-    summary: 'A kayjs-ui Menu entry flagged `danger: true`, which is `tone: \'danger\'` since 1.92, the tone every component names a meaning with. The old flag works until 2.0.0. Found in the entries written out in the `items` of a Menu, through array literals, ternaries and `map` callbacks; the fix writes the tone, and an entry that names a `tone` too, or spreads or computes a key that may, is reported with no fix, as the tone wins. Items built elsewhere and passed by name are not found.',
-    wrong: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', danger: true }]})',
-    right: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', tone: \'danger\' }]})',
-  },
   'deprecated-stream-open': {
     level: 'warn',
     group: 'deprecated',

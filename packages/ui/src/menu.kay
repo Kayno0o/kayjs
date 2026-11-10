@@ -34,7 +34,7 @@ const look = recipe({
     indicator: 'inline-block w-4 shrink-0 text-center text-accent',
     shortcut: 'ml-auto pl-4 font-sans text-xs text-muted',
     chevron: 'ml-auto size-4 shrink-0 -rotate-90',
-    item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-danger:text-danger data-[tone=info]:text-info disabled:cursor-default disabled:opacity-50`,
+    item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info disabled:cursor-default disabled:opacity-50`,
   },
 })
 
@@ -246,15 +246,6 @@ function keyDown(event: KeyboardEvent) {
   buttons[move(buttons.indexOf(document.activeElement as HTMLElement), buttons.length)]?.focus()
 }
 
-// A `tone` has the last word over the `danger` flag it replaces.
-function toneOf(action: Pick<MenuAction, 'tone' | 'danger'>): Tone | undefined {
-  return action.tone ?? (action.danger === true ? 'danger' : undefined)
-}
-
-function isDanger(action: Pick<MenuAction, 'tone' | 'danger'>) {
-  return toneOf(action) === 'danger'
-}
-
 // Closes the menu first, unless the entry keeps it open, then runs what the pick does.
 function pick(entry: { closeOnSelect?: boolean | undefined }, run: () => unknown) {
   if (entry.closeOnSelect !== false)
@@ -342,7 +333,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
                 | {submenu.label}
                 Icon(icon="chevron" part="chevron")
       else if checkboxOf(entry) as box
-        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemcheckbox" aria-checked={isChecked(box, index) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-danger={isDanger(box) || undefined} data-tone={toneOf(box)} onClick={() => toggle(box, index)})
+        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemcheckbox" aria-checked={isChecked(box, index) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-tone={box.tone} onClick={() => toggle(box, index)})
           span(part="indicator" aria-hidden="true") {isChecked(box, index) ? '✓' : ''}
           if item
             | {item(box)}
@@ -355,7 +346,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
       else if radioOf(entry) as radio
         if announced().radios.get(index) as group
           div(part="group" id={`${menuId}-group-${index}`} role="group" aria-labelledby={group.labelledby} aria-owns={group.owns})
-        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemradio" aria-checked={isChecked(radio, index) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-danger={isDanger(radio) || undefined} data-tone={toneOf(radio)} onClick={() => choose(radio, index)})
+        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemradio" aria-checked={isChecked(radio, index) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-tone={radio.tone} onClick={() => choose(radio, index)})
           span(part="indicator" aria-hidden="true") {isChecked(radio, index) ? '●' : ''}
           if item
             | {item(radio)}
@@ -367,7 +358,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
               kbd(part="shortcut") {radio.shortcut}
       else if actionOf(entry) as action
         if action.href !== undefined && !action.disabled
-          a(part="item" id={`${menuId}-item-${index}`} href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
+          a(part="item" id={`${menuId}-item-${index}`} href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-tone={action.tone} onClick={() => select(action)})
             if item
               | {item(action)}
             else
@@ -377,7 +368,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
               if action.shortcut
                 kbd(part="shortcut") {action.shortcut}
         else
-          button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
+          button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-tone={action.tone} onClick={() => select(action)})
             if item
               | {item(action)}
             else

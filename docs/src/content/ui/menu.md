@@ -6,7 +6,7 @@ description: An icon button opening a menu of actions.
 
 ## Entries
 
-`items` lists the entries: an object with a `label`, an `onSelect`, an optional `icon` and `danger` for a destructive one, or `'separator'` to draw a rule between groups. `icon` sets the trigger's icon and `label` names it. `onSelect` runs once the menu has closed and focus is back on the trigger. A menu taller than the window scrolls, and its entries are taller on a touch screen.
+`items` lists the entries: an object with a `label`, an `onSelect`, an optional `icon` and `tone: 'danger'` for a destructive one, or `'separator'` to draw a rule between groups. `icon` sets the trigger's icon and `label` names it. `onSelect` runs once the menu has closed and focus is back on the trigger. A menu taller than the window scrolls, and its entries are taller on a touch screen.
 
 ## Options, groups and submenus
 
@@ -40,7 +40,7 @@ An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "co
 
 ## Trigger and placement
 
-`size` is `xs` to `lg`, `md` by default, and `variant` is `solid`, `ghost` or `inline`, `ghost` by default, with a `tone` for the trigger. An entry takes a `tone` too, `danger` for a destructive one; an entry's `danger: true` is deprecated for it. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.
+`size` is `xs` to `lg`, `md` by default, and `variant` is `solid`, `ghost` or `inline`, `ghost` by default, with a `tone` for the trigger. An entry takes a `tone` too, `danger` for a destructive one. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.
 
 ## Your own trigger
 

@@ -12,12 +12,12 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-test('a Menu entry is destructive by its tone or the deprecated danger flag, the tone winning', async () => {
+test('a Menu entry is destructive by its tone', async () => {
   mounted = await mountComponent(Menus)
 
-  const items = [...mounted.root.querySelectorAll('#by-tone [data-part=item]')].map(item => [item.textContent, item.hasAttribute('data-danger')])
+  const items = [...mounted.root.querySelectorAll('#by-tone [data-part=item]')].map(item => [item.textContent, item.getAttribute('data-tone')])
 
-  expect(items).toEqual([['Tone', true], ['Old', true], ['Wins', false], ['Plain', false]])
+  expect(items).toEqual([['Tone', 'danger'], ['Neutral', 'neutral'], ['Plain', null]])
 })
 
 test('a Menu trigger takes a tone, the danger variant being the danger tone', async () => {

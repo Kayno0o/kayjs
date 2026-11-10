@@ -12,7 +12,7 @@ const items: MenuEntry[] = [
   {
     label: 'Delete',
     icon: 'delete',
-    danger: true,
+    tone: 'danger',
     onSelect: () => picked = 'Delete',
   },
 ]

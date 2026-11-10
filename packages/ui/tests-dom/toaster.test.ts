@@ -20,7 +20,7 @@ test('a toast shows in the toaster and is read from a region kept in the page, a
 
   const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
 
-  expect(toasts.map(item => [item.getAttribute('data-tone'), item.getAttribute('data-type'), item.querySelector('.kui-toast [data-part=message]')?.textContent])).toEqual([['success', 'success', 'Saved'], ['danger', 'error', 'Refused']])
+  expect(toasts.map(item => [item.getAttribute('data-tone'), item.querySelector('.kui-toast [data-part=message]')?.textContent])).toEqual([['success', 'Saved'], ['danger', 'Refused']])
   expect([...mounted.root.querySelectorAll('[data-part=live]')].map(region => [region.getAttribute('role'), region.textContent])).toEqual([['status', 'Saved'], ['alert', 'Refused']])
   expect(mounted.root.querySelector('.kui-toaster')?.matches(':popover-open')).toBe(true)
 

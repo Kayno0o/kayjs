@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { IconSlot } from './defaults'
-import type { Toast, ToastType } from './toast'
+import type { Toast } from './toast'
 import type { Tone } from './tone'
 import { effect, onMount, recipe, shortcut, signal } from 'kay'
 import { claim } from './claim'
@@ -11,10 +11,6 @@ import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { dismissToast, holdToasts, toasts } from './toast'
 import { wording } from 'kay/words'
-
-function toneOf(item: { tone?: Tone | undefined, type: ToastType }): Tone {
-  return item.tone ?? (item.type === 'error' ? 'danger' : item.type)
-}
 
 const ICONS: Record<Tone, IconSlot> = { neutral: 'info', accent: 'info', info: 'info', success: 'success', warning: 'alert', danger: 'alert' }
 
@@ -152,23 +148,23 @@ function dismissed(event: KeyboardEvent) {
 if owns()
   // The outcome of a `toast.promise` is read politely whatever its tone: the reader waited for it, and an alert would cut in on what they were doing.
   div(part="live" role="status" aria-live="polite")
-    for item of listed().filter(item => toneOf(item) !== 'danger' || item.outcome) key={item.id}
+    for item of listed().filter(item => item.tone !== 'danger' || item.outcome) key={item.id}
       span {item.message}
       if item.description
         span {` ${item.description}`}
   div(part="live" role="alert")
-    for item of listed().filter(item => toneOf(item) === 'danger' && !item.outcome) key={item.id}
+    for item of listed().filter(item => item.tone === 'danger' && !item.outcome) key={item.id}
       span {item.message}
       if item.description
         span {` ${item.description}`}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
   div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
-      div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
+      div(part="toast" data-id={item.id} data-tone={item.tone} onKeyDown={dismissed})
         if toast
           | {toast(item, () => dismissToast(item.id, 'user'))}
         else
-          Icon(icon={item.loading ? 'spinner' : ICONS[toneOf(item)]} part="icon" data-loading={item.loading ? '' : undefined})
+          Icon(icon={item.loading ? 'spinner' : ICONS[item.tone]} part="icon" data-loading={item.loading ? '' : undefined})
           div(part="content")
             p(part="message") {item.message}
             if item.description
