@@ -115,7 +115,7 @@ class Notifier {
     // One line for the whole run: a database down for an hour is not logged at every retry.
     if (!this.#said) {
       this.#said = true
-      kayLog('warn', `kay: Postgres ${why}, so processes hear each other's writes by polling only`, error)
+      kayLog('warn', `Postgres ${why}, so processes hear each other's writes by polling only`, error)
     }
 
     if (this.#retry !== undefined || this.#readers.size === 0)
