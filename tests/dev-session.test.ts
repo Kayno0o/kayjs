@@ -801,6 +801,25 @@ describe('kay dev\'s session', () => {
       expect(fakes.types.closed).toBe(true)
       expect(fakes.lines.some(line => line.includes('building the client exited'))).toBe(false)
     })
+
+    it('stops what it started and gives the terminal its lines back when it fails part way', async () => {
+      const fakes = await project({ 'src/routes/index.kay': 'p hi' })
+      const modes: boolean[] = []
+      const keys = Object.assign(fakes.keys, { setRawMode: (mode: boolean) => modes.push(mode) })
+
+      const load = fakes.types.hold('load')
+      const starting = dev(fakes.root, { log: line => fakes.lines.push(line), keys }, fakes.ports)
+
+      // Rejected only once the start awaits it, so the rejection is never unhandled.
+      await eventually(() => expect(fakes.trace).toContain('types load'))
+      load.reject(new Error('the types process crashed'))
+      await expect(starting).rejects.toThrow('the types process crashed')
+      expect(fakes.servers[0]!.signalCode).toBe('SIGTERM')
+      expect(fakes.builders[0]!.stopped).toBe(true)
+      expect(fakes.types.closed).toBe(true)
+      expect(modes).toEqual([true, false])
+      expect(keys.listenerCount('data')).toBe(0)
+    })
   })
 
   describe('a config edit', () => {

@@ -373,25 +373,25 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
 
   terminal = options.keys === undefined ? undefined : readTerminalKeys(options.keys, pressed, () => options.onQuit?.())
 
-  // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks; a server that never asks, as one with no pages, starts none.
-  if (client.building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes)))
-    client.startEarly()
-
-  // A config that loaded, with every file it read as it is now, has told the entry already: the first server need not wait for the types to read it again.
-  // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends, though the server's own failure may print before the types' error.
-  const recorded = options.config === undefined && options.entry === undefined ? await readConfigRecord(devDir, root) : undefined
-
-  if (recorded !== undefined)
-    types.process.configuredEntry = recorded
-
-  // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
-  // The same holds while the config is still to be read for its `entry`, which the types do.
-  if (recorded === undefined && (options.refuseConfig === true || (options.config === undefined && options.entry === undefined)))
-    servers.spawnWaiting()
-  else
-    servers.start()
-
   try {
+    // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks; a server that never asks, as one with no pages, starts none.
+    if (client.building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes)))
+      client.startEarly()
+
+    // A config that loaded, with every file it read as it is now, has told the entry already: the first server need not wait for the types to read it again.
+    // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends, though the server's own failure may print before the types' error.
+    const recorded = options.config === undefined && options.entry === undefined ? await readConfigRecord(devDir, root) : undefined
+
+    if (recorded !== undefined)
+      types.process.configuredEntry = recorded
+
+    // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
+    // The same holds while the config is still to be read for its `entry`, which the types do.
+    if (recorded === undefined && (options.refuseConfig === true || (options.config === undefined && options.entry === undefined)))
+      servers.spawnWaiting()
+    else
+      servers.start()
+
     if (options.config === undefined) {
       const loadedAt = Date.now()
 
@@ -417,6 +417,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     else {
       await types.write()
     }
+  }
+  // A start failing part way stops what it started, and gives the terminal its lines back, before the error goes on.
+  catch (error) {
+    verified.resolve()
+    await stop()
+
+    throw error
   }
   finally {
     if (phase === 'starting')
