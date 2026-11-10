@@ -67,6 +67,9 @@ describe('AvatarGroup', () => {
     expect([...panel.querySelectorAll('[data-part=name]')].map(one => one.textContent)).toEqual(['Grace', 'Margaret', 'Dennis'])
     expect([...panel.querySelectorAll('[data-part=row]')].map(row => [row.tagName, row.getAttribute('href')])).toEqual([['A', '/grace'], ['DIV', null], ['DIV', null]])
 
+    // A person with a status is named once, by the avatar, so the written name is hidden from screen readers.
+    expect([...panel.querySelectorAll('[data-part=name]')].map(one => one.getAttribute('aria-hidden'))).toEqual([null, null, null])
+
     panel.hidePopover()
     await settle()
 
@@ -96,6 +99,24 @@ describe('AvatarGroup', () => {
 
     expect(names(root, 'failing')).toHaveLength(2)
     expect(root.querySelector('#failing [role=status]')).toBeNull()
+  })
+})
+
+describe('AvatarGroup max', () => {
+  test('counts a fractional max down and a max that is no number as none', async () => {
+    const root = await groups()
+
+    expect(root.querySelectorAll('#fractional > .kui-avatar')).toHaveLength(2)
+    expect(root.querySelector('#fractional [data-part=count]')!.textContent).toBe('+3')
+    expect(root.querySelectorAll('#nan > .kui-avatar')).toHaveLength(0)
+    expect(root.querySelector('#nan [data-part=count]')!.textContent).toBe('+5')
+  })
+
+  test('overlaps the avatars and the chip, not the status line', async () => {
+    const root = await groups()
+
+    expect(root.querySelector('#popover')!.className).toContain('[&>.kui-avatar:not(:first-child)]:-ms-2')
+    expect(root.querySelector('#popover [data-part=more]')!.className).toContain('-ms-2')
   })
 })
 

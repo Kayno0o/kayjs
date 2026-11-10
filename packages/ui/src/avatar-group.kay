@@ -12,8 +12,8 @@ import Popover from './popover.kay'
 // 'kui-avatar-group' is the component's name for an app's CSS and tests. The avatars overlap; the overflow chip is an avatar-sized button or link, the rest of the people a list in its popover.
 const look = recipe({
   parts: {
-    root: 'kui-avatar-group flex items-center [&>*:not(:first-child)]:-ms-2',
-    more: 'grid shrink-0 cursor-pointer place-items-center rounded-[calc(infinity*1px)] border-0 bg-transparent p-0 text-foreground no-underline outline-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:outline-offset-2',
+    root: 'kui-avatar-group flex items-center [&>.kui-avatar:not(:first-child)]:-ms-2',
+    more: '-ms-2 first:ms-0 grid shrink-0 cursor-pointer place-items-center rounded-[calc(infinity*1px)] border-0 bg-transparent p-0 text-foreground no-underline outline-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:outline-offset-2',
     count: 'text-xs [font-weight:var(--font-weight-semibold)]',
     panel: 'kui-avatar-group-panel min-w-48',
     item: '',
@@ -56,8 +56,10 @@ const { avatars, max = 4, size = 'md', label, moreLabel, moreHref, placement = '
 
 const source = loadOptions<GroupedAvatar>(() => avatars, { onLoad, onError, label: 'AvatarGroup' })
 
-const shown = () => source.options().slice(0, Math.max(0, max))
-const hidden = () => source.options().slice(Math.max(0, max))
+// A max that is no whole number counts as none.
+const limit = () => Math.max(0, Math.floor(max) || 0)
+const shown = () => source.options().slice(0, limit())
+const hidden = () => source.options().slice(limit())
 
 const moreName = () => {
   const count = hidden().length
@@ -69,7 +71,7 @@ snippet person(entry: GroupedAvatar, named: boolean)
   if avatar
     | {avatar(entry)}
   else
-    Avatar(src={entry.src} name={entry.name} size={size} label={named ? undefined : (entry.label ?? entry.name)} href={named ? undefined : entry.href} status={entry.status} statusLabel={entry.statusLabel})
+    Avatar(src={entry.src} name={entry.name} size={size} label={named ? (entry.status ? entry.label : undefined) : (entry.label ?? entry.name)} href={named ? undefined : entry.href} status={entry.status} statusLabel={entry.statusLabel})
 
 snippet chip()
   Avatar(name={`+${hidden().length}`} size={size})
@@ -103,8 +105,8 @@ div(part="root" {...rest} role={label ? 'group' : undefined} aria-label={label} 
                 if entry.href !== undefined
                   a(part="row" href={entry.href})
                     {person(entry, true)}
-                    span(part="name") {entry.name}
+                    span(part="name" aria-hidden={entry.status ? 'true' : undefined}) {entry.name}
                 else
                   div(part="row")
                     {person(entry, true)}
-                    span(part="name") {entry.name}
+                    span(part="name" aria-hidden={entry.status ? 'true' : undefined}) {entry.name}
