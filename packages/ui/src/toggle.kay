@@ -33,6 +33,8 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'chec
   issue?: string | undefined
   // Marks the switch as refused, in the danger colour with `aria-invalid`. A message shown for the switch marks it on its own.
   invalid?: boolean | undefined
+  // Requires the switch be on to submit: the native `required`, which the browser's validation and a post with no JavaScript know.
+  required?: boolean | undefined
   // A promise holds the switch busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   onChange?: ((checked: boolean) => unknown) | undefined

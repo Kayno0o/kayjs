@@ -12,13 +12,13 @@ interface Description {
 }
 
 export interface DescribeOptions {
-  // Marks the field `aria-required="true"` as well: the first field, or every field with `'all'`, such as a group of checkboxes.
+  // Marks the field `required` and `aria-required="true"` as well: the first field, or every field with `'all'`, such as a group of checkboxes, which take `aria-required` alone as the browser would ask for every box.
   required?: boolean | 'all' | undefined
 }
 
 // Adds `ids` to the `aria-describedby` of the first input, select or textarea the calling component renders on the server, its slot included, beside the field's own ids.
 // A component such as a form field links its control to its hint and messages this way, the control being its parent's markup; in an island the browser keeps that link itself.
-// `required` gives the field `aria-required="true"` unless the field sets its own.
+// `required` gives the field the native `required`, so the browser and a post with no JavaScript know it, and `aria-required="true"` where its type takes one, unless the field sets its own.
 // kept: free
 export function describeField(ids: string, options: DescribeOptions = {}): void {
   const required = options.required ?? false
@@ -38,15 +38,18 @@ export function fieldDescription(own?: unknown): unknown {
   return typeof own === 'string' && own !== '' ? `${own} ${found.ids}` : found.ids
 }
 
-// Whether the field rendering now takes `aria-required` from the nearest `describeField` above: the first field, or each with `'all'`.
-export function fieldRequired(): boolean {
+// How the field rendering now is required by the nearest `describeField` above: `'first'` for the first field, `'all'` for each with `'all'`, false for the others.
+export function fieldRequired(): false | 'first' | 'all' {
   const found = readContext(DESCRIBED).value as Description | undefined
 
   if (!found || found.requiredTaken)
     return false
 
-  if (found.required !== 'all')
+  if (found.required !== 'all') {
     found.requiredTaken = true
 
-  return true
+    return 'first'
+  }
+
+  return 'all'
 }

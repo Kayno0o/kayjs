@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
 - A call whose action redirects rejects with `ActionRedirectError` (its `location`) once the browser has gone there, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
 - `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([components](components.md#effects-and-lifecycle)).
+- A `required` FormField and `describeField({ required })` write the native `required` as well as `aria-required`, server-rendered, and RadioGroup, Segmented, Rating, Checkbox, Toggle and ChipGroup take a typed `required` ([FormField](../packages/ui/llms/forms-and-steps.md)).
 
 ## 1.95.0
 

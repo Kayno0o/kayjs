@@ -1080,6 +1080,7 @@ describe('SubscribeForm', () => {
 
     expect(html).toContain('name="email"')
     expect(html).toContain('aria-required="true"')
+    expect(html).toMatch(/<input[^>]*name="email"[^>]* required/)
     expect(html).toContain('We use your address to send you the mails of this site')
     expect(html).toContain('<a data-part="link" href="/privacy" target="_blank" rel="noopener">Privacy policy</a>')
     expect(html).toContain('name="wording" value="ui-v1"')
@@ -1505,4 +1506,33 @@ test('a page writing scheme() on html has the theme the visitor kept from the fi
   expect(await theme(persistedCookie('theme', 'light'))).toContain('data-theme="light"')
   expect(await theme()).not.toContain('data-theme')
   expect(await theme(persistedCookie('theme', 'sepia'))).not.toContain('data-theme')
+})
+
+describe('required fields with JavaScript off', () => {
+  test('a required FormField writes the native required where its type takes it, beside aria-required', async () => {
+    expect(await attributes('/required', '#framed input', ['name', 'type', 'required', 'aria-required'])).toEqual([
+      { 'name': 'framed', 'type': 'radio', 'required': '', 'aria-required': null },
+      { 'name': 'framed', 'type': 'radio', 'required': null, 'aria-required': null },
+      { 'name': 'access', 'type': 'checkbox', 'required': null, 'aria-required': 'true' },
+      { 'name': 'access', 'type': 'checkbox', 'required': null, 'aria-required': 'true' },
+      { 'name': 'volume', 'type': 'range', 'required': null, 'aria-required': null },
+    ])
+  })
+
+  test('RadioGroup, Segmented and Rating take required on each radio and aria-required on the group', async () => {
+    for (const id of ['radios', 'segmented', 'rating']) {
+      const inputs = await attributes('/required', `#${id} input`, ['required'])
+
+      expect(inputs.length).toBeGreaterThan(1)
+      expect(inputs.every(input => input.required === '')).toBe(true)
+      expect(await attributes('/required', `#${id}`, ['aria-required'])).toEqual([{ 'aria-required': 'true' }])
+    }
+
+    expect(await attributes('/required', '#optional, #optional input', ['required', 'aria-required'])).toEqual([{ 'required': null, 'aria-required': null }, { 'required': null, 'aria-required': null }, { 'required': null, 'aria-required': null }])
+  })
+
+  test('Checkbox and Toggle take the native required, and ChipGroup aria-required on each chip, none native since one of several is enough', async () => {
+    expect(await attributes('/required', '#box, #toggle', ['required'])).toEqual([{ required: '' }, { required: '' }])
+    expect(await attributes('/required', '#chips input', ['required', 'aria-required'])).toEqual([{ 'required': null, 'aria-required': 'true' }, { 'required': null, 'aria-required': 'true' }])
+  })
 })

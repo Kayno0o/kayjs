@@ -18,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { value = 0, max = 5, label, onChange, name, invalid, icon = 'star', allowClear = false, disabled = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { value = 0, max = 5, label, onChange, name, invalid, required, icon = 'star', allowClear = false, disabled = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onChange'> & {
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star. A rating that is picked holds a whole number, 0 for none, and follows the parent when it passes another. 0 when left out.
   value?: number | undefined
   max?: number | undefined
@@ -37,6 +37,8 @@ const { value = 0, max = 5, label, onChange, name, invalid, icon = 'star', allow
   disabled?: boolean | undefined
   // Marks the rating as refused, ringed in the danger colour, with `aria-invalid` on a picked rating. A FormField showing a message marks the radios on its own.
   invalid?: boolean | undefined
+  // Requires one of the stars be picked: `required` on the radios, which the browser's validation and a post with no JavaScript know, and `aria-required` on the group. A FormField with `required` around it does the same for its first radio.
+  required?: boolean | undefined
 }>()
 
 // One place per star; a value that is no number fills none.
@@ -74,10 +76,10 @@ function again(star: number) {
 }
 ---
 if picker
-  span(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() ? 'true' : undefined} onPointerLeave={() => hovered = null})
+  span(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-busy={busy() ? 'true' : undefined} onPointerLeave={() => hovered = null})
     for place of places() key={place}
       label(part="star" data-on={lit(place + 1) ? '' : undefined} onPointerEnter={event => hovered = event.pointerType === 'mouse' && !disabled ? place + 1 : null})
-        input(part="input" ref={element => element.defaultChecked = untrack(() => place + 1 === whole())} type="radio" name={group} value={place + 1} checked={picked() === place + 1} disabled={disabled} aria-label={String(place + 1)} onChange={() => pick(place + 1)} onClick={() => again(place + 1)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => place + 1 === whole())} type="radio" name={group} required={required} value={place + 1} checked={picked() === place + 1} disabled={disabled} aria-label={String(place + 1)} onChange={() => pick(place + 1)} onClick={() => again(place + 1)})
         Icon(icon={icon} part="glyph")
 else
   span(part="root" {...rest} role="img" aria-label={label})

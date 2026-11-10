@@ -23,3 +23,7 @@ Return a promise from `onChange` to hold the box busy until it settles. If the p
 `name` and `issue` show a message under the box, as a [FormField](/ui/form-field) shows one: inside a FormDialog the message its call was refused with for `name` appears there, and `issue` takes a message of the page's own, such as `add.error('terms')` after a plain form post. A message marks the box invalid, and `invalid` marks it without one.
 
 Inside a form posting to an action, a box with no `onChange` starts from what a refused post sent, so a page working without JavaScript shows the choice again.
+
+## Required
+
+`required` is the native attribute: the form cannot be submitted until the box is ticked, with or without JavaScript. A [FormField](/ui/form-field) with `required` around a single checkbox sets it too.

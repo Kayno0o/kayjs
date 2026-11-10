@@ -61,3 +61,7 @@ The label and the group then sit in a `field` part, the label being `heading`; `
 ## Drawing an option
 
 `@option(option)` draws each option in place of its label, and its icon if it has one, as in Combobox: an avatar with a name, a price, a colour dot. The input stays, with its checked and disabled state, and the option's `label` still names it for screen readers.
+
+## Required
+
+`required` asks for one of the options to be picked. Each radio gets the native `required`, so the browser's validation and a post with no JavaScript know it, and the group gets `aria-required="true"`. A [FormField](/ui/form-field) with `required` around a Segmented marks the same in the browser.

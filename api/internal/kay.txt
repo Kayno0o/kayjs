@@ -485,7 +485,7 @@ function escapeAttribute(text: string): string
 const FAILED_MARKER: "<!--kay-failed-->"
 
 [./html] fieldDescribed
-function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown): string
+function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ownNative?: unknown): string
 
 [./html] formConstraints
 function formConstraints(target: unknown, name: string, written: readonly string[]): string
@@ -611,6 +611,9 @@ function spreadWith(sources: readonly object[], styles?: readonly (readonly [str
 
 [./html] style
 function style(value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): string
+
+[./html] UNCONSTRAINABLE_TYPES
+const UNCONSTRAINABLE_TYPES: Set<string>
 
 [./html] UNDESCRIBED_TYPES
 const UNDESCRIBED_TYPES: Set<string>

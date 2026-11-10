@@ -19,8 +19,8 @@ const BROWSER_ADDED: Record<string, string | undefined> = {
 
 // What an effect adds to the browser's render while the server's holds none, by component.
 const EFFECT_ADDED: Record<string, string | undefined> = {
-  'contact-form': 'aria-required',
-  'subscribe-form': 'aria-required',
+  'contact-form': 'aria-required required',
+  'subscribe-form': 'aria-required required',
   // The server cannot tell the visitor's zone, so it draws the box empty and the browser writes the instant on its clock once it runs.
   'date-time-input': 'value',
 }
@@ -100,9 +100,9 @@ function canonical(html: string, browserDrawn = '', effectAdded = '', effectRemo
     element.removeAttribute('aria-keyshortcuts')
 
   // Only the browser's side is stripped of it, so a server render that starts writing it too is seen.
-  if (effectAdded) {
-    for (const element of holder.querySelectorAll(`[${effectAdded}]`))
-      element.removeAttribute(effectAdded)
+  for (const added of effectAdded.split(' ').filter(name => name !== '')) {
+    for (const element of holder.querySelectorAll(`[${added}]`))
+      element.removeAttribute(added)
   }
 
   if (effectRemoved) {

@@ -1032,6 +1032,7 @@ component default
   label?: string | undefined
   name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
+  required?: boolean | undefined
 
 [./chip-group.kay] default
 component default
@@ -1064,6 +1065,8 @@ component default
 }[], query: string) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: OptionsSource<{ value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }>
+  required?: boolean | undefined
+  requiredLabel?: string | undefined
   retryLabel?: string | undefined
   showLabel?: boolean | undefined
   value?: readonly Value[] | undefined
@@ -2141,6 +2144,7 @@ component default
   onLoad?: ((options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[], query: string) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: OptionsSource<{ value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }> & NullOption<Value, Held>
+  required?: boolean | undefined
   retryLabel?: string | undefined
   value?: Held | undefined
 
@@ -2179,6 +2183,7 @@ component default
   max?: number | undefined
   name?: string | undefined
   onChange?: ((value: null | number) => unknown) | undefined
+  required?: boolean | undefined
   value?: number | undefined
 
 [./record-button.kay] default
@@ -2401,6 +2406,7 @@ component default
   orientation?: "horizontal" | "vertical" | undefined
   param?: string | undefined
   paramDefault?: number | string | undefined
+  required?: boolean | undefined
   retryLabel?: string | undefined
   showLabel?: boolean | undefined
   value?: Held | undefined
@@ -3007,6 +3013,7 @@ component default
   label?: string | undefined
   name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
+  required?: boolean | undefined
 
 [./toolbar.kay] default
 component default

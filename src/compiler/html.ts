@@ -7,6 +7,7 @@ import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
+import { addFieldDescribed } from './field-described'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addStyleArguments, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
@@ -516,30 +517,7 @@ export class HtmlTemplate extends TemplateWriter {
     const fieldAria = fieldAriaOf(name, type, plan.attributes)
     const describable = fieldAria !== undefined
     let ownDescribed: (() => void) | undefined
-    // A field written with its own `aria-required`, or of a type whose role takes none, is left as it is whatever a component around it asks; an expression for it is read a second time, as the type's is, and counts once it gives a value.
-    const fieldDescribed = (own: (() => void) | undefined) => {
-      const required = fieldAria?.required
-      const typed = type?.kind === 'value' ? () => b.add('(').addSource(type.expression).add(')') : undefined
-      const written = required?.kind === 'value' ? () => b.add('(').addSource(required.expression).add(')') : undefined
-      const args = [own, typed, written ?? (required || fieldAria?.unrequirable ? () => b.add('true') : undefined)]
-
-      while (args.length > 0 && args.at(-1) === undefined)
-        args.pop()
-
-      b.add(`${helperName('fieldDescribed')}(`)
-
-      for (const [index, arg] of args.entries()) {
-        if (index > 0)
-          b.add(', ')
-
-        if (arg)
-          arg()
-        else
-          b.add('undefined')
-      }
-
-      b.add(')')
-    }
+    const fieldDescribed = (own: (() => void) | undefined) => addFieldDescribed(b, own, type, fieldAria)
 
     markup.text(`<${name}${element.fixed ?? ''}`)
 

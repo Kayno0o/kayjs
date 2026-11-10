@@ -4,7 +4,7 @@
 
 ### Forms and Steps
 
-FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. A `required` FormField gives its control, each field of a `group`, `aria-required="true"` unless it sets its own, as the `*` is hidden from screen readers. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
+FormField frames a control with its label, hint and messages; inside an island a `group` given a message marks each input, select and textarea in it `aria-invalid` and described by the message, so `focusInvalid` reveals its tab and focuses its first field. A `required` FormField gives its control, each field of a `group`, `aria-required="true"` unless it sets its own, as the `*` is hidden from screen readers, and the native `required` (not on the boxes of a group of checkboxes, which would all be asked for), server-rendered too, so the browser and a post with no JavaScript know it; turning it off takes both back. FormDialog calls a page's action from a dialog and shows the message of each refused field on its FormField. SaveForm does the same for an editor page, with a sticky bar of unsaved changes.
 
 ```kay
 --- server

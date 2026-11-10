@@ -237,11 +237,11 @@ describe('a field of a form posting to an action', () => {
     expect(fields.hydrating).toContain('KayFieldDescribed(undefined, undefined, true)')
   })
 
-  it('of a type with no text or no `aria-required` is left out of the description or the requirement', () => {
+  it('of a type with no text or no `aria-required` is left out of the description or the aria requirement', () => {
     const typed = form('input(type="hidden" name="x")\ninput(type="radio" name="r")')
 
     expect(typed.server).toContain('<input type=\\"hidden\\" name=\\"x\\">')
-    expect(typed.server).toMatch(/type=\\"radio\\" name=\\"r\\".*KayFieldDescribed\(undefined, undefined, true\)/)
+    expect(typed.server).toMatch(/type=\\"radio\\" name=\\"r\\".*KayFieldDescribed\(undefined, "radio", true\)/)
   })
 
   it('written with `field` beside a `name`, or as an expression, is left as written in the types', () => {

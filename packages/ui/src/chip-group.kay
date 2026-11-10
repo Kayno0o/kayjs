@@ -28,7 +28,7 @@ const look = recipe({
   },
 })
 
-const { options, value = NONE, label, showLabel = false, name, invalid, disabled = false, loadingLabel = wording('ui.chipGroup.loading', 'Loading…'), retryLabel = wording('ui.chipGroup.retry', 'Try again'), failureLabel = wording('ui.chipGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
+const { options, value = NONE, label, showLabel = false, name, invalid, required, requiredLabel = wording('ui.chipGroup.required', 'Pick at least one'), disabled = false, loadingLabel = wording('ui.chipGroup.loading', 'Loading…'), retryLabel = wording('ui.chipGroup.retry', 'Try again'), failureLabel = wording('ui.chipGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: OptionsSource<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>
@@ -48,6 +48,9 @@ const { options, value = NONE, label, showLabel = false, name, invalid, disabled
   disabled?: boolean | undefined
   // Marks the group as refused, its chips' keylines in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the boxes on its own.
   invalid?: boolean | undefined
+  // Requires at least one chip picked: `aria-required` on each box, and the first enabled box refuses the form's submit, with `requiredLabel`, while none is picked, as the browser cannot ask for one of several checkboxes itself.
+  required?: boolean | undefined
+  requiredLabel?: string | undefined
   // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
   name?: string | undefined
   // Gets every picked option, in the order of `options`.
@@ -133,13 +136,25 @@ const resetting = resetWhenIdle(busy, () => {
 })
 
 onFormReset(() => root, resetting.reset)
+
+// No native attribute asks for one of several checkboxes, so the first enabled box holds the form back while none is picked.
+effect(() => {
+  list()
+
+  const message = required && picked().length === 0 ? requiredLabel : ''
+
+  const holder = boxes().find(box => !box.disabled)
+
+  for (const box of boxes())
+    box.setCustomValidity(box === holder ? message : '')
+})
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 snippet chips()
   div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
     for option of list() key={option.value}
       label(part="chip")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-required={required ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}

@@ -30,7 +30,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, invalid, param, paramDefault, disabled = false, orientation = 'horizontal', loadingLabel = wording('ui.segmented.loading', 'Loading…'), retryLabel = wording('ui.segmented.retry', 'Try again'), failureLabel = wording('ui.segmented.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
+const { options, value, label, showLabel = false, name, invalid, required, param, paramDefault, disabled = false, orientation = 'horizontal', loadingLabel = wording('ui.segmented.loading', 'Loading…'), retryLabel = wording('ui.segmented.retry', 'Try again'), failureLabel = wording('ui.segmented.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: OptionsSource<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }> & NullOption<Value, Held>
@@ -50,6 +50,8 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
   disabled?: boolean | undefined
   // Marks the group as refused, its keyline in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the radios on its own.
   invalid?: boolean | undefined
+  // Requires one of the options be picked: `required` on the radios, which the browser's validation and a post with no JavaScript know, and `aria-required` on the group. A FormField with `required` around it does the same for its first radio.
+  required?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
   // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it, and each option also covers a link to that address, so a middle click, a new tab, a copy or a crawler finds it. Left without `value`, the group shows the option the address names, else `paramDefault`. The radios take its name, so a GET form around the group sends it without JavaScript.
@@ -116,10 +118,10 @@ const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
 snippet radios()
-  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() || source.loading() ? 'true' : undefined})
+  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() || source.loading() ? 'true' : undefined})
     for option of list() key={option.value}
       label(part="option")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), start()))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), start()))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}

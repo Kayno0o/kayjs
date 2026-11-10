@@ -17,3 +17,7 @@ Return a promise from `onChange` to hold the switch busy until it settles. If it
 ## Messages and refusals
 
 `name` and `issue` show a message under the switch, as a [FormField](/ui/form-field) shows one, and mark it invalid; `invalid` marks it without a message. Inside a form posting to an action, a switch with no `onChange` starts from what a refused post sent.
+
+## Required
+
+`required` is the native attribute: the form cannot be submitted until the switch is on, with or without JavaScript.

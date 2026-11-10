@@ -35,3 +35,7 @@ Rating(value={rating()} label="Your rating" name="rating" onChange={value => rat
 ## Another glyph
 
 `icon` swaps the star for a slot of the icon set or an imported icon: `Rating(value={3} max={3} label="Liked" icon="success")`. The parts of a picker are `star` (one per radio, with `data-on` while lit), `input` and `glyph`.
+
+## Required
+
+`required` asks for one of the stars to be picked. Each radio gets the native `required`, so the browser's validation and a post with no JavaScript know it, and the group gets `aria-required="true"`. A [FormField](/ui/form-field) with `required` around a Rating marks the same in the browser.
