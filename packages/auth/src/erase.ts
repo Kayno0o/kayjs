@@ -1,7 +1,7 @@
 import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
-import { notifications } from 'kay/server'
+import { notifications, personalData } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
 import { failed } from './failure'
@@ -157,9 +157,10 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, acto
   return { ok: true }
 }
 
-// What other parts of the app keep about the user: their notifications, and their address on the mailer's lists and in its queue. An address nobody proved is left there, as it may be someone else's.
+// What other parts of the app keep about the user: their notifications, what libraries such as kayjs-ai registered with kay, and their address on the mailer's lists and in its queue. An address nobody proved is left there, as it may be someone else's.
 async function eraseAside(core: Core, record: UserRecord): Promise<void> {
   await notifications.erase(record.id)
+  await personalData.erase(record.id)
 
   if (record.email !== null && record.email !== '' && record.emailVerifiedAt !== null)
     await core.email?.mailer.erase?.(record.email)

@@ -815,6 +815,7 @@ interface DataExport
   grants: ApprovedClient[]
   identities: { provider: string; providerId: string; createdAt: Date; }[]
   invitations: { received: Invitation<string>[]; sent: Invitation<string>[]; }
+  libraries: Record<string, unknown>
   mailingLists: MailingSubscription[]
   notifications: Notification[]
   organizations: Membership<string>[]

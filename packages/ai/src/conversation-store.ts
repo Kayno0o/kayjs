@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite'
 import type { ConversationRow } from './conversation-title'
 import type { Source, Thinking } from './types'
+import { existsSync } from 'node:fs'
 import { openSqlite } from 'kay/library'
 
 // A tool call a reply made and what the model was told of it, as the next ask replays them.
@@ -60,6 +61,17 @@ export interface ConversationStore {
   // Answer whether the conversation was there.
   rename: (key: ConversationKey, title: string) => Promise<boolean>
   delete: (key: ConversationKey) => Promise<boolean>
+  // The three below let an erase and an export of a user, and the age conversations are kept to, reach the store; a store of the app's own without them is left out of all three, with a warning when one is called. They must not create the store when it does not exist yet.
+  // Every conversation the owner has under any scope, turns included.
+  ownedBy?: ((owner: string) => Promise<OwnedConversation[]>) | undefined
+  // Deletes every conversation of the owner and answers how many went.
+  eraseOwner?: ((owner: string) => Promise<number>) | undefined
+  // Deletes the conversations last updated before `before` (milliseconds since the epoch) and answers how many went.
+  deleteOlderThan?: ((before: number) => Promise<number>) | undefined
+}
+
+export interface OwnedConversation extends StoredConversation {
+  scope: string
 }
 
 export const CONVERSATIONS_FILE = 'data/ai-conversations.sqlite'
@@ -121,6 +133,7 @@ export function sqliteConversations(path: string = CONVERSATIONS_FILE): Conversa
 
   // Opened by the first query, so building or checking an app makes no file.
   const db = () => opened ??= open(path)
+  const absent = () => opened === undefined && path !== ':memory:' && !existsSync(path)
 
   return {
     list: async (owner, scope, limit) => Promise.resolve(db().list.all(owner, scope, limit).map(row => ({ id: row.id, title: row.title, updatedAt: row.updated_at }))),
@@ -132,6 +145,10 @@ export function sqliteConversations(path: string = CONVERSATIONS_FILE): Conversa
     write: async (key, revision, change) => Promise.resolve(db().write(key, revision, change)),
     rename: async ({ owner, scope, id }, title) => Promise.resolve(db().rename.run(title, owner, scope, id).changes > 0),
     delete: async ({ owner, scope, id }) => Promise.resolve(db().remove.run(owner, scope, id).changes > 0),
+    // A file that is not there holds nothing, so an erase of a person never makes one.
+    ownedBy: async owner => Promise.resolve(absent() ? [] : db().owned.all(owner).map(row => ({ id: row.id, scope: row.scope, title: row.title, updatedAt: row.updated_at, revision: row.revision, turns: turnsOf(row.turns) }))),
+    eraseOwner: async owner => Promise.resolve(absent() ? 0 : db().eraseOwner.run(owner).changes),
+    deleteOlderThan: async before => Promise.resolve(absent() ? 0 : db().older.run(before).changes),
   }
 }
 
@@ -171,6 +188,9 @@ function open(path: string) {
   // A rename keeps the conversation's place in the list and among the ones kept, which only its turns move.
   const rename = db.query('UPDATE kay_ai_conversations SET title = ?1 WHERE owner = ?2 AND scope = ?3 AND id = ?4')
   const remove = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
+  const owned = db.query<Row & { scope: string }, [string]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = ?1 ORDER BY updated_at, rowid')
+  const eraseOwner = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1')
+  const older = db.query('DELETE FROM kay_ai_conversations WHERE updated_at < ?1')
 
   // The check of the revision and the write are one transaction, so two processes writing at once cannot both pass it.
   const write = db.transaction(({ owner, scope, id }: ConversationKey, revision: number, { drop, add, title }: ConversationChange): number | undefined => {
@@ -190,5 +210,5 @@ function open(path: string) {
     return revision + 1
   })
 
-  return { list, get, write: (key: ConversationKey, revision: number, change: ConversationChange) => write.immediate(key, revision, change), rename, remove }
+  return { list, get, write: (key: ConversationKey, revision: number, change: ConversationChange) => write.immediate(key, revision, change), rename, remove, owned, eraseOwner, older }
 }

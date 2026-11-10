@@ -7,7 +7,7 @@ import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
 import { usableSources } from './chat-sources'
-import { conversationStore } from './conversation-home'
+import { conversationStore, purgeAged } from './conversation-home'
 import { LEFT_OUT, thinkingChars } from './conversation-store'
 import { renamedTitle, titleOf } from './conversation-title'
 import { deferredReply } from './deferred'
@@ -273,6 +273,8 @@ async function kept(reply: AiReply, key: ConversationKey, revision: number, drop
   const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer].map(turn => writer === undefined ? turn : { ...turn, reply: writer })
 
   try {
+    await purgeAged(conversationStore())
+
     if (await conversationStore().write(key, revision, { drop, add, title: titleOf(prompt.find(({ role }) => role === 'user')?.content ?? '') }) === undefined)
       log.warn('another tab wrote to the conversation while this reply ran, so the reply is not kept')
   }
@@ -301,6 +303,8 @@ async function answerOf(call: HeldCall, prompt: readonly AiMessage[], named: str
   // A read is a page showing the conversation, not a question, so it gives back the attempt the action's `protect.rateLimit` counted.
   if ((call.op === 'load' || call.op === 'list') && mayRefund(`${owner}\0${scope}`, Date.now()))
     await refundRateLimit(call.request)
+
+  await purgeAged(store)
 
   if (call.op === 'list')
     return { owned: true, op: 'list', conversations: await store.list(owner, scope, LISTED) }

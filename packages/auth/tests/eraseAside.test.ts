@@ -1,6 +1,6 @@
 import type { MailingSubscription } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { memoryPush, notifications, notify } from 'kay/server'
+import { memoryPush, notifications, notify, personalData } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
 import { PRUNE_EVERY_MS } from '../src/prune'
 import { testApp, userRecord } from './helpers/app'
@@ -126,6 +126,69 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     await notify(user.id, { title: 'Welcome' })
     expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await notifications.list(user.id)).toEqual([])
+  })
+})
+
+describe('a source another library registered with kay', () => {
+  const kept = new Map<string, string[]>([['ada', ['hello']]])
+
+  function register(fail = false) {
+    personalData.register({
+      name: 'chats',
+      erase: (user) => {
+        if (fail)
+          throw new Error('chats down')
+
+        return kept.delete(user) ? 1 : 0
+      },
+      export: user => kept.get(user),
+    })
+  }
+
+  afterEach(() => {
+    personalData.unregister('chats')
+    kept.set('ada', ['hello'])
+  })
+
+  test('is erased with the account and listed in the export under its name', async () => {
+    register()
+
+    const { ada, user } = await setup()
+
+    kept.set(user.id, ['hello'])
+    expect((await ada.callOk('account.export')).data.libraries).toEqual({ chats: ['hello'] })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
+    expect(kept.has(user.id)).toBe(false)
+  })
+
+  test('is erased by an admin deleting the user', async () => {
+    register()
+
+    const { browser, store, user } = await setup()
+    const admin = browser()
+    const { user: boss } = await admin.callHas('user', 'password.register', { email: 'boss@example.com', password: PASSWORD })
+
+    kept.set(user.id, ['hello'])
+    await store.users.update(boss.id, { roles: ['admin'] })
+    expect(await admin.call('admin.deleteUser', user.id)).toEqual({ ok: true })
+    expect(kept.has(user.id)).toBe(false)
+  })
+
+  test('failing leaves the account in place, to delete again', async () => {
+    register(true)
+
+    const { ada, store } = await setup()
+
+    expect((await ada.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
+  })
+
+  test('adds nothing to the export when it keeps nothing about the user', async () => {
+    register()
+
+    const { ada } = await setup()
+
+    expect((await ada.callOk('account.export')).data.libraries).toEqual({})
   })
 })
 

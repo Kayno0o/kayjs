@@ -9,7 +9,7 @@ import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import { notifications, pushSubscriptions } from 'kay/server'
+import { notifications, personalData, pushSubscriptions } from 'kay/server'
 import { listTokens } from './bearer'
 import { linkedUser } from './core'
 import { impersonatorOf } from './events'
@@ -44,6 +44,8 @@ export interface DataExport {
   notifications: Notification[]
   // The devices the user opted in to web push on: each endpoint and when it was stored or last reached, the keys left out.
   pushSubscriptions: { endpoint: string, createdAt: Date }[]
+  // What libraries registered with kay keep about the user, by library name: `ai` holds their kayjs-ai conversations. A library keeping nothing about them is left out.
+  libraries: Record<string, unknown>
   // The mailing lists of kayjs-mail their address is on, pending ones included; empty without kayjs-mail.
   mailingLists: MailingSubscription[]
   // Empty without the `audit` option.
@@ -90,6 +92,7 @@ export async function exportData(state: RequestState): Promise<ExportResult> {
       invitations: organizations ? await organizations.exportedInvitations(state) : { received: [], sent: [] },
       notifications: await notifications.list(record.id, { limit: NOTIFICATIONS_EXPORT_MAX }),
       pushSubscriptions: await pushSubscriptions.list(record.id),
+      libraries: await personalData.export(record.id),
       mailingLists: record.email !== null && record.email !== '' && core.email?.mailer.subscriptions ? await core.email.mailer.subscriptions(record.email) : [],
       audit: core.audit ? (await core.store.audit!.list({ userId: record.id, limit: AUDIT_EXPORT_MAX })).map(entry => ({ ...entry, event: entry.event as AuditEntry['event'] })) : [],
       app: await core.onExport?.(user) ?? null,

@@ -3188,6 +3188,20 @@ interface PagesOptions extends KayConfig
   timeZone?: string | undefined
   trailingSlash?: TrailingSlash | undefined
 
+[./server] personalData
+const personalData: {
+  register(source: PersonalDataSource): void;
+  unregister(name: string): void;
+  erase(user: string): Promise<number>;
+  export(user: string): Promise<Record<string, unknown>>;
+}
+
+[./server] PersonalDataSource
+interface PersonalDataSource
+  erase: (user: string) => MaybePromise<number>
+  export: (user: string) => unknown
+  name: string
+
 [./server] pgData
 function pgData(source: PgSource): {
   sql: SQL;

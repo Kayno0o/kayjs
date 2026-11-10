@@ -31,7 +31,7 @@ export async function erase(userId: string) {
 }
 ```
 
-A site with a kayjs-mail mailing list also calls `await mail.erase(email)`: it takes the address off every list and removes the queued mails. With kayjs-auth, `account.delete` and `admin.deleteUser` already call `notifications.erase` and `mail.erase` (for a verified address), and `exportData` lists both, so an app erasing through them adds neither.
+A site with a kayjs-mail mailing list also calls `await mail.erase(email)`: it takes the address off every list and removes the queued mails. With kayjs-auth, `account.delete` and `admin.deleteUser` already call `notifications.erase` and `mail.erase` (for a verified address), and `exportData` lists both, so an app erasing through them adds neither. A library keeping a person's data registers it with `personalData.register({ name, erase, export })` from `kay/server`: `account.delete`, `admin.deleteUser` and `account.export` (as `libraries`) reach it, and `await personalData.erase(userId)` does outside kayjs-auth. kayjs-ai registers its conversations this way.
 
 ### Load a script only once the visitor agreed
 

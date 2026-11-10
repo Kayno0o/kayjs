@@ -64,6 +64,8 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     }
   }
 
+  const existing = async (): Promise<SQL | undefined> => ready === undefined && await relationsMissing(db, [conversationTable]) ? undefined : connected()
+
   const summaryOf = (row: Row): ConversationRow => ({ id: row.id, title: row.title, updatedAt: Number(row.updated_at) })
 
   return {
@@ -112,6 +114,23 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     },
     async delete({ owner, scope, id }) {
       return (await (await connected()).unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE owner = $1 AND scope = $2 AND id = $3 RETURNING id', [owner, scope, id])).length > 0
+    },
+    // A table that is not there holds nothing, so an erase of a person never creates it, which a role that may not would fail on.
+    async ownedBy(owner) {
+      const connection = await existing()
+
+      if (connection === undefined)
+        return []
+
+      const rows = await connection.unsafe<(Row & { scope: string })[]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = $1 ORDER BY updated_at, id', [owner])
+
+      return rows.map(row => ({ ...summaryOf(row), scope: row.scope, revision: row.revision, turns: turnsOf(row.turns) }))
+    },
+    async eraseOwner(owner) {
+      return (await (await existing())?.unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE owner = $1 RETURNING id', [owner]))?.length ?? 0
+    },
+    async deleteOlderThan(before) {
+      return (await (await existing())?.unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE updated_at < $1 RETURNING id', [before]))?.length ?? 0
     },
     close: async () => {
       if (typeof source === 'string')
