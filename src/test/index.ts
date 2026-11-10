@@ -76,7 +76,7 @@ export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, DragOp
 export { scratchDir } from './scratch'
 export type { FakeService, ServiceAnswer, ServiceHandler, ServiceRequest, ServiceRoutes } from './service'
 export { fakeService } from './service'
-export type { ApiResult, FormValue, McpCall, McpTool, TestOptions, TestSite, TestSocket, TestStream, Visit, VisitInit } from './site-types'
+export type { ApiResult, FormValue, McpCall, McpInitialize, McpTool, TestOptions, TestSite, TestSocket, TestStream, Visit, VisitInit } from './site-types'
 export type { WaitUntilOptions } from './wait'
 export { solveWork }
 export { waitUntil } from './wait'

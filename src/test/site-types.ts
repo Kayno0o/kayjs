@@ -81,6 +81,8 @@ export interface TestSite {
   mcp: {
     // The tools `tools/list` gives.
     tools: (init?: VisitInit) => Promise<McpTool[]>
+    // What `initialize` answers a client with: the server's `serverInfo` and the `instructions` set by `mcp: { instructions }`, undefined when none.
+    initialize: (init?: VisitInit) => Promise<McpInitialize>
     // A call to the tool named `name`, which a model would make: its result, with `isError` set when the app refused it, and the HTTP `status` of the answer, 401 when a guard asked for a sign-in. A request the endpoint answers with a protocol error, such as an unknown tool, is thrown.
     call: (name: string, args?: object, init?: VisitInit) => Promise<McpCall>
   }
@@ -120,6 +122,11 @@ export interface McpTool {
   name: string
   description: string
   inputSchema: Record<string, unknown>
+}
+
+export interface McpInitialize {
+  serverInfo: { name: string, title: string, version: string }
+  instructions: string | undefined
 }
 
 export interface McpCall {

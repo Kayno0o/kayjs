@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { refuseFeedsWithoutSite } from '../content/server'
-import { mcpPath, mcpRateLimit } from './api-modules'
+import { mcpInstructions, mcpPath, mcpRateLimit } from './api-modules'
 import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, hookLifecycleOf, hookRequestsOf, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
 import { bundled } from './bundle'
 import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs } from './config-limits'
@@ -99,6 +99,7 @@ function refuseScanned({ root, config }: Project<ServedOptions>, { routes, files
 
   // Refused here with the other settings, not when the endpoint is first mounted.
   mcpRateLimit(config.mcp)
+  mcpInstructions(config.mcp)
 
   if (mcpAt !== undefined)
     served.claim({ path: mcpAt, owner: '`mcp`', kind: 'kay', method: 'ALL' })

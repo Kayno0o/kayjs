@@ -1,9 +1,9 @@
 import type { SiteScope } from './site-scope'
-import type { McpTool, TestSite, VisitInit } from './site-types'
+import type { McpInitialize, McpTool, TestSite, VisitInit } from './site-types'
 import { NativeHeaders, withNatives } from './natives'
 
 export function mcpOf({ defaults, send, mcpKey, mcpUrl }: SiteScope): Pick<TestSite, 'mcp'> {
-  interface RpcResult { tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
+  interface RpcResult { serverInfo?: McpInitialize['serverInfo'], instructions?: string, tools?: McpTool[], isError?: boolean, content?: { text: string }[], structuredContent?: Record<string, unknown> }
 
   let rpcId = 0
 
@@ -20,6 +20,11 @@ export function mcpOf({ defaults, send, mcpKey, mcpUrl }: SiteScope): Pick<TestS
 
   return {
     mcp: {
+      initialize: async (init) => {
+        const { result } = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'kay/test', version: '0' } }, init)
+
+        return { serverInfo: result.serverInfo!, instructions: result.instructions }
+      },
       tools: async init => (await rpc('tools/list', {}, init)).result.tools ?? [],
       call: async (name, args = {}, init) => {
         const { status, result } = await rpc('tools/call', { name, arguments: args }, init)

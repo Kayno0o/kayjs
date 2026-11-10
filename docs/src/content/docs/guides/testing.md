@@ -76,7 +76,7 @@ An action with no input, such as a sign-out button, takes no fields: `site.submi
 
 ### Testing an MCP endpoint
 
-With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees. `site.mcp.call('add_note', { title: 'Milk' })` calls one and resolves with `{ isError, text, data, status }`.
+With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees. `site.mcp.call('add_note', { title: 'Milk' })` calls one and resolves with `{ isError, text, data, status }`. `site.mcp.initialize()` resolves with `{ serverInfo, instructions }`, the text of `mcp: { instructions }` being what a client is told on connecting.
 
 For an endpoint with `mcp: { key }`, `testSite({ mcpKey: 'a-test-key-0123456789' })` sets the key and `site.mcp` sends it as the bearer; a call that gives its own `authorization` header sends that one instead, such as a wrong key to see the refusal. A site whose config sets `mcp.key` and gives no `mcpKey` is given a generated one.
 

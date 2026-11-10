@@ -403,6 +403,8 @@ export interface McpOptions {
   path: string
   // The requests a client may send it a minute, or undefined for no limit.
   perMinute: number | undefined
+  // Sent as `instructions` of `initialize`, from `mcp.instructions`.
+  instructions?: string | undefined
   // Set with `mcp.key`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
   key?: string | false | undefined
   // Under `kay dev`: an answer that does not match the tool's `output` logs one warning.
@@ -564,7 +566,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   const build = () => {
     const tools = documentedTools(document, options.dev === true).map(({ call, ...tool }): Tool => ({ ...tool, run: async args => call(args, calls.getStore()!) }))
 
-    return { known: new Set(tools.map(tool => tool.name)), mcp: new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version } }) }
+    return { known: new Set(tools.map(tool => tool.name)), mcp: new McpServer(tools, [], undefined, { serverInfo: { name: options.title, title: options.title, version: options.version }, instructions: options.instructions }) }
   }
   let recorded = options.outputs?.stamp()
   let serving = build()

@@ -166,6 +166,8 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, or at the path of `mcp: { path: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: 60 }` changes that and `false` removes it. With a `store.rates`, replicas count together.
 
+Guidance that spans tools, such as which one to call first, goes in `mcp: { instructions: 'Read French text through resolve first.' }`. The client receives it when it connects, before it looks at any tool description.
+
 ### Guarding the endpoint with a key
 
 An agent on your own machine can hold a static key instead of signing in. Set `mcp: { key: true }` and every request to the endpoint must send `Authorization: Bearer <key>`. Kay reads the key from `KAY_MCP_KEY`, or from the file `KAY_MCP_KEY_FILE` names, such as a container secret. A request without it, or with another, is refused with 401 before anything is read, and the tools it would have listed stay unseen.

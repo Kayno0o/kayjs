@@ -21,8 +21,8 @@
 Each of kay's own libraries ships its `llms.txt` and `llms/`: open the one a task needs.
 
 - [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys
-- [kayjs-ui](packages/ui/llms.txt): components styled by one theme: buttons, dialogs, toasts, tables, forms, charts, layouts
-- [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, sending through the queue
+- [kayjs-ui](packages/ui/llms.txt): components styled by one theme: buttons, dialogs, toasts, tables, forms, charts
+- [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, queued sending
 - [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collection screens, history, uploads
 - [kayjs-ai](packages/ai/llms.txt): `ask()` over Anthropic or an OpenAI-compatible server, streamed replies, tools, limits
 
@@ -48,9 +48,9 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Islands: state to ids](llms/islands-state-to-ids.md): shared state, transitions, context
 - [Browser-only code](llms/browser-only.md): browser globals on the server, server globals in the browser
 - [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages
-- [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onBeforeNavigate`, `onNavigate`, `mount`
+- [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onNavigate`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
-- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`, `rewrite`, `base`
+- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`, `rewrite`
 - [Prerendering and static export](llms/prerendering.md): `prerender`
 - [Server islands](llms/server-islands.md): `defer`
 - [CDN caching](llms/cdn-caching.md): `ttl`
@@ -72,7 +72,8 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions, `_guard.ts` guards
 - [Guards](llms/guards.md): `_guard.ts`, `once`, public routes
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
-- [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, MCP
+- [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI
+- [MCP](llms/mcp.md): tools, key, instructions
 - [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events
 - [Island sources](llms/island-sources.md): status, error, retry, hooks
 - [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets

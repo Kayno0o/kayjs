@@ -82,6 +82,22 @@ describe('the endpoint', () => {
       await expect(testSite({ dirs: { routes, api }, mcp: { rateLimit }, islands: false })).rejects.toThrow('mcp.rateLimit')
   })
 
+  it('sends mcp.instructions on initialize, and none without it', async () => {
+    const told = await testSite({ dirs: { routes, api }, mcp: { instructions: 'Call list_notes before add_note.' }, islands: false })
+
+    try {
+      expect((await told.mcp.initialize()).instructions).toBe('Call list_notes before add_note.')
+      expect((await rpc(told, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })).body.result).toHaveProperty('instructions', 'Call list_notes before add_note.')
+      expect((await site.mcp.initialize()).instructions).toBeUndefined()
+    }
+    finally {
+      await told.close()
+    }
+
+    for (const instructions of ['', '  ', 3])
+      await expect(testSite({ dirs: { routes, api }, mcp: { instructions: instructions as string }, islands: false })).rejects.toThrow('mcp.instructions')
+  })
+
   it('is not served without mcp', async () => {
     expect((await post(off, { jsonrpc: '2.0', id: 1, method: 'ping' })).status).toBe(404)
   })

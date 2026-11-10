@@ -3971,6 +3971,11 @@ interface McpCall
   status: number
   text: string
 
+[./test] McpInitialize
+interface McpInitialize
+  instructions: string | undefined
+  serverInfo: { name: string; title: string; version: string; }
+
 [./test] McpTool
 interface McpTool
   description: string
@@ -4233,6 +4238,7 @@ interface TestSite
   logs: readonly LogEntry[]
   mcp: {
   tools: (init?: VisitInit | undefined) => Promise<McpTool[]>;
+  initialize: (init?: VisitInit | undefined) => Promise<McpInitialize>;
   call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>;
 }
   open: (path: string, options?: BrowserOptions | undefined) => Promise<TestPage>

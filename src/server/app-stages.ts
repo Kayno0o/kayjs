@@ -33,7 +33,7 @@ import { kayLog } from '../runtime/log'
 import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { apiPathOf, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { apiPathOf, mcpInstructions, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { hookLifecycle, hookRequests } from './app-hooks'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
@@ -604,7 +604,7 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
 
   if (mcpAt !== undefined && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base: env.base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp), key: mcpKey, dev: env.dev, outputs: actionOptions.toolOutputs })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base: env.base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp), instructions: mcpInstructions(options.mcp), key: mcpKey, dev: env.dev, outputs: actionOptions.toolOutputs })
 }
 
 // The routes the browser reports to: errors, with their stack mapped back to the source, then live values, policy violations and previews.
