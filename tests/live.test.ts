@@ -1187,7 +1187,7 @@ class UploadRequest {
 
 describe('kay check, API modules', () => {
   it('types an island\'s sockets and streams from the modules it imports', async () => {
-    expect(await check(fixture)).toEqual([])
+    expect(await check(fixture, { requireGuards: false })).toEqual([])
   }, 60_000)
 
   it('checks links and redirects against the GET routes of the modules, under their mounts', async () => {
@@ -1206,7 +1206,7 @@ describe('kay check, API modules', () => {
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(project, path), content)))
 
     try {
-      expect((await check(project)).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[7, '/api/files'], [8, '/api/nope/deeper']])
+      expect((await check(project, { requireGuards: false })).map(d => [d.line, d.message.match(/serves ([^\s;"`]+)/)?.[1]])).toEqual([[7, '/api/files'], [8, '/api/nope/deeper']])
     }
     finally {
       await rm(project, { recursive: true, force: true })

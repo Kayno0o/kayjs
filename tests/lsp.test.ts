@@ -180,6 +180,8 @@ function asPublished({ line, severity, code, message, note, help }: CheckDiagnos
 const workspace = await scratchDir('lsp-fixtures-')
 
 await Promise.all(['broken', 'site'].map(async name => cp(join(fixtures, name), join(workspace, name), { recursive: true, filter: source => !source.endsWith('/.kay') })))
+// The site mixes guarded and open routes on purpose, so the 2.0 warning of an unset requireGuards stays out of what each test compares.
+await Bun.write(join(workspace, 'site/kay.config.ts'), 'export default { requireGuards: false }\n')
 
 afterAll(async () => {
   await rm(workspace, { recursive: true, force: true })
@@ -504,7 +506,7 @@ describe('kay lsp', () => {
     await Bun.write(join(workspace, page), source)
 
     const published = (await editor.open(page)).map(({ range, severity, code, message }) => [range.start.line, severity, code, message])
-    const checked = (await check(join(workspace, 'site'))).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
+    const checked = (await check(join(workspace, 'site'), { requireGuards: false })).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
 
     // The index of a positionally keyed for whose rows do not read it is no unread name.
     expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[8, 2, 'positional-key'], [10, 2, 'positional-key'], [14, 1, 2774]])
@@ -713,7 +715,7 @@ describe('kay lsp following the project on disk', () => {
     await symlink(real, dir)
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'),
+      Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ requireGuards: false, lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'),
       Bun.write(join(dir, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Bonjour\' })\n'),
       Bun.write(join(dir, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({})\n'),
       Bun.write(join(dir, 'src/content.config.ts'), 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n'),
@@ -750,7 +752,7 @@ describe('kay lsp following the project on disk', () => {
   it('reads the config again, and what guards export, once either changes on disk', async () => {
     const config = 'kay.config.ts'
     const messages = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.message)
-    const written = async (lints: string) => Bun.write(join(dir, config), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ lints: { ${lints} }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })\n`)
+    const written = async (lints: string) => Bun.write(join(dir, config), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ requireGuards: false, lints: { ${lints} }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })\n`)
 
     await written('')
     expect(await editor.filesChanged(config, [{ path: config, type: 2 }])).toEqual([])

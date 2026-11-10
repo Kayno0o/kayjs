@@ -248,7 +248,7 @@ describe('prerendering', () => {
 describe('kay check', () => {
   it('types each param as its matcher returns, optional ones as possibly missing, and reports a redirect to nowhere', async () => {
     // The sitemap kay serves counts as served; nothing else on the fixture is reported.
-    const diagnostics = await check(FIXTURE, { redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
+    const diagnostics = await check(FIXTURE, { requireGuards: false, redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
 
     expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /y goes to /nowhere, which nothing on the site serves'])
   })
@@ -261,7 +261,7 @@ describe('kay check', () => {
     redirectSet(db).add('/old-b', '/nowhere', undefined, { hosts: [], configured: {} })
     db.close()
 
-    const messages = (await check(copy, { redirects: { '/x': '/sitemap.xml' } })).map(diagnostic => diagnostic.message)
+    const messages = (await check(copy, { requireGuards: false, redirects: { '/x': '/sitemap.xml' } })).map(diagnostic => diagnostic.message)
 
     expect(messages).toEqual(['the redirect added while the site runs from /old-b goes to /nowhere, which nothing on the site serves'])
   })
@@ -273,7 +273,7 @@ describe('kay check', () => {
     try {
       await Bun.write(page, 'p x\n')
 
-      expect((await check(copy)).map(({ file, message }) => ({ file: file.slice(file.indexOf(copy)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
+      expect((await check(copy, { requireGuards: false })).map(({ file, message }) => ({ file: file.slice(file.indexOf(copy)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
     }
     finally {
       await rm(copy, { recursive: true, force: true })
