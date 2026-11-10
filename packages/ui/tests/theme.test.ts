@@ -768,7 +768,7 @@ describe('theme.css', () => {
     const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@theme { --color-accent: red; }\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
     const css = compiler.build(['starfield'])
 
-    expect(css).toMatch(/\.starfield \{[^}]*background-size: 97px 97px, 131px 131px, 173px 173px, 211px 211px/)
+    expect(css).toMatch(/\.starfield \{[^}]*&::before \{[^}]*background-size: 97px 97px, 131px 131px, 173px 173px, 211px 211px/)
     expect(css).toMatch(/data-theme=.light.\][^{]*\{\s*color-scheme: dark/)
     expect(skin).toContain('--font-sans: \'Space Grotesk\'')
     expect(css).toContain('--color-accent: red')
@@ -811,14 +811,16 @@ describe('theme.css', () => {
     expect(sourceOf('card')).toMatch(/border-\[length:var\(--border-width\)\]/)
   })
 
-  test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed attachment and its checkbox a hover', async () => {
+  test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed ::before layer and its checkbox a hover', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
     const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${skin}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
     const css = compiler.build(['starfield'])
 
     expect(css).toMatch(/\.starfield \{[^}]*background-color: var\(--color-background\)/)
-    expect(css).toMatch(/\.starfield \{[^}]*background-attachment: fixed/)
+    expect(css).toMatch(/\.starfield \{[^}]*isolation: isolate/)
+    expect(css).toMatch(/\.starfield \{[^}]*&::before \{[^}]*position: fixed;[^}]*inset: 0;[^}]*z-index: -1;[^}]*pointer-events: none/)
+    expect(skin).not.toContain('background-attachment')
 
     // Every selector of the skin as compiled, nested rules (option states, checkbox, picker) resolved against their parents: one class at most, two for the key's hover as the theme's own.
     const selectors = resolvedSelectors(css.replaceAll(/\/\*[\s\S]*?\*\//g, '')).filter(selector => selector.includes('.kui-') || selector.includes('select'))
