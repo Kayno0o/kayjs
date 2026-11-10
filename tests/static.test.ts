@@ -414,7 +414,9 @@ describe('kay build --static', () => {
   it('turns a redirect into a page sending the browser on, and lists every one in _redirects', async () => {
     expect((await get('/old')).text).toContain('<meta http-equiv="refresh" content="0; url=/repo/about">')
     expect((await get('/old')).text).toStartWith('<!doctype html><html lang="en">')
-    expect(await Bun.file(join(out, '_redirects')).text()).toBe('/repo/old /repo/about 301\n/repo/blog/:slug /repo/posts/:slug 301\n/repo/moved /repo/about 302\n/repo/temp /repo/about 302\n/repo/kept /repo/about 308\n')
+    expect(await Bun.file(join(out, '_redirects')).text()).toBe('/repo/old /repo/about 301\n/repo/blog/:slug /repo/posts/:slug 301\n/repo/moved /repo/about 302\n/repo/temp /repo/about 307\n/repo/kept /repo/about 308\n/repo/retired /repo/retired 410\n/repo/retired-docs/* /repo/retired-docs/:splat 410\n')
+    // A path that is gone is no page to send the browser on.
+    expect(existsSync(join(out, 'retired/index.html'))).toBe(false)
   })
 
   it('writes the security headers a server would send as _headers and as an nginx include, HSTS left to nginx.conf', async () => {

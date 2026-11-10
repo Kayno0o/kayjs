@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.96.0
 
+### `permanent` of a redirect is deprecated
+
+`redirects` in `kay.config.ts` names every answer with `status`, which now takes 410 too. `permanent` still works for three minors, and `kay upgrade` rewrites it (`deprecated-redirect-permanent`): `permanent: false` is `status: 307`, `permanent: true` is `status: 308`, and a `permanent` beside an agreeing `status` is dropped.
+
 ### A Menu entry's `danger` and a toast's `type` are gone
 
 Their lint (`deprecated-menu-danger`) goes with them: run `kay upgrade` on 1.95 first and it rewrites the entries written out in a Menu's `items`.

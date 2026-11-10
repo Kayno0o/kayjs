@@ -3010,6 +3010,8 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       ])
       expect(await refusals(root, { redirects: { old: '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from old needs a path starting with /']])
       expect(await refusals(root, { redirects: { '/a*b': '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from /a*b has a*b, neither a :param nor a final *']])
+      expect(await refusals(root, { redirects: { '/gone': { status: 410, to: '/' } } })).toEqual([['kay.config.ts', 'kay: the redirect from /gone has status 410 and goes to /; a path that is gone has no target, so drop `to`']])
+      expect(await refusals(root, { redirects: { '/gone/*': { status: 410 } } })).toEqual([])
       expect(await refusals(root, { base: '/docs/', site: 'https://example.com', serve: { shutdownTimeout: '30s' }, redirects: { '/old/*': '/*' } })).toEqual([])
     }
     finally {

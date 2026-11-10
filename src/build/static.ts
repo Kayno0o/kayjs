@@ -23,7 +23,7 @@ import { limiter } from '../server/limit'
 import { routesWithSecurity } from '../server/page-headers'
 import { applyPageHooks, assetFiles, pageSizes } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
-import { hostedStatus } from '../server/redirects'
+import { hostedStatus, redirectTarget } from '../server/redirects'
 import { withoutSlash } from '../server/routes'
 import { securityHeaders } from '../server/security'
 import { siteOrigin } from '../server/seo'
@@ -299,19 +299,19 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
   return [...written, file]
 }
 
-// A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read.
+// A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read. A path that is gone (410) is a line of `_redirects` only, naming its own path as the destination a 410 ignores, as a page cannot answer 410.
 async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string, lang: string): Promise<string[]> {
-  const entries = Object.entries(redirects).map(([from, target]) => ({ from, to: typeof target === 'string' ? target : target.to, status: hostedStatus(from, target) }))
+  const entries = Object.entries(redirects).map(([from, target]) => ({ from, to: redirectTarget(target), status: hostedStatus(from, target) }))
 
   if (entries.length === 0)
     return []
 
   const written: string[] = []
 
-  for (const { from, to } of entries.filter(entry => !PARAM_OR_REST.test(entry.from)))
+  for (const { from, to } of entries.filter(entry => entry.status !== 410 && !PARAM_OR_REST.test(entry.from)))
     written.push(...await writeRefresh(out, from, joinBase(base, to), origin, lang))
 
-  const lines = entries.map(({ from, to, status }) => `${joinBase(base, from)} ${joinBase(base, to).replace(REST, ':splat')} ${status}`)
+  const lines = entries.map(({ from, to, status }) => `${joinBase(base, from)} ${joinBase(base, status === 410 ? from : to).replace(REST, ':splat')} ${status}`)
 
   await Bun.write(join(out, '_redirects'), `${lines.join('\n')}\n`)
 

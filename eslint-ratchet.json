@@ -82,7 +82,7 @@
     "complexity": 56
   },
   "src/check/site-seo.ts": {
-    "complexity": 42
+    "complexity": 41
   },
   "src/commands/env-compare.ts": {
     "complexity": 46
@@ -120,7 +120,7 @@
     "max-lines": 682
   },
   "src/compiler/lints.ts": {
-    "max-lines": 1039
+    "max-lines": 1015
   },
   "src/compiler/markup.ts": {
     "max-lines": 621,

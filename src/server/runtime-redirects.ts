@@ -32,7 +32,7 @@ export class RedirectRefusedError extends KayError {
 }
 
 // What a runtime row answers: a redirect's status, or 410 for a path that is gone for good, which has no target.
-export type RuntimeStatus = RedirectStatus | 410
+export type RuntimeStatus = RedirectStatus
 
 // A redirect an editor added while the site runs, in the same file as the paths visitors found nothing at.
 export interface RuntimeRedirect {
@@ -48,7 +48,7 @@ export interface RuntimeRedirect {
 export interface RuntimeRules {
   // The hosts other than the site's own a target may name, none by default.
   hosts: readonly string[]
-  // The config's redirects, which win over the runtime ones and so count in a chain.
+  // The config's redirects, which win over the runtime ones and so count in a chain; empty for one that answers 410.
   configured: Record<string, string>
   // Every path the site serves, when the server knows them, to refuse a target nothing serves.
   served?: (() => string[]) | undefined
@@ -210,6 +210,9 @@ export function check(set: RedirectView, from: string, to: string, status: numbe
 
     if (row?.status === 410 && rules.configured[path] === undefined)
       throw new RedirectRefusedError(`${to} is gone (410): redirect to a page that exists`)
+
+    if (rules.configured[path] === '')
+      throw new RedirectRefusedError(`${to} is gone (410) in kay.config.ts: redirect to a page that exists`)
 
     const next = rules.configured[path] ?? row?.to
 

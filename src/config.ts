@@ -88,7 +88,7 @@ export interface KayConfig extends AppHooks {
   jobs?: JobsConfig | undefined
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite | undefined
-  // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`, or the 301 or 302 older clients and some crawlers expect with `status`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 } }`. `kay check` reports a target no page serves.
+  // Old paths sent elsewhere with a 308, or the 301, 302 or 307 `status` names, and `{ status: 410 }` for a path that ended, which answers `Gone`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 }, '/retired': { status: 410 } }`. `kay check` reports a target no page serves and a 410 that has a `to`.
   redirects?: Redirects | undefined
   // The hosts besides the site's own that a redirect added while the site runs, from a library's screen or `kay not-found --runtime`, may send to: `{ hosts: ['example.org'] }`. None by default, which keeps an editor's redirect on the site.
   runtimeRedirects?: { hosts?: string[] | undefined } | undefined

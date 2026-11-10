@@ -32,7 +32,7 @@ import { METRICS_PATH, metricsOf } from '../server/metrics'
 import { SERVICE_WORKER } from '../server/offline'
 import { reachesServerIsland } from '../server/prerender'
 import { PREVIEW_ROUTE } from '../server/preview'
-import { redirectStatus } from '../server/redirects'
+import { redirectStatus, redirectTarget } from '../server/redirects'
 import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { CSP_REPORTS } from '../server/violations'
@@ -190,7 +190,7 @@ function unlistedServers(root: string, config: KayConfig): string[] {
 
 function redirectRoutes(config: KayConfig): Listed[] {
   return Object.entries(config.redirects ?? {}).map(([from, target]) => {
-    const to = typeof target === 'string' ? target : target.to
+    const to = redirectTarget(target)
 
     return { methods: 'GET', path: from, kind: 'redirect', by: `${redirectStatus(from, target)} to ${to}` }
   })

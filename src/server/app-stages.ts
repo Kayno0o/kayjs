@@ -78,7 +78,7 @@ import { requireProxyKey } from './proxy-key'
 import { publicCacheRules, servePublic } from './public'
 import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { redirectSpelling } from './redirect-spelling'
-import { redirectStatus, serveRedirects } from './redirects'
+import { redirectStatus, redirectTarget, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { pageHeaderCopies } from './render'
 import { reportServerError, useAppOnError } from './report'
@@ -566,7 +566,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
 
   knowRedirects(Object.keys(options.redirects ?? {}))
   knowRuntimeRules({
-    redirects: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, typeof target === 'string' ? target : target.to])),
+    redirects: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, redirectTarget(target)])),
     statuses: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, redirectStatus(from, target)])),
     hosts: options.runtimeRedirects?.hosts,
     served: () => [...served.paths(), ...client.pages.keys(), ...table.paths.keys()],

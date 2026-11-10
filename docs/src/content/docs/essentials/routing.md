@@ -303,11 +303,14 @@ export default defineConfig({
   redirects: {
     '/blog/:slug': '/posts/:slug',
     '/old': { to: '/new', status: 301 },
+    '/retired': { status: 410 },
   },
 })
 ```
 
-A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
+A redirect answers 308. `status` names another: 301 or 302 for clients and crawlers that expect them, or 307 for a move you may undo. `{ status: 410 }` takes no `to` and answers `Gone` for a page that ended for good, and `kay check` reports a 410 that has one. A static export writes it to `_redirects` for hosts that read that file, and no page, as a page cannot answer 410.
+
+The `permanent` option is deprecated since 1.96: `permanent: false` is `status: 307` and `permanent: true` is `status: 308`, and `kay upgrade` rewrites them.
 
 A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while that file is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
 

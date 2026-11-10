@@ -795,7 +795,7 @@ function acceptedLocales(header: string): string[]
 function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string> | undefined): LibraryTool | undefined
 
 [./library] addRuntimeRedirect
-function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): Promise<RuntimeRedirect>
+function addRuntimeRedirect(from: string, to: string, options?: { status?: RedirectStatus | undefined; file?: string | undefined; }): Promise<RuntimeRedirect>
 
 [./library] admitEditSession
 function admitEditSession(ctx: { cookies: CookieMap; request: Request; }, given?: string | undefined): void
@@ -1274,7 +1274,7 @@ const RESTART_RELOAD: string
 interface RuntimeRedirect
   addedAt: number
   from: string
-  status: RuntimeStatus
+  status: RedirectStatus
   to: string
 
 [./library] runtimeRedirects

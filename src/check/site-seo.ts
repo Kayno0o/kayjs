@@ -6,7 +6,7 @@ import type { OtherPage, RenderedPage, SiteSeo } from './seo'
 import { sep } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { basePath } from '../server/base'
-import { fillTarget } from '../server/redirects'
+import { fillTarget, redirectTarget } from '../server/redirects'
 import { slashedPath } from '../server/routes'
 import { configLocator } from './config-keys'
 import { decode, headOf, lintReporter } from './seo'
@@ -193,7 +193,7 @@ export function siteSeoLints(config: SiteSeoConfig, pages: RenderedPage[], other
   }
 
   for (const [from, target] of Object.entries(config.redirects ?? {}))
-    chain(from, options.configFile, typeof target === 'string' ? target : target.to, siteHost, locateConfig(['redirects', from]), options.skipConfigChains)
+    chain(from, options.configFile, redirectTarget(target), siteHost, locateConfig(['redirects', from]), options.skipConfigChains)
 
   for (const page of others) {
     const place = page.status >= 300 && page.status < 400 && page.location !== undefined ? locate(page.location, page) : undefined
@@ -291,7 +291,8 @@ function plainPath(path: string): string {
 }
 
 function redirectsOf(redirects: Redirects | undefined): Redirect[] {
-  return Object.entries(redirects ?? {}).map(([from, target]) => ({ from: segmentsOf(from), to: typeof target === 'string' ? target : target.to }))
+  // A path that is gone has no target to chain to.
+  return Object.entries(redirects ?? {}).flatMap(([from, target]) => redirectTarget(target) === '' ? [] : [{ from: segmentsOf(from), to: redirectTarget(target) }])
 }
 
 function segmentsOf(path: string): string[] {

@@ -45,10 +45,11 @@ import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
+import { redirectPermanent } from './redirect-permanent'
+
 import { removedUiTokens } from './removed-ui-tokens'
 
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
-
 import { untypedSockets } from './socket-routes'
 import { streamOpen } from './stream-on'
 import { unknownToolLabels } from './tool-labels'
@@ -151,6 +152,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => streamOpen(root, options),
   async ({ root, options }) => localState(root, options),
+  ({ root, options }) => redirectPermanent(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

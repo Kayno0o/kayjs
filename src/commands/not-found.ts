@@ -10,6 +10,7 @@ import { buildingWithoutEnv } from '../server/env-state'
 import { answeredBy, notFoundHome, openMissing } from '../server/not-found'
 import { addRedirect, checkRedirect, redirectEntry, withRedirect } from '../server/not-found-config'
 import { notFoundTablesExist } from '../server/pg-not-found'
+import { redirectTarget } from '../server/redirects'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 
 const REFERRER_LIMIT = 3
@@ -156,7 +157,7 @@ async function runtimeRules(root: string, config: Awaited<ReturnType<typeof load
   const [{ configCheckOptions }, { servedPathsOf }] = await Promise.all([import('../check'), import('../check/shadow-types')])
   const served = await servedPathsOf(root, configCheckOptions(config))
 
-  return { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, typeof to === 'string' ? to : to.to])), served: () => served, dryRun }
+  return { hosts: config.runtimeRedirects?.hosts ?? [], configured: Object.fromEntries(Object.entries(config.redirects ?? {}).map(([from, to]) => [from, redirectTarget(to)])), served: () => served, dryRun }
 }
 
 function formatListing(missing: MissingPath[], redirected: boolean): string {

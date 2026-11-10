@@ -1,4 +1,5 @@
 import type { Matcher } from '../src/server/params'
+import type { Redirects } from '../src/server/redirects'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -17,7 +18,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
-const redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', permanent: false }, '/go/*': '/*' }
+const redirects: Redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', status: 307 }, '/go/*': '/*', '/retired': { status: 410 }, '/retired-docs/*': { status: 410 } }
 const app = new Elysia().use(await pages({ requireGuards: false, dirs: { routes }, prebuilt: false, security: false, redirects }))
 
 async function get(path: string, served = app): Promise<{ status: number, html: string, location: string | null }> {
@@ -136,6 +137,19 @@ describe('redirects', () => {
     expect(await get('/old/my%20post?ref=1')).toMatchObject({ status: 308, location: '/items/my%20post?ref=1' })
     expect(await get('/legacy/a/b')).toMatchObject({ status: 308, location: '/blog/a/b' })
     expect(await get('/temp')).toMatchObject({ status: 307, location: '/about' })
+  })
+
+  it('answer 410 Gone for a path with no target, a rest of the path included', async () => {
+    for (const path of ['/retired', '/retired-docs/a/b']) {
+      expect(await get(path)).toEqual({ status: 410, html: 'Gone', location: null })
+    }
+  })
+
+  it('refuse a 410 that has a target, and a redirect with none', () => {
+    expect(() => readRedirects({ '/a': { status: 410, to: '/b' } })).toThrow('has status 410 and goes to /b')
+    expect(() => readRedirects({ '/a': { to: '' } })).toThrow('the redirect from /a has no target')
+    expect(() => readRedirects({ '/a': { status: 410, permanent: true } as never })).toThrow('has permanent and status 410')
+    expect(readRedirects({ '/a/:id': { status: 410 } })[0]).toMatchObject({ to: '', status: 410 })
   })
 
   it('never send a rest of the path off the site', async () => {

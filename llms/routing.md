@@ -156,15 +156,16 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 ### Redirect old paths
 
-`redirects` in kay.config.ts sends old paths elsewhere, with a 308, a 307 when `permanent` is false, or the status `status` names, 301, 302, 307 or 308, for older clients and crawlers that expect a 301:
+`redirects` in kay.config.ts sends old paths elsewhere with a 308, or the `status` it names: 301 or 302 for older clients and crawlers that expect them, 307 for a move that may be undone. `{ status: 410 }`, with no `to`, answers `Gone` for a path that ended, and `kay check` reports a 410 that has a `to`. `permanent` is deprecated since 1.96 (`deprecated-redirect-permanent`, `kay upgrade` writes `status: 307` for `permanent: false` and `status: 308` for `true`). A static export lists a 410 in `_redirects` as `/old /old 410` and writes no page for it:
 
 ```ts
 export default defineConfig({
   redirects: {
     '/blog/:slug': '/posts/:slug',
     '/docs/*': '/guide/*',
-    '/sale': { to: 'https://shop.example.com/sale', permanent: false },
+    '/sale': { to: 'https://shop.example.com/sale', status: 307 },
     '/old': { to: '/new', status: 301 },
+    '/retired': { status: 410 },
   },
 })
 ```

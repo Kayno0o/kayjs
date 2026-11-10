@@ -4,10 +4,14 @@ import { KayError } from '../compiler/errors'
 import { noteRedirect } from './dev-notes'
 import { requestUrl } from './request-url'
 
-// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise: `permanent: false` for a 307, or `status` for a 301 or 302 that older clients and some crawlers expect, which let a browser turn a POST into a GET where 307 and 308 do not.
-export type Redirects = Record<string, string | { to: string, permanent?: boolean, status?: RedirectStatus }>
+// A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless `status` says otherwise: 307 for a move that may be undone, or the 301 or 302 that older clients and some crawlers expect, which let a browser turn a POST into a GET where 307 and 308 do not. `{ status: 410 }` answers `Gone` for a path that ended, with no target.
+// `permanent` is the old spelling of 307 and 308, which the `deprecated-redirect-permanent` lint moves to `status`.
+export type Redirects = Record<string, string | RedirectOptions>
 
-export type RedirectStatus = 301 | 302 | 307 | 308
+export type RedirectOptions = { to: string, status?: Exclude<RedirectStatus, 410>, permanent?: boolean } | { status: 410, to?: string, permanent?: undefined }
+
+// What a path answers with: a redirect's status, or 410 for a path that is gone for good.
+export type RedirectStatus = 301 | 302 | 307 | 308 | 410
 
 const PARAM = /^:([A-Z_$][\w$]*)$/i
 const QUERY_OR_HASH = /[?#].*$/
@@ -21,22 +25,31 @@ export interface Redirect {
   path: string
   // The router's name for each param the old path names.
   names: Map<string, string>
+  // Empty for a 410, which has no target.
   to: string
   status: RedirectStatus
 }
 
-const STATUSES = new Set<unknown>([301, 302, 307, 308])
+const STATUSES = new Set<unknown>([301, 302, 307, 308, 410])
 const PERMANENT = new Set<unknown>([301, 308])
 
-// The status a redirect answers with: its `status`, else a 308 or, with `permanent: false`, a 307. A `status` that is none of 301, 302, 307 and 308, or that contradicts `permanent`, is refused.
+// Where a redirect goes, empty for a path that is gone.
+export function redirectTarget(target: Redirects[string]): string {
+  return typeof target === 'string' ? target : target.to ?? ''
+}
+
+// The status a redirect answers with: its `status`, else a 308 or, with `permanent: false`, a 307. A `status` that is none of 301, 302, 307, 308 and 410, or that contradicts `permanent`, is refused.
 export function redirectStatus(from: string, target: Redirects[string]): RedirectStatus {
-  const { permanent, status }: { permanent?: boolean, status?: RedirectStatus } = typeof target === 'string' ? {} : target
+  const { permanent, status }: { permanent?: boolean | undefined, status?: RedirectStatus | undefined } = typeof target === 'string' ? {} : target
 
   if (status === undefined)
     return permanent === false ? 307 : 308
 
   if (!STATUSES.has(status))
-    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has status ${String(status)}; it answers 301, 302, 307 or 308`)
+    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has status ${String(status)}; it answers 301, 302, 307, 308 or 410`)
+
+  if (status === 410 && permanent !== undefined)
+    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent and status 410; a path that is gone has no target to be permanent about, so drop permanent`)
 
   if (permanent !== undefined && permanent !== PERMANENT.has(status))
     throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent: ${String(permanent)} and status ${String(status)}, which disagree; set one of them`)
@@ -57,10 +70,14 @@ export function hostedStatus(from: string, target: Redirects[string]): RedirectS
 // Each redirect read and checked, so a target naming a param its old path lacks stops the server rather than redirecting to `:slug`.
 export function readRedirects(redirects: Redirects): Redirect[] {
   return Object.entries(redirects).map(([from, target]) => {
-    const to = typeof target === 'string' ? target : target.to
+    const to = redirectTarget(target)
+    const status = redirectStatus(from, target)
 
     if (!from.startsWith('/'))
       throw new KayError('redirect-invalid', `kay: the redirect from ${from} needs a path starting with /`)
+
+    if (status === 410 ? to !== '' : to === '')
+      throw new KayError('redirect-invalid', status === 410 ? `kay: the redirect from ${from} has status 410 and goes to ${to}; a path that is gone has no target, so drop \`to\`` : `kay: the redirect from ${from} has no target; give it a \`to\`, or \`status: 410\` for a path that is gone`)
 
     const names = new Map<string, string>()
     const segments = from.split('/')
@@ -87,7 +104,7 @@ export function readRedirects(redirects: Redirects): Redirect[] {
         throw new KayError('redirect-invalid', `kay: the redirect from ${from} goes to ${to}, whose ${part} its path has none of`)
     }
 
-    return { path, names, to, status: redirectStatus(from, target) }
+    return { path, names, to, status }
   })
 }
 
@@ -96,7 +113,7 @@ export function redirectProblems(redirects: Redirects, served: string[]): string
   const paths = [...served, ...Object.keys(redirects)].map(path => path.split('/').slice(1))
 
   return Object.entries(redirects).flatMap(([from, target]) => {
-    const to = typeof target === 'string' ? target : target.to
+    const to = redirectTarget(target)
 
     // Another site's URL, or a protocol-relative one, is not this site's to check.
     if (!to.startsWith('/') || to.startsWith('//'))
@@ -154,6 +171,9 @@ export function serveRedirects(app: Elysia, redirects: Redirect[], dev?: boolean
       const location = redirectLocation(target, requestUrl(request).search)
 
       noteRedirect(dev, request, `the redirect from ${redirect.path}`)
+
+      if (redirect.status === 410)
+        return new Response('Gone', { status: 410, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 
       return new Response(null, { status: redirect.status, headers: { location } })
     })

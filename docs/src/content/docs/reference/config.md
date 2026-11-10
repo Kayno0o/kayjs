@@ -123,7 +123,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | --- | --- |
 | `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
 | `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. `0` revalidates. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
-| `redirects` | Old paths sent to new ones with a 308, a 307 with `permanent: false`, or the 301, 302, 307 or 308 that `status` names. See [Routing](/essentials/routing) |
+| `redirects` | Old paths sent to new ones with a 308, or the 301, 302, 307 or 308 that `status` names; `{ status: 410 }` answers `Gone` for a path that ended. See [Routing](/essentials/routing) |
 | `runtimeRedirects` | The hosts besides the site's own that a redirect added while the site runs may send to: `{ hosts: ['example.org'] }`. None by default. See [Routing](/essentials/routing#find-the-old-urls-visitors-still-use) |
 | `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL. It runs before the alias of a path an extension moved (`api.former`), so it can rewrite such a path itself |
 | `base` | Where the site is mounted when it is not at its host's root, such as `/docs`. Unset by default. See [Static export and base path](/guides/static-export#mount-the-site-under-a-path) |
