@@ -20,7 +20,7 @@ import { kayLog } from '../runtime/log'
 import { previewing, previewState, sharedDraft } from '../runtime/preview'
 import { checkPublishField, isDraft, modifiedMode, publishTime } from './drafts'
 import { entryPath } from './entry-route'
-import { excerptOf } from './excerpt'
+import { excerptOf, keepMarkerHtml, restoreMarker } from './excerpt'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
 import { builtBody, contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
@@ -572,7 +572,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 
     try {
       const sanitize = options.trusted !== true
-      const safe = typeof html === 'string' && sanitize ? sanitizedHtml(html) : html
+      const safe = typeof html === 'string' && sanitize ? restoreMarker(sanitizedHtml(keepMarkerHtml(html))) : html
       const fromHtml = typeof safe === 'string' ? { segments: [safe], headings: [], words: countWords(safe) } : undefined
       const compiled = typeof body === 'string' ? await bodies.compile(slug, body) : fromHtml
 

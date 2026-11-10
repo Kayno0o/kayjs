@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `permanent` of a redirect is deprecated
 
 `redirects` in `kay.config.ts` names every answer with `status`, which now takes 410 too. `permanent` still works for three minors, and `kay upgrade` rewrites it (`deprecated-redirect-permanent`): `permanent: false` is `status: 307`, `permanent: true` is dropped, as 308 is the default, and so is a `permanent` beside an agreeing `status`. A static export lists `permanent: false` as 302 in `_redirects` and `status: 307` as 307.
+### An `Entry` has `excerpt`, `body` and `html`
+
+An `Entry` literal in an app's tests, passed to a component as a prop, is a type error without them: build it with `testEntry(data, members?)` from `kay/test`, which fills every member and takes the ones a test names.
 
 ### A Menu entry's `danger` and a toast's `type` are gone
 

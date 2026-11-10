@@ -14,6 +14,7 @@ import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { imageColors } from '../server/image-color'
 import { projectSource } from '../server/source'
+import { keepMarker, restoreMarker } from './excerpt'
 import { linkImages, statOf } from './images'
 import { compileMarkdown, MarkdownError, markdownHooks, markdownSource, problemMessage, splitFrontmatter } from './markdown'
 import { modifiedTimes } from './modified'
@@ -59,7 +60,7 @@ const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)+/
 const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 8
+const CACHE_VERSION = 9
 
 // What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
 interface CachedEntry {
@@ -381,7 +382,11 @@ export interface LoadedBodies {
 // A loader collection's Markdown bodies, compiled as a folder's entries are and kept in one file per collection under `.kay/cache/content`, while the build is not prebuilt and no draft preview is read.
 // A body is reused while its source, the collection's Markdown settings, the highlighter with the modules the config imports, kay's compiler and Bun's version are as they were; a fresh compile is the fallback for all else.
 export async function loadedBodies(name: string, markdown: MarkdownSettings, { sanitize, preview, localized = false }: { sanitize: boolean, preview: boolean, localized?: boolean }): Promise<LoadedBodies> {
-  const compiling = async (slug: string, body: string) => compileMarkdown(body, 1, { highlight: markdown.highlight, headingLinks: markdown.headingLinks, sanitize, ...markdownHooks(markdown, markdownSource(`${name}/${slug}`, slug, localized)) })
+  const compiling = async (slug: string, body: string) => {
+    const compiled = await compileMarkdown(sanitize ? keepMarker(body) : body, 1, { highlight: markdown.highlight, headingLinks: markdown.headingLinks, sanitize, ...markdownHooks(markdown, markdownSource(`${name}/${slug}`, slug, localized)) })
+
+    return sanitize ? { ...compiled, segments: compiled.segments.map(segment => typeof segment === 'string' ? restoreMarker(segment) : segment) } : compiled
+  }
 
   if (contentMode().prebuilt || preview)
     return { compile: compiling, save: () => undefined }

@@ -139,7 +139,9 @@ The page's head comes from the entry too: its `title` and `description` fields b
 
 A `modified` option naming another `Date` field adds `article:modified_time` and gives the sitemap a `lastmod` for each entry's URL.
 
-`modified: 'mtime'` or `modified: 'git'` needs no field. `'mtime'` uses the file's time and `'git'` the author date of the file's last commit, read with one `git log` for the whole folder. A file git does not know, such as an untracked one or any file outside a repository, falls back to its time. The date is also `entry.modified`. A shallow clone has one commit, so build with the full history when you use `'git'`. A loader's entries have no file, so they get no date.
+`modified: 'mtime'` or `modified: 'git'` needs no field. `'mtime'` uses the file's time and `'git'` the author date of the file's last commit, read with one `git log` for the whole folder, which `kay dev` keeps until HEAD moves, a file you edit meanwhile taking its time.
+
+A file git does not know, such as an untracked one or any file outside a repository, falls back to its time. The date is also `entry.modified`. A shallow clone has one commit, so build with the full history when you use `'git'`. A loader's entries have no file, so they get no date.
 
 An entry with no `description` takes its excerpt, cut at a word under 160 characters, so a page gets a description without anyone writing one.
 

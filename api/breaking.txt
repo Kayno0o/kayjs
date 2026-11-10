@@ -1,3 +1,4 @@
+kay [./content] Entry
 ui [.] MenuAction
 ui [.] MenuCheckbox
 ui [.] MenuItemBase

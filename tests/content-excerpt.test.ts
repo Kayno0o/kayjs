@@ -10,6 +10,7 @@ import { collection } from '../src/content'
 import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
 import { bodiesFile, contentPlace, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import { gitSpawns } from '../src/content/modified'
 import { writeContentManifests } from '../src/content/server'
 import { html } from '../src/runtime/html'
 import { setPreviewScope } from '../src/runtime/preview'
@@ -76,6 +77,20 @@ describe('an entry\'s excerpt', () => {
 
       expect([entry.excerpt, entry.body, entry.html]).toEqual(['', '', ''])
     })
+  })
+
+  it('keeps a more marker of a loader\'s untrusted body and html, past the sanitizer, but not one in a code fence', async () => {
+    const rows = collection({ name: 'marked-rows', load: () => [
+      { slug: 'b', data: { title: 'B' }, body: 'One.\n\nTwo.\n\n<!-- more -->\n\nThree.\n\n```\n<!-- more -->\n```\n' },
+      { slug: 'f', data: { title: 'F' }, body: 'One.\n\n```\n<!-- more -->\n```\n\nTwo.\n' },
+      { slug: 'h', data: { title: 'H' }, html: '<p>One.</p><p>Two.</p><!-- more --><p>Three.</p>' },
+    ] }, { schema })
+
+    expect((await rows.get('b'))!.excerpt).toBe('One. Two.')
+    expect((await rows.get('b'))!.html).toContain('<!-- more -->')
+    expect((await rows.get('b'))!.html).not.toContain('kay-more-marker')
+    expect((await rows.get('f'))!.excerpt).toBe('One.')
+    expect((await rows.get('h'))!.excerpt).toBe('One. Two.')
   })
 
   it('is the first paragraph of a loader\'s html, and of its body', async () => {
@@ -177,7 +192,7 @@ describe('modified: \'mtime\' and \'git\'', () => {
       await run('2024-01-01T00:00:00Z', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'a')
       await Bun.write(join(root, 'p/a.md'), post('A changed.\n'))
       await run('2024-06-01T00:00:00Z', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'a2')
-      await utimes(join(root, 'p/a.md'), new Date('2030-01-01T00:00:00Z'), new Date('2030-01-01T00:00:00Z'))
+      await utimes(join(root, 'p/a.md'), new Date('2025-01-01T00:00:00Z'), new Date('2025-01-01T00:00:00Z'))
       await utimes(join(root, 'p/b.md'), new Date('2025-05-05T00:00:00Z'), new Date('2025-05-05T00:00:00Z'))
 
       const posts = collection('p', { schema, modified: 'git' })
@@ -190,6 +205,51 @@ describe('modified: \'mtime\' and \'git\'', () => {
       await utimes(join(root, 'p/a.md'), new Date('2025-01-02T00:00:00Z'), new Date('2025-01-02T00:00:00Z'))
 
       expect(at(await collection('p', { schema, modified: 'git' }).get('a'))).toBe('2025-01-02T00:00:00.000Z')
+    })
+  })
+
+  it('asks git once per HEAD, not once per load, and takes the time of a file edited since', async () => {
+    await inProject(files, async (root) => {
+      const run = async (date: string, ...args: string[]) => $`git ${args}`.cwd(root).env({ ...process.env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }).quiet()
+      const commit = async (date: string) => run(date, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-am', 'c')
+
+      await run('2024-01-01T00:00:00Z', 'init', '-q')
+      await run('2024-01-01T00:00:00Z', 'add', '.')
+      await commit('2024-01-01T00:00:00Z')
+
+      const old = new Date('2025-01-01T00:00:00Z')
+
+      await Promise.all(['a', 'b'].map(async name => utimes(join(root, `p/${name}.md`), old, old)))
+
+      const posts = collection('p', { schema, modified: 'git' })
+      const spawned = async (load: () => Promise<unknown>) => {
+        const before = gitSpawns.count
+
+        await load()
+
+        return gitSpawns.count - before
+      }
+
+      // One `git rev-parse` for the HEAD and one `git log` for the history.
+      expect(await spawned(async () => posts.all())).toBe(2)
+      posts.invalidate()
+      // The same HEAD: only the `git rev-parse`.
+      expect(await spawned(async () => posts.all())).toBe(1)
+      expect(at(await posts.get('a'))).toBe('2024-01-01T00:00:00.000Z')
+
+      // A file edited while the server runs is dated by its time.
+      await Bun.write(join(root, 'p/a.md'), post('A changed.\n'))
+      posts.invalidate()
+      expect(await spawned(async () => posts.all())).toBe(1)
+      expect(new Date(at(await posts.get('a'))!).getTime()).toBeGreaterThan(Date.now() - 60_000)
+      expect(at(await posts.get('b'))).toBe('2024-01-01T00:00:00.000Z')
+
+      // A commit moves HEAD: the history is read again.
+      await commit('2024-09-09T00:00:00Z')
+      await utimes(join(root, 'p/a.md'), old, old)
+      posts.invalidate()
+      expect(await spawned(async () => posts.all())).toBe(2)
+      expect(at(await posts.get('a'))).toBe('2024-09-09T00:00:00.000Z')
     })
   })
 
