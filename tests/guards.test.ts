@@ -126,7 +126,8 @@ describe('requireGuards', () => {
     const reported = async (requireGuards?: boolean) => (await writeShadowTypes(dir, { dirs: { routes: 'routes', api: 'api' }, requireGuards })).problems.filter(found => found.code === 'unguarded-route')
     const unset = await reported()
 
-    expect(unset.map(found => [relative(dir, found.file), found.severity])).toEqual((await reported(true)).map(found => [relative(dir, found.file), 'warning']))
+    // Routes alone: a layout's or module's actions are not routes a start would refuse.
+    expect(unset.map(found => [relative(dir, found.file), found.severity])).toEqual([['routes/index.kay', 'warning'], ['routes/feed.json.ts', 'warning'], ['api/notes.ts', 'warning']])
     expect(unset.every(found => found.message.includes('so a 2.0 start would refuse'))).toBe(true)
     expect(await reported(false)).toEqual([])
   })

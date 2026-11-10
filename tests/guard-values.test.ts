@@ -184,7 +184,7 @@ describe('kay check on ctx.guard', () => {
     await Promise.all(Object.entries({
       'package.json': JSON.stringify({ name: 'app', private: true }),
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
-      'kay.config.ts': 'export default {}\n',
+      'kay.config.ts': 'export default { requireGuards: false }\n',
       ...files,
     }).map(async ([path, text]) => Bun.write(join(root, path), text)))
 

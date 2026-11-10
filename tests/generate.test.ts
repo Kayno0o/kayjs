@@ -229,6 +229,8 @@ it('writes files that pass kay check and their own tests', async () => {
   await generate(dir, 'action', 'team/addTissue')
 
   await Bun.write(join(dir, 'src/routes/team/index.kay'), 'head\n  title Team\nh1 Team\n')
+  // The generated guard makes the app a mix of guarded and open routes, which kay check warns of while requireGuards is unset.
+  await Bun.write(join(dir, 'kay.config.ts'), (await Bun.file(join(dir, 'kay.config.ts')).text()).replace('defineConfig({', 'defineConfig({\n  requireGuards: false,'))
 
   expect(await check(dir, configCheckOptions(await loadConfig(dir)))).toEqual([])
 

@@ -16,7 +16,8 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
 
   const upcoming = options.requireGuards === undefined
 
-  if (upcoming && ![...routes, ...endpoints, ...apiModules].some(route => route.guards.length > 0))
+  // Guards a library mounts on its own routes say nothing of the app's: only the app's own guarded routes mark a site that has started to guard.
+  if (upcoming && ![...routes, ...endpoints, ...apiModules].some(route => route.open !== true && route.guards.length > 0))
     return []
 
   const report = (file: string, message: string, help = HELP): CheckDiagnostic => ({
@@ -50,7 +51,8 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
     }
   }
 
-  for (const [layout, guarded] of layouts) {
+  // Layouts and action modules are not routes: a site that has not asked for `requireGuards` is told of its routes alone.
+  for (const [layout, guarded] of upcoming ? [] : layouts) {
     const source = guarded ? '' : await Bun.file(layout).text()
     const actions = guarded ? [] : analyzeServer(source, parseKay(source).server)?.actionNames ?? []
 
