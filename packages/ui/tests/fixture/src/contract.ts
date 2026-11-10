@@ -3,6 +3,7 @@ import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
@@ -120,6 +121,7 @@ export const COMPONENTS = {
   'app-switcher': AppSwitcher,
   'audio-player': AudioPlayer,
   'avatar': Avatar,
+  'avatar-group': AvatarGroup,
   'badge': Badge,
   'bar-chart': BarChart,
   'bar-list': BarList,
@@ -218,7 +220,8 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
   'app-switcher': { apps: [{ id: 'atlas', href: '/atlas', label: 'Atlas', icon }, { id: 'hubble', href: '/hubble', label: 'Hubble' }], current: 'hubble' },
   'audio-player': { src: '/episode.mp3', title: 'Episode', chapters: [{ title: 'Intro', start: 0 }, { title: 'News', start: 30 }], cues: [{ start: 0, end: 10, text: 'Hello' }] },
-  'avatar': { name: 'Grace', label: 'Grace' },
+  'avatar': { name: 'Grace', label: 'Grace', status: 'online' },
+  'avatar-group': { avatars: [{ name: 'Ada' }, { name: 'Grace' }, { name: 'Linus' }], max: 2, label: 'Team' },
   'badge': { label: 'Draft', icon },
   'bar-chart': { labels: ['a', 'b'], series: [{ name: 'Runs', values: [1, 2] }], label: 'Runs' },
   'bar-list': { rows, onSelect: noop },

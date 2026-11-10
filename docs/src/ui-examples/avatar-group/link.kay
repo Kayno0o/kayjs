@@ -1,0 +1,6 @@
+---
+import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
+
+const team = [{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }, { name: 'Linus Torvalds' }, { name: 'Margaret Hamilton' }]
+---
+AvatarGroup(avatars={team} max={2} moreHref="/ui/avatar" label="Team")

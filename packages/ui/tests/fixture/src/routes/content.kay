@@ -1,6 +1,7 @@
 ---
 import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
@@ -43,6 +44,15 @@ main
       | Could not save. #[a(href="/data") Retry]
   article#avatar
     Avatar(src="/ada.png" name="Ada" size="sm")
+  article#avatar-status
+    Avatar(name="Ada" status="busy")
+    Avatar(name="Ada" size="xl" label="Ada" href="/ada" status="offline")
+  article#avatar-group
+    AvatarGroup(avatars={[{ name: 'Ada' }, { name: 'Grace', href: '/grace' }, { name: 'Linus' }]} max={2} label="Team")
+  article#avatar-group-link
+    AvatarGroup(avatars={[{ name: 'Ada' }, { name: 'Grace' }, { name: 'Linus' }]} max={1} moreHref="/team")
+  article#avatar-group-fits
+    AvatarGroup(avatars={[{ name: 'Ada' }, { name: 'Grace' }]} max={2})
   article#avatar-initial
     Avatar(name=" grace" label="Grace")
   form#form

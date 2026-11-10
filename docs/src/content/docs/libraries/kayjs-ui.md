@@ -282,7 +282,7 @@ Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header)
 
 Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [ThemeToggle](/ui/theme-toggle), [SiteNav](/ui/site-nav), [SideNav](/ui/side-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
 
-Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [DescriptionList](/ui/description-list), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar).
+Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [DescriptionList](/ui/description-list), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar), [AvatarGroup](/ui/avatar-group).
 
 Charts: [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [MapView](/ui/map-view), [ContributionGraph](/ui/contribution-graph), [Sparkline](/ui/sparkline), [StatusStrip](/ui/status-strip), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 

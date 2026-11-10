@@ -15,6 +15,8 @@ export default defineMessages({
       seek: 'Position',
       transcript: 'Transcription',
     },
+    avatar: { away: 'absent', busy: 'occupé', offline: 'hors ligne', online: 'en ligne' },
+    avatarGroup: { failure: 'Impossible de charger les personnes', loading: 'Chargement…', more: { one: '{count} autre', other: '{count} autres' }, retry: 'Réessayer' },
     barChart: { empty: 'Aucune donnée pour le moment.', total: 'Total' },
     barList: { empty: 'Aucune donnée pour le moment.' },
     bell: {

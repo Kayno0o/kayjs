@@ -111,6 +111,19 @@ function previousStart(chapters: readonly AudioChapter[], seconds: number): numb
 [./lib/audio] RESTART_CHAPTER_SECONDS
 const RESTART_CHAPTER_SECONDS: 3
 
+[./lib/avatar-group] AvatarStatus
+type AvatarStatus = 'online' | 'away' | 'busy' | 'offline'
+
+[./lib/avatar-group] GroupedAvatar
+interface GroupedAvatar
+  href?: string | undefined
+  key?: number | string | undefined
+  label?: string | undefined
+  name: string
+  src?: null | string | undefined
+  status?: AvatarStatus | undefined
+  statusLabel?: string | undefined
+
 [./lib/bell] BellItem
 interface BellItem
   id: string

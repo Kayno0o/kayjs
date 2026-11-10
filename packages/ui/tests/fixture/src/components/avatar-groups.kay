@@ -1,0 +1,33 @@
+---
+import { signal } from 'kay'
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
+
+const { onOpenChange, onLoad, onError } = props<{ onOpenChange: (open: boolean) => void, onLoad: (count: number) => void, onError: (error: unknown) => void }>()
+
+const people = [{ name: 'Ada', status: 'online' as const }, { name: 'Linus', status: 'busy' as const }, { name: 'Grace', href: '/grace' }, { name: 'Margaret' }, { name: 'Dennis' }]
+const failing = signal(true)
+const ask = async () => {
+  if (failing())
+    throw new Error('nope')
+
+  return people
+}
+---
+AvatarGroup#popover(avatars={people} max={2} size="sm" label="Team" onOpenChange={onOpenChange})
+AvatarGroup#linked(avatars={people} max={3} moreHref="/team" moreLabel={count => `See ${count} more`})
+AvatarGroup#under(avatars={people} max={9})
+AvatarGroup#exact(avatars={people} max={5})
+AvatarGroup#custom(avatars={people} max={1})
+  @avatar(person)
+    b.mine {person.name}
+  @rest(rest)
+    p.rest {rest.length} others
+AvatarGroup#remote(avatars={async () => people} max={2} onLoad={list => onLoad(list.length)})
+AvatarGroup#failing(avatars={ask} max={2} onError={failure => onError(failure.error)})
+AvatarGroup#pending(avatars={new Promise<typeof people>(() => undefined)} loadingLabel="Un instant")
+button#heal(onClick={() => failing = false}) Heal
+Avatar#dot-online(name="Ada" status="online")
+Avatar#dot-offline(name="Ada" status="offline" label="Ada L.")
+Avatar#dot-custom(name="Ada" status="away" statusLabel="at lunch" href="/ada")
+Avatar#xl(name="Ada" size="xl")

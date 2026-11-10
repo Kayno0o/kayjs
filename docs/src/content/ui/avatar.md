@@ -8,9 +8,15 @@ description: A person's picture, or the initial of their name on a colour of its
 
 ## Sizes
 
-`size` is `xs`, `sm`, `md` (the default) or `lg`.
+`size` is `xs`, `sm`, `md` (the default), `lg` or `xl`.
 
 <Demo name="avatar/sizes" />
+
+## Status
+
+`status` draws a presence dot in the picture's corner: `online`, `away`, `busy` or `offline` (hollow). The state is part of the avatar's accessible name, `Ada, online`, from the `ui.avatar.<status>` messages, so it is read out and not shown by colour alone; `statusLabel` words it for one avatar. To show several people at once, see [AvatarGroup](/ui/avatar-group).
+
+<Demo name="avatar/status" />
 
 ## Load, error and a fallback of your own
 

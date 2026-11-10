@@ -1,0 +1,9 @@
+---
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+---
+.flex.items-center.gap-3
+  Avatar(name="Ada" size="lg" status="online")
+  Avatar(name="Grace" size="lg" status="away")
+  Avatar(name="Linus" size="lg" status="busy")
+  Avatar(name="Margaret" size="lg" status="offline")
+  Avatar(name="Dennis" size="xl" status="online")

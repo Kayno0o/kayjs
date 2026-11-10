@@ -28,6 +28,7 @@
 
 ### Avatar, SiteFavicon, CopyButton, AudioPlayer
 
+- `AvatarGroup` takes `avatars` as a list, a promise or a function, with `onLoad(people, query)`, `onError({ error, query })` and `onOpenChange(open)` for its overflow popover.
 - `Avatar` and `SiteFavicon` take `onLoad(event)`, `onError({ event })` and `@fallback`, drawn in place of the initial or the globe when there is no picture or it fails.
 - `CopyButton(text={() => signedLink()} onCopy={copied => ...} onError={({ error }) => ...})`: `text` is a string, a function returning one or a promise of one, copied inside the click so Safari accepts it. `onCopy(text)` follows a successful copy, `onError({ error })` a text that could not be built or a refused copy, beside the `failureLabel` toast.
 - `AudioPlayer` takes `onPlay`, `onPause`, `onEnd` and `onError({ error, event })`, the `MediaError` of a file that fails to load or the `DOMException` of a refused play, and `failureLabel` for the refused play's toast.

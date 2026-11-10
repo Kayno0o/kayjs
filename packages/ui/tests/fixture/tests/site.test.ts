@@ -462,6 +462,24 @@ describe('content', () => {
     expect([initial.text, initial.attributes.style]).toEqual(['g', expect.stringMatching(/^background-color: #[\dA-F]{6}; color: #(?:000|fff)$/)])
   })
 
+  test('Avatar draws its status dot named in the avatar\'s name, and takes the xl size', async () => {
+    expect(await attributes('/content', '#avatar-status [data-part=root]', ['role', 'aria-label', 'data-size'])).toEqual([
+      { 'role': 'img', 'aria-label': 'Ada, busy', 'data-size': 'md' },
+      { 'role': null, 'aria-label': 'Ada, offline', 'data-size': 'xl' },
+    ])
+    expect(await attributes('/content', '#avatar-status [data-part=status]', ['data-presence', 'aria-hidden'])).toEqual([{ 'data-presence': 'busy', 'aria-hidden': 'true' }, { 'data-presence': 'offline', 'aria-hidden': 'true' }])
+    expect((await one('/content', '#avatar-status a')).attributes.href).toBe('/ada')
+  })
+
+  test('AvatarGroup draws max avatars and a +N chip that opens a popover listing the rest, or is the link to moreHref', async () => {
+    expect(await attributes('/content', '#avatar-group .kui-avatar-group > .kui-avatar', ['aria-label'])).toEqual([{ 'aria-label': 'Ada' }, { 'aria-label': 'Grace' }])
+    expect(await attributes('/content', '#avatar-group [data-part=more]', ['type', 'aria-label', 'aria-expanded'])).toEqual([{ 'type': 'button', 'aria-label': '1 more', 'aria-expanded': 'false' }])
+    expect((await find('/content', '#avatar-group [data-part=name]')).map(found => found.text)).toEqual(['Linus'])
+    expect(await attributes('/content', '#avatar-group-link a[data-part=more]', ['href', 'aria-label'])).toEqual([{ 'href': '/team', 'aria-label': '2 more' }])
+    expect(await find('/content', '#avatar-group-link [popover]')).toEqual([])
+    expect(await find('/content', '#avatar-group-fits [data-part=more]')).toEqual([])
+  })
+
   test('Carousel shows its slide, hides the rest from the focus and screen readers, and names each in the app\'s words', async () => {
     expect(await attributes('/content', '#carousel section', ['aria-roledescription', 'aria-label'])).toEqual([{ 'aria-roledescription': 'carousel', 'aria-label': 'Galerie photos' }])
     expect(await attributes('/content', '#carousel [aria-label$=" sur 2"]', ['aria-label', 'aria-hidden', 'inert'])).toEqual([

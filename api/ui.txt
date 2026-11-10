@@ -788,17 +788,53 @@ component default
   title?: string | undefined
   transcriptLabel?: string | undefined
 
+[./avatar-group.kay] default
+component default
+  avatar?: ((person: GroupedAvatar) => Element) | undefined
+  avatars: OptionsSource<GroupedAvatar>
+  class?: string | undefined | {
+  root?: string | undefined;
+  count?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
+  more?: string | undefined;
+  panel?: string | undefined | {
+    root?: string | undefined;
+    anchor?: string | undefined;
+  };
+  list?: string | undefined;
+  item?: string | undefined;
+  row?: string | undefined;
+  name?: string | undefined;
+}
+  failureLabel?: string | undefined
+  label?: string | undefined
+  loadingLabel?: string | undefined
+  max?: number | undefined
+  moreHref?: string | undefined
+  moreLabel?: ((count: number) => string) | string | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((avatars: readonly GroupedAvatar[], query: string) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined
+  retryLabel?: string | undefined
+  size?: "lg" | "md" | "sm" | "xl" | "xs" | undefined
+
 [./avatar.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; status?: string | undefined; }
   fallback?: Element
   href?: string | undefined
   label?: string | undefined
   name: string
   onError?: ((failure: { event: Event; }) => unknown) | undefined
   onLoad?: ((event: Event) => unknown) | undefined
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: "lg" | "md" | "sm" | "xl" | "xs" | undefined
   src?: null | string | undefined
+  status?: AvatarStatus | undefined
+  statusLabel?: string | undefined
 
 [./badge.kay] default
 component default

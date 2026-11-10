@@ -3,20 +3,24 @@ import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, signal } from 'kay'
+import { wording } from 'kay/words'
+import type { AvatarStatus } from './avatar-group'
 
 // 'kui-avatar' is the component's name for an app's CSS and tests, and carries no rule of its own that the utilities do not.
 const look = recipe({
   parts: {
-    root: 'kui-avatar inline-grid size-8 shrink-0 [&:is(a)]:no-underline place-items-center overflow-hidden rounded-[calc(infinity*1px)] border-solid border-[var(--color-border)] bg-surface-strong [border-width:var(--border-width)]',
+    root: 'kui-avatar relative inline-grid size-8 shrink-0 [&:is(a)]:no-underline place-items-center overflow-hidden rounded-[calc(infinity*1px)] border-solid border-[var(--color-border)] bg-surface-strong [border-width:var(--border-width)]',
     image: 'size-full object-cover',
     // Its colours are set inline, seeded by the name.
     initial: 'grid size-full place-items-center text-xs [font-weight:var(--font-weight-semibold)] uppercase',
+    // A dot inside the circle's corner, ringed in its own tone. Online, away and busy are filled, offline is hollow, so the four differ by more than a colour.
+    status: 'absolute right-[8%] bottom-[8%] size-[30%] rounded-[calc(infinity*1px)] border-solid bg-[var(--_status-color)] [border-color:var(--_status-color)] [border-width:var(--border-width)] data-[presence=online]:[--_status-color:var(--color-success)] data-[presence=away]:[--_status-color:var(--color-warning)] data-[presence=busy]:[--_status-color:var(--color-danger)] data-[presence=offline]:[--_status-color:var(--color-muted)] data-[presence=offline]:bg-surface-strong',
   },
-  variants: { size: { xs: { root: 'size-5' }, sm: { root: 'size-6' }, md: '', lg: { root: 'size-12', initial: 'text-base' } } },
+  variants: { size: { xs: { root: 'size-5' }, sm: { root: 'size-6' }, md: '', lg: { root: 'size-12', initial: 'text-base' }, xl: { root: 'size-20', initial: 'text-2xl' } } },
   defaults: { size: 'md' },
 })
 
-const { src, name, size = 'md', label, href, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
+const { src, name, size = 'md', label, href, status, statusLabel, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
   src?: string | null | undefined
   // Seeds the fallback's colour and gives its initial.
   name: string
@@ -30,6 +34,10 @@ const { src, name, size = 'md', label, href, fallback, onLoad, onError, ...rest 
   onError?: ((failure: { event: Event }) => unknown) | undefined
   // Makes the avatar a link, to the person's page: the `label`, else the name, names it.
   href?: string | undefined
+  // Draws a presence dot in the picture's corner. The dot is named in the avatar's own name, `Ada, online`, from the `ui.avatar.<status>` message, so the state is read out and not shown by its colour alone.
+  status?: AvatarStatus | undefined
+  // Replaces the status's wording in the avatar's name.
+  statusLabel?: string | undefined
 }>()
 
 const failed = signal(false)
@@ -41,6 +49,20 @@ effect(() => {
 })
 
 const ground = () => stringToHexColor(name)
+
+const STATUS_WORDS = {
+  online: () => wording('ui.avatar.online', 'online'),
+  away: () => wording('ui.avatar.away', 'away'),
+  busy: () => wording('ui.avatar.busy', 'busy'),
+  offline: () => wording('ui.avatar.offline', 'offline'),
+}
+
+// What names the avatar: the label, or the name when a link or a status needs one, the status after it; none for a decorative avatar.
+const accessibleName = () => {
+  const base = label ?? (href !== undefined || status ? name : undefined)
+
+  return base && status ? `${base}, ${statusLabel ?? STATUS_WORDS[status]()}` : base
+}
 ---
 snippet face()
   if src && !failed()
@@ -50,11 +72,13 @@ snippet face()
     | {fallback}
   else
     span(part="initial" aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}
+  if status
+    span(part="status" aria-hidden="true" data-presence={status})
 
 // The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
 if href !== undefined
-  a(part="root" {...rest} href={href} data-size={size} aria-label={label ?? name})
+  a(part="root" {...rest} href={href} data-size={size} aria-label={accessibleName()})
     {face()}
 else
-  span(part="root" {...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
+  span(part="root" {...rest} data-size={size} role={accessibleName() ? 'img' : undefined} aria-label={accessibleName()})
     {face()}
