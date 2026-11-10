@@ -39,7 +39,7 @@ const look = recipe({
     tooltipValue: 'ml-auto pl-3 font-mono text-foreground tabular-nums',
     swatch: 'size-2 shrink-0',
     // An event marked on the x axis: a hit area as wide as a pointer with its dashed rule in the middle, and its title in the tooltip.
-    event: EVENT_LOOK.event,
+    event: `${EVENT_LOOK.event} z-10`,
     eventRule: EVENT_LOOK.eventRule,
     tooltipEvent: 'text-foreground',
     // What screen readers read in place of the drawing: every value, and how to pick a span from the keyboard.

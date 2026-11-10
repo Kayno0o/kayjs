@@ -95,12 +95,12 @@ const reading = (item: BarSeries, at: number) => {
   return typeof value === 'number' ? formatValue(value) : '-'
 }
 
-// What a bar column reads on hover and focus, and to screen readers: the label, each series' reading and the notes the series carry for it.
 const placed = memo(() => placeEvents(events, labels))
 
 // Side by side with the events on the same column, each a pointer's width further along.
 const eventStyle = (event: ChartEvent, slot: number) => `margin-left: ${slot * 0.5}rem${event.color ? `; --event-color: ${event.color}` : ''}`
 
+// What a bar column reads on hover and focus, and to screen readers: the label, each series' reading, the notes the series carry for it and the events marked on it.
 const summaries = memo(() => labels.map((_, at) => {
   const total = stacked ? [`${totalLabel} ${formatValue(series.reduce((sum, item) => sum + (item.values[at] ?? 0), 0))}`] : []
   const notes = [...series.map(item => item.notes?.[at]), ...placed().filter(item => item.index === at).map(item => item.event.title)].filter(Boolean)

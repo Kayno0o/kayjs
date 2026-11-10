@@ -548,6 +548,15 @@ inBrowser('LineChart events', () => {
     expect(drawn.events[1]!.x).toBeGreaterThan(drawn.events[0]!.x + 4)
     expect(drawn.events[2]!.x).toBeGreaterThan(drawn.events[0]!.x + 20)
 
+    // The link is on top of the slider's overlay, so a click or a middle click reaches it.
+    expect(await page.evaluate(() => {
+      document.querySelector('#events a[data-part="event"]')!.scrollIntoView({ block: 'center' })
+
+      const link = document.querySelector('#events a[data-part="event"]')!.getBoundingClientRect()
+
+      return document.elementFromPoint(link.left + link.width / 2, link.top + link.height / 2)?.closest('[data-part="event"]')?.getAttribute('href')
+    })).toBe('/changes/1')
+
     // The slider keeps the arrows: the keyboard on the point `b` shows both titles.
     await page.evaluate(() => {
       const slider = document.querySelector<HTMLElement>('#events [role="slider"]')!
