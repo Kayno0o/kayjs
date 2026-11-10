@@ -67,8 +67,9 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
       const db = await pg.db()
       const text = stringify(data)
 
+      // Off the write's path: `sweepLogged` logs its own failure, so the write neither waits for it nor fails with it.
       if (++writes % SWEEP_EVERY === 0)
-        await sweep()
+        void sweepLogged()
 
       await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(maxAge)])
     },

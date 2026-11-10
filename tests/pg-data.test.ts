@@ -401,6 +401,36 @@ pgDescribe('pgSessions', () => {
     expect(await store.get('new')).toEqual({ user: 2 })
   })
 
+  pgIt('writes without waiting for the expiry sweep, and a failing sweep fails no write', async () => {
+    const sql = await fresh()
+    const store = pgSessions(pgHandle(sql))
+
+    await Promise.all(Array.from({ length: 999 }, async (_, index) => store.set(`s${index}`, { n: index }, 3_600_000)))
+    await rows(sql, 'INSERT INTO kay_sessions (id, data, expires) VALUES (\'expired\', \'x\', 0)')
+    await rows(sql, 'CREATE OR REPLACE FUNCTION kay_slow_sweep() RETURNS trigger AS $$ BEGIN PERFORM pg_sleep(1); RAISE EXCEPTION \'sweep refused\'; END $$ LANGUAGE plpgsql')
+    await rows(sql, 'CREATE TRIGGER kay_slow_sweep BEFORE DELETE ON kay_sessions FOR EACH ROW EXECUTE FUNCTION kay_slow_sweep()')
+
+    const sink = globalThis as Record<symbol, unknown>
+    const key = Symbol.for('kay.log')
+    const previous = sink[key]
+    const logged: string[] = []
+
+    sink[key] = (level: string, message: string) => logged.push(`${level}: ${message}`)
+
+    try {
+      const began = Date.now()
+
+      await store.set('thousandth', { n: 1000 }, 3_600_000)
+      expect(Date.now() - began).toBeLessThan(800)
+      expect(await store.get('thousandth')).toEqual({ n: 1000 })
+      await waitFor(() => logged.some(line => line.startsWith('error: dropping the expired sessions failed')), 'the failed sweep to be logged')
+    }
+    finally {
+      sink[key] = previous
+      await rows(sql, 'DROP TRIGGER kay_slow_sweep ON kay_sessions')
+    }
+  })
+
   pgIt('ends the sessions deleteWhere matches, and counts them', async () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))
