@@ -101,6 +101,7 @@ div(part="root" {...rest} role={label ? 'group' : undefined} aria-label={label} 
           | {drawRest(hidden())}
         else
           ul(part="list")
+            // Workaround for #3229, as above.
             for entry of hidden() key={entry.key ?? entry.name}
               li(part="item")
                 if entry.href !== undefined
