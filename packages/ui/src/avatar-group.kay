@@ -15,7 +15,7 @@ const look = recipe({
     root: 'kui-avatar-group flex items-center [&>.kui-avatar:not(:first-child)]:-ms-2',
     more: '-ms-2 first:ms-0 grid shrink-0 cursor-pointer place-items-center rounded-[calc(infinity*1px)] border-0 bg-transparent p-0 text-foreground no-underline outline-none focus-visible:[outline:2px_solid_var(--color-accent)] focus-visible:outline-offset-2',
     count: 'text-xs [font-weight:var(--font-weight-semibold)]',
-    panel: 'kui-avatar-group-panel min-w-48',
+    panel: 'kui-avatar-group-panel min-w-48 [--_avatar-ground:var(--color-popover)]',
     item: '',
     list: 'm-0 flex list-none flex-col gap-1 p-2',
     row: 'flex items-center gap-2 rounded-md p-1 text-sm text-foreground no-underline [&:is(a)]:hover:bg-hover [&:is(a)]:focus-visible:bg-hover',

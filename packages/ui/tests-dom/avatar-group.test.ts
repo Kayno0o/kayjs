@@ -140,6 +140,14 @@ describe('Avatar status and xl size', () => {
     expect(root.querySelector('#dot-online [data-part=status]')!.getAttribute('aria-hidden')).toBe('true')
   })
 
+  test('rings the dot in the ground the avatar sits on: the page, and the popover inside the list', async () => {
+    const root = await groups()
+    const panel = root.querySelector<HTMLElement>(`#${root.querySelector('#popover button[data-part=more]')!.getAttribute('popovertarget')}`)!
+
+    expect(root.querySelector('#dot-online [data-part=status]')!.className).toContain('[border-color:var(--_avatar-ground,var(--color-background))]')
+    expect(panel.className).toContain('[--_avatar-ground:var(--color-popover)]')
+  })
+
   test('takes the xl size', async () => {
     const root = await groups()
 
