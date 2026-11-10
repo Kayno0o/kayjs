@@ -26,7 +26,7 @@ export const posts = collection(sqliteLoader({
 
 ### Keep entries in Postgres
 
-`pgLoader` from `@kaynooo/kayjs-cms/pg` takes a `source`: a connection URL, a Bun `SQL` or a pg-orm `Database` (`source: db`). `sql` is the deprecated name of `source`:
+`pgLoader` from `@kaynooo/kayjs-cms/pg` takes a `source`: a connection URL, a Bun `SQL` or a pg-orm `Database` (`source: db`):
 
 ```ts
 import { pgLoader } from '@kaynooo/kayjs-cms/pg'

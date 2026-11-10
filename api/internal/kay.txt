@@ -1218,9 +1218,6 @@ interface Parsed
 [./library] parseEvents
 function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string, id?: string | undefined) => End | undefined, onId?: ((id: string) => void) | undefined): Promise<End | undefined>
 
-[./library] PgJobsSource
-type PgJobsSource = PgSource
-
 [./library] PgSource
 type PgSource = SQL | { sql: SQL } | string
 

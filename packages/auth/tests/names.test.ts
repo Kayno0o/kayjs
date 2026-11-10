@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import * as auth from '../src'
-import { pgAuth, pgStore } from '../src/pg'
+import * as pg from '../src/pg'
+import { pgAuth } from '../src/pg'
 
 describe('the constructor names of 1.91', () => {
-  it('keeps each old name as the same function', () => {
-    expect(auth.createAuth).toBe(auth.authCore)
-    expect(auth.createGate).toBe(auth.authGate)
-    expect(auth.createRoleHierarchy).toBe(auth.roleHierarchy)
-    expect(auth.createWsAuthStore).toBe(auth.wsAuthStore)
-    expect(auth.memoryAuthStore).toBe(auth.memoryAuth)
-    expect(pgStore).toBe(pgAuth)
+  it('no longer exports the old names', () => {
+    for (const old of ['createAuth', 'createGate', 'createRoleHierarchy', 'createWsAuthStore', 'memoryAuthStore'])
+      expect(old in auth).toBe(false)
+
+    expect('pgStore' in pg).toBe(false)
   })
 
   it('names the URL path when pgAuth is given a connection instead of a Database', () => {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from '../../../src/runtime/site'
 import { authGuard } from '../src/guard'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { testApp, userRecord } from './helpers/app'
 
 afterEach(() => {
@@ -65,7 +65,7 @@ describe('authGuard() from kayjs-auth', () => {
     expect(asked).toEqual([{ redirect: '/in' }])
   })
 
-  test('stops an anonymous visitor as auth.guard() does, with no import of the createAuth result', async () => {
+  test('stops an anonymous visitor as auth.guard() does, with no import of the authCore result', async () => {
     const { auth } = testApp({ pages: true })
     const anonymous = await contextOf(auth.plugin)
 
@@ -74,7 +74,7 @@ describe('authGuard() from kayjs-auth', () => {
   })
 
   test('lets a signed-in user through, and asks for a role when given `require`', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['editor'] }))
 

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test'
 import { describeAuditEntry } from '../src/auditWording'
 import { deriveKeys, digest } from '../src/keys'
 import { createPkcePair } from '../src/oauth/pkce'
-import { createRoleHierarchy } from '../src/roles'
+import { roleHierarchy } from '../src/roles'
 import { emailProblem, normalizeEmail, normalizeUsername, passwordProblem, usernameProblem } from '../src/rules'
 
 describe('rules', () => {
@@ -46,9 +46,9 @@ const hierarchy: Record<Role, Role[]> = {
   ROLE_SUPER_ADMIN: ['ROLE_ADMIN'],
 }
 
-const { isGranted, hasRole } = createRoleHierarchy<User, Role>(hierarchy, u => u.roles)
+const { isGranted, hasRole } = roleHierarchy<User, Role>(hierarchy, u => u.roles)
 
-describe('createRoleHierarchy', () => {
+describe('roleHierarchy', () => {
   test('isGranted walks inherited roles', () => {
     expect(isGranted('ROLE_USER', ['ROLE_ADMIN'])).toBe(true)
     expect(isGranted('ROLE_ADMIN', ['ROLE_SUPER_ADMIN'])).toBe(true)

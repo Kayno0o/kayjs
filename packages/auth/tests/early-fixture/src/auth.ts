@@ -1,8 +1,8 @@
 import type { AuthSessionData } from '../../../src/auth'
 import { session } from 'kay/server'
-import { createAuth } from '../../../src/auth'
-import { memoryAuthStore } from '../../../src/memoryStore'
+import { authCore } from '../../../src/auth'
+import { memoryAuth } from '../../../src/memoryStore'
 
-export const store = memoryAuthStore()
+export const store = memoryAuth()
 
-export const auth = createAuth({ sessions: session<AuthSessionData>(), store, site: 'http://localhost', name: 'Early' })
+export const auth = authCore({ sessions: session<AuthSessionData>(), store, site: 'http://localhost', name: 'Early' })

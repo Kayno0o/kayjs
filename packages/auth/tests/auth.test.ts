@@ -5,8 +5,8 @@ import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
 import { setSite } from '../../../src/runtime/site'
-import { Auth, createAuth } from '../src/auth'
-import { memoryAuthStore } from '../src/memoryStore'
+import { Auth, authCore } from '../src/auth'
+import { memoryAuth } from '../src/memoryStore'
 import { browser, SECRET, testApp, userRecord } from './helpers/app'
 
 const POST = { method: 'POST' }
@@ -21,7 +21,7 @@ async function seeded() {
   return setup
 }
 
-describe('createAuth', () => {
+describe('authCore', () => {
   test('sessionCookie gives a test the cookie of a session signed in as a user, against the app\'s own auth', async () => {
     const { auth, app, store } = testApp()
 
@@ -197,10 +197,10 @@ describe('createAuth', () => {
   })
 
   test('reaches the app\'s routes from inside a plugin of the app\'s own, however deep', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store })
+    const auth = authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store })
     const locals = new Elysia({ name: 'locals' }).use(new Elysia().use(auth.plugin)).derive(() => ({ site: 'Site' }))
     const app = new Elysia()
       .use(locals)
@@ -219,7 +219,7 @@ describe('createAuth', () => {
 
   test('says where the session plugin goes when a plugin of the app\'s own keeps it to itself', async () => {
     const sessions = session<AuthSessionData>({ secret: SECRET })
-    const auth = createAuth({ sessions, secret: SECRET, store: memoryAuthStore() })
+    const auth = authCore({ sessions, secret: SECRET, store: memoryAuth() })
     const app = new Elysia().use(new Elysia().use(sessions).use(auth.plugin)).get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const response = await app.handle(new Request('http://localhost/me'))
@@ -290,7 +290,7 @@ describe('createAuth', () => {
   })
 
   test('a secret shorter than 32 characters is refused', () => {
-    expect(() => createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: 'short', store: memoryAuthStore() })).toThrow('at least 32 characters')
+    expect(() => authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: 'short', store: memoryAuth() })).toThrow('at least 32 characters')
   })
 
   test('reading auth without the plugin says how to add it', async () => {

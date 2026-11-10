@@ -1,2 +1,2 @@
-export { createMailListTables, mailListTableNames, mailListTables, pgLists } from './list-pg'
-export { createMailSuppressionTable, createMailSuppressionTables, pgSuppressions } from './suppressions-pg'
+export { createMailListTables, mailListTableNames, pgLists } from './list-pg'
+export { createMailSuppressionTables, pgSuppressions } from './suppressions-pg'

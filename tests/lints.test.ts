@@ -207,7 +207,7 @@ describe('missing-captcha', () => {
     expect(found('export const a = (input: never) => auth.password.register(input, { captcha: \'x\' })')).toEqual([])
     expect(found('export const a = (response: never) => auth.passkeys.register(response)')).toEqual([])
     expect(found('export const a = (input: never) => registry.password.register(input)')).toEqual([])
-    expect(found('export const a = (input: never) => auth.password.register(input)\nexport const auth = createAuth({ captcha: false })')).toEqual([])
+    expect(found('export const a = (input: never) => auth.password.register(input)\nexport const auth = authCore({ captcha: false })')).toEqual([])
     expect(found('// kay-allow missing-captcha\nexport const a = (input: never) => auth.password.register(input)')).toEqual([])
   })
 

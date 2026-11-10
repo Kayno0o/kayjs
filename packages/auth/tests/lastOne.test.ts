@@ -1,8 +1,8 @@
 import type { AuthStore } from '../src/store'
 import { Database } from '@kaynooo/pg-orm'
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
-import { memoryAuthStore } from '../src/memoryStore'
-import { authTables, pgStore } from '../src/pg'
+import { memoryAuth } from '../src/memoryStore'
+import { authTables, pgAuth } from '../src/pg'
 import { testApp, userRecord } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -24,20 +24,20 @@ if (reachable)
 opened.push(postgres)
 
 const backends: [string, () => Promise<AuthStore>][] = [
-  ['memoryAuthStore', async () => memoryAuthStore()],
-  ['pgStore on SQLite', async () => {
+  ['memoryAuth', async () => memoryAuth()],
+  ['pgAuth on SQLite', async () => {
     const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
 
     opened.push(db)
     await db.sync({ allowDestructive: true })
 
-    return pgStore(db)
+    return pgAuth(db)
   }],
   ...reachable
-    ? [['pgStore on Postgres', async () => {
+    ? [['pgAuth on Postgres', async () => {
       await postgres.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
-      return pgStore(postgres)
+      return pgAuth(postgres)
     }] as [string, () => Promise<AuthStore>]]
     : [],
 ]
@@ -270,7 +270,7 @@ describe('an undo meeting a store outage', () => {
   const down = new Error('store down')
 
   test('a failed put-back of the last way in is not answered as last-way-in', async () => {
-    const race = overlapping(memoryAuthStore(), 2)
+    const race = overlapping(memoryAuth(), 2)
     const store: AuthStore = { ...race.store, identities: { ...race.store.identities, create: async (...args: Parameters<typeof race.store.identities.create>) => {
       if (outage)
         throw down
@@ -299,7 +299,7 @@ describe('an undo meeting a store outage', () => {
   })
 
   test('a failed put-back of the last owner is not answered as last-owner', async () => {
-    const race = overlapping(memoryAuthStore(), 2)
+    const race = overlapping(memoryAuth(), 2)
     const members = race.store.members!
     const store: AuthStore = { ...race.store, members: { ...members, add: async (...args: Parameters<typeof members.add>) => {
       if (outage)

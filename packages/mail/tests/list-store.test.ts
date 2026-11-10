@@ -3,11 +3,11 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { testSite } from 'kay/test'
-import { createMailListTables, mailListTables, pgLists } from '../src/list-pg'
+import { createMailListTables, mailListTableNames, pgLists } from '../src/list-pg'
 import { DELIVERY_TRIES, openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
-import { createMailSuppressionTable, pgSuppressions } from '../src/suppressions-pg'
+import { createMailSuppressionTables, pgSuppressions } from '../src/suppressions-pg'
 
 await testSite({ root: 'tests/fixture' })
 
@@ -247,7 +247,7 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       await createMailListTables(db)
       await createMailListTables(db)
 
-      const [found] = await db.unsafe<{ present: boolean }[]>(`SELECT ${mailListTables.map(name => `to_regclass('${name}') IS NOT NULL`).join(' AND ')} AS present`)
+      const [found] = await db.unsafe<{ present: boolean }[]>(`SELECT ${mailListTableNames.map(name => `to_regclass('${name}') IS NOT NULL`).join(' AND ')} AS present`)
 
       expect(found!.present).toBe(true)
     }
@@ -295,8 +295,8 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       expect((await pgLists(db).suppressed!([email('x')])).map(row => row.reason)).toEqual(['complaint'])
       expect(await kept.lift(email('x'))).toBe(true)
       await db.unsafe('DROP TABLE kay_mail_suppressions')
-      await createMailSuppressionTable(db)
-      await createMailSuppressionTable(db)
+      await createMailSuppressionTables(db)
+      await createMailSuppressionTables(db)
       expect((await db.unsafe<{ found: string | null }[]>('SELECT to_regclass(\'kay_mail_suppressions\') AS found'))[0]!.found).not.toBeNull()
     }
     finally {

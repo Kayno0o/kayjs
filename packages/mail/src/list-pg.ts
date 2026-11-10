@@ -8,9 +8,6 @@ import { pgSuppressions, SUPPRESSIONS_TABLE } from './suppressions-pg'
 // The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createMailListTables`.
 export const mailListTableNames = ['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries', 'kay_mail_suppressions'] as const
 
-/** @deprecated Renamed `mailListTableNames` in 1.91, so `xTableNames` lists names as `jobTableNames` does; the old name works until 1.94. */
-export const mailListTables = mailListTableNames
-
 // The tables a store needs to open: the suppressions one is made by the first suppression.
 const coreTables = mailListTableNames.slice(0, 3)
 

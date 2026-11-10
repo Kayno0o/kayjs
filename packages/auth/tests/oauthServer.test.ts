@@ -6,7 +6,7 @@ import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 import { scratchDir } from 'kay/test'
 import { setupStore } from '../../../src/server/app-store'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { auth } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
 
@@ -20,7 +20,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryAuthStore> } = {}) {
+function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryAuth> } = {}) {
   const fetched: string[] = []
 
   // The documents of an earlier app are not this one's.
@@ -215,7 +215,7 @@ describe('the authorization request', () => {
   })
 
   test('an approval held with every scope, from an app declaring none, asks again once the app declares some', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
     const before = server({ scopes: [], store })
     const { client_id } = await register(before)
     const ada = await signedIn(before)

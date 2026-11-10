@@ -439,6 +439,3 @@ export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     pending: () => waiting(),
   }
 }
-
-/** @deprecated Renamed `cmsDrafts` in 1.91, as a constructor is a noun; the old name works until 1.94. */
-export const createDrafts = cmsDrafts

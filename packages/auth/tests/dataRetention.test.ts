@@ -3,9 +3,9 @@ import type { AuthStore } from '../src/store'
 import { Database } from '@kaynooo/pg-orm'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { truncatedAddress } from '../src/address'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { discordProvider } from '../src/oauth/providers'
-import { authTables, pgStore } from '../src/pg'
+import { authTables, pgAuth } from '../src/pg'
 import { PRUNE_EVERY_MS } from '../src/prune'
 import { testApp, userRecord } from './helpers/app'
 
@@ -23,7 +23,7 @@ describe('pruning accounts never verified', () => {
   function setup(options: { requireVerified?: boolean, unverifiedMaxAge?: Duration, store?: AuthStore } = {}) {
     const deleted: string[] = []
     const app = testApp({
-      store: options.store ?? memoryAuthStore(),
+      store: options.store ?? memoryAuth(),
       site: 'https://site.test',
       defaultRoles: ['editor'],
       onDelete: ({ user }) => {
@@ -62,13 +62,13 @@ describe('pruning accounts never verified', () => {
   })
 
   describe.each([
-    ['memoryAuthStore', async () => memoryAuthStore()],
-    ['pgStore on SQLite', async () => {
+    ['memoryAuth', async () => memoryAuth()],
+    ['pgAuth on SQLite', async () => {
       const db = new Database({ url: 'sqlite://:memory:', tables: [...authTables] })
 
       await db.sync({ allowDestructive: true })
 
-      return pgStore(db)
+      return pgAuth(db)
     }],
   ] as [string, () => Promise<AuthStore>][])('%s', (_, make) => {
     test('a run goes past more than a batch of kept accounts to the one behind them', async () => {
@@ -100,7 +100,7 @@ describe('pruning accounts never verified', () => {
   })
 
   test('a store without the listing keeps them', async () => {
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store: AuthStore = { ...base, users: { ...base.users } }
 
     delete store.users.staleUnverified
@@ -116,7 +116,7 @@ describe('pruning accounts never verified', () => {
 
 describe('erasing a user', () => {
   test('a store failing to strip the audit log fails the erase with the account still there', async () => {
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store: AuthStore = { ...base, audit: { ...base.audit!, erase: () => {
       throw new Error('audit store down')
     } } }
@@ -290,7 +290,7 @@ describe('exporting a user\'s data', () => {
 
 describe('erasing a user, the entry recording it', () => {
   test('a failure stripping it fails the erase once the account is gone', async () => {
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     let calls = 0
     const store: AuthStore = { ...base, audit: { ...base.audit!, erase: async (userId, pseudonym) => {
       if (++calls === 2)

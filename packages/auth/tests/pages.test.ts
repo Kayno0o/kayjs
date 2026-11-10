@@ -2,8 +2,8 @@ import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
-import { memoryAuthStore } from '../src/memoryStore'
+import { authCore } from '../src/auth'
+import { memoryAuth } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { auth } from '../src/pages'
 import { scopeLabel } from '../src/pages/forms'
@@ -15,7 +15,7 @@ const LATER = 11 * 60_000
 
 const mailer = (mails: Mail[]) => ({ send: (mail: Mail) => void mails.push(mail) })
 
-describe('createAuth with the prebuilt pages', () => {
+describe('authCore with the prebuilt pages', () => {
   test('the sign-in, two-factor and sessions pages and every mailed link default to the pages under their prefix', async () => {
     const mails: Mail[] = []
     const { browser, store } = testApp({ site: 'http://localhost', pages: auth({ server: false, prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
@@ -32,7 +32,7 @@ describe('createAuth with the prebuilt pages', () => {
     expect((await ada.fetch('/auth/discord/callback?code=x&state=y')).headers.get('location')).toStartWith('/account-pages/sign-in?error=')
   })
 
-  test('without pages, a mailed link with no page of its own stops createAuth', () => {
+  test('without pages, a mailed link with no page of its own stops authCore', () => {
     expect(() => testApp({ site: 'http://localhost', email: { mailer: mailer([]), links: { 'magic-link': '/magic' } } })).toThrow('email.links needs a page for verify-email, reset-password, change-email')
     expect(() => testApp({ site: 'http://localhost', pages: true, email: { mailer: mailer([]) } })).not.toThrow()
   })
@@ -40,7 +40,7 @@ describe('createAuth with the prebuilt pages', () => {
 
 describe('auth({ module }) registers the app\'s auth module', () => {
   const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
-  const make = (pages?: Record<string, unknown> | boolean) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
+  const make = (pages?: Record<string, unknown> | boolean) => authCore({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuth(), proxy: { hops: 1 }, captcha: false, ...pages === undefined ? {} : { pages } })
 
   // What `features().pages` says once `prepare` handed the module's `auth` the extension's prefix and home, as kay does before it takes the plugin.
   async function adopted(options: Parameters<typeof auth>[0], pages: Record<string, unknown> | boolean | undefined) {
@@ -68,7 +68,7 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     expect(extension.serverModule?.export).toBe('auth')
   })
 
-  test('hands createAuth the prefix and home, as the pages extension gave them', async () => {
+  test('hands authCore the prefix and home, as the pages extension gave them', async () => {
     expect(await adopted({ prefix: '/account', home: '/dashboard' }, true)).toMatchObject({ prefix: '/account', home: '/dashboard' })
     expect(await adopted({}, true)).toMatchObject({ prefix: '/auth', home: '/' })
     expect(await adopted({ prefix: '/account' }, { home: '/dashboard' })).toMatchObject({ prefix: '/account', home: '/dashboard' })

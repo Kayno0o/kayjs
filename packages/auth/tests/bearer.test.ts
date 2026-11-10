@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -243,7 +243,7 @@ describe('issuing a token from the server', () => {
 describe('reading a token and its user', () => {
   // A store counting the reads a request makes for a token, with or without the joined read.
   function counting(joined: boolean) {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
     const calls = { digest: 0, joined: 0, user: 0 }
     const { findByDigestWithUser, ...bearerTokens } = store.bearerTokens
 
@@ -284,7 +284,7 @@ describe('reading a token and its user', () => {
   })
 })
 
-async function withTokenIn(store: ReturnType<typeof memoryAuthStore>) {
+async function withTokenIn(store: ReturnType<typeof memoryAuth>) {
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'], store })
   const ada = app.browser()
 

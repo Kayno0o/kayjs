@@ -215,6 +215,3 @@ function withPluginOwner<Auth extends { plugin: object }>(auth: Auth): Auth {
 
   return auth
 }
-
-/** @deprecated Renamed `authCore` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const createAuth = authCore

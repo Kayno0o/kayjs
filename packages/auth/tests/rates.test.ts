@@ -3,7 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { memoryRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
 import { TimeoutError } from '../../../src/server/pg-poll'
-import { DEFAULT_LIMITS, memoryAuthStore } from '../src'
+import { DEFAULT_LIMITS, memoryAuth } from '../src'
 import { log } from '../src/log'
 import { memoryAuthRates } from '../src/rates'
 import { testApp } from './helpers/app'
@@ -13,7 +13,7 @@ const WRONG = 'wrong password!'
 
 // A store keeping no counts of its own, as one an app writes over its tables.
 function withoutRates(): AuthStore {
-  return { ...memoryAuthStore(), rates: undefined }
+  return { ...memoryAuth(), rates: undefined }
 }
 
 async function signIn(browser: ReturnType<typeof testApp>['browser'], password: string): Promise<unknown> {
@@ -78,7 +78,7 @@ describe('where attempts are counted', () => {
 
     setupStore({ rates: shared })
 
-    const { browser } = await registered(memoryAuthStore())
+    const { browser } = await registered(memoryAuth())
 
     await signIn(browser, WRONG)
     expect(hit).not.toHaveBeenCalled()
@@ -115,7 +115,7 @@ describe('a rates store that fails', () => {
     const rejected = async () => Promise.reject(new Error('the database went away'))
 
     try {
-      const { browser } = await registered({ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } })
+      const { browser } = await registered({ ...memoryAuth(), rates: { hit: rejected, peek: rejected, reset: rejected } })
 
       await signIn(browser, WRONG)
       await signIn(browser, WRONG)

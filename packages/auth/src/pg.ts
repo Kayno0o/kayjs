@@ -697,6 +697,3 @@ function isEmpty(row: object): boolean {
 function withoutUndefined<T extends object>(row: T): { [Key in keyof T]: Exclude<T[Key], undefined> } {
   return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined)) as { [Key in keyof T]: Exclude<T[Key], undefined> }
 }
-
-/** @deprecated Renamed `pgAuth` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const pgStore = pgAuth

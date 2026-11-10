@@ -102,6 +102,3 @@ export function authGate<P, G extends string, S extends string = string>(deps: G
     return gated
   }
 }
-
-/** @deprecated Renamed `authGate` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const createGate = authGate

@@ -1,7 +1,7 @@
 import type { GateDeps } from '../src/gate'
 import { describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
-import { createGate } from '../src/gate'
+import { authGate } from '../src/gate'
 
 interface User { id: number }
 
@@ -15,7 +15,7 @@ const deps: GateDeps<User, string> = {
 
 function buildApp() {
   return new Elysia()
-    .use(createGate(deps))
+    .use(authGate(deps))
     .get('/default', () => 'ok')
     .get('/open', () => 'ok', { auth: false })
     .get('/custom', () => 'ok', { auth: (p: User | null) => p?.id === 2 })
@@ -25,7 +25,7 @@ function req(path: string, headers: Record<string, string> = {}) {
   return new Request(`http://localhost${path}`, { headers })
 }
 
-describe('createGate', () => {
+describe('authGate', () => {
   // One credential by route: no annotation falls back to defaultRequirement, `auth: false` opts out, a requirement overrides the default and answers a signed-in denial with 403 (principal is { id: 1 }, the requirement wants id 2).
   test.each([
     ['anonymous', {}, { '/default': 401, '/open': 200, '/custom': 401 }],
@@ -41,7 +41,7 @@ describe('createGate', () => {
   test('routes added through group, guard, route, all and a used plugin fall back to the default', async () => {
     const sub = new Elysia({ prefix: '/sub' }).get('/', () => 'ok')
     const app = new Elysia()
-      .use(createGate(deps))
+      .use(authGate(deps))
       .group('/g', g => g.get('/', () => 'ok').get('/open', () => 'ok', { auth: false }))
       .guard({}, g => g.get('/guard', () => 'ok'))
       .use(sub)
@@ -56,7 +56,7 @@ describe('createGate', () => {
   })
 
   test('a websocket route falls back to the default too, refusing the upgrade to an anonymous visitor', async () => {
-    const app = new Elysia().use(createGate(deps)).ws('/socket', { message: () => undefined }).listen(0)
+    const app = new Elysia().use(authGate(deps)).ws('/socket', { message: () => undefined }).listen(0)
     const upgrade = { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' }
     const status = async (headers: Record<string, string>) => (await fetch(`http://localhost:${app.server!.port}/socket`, { headers: { ...upgrade, ...headers } })).status
 
@@ -70,7 +70,7 @@ describe('createGate', () => {
 
   test('a route under two authed instances is authorized once', async () => {
     let calls = 0
-    const counting = createGate<User, string>({
+    const counting = authGate<User, string>({
       ...deps,
       authorize: async (principal, requirement) => {
         calls++
@@ -86,24 +86,24 @@ describe('createGate', () => {
   })
 
   test('a looser outer gate does not let a route through a stricter inner one', async () => {
-    const inner = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/admin', () => 'secret')
-    const app = new Elysia().use(createGate(deps)).use(inner)
+    const inner = new Elysia().use(authGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/admin', () => 'secret')
+    const app = new Elysia().use(authGate(deps)).use(inner)
 
     expect((await app.handle(req('/admin'))).status).toBe(401)
     expect((await app.handle(req('/admin', { authorization: 'Bearer good' }))).status).toBe(403)
   })
 
   test('a route asking less of its own gate still meets the stricter gate around it', async () => {
-    const inner = new Elysia().use(createGate(deps)).get('/loose', () => 'secret', { auth: (p: User | null) => p != null })
-    const app = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).use(inner)
+    const inner = new Elysia().use(authGate(deps)).get('/loose', () => 'secret', { auth: (p: User | null) => p != null })
+    const app = new Elysia().use(authGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).use(inner)
 
     expect((await app.handle(req('/loose'))).status).toBe(401)
     expect((await app.handle(req('/loose', { authorization: 'Bearer good' }))).status).toBe(403)
   })
 
   test('auth: false opens a route to its own gate only', async () => {
-    const inner = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/health', () => 'ok', { auth: false })
-    const app = new Elysia().use(createGate(deps)).use(inner)
+    const inner = new Elysia().use(authGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/health', () => 'ok', { auth: false })
+    const app = new Elysia().use(authGate(deps)).use(inner)
 
     expect((await app.handle(req('/health'))).status).toBe(401)
     expect((await app.handle(req('/health', { authorization: 'Bearer good' }))).status).toBe(200)
@@ -111,14 +111,14 @@ describe('createGate', () => {
 
   test('a route\'s scope binds its own gate only', async () => {
     const scoped: GateDeps<User, string> = { ...deps, scopes: async () => ['read'] }
-    const inner = new Elysia().use(createGate(scoped)).get('/read', () => 'ok', { scope: 'read' })
-    const app = new Elysia().use(createGate({ ...scoped, defaultScope: 'admin' })).use(inner)
+    const inner = new Elysia().use(authGate(scoped)).get('/read', () => 'ok', { scope: 'read' })
+    const app = new Elysia().use(authGate({ ...scoped, defaultScope: 'admin' })).use(inner)
 
     expect((await app.handle(req('/read', { authorization: 'Bearer good' }))).status).toBe(403)
   })
 
   test('a parent that uses an authed plugin keeps its own later routes as they were', async () => {
-    const authed = new Elysia().use(createGate(deps)).get('/authed', () => 'ok')
+    const authed = new Elysia().use(authGate(deps)).get('/authed', () => 'ok')
     const app = new Elysia().use(authed).get('/later', () => 'ok').use(new Elysia().get('/later-plugin', () => 'ok'))
 
     expect((await app.handle(req('/authed'))).status).toBe(401)
@@ -127,7 +127,7 @@ describe('createGate', () => {
   })
 
   test('an authed route file mounted in a group leaves a sibling plugin without auth open', async () => {
-    const authed = new Elysia().use(createGate(deps)).get('/', () => 'ok')
+    const authed = new Elysia().use(authGate(deps)).get('/', () => 'ok')
     const open = new Elysia().get('/', () => 'ok')
     const app = new Elysia()
       .group('/authed', a => a.use(authed))

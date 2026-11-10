@@ -1,6 +1,6 @@
 import type { Switches } from '../src/core'
 import { describe, expect, test } from 'bun:test'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { totpCode, totpStep } from '../src/totp'
 import { hasWayIn } from '../src/wayIn'
 import { testApp, userRecord } from './helpers/app'
@@ -72,7 +72,7 @@ describe('feature switches', () => {
   })
 
   test('twoFactor: false leaves a user who has it the sign-in code, their recovery codes and the way to turn it off', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
     const ada = testApp({ store }).browser()
 
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
@@ -96,7 +96,7 @@ describe('feature switches', () => {
   })
 
   test('a way in that is switched off is no way in when a user unlinks or revokes the last', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
     const identity = { provider: 'discord', providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() }
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date(), passwordHash: 'hash' }))

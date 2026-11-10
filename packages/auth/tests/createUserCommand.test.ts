@@ -9,16 +9,16 @@ import { parseArgs } from 'node:util'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { commandProject, configuredSite, libraryCommand, setSite } from 'kay/library'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
+import { authCore } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { auth as authFrom, LOAD_AUTH } from '../src/pages'
 import { SECRET } from './helpers/app'
 
 const FIXTURE = `${import.meta.dir}/fixture`
-const store = memoryAuthStore()
-const auth = createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store, roles: { admin: [] } })
-// An auth extension whose plugin carries the `createAuth` result a function builds, as the command reaches it.
+const store = memoryAuth()
+const auth = authCore({ sessions: session({ secret: SECRET }), secret: SECRET, store, roles: { admin: [] } })
+// An auth extension whose plugin carries the `authCore` result a function builds, as the command reaches it.
 const withAuth = (load: () => Promise<{ auth: { plugin: AnyElysia } }>) => authFrom({ server: async () => (await load()).auth.plugin })
 const CONFIG: KayConfig = { extensions: [withAuth(async () => ({ auth }))] }
 const PASSWORD = 'a long enough password'
@@ -66,7 +66,7 @@ describe('the command is reached from the extension', () => {
     expect(found).toBe((await import('./fixture/src/auth')).auth)
   })
 
-  test('a plugin that is not a createAuth result is told', async () => {
+  test('a plugin that is not a authCore result is told', async () => {
     const lone = authFrom({ server: () => ({}) as never })
     const [symbol] = Object.getOwnPropertySymbols(lone)
 
@@ -308,7 +308,7 @@ describe('the command in production', () => {
     setSite(undefined)
 
     try {
-      const config: KayConfig = { site: 'https://auth.example.test', extensions: [withAuth(async () => ({ auth: createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), forwardAuth: 'example.test' }) }))] }
+      const config: KayConfig = { site: 'https://auth.example.test', extensions: [withAuth(async () => ({ auth: authCore({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuth(), forwardAuth: 'example.test' }) }))] }
 
       expect(await run(['prod@example.com'], PASSWORD, config)).toMatchObject({ code: 0 })
     }

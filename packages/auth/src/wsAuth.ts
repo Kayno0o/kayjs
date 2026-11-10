@@ -51,6 +51,3 @@ export function wsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | nu
     forget: (ws: Ws) => authed.delete(String(ws.id)),
   }
 }
-
-/** @deprecated Renamed `wsAuthStore` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const createWsAuthStore = wsAuthStore

@@ -6,7 +6,7 @@ import { documentUrl, fetchPublicDocument, plainName } from '../src/authorize/cl
 import { underResource } from '../src/authorize/resource'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
 import { digest } from '../src/keys'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { auth } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
 
@@ -633,7 +633,7 @@ describe('clients nobody approved', () => {
   })
 
   test('the memory store is the one tested', () => {
-    expect(memoryAuthStore().oauth).toBeDefined()
+    expect(memoryAuth().oauth).toBeDefined()
   })
 })
 

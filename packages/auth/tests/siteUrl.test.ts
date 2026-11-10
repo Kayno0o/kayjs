@@ -3,8 +3,8 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from 'kay/library'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
-import { memoryAuthStore } from '../src/memoryStore'
+import { authCore } from '../src/auth'
+import { memoryAuth } from '../src/memoryStore'
 import { discordProvider } from '../src/oauth/providers'
 import { SECRET, testApp } from './helpers/app'
 import { mailbox } from './helpers/mail'
@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 describe('the site\'s origin kayjs-auth builds URLs on', () => {
-  test('is the site of kay.config.ts when createAuth gets no site', async () => {
+  test('is the site of kay.config.ts when authCore gets no site', async () => {
     setSite('https://app.example.com')
 
     const response = await testApp({ oauth: OAUTH }).browser().fetch('/auth/discord')
@@ -64,7 +64,7 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
   })
 
   test('refuses to start a server when OAuth or mail has no origin from anywhere, naming where it goes', () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), oauth: OAUTH })
+    const auth = authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuth(), oauth: OAUTH })
 
     expect(() => new Elysia().use(auth.plugin).listen(0)).toThrow('SITE_URL')
   })
@@ -74,7 +74,7 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
   })
 
   test('keeps the objects it built with no origin, and builds them again once the site is known', async () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuthStore() })
+    const auth = authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, store: memoryAuth() })
     const app = new Elysia().use(auth.plugin).get('/core', ({ auth }) => {
       const state = Object.getOwnPropertySymbols(auth).find(symbol => symbol.description === 'kayjs-auth.state')!
       const { core } = (auth as unknown as Record<symbol, { core: { refreshers: unknown, oauth: unknown, name: string, passkeys: unknown } }>)[state]!

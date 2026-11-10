@@ -2,7 +2,7 @@ import type { User } from '../src/auth'
 import type { AuthEventInfo } from '../src/events'
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { PRUNE_EVERY_MS } from '../src/prune'
 import { testApp, userRecord } from './helpers/app'
 
@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 async function setup(options: { store?: AuthStore, onDelete?: (user: User) => void | Promise<void>, beforeDelete?: (user: User) => false | undefined } = {}) {
-  const store = options.store ?? memoryAuthStore()
+  const store = options.store ?? memoryAuth()
   const deleted: string[] = []
   const heard: AuthEventInfo[] = []
   const app = testApp({
@@ -129,7 +129,7 @@ describe('pruning guests', () => {
   })
 
   test('guests are deleted after 30 days without the option', async () => {
-    const store = memoryAuthStore()
+    const store = memoryAuth()
     const { browser, pruned } = testApp({ store })
     const start = Date.now()
 
@@ -144,7 +144,7 @@ describe('pruning guests', () => {
   })
 
   test('a store that lists no stale guests keeps them', async () => {
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store: AuthStore = { ...base, users: { ...base.users } }
 
     delete store.users.staleGuests

@@ -1,5 +1,5 @@
 import { Database } from '@kaynooo/pg-orm'
-import { authTables, pgStore } from '../../src/pg'
+import { authTables, pgAuth } from '../../src/pg'
 import { userRecord } from './app'
 
 // A process writing users into a shared SQLite file: `writeUsers.ts <file> <prefix> <count>`.
@@ -8,7 +8,7 @@ const db = new Database({ url: `sqlite://${file}`, tables: [...authTables] })
 
 await db.sync()
 
-const store = pgStore(db)
+const store = pgAuth(db)
 
 for (let index = 0; index < Number(count); index++)
   await store.users.create(userRecord({ id: `${prefix}${index}`, email: `${prefix}${index}@example.com` }))

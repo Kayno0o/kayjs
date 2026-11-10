@@ -1,6 +1,6 @@
 import { Database } from '@kaynooo/pg-orm'
 import { afterAll, expect, test } from 'bun:test'
-import { authTables, pgStore } from '../src/pg'
+import { authTables, pgAuth } from '../src/pg'
 import { userRecord } from './helpers/app'
 import { signInAsContract } from './helpers/signInAsContract'
 import { storeContract } from './helpers/storeContract'
@@ -15,27 +15,27 @@ afterAll(async () => {
 })
 
 if (reachable) {
-  const store = () => pgStore(db)
+  const store = () => pgAuth(db)
 
   await db.sync({ allowDestructive: true })
 
-  storeContract('pgStore', async () => {
+  storeContract('pgAuth', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
-    return pgStore(db)
+    return pgAuth(db)
   })
 
-  signInAsContract('pgStore', async () => {
+  signInAsContract('pgAuth', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
-    return pgStore(db)
+    return pgAuth(db)
   })
 
   // Rows written before the resource columns existed have them null, and read back as unbound.
-  test('pgStore reads rows stored before the resource columns as unbound', async () => {
+  test('pgAuth reads rows stored before the resource columns as unbound', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
-    const store = pgStore(db)
+    const store = pgAuth(db)
 
     await store.users.create(userRecord({ id: 'u1' }))
     await db.raw(`INSERT INTO "kay_oauth_codes" ("digest", "user_id", "client_id", "redirect_uri", "challenge", "family", "created_at", "expires_at") VALUES ('legacy-code', 'u1', 'c1', 'http://127.0.0.1/cb', 'x', 'f1', now(), now() + interval '1 hour')`, [])
@@ -51,7 +51,7 @@ if (reachable) {
   })
 
   // A table made before users kept app data gains the column on sync, its rows reading as empty.
-  test('pgStore adds the data column to an older users table and reads its rows as empty', async () => {
+  test('pgAuth adds the data column to an older users table and reads its rows as empty', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
     await store().users.create(userRecord({ id: 'u1' }))
     await db.raw('ALTER TABLE "kay_users" DROP COLUMN "data"', [])
@@ -67,11 +67,11 @@ if (reachable) {
   })
 
   // An app whose migrations predate the OAuth server: its sign-in, magic-link and reset flows revoke bearer tokens and prune, and must not fail on the missing tables.
-  test('pgStore skips the OAuth tables an older schema lacks', async () => {
+  test('pgAuth skips the OAuth tables an older schema lacks', async () => {
     await db.raw('DROP TABLE IF EXISTS "kay_oauth_refresh_tokens", "kay_oauth_codes", "kay_oauth_grants", "kay_oauth_clients" CASCADE', [])
 
     try {
-      const store = pgStore(db)
+      const store = pgAuth(db)
 
       await store.oauth!.refresh.erase('u1')
       await store.prune!({ now: new Date(), bearerExpiredBefore: new Date(), sessionMaxAge: '60s', sessionAbsoluteMaxAge: '60s' })
@@ -82,8 +82,8 @@ if (reachable) {
   })
 }
 else if (process.env.KAYJS_AUTH_REQUIRE_DATABASE !== undefined && process.env.KAYJS_AUTH_REQUIRE_DATABASE !== '') {
-  throw new Error(`pgStore: no Postgres at ${URL}, and KAYJS_AUTH_REQUIRE_DATABASE forbids skipping its tests`)
+  throw new Error(`pgAuth: no Postgres at ${URL}, and KAYJS_AUTH_REQUIRE_DATABASE forbids skipping its tests`)
 }
 else {
-  console.warn(`pgStore: skipped, no Postgres at ${URL}; start one with \`docker compose up -d\``)
+  console.warn(`pgAuth: skipped, no Postgres at ${URL}; start one with \`docker compose up -d\``)
 }

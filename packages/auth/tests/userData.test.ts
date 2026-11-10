@@ -3,8 +3,8 @@ import { afterEach, describe, expect, expectTypeOf, spyOn, test } from 'bun:test
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
-import { memoryAuthStore } from '../src/memoryStore'
+import { authCore } from '../src/auth'
+import { memoryAuth } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { untilHolds } from './helpers/until'
@@ -323,7 +323,7 @@ describe('app data and provider ids on the user', () => {
 
   // Checked by `bun run check`: the schema types `data`.
   test('the schema types the user\'s data', () => {
-    const auth = createAuth({ sessions: session<AuthSessionData>({ secret: SECRET }), store: memoryAuthStore(), user: schema, profileFields: ({ profile }) => ({ avatar: profile.avatar ?? undefined }) })
+    const auth = authCore({ sessions: session<AuthSessionData>({ secret: SECRET }), store: memoryAuth(), user: schema, profileFields: ({ profile }) => ({ avatar: profile.avatar ?? undefined }) })
 
     new Elysia().use(auth.plugin).get('/', async ({ auth }) => {
       const user = await auth.user()

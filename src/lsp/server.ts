@@ -45,7 +45,7 @@ const KAY_FILE = /^file:.*\.kay$/
 // The one TypeScript file the server completes besides the components: where an app restyles them.
 const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
 const SCRIPT_FILE = /\.(?:[cm]?ts|tsx)$/
-const AUTH_CORE = /\b(?:authCore|createAuth)\b/
+const AUTH_CORE = /\bauthCore\b/
 const FULL_SYNC = 1
 const CREATED = 1
 const CHANGED = 2

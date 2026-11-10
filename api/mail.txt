@@ -657,17 +657,11 @@ component default
 [./pg] createMailListTables
 function createMailListTables(source: PgSource): Promise<void>
 
-[./pg] createMailSuppressionTable
-function createMailSuppressionTable(source: PgSource): Promise<void>
-
 [./pg] createMailSuppressionTables
 function createMailSuppressionTables(source: PgSource): Promise<void>
 
 [./pg] mailListTableNames
 const mailListTableNames: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
-
-[./pg] mailListTables
-const mailListTables: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
 
 [./pg] pgLists
 function pgLists(source: PgSource): ListStore & { close: () => Promise<void>; }

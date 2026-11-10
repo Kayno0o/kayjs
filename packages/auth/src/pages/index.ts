@@ -242,8 +242,6 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   pages?: boolean | undefined
   // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `SignedOut`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
   viewer?: boolean | undefined
-  /** @deprecated Named `server: false` since 1.91, as kayjs-mail's escape is; the old name works until 1.94, and `kay upgrade` renames it. */
-  plugin?: false | undefined
 }
 
 // The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
@@ -254,7 +252,7 @@ function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHa
   return exported as { [PAGES_OF]?: PagesHandle | undefined }
 }
 
-const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, plugin: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, onDelete: true, beforeDelete: true, guests: true, exportData: true, onAuthEvent: true, onEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true }
+const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, onDelete: true, beforeDelete: true, guests: true, exportData: true, onAuthEvent: true, onEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true }
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `authCore`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `authCore({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
 export function auth<Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData>): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>
@@ -264,10 +262,7 @@ export function auth(options: object = {}): AuthPages {
 
   const given = options as AuthExtensionOptions
 
-  if (given.module === undefined && given.server === undefined && given.plugin !== false)
-    return ownAuth(options)
-
-  return moduleAuth(given)
+  return given.module === undefined && given.server === undefined ? ownAuth(options) : moduleAuth(given)
 }
 
 // `auth()` with no module: kayjs-auth builds the whole `authCore` as the server starts, so kay.config.ts declares everything and no file of the app is needed.

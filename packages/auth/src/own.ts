@@ -53,7 +53,6 @@ type Inherited = 'sessions' | 'store' | 'oauth' | 'pages' | 'prefix' | 'email'
 export interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions {
   module?: undefined
   server?: undefined
-  plugin?: undefined
   // Where the OAuth and page routes live, `/auth` by default.
   prefix?: Prefix | undefined
   // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`). Left out they are served.

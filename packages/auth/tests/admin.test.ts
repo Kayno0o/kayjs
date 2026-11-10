@@ -3,7 +3,7 @@ import type { AuthEvent, AuthEventInfo } from '../src/events'
 import type { AuthMailMessage as Mail } from '../src/mail'
 import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -239,7 +239,7 @@ describe('admin', () => {
   })
 
   test('an admin\'s deletion whose after-delete step throws still hands the organization over and strips the audit log', async () => {
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     let strips = 0
     const store: AuthStore = { ...base, audit: { ...base.audit!, erase: async (userId, pseudonym) => {
       strips++

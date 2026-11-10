@@ -731,15 +731,6 @@ export const LINTS = {
     wrong: '// src/jobs.ts, imported by no plugin\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)',
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
-  'deprecated-escape-option': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.91',
-    site: true,
-    summary: 'The escape of kayjs-auth\'s `auth()` under its name before 1.91: `plugin: false`, which builds no plugin for an app mounting it by hand, is `server: false` now, the escape `mail({ server: false })` takes too. The old name works until 1.94. Found in the options object written out at a call of `auth` read from `@kaynooo/kayjs-auth`; the fix renames the key, and a `server` set beside it is reported with no fix.',
-    wrong: 'auth({ plugin: false })',
-    right: 'auth({ server: false })',
-  },
   'deprecated-menu-danger': {
     level: 'warn',
     group: 'deprecated',
@@ -755,15 +746,6 @@ export const LINTS = {
     summary: 'A kayjs-ui IconPicker `search`, which is a function `icons` since 1.92: `icons` takes a set, a promise of one or a function handed `{ q, limit, offset }`, the one source every choice control takes. The old prop works until 1.95. The fix writes `icons={({ q, limit, offset }) => (search)(q, limit, offset)}`; a search function declaring fewer than three parameters then needs the extra arguments dropped from the call, or `kay check` reports a type error; an IconPicker that already names `icons` is reported with no fix.',
     wrong: '---\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport { findIcons } from \'./icons\'\n---\nIconPicker(search={findIcons})',
     right: '---\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport { findIcons } from \'./icons\'\n---\nIconPicker(icons={({ q, limit, offset }) => (findIcons)(q, limit, offset)})',
-  },
-  'deprecated-library-names': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.91',
-    site: true,
-    summary: 'An import of an export under the name it had before 1.91, when the libraries\' constructors became nouns and every Postgres helper took one `PgSource`: kayjs-auth\'s `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms\'s `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`; kayjs-mail\'s `createMailSuppressionTable` and `mailListTables` from `/pg` are `createMailSuppressionTables` and `mailListTableNames`; `PgJobsSource` of `kay/server` is `PgSource`. The `sql` key of a `pgLoader({ ... })` literal is `source`. The old names work until 1.94. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it, or the key. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix, as is a `sql` written beside a `source` or a spread. A re-export keeps its public name (`export { createAuth } from \'pkg\'` becomes `export { authCore as createAuth } from \'pkg\'`); `import(\'pkg\').X` is renamed with a safe fix, and a namespace use is not found.',
-    wrong: '--- server\nimport { createGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = createGate\n---\np x',
-    right: '--- server\nimport { authGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = authGate\n---\np x',
   },
   'deprecated-stream-types': {
     level: 'warn',
@@ -886,7 +868,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.88', removedIn: '1.92' },
   { since: '1.89', removedIn: '1.93' },
   { since: '1.90', removedIn: '1.94' },
-  { since: '1.91' },
+  { since: '1.91', removedIn: '1.95' },
   { since: '1.92' },
 ]
 

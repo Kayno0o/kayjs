@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto'
 import { describe, expect, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
+import { authCore } from '../src/auth'
 import { log } from '../src/log'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { auth as authPages } from '../src/pages'
 import { totpCode, totpStep } from '../src/totp'
 import { SECRET, testApp } from './helpers/app'
@@ -356,7 +356,7 @@ describe('twoFactor.require in OAuth consent', () => {
 })
 
 describe('the boot warning', () => {
-  const make = (twoFactor?: false | { require: 'admin'[] }) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), roles: { admin: [] }, admin: 'admin', ...twoFactor === undefined ? {} : { twoFactor } })
+  const make = (twoFactor?: false | { require: 'admin'[] }) => authCore({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuth(), roles: { admin: [] }, admin: 'admin', ...twoFactor === undefined ? {} : { twoFactor } })
   const told = (warned: { mock: { calls: unknown[][] } }) => warned.mock.calls.filter(([message]) => String(message).includes('twoFactor.require')).length
 
   test('warns in production when admin is on and no requirement names it', () => {

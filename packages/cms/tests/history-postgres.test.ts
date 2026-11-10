@@ -29,7 +29,7 @@ if (admin !== undefined) {
 
 function notes(): void {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
-  restore = registerCollections([['notes', collection(pgLoader({ name: 'notes', sql: shared, table: `notes_${++count}` }), { schema })]])
+  restore = registerCollections([['notes', collection(pgLoader({ name: 'notes', source: shared, table: `notes_${++count}` }), { schema })]])
 }
 
 beforeEach(() => {

@@ -3187,9 +3187,6 @@ function pgData(source: PgSource): {
 [./server] pgJobs
 function pgJobs(source: PgSource): JobStore
 
-[./server] PgJobsSource
-type PgJobsSource = PgSource
-
 [./server] PgSource
 type PgSource = SQL | { sql: SQL } | string
 

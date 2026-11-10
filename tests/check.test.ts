@@ -5043,9 +5043,9 @@ describe('kay check, missing-captcha', () => {
 
   it('is reported in a page, and quiet project-wide once any module creates an auth with captcha: false', async () => {
     expect(await found({})).toBe(1)
-    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: false })\n' })).toBe(0)
-    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: proofOfWork() })\n' })).toBe(1)
-    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: false })\n' }, { lints: { 'missing-captcha': 'warn' } })).toBe(1)
+    expect(await found({ 'src/auth.ts': 'export const auth = authCore({ captcha: false })\n' })).toBe(0)
+    expect(await found({ 'src/auth.ts': 'export const auth = authCore({ captcha: proofOfWork() })\n' })).toBe(1)
+    expect(await found({ 'src/auth.ts': 'export const auth = authCore({ captcha: false })\n' }, { lints: { 'missing-captcha': 'warn' } })).toBe(1)
   })
 })
 

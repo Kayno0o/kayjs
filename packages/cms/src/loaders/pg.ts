@@ -9,8 +9,6 @@ export type { CmsSeedEntry, LoaderOptions }
 export interface PgLoaderOptions extends LoaderOptions {
   // A connection URL, the Bun `SQL` the app already has or a pg-orm `Database`, as `pgData` takes it. The app's `store: pgData(url)` when left out.
   source?: PgSource | undefined
-  /** @deprecated Renamed `source` in 1.91, as every Postgres store takes its database under that name; the old key works until 1.94. */
-  sql?: PgSource | undefined
 }
 
 // Any statement runner of Bun's SQL: the client, or a transaction's.
@@ -45,7 +43,7 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
   // The rows' count and the sum of the transactions that wrote them move with an insert, an update and a delete, whoever made them, but also with a `VACUUM FREEZE` or any rewrite of the rows that changed nothing; so the rows are read and hashed only when it moves, and what is reported is that hash.
   let moved: string | undefined
   let fingerprint = ''
-  const given = options.source ?? options.sql
+  const given = options.source
   const sqlOf = () => given ?? contentSource()
   const watching = watcher(name, `${scopeOf(given === undefined || typeof given === 'string' ? given ?? 'the app\'s store' : clientOf(given))}/${table}`, options.watch, '2s', async (force) => {
     const client = clientOf(sqlOf())

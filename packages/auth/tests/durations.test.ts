@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { testApp } from './helpers/app'
 import { untilHolds } from './helpers/until'
 
@@ -35,7 +35,7 @@ describe('time options take a Duration', () => {
 
   test('a sub-second guests.maxAge is read as whole seconds, rounded up', async () => {
     const cutoffs: Date[] = []
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store = { ...base, users: { ...base.users, staleGuests: async (createdBefore: Date, limit: number) => {
       cutoffs.push(createdBefore)
 
@@ -53,7 +53,7 @@ describe('time options take a Duration', () => {
 
   test('a sub-second audit.maxAge is read as whole seconds, rounded up', async () => {
     const cutoffs: Date[] = []
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store = { ...base, audit: { ...base.audit!, prune: async (before: Date) => {
       cutoffs.push(before)
 
@@ -84,7 +84,7 @@ describe('time options take a Duration', () => {
 
   test('a limit window takes a string, handed to the store in milliseconds, and a bad one names its limit', async () => {
     const windows: number[] = []
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
       windows.push(window)
 
@@ -99,7 +99,7 @@ describe('time options take a Duration', () => {
 
   test('rateLimit windows reach the store in milliseconds', async () => {
     const windows: number[] = []
-    const base = memoryAuthStore()
+    const base = memoryAuth()
     const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
       windows.push(window)
 

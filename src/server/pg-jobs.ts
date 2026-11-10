@@ -20,9 +20,6 @@ type PgStateRow = PgJobRow & { failed: boolean, held: boolean }
 // Whatever holds a Bun SQL on Postgres: the `SQL` itself, a pg-orm `Database` (its `sql`), or a connection URL.
 export type PgSource = SQL | { sql: SQL } | string
 
-/** @deprecated Renamed `PgSource` in 1.91, as every Postgres store and table helper of kay and its libraries takes it, not the jobs alone; the old name works until 1.94. */
-export type PgJobsSource = PgSource
-
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_jobs'
 const INDEX_LOCK = 'kay_indexes'

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
-import { createWsAuthStore } from '../src/wsAuth'
+import { wsAuthStore } from '../src/wsAuth'
 import { testApp, userRecord } from './helpers/app'
 
 afterEach(() => {
@@ -12,7 +12,7 @@ function later(): void {
   setSystemTime(new Date(Date.now() + 31 * 1000))
 }
 
-describe('createWsAuthStore', () => {
+describe('wsAuthStore', () => {
   const ws = (id: string) => {
     const sent: string[] = []
 
@@ -20,7 +20,7 @@ describe('createWsAuthStore', () => {
   }
 
   test('stores the verified value per connection and acks', async () => {
-    const store = createWsAuthStore<{ userId: number }>(async token => token === 'good' ? { userId: 1 } : null)
+    const store = wsAuthStore<{ userId: number }>(async token => token === 'good' ? { userId: 1 } : null)
     const a = ws('c1')
 
     await store.handleAuth(a.ws, 'good')
@@ -30,7 +30,7 @@ describe('createWsAuthStore', () => {
   })
 
   test('a rejected token stores nothing and sends no ack', async () => {
-    const store = createWsAuthStore<{ userId: number }>(async () => null)
+    const store = wsAuthStore<{ userId: number }>(async () => null)
     const a = ws('c2')
 
     await store.handleAuth(a.ws, 'bad')
@@ -40,7 +40,7 @@ describe('createWsAuthStore', () => {
   })
 
   test('forget drops the stored value', async () => {
-    const store = createWsAuthStore<number>(async () => 7)
+    const store = wsAuthStore<number>(async () => 7)
     const a = ws('c3')
 
     await store.handleAuth(a.ws, 't')
@@ -53,7 +53,7 @@ describe('createWsAuthStore', () => {
   test('checks the token again past 30 seconds, closing the socket once it is refused', async () => {
     let valid = true
     let closed = 0
-    const store = createWsAuthStore<number>(async () => valid ? 7 : null)
+    const store = wsAuthStore<number>(async () => valid ? 7 : null)
     const a = { id: 'c4', send: () => undefined, close: () => void closed++ }
 
     await store.handleAuth(a, 't')

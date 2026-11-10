@@ -338,7 +338,6 @@ interface AuthExtensionOptions extends AuthPagesOptions
   home?: string | undefined
   module?: string | undefined
   pages?: boolean | undefined
-  plugin?: false | undefined
   prefix?: string | undefined
   server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
   viewer?: boolean | undefined
@@ -787,133 +786,10 @@ interface ConsentFields
   scope: string
   state: string
 
-[.] createAuth
-function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): {
-  admin: {
-    createUser(input: Omit<CreateUserInput, "roles"> & {
-      roles?: Role[] | undefined;
-    }): Promise<CreateUserResult>;
-  };
-  issueToken(userId: string, label: string, tokenOptions?: TokenOptions<Scope> & {
-    token?: string | undefined;
-  }): Promise<IssueTokenResult>;
-  userFromToken(token: string, url?: string | undefined): Promise<User<Record<string, unknown>> | null>;
-  gate(gateOptions?: {
-    require?: AuthRequirement<Role>;
-    scope?: ScopeRequirement<Scope>;
-  }): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => Elysia<Base, {
-    decorator: Single["decorator"] & {};
-    store: {
-      [K in keyof (Single["store"] & {})]: (Single["store"] & {})[K];
-    };
-    derive: Single["derive"] & {
-      readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-    };
-    resolve: Single["resolve"] & {};
-  }, Defs & {
-    typebox: {};
-    error: {};
-  }, {
-    schema: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {};
-      parser: {};
-      response: {} & ExtractErrorFromHandle<{
-        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-      }>;
-    })["schema"];
-    standaloneSchema: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {};
-      parser: {};
-      response: {} & ExtractErrorFromHandle<{
-        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-      }>;
-    })["standaloneSchema"];
-    macro: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {};
-      parser: {};
-      response: {} & ExtractErrorFromHandle<{
-        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-      }>;
-    })["macro"] & Partial<{
-      readonly auth: Requirement<BareUser<Record<string, unknown>>, Role> | false | undefined;
-      readonly scope: ScopeRequirement<Scope> | undefined;
-    }>;
-    macroFn: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {};
-      parser: {};
-      response: {} & ExtractErrorFromHandle<{
-        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-      }>;
-    })["macroFn"] & {
-      readonly auth: (requirement: Requirement<BareUser<Record<string, unknown>>, Role> | false | undefined) => {
-        readonly transform: (ctx: object) => void;
-      };
-      readonly scope: (scope: ScopeRequirement<Scope> | undefined) => {
-        readonly transform: (ctx: object) => void;
-      };
-    };
-    parser: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {}; ...#3b849fac (3887 lines)
-  guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
-  test: (site: OAuthSite) => { ...#d43a5614 (9 lines)
-  sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
-  signInAs(site: { ...#730c06b7 (3 lines)
-  enrollTotp(userId: string): Promise<TotpEnrolment>;
-  oauth(site: OAuthSite): OAuthTest;
-  signOut(site: { ...#2b384ff2 (3 lines)
-  [PAGES_OF]: PagesHandle | undefined;
-  [CHECK_USER]: (input: CreateUserInput) => Promise<RegisterErrors>;
-  plugin: Elysia<"", { ...#8cb7e894 (1964 lines)
-  hasRole: (required: Role) => Predicate<BareUser<Record<string, unknown>>>;
-  isGranted: (role: Role, user: BareUser<Record<string, unknown>>) => boolean;
-  memberOf: (role?: OrgRole | undefined, memberOptions?: { ...#6ade75cc (3 lines)
-  socketUser: (ws: { ...#7266a8b7 (5 lines)
-
-[.] createGate
-function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => Elysia<Base, Single, Defs, {
-  schema: Meta["schema"];
-  standaloneSchema: Meta["standaloneSchema"];
-  macro: Meta["macro"] & Partial<{
-    readonly auth: Requirement<P, G> | false | undefined;
-    readonly scope: ScopeRequirement<S> | undefined;
-  }>;
-  macroFn: Meta["macroFn"] & {
-    readonly auth: (requirement: Requirement<P, G> | false | undefined) => {
-      readonly transform: (ctx: object) => void;
-    };
-    readonly scope: (scope: ScopeRequirement<S> | undefined) => {
-      readonly transform: (ctx: object) => void;
-    };
-  };
-  parser: Meta["parser"];
-  response: Meta["response"];
-}, Routes, Eph, Vol>
-
 [.] CreateOrganizationResult
 type CreateOrganizationResult<Role extends string = string> = {
   ok: true, membership: Membership<Role>
 } | AuthFailed<'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>
-
-[.] createRoleHierarchy
-function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): {
-  isGranted: (role: string, userRoles: string[]) => boolean;
-  hasRole: (required: R) => Predicate<P>;
-}
 
 [.] CreateTokenResult
 type CreateTokenResult = { ok: true, token: string, id: string } | AuthFailed<ProofFailure | TokenProblem>
@@ -929,13 +805,6 @@ interface CreateUserInput
 
 [.] CreateUserResult
 type CreateUserResult = { ok: true, user: BareUser } | AuthRejected<RegisterErrors>
-
-[.] createWsAuthStore
-function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T | null): {
-  handleAuth(ws: Ws, token: string): Promise<void>;
-  get(ws: Ws): Promise<T | undefined>;
-  forget: (ws: Ws) => boolean;
-}
 
 [.] DataExport
 interface DataExport
@@ -1320,9 +1189,6 @@ interface Membership<Role extends string = string>
 [.] memoryAuth
 function memoryAuth(): AuthStore
 
-[.] memoryAuthStore
-function memoryAuthStore(): AuthStore
-
 [.] microsoftProvider
 function microsoftProvider(opts?: OpenIdOptions & { tenant?: string; }): OAuthProvider<OpenIdClaims & { tid?: string; xms_edov?: boolean | number | string; }, OAuthUser>
 
@@ -1532,7 +1398,6 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | false | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
   password?: false | undefined
-  plugin?: undefined
   prefix?: Prefix | undefined
   profileFields?: ((event: {
   user: User<UserData>;
@@ -2369,9 +2234,6 @@ const AuthUsers: TableDef<"kay_users", ExtractColumns<{
 
 [./pg] pgAuth
 function pgAuth(db: Database): AuthStore
-
-[./pg] pgStore
-function pgStore(db: Database): AuthStore
 
 [./rules] CredentialRules
 interface CredentialRules

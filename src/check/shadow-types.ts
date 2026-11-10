@@ -31,7 +31,7 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
-import { deprecatedEscapeOption } from './deprecated-escape-option'
+
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
@@ -40,7 +40,7 @@ import { unguardedRoutes, unguardedTools } from './guards'
 import { hookNames } from './hook-names'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
-import { libraryNames, pgLoaderSource } from './library-names'
+
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
@@ -145,10 +145,9 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-  async ({ root, options }) => libraryNames(root, options),
-  async ({ root, options }) => pgLoaderSource(root, options),
+
   async ({ root, options }) => hookDispatch(root, options),
-  async ({ root, options }) => deprecatedEscapeOption(root, options),
+
   async ({ root, options }) => streamTypes(root, options),
   async ({ root, options }) => streamOn(root, options),
   async ({ root, options }) => streamOpen(root, options),

@@ -5,11 +5,11 @@ import { testSite } from 'kay/test'
 const ROOT = join(import.meta.dir, '..')
 const PAGES = join(ROOT, '..', '..', 'src', 'pages', 'routes')
 const PASSWORD = 'correct horse battery'
-// Where the pages are served: the fixture's kay.config.ts gives `authPages` a prefix through the environment, and its `createAuth` none.
+// Where the pages are served: the fixture's kay.config.ts gives `authPages` a prefix through the environment, and its `authCore` none.
 const PAGES_AT = process.env.FIXTURE_PREFIX ?? '/auth'
 
 const site = await testSite({ root: ROOT, ...process.env.FIXTURE_BASE && { base: process.env.FIXTURE_BASE } })
-// After the site loads, so `authPages` hands the fixture's `createAuth` its prefix.
+// After the site loads, so `authPages` hands the fixture's `authCore` its prefix.
 const { mails, store } = await import('../src/auth')
 
 const { password } = await import(join(PAGES, 'sign-in.kay'))

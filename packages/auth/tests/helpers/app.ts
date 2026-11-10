@@ -5,8 +5,8 @@ import { Elysia } from 'elysia'
 import { drainQueues, userOf } from 'kay/library'
 import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
-import { createAuth } from '../../src/auth'
-import { memoryAuthStore } from '../../src/memoryStore'
+import { authCore } from '../../src/auth'
+import { memoryAuth } from '../../src/memoryStore'
 
 export const SECRET = 'a-test-secret-that-is-long-enough-for-kayjs-auth'
 
@@ -35,7 +35,7 @@ export function userRecord(fields: Partial<UserRecord> & Pick<UserRecord, 'id'>)
 
 // A store numbering its users itself, as one over a serial id column does: the id kayjs-auth picks is dropped.
 export function serialStore(): AuthStore {
-  const store = memoryAuthStore()
+  const store = memoryAuth()
   let last = 0
 
   return {
@@ -55,10 +55,10 @@ export function serialStore(): AuthStore {
 
 // An Elysia app on kayjs-auth with routes to drive it, and a browser per call that keeps its own cookies.
 export function testApp<const Scope extends string = never, OrgRole extends string = never>(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>, 'store'>> & { store?: AuthStore } = {}) {
-  const store = options.store ?? memoryAuthStore()
+  const store = options.store ?? memoryAuth()
   // The default proof of work stays off unless a test gives `captcha`, `undefined` included, as a script calling the API sends no solution.
   const captcha = 'captcha' in options ? options.captcha : false
-  const auth = createAuth<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, proxy: { hops: 1 }, ...options, captcha, store })
+  const auth = authCore<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, proxy: { hops: 1 }, ...options, captcha, store })
   const app = new Elysia()
     .use(auth.plugin)
     .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')

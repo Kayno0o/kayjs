@@ -419,6 +419,3 @@ export function cmsEntryForm({ prefix, collection, entry, locale, copy, source, 
     reset: () => drafts.reset(ref),
   }
 }
-
-/** @deprecated Renamed `cmsEntryForm` in 1.91, as a constructor is a noun; the old name works until 1.94. */
-export const createEntryForm = cmsEntryForm

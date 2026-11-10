@@ -597,6 +597,3 @@ function oldestFirst<T extends { createdAt: Date }>(records: T[]): T[] {
 function clone<T extends object>(value: T | undefined): T | undefined {
   return value && { ...value }
 }
-
-/** @deprecated Renamed `memoryAuth` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const memoryAuthStore = memoryAuth

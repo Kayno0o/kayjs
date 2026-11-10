@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { appModules, setSite } from 'kay/library'
-import { memoryAuthStore } from '../src/memoryStore'
+import { memoryAuth } from '../src/memoryStore'
 import { emailOf, MAIL_EXTENSION } from '../src/own'
 import { auth, LOAD_AUTH } from '../src/pages'
 
@@ -44,7 +44,7 @@ async function boot(extension: KayExtension, at = root, extensions: string[] = [
 
 // The app an `auth()` with no module serves, the way kay's `pages()` mounts its server.
 async function served(options: Options, extensions: string[] = []) {
-  const extension = auth({ captcha: false, store: memoryAuthStore(), ...options })
+  const extension = auth({ captcha: false, store: memoryAuth(), ...options })
   const plugin = await boot(extension, root, extensions)
 
   const app = new Elysia()
@@ -88,7 +88,7 @@ describe('auth() with no module', () => {
     expect(await features()).toMatchObject({ pages: null })
   })
 
-  test('server: false builds none, for an app mounting it by hand, as plugin: false did', () => {
+  test('server: false builds none, for an app mounting it by hand', () => {
     const extension = auth({ server: false })
 
     expect(extension.server).toBeUndefined()
@@ -97,11 +97,8 @@ describe('auth() with no module', () => {
     expect(() => auth({ server: false, module: './src/auth' })).toThrow('not both')
   })
 
-  test('plugin: false builds none, for an app mounting it by hand', () => {
-    const extension = auth({ plugin: false })
-
-    expect(extension.server).toBeUndefined()
-    expect(extension.routes).toBeDefined()
+  test('plugin is no longer an option', () => {
+    expect(() => auth({ plugin: false } as never)).toThrow('plugin')
   })
 
   test('the module form is unchanged', () => {
@@ -109,7 +106,7 @@ describe('auth() with no module', () => {
   })
 
   test('the app\'s auth reaches the commands, built once', async () => {
-    const extension = auth({ store: memoryAuthStore() })
+    const extension = auth({ store: memoryAuth() })
     const load = (extension as unknown as Record<symbol, (root: string, extensions: string[]) => Promise<unknown>>)[LOAD_AUTH]!
 
     expect(await load(root, [])).toBe(await load(root, []))
@@ -145,7 +142,7 @@ describe('found by convention', () => {
   })
 
   test('are built once while the files of the app stay as they were, and again once one is added', async () => {
-    const extension = auth({ captcha: false, store: memoryAuthStore(), email: false })
+    const extension = auth({ captcha: false, store: memoryAuth(), email: false })
     const first = await boot(extension)
 
     expect(await boot(extension)).toBe(first)
@@ -164,7 +161,7 @@ describe('found by convention', () => {
       process.chdir(elsewhere)
       Object.assign(globalThis, { signedUpAt: undefined })
 
-      const app = new Elysia().use(await boot(auth({ captcha: false, store: memoryAuthStore(), email: false }), root)).post('/register', async (context) => {
+      const app = new Elysia().use(await boot(auth({ captcha: false, store: memoryAuth(), email: false }), root)).post('/register', async (context) => {
         const { auth: current } = context as unknown as { auth: { password: { register: (input: unknown) => Promise<unknown> } } }
 
         return current.password.register({ email: 'ada@example.com', password: PASSWORD })
@@ -418,7 +415,7 @@ describe('the store', () => {
   test('lists the database url for kay env while the app gives no store', () => {
     expect(Object.keys((auth({}).env as unknown as { properties: object }).properties)).toEqual(['AUTH_DATABASE_URL'])
     expect(Object.keys((auth({ oauth: { github: true } }).env as unknown as { properties: object }).properties).every(name => (/^AUTH_|^[A-Z]+_CLIENT_(?:ID|SECRET)$/).test(name))).toBe(true)
-    expect(Object.keys((auth({ store: memoryAuthStore() }).env as unknown as { properties: object }).properties)).toEqual([])
+    expect(Object.keys((auth({ store: memoryAuth() }).env as unknown as { properties: object }).properties)).toEqual([])
   })
 
   test('is the function the app gives, called as the server starts', async () => {
@@ -427,7 +424,7 @@ describe('the store', () => {
     await served({ store: () => {
       made++
 
-      return memoryAuthStore()
+      return memoryAuth()
     } })
 
     expect(made).toBe(1)

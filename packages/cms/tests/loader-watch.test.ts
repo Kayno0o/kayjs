@@ -200,7 +200,7 @@ describe('the postgres loader\'s watch', () => {
     await admin.unsafe(`CREATE DATABASE ${database}`)
     sql = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 2 })
 
-    const loader = pgLoader({ name: 'frozen', sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
+    const loader = pgLoader({ name: 'frozen', source: sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
     let reads = 0
     const posts = collection({ ...loader, load: async (context) => {
       reads++

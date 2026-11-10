@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { requestOfContext } from 'kay/library'
 import { claimBanner, currentUser, isSignedOut, loadViewer, readRequestWith, registerViewer, viewerValues } from '../src/viewer'
 
-// Bun shares modules between test files, so the reader `createAuth` set goes back after each test.
+// Bun shares modules between test files, so the reader `authCore` set goes back after each test.
 afterEach(() => readRequestWith(requestOfContext))
 
 const user = (fields: Partial<User>) => ({ id: 'u1', roles: [], guest: false, ...fields }) as User

@@ -16,6 +16,3 @@ export function roleHierarchy<P, R extends string>(
 
   return { isGranted, hasRole }
 }
-
-/** @deprecated Renamed `roleHierarchy` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
-export const createRoleHierarchy = roleHierarchy

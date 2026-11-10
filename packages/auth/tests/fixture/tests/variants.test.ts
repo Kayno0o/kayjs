@@ -73,7 +73,7 @@ test('with pages.remember never under a base, the pages show no box, the provide
   })
 }, 60_000)
 
-test('with a prefix given to authPages alone, under a base, the pages are served there and every flow lands on home, createAuth taking the prefix from authPages', async () => {
+test('with a prefix given to authPages alone, under a base, the pages are served there and every flow lands on home, authCore taking the prefix from authPages', async () => {
   const seen = await variant({ FIXTURE_PREFIX: '/members', FIXTURE_BASE: '/app', FIXTURE_HOME: '/dashboard' })
 
   delete seen['reset-fr']
