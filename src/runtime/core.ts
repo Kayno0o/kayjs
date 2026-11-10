@@ -170,7 +170,7 @@ export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & st
 
     at.addEventListener(type, listener, options)
     onCleanup(() => at.removeEventListener(type, listener, options))
-  }, 'listen', handler), typeof options === 'object' ? options.signal : undefined)
+  }, 'listen', handler), typeof options === 'object' ? options?.signal : undefined)
 }
 
 // A writable signal that follows `source`: an island edits it locally, and it takes `source`'s value again whenever that changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.

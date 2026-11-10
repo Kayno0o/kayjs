@@ -2,7 +2,7 @@
 // Writes apply at once; effects that depend on what changed run batched in a microtask, or right away through `flush()`.
 
 import type { Setter, Signal } from './core'
-import { sourceStart, warnOnce } from './warn-once'
+import { sourceStart, warnOnce, warnUnowned } from './warn-once'
 
 type Equals<T> = false | ((previous: T, next: T) => boolean)
 
@@ -534,10 +534,11 @@ export function effect(fn: () => void): void {
 
 // `effect` for `api`, which a development warning names, with the start of `named`, when it runs with no owner.
 export function createEffect(fn: () => void, api: string, named: (...args: never[]) => unknown = fn): void {
-  if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
+  if (serverRenders())
     return
 
-  warnUnowned(api, named)
+  if (!owner)
+    warnUnowned(api, named)
 
   const node = computation(fn, 'user', false)
 
@@ -545,10 +546,9 @@ export function createEffect(fn: () => void, api: string, named: (...args: never
   enqueue(node)
 }
 
-// Development only: a helper called with no owner, which nothing but its own handle ever stops.
-export function warnUnowned(api: string, named: (...args: never[]) => unknown): void {
-  if (process.env.NODE_ENV !== 'production' && !owner && (typeof KAY_BROWSER !== 'undefined' || serverRendering === 0))
-    warnOnce(`${api}() ran with no owner (at module scope, after an await or in a timer), so nothing ever stops it: it lives until the page goes. Call it in a component's script, or inside root() and call its dispose when done.\n${sourceStart(named)}`)
+// Whether a page is being rendered on the server, where no effect runs.
+export function serverRenders(): boolean {
+  return typeof KAY_BROWSER === 'undefined' && serverRendering > 0
 }
 
 // Runs `fn` now, then again whenever what it read changes: what the DOM bindings islands build run on.

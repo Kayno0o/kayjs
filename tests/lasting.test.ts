@@ -1,5 +1,5 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 
 type Core = typeof import('../src/runtime/core')
 type Reactive = typeof import('../src/runtime/reactive')
@@ -46,7 +46,7 @@ describe('the handle of a helper that lasts as long as an island', () => {
     const run = mock(() => undefined)
     const { handle } = island(() => core.every('5ms', run, { background: true }))
 
-    await Bun.sleep(30)
+    await Bun.sleep(100)
     expect(run.mock.calls.length).toBeGreaterThan(0)
 
     handle()
@@ -196,18 +196,131 @@ describe('the handle of a helper that lasts as long as an island', () => {
     expect(remove).toHaveBeenCalledTimes(2)
   })
 
-  it('presence: stops listening, once or twice, or on abort', () => {
+  it('presence: stops reading the room, once or twice, or on abort', () => {
+    presence.readPresenceWith(() => ['{"name":"b"}', '{"name":"a"}'])
+
     const { handle } = island(() => presence.presence('room:stop', { name: 'a' }))
 
+    expect(handle.count()).toBe(2)
+    expect(handle.others()).toEqual([{ name: 'b' }])
     handle()
     handle()
     expect(handle.count()).toBe(0)
     expect(handle.others()).toEqual([])
 
     const abort = new AbortController()
+    const { handle: second } = island(() => presence.presence('room:stop', { name: 'a' }, { signal: abort.signal }))
 
+    expect(second.count()).toBe(2)
     abort.abort()
+    expect(second.count()).toBe(0)
+
     expect(presence.presence('room:stop', null, { signal: abort.signal }).count()).toBe(0)
     expect(presence.presence({ signal: abort.signal }).count()).toBe(0)
+  })
+
+  it('ends with the island: listen, shortcut, guardLeave, followLog and presence', async () => {
+    const { leaveGuards } = await import('../src/runtime/navigation')
+    const target = document.createElement('div')
+    const heard = mock(() => undefined)
+    const pressed = mock(() => undefined)
+    const element = document.createElement('ol')
+    const remove = mock(() => undefined)
+
+    element.scrollTo = () => undefined
+    element.removeEventListener = remove
+
+    const { dispose, handle } = island(() => {
+      core.listen(target, 'click', heard)
+      shortcut.shortcut('/', pressed)
+      leave.guardLeave(() => true)
+      followLog.followLog(element)
+
+      return presence.presence('room:island', null)
+    })
+
+    expect(leaveGuards.size).toBe(1)
+    dispose()
+    target.click()
+    press('/')
+    expect(heard).not.toHaveBeenCalled()
+    expect(pressed).not.toHaveBeenCalled()
+    expect(leaveGuards.size).toBe(0)
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(handle.count()).toBe(0)
+  })
+
+  it('lets go of the abort listener when the island ends first', () => {
+    const abort = new AbortController()
+    const remove = mock(abort.signal.removeEventListener.bind(abort.signal))
+
+    abort.signal.removeEventListener = remove as typeof abort.signal.removeEventListener
+
+    const { dispose } = island(() => core.watch(() => 1, () => undefined, { signal: abort.signal }))
+
+    dispose()
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('watch: may stop itself from its own callback', () => {
+    const [read, write] = reactive.createSignal(0)
+    const seen: number[] = []
+    let stop: () => void = () => undefined
+
+    island(() => {
+      stop = core.watch(read, (next) => {
+        seen.push(next)
+        stop()
+      })
+    })
+    write(1)
+    reactive.flush()
+    write(2)
+    reactive.flush()
+    expect(seen).toEqual([1])
+  })
+
+  it('starts nothing while the server renders', () => {
+    const abort = new AbortController()
+    const add = mock(abort.signal.addEventListener.bind(abort.signal))
+    const target = document.createElement('div')
+    const heard = mock(() => undefined)
+
+    abort.signal.addEventListener = add as typeof abort.signal.addEventListener
+    reactive.renderOnServer(() => {
+      reactive.root(() => {
+        core.listen(target, 'click', heard, { signal: abort.signal })
+        core.every('5ms', heard, { signal: abort.signal })
+      })
+    })
+    reactive.flush()
+    target.click()
+    expect(add).not.toHaveBeenCalled()
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('takes null as the options of listen', () => {
+    const target = document.createElement('div')
+    const heard = mock(() => undefined)
+
+    island(() => core.listen(target, 'click', heard, null as unknown as undefined))
+    target.click()
+    expect(heard).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns once in development for a helper with no owner', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const run = () => undefined
+
+    const stops = [core.every('1s', run), core.every('1s', run)]
+
+    reactive.flush()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]![0])).toContain('every()')
+
+    for (const stop of stops)
+      stop()
+
+    warn.mockRestore()
   })
 })

@@ -127,4 +127,4 @@ ol(ref={element => list = element} style="height: 20rem; overflow-y: auto")
     li {line}
 ```
 
-It returns `{ toBottom }`: `toBottom()` takes a reader who scrolled up back to the bottom and follows again, as a chat does when they send a message (`const log = followLog(() => list)`, then `log.toBottom()` in the send handler). A list hidden then shown, such as in a panel reopened, shows its bottom.
+It returns a function that stops following, which also has `toBottom`: `toBottom()` takes a reader who scrolled up back to the bottom and follows again, as a chat does when they send a message (`const log = followLog(() => list)`, then `log.toBottom()` in the send handler). A list hidden then shown, such as in a panel reopened, shows its bottom.

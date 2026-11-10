@@ -2,7 +2,7 @@ import { NON_ROOT_TRAILING_SLASH, withoutBase } from './base'
 import { lasting } from './lasting'
 import { hold, live, wanted } from './live-value'
 import { randomId } from './random-id'
-import { createSignal, currentServerScope, onCleanup } from './reactive'
+import { currentServerScope, onCleanup, ownSignal } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -69,16 +69,22 @@ export function presence(first?: string | PresenceOptions, member?: unknown, ext
   handle ??= (live as (initial: Handle, id: string, name: string) => Handle)((name: string) => readMembers?.(name) ?? [], PRESENCE_LIVE_ID, 'presence')
 
   const members = handle
-  const [stopped, stop] = createSignal(options?.signal?.aborted === true)
+  const left = options?.signal?.aborted === true
+  const [stopped, stop] = ownSignal(left)
   const own = JSON.stringify(member ?? null)
 
-  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
+  if (left) {
+    // Starts nothing: the page neither proves the room nor holds a connection for it.
+  }
+  else if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined') {
     members(key) // read now, so the render notes the key the page proves
-  else
+  }
+  else {
     holdConnection()
+  }
 
   const read = (): string[] => stopped() ? [] : members(key)
-  const end = lasting('presence', read, () => onCleanup(() => stop(true)), options?.signal)
+  const end = lasting('presence', presence, () => onCleanup(() => stop(true)), options?.signal)
 
   return Object.assign(end, {
     others: () => [...new Set(read().filter(text => text !== own))].map(text => JSON.parse(text) as unknown),
