@@ -1,3 +1,5 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
@@ -67,4 +69,39 @@ it('describes --editor in kay new --help', async () => {
   const { stdout } = await kay(['new', '--help'], await project())
 
   expect(stdout).toMatch(/--editor <value>\s+the editors to set up/)
+})
+
+it('refuses kay test --format json with --watch, in one line and exit 1', async () => {
+  const { stdout, stderr, code } = await kay(['test', '--format', 'json', '--watch'], await project())
+
+  expect(code).toBe(1)
+  expect(stderr.slice(0, stderr.indexOf('\n'))).toBe('kay test: --format json prints one document at the end of a run, so it does not go with --watch or --hot')
+  expect(JSON.parse(stdout)).toMatchObject({ errors: 1 })
+})
+
+it('keeps kay lint --help --format json off stdout but for keslint\'s own help', async () => {
+  const { stdout, stderr } = await kay(['lint', '--help', '--format', 'json'], await project())
+
+  expect(stdout.trim()).toBe('keslint --help')
+  expect(stderr).toContain('kay lint writes the types')
+})
+
+it('prints the failure alone for kay lint --help without keslint', async () => {
+  // Outside the checkout, whose own keslint an ancestor folder would lend.
+  const root = await mkdtemp(join(tmpdir(), 'kay-lint-help-'))
+
+  try {
+    await Bun.write(join(root, 'package.json'), '{ "name": "app", "type": "module" }')
+    await Bun.write(join(root, 'tsconfig.json'), '{}')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
+
+    const { stdout, stderr, code } = await kay(['lint', '--help'], root)
+
+    expect(code).toBe(1)
+    expect(stdout).toBe('')
+    expect(stderr).toContain('the project has no `keslint`')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

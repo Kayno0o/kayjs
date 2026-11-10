@@ -29,17 +29,21 @@ export const lint: Command = {
 
     const keslint = installedBin(root)
 
-    if (asksForHelp(positionals))
-      console.log(HELP)
-
     if (keslint === undefined) {
       printFailure('lint', 'the project has no `keslint`: add `@kaynooo/eslint`', format)
 
       return 1
     }
 
-    if (asksForHelp(positionals))
+    if (asksForHelp(positionals)) {
+      // Under --format json stdout holds what keslint prints alone.
+      if (format === 'json')
+        console.error(HELP)
+      else
+        console.log(HELP)
+
       return Bun.spawn([keslint, '--help'], { stdio: ['inherit', 'inherit', 'inherit'] }).exited
+    }
 
     buildingWithoutEnv()
 

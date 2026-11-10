@@ -3,7 +3,7 @@ import { readFileSync, statSync } from 'node:fs'
 import process from 'node:process'
 import { mapPosition } from '../build/sourcemap'
 import { transformKay } from '../build/transform'
-import { asksForHelp, printDocument, projectRoot, takeFormat } from './command'
+import { asksForHelp, printDocument, printFailure, projectRoot, takeFormat } from './command'
 
 // A `.kay` position in Bun's report, the path absolute.
 const KAY_POSITION = /(\/[^\s()]+\.kay):(\d+):(\d+)/g
@@ -44,6 +44,13 @@ export const test: Command = {
     }
 
     const watching = positionals.some(argument => WATCHING.has(argument))
+
+    if (json && watching) {
+      printFailure('test', '--format json prints one document at the end of a run, so it does not go with --watch or --hot', 'json')
+
+      return 1
+    }
+
     const color = (process.stdout.isTTY || process.stderr.isTTY) && process.env.NO_COLOR === undefined && process.env.FORCE_COLOR === undefined
     const child = Bun.spawn([process.execPath, 'test', '--isolate', '--preload', 'kay/test/preload', ...positionals], {
       cwd: root,
