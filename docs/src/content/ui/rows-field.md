@@ -10,11 +10,19 @@ description: A list of rows of text boxes with Add and Remove, for headers, addr
 
 Without `onChange` the field keeps its rows itself. Give it a `name` and each column posts under `<name>_<key>`, once per row in order with blank cells kept, so an action reads the columns as lists of one length. A reset brings back the rows it started with, and inside a [SaveForm](/ui/save-form) an added or removed row counts as an unsaved change.
 
+## Issues per row
+
+`invalid` marks every box of the field. When the editor checks its rows itself, pass `rowIssues`, a function of the row's place (from 0) or a record by place, returning the message for a bad row: that row's boxes turn invalid and the message shows under the row, linked to its boxes with `aria-describedby`.
+
+```kay
+RowsField(rows={addresses()} columns={columns} label="Addresses" rowIssues={index => problems()[index]} onChange={addresses.set})
+```
+
 ## Numbers, selects and other cells
 
 A column of `type: 'number'` is a number box; the row keeps the figure as text, `''` once emptied. For anything else, mark the column `cell: true` and draw it in the `@cell(column, row, index, set)` block: a Select of units, a checkbox, a Combobox. `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box.
 
-The `column` it gets carries the `name` the cell posts under (`<name>_<key>`), which the control takes as its own, and the cell is named for screen readers by `${column.label} ${index + 1}`. Add and Remove move focus to the first control of a row, whatever it is.
+The `column` it gets carries the `name` the cell posts under (`<name>_<key>`), which the control takes as its own, and the cell is named for screen readers by `${column.label} ${index + 1}`. Add and Remove move focus to the first control of a row, whatever it is. The block is drawn once per row, so its control keeps its focus while the row is edited; read `row` where it is used, as in `value={row.unit}`.
 
 ```kay
 ---

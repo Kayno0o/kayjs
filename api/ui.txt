@@ -2236,6 +2236,7 @@ component default
       root?: string | undefined;
     };
   };
+  issue?: string | undefined;
   add?: string | undefined | {
     root?: string | undefined | {
       root?: string | undefined;
@@ -2265,6 +2266,7 @@ component default
   onChange?: ((rows: Row[]) => unknown) | undefined
   onRemove?: ((row: Row, index: number) => unknown) | undefined
   removeLabel?: ((index: number) => string) | string | undefined
+  rowIssues?: ((index: number) => string | undefined) | Record<number, string | undefined> | undefined
   rows?: readonly Row[] | undefined
   style?: string | undefined
 

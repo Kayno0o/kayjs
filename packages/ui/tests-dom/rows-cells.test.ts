@@ -66,3 +66,65 @@ test('adding focuses the first control of the new row, removing and adding are r
   expect(out(root)).toEqual([{ name: 'Cable', qty: '2', unit: 'm' }])
   expect(posted(root)).toEqual(['line_name=Cable', 'line_qty=2', 'line_unit=m'])
 })
+
+test('a cell keeps its control while its row is edited', async () => {
+  const { root } = await quote()
+  const row = root.querySelector('#lines [data-part=row]')!
+  const select = row.querySelector('select')!
+
+  choose(select, 'kg')
+  await settle()
+  expect(root.querySelector('#lines select')).toBe(select)
+  expect(select.value).toBe('kg')
+
+  const qty = row.querySelector<HTMLInputElement>('input[type=number]')!
+
+  qty.value = '5'
+  qty.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(root.querySelector('#lines select')).toBe(select)
+  expect(root.querySelector('#lines input[type=number]')).toBe(qty)
+})
+
+test('a row issue marks the boxes of that row only and shows its message under it, linked to them', async () => {
+  const { root } = await quote()
+
+  click(root.querySelector('#lines [data-part=add]'))
+  await settle()
+
+  const [first, second] = [...root.querySelectorAll('#lines [data-part=row]')]
+  const qty = second!.querySelector<HTMLInputElement>('input[type=number]')!
+
+  qty.value = '500'
+  qty.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+
+  const marks = (row: Element) => [...row.querySelectorAll('input')].map(input => input.getAttribute('aria-invalid'))
+  const message = second!.querySelector<HTMLElement>('[data-part=issue]')!
+
+  expect(marks(first!)).toEqual([null, null])
+  expect(marks(second!)).toEqual(['true', 'true'])
+  expect(message.textContent).toBe('Too many')
+  expect(message.hidden).toBe(false)
+  expect(second!.querySelector('input')!.getAttribute('aria-describedby')).toBe(message.id)
+  expect(first!.querySelector('input')!.hasAttribute('aria-describedby')).toBe(false)
+  expect(first!.querySelector<HTMLElement>('[data-part=issue]')!.hidden).toBe(true)
+
+  qty.value = '5'
+  qty.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(marks(second!)).toEqual([null, null])
+  expect(second!.querySelector('input')!.hasAttribute('aria-describedby')).toBe(false)
+})
+
+test('typing in a box keeps the element and its focus', async () => {
+  const { root } = await quote()
+  const name = root.querySelector<HTMLInputElement>('#lines input[name=line_name]')!
+
+  name.focus()
+  name.value = 'Cables'
+  name.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(root.querySelector('#lines input[name=line_name]')).toBe(name)
+  expect(document.activeElement).toBe(name)
+})
