@@ -12,7 +12,7 @@ Without `onChange` the field keeps its rows itself. Give it a `name` and each co
 
 ## Issues per row
 
-`invalid` marks every box of the field. When the editor checks its rows itself, pass `rowIssues`, a function of the row's place (from 0) or a record by place, returning the message for a bad row: that row's boxes turn invalid and the message shows under the row, linked to its boxes with `aria-describedby`.
+`invalid` marks every box of the field. When the editor checks its rows itself, pass `rowIssues`, a function of the row's place (from 0) or a record by place, returning the message for a bad row: that row's boxes turn invalid and the message shows under the row, linked to its boxes with `aria-describedby`. A `@cell` block gets the same as its fifth argument, `issue`, with `invalid`, `message` and the `id` of the message, so a custom control marks itself too.
 
 ```kay
 RowsField(rows={addresses()} columns={columns} label="Addresses" rowIssues={index => problems()[index]} onChange={addresses.set})

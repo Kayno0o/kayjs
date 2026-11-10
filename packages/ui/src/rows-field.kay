@@ -36,7 +36,7 @@ const { rows = NONE, style, columns, label, name, invalid, rowIssues, onChange, 
   label: string
   // Marks the field as refused: its text boxes in the danger colour, with `aria-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
   invalid?: boolean | undefined
-  // What a row is refused for, its text boxes drawn invalid and the message shown under the row, linked to its boxes with `aria-describedby`: a function of the row's place (from 0) or a record by place, `undefined` or `''` for a row with no issue. A cell drawn by `@cell` reads it itself.
+  // What a row is refused for, its text boxes drawn invalid and the message shown under the row, linked to its boxes with `aria-describedby`: a function of the row's place (from 0) or a record by place, `undefined` or `''` for a row with no issue. A cell drawn by `@cell` gets the row's issue as the block's fifth argument.
   rowIssues?: ((index: number) => string | undefined) | Record<number, string | undefined> | undefined
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
   name?: string | undefined
@@ -46,8 +46,8 @@ const { rows = NONE, style, columns, label, name, invalid, rowIssues, onChange, 
   onAdd?: ((row: Row, index: number) => unknown) | undefined
   onRemove?: ((row: Row, index: number) => unknown) | undefined
   // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; name the control by `${column.label} ${index + 1}` for screen readers, and read its value off `row[column.key]`.
-  // The cell is drawn once per row and keeps its control while the row is edited: `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is drawn again only when the row's place changes.
-  cell?: Snippet<[column: { key: string, label: string, name: string | undefined }, row: Row, index: number, set: (value: string) => void]> | undefined
+  // The cell is drawn once per row and keeps its control while the row is edited: `issue` (`invalid`, `message` and the `id` of the message under the row, for `aria-describedby`) reads the same way, and `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is drawn again only when the row's place changes.
+  cell?: Snippet<[column: { key: string, label: string, name: string | undefined }, row: Row, index: number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
   // The fewest rows: Remove stops there. The most: Add stops there.
   min?: number | undefined
   max?: number | undefined
@@ -108,6 +108,11 @@ const issueOf = (id: number): string | undefined => {
 
 // The cell block is called once per row and place, not on each edit: a call made from the template would track the row it is handed, so every keystroke drew its control again and lost the focus. The row it gets reads the current one where the block uses it.
 function drawCell(id: number, column: { key: string, label: string }) {
+  const issue = {
+    get invalid() { return invalid === true || issueOf(id) !== undefined },
+    get message() { return issueOf(id) },
+    get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
+  }
   const place = memo(() => placeOf(id))
   const at = place()
   const view = new Proxy({} as Row, {
@@ -121,7 +126,7 @@ function drawCell(id: number, column: { key: string, label: string }) {
     },
   })
 
-  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column) }, view, at, text => edit(placeOf(id), column.key, text)))
+  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column) }, view, at, text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)

@@ -2222,7 +2222,15 @@ component default
 [./rows-field.kay] default
 component default
   addLabel?: string | undefined
-  cell?: ((column: { key: string; label: string; name: string | undefined; }, row: Row, index: number, set: (value: string) => void) => Element) | undefined
+  cell?: ((column: {
+  key: string;
+  label: string;
+  name: string | undefined;
+}, row: Row, index: number, set: (value: string) => void, issue: {
+  readonly invalid: boolean;
+  readonly message: string | undefined;
+  readonly id: string | undefined;
+}) => Element) | undefined
   class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;

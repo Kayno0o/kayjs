@@ -128,3 +128,30 @@ test('typing in a box keeps the element and its focus', async () => {
   expect(root.querySelector('#lines input[name=line_name]')).toBe(name)
   expect(document.activeElement).toBe(name)
 })
+
+test('removing a middle row leaves the controls of the others as they are, and a cell gets the row issue', async () => {
+  const { root } = await quote()
+
+  for (let at = 0; at < 2; at++) {
+    click(root.querySelector('#lines [data-part=add]'))
+    await settle()
+  }
+
+  const rows = [...root.querySelectorAll('#lines [data-part=row]')]
+  const last = rows[2]!
+  const select = last.querySelector('select')!
+  const qty = last.querySelector<HTMLInputElement>('input[type=number]')!
+
+  qty.value = '500'
+  qty.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+  expect(select.getAttribute('aria-invalid')).toBe('true')
+  expect(select.getAttribute('aria-describedby')).toBe(last.querySelector('[data-part=issue]')!.id)
+
+  click(rows[1]!.querySelector('[data-part=remove]'))
+  await settle()
+  expect(root.querySelectorAll('#lines [data-part=row]')).toHaveLength(2)
+  expect(root.querySelectorAll('#lines [data-part=row]')[1]).toBe(last)
+  expect(last.querySelector('input[type=number]')).toBe(qty)
+  expect(last.querySelector('select')!.getAttribute('aria-label')).toBe('Unit 2')
+})

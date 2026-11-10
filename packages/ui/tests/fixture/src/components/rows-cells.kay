@@ -11,7 +11,7 @@ const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity'
 ---
 form#quote
   RowsField#lines(rows={lines()} columns={columns} name="line" label="Quote" rowIssues={index => Number(lines()[index]?.qty) > 100 ? 'Too many' : undefined} onChange={lines.set} onAdd={(row, index) => adds.push(`${index}:${row.unit}`)} onRemove={(row, index) => removes.push(`${index}:${row.name}`)})
-    @cell(column, row, index, set)
-      Select(name={column.name} aria-label={`${column.label} ${index + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
+    @cell(column, row, index, set, issue)
+      Select(invalid={issue.invalid} aria-describedby={issue.id} name={column.name} aria-label={`${column.label} ${index + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
   button#reset(type="reset") Reset
 p#out {JSON.stringify(lines())}
