@@ -156,7 +156,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 ### Redirect old paths
 
-`redirects` in kay.config.ts sends old paths elsewhere with a 308, or the `status` it names: 301 or 302 for older clients and crawlers that expect them, 307 for a move that may be undone. `{ status: 410 }`, with no `to`, answers `Gone` for a path that ended, and `kay check` reports a 410 that has a `to`. `permanent` is deprecated since 1.96 (`deprecated-redirect-permanent`, `kay upgrade` writes `status: 307` for `permanent: false` and `status: 308` for `true`). A static export lists a 410 in `_redirects` as `/old /old 410` and writes no page for it:
+`redirects` in kay.config.ts sends old paths elsewhere with a 308, or the `status` it names: 301 or 302 for older clients and crawlers that expect them, 307 for a move that may be undone. `{ status: 410 }`, with no `to`, answers `Gone` for a path that ended, and `kay check` reports a 410 that has a `to`. `permanent` is deprecated since 1.96 (`deprecated-redirect-permanent`, `kay upgrade` writes `status: 307` for `permanent: false` and drops `permanent: true`). A static export lists a 410 in `_redirects` as `/old /old 410`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and writes no page for it:
 
 ```ts
 export default defineConfig({
@@ -190,7 +190,7 @@ Pages live in `src/routes/`:
 | `_actions.kay` | A server fence of actions and no template, served behind the guards of its directory and above, which pages and components import by path; see [Actions](actions.md#declaring-an-action). |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
-| `_401.kay`, `_403.kay`, `_429.kay`, `_503.kay` | Rendered with that status for a `ctx.deny` of it in their directory and below, before `_error.kay`, nearest directory first as `_404.kay`; every other status stays `_error.kay`'s. `kay check` reports one in a directory with no route. |
+| `_401.kay`, `_403.kay`, `_429.kay`, `_503.kay` | Rendered with that status for a `ctx.deny` of it in their directory and below, before `_error.kay`, nearest directory first as `_404.kay`, a guard's denial from the directory above the guard; every other status stays `_error.kay`'s. `kay check` reports one in a directory with no route. |
 | `_card.kay` | Only in the routes directory: lays out the 1200x630 share card `shareCard()` links, reading `ctx.card`; see [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself). |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](guards.md). |
 

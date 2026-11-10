@@ -84,6 +84,18 @@ describe('status pages', () => {
   })
 })
 
+describe('a status page that fails', () => {
+  it('leaves the error page to render', async () => {
+    const get = await site({
+      '_error.kay': special('error'),
+      '_403.kay': '--- server\nthrow new Error(\'broken page\')\n---\nh1 Never\n',
+      'a.kay': gated('ctx.deny(403, \'Members only\')'),
+    })
+
+    expect(await get('/a')).toMatchObject({ status: 403, html: expect.stringContaining('<h1 class="error">error 403 Members only</h1>') })
+  })
+})
+
 describe('unused status pages', () => {
   it('are reported for a directory with no route under it, and nothing for one with a route', async () => {
     const root = await scratchDir('status-unused-')

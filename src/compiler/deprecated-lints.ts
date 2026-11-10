@@ -34,7 +34,7 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.96',
     site: true,
-    summary: '`permanent` of a redirect in `kay.config.ts`, `status` since 1.96: `status` is the one spelling for 301, 302, 307, 308 and 410 (a path that is gone, with no `to`), where `permanent` named two of them and could contradict it. The old form still works. Found in the `redirects` object of `kay.config.ts`, through a `const` it names. The fix writes `status: 307` for `permanent: false` and `status: 308` for `permanent: true`, and drops `permanent` beside a `status` that agrees; any other form is reported with no fix.',
+    summary: '`permanent` of a redirect in `kay.config.ts`, `status` since 1.96: `status` is the one spelling for 301, 302, 307, 308 and 410 (a path that is gone, with no `to`), where `permanent` named two of them and could contradict it. The old form still works. Found in the `redirects` object of `kay.config.ts`, through a `const` it names. The fix writes `status: 307` for `permanent: false`, and drops `permanent: true`, which is the 308 default, and `permanent` beside a `status` that agrees; any other form is reported with no fix. A static export lists a `status` as written in `_redirects`, where `permanent: false` was listed as 302, so it lists 307 after the fix.',
     wrong: '// kay.config.ts\nexport default { redirects: { \'/sale\': { to: \'/offers\', permanent: false } } }',
     right: '// kay.config.ts\nexport default { redirects: { \'/sale\': { to: \'/offers\', status: 307 } } }',
   },

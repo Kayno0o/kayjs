@@ -308,9 +308,9 @@ export default defineConfig({
 })
 ```
 
-A redirect answers 308. `status` names another: 301 or 302 for clients and crawlers that expect them, or 307 for a move you may undo. `{ status: 410 }` takes no `to` and answers `Gone` for a page that ended for good, and `kay check` reports a 410 that has one. A static export writes it to `_redirects` for hosts that read that file, and no page, as a page cannot answer 410.
+A redirect answers 308. `status` names another: 301 or 302 for clients and crawlers that expect them, or 307 for a move you may undo. `{ status: 410 }` takes no `to` and answers `Gone` for a page that ended for good, and `kay check` reports a 410 that has one. A static export writes it to `_redirects`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and no page, as a page cannot answer 410.
 
-The `permanent` option is deprecated since 1.96: `permanent: false` is `status: 307` and `permanent: true` is `status: 308`, and `kay upgrade` rewrites them.
+The `permanent` option is deprecated since 1.96: `kay upgrade` writes `status: 307` for `permanent: false` and drops `permanent: true`, which is the 308 default. A static export lists `permanent: false` as 302 in `_redirects` and `status: 307` as 307.
 
 A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while that file is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
 

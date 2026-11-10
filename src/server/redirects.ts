@@ -111,6 +111,7 @@ export function readRedirects(redirects: Redirects): Redirect[] {
 // A redirect target on the site that nothing serves: no page, public file, route kay adds nor other redirect. A `:param` stands for any segment, a `*` for any rest of the path, and a trailing slash is the page's as `trailingSlash` allows.
 export function redirectProblems(redirects: Redirects, served: string[]): string[] {
   const paths = [...served, ...Object.keys(redirects)].map(path => path.split('/').slice(1))
+  const gone = new Set(Object.entries(redirects).filter(([, target]) => redirectTarget(target) === '').map(([from]) => from))
 
   return Object.entries(redirects).flatMap(([from, target]) => {
     const to = redirectTarget(target)
@@ -122,6 +123,9 @@ export function redirectProblems(redirects: Redirects, served: string[]): string
     const path = to.replace(QUERY_OR_HASH, '')
     const slash = path.length > 1 && path.endsWith('/')
     const segments = (slash ? path.slice(0, -1) : path).split('/').slice(1)
+
+    if (gone.has(path))
+      return [`the redirect from ${from} goes to ${to}, which answers 410 Gone`]
 
     return paths.some(served => reaches(segments, slash, served)) ? [] : [`the redirect from ${from} goes to ${to}, which nothing on the site serves`]
   })

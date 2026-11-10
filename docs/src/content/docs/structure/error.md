@@ -30,11 +30,11 @@ kay waits 10 seconds at most for `onError` after a job or an `onStop` hook, so a
 ```kay
 --- server
 // _403.kay, rendered by ctx.deny(403, 'Members only', { plan: 'pro' })
-const plan = ctx.error.data?.plan
+const plan = (ctx.error.data as { plan: string } | undefined)?.plan
 ---
 h1 Upgrade to {plan}
 ```
 
-`data` is `unknown` until the app names its type: `declare module 'kay' { interface Register { errorData: { plan: string } } }`. `kay check` reports a status page in a folder with no route, as nothing renders it.
+`data` is `unknown` until the app names its type, `declare module 'kay' { interface Register { errorData: { plan: string } } }`, which makes the cast above unnecessary. A guard's denial is answered from the folder above the guard, so `admin/_guard.ts` renders the `_403.kay` of the folder holding `admin`, not `admin/_403.kay`. `kay check` reports a status page in a folder with no route, as nothing renders it.
 
 <ReadMore href="/essentials/routing#not-found-and-errors">Not found and error pages in the routing guide.</ReadMore>

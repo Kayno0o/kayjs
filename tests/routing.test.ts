@@ -173,6 +173,10 @@ describe('redirects', () => {
 
     expect(problems).toEqual(['the redirect from /d goes to /nowhere, which nothing on the site serves', 'the redirect from /g goes to /docs, which nothing on the site serves'])
   })
+
+  it('are refused a target that answers 410', () => {
+    expect(redirectProblems({ '/a': '/retired', '/retired': { status: 410 } }, [])).toEqual(['the redirect from /a goes to /retired, which answers 410 Gone'])
+  })
 })
 
 describe('localPath', () => {

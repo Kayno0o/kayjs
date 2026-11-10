@@ -227,7 +227,7 @@ export default guard(({ locals, redirect, deny }) => {
 })
 ```
 
-A denied page renders the nearest `_error.kay` outside the guard's directory. A refused form post gets the redirect, or the denial as plain text.
+A denied page renders the nearest page of its status (`_403.kay`, else `_error.kay`) outside the guard's directory. A refused form post gets the redirect, or the denial as plain text.
 
 ### Params and actions
 

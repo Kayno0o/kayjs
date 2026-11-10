@@ -202,6 +202,12 @@ describe('a path that is gone', () => {
     expect(() => set.add('/cfg', '', 410, { ...rules, configured: { '/cfg': '/z' } })).toThrow(/kay\.config/)
   })
 
+  it('refuses a target the config answers 410 for', () => {
+    const set = setOf()
+
+    expect(() => set.add('/a', '/retired', undefined, { ...rules, configured: { '/retired': '' } })).toThrow('is gone (410) in kay.config.ts')
+  })
+
   it('answers 410 from a served app, under a base, without a location', async () => {
     const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app' }))
 

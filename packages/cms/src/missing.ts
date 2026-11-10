@@ -44,8 +44,9 @@ export interface AddedRedirect {
 // A redirect of kay.config.ts, which the screen lists and does not change.
 export interface ConfiguredRedirect {
   from: string
+  // Empty for a 410.
   to: string
-  status: number
+  status: RedirectStatus
 }
 
 export type MissingScreen = { rows: MissingRow[], total: number, added: AddedRedirect[], configured: ConfiguredRedirect[] } | { failure: string }

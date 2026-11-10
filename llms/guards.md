@@ -31,7 +31,7 @@
 - Input the schema refuses, or a file of the wrong type, meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
 - On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so read the user from what the app derives, such as the session `session()` derives. A guard throwing there answers 500 and is reported, as on valid input, never with the field errors.
 - A refused form post gets the redirect, or the denial as plain text.
-- A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
+- A denied page renders the nearest page of its status (`_403.kay`, else `_error.kay`) outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads.
 - Neither is an Elysia `onBeforeHandle` testing the page's path: actions are served under `/_kay/action/`.
 - `export const page = { guards: false }` runs none of the guards above a page or its actions, a sign-in page under a root guard asking for a session; in a layout, none above its actions; in an endpoint, none above it.

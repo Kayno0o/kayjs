@@ -15,4 +15,7 @@ const columns: Column<ConfiguredRedirect>[] = [
 ---
 Table.kcms-missing.kcms-config-redirects(columns={columns} rows={redirects} rowKey={row => row.from})
   @cell(row, column)
-    code.kcms-missing-path {column.key === 'from' ? row.from : row.to}
+    if column.key === 'to' && row.status === 410
+      small {wording('cms.redirects.gone', 'Gone, no target')}
+    else
+      code.kcms-missing-path {column.key === 'from' ? row.from : row.to}

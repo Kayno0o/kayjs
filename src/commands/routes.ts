@@ -192,7 +192,7 @@ function redirectRoutes(config: KayConfig): Listed[] {
   return Object.entries(config.redirects ?? {}).map(([from, target]) => {
     const to = redirectTarget(target)
 
-    return { methods: 'GET', path: from, kind: 'redirect', by: `${redirectStatus(from, target)} to ${to}` }
+    return { methods: 'GET', path: from, kind: 'redirect', by: to === '' ? 'gone (410)' : `${redirectStatus(from, target)} to ${to}` }
   })
 }
 

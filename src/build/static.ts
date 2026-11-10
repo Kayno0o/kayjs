@@ -299,7 +299,7 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
   return [...written, file]
 }
 
-// A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read. A path that is gone (410) is a line of `_redirects` only, naming its own path as the destination a 410 ignores, as a page cannot answer 410.
+// A static host answers no redirect, so each one without params becomes a page sending the browser on; all of them also go to `_redirects`, which hosts such as Netlify and Cloudflare Pages read. A path that is gone (410) is a line of `_redirects` only, naming its own path as the destination a 410 ignores, as a page cannot answer 410; a host that takes redirects only, such as Cloudflare Pages, ignores the line.
 async function writeRedirects(out: string, redirects: Redirects, base: string, origin: string, lang: string): Promise<string[]> {
   const entries = Object.entries(redirects).map(([from, target]) => ({ from, to: redirectTarget(target), status: hostedStatus(from, target) }))
 

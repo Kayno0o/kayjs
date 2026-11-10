@@ -14,12 +14,8 @@ function named(properties: readonly Node[], name: string): Property | undefined 
   return properties.find((property): property is Property => property.type === 'Property' && keyName(property) === name)
 }
 
-function answerOf(permanent: boolean): 307 | 308 {
-  return permanent ? 308 : 307
-}
-
 // `permanent` of a redirect in kay.config.ts, `status` since 1.96: one spelling for 301, 302, 307, 308 and now 410, where `permanent` named two of them and could contradict `status`.
-// `permanent: false` becomes `status: 307` and `permanent: true` `status: 308`; beside a `status` that agrees it is dropped, and any other form is reported with no fix.
+// `permanent: false` becomes `status: 307` and `permanent: true`, a 308 already, is dropped, as it is beside a `status` that agrees; any other form is reported with no fix.
 export function redirectPermanent(root: string, options: CheckOptions): CheckDiagnostic[] {
   if (lintLevel('deprecated-redirect-permanent', options.lints) === 'allow')
     return []
@@ -46,7 +42,6 @@ export function redirectPermanent(root: string, options: CheckOptions): CheckDia
 
     const status = named(properties, 'status')
     const value = permanent.value.type === 'Literal' && typeof permanent.value.value === 'boolean' ? permanent.value.value : undefined
-    const wanted = value === undefined ? undefined : answerOf(value)
     // Written in the entry itself, not spread in from a const, which another entry may share.
     const written: readonly Node[] = object.properties
     const at = written.indexOf(permanent)
@@ -55,10 +50,11 @@ export function redirectPermanent(root: string, options: CheckOptions): CheckDia
     const agrees = status !== undefined && named301Or308 === value
     let edits: { start: number, end: number, text: string }[] | undefined
 
-    if (own && wanted !== undefined && status === undefined) {
-      edits = [{ start: permanent.start, end: permanent.end, text: `status: ${wanted}` }]
+    if (own && value === false && status === undefined) {
+      edits = [{ start: permanent.start, end: permanent.end, text: 'status: 307' }]
     }
-    else if (own && agrees) {
+    // A `permanent: true` is the default answer, a 308, as a `status` that agrees with it is.
+    else if (own && (agrees || (value === true && status === undefined))) {
       const next = written[at + 1]
       const before = written[at - 1]
 
@@ -68,7 +64,7 @@ export function redirectPermanent(root: string, options: CheckOptions): CheckDia
         edits = [{ start: before.end, end: permanent.end, text: '' }]
     }
 
-    const help = edits?.[0]?.text === '' ? 'drop `permanent`, `status` says it' : 'write `status: 307` for `permanent: false` and `status: 308` for `permanent: true`'
+    const help = edits?.[0]?.text === '' ? 'drop `permanent`, the redirect answers 308 or its `status` without it' : 'write `status: 307` for `permanent: false`, and drop `permanent: true`, which is the default'
 
     found.push({
       file: join(root, CONFIG_FILE),

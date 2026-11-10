@@ -955,13 +955,14 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 
   // A page that found no entry because its end date passed answers that it is gone for good.
   const pageError: PageError = notFound && askedForEndedEntry() ? { status: 410, message: 'Gone' } : pageErrorOf(error, options.dev)
-  const page = (notFound || (denied && error.status === 404) ? special.notFound : special.statuses?.[pageError.status]) ?? special.error
+  const first = (notFound || (denied && error.status === 404) ? special.notFound : special.statuses?.[pageError.status]) ?? special.error
 
   rendering.status = pageError.status
   ;(rendering.ctx as ErrorPageContext).error = pageError
   calmDeadline(rendering.ctx)
 
-  const html = page && await renderSpecialPage(page, rendering, loaded, client, options)
+  // A status page that fails leaves the error page, which may still render.
+  const html = (first && await renderSpecialPage(first, rendering, loaded, client, options)) ?? (first !== special.error && special.error ? await renderSpecialPage(special.error, rendering, loaded, client, options) : undefined)
 
   if (html !== undefined)
     return respond(rendering, html)
