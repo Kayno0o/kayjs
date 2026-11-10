@@ -849,6 +849,24 @@ describe('call()', () => {
 
   afterAll(() => served.mockRestore())
 
+  it('passes keepalive to fetch for a body within 64 KB, and sends a larger one as a plain call', async () => {
+    const keepalives = () => served.mock.calls.map(([, init]) => init?.keepalive)
+    const before = served.mock.calls.length
+    const sentSince = () => keepalives().slice(before)
+
+    await call(notes, '/', { method: 'post', body: { title: 'kept' }, keepalive: true })
+    await call(notes, '/', { method: 'post', body: { title: 'plain' } })
+
+    try {
+      await call(notes, '/', { method: 'post', body: { title: 'x'.repeat(70 * 1024) }, keepalive: true })
+    }
+    catch {
+      // The route may refuse a title this long; what matters is how it was sent.
+    }
+
+    expect(sentSince()).toEqual([true, undefined, undefined])
+  })
+
   it('calls any method of a route, sending its body as JSON and reading its answer typed', async () => {
     const added = await call(notes, '/', { method: 'post', body: { title: 'Milk' } })
 

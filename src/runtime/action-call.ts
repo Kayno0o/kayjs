@@ -13,6 +13,7 @@ import { withBase, withoutBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
+import { fits } from './keepalive'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
 import { randomId } from './random-id'
@@ -459,13 +460,6 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     error => error instanceof ActionRedirectError || superseding.has(error as object),
     hooks,
   ) as unknown as TrackedCall<never, unknown>
-}
-
-// What a browser lets a `keepalive` request carry. Only a text body is measured: a form may hold files of any size.
-const KEEPALIVE_LIMIT = 64 * 1024
-
-function fits(body: unknown): boolean {
-  return typeof body === 'string' && new TextEncoder().encode(body).byteLength <= KEEPALIVE_LIMIT
 }
 
 async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller, call?: { key?: string | undefined, options?: CallOptions | undefined }): Promise<Output> {

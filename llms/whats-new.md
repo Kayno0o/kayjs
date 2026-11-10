@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `RowsField` takes `rowIssues`, a function of the row's place or a record, marking only that row's boxes invalid with its message under the row, and a `@cell` block keeps its control and focus while its row is edited, reading `row` where it is used ([forms](../packages/ui/llms/forms.md#rowsfield)).
 - kayjs-ui: `TextInput` and `Combobox` take `icon`, drawn inside the box at its start with the text after it and hidden from screen readers, and a `type="search"` TextInput draws the search icon on its own (`icon={false}` leaves it out) ([forms](../packages/ui/llms/forms.md)).
 - An action call takes `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md)).
+- An action call and an api `call()` take `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md), [api from islands](api-from-islands.md)).
 
 ## 1.95.0
 

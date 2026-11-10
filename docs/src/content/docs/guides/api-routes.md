@@ -87,6 +87,8 @@ For a write from an island that should not reload the page, an [action](/essenti
 
 Pass `signal` to abort a call. A body holding a `File` goes as a multipart form, and `progress: sent => ...` reports how much of it went, from 0 to 1.
 
+A call made while the page unloads, from `pagehide` or `beforeunload`, takes `keepalive: true` so the browser lets it finish: `call(notes, '/', { method: 'post', body, keepalive: true })`. Browsers cap such a body at 64 KB, so a bigger one is sent as a plain call, as is one with files.
+
 To keep a page current from a route, see [Live data and realtime](/guides/live-and-realtime).
 
 ## Calls from other sites

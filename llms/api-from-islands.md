@@ -149,6 +149,7 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - `signal` aborts the call, which rejects with the signal's reason, while the answer is read too.
 - A body holding a `File` or a `Blob`, or a `FormData`, goes as a multipart form, its other fields as text, a Date as its ISO text, an object as JSON and null left out, as in a `query`.
 - `progress: sent => ...` gets how much of it went, from 0 to 1.
+- `keepalive: true` lets a call made from `pagehide` or `beforeunload` outlive the page, as on an action ([the limits](actions-from-islands.md)): `call(notes, '/', { method: 'post', body, keepalive: true })`. A JSON body over the browser's 64 KB cap, and a body with files, go as a plain call instead of failing.
 - `socket` and `stream` open once the island is in the page, never on the server, and a `resource` asks the browser once it has no server value; all close with the component that opened them.
 - The browser build gives the island the module's mount and none of its code, so its other exports never reach the browser.
 - An island importing any other file under `src/api/`, such as a `_schemas.ts`, fails the build: code an island shares with a module lives outside it.

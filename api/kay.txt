@@ -150,7 +150,8 @@ type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Ch
 
 [.] ApiCallOptions
 type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
-  // Aborts the call, which rejects with the signal's reason. signal?: AbortSignal | undefined // Called as a body carrying files uploads, with how much of it went, from 0 to 1. progress?: ((sent: number) => void) | undefined }
+  // Aborts the call, which rejects with the signal's reason. signal?: AbortSignal | undefined // Called as a body carrying files uploads, with how much of it went, from 0 to 1. progress?: ((sent: number) => void) | undefined // Lets the call outlive the page, for one made from `pagehide` or `beforeunload`: passed to `fetch` as `keepalive`, unless the body is past the browser's 64 KB cap or holds files, which go as a plain call. keepalive?: boolean | undefined
+}
 
 [.] ApiError
 class ApiError

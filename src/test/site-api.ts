@@ -1,6 +1,7 @@
 import type { SiteScope } from './site-scope'
 import type { ApiResult, TestSite } from './site-types'
-import { callBody, readAnswer, routeUrl } from '../runtime/live'
+import { callBody } from '../runtime/call-body'
+import { readAnswer, routeUrl } from '../runtime/live'
 import { NativeHeaders, withNatives } from './natives'
 
 export function apiOf({ defaults, send }: SiteScope): Pick<TestSite, 'api'> {

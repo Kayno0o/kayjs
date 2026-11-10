@@ -140,7 +140,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
       const original = window.fetch.bind(window)
 
       window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (init?.method === 'POST') {
+        if (init?.method === 'POST' && String(input).includes('/_kay/action/')) {
           const seen = JSON.parse(sessionStorage.getItem('keepalive') ?? '[]') as boolean[]
 
           seen.push(init.keepalive === true)

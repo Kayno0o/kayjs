@@ -3,9 +3,11 @@ import type { Duration } from './duration'
 import type { Seed } from './live-resource.server'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
+import { callBody, fieldText } from './call-body'
 import { trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
 import { durationSeconds } from './duration'
+import { fits } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
 import { pageData } from './page-data'
@@ -496,14 +498,6 @@ function encodeSegment(value: string, path: string): string {
     throw new TypeError(`kay: ${path} cannot take "${value}" as a param, it would reach the parent route`)
 
   return encodeURIComponent(value)
-}
-
-// A value as a form field or a query param carries it: a Date as its ISO text, an object as JSON.
-function fieldText(value: unknown): string {
-  if (value instanceof Date)
-    return value.toISOString()
-
-  return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
 }
 
 export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>>
@@ -1119,6 +1113,8 @@ export type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
   signal?: AbortSignal | undefined
   // Called as a body carrying files uploads, with how much of it went, from 0 to 1.
   progress?: ((sent: number) => void) | undefined
+  // Lets the call outlive the page, for one made from `pagehide` or `beforeunload`: passed to `fetch` as `keepalive`, unless the body is past the browser's 64 KB cap or holds files, which go as a plain call.
+  keepalive?: boolean | undefined
 }
 
 // What an answer reads back as: an object as JSON, a Date in it as its ISO text, while a number or a boolean arrives as the text Elysia sends, `null` as `null` and nothing (`undefined`, a 204) as ''.
@@ -1128,7 +1124,7 @@ export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, P
 
 // Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.
 async function callApi<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<ApiAnswer<Module, Path, M>> {
-  const { method = 'get', body, signal, progress } = (options ?? {}) as { method?: string, body?: unknown, signal?: AbortSignal, progress?: (sent: number) => void }
+  const { method = 'get', body, signal, progress, keepalive } = (options ?? {}) as { method?: string, body?: unknown, signal?: AbortSignal, progress?: (sent: number) => void, keepalive?: boolean }
   const url = withBase(routeUrl(module, path, options as UrlInput | undefined))
   const sent = callBody(body)
   const headers = { accept: 'application/json', ...sent.headers }
@@ -1137,7 +1133,7 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
   try {
     response = sent.body instanceof FormData && progress && typeof XMLHttpRequest !== 'undefined'
       ? await (await import('./upload')).uploaded(method.toUpperCase(), url, headers, sent.body, progress, signal)
-      : await fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal } })
+      : await fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal }, ...keepalive === true && fits(sent.body) && { keepalive: true } })
   }
   catch (failure) {
     if (signal?.aborted === true)
@@ -1178,25 +1174,3 @@ function track<Module, const Path extends CallPath<Module>>(module: Module, path
 // `call` with `track` on it, built in its declaration and marked pure so a bundle dropping `call` drops `track` and the tracker too.
 // kept: request
 export const call = /* @__PURE__ */ Object.assign(callApi, { track })
-
-// A body carrying files goes as a form, its other fields as text, which Elysia reads against the route's schema; anything else goes as JSON.
-export function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Record<string, string> } {
-  if (body === undefined || body instanceof FormData)
-    return { body }
-
-  const fields = typeof body === 'object' && body !== null && !Array.isArray(body) ? Object.entries(body) : []
-
-  if (!fields.some(([, value]) => value instanceof Blob || (Array.isArray(value) && value.some(item => item instanceof Blob))))
-    return { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } }
-
-  const form = new FormData()
-
-  for (const [name, value] of fields) {
-    for (const item of Array.isArray(value) ? value as unknown[] : [value]) {
-      if (item !== undefined && item !== null)
-        form.append(name, item instanceof Blob ? item : fieldText(item))
-    }
-  }
-
-  return { body: form }
-}
