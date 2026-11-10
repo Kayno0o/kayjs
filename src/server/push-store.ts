@@ -24,7 +24,10 @@ export interface PushStore extends StoreBase {
   delete: (endpoint: string, user?: string) => MaybePromise<boolean>
   // Deletes every subscription of a person, answering how many went.
   erase: (user: string) => MaybePromise<number>
-
+  // Marks the subscription at an endpoint as reached at a time (ms), which `createdAt` then answers. Without it, a subscription is purged by the age it was stored at.
+  touch?: (endpoint: string, at: number) => MaybePromise<void>
+  // Deletes every subscription stored or reached before a time (ms), answering how many went. Without it, none is purged by age.
+  prune?: (before: number) => MaybePromise<number>
 }
 
 // Subscriptions kept in this process's memory, gone when it stops.
@@ -64,6 +67,27 @@ export function memoryPush(): PushStore {
 
       return count
     },
+    touch(endpoint, at) {
+      const row = rows.get(endpoint)
+
+      if (row === undefined)
+        return
+
+      rows.delete(endpoint)
+      rows.set(endpoint, { ...row, createdAt: at })
+    },
+    prune(before) {
+      let count = 0
+
+      for (const row of rows.values()) {
+        if (row.createdAt < before) {
+          rows.delete(row.endpoint)
+          count++
+        }
+      }
+
+      return count
+    },
   })
 }
 
@@ -94,6 +118,8 @@ export function sqlitePush(path: string): PushStore {
     list: async user => open().list(user),
     delete: async (endpoint, user) => open().delete(endpoint, user),
     erase: async user => open().erase(user),
+    touch: async (endpoint, at) => open().touch!(endpoint, at),
+    prune: async before => open().prune!(before),
     close: async () => {
       closed = true
       await opened?.close?.()
@@ -113,6 +139,8 @@ function openPush(path: string): PushStore {
   const drop = db.query('DELETE FROM kay_push_subscriptions WHERE endpoint = ?1')
   const dropOwn = db.query('DELETE FROM kay_push_subscriptions WHERE endpoint = ?1 AND user_id = ?2')
   const erase = db.query('DELETE FROM kay_push_subscriptions WHERE user_id = ?1')
+  const touch = db.query('UPDATE kay_push_subscriptions SET at = ?2 WHERE endpoint = ?1')
+  const prune = db.query('DELETE FROM kay_push_subscriptions WHERE at < ?1')
 
   return {
     add(user, subscription, most) {
@@ -122,6 +150,8 @@ function openPush(path: string): PushStore {
     list: user => list.all(user).map(({ at, ...row }) => ({ ...row, createdAt: at })),
     delete: (endpoint, user) => (user === undefined ? drop.run(endpoint) : dropOwn.run(endpoint, user)).changes > 0,
     erase: user => erase.run(user).changes,
+    touch: (endpoint, at) => void touch.run(endpoint, at),
+    prune: before => prune.run(before).changes,
     close: () => db.close(),
   }
 }

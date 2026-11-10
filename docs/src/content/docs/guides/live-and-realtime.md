@@ -182,7 +182,7 @@ Hand the member to the island from the page's server fence, as a prop: `Editor(e
 
 A tab leaves when it closes, goes to a page without the room, or loses its connection. The others see it go after a few seconds, so a reconnect or a page swap never shows someone leaving and coming back. A hidden tab stays in the room, and a page opened in a hidden tab joins at once.
 
-Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. With `pgData(db)` they share the Postgres database instead.
+Presence is kept in memory by default. Set `store: sqliteData('data/app.sqlite')` in `kay.config.ts` and replicas sharing the file see each other's visitors, as they share jobs and rate limits. With `pgData(db)` they share the Postgres database instead, and a join, a leave or a message in one replica reaches the others through `NOTIFY` as it happens; a server nobody is connected to reads nothing.
 
 A page with presence is rendered for each request, so a static export of it fails. The room and the member together take at most 256 characters as JSON. Call `presence` once per room on a page, and expect a room of many tabs to send each the whole list on every join and leave.
 
@@ -464,7 +464,11 @@ import { webPush } from 'kay'
 button(onClick={async () => { await webPush.enable() }}) Notify me
 ```
 
-kay asks the browser's permission only from a click, keeps the device in your store, forgets it when kayjs-auth signs the person out of that browser, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.install()` from `kay` draw an "Install" button once the browser offers one.
+kay asks the browser's permission only from a click, keeps the device in your store, forgets it when kayjs-auth signs the person out of that browser, and drops it when the push service says it is gone.
+
+A device no push has reached in 180 days is purged too; `push({ keep: '90d' })` changes the age.
+
+`sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.install()` from `kay` draw an "Install" button once the browser offers one.
 
 When the browser rotates a subscription, kay's worker subscribes again by itself and keeps the person.
 

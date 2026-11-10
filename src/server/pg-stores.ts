@@ -339,5 +339,11 @@ export function pgPush(pg: PgHandle): PushStore {
     async erase(user) {
       return counted('DELETE FROM kay_push_subscriptions WHERE user_id = $1', [user])
     },
+    async touch(endpoint, at) {
+      await counted('UPDATE kay_push_subscriptions SET at = $2::bigint WHERE endpoint = $1', [endpoint, at])
+    },
+    async prune(before) {
+      return counted('DELETE FROM kay_push_subscriptions WHERE at < $1::bigint', [before])
+    },
   }, 'the push subscriptions store', { ready: pg.db })
 }

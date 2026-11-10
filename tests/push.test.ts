@@ -13,6 +13,7 @@ import { createDataTables, pgHandle } from '../src/server/pg-data'
 import { pgPush } from '../src/server/pg-stores'
 import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setPushResolver, setVapidKeys, vapidKeys } from '../src/server/push'
 import { decryptPayload, encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, validVapidKeys, vapidAuthorization } from '../src/server/push-crypto'
+import { prunePushSubscriptions } from '../src/server/push-server'
 import { pushLoose, setPushLoose, setPushSettings } from '../src/server/push-settings'
 import { memoryPush, sqlitePush } from '../src/server/push-store'
 import { nameUser } from '../src/server/request-user'
@@ -196,6 +197,34 @@ describe('sendPush', () => {
     expect(await sendPush('ada', { title: 'Hi' })).toEqual({ sent: 1, dropped: 2, failed: 1 })
     expect((await pushSubscriptions.list('ada')).map(each => new URL(each.endpoint).pathname).toSorted()).toEqual(['/push/busy', '/push/fine'])
     expect((await pushSubscriptions.list('ada'))[0]!.createdAt).toBeInstanceOf(Date)
+  })
+
+  it('marks a subscription reached when a push gets through, once a day at most, and purges the idle ones', async () => {
+    const day = 86_400_000
+    const fresh = await device('fresh')
+    const stale = await device('stale')
+    const idle = await device('idle')
+
+    await store.add('ada', { endpoint: fresh.endpoint, p256dh: fresh.keys.publicKey, auth: fresh.auth, createdAt: Date.now() - 1000 }, 10)
+    await store.add('ada', { endpoint: stale.endpoint, p256dh: stale.keys.publicKey, auth: stale.auth, createdAt: Date.now() - 200 * day }, 10)
+    await store.add('ada', { endpoint: idle.endpoint, p256dh: idle.keys.publicKey, auth: idle.auth, createdAt: Date.now() - 300 * day }, 10)
+    answers.set('/push/idle', 503)
+
+    await sendPush('ada', { title: 'Hi' })
+
+    const times = new Map((await store.list('ada')).map(each => [new URL(each.endpoint).pathname, each.createdAt]))
+
+    expect(times.get('/push/fresh')).toBeLessThan(Date.now() - 500)
+    expect(Date.now() - times.get('/push/stale')!).toBeLessThan(5000)
+    expect(await prunePushSubscriptions()).toBe(1)
+    expect((await store.list('ada')).map(each => new URL(each.endpoint).pathname).toSorted()).toEqual(['/push/fresh', '/push/stale'])
+  })
+
+  it('keeps `push({ keep })` as the idle age', async () => {
+    setPushSettings({ subject: undefined, keep: 1000 })
+    await store.add('ada', { endpoint: 'https://a/1', p256dh: 'p', auth: 'a', createdAt: Date.now() - 5000 }, 10)
+    expect(await prunePushSubscriptions()).toBe(1)
+    expect(() => push({ keep: '0d' })).toThrow('keep')
   })
 
   it('refuses a title, body, tag, topic or urgency out of bounds, and drops a hostile link', async () => {
@@ -843,6 +872,20 @@ function storeCases(name: string, make: () => Promise<PushStore>): void {
 
       expect(first).toHaveLength(10)
       expect((await made.list('ada')).map(each => each.endpoint)).toEqual(first)
+    })
+
+    it('prunes what was kept or reached before a time, and a touch counts as reached', async () => {
+      const made = await make()
+
+      await made.add('ada', record('https://a/old', 1), 10)
+      await made.add('ada', record('https://a/reached', 2), 10)
+      await made.add('grace', record('https://g/new', 100), 10)
+      await made.touch!('https://a/reached', 50)
+
+      expect(await made.prune!(50)).toBe(1)
+      expect((await made.list('ada')).map(each => each.endpoint)).toEqual(['https://a/reached'])
+      expect(await made.prune!(50)).toBe(0)
+      expect(await made.list('grace')).toHaveLength(1)
     })
 
     it('removes by endpoint, a person\'s own when named, and erases a person', async () => {

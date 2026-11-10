@@ -1,6 +1,7 @@
 import type { MailingSubscription } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { notifications, notify } from 'kay/server'
+import { memoryPush, notifications, notify } from 'kay/server'
+import { setupStore } from '../../../src/server/app-store'
 import { PRUNE_EVERY_MS } from '../src/prune'
 import { testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
@@ -137,6 +138,26 @@ describe('the export lists them', () => {
     expect(exported.data.mailingLists).toMatchObject([{ list: 'news', status: 'confirmed' }, { list: 'offers', status: 'pending', confirmedAt: null }])
   })
 
+  test('push subscriptions, the user\'s own endpoints and dates only, no keys', async () => {
+    const store = memoryPush()
+
+    setupStore({ push: store })
+
+    try {
+      const { ada, user } = await setup()
+
+      await store.add(user.id, { endpoint: 'https://push.example/ada', p256dh: 'p', auth: 'a', createdAt: 5000 }, 10)
+      await store.add('someone-else', { endpoint: 'https://push.example/other', p256dh: 'p', auth: 'a', createdAt: 6000 }, 10)
+
+      const exported = await ada.callOk('account.export')
+
+      expect(exported.data.pushSubscriptions).toEqual([{ endpoint: 'https://push.example/ada', createdAt: new Date(5000).toISOString() }])
+    }
+    finally {
+      setupStore(undefined)
+    }
+  })
+
   test('are empty without a mailer that lists', async () => {
     const app = testApp({ site: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
     const ada = app.browser()
@@ -147,5 +168,6 @@ describe('the export lists them', () => {
 
     expect(exported.data.notifications).toEqual([])
     expect(exported.data.mailingLists).toEqual([])
+    expect(exported.data.pushSubscriptions).toEqual([])
   })
 })

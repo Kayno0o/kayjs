@@ -3261,6 +3261,7 @@ interface PushMessage
 
 [./server] PushOptions
 interface PushOptions
+  keep?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   subject?: string | undefined
 
 [./server] PushResult
@@ -3283,6 +3284,8 @@ interface PushStore extends StoreBase
   erase: (user: string) => MaybePromise<number>
   list: (user: string) => MaybePromise<PushSubscriptionRecord[]>
   ping?: (() => unknown) | undefined
+  prune?: (before: number) => MaybePromise<number>
+  touch?: (endpoint: string, at: number) => MaybePromise<void>
 
 [./server] PushSubscriptionRecord
 interface PushSubscriptionRecord

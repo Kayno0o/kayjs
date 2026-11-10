@@ -10,6 +10,8 @@ export const PUSH_UNSUBSCRIBE_PATH = `${PUSH_PATH}/unsubscribe`
 export interface PushSettings {
   // The VAPID contact, a `mailto:` or https address the push services reach the site's operator by.
   subject: string | undefined
+  // How long (ms) a subscription may go unreached before it is purged; 180 days when left out.
+  keep?: number | undefined
 }
 
 let current: PushSettings | undefined

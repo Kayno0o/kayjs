@@ -819,6 +819,7 @@ interface DataExport
   notifications: Notification[]
   organizations: Membership<string>[]
   passkeys: Passkey[]
+  pushSubscriptions: { endpoint: string; createdAt: Date; }[]
   recoveryCodesLeft: number
   sessions: UserSession[]
   tokens: BearerToken[]

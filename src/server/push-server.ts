@@ -1,9 +1,10 @@
 import type { AnyElysia, Elysia } from 'elysia'
 import { isCrossSite } from './cross-site'
 import { readCapped } from './errors'
+import { maintenance } from './maintenance'
 import { clientAddress, overLimit } from './protection'
 import { clearPushDeviceCookie, MOST_DEVICES, pushDeviceCookie, readSubscription, vapidKeys } from './push'
-import { PUSH_KEY_PATH, PUSH_SUBSCRIBE_PATH, PUSH_UNSUBSCRIBE_PATH } from './push-settings'
+import { PUSH_KEY_PATH, PUSH_SUBSCRIBE_PATH, PUSH_UNSUBSCRIBE_PATH, pushSettings } from './push-settings'
 import { pushStore } from './push-store'
 import { overHttps } from './request-url'
 import { userOf } from './request-user'
@@ -12,6 +13,8 @@ const MAX_BODY_BYTES = 2048
 const CHANGES_PER_MINUTE = 60
 const MINUTE_MS = 60_000
 const RATE_NAME = 'kay:push'
+const HOUR_MS = 3_600_000
+const DEFAULT_KEEP_MS = 180 * 86_400_000
 
 const none = (status: number) => new Response(null, { status, headers: { 'cache-control': 'no-store' } })
 
@@ -39,10 +42,21 @@ async function bodyOf(request: Request, server: Parameters<typeof clientAddress>
   }
 }
 
+// Deletes the subscriptions no push reached within the configured `keep`, answering how many went.
+export async function prunePushSubscriptions(): Promise<number> {
+  return await pushStore().prune?.(Date.now() - (pushSettings()?.keep ?? DEFAULT_KEEP_MS)) ?? 0
+}
+
+// The sweep is the server's, as a subscription is only sent to from here; one timer per process, shared by a reloaded config.
+const upkeep = maintenance('push-subscriptions', HOUR_MS, prunePushSubscriptions)
+
 // The routes the island's `push` calls: the public key to subscribe with, and the person's subscribing and unsubscribing, whose user comes from whatever names the request's user, kayjs-auth say, never from the body.
 export async function pushServer(): Promise<AnyElysia> {
   // Read at boot, so a production server without a valid pair stops rather than failing the first push.
   const { publicKey } = await vapidKeys()
+
+  upkeep.start()
+
   const plugin = (app: Elysia) => app
     .get(PUSH_KEY_PATH, () => new Response(publicKey, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' } }))
     .post(PUSH_SUBSCRIBE_PATH, async ({ request, server }) => {

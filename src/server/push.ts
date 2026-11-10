@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
-import { durationSeconds } from '../runtime/duration'
+import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { s } from '../runtime/schema'
 import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
@@ -26,6 +26,8 @@ export { memoryPush, sqlitePush } from './push-store'
 export interface PushOptions {
   // The VAPID contact push services reach the site's operator by, a `mailto:` or https address. Defaults to the origin of `SITE_URL` when that is https.
   subject?: string | undefined
+  // How long a subscription may go without a push reaching its device before it is purged, `'180d'` by default. A person's subscription is personal data, so one a device never answers to does not stay for good.
+  keep?: Duration | undefined
 }
 
 // What a person is shown: a notification the worker draws.
@@ -66,6 +68,7 @@ const SUBJECT = /^(?:mailto:[^\s@]+@[^\s@]+|https:\/\/\S+)$/
 const BASE64URL = /^[\w-]+$/
 const TOPIC = /^[\w-]{1,32}$/
 const SEND_TIMEOUT_MS = 10_000
+const TOUCH_EVERY_MS = 86_400_000
 const DEFAULT_TTL = '1d'
 const URGENCIES = new Set(['very-low', 'low', 'normal', 'high'])
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]'])
@@ -78,12 +81,12 @@ const PUSH_ENV = s.Object({
 // Lets the site push to the devices of the people who opted in: `sendPush` sends, an island's `webPush.subscribe()` opts in, `notify()` pushes beside the inbox, and kay's service worker shows the notification and opens its link on a click.
 // The VAPID keys are read from `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (`kay push keys` prints a pair); under `kay dev` a pair is generated once into `.kay/vapid.json`.
 export function push(options: PushOptions = {}): KayExtension {
-  const { subject } = options
+  const { subject, keep } = options
 
   if (subject !== undefined && (typeof subject !== 'string' || !SUBJECT.test(subject)))
     throw new KayError('config-invalid', `kay: push takes a subject such as 'mailto:ops@example.com' or an https address; got ${JSON.stringify(subject)}`)
 
-  setPushSettings({ subject })
+  setPushSettings({ subject, keep: keep === undefined ? undefined : optionMs(keep, 'push\'s keep') })
 
   return {
     name: 'kay/push',
@@ -282,6 +285,21 @@ async function post(endpoint: string, headers: Record<string, string>, body: Uin
   })
 }
 
+// A push that got through keeps the subscription from being purged as idle; at most one write a day per device, and a store that fails never fails the push.
+async function touchReached(subscription: PushSubscriptionRecord): Promise<void> {
+  const now = Date.now()
+
+  if (now - subscription.createdAt < TOUCH_EVERY_MS)
+    return
+
+  try {
+    await pushStore().touch?.(subscription.endpoint, now)
+  }
+  catch (error) {
+    kayLog('warn', 'a push subscription could not be marked reached', error)
+  }
+}
+
 async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array<ArrayBuffer>, headers: Record<string, string>, pair: VapidKeys, subject: string): Promise<Outcome> {
   const production = !pushLoose()
   const found = staticEndpoint(subscription.endpoint, production)
@@ -298,8 +316,11 @@ async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array
     const body = await encryptPayload(payload, subscription)
     const status = await post(endpoint, { ...headers, 'authorization': await vapidAuthorization(endpoint, subject, pair), 'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream' }, body, production)
 
-    if (status >= 200 && status < 300)
+    if (status >= 200 && status < 300) {
+      await touchReached(subscription)
+
       return 'sent'
+    }
 
     if (status === 404 || status === 410) {
       await pushStore().delete(subscription.endpoint)
