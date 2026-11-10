@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { byteSize } from '../src/runtime/byte-size'
 import { socketLimits } from '../src/server/ws-limits'
 import { testSite } from '../src/test'
 
@@ -10,11 +11,13 @@ const site = await testSite({ root, islands: false })
 // The server the site starts with its first socket, whose port a raw socket needs.
 const serve = Bun.serve
 let port = 0
+let served: { websocket?: { maxPayloadLength?: number } } = {}
 
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const server = serve(options)
 
   port = server.port!
+  served = options
 
   return server
 }) as typeof Bun.serve
@@ -87,6 +90,65 @@ describe('the payload of a websocket message', () => {
     expect((await talk('/big', 'x'.repeat(5_000_000))).code).toBe(1009)
     expect((await talk('/tiny', 'x'.repeat(100))).received).toEqual(['echo:100'])
     expect((await talk('/tiny', 'x'.repeat(101))).code).toBe(1009)
+  })
+})
+
+describe('the frames Bun buffers', () => {
+  it('are held to the largest maxSize of the routes, not the 16 MiB Bun allows by default', () => {
+    expect(served.websocket?.maxPayloadLength).toBe(byteSize('4mb', 'maxSize'))
+  })
+})
+
+// Opens a socket and says whether the server took it.
+async function opens(path: string): Promise<WebSocket | undefined> {
+  const socket = new WebSocket(`ws://localhost:${port}/api/chat${path}`)
+
+  return new Promise((resolve) => {
+    socket.onopen = () => resolve(socket)
+    socket.onerror = () => resolve(undefined)
+  })
+}
+
+async function closed(socket: WebSocket): Promise<void> {
+  await new Promise<void>((resolve) => {
+    socket.onclose = () => resolve()
+    socket.close()
+  })
+}
+
+describe('the open sockets of one client', () => {
+  it('are 20 a route by default, the next refused', async () => {
+    const sockets = await Promise.all(Array.from({ length: 21 }, async () => opens('/plain-limits')))
+    const taken = sockets.filter(socket => socket !== undefined)
+
+    await Promise.all(taken.map(closed))
+    expect(taken).toHaveLength(20)
+  })
+
+  it('are the route\'s messages.connections when it sets one, and a closed socket frees its place', async () => {
+    const first = await opens('/few')
+    const second = await opens('/few')
+
+    expect(first && second).toBeTruthy()
+    expect(await opens('/few')).toBeUndefined()
+    // Another route has its own count.
+    const other = await opens('/')
+
+    expect(other).toBeDefined()
+    await closed(first!)
+    await Bun.sleep(50)
+
+    const third = await opens('/few')
+
+    expect(third).toBeDefined()
+    await Promise.all([second!, third!, other!].map(closed))
+  })
+
+  it('are not limited with connections: false', async () => {
+    const sockets = await Promise.all(Array.from({ length: 25 }, async () => opens('/many')))
+
+    expect(sockets.every(socket => socket !== undefined)).toBe(true)
+    await Promise.all(sockets.map(async socket => closed(socket!)))
   })
 })
 
@@ -174,5 +236,7 @@ describe('the options of a websocket route', () => {
     expect(() => socketLimits('/', { maxSize: 'big' as never })).toThrow('maxSize')
     expect(() => socketLimits('/', { rateLimit: { max: 0, window: '1s' } })).toThrow('rateLimit')
     expect(() => socketLimits('/', { rateLimit: { max: 5, window: 3 as never } })).toThrow('rateLimit')
+    expect(() => socketLimits('/', { connections: 0 })).toThrow('connections')
+    expect(() => socketLimits('/', { connections: 1.5 })).toThrow('connections')
   })
 })

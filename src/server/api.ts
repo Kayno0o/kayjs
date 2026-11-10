@@ -152,7 +152,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
       if (hooks && route.method === 'WS')
-        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages), ...[hooks.beforeHandle ?? []].flat()]
+        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages, app), ...[hooks.beforeHandle ?? []].flat()]
 
       if (hooks?.error !== undefined)
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
@@ -728,7 +728,7 @@ declare module 'elysia' {
     rateLimit?: RateLimit | RateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description, text }`, as an action's `tool` is, `text` taking the route's parsed JSON answer. A route without it is in the OpenAPI document and never offered.
     tool?: boolean | string | Omit<ActionTool<unknown>, 'output'> | undefined
-    // On a websocket route: the most one message may weigh (`maxSize`, 1 MB by default) and how many a socket may send in a window (`rateLimit`, 100 a second by default). A socket over either is closed, with 1009 or 1008.
+    // On a websocket route: the most one message may weigh (`maxSize`, 1 MB by default) and how many a socket may send in a window (`rateLimit`, 100 a second by default). A socket over either is closed, with 1009 or 1008. `connections` is how many sockets one client may have open on the route (20 by default, `false` for no limit); one past it answers 429.
     messages?: SocketLimits | undefined
   }
 }

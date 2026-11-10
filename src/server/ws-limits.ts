@@ -1,25 +1,32 @@
+import type { Elysia } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
 import { optionMs } from '../runtime/duration'
 import { DEFAULT_BODY_LIMIT } from './body'
+import { clientAddress, rateKey } from './protection'
 
-// What a websocket route lets one socket send, in the route's `detail.messages`: the most one message may weigh, and how many a socket may send in a window.
+// What a websocket route lets one socket send, in the route's `detail.messages`: the most one message may weigh, how many a socket may send in a window, and how many sockets one client may hold open on the route.
 export interface SocketLimits {
   maxSize?: ByteSize | undefined
   rateLimit?: { max: number, window: Duration } | undefined
+  // The sockets one client may have open on the route at once, 20 by default, `false` for no limit; one past it is refused with 429.
+  connections?: number | false | undefined
 }
 
 const LIMITS = Symbol.for('kay.socketLimits')
 const CLOSE_POLICY = 1008
 const CLOSE_TOO_BIG = 1009
 const DEFAULT_RATE = { max: 100, window: '1s' } as const
+const DEFAULT_CONNECTIONS = 20
 
 interface Limits {
   bytes: number
   max: number
   windowMs: number
+  // Open sockets by client, undefined when the route sets no limit on them.
+  connections: { most: number, open: Map<string, number> } | undefined
 }
 
 interface Upgradable {
@@ -27,12 +34,14 @@ interface Upgradable {
 }
 
 type Handler = (ws: Closable, message: string | ArrayBuffer | Uint8Array) => unknown
+type CloseHandler = (ws: Closable, code: number, reason: string) => unknown
 
 interface Closable {
   close: (code: number, reason: string) => unknown
 }
 
 interface RouteContext {
+  request?: Request
   server?: Upgradable | null
   [LIMITS]?: Limits
 }
@@ -43,12 +52,18 @@ const wrapped = new WeakSet<Upgradable>()
 function limitsOf(path: string, given: SocketLimits | undefined): Limits {
   const bytes = byteSize(given?.maxSize ?? DEFAULT_BODY_LIMIT, `the maxSize of the websocket route ${path}`)
   const { max, window } = given?.rateLimit ?? DEFAULT_RATE
+  const most = given?.connections ?? DEFAULT_CONNECTIONS
 
   if (!Number.isInteger(max) || max < 1)
     throw new KayError('config-invalid', `kay: the rateLimit of the websocket route ${path} has max ${String(max)}; it takes a whole number of messages from 1`)
 
+  if (most !== false && (!Number.isInteger(most) || most < 1))
+    throw new KayError('config-invalid', `kay: the connections of the websocket route ${path} is ${String(most)}; it takes a whole number of sockets from 1, or false for no limit`)
+
+  const connections = most === false ? undefined : { most, open: new Map<string, number>() }
+
   try {
-    return { bytes, max, windowMs: optionMs(window, 'window') }
+    return { bytes, max, windowMs: optionMs(window, 'window'), connections }
   }
   catch (error) {
     throw new KayError('config-invalid', `kay: the rateLimit of the websocket route ${path} is wrong: ${(error as Error).message}`)
@@ -83,7 +98,33 @@ function guarded(message: Handler, { bytes, max, windowMs }: Limits): Handler {
   }
 }
 
+// The cap kay gave each app, so a later route raises it and one the app set itself is left alone.
+const payloadCaps = new WeakMap<Elysia, number>()
+
+// Bun takes one `maxPayloadLength` for the whole server and buffers a frame up to it, 16 MiB by default, before kay's own check can close the socket: it is the largest `maxSize` of the app's routes.
+function capPayload(app: Elysia, bytes: number): void {
+  const own = app.config.websocket?.maxPayloadLength
+  const given = payloadCaps.get(app)
+
+  if (own !== undefined && own !== given)
+    return
+
+  const cap = Math.max(given ?? 0, bytes)
+
+  payloadCaps.set(app, cap)
+  app.config.websocket = { ...app.config.websocket, maxPayloadLength: cap }
+}
+
+function clientKey(request: Request, server: Upgradable | null | undefined): string {
+  return rateKey(clientAddress(request, server as Parameters<typeof clientAddress>[1]))
+}
+
+function hasRoom({ connections }: Limits, request: Request | undefined, server: Upgradable | null | undefined): boolean {
+  return !connections || !request || (connections.open.get(clientKey(request, server)) ?? 0) < connections.most
+}
+
 // Elysia hands the server's `upgrade` the socket's data, whose `message` Bun calls with the raw frame before Elysia parses it: wrapping it there is the one place a frame is measured before a 16 MB JSON is parsed.
+// Its `close` frees the client's place among the open sockets of the route.
 function limitUpgrades(server: Upgradable): void {
   if (wrapped.has(server))
     return
@@ -92,24 +133,65 @@ function limitUpgrades(server: Upgradable): void {
 
   wrapped.add(server)
   server.upgrade = (request, options) => {
-    const data = options?.data as { message?: Handler, [LIMITS]?: Limits } | undefined
+    const data = options?.data as { message?: Handler, close?: CloseHandler | undefined, [LIMITS]?: Limits } | undefined
     const limits = data?.[LIMITS]
 
-    if (data?.message && limits)
-      data.message = guarded(data.message, limits)
+    if (!data || !limits)
+      return upgrade(request, options)
 
-    return upgrade(request, options)
+    data.message &&= guarded(data.message, limits)
+
+    const { connections } = limits
+
+    if (!connections)
+      return upgrade(request, options)
+
+    const client = clientKey(request, server)
+
+    if (!hasRoom(limits, request, server))
+      return false
+
+    const close = data.close
+
+    data.close = (ws, code, reason) => {
+      const left = (connections.open.get(client) ?? 1) - 1
+
+      if (left > 0)
+        connections.open.set(client, left)
+      else
+        connections.open.delete(client)
+
+      return close?.(ws, code, reason)
+    }
+
+    if (!upgrade(request, options)) {
+      data.close = close
+
+      return false
+    }
+
+    connections.open.set(client, (connections.open.get(client) ?? 0) + 1)
+
+    return true
   }
 }
 
-// A hook run before a websocket route's upgrade, its limits checked when the module mounts: it puts them on the context, which Elysia copies into the socket's data.
-export function socketLimits(path: string, given: SocketLimits | undefined): (context: RouteContext) => void {
+// A hook run before a websocket route's upgrade, its limits checked when the module mounts: it puts them on the context, which Elysia copies into the socket's data, and answers 429 to a client whose places are all taken.
+export function socketLimits(path: string, given: SocketLimits | undefined, app?: Elysia): (context: RouteContext) => Response | undefined {
   const limits = limitsOf(path, given)
 
+  if (app)
+    capPayload(app, limits.bytes)
+
   return (context) => {
+    if (!hasRoom(limits, context.request, context.server))
+      return new Response('Too many open connections', { status: 429 })
+
     context[LIMITS] = limits
 
     if (context.server)
       limitUpgrades(context.server)
+
+    return undefined
   }
 }
