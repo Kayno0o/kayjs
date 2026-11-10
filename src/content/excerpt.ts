@@ -4,6 +4,8 @@ import { decode } from './markdown'
 // The marker an author writes between the lead and the rest of an entry, as Markdown passes it through.
 const MORE = /<!--\s*more\s*-->/i
 const PARAGRAPH = /<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/g
+// Paragraphs a quote, a list item or a disclosure holds are not the entry's own lead.
+const NESTED = /<(blockquote|li|details)\b[\s\S]*?<\/\1>/g
 const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/
@@ -19,7 +21,7 @@ function plain(markup: string): string {
 export function excerptOf(segments: readonly Segment[]): string {
   const markup = segments.filter((segment): segment is string => typeof segment === 'string').join('')
   const marker = MORE.exec(markup)
-  const lead = marker === null ? markup : markup.slice(0, marker.index)
+  const lead = (marker === null ? markup : markup.slice(0, marker.index)).replace(NESTED, '')
   const paragraphs = [...lead.matchAll(PARAGRAPH)].map(match => plain(match[1]!)).filter(paragraph => paragraph !== '')
 
   return (marker === null ? paragraphs.slice(0, 1) : paragraphs).join(' ')

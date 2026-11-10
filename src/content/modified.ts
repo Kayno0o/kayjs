@@ -3,7 +3,7 @@ export async function gitDates(folder: string): Promise<Map<string, Date>> {
   const dates = new Map<string, Date>()
 
   try {
-    const run = Bun.spawn(['git', '-c', 'core.quotepath=off', 'log', '--format=%x00%cI', '--name-only', '--no-renames', '--relative', '--', '.'], { cwd: folder, stdout: 'pipe', stderr: 'ignore', stdin: 'ignore' })
+    const run = Bun.spawn(['git', '-c', 'core.quotepath=off', 'log', '--format=%x00%aI', '--name-only', '--no-renames', '--relative', '--', '.'], { cwd: folder, stdout: 'pipe', stderr: 'ignore', stdin: 'ignore' })
     const output = await new Response(run.stdout).text()
 
     if (await run.exited !== 0)

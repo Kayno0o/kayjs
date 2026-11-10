@@ -1,3 +1,4 @@
+import type { PreviewState } from '../src/runtime/preview'
 import { mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +10,7 @@ import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
 import { contentPlace, setContentPlace } from '../src/content/load'
 import { html } from '../src/runtime/html'
+import { setPreviewScope } from '../src/runtime/preview'
 
 const schema = t.Object({ title: t.String(), description: t.Optional(t.String()), updatedAt: t.Optional(t.Date()) })
 
@@ -54,6 +56,11 @@ describe('an entry\'s excerpt', () => {
     expect(await excerptOf('')).toBe('')
   })
 
+  it('leaves the paragraphs of a quote or a loose list out', async () => {
+    expect(await excerptOf('> quoted\n\nOne.\n')).toBe('One.')
+    expect(await excerptOf('- a\n\n- b\n\nOne.\n')).toBe('One.')
+  })
+
   it('leaves a component\'s own paragraphs out', async () => {
     expect(await excerptOf('<Box>\n\ninside\n\n</Box>\n\nOutside.\n')).toBe('Outside.')
   })
@@ -94,6 +101,25 @@ describe('an entry\'s body and html', () => {
       expect(Object.keys(entry)).not.toContain('excerpt')
       expect(Object.keys({ ...entry })).not.toContain('html')
     })
+  })
+})
+
+describe('a localized collection with a draft in preview', () => {
+  it('keeps the excerpt and html of the entries it copies', async () => {
+    const rows = collection({ name: 'copy-rows', load: () => [{ slug: 'fr/a', data: { title: 'A' }, body: 'Lead.\n' }, { slug: 'fr/b', data: { title: 'B' }, body: 'Other.\n' }] }, { schema, localized: true })
+    const state: PreviewState = { loads: new Map(), edit: false, drafts: new Map([['copy-rows', [{ slug: 'b', locale: 'fr', data: { title: 'B2' } }]]]) }
+
+    setPreviewScope(() => state)
+
+    try {
+      const entry = (await rows.all('fr')).find(row => row.slug === 'a')!
+
+      expect([entry.excerpt, entry.html]).toEqual(['Lead.', '<p>Lead.</p>\n'])
+      expect(entryHead(rows, entry).find(tag => tag.props.name === 'description')?.props.content).toBe('Lead.')
+    }
+    finally {
+      setPreviewScope(() => undefined)
+    }
   })
 })
 

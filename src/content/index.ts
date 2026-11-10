@@ -414,7 +414,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
         // The drafted entries alone are decoded; the others are copied when localized, as indexing sets their translations and the collection's own are shared with every request.
         const kept = entries.list.filter(entry => !written.has(localized ? `${entry.locale}/${entry.slug}` : entry.slug))
 
-        return indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])])
+        return indexed([...localized ? kept.map(copied) : kept, ...decodeEach([...written.values()])])
       }))
     }
 
@@ -709,6 +709,11 @@ function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, C
     excerpt: { get: memo(() => excerptOf(segments)) },
     html: { get: memo(() => render(segments, components, entry.file, imageSizes).t) },
   }) as Entry<Data>
+}
+
+// A copy of an entry that keeps its lazy `excerpt` and `html`, which a spread would drop.
+function copied<Data>(entry: Entry<Data>): Entry<Data> {
+  return Object.defineProperties({}, Object.getOwnPropertyDescriptors(entry)) as Entry<Data>
 }
 
 function memo<Value>(make: () => Value): () => Value {
