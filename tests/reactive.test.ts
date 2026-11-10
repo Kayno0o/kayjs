@@ -1383,7 +1383,7 @@ describe('a tracked action call', () => {
       expect(call.pending()).toBe(false)
       await expect(call({ id: 1 })).rejects.toBeInstanceOf(ActionRedirectError)
       expect(call.pending()).toBe(false)
-      // A redirect that did not take the page away, there being none here to go, settles the wait too.
+      // A redirect settles the wait too.
       await call.settled()
       await saved.settled()
       // A handle follows its own action's refusals only.

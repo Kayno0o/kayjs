@@ -508,7 +508,7 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 A retry gives no result back; read `status()`, or add `onSuccess` and `onError` to the handle. Every source shares this shape: see [island sources](/llms/island-sources). A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
 
-To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects rejects with an `ActionRedirectError` carrying `location` as the browser goes there, so it stops running at once, as it does when a leave guard keeps the visitor on the page.
+To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects rejects with an `ActionRedirectError` carrying `location` once the browser has gone there (the swap has shown the page, or a full load has started), so it stops running, as it does when a leave guard keeps the visitor on the page.
 
 ```kay
 ---

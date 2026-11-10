@@ -1,6 +1,6 @@
 import type { Duration, Snippet } from 'kay'
 import type { Tone } from './tone'
-import { ActionError, ApiError, durationMs, signal, untrack } from 'kay'
+import { ActionError, ActionRedirectError, ApiError, durationMs, signal, untrack } from 'kay'
 import { answerMessage } from './internal/answer-message'
 
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
@@ -309,6 +309,10 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     return (value === undefined ? true : value) as Attempted<T>
   }
   catch (error) {
+    // The browser is going to the page the action redirected to: nothing failed, nothing to toast.
+    if (error instanceof ActionRedirectError)
+      return undefined
+
     const { onRefused, refusedAction } = options
     const data = onRefused === undefined && refusedAction === undefined ? undefined : refusalData<Data>(error)
 

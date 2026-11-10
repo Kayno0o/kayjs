@@ -1,6 +1,7 @@
 import type { ActionStream, SETTLED, Settles } from './action'
 import type { ApiError } from './api-error'
 import type { ConnectionStatus } from './live'
+import { ActionRedirectError } from './action-error'
 import { apiErrorOf } from './api-error'
 import { connection, connectionHooks, ended } from './connection'
 import { listenerSet } from './listener-set'
@@ -81,6 +82,10 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
       retrying!.begun(stream)
     }
     catch (thrown) {
+      // A retry answered with a redirect: the browser is going there, so the stream ends with the page rather than failing.
+      if (thrown instanceof ActionRedirectError)
+        return close()
+
       link.fail(apiErrorOf(thrown))
     }
   }

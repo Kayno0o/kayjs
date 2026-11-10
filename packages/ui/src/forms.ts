@@ -1,5 +1,5 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
-import { ActionError, ApiError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
+import { ActionError, ActionRedirectError, ApiError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
 import { liveElements } from './field-look'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
@@ -171,6 +171,10 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     return { result: await action(new FormData(form)) }
   }
   catch (error) {
+    // The browser is going to the page the action redirected to: nothing failed.
+    if (error instanceof ActionRedirectError)
+      return undefined
+
     // Told first, before the toast, what the call was refused or failed with.
     try {
       onError?.({ error })

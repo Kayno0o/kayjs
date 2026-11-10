@@ -12,7 +12,13 @@ if (typeof KAY_STATIC_EXPORT === 'undefined' && (typeof KAY_BROWSER !== 'undefin
     if (event.error !== undefined && event.error !== null)
       void reportLazily(event.error)
   })
-  window.addEventListener('unhandledrejection', event => void reportLazily(event.reason))
+  window.addEventListener('unhandledrejection', (event) => {
+    // A call whose action redirected rejects as the page goes away: no error to report.
+    if ((event.reason as { name?: unknown } | null)?.name === 'ActionRedirectError')
+      return event.preventDefault()
+
+    void reportLazily(event.reason)
+  })
 }
 
 // Loads the code posting errors to the server on the first one, so a page that never fails never ships it.

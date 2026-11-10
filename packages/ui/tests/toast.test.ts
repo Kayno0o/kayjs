@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
-import { ActionError, ApiError, signal } from 'kay'
+import { ActionError, ActionRedirectError, ApiError, signal } from 'kay'
 import { callAction } from '../src/forms'
 import { attempt, dismissToast, holdToasts, messageOf, toast, toasts } from '../src/toast'
 
@@ -463,6 +463,15 @@ describe('callAction reading a refusal without `refused`', () => {
     expect(await run('Name taken')).toEqual(['Name taken'])
     expect(await run({ error: 'Branch is behind' })).toEqual(['Branch is behind'])
     expect(await run({ message: 'Locked' })).toEqual(['Locked'])
+  })
+
+  test('says nothing for an action that redirects, there being no failure to show', async () => {
+    const onError = jest.fn()
+
+    toasts.set([])
+    expect(await callAction(form, (async () => Promise.reject(new ActionRedirectError(303, '/done'))) as never, signal<Record<string, string>>({}), 'Could not save', undefined, onError)).toBeUndefined()
+    expect(await attempt(async () => Promise.reject(new ActionRedirectError(303, '/done')), 'Could not delete')).toBeUndefined()
+    expect([shown(), onError.mock.calls.length]).toEqual([[], 0])
   })
 
   test('reads the errors and data of any ApiError of a 4xx, and keeps `failure` for no answer and a 5xx', async () => {

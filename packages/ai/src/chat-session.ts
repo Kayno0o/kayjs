@@ -2,7 +2,7 @@ import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
 import type { AiMessage, AiToolCall, ChatFailure, ChatMessage, ChatTurn, CodeBlock, Progress, Source } from './types'
-import { ActionError, effect, onMount, signal, untrack } from 'kay'
+import { ActionError, ActionRedirectError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
@@ -178,12 +178,11 @@ export function createChatSession(options: ChatSessionOptions) {
       return undefined
     }
     catch (error) {
-      console.error(error)
+      // A redirect is the browser leaving: nothing failed.
+      if (error instanceof ActionRedirectError || (console.error(error), heardIn !== left))
+        return undefined
 
       const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
-
-      if (heardIn !== left)
-        return undefined
 
       return refusal === undefined || refusal === '' ? voice.failedLabel : refusal
     }

@@ -43,6 +43,9 @@ export function bootDevTool(win: Window & { $kayProblems?: DevProblems }): void 
   win.addEventListener('unhandledrejection', (event) => {
     const reason: unknown = event.reason
 
+    if ((reason as { name?: unknown } | null)?.name === 'ActionRedirectError')
+      return
+
     win.$kayProblems!.push({ level: 'error', kind: 'uncaught', text: `Uncaught (in promise) ${String(reason)}`, error: reason })
   })
   win.addEventListener('securitypolicyviolation', (event) => {

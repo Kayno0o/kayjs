@@ -123,6 +123,35 @@ describe('what a call does once it succeeded', () => {
     expect(cart.count).toBe(1)
   })
 
+  it('rejects with ActionRedirectError once the swap went to the redirect, so pending() clears and settled() resolves', async () => {
+    serve(() => new Response(null, { status: 303, headers: { 'x-kay-redirect': '/away' } }))
+
+    const navigate = await import('../src/runtime/navigate-api')
+    const { navigation } = await import('../src/runtime/navigation')
+    const { ActionRedirectError } = await import('../src/runtime/action')
+    const swapped = spyOn(navigate, 'navigateTo').mockImplementation(async () => true)
+    const hooks = navigation.hooks
+
+    mocks.push(swapped)
+    navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
+
+    try {
+      const save = stub()
+
+      await expect(save({})).rejects.toBeInstanceOf(ActionRedirectError)
+      expect(swapped).toHaveBeenCalledTimes(1)
+      expect(swapped.mock.calls[0]![0]).toBe('/away')
+      expect(save.pending()).toBe(false)
+      await (save as unknown as { settled: () => Promise<void> }).settled()
+    }
+    finally {
+      if (hooks)
+        navigation.hooks = hooks
+      else
+        delete navigation.hooks
+    }
+  })
+
   it('leaves the page alone when it names resources, and refreshes it for refresh: true', async () => {
     serve(() => ok(1))
 

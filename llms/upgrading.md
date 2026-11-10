@@ -15,7 +15,8 @@ Their lint (`deprecated-menu-danger`) goes with them: run `kay upgrade` on 1.95 
 The call used to stay pending for good once the browser went to the redirect's target; it now rejects with `ActionRedirectError` (with `location`), as it already did when a leave guard kept the visitor on the page. The navigation goes on either way.
 
 - A `finally` after the call, or a `settled()` waiting on it, now runs on the page that is going away, and `pending()` is false.
-- Code awaiting the call without a `try` sees an unhandled rejection where it saw nothing: catch it and ignore an `ActionRedirectError`.
+- A call nobody awaits, as `onClick={() => logout()}`, reports nothing: the runtime ignores the rejection of a redirect. Code that awaits the call and reacts to any error (a `catch` that shows a failure) ignores an `ActionRedirectError` first; kayjs-ui's forms, `attempt` and the chat do. On a full load, `pending()` clears while the old page is still shown, for a moment.
+- The call's own `onError` hooks still skip a redirect, and `onSettled` runs for it.
 
 ## 1.95.0
 

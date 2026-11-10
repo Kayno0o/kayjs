@@ -130,4 +130,17 @@ describe('a stream retried whose post fails', () => {
     expect(stream.status()).toBe('failed')
     expect(run.pending()).toBe(false)
   })
+
+  it('closes a stream whose retry is answered with a redirect, as the page is going', async () => {
+    const first = open()
+
+    serve([first.response, () => new Response(null, { status: 303, headers: { 'x-kay-redirect': '/away' } })])
+
+    const { data: stream } = await stub().track()({})
+
+    first.drop()
+    await eventually(() => expect(stream.status()).toBe('failed'))
+    stream.retry()
+    await eventually(() => expect(stream.status()).toBe('closed'))
+  })
 })
