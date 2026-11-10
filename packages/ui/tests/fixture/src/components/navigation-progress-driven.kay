@@ -1,0 +1,14 @@
+---
+import type { Duration } from 'kay'
+import { onMount } from 'kay'
+import NavigationProgress from '@kaynooo/kayjs-ui/navigation-progress.kay'
+import { navigation as swap } from '../../../../../../src/runtime/navigation'
+
+const { delay, onShow, onHide } = props<{ delay: Duration, onShow: () => unknown, onHide: () => unknown }>()
+
+// Puts the swap in a state as the page swap does, for the bar that follows it with no `pending`.
+onMount(() => {
+  ;(window as unknown as { driveSwap: (state: 'loading' | 'swapping' | 'idle') => void }).driveSwap = state => swap.phase?.(state, new URL('http://localhost/next'))
+})
+---
+NavigationProgress(delay={delay} onShow={onShow} onHide={onHide})

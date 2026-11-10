@@ -1731,9 +1731,38 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         expect(await pending()).toEqual(['second'])
         // The next link takes the mark over.
         await own.click('a.two')
+        expect(await pending()).toEqual(['two'])
         await own.waitFor('h1', { text: 'Watched two' })
         release()
         await settled(own)
+        expect(await pending()).toEqual([])
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('clears the mark of a link that survives the swap, one in a persisted island', async () => {
+      const own = await open('/query')
+
+      try {
+        const { promise: held, resolve: release } = Promise.withResolvers<void>()
+        const pending = async () => own.evaluate(() => [...document.querySelectorAll('[data-pending]')].map(link => link.className))
+
+        await own.route(`${origin}/query?page=2`, async (request) => {
+          await held
+
+          try {
+            await request.continue()
+          }
+          catch {}
+        })
+        await own.click('a.next')
+        await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
+        expect(await pending()).toEqual(['next'])
+        release()
+        await settled(own)
+        expect(await own.evaluate(() => location.search)).toBe('?page=2')
         expect(await pending()).toEqual([])
       }
       finally {

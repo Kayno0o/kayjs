@@ -12,4 +12,4 @@ Put `NavigationProgress` once in the layout, with no props: it follows `navigati
 
 ## The followed link
 
-While a link is being followed, kay sets `data-pending` on it until the swap ends, with no script on your side. `a[data-pending]` styles it, such as dimming it or drawing a spinner after it: `a[data-pending] { opacity: 0.6 }`. Only the link followed carries it, one at a time; a form post, a refresh and a visit to a page kay does not swap in place do not.
+While a link is being followed, kay sets `data-pending` on it until the swap ends, with no script on your side. `a[data-pending]` styles it, such as dimming it or drawing a spinner after it: `a[data-pending] { opacity: 0.6 }`. Only the link followed carries it, one at a time, and a GET form that visits a page carries it too, so `form[data-pending]` works. A form post, a refresh and a visit to a page kay does not swap in place do not, and the mark goes when kay hands a page over to a full load.
