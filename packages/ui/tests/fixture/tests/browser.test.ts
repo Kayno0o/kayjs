@@ -577,8 +577,8 @@ inBrowser('LineChart onMark', () => {
     const site = await shared()
 
     await using page = await site.open('/chart-tooltip')
-    await page.waitFor('#events-press button[data-part="event"]')
-    await page.evaluate(() => document.querySelector<HTMLElement>('#events-press button[data-part="event"]')!.click())
+    await page.click('#events-press button[data-part="event"]')
+    await page.waitUntil(() => (window as unknown as { pressed?: unknown }).pressed !== undefined)
     expect(await page.evaluate(() => (window as unknown as { pressed: unknown }).pressed)).toEqual(['Press me', 1])
     expect(page.errors).toEqual([])
   }, 120_000)
