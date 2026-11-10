@@ -33,6 +33,8 @@ export const auth = authCore({
     ...process.env.FIXTURE_HOME && { home: process.env.FIXTURE_HOME },
     // tests/landmark.test.ts sets FIXTURE_MAIN with the layout that writes a main of its own.
     ...process.env.FIXTURE_MAIN === '1' && { main: false },
+    // tests/privacy.test.ts sets FIXTURE_PRIVACY to the privacy and purpose options, as JSON.
+    ...process.env.FIXTURE_PRIVACY && JSON.parse(process.env.FIXTURE_PRIVACY) as { privacy?: string, purpose?: string },
     ...(process.env.FIXTURE_REMEMBER === 'always' || process.env.FIXTURE_REMEMBER === 'never') && { remember: process.env.FIXTURE_REMEMBER },
     profile: {
       fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: { en: 'Bio', fr: 'Biographie' }, type: 'textarea' }, constructor: { label: 'Constructor' } },

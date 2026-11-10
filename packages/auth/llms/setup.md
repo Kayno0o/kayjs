@@ -104,6 +104,8 @@ A plain Elysia app, or one mounting the plugin by hand, gives `auth({ server: fa
 
 Each prebuilt page writes its content in a `main` landmark; `pages: { main: false }` (`auth({ pages: { main: false } })`) writes a `div` instead, for an app whose layout already writes a `main`.
 
+The register page's notice: `pages: { privacy: '/privacy', purpose: 'Your address signs you in.' }` draws `purpose` (stock line `auth.register.purpose` when unset) and a link to `privacy` (`auth.register.privacy`, `target="_blank"`) under the form; either one draws it, and `AuthFeatures.pages` carries both. In production `authCore` warns when the pages are on, sign-up and passwords are open and `privacy` is unset (RGPD art. 13).
+
 `auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, password, magicLink, twoFactor, captcha, scopes, prefix, oauthServer, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
 
 ### Signed-in user rules

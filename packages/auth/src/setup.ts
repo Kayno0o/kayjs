@@ -177,6 +177,11 @@ interface SiteBound {
   passkeys: Core['passkeys']
 }
 
+function warnWithoutPrivacy(pages: ReturnType<typeof pagesOf>, options: { signUp?: boolean | undefined, password?: unknown }) {
+  if (process.env.NODE_ENV === 'production' && pages && pages.privacy === undefined && (options.signUp ?? true) && options.password !== false)
+    log.warn('the stock register page collects an email address and states no purpose and links no privacy policy: set `pages: { privacy: \'/privacy\' }`, with `purpose` for the line above the link')
+}
+
 export function createCore<Data extends AuthSessionData, Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): Core {
   const prefix = options.prefix ?? '/auth'
 
@@ -192,6 +197,8 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
 
   if (process.env.NODE_ENV === 'production' && admin !== undefined && options.twoFactor !== false && !(typeof options.twoFactor === 'object' && options.twoFactor.require !== undefined))
     log.warn('`admin` is on and no `twoFactor.require` names it, so an admin can sign in without two-factor: set `twoFactor: { require: [\'admin\'] }`')
+
+  warnWithoutPrivacy(pages, options)
 
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
   let bound: SiteBound | undefined

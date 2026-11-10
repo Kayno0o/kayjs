@@ -176,6 +176,10 @@ With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in
 
 Each prebuilt page writes its content in a `main`, so a screen reader can jump to it. If your layout already wraps pages in a `main`, set `pages: { main: false }` in `authCore` (or `auth({ pages: { main: false } })`) and the pages write a `div` instead, so yours stays the one landmark.
 
+The register page collects an email address, so a site has to say what it is used for and link its privacy policy. Set `pages: { privacy: '/privacy' }` and the page draws a line under the form with a link to it, opening in a new tab.
+
+The line says the address is used to create and secure the account; `pages: { purpose: 'Your address signs you in and nothing else.' }` replaces it with your own words. In production, an app that opens sign-up with the stock pages and gives no `privacy` logs a warning at start.
+
 The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: same-origin`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.
 
 For a link of your own, `signInUrl()` is the sign-in page leading back to the current page, and `signInUrl('/pricing')` to another path of the site. A path that is not of the site leads home.

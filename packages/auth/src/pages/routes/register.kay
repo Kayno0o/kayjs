@@ -46,6 +46,8 @@ const fields = refused && 'fields' in refused ? refused.fields : {}
 const error = refusal(register.failed(), features.captcha)
 const verify = register.succeeded() !== undefined
 const landmark = ctx.locals.auth.features().pages?.main !== false
+const privacy = features.pages?.privacy
+const purpose = features.pages?.purpose
 ---
 head
   title {wording('auth.register.title', 'Create an account')}
@@ -72,5 +74,10 @@ Panel(landmark={landmark} title={wording('auth.register.title', 'Create an accou
       if error
         Message(text={error})
       Button(type="submit" tone="accent" label={wording('auth.register.submit', 'Create the account')})
+      if privacy || purpose
+        p.text-xs.text-muted
+          | {purpose ?? wording('auth.register.purpose', 'We use your email address to create and secure your account.')}{' '}
+          if privacy
+            a(href={privacy} target="_blank" rel="noopener" data-new-tab="") {wording('auth.register.privacy', 'Privacy policy')}
   p.text-center
     | {wording('auth.register.haveAccount', 'Already have an account?')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.register.signIn', 'Sign in')}]

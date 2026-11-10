@@ -359,7 +359,7 @@ interface AuthFeatures
   magicLink: boolean
   oauthServer: boolean
   organizations: null | { roles: string[]; owner: string; manage: string; grants: Record<string, string[]>; }
-  pages: null | { prefix: string; home: string; remember: RememberMode; main: boolean; }
+  pages: null | { prefix: string; home: string; remember: RememberMode; main: boolean; privacy?: string | undefined; purpose?: string | undefined; }
   passkeys: boolean
   password: boolean
   prefix: string
@@ -514,7 +514,9 @@ interface AuthPagesConfig extends AuthPagesOptions
   home?: string | undefined
   main?: boolean | undefined
   prefix?: string | undefined
+  privacy?: string | undefined
   profile?: ProfileOptions<string> | undefined
+  purpose?: string | undefined
   remember?: RememberMode | undefined
 
 [.] AuthPagesOptions

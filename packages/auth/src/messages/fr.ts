@@ -30,6 +30,8 @@ export default defineMessages({
       haveAccount: 'Déjà un compte ?',
       signIn: 'Se connecter',
       checkMail: 'Consultez vos e-mails pour continuer.',
+      purpose: 'Votre adresse e-mail sert à créer et à protéger votre compte.',
+      privacy: 'Politique de confidentialité',
     },
     twoFactor: {
       title: 'Validation en deux étapes',

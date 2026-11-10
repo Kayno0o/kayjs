@@ -61,6 +61,10 @@ export interface AuthPagesConfig extends AuthPagesOptions {
   remember?: RememberMode | undefined
   // Whether the prebuilt pages write their content in a `main` landmark, `true` by default. `false` for an app whose layout already wraps its pages in one, so a page holds a single `main`.
   main?: boolean | undefined
+  // Where the privacy policy is, such as `/privacy`: the register page links it under the form, after the purpose line. A site collecting email addresses states what for and links its policy; without it a production start warns.
+  privacy?: string | undefined
+  // What the register page tells a visitor their address and name are used for, drawn under the form; `privacy` alone draws the link after a stock line, worded as `auth.register.purpose`.
+  purpose?: string | undefined
   // Extra fields on the account page's profile form, with where they are read and stored.
   profile?: ProfileOptions | undefined
 }
@@ -107,7 +111,7 @@ export interface AuthFeatures {
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
-  pages: { prefix: string, home: string, remember: RememberMode, main: boolean } | null
+  pages: { prefix: string, home: string, remember: RememberMode, main: boolean, privacy?: string | undefined, purpose?: string | undefined } | null
   // The password and username limits, for a page or an island to show and check with: `passwordProblem(value, features.rules)`. The password rule's `check` stays on the server and in the app's own `rules`.
   rules: { password: { min: number, max: number }, username: { min: number, max: number } }
 }
@@ -151,7 +155,7 @@ export function featuresOf(core: Core): AuthFeatures {
     organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage, grants: grantsOf(core.organizations) } : null,
     audit: core.audit !== undefined,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
-    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember, main: core.pages.main } : null,
+    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember, main: core.pages.main, privacy: core.pages.privacy, purpose: core.pages.purpose } : null,
   }
 }
 
@@ -323,13 +327,13 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
 }
 
 // The prefix and home `authCore` reads off its `pages` option.
-export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, main: boolean, profile?: ProfileOptions } | undefined {
+export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, main: boolean, privacy: string | undefined, purpose: string | undefined, profile?: ProfileOptions } | undefined {
   if (pages == null || pages === false)
     return undefined
 
   const options = pages === true ? {} : pages
 
-  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', remember: options.remember ?? 'checkbox', main: options.main ?? true, ...options.profile && { profile: options.profile } }
+  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', remember: options.remember ?? 'checkbox', main: options.main ?? true, privacy: options.privacy, purpose: options.purpose, ...options.profile && { profile: options.profile } }
 }
 
 // The label of a profile field in `locale`: a plain string as it is, a map by locale tag the entry matching `locale` exactly or by language, else the first.

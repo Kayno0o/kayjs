@@ -129,6 +129,8 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   error: string | undefined;
   verify: boolean;
   landmark: boolean;
+  privacy: any;
+  purpose: any;
 }>
 
 [./pages/register.kay] page
