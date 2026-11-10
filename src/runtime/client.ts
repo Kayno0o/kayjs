@@ -4,7 +4,6 @@ import { withBase } from './base'
 import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
-import { islandLoading } from './page-data'
 import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { savesDataInBrowser } from './save-data'
 import { freshPrefix, withIds } from './uid'
@@ -139,9 +138,6 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     else
       eager.push(run())
   }
-
-  for (const hydrated of eager)
-    islandLoading(hydrated)
 
   await Promise.all(eager)
 }

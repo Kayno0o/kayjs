@@ -2,7 +2,8 @@ import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-
 import { withBase } from './base'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
-import { islandsLoaded, pageData } from './page-data'
+import { ISLAND } from './markers'
+import { pageData } from './page-data'
 import { isHydrating, onCleanup, ownSignal, tracking, untrack, whenHydrated } from './reactive'
 import { decodeServerValue } from './wire'
 
@@ -15,8 +16,8 @@ const GONE_RETRY_MS = 5 * 60_000
 const RENEW_EVENT = 'kay-renew'
 // How long a browser waits after the values it reads change before it opens, moves or closes its connection, so the islands of a page and a swap share one.
 const SETTLE_MS = 30
-// The longest it then waits for the islands the page hydrates as it loads, whose code may arrive late, so one that never does leaves the page no less followed.
-const ISLANDS_MS = 5000
+// The most settles (5 seconds) it waits for the islands the page hydrates as it loads, whose code may arrive late, so one that never does leaves the page no less followed.
+const ISLANDS_WAITS = 166
 
 interface Entry {
   read: () => unknown
@@ -152,23 +153,19 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+// The islands that hydrate as the page loads and have not yet (`_$k` marks one done, as in client.ts), so one waiting for the viewport or the browser's idle time is not waited for.
+const EAGER_ISLANDS = `${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])`
+let waits = 0
+
+// Each settle that finds an island hydrating as the page loads still to subscribe waits one more, so the keys they all read are carried by one connection however late their code arrives; one that subscribes later still moves it.
 function settle(): void {
   clearTimeout(settling)
-  settling = setTimeout(() => void syncAfterIslands(), SETTLE_MS)
-}
-
-// The keys of every island hydrating as the page loads are read before the connection opens, however late their code arrives, so a page costs one connection; one that subscribes later still moves it.
-async function syncAfterIslands(): Promise<void> {
-  const mine = settling
-
-  let giveUp: ReturnType<typeof setTimeout> | undefined
-
-  await Promise.race([islandsLoaded(), new Promise(resolve => giveUp = setTimeout(resolve, ISLANDS_MS))])
-  clearTimeout(giveUp)
-
-  // A key that changed meanwhile settled again, and that one syncs.
-  if (settling === mine)
-    sync()
+  settling = setTimeout(() => {
+    if (waits++ < ISLANDS_WAITS && [...document.querySelectorAll<Element & { _$k?: boolean }>(EAGER_ISLANDS)].some(island => !island._$k))
+      settle()
+    else
+      sync()
+  }, SETTLE_MS)
 }
 
 // Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; `gone` when the page no longer holds any, as one the visitor may not see, `failed` when it could not be asked.
@@ -239,6 +236,7 @@ function release(): void {
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
 function sync(): void {
   settling = undefined
+  waits = 0
   syncs++
   wake?.()
 

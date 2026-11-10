@@ -8,28 +8,6 @@ const failed = new WeakMap<Element, string>()
 // The scripts each selector found once the page was parsed, until a swap changes the page: a read that finds nothing, the usual one, then searches the page once.
 const found = new Map<string, Element[]>()
 
-// The islands a page hydrates as it loads, whose code may still be arriving, which a live value's connection waits for so it carries what they all read.
-const loadingIslands = new Set<Promise<unknown>>()
-
-// Notes an island hydrating as the page loads, until it is done or failed.
-export function islandLoading(hydrated: Promise<unknown>): void {
-  loadingIslands.add(hydrated)
-  void (async () => {
-    try {
-      await hydrated
-    }
-    catch {}
-
-    loadingIslands.delete(hydrated)
-  })()
-}
-
-// Resolves once every island noted is hydrated, those noted meanwhile included.
-export async function islandsLoaded(): Promise<void> {
-  while (loadingIslands.size > 0)
-    await Promise.allSettled(loadingIslands)
-}
-
 // Called where a swap changes the page's elements, so the next read searches the page again.
 export function forgetPageData(): void {
   found.clear()
