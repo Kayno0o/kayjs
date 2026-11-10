@@ -8,7 +8,9 @@ description: A bar showing a level, such as a disk or quota usage, with its valu
 
 ## The value as text
 
-`formatValue(value, max)` words the value, a function such as `(value, max) => value + ' of ' + max + ' seats'`. Screen readers hear it as `aria-valuetext`, and `showValue` draws it under the bar, `value / max` when there is no `formatValue`. A `@reading(text, value, max)` block draws the text in your own markup and shows without `showValue`. A function or a block with parameters makes the Meter an island on the page that passes it, so write `--- island` there.
+`formatValue(value, max)` words the value, a function such as `(value, max) => value + ' of ' + max + ' seats'`. Screen readers hear it as `aria-valuetext`, and `showValue` draws it under the bar, `value / max` when there is no `formatValue`. A `@reading(text, value, max)` block draws the text in your own markup and shows without `showValue`. Either of them wraps the bar in a `field` part.
+
+A function or a block with parameters makes the Meter an island on the page that passes it, so write `--- island` there.
 
 <Demo name="meter/value" />
 

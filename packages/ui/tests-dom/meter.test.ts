@@ -95,10 +95,10 @@ test('size sets the height through the root', async () => {
 
     const meter = bar(await mount('meter', { value: 1, size }), 'meter')
 
-    sizes.push(meter.getAttribute('data-size'))
+    sizes.push([meter.getAttribute('data-size'), ['h-1', 'h-2', 'h-3'].filter(name => meter.classList.contains(name))])
   }
 
-  expect(sizes).toEqual(['sm', 'md', 'lg'])
+  expect(sizes).toEqual([['sm', ['h-1']], ['md', ['h-2']], ['lg', ['h-3']]])
 })
 
 test('a Progress takes formatValue, thresholds, size and the text too, and stays silent while indeterminate', async () => {

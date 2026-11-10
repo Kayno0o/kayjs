@@ -7,14 +7,14 @@ import type { Threshold } from './threshold'
 // Indeterminate, a bar slides across the track, held still and part-filled under reduced motion.
 const look = recipe({
   parts: {
-    root: 'kui-progress h-2 w-full overflow-hidden bg-surface',
+    root: 'kui-progress w-full overflow-hidden bg-surface',
     fill: 'h-full transition-[width] motion-reduce:transition-none data-indeterminate:w-2/5 data-indeterminate:animate-[kui-progress-slide_1.4s_ease-in-out_infinite] data-indeterminate:motion-reduce:animate-none',
     field: 'block',
     reading: 'mt-1 block text-xs text-muted tabular-nums',
   },
   variants: {
     // The bar's height: `sm`, `md` (default) or `lg`.
-    size: { sm: { root: 'h-1' }, md: '', lg: { root: 'h-3' } },
+    size: { sm: { root: 'h-1' }, md: { root: 'h-2' }, lg: { root: 'h-3' } },
   },
   defaults: { size: 'md' },
 })
