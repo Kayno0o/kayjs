@@ -185,7 +185,7 @@ function lazySignal<T>(value: T): [read: () => T, write: (next: T) => void, peek
   }, () => current]
 }
 
-// Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes, unless the visitor stays or already went elsewhere.
+// Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 export function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
@@ -550,9 +550,8 @@ export async function readActionResponse<Output>(response: Response, action: str
     if (left?.() === true)
       throw new ActionRedirectError(response.status, target)
 
-    // The page goes away, so whatever awaited the call never resumes; a leave guard keeping the visitor here settles it instead.
-    if (await goTo(target))
-      return new Promise<never>(() => undefined)
+    // The navigation goes on either way; the call rejects as one a leave guard stopped does, so `pending()` clears and a `finally` runs.
+    await goTo(target)
 
     throw new ActionRedirectError(response.status, target)
   }
@@ -625,24 +624,17 @@ async function refreshedIn(sources: readonly Refreshable[]): Promise<void> {
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.
-// Whether the page went, or a leave guard kept the visitor on it.
-async function goTo(target: string): Promise<boolean> {
+async function goTo(target: string): Promise<void> {
   const api = navigation.hooks ? await navigateApi() : undefined
 
   if (api) {
-    const [before, released] = [navigation.current, navigation.released]
-
     await api.navigateTo(target, {}, false)
 
-    return navigation.current !== before || (!released && navigation.released)
+    return
   }
 
   const url = new URL(target, location.href)
 
-  if (!await mayLeave(url, false))
-    return false
-
-  leave(url)
-
-  return true
+  if (await mayLeave(url, false))
+    leave(url)
 }

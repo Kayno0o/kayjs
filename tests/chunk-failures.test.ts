@@ -43,13 +43,14 @@ Bun.plugin({
 
 let navigation: typeof import('../src/runtime/navigation').navigation
 let actionStub: typeof import('../src/runtime/action').actionStub
+let ActionRedirectError: typeof import('../src/runtime/action').ActionRedirectError
 let showRefusal: typeof import('../src/runtime/swap-refusal').showRefusal
 
 beforeAll(async () => {
   GlobalRegistrator.register({ url: 'http://localhost/page' })
 
   ;({ navigation } = await import('../src/runtime/navigation'))
-  ;({ actionStub } = await import('../src/runtime/action'))
+  ;({ actionStub, ActionRedirectError } = await import('../src/runtime/action'))
   ;({ showRefusal } = await import('../src/runtime/swap-refusal'))
 })
 
@@ -185,8 +186,8 @@ describe('a page whose navigate-api chunk fails to load with the build unchanged
 
     const call = actionStub('/_kay/action/test/redirect') as unknown as (input: object) => Promise<unknown>
 
-    // The page goes away, so the call never settles.
-    void call({})
+    // The page goes away, and the call rejects as one a leave guard stopped does.
+    await expect(call({})).rejects.toBeInstanceOf(ActionRedirectError)
     await settle()
 
     expect(assigned).toHaveBeenCalledTimes(1)

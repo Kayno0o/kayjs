@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An action call takes `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md)).
 - An action call and an api `call()` take `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md), [api from islands](api-from-islands.md)).
 - `kay lint --help` and `kay test --help` open with what kay adds, then print keslint's and `bun test`'s help; `kay test --format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` as one document with the report on stderr, `kay lint --format json` hands keslint ESLint's JSON, and `kay new --help` describes `--editor` ([commands](check-and-tools.md)).
+- A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
 
 ## 1.95.0
 

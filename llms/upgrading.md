@@ -10,6 +10,12 @@ Their lint (`deprecated-menu-danger`) goes with them: run `kay upgrade` on 1.95 
 
 - A `MenuAction` flagged `danger: true` is `tone: 'danger'`; the flag is a type error now, and an entry built elsewhere that still sets it is drawn without the danger colour.
 - `Toast` is `{ id, message, tone, ... }`: `ToastType` and `Toast.type` are gone, so `toasts()[n].type`, or a `@toast` block reading `item.type`, reads `tone` instead, where `error` was `danger` (`info` and `success` are unchanged). `toast.error`, `toast.success` and `toast.info` stay.
+### A call whose action redirects rejects
+
+The call used to stay pending for good once the browser went to the redirect's target; it now rejects with `ActionRedirectError` (with `location`), as it already did when a leave guard kept the visitor on the page. The navigation goes on either way.
+
+- A `finally` after the call, or a `settled()` waiting on it, now runs on the page that is going away, and `pending()` is false.
+- Code awaiting the call without a `try` sees an unhandled rejection where it saw nothing: catch it and ignore an `ActionRedirectError`.
 
 ## 1.95.0
 

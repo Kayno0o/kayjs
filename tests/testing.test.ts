@@ -321,9 +321,11 @@ describe('kay/test', () => {
       expect(asked).toEqual(['/about'])
 
       leaving = true
-      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
+      const going = expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')).rejects.toBeInstanceOf(ActionRedirectError)
+
       // The swap is imported first.
       await until(() => window.location.href === 'http://localhost/about')
+      await going
       await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }), '/_kay/action/test/go')).rejects.toThrow('which is no page')
       expect(window.location.href).toBe('http://localhost/about')
     }
