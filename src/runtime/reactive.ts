@@ -615,42 +615,39 @@ export function root<T>(fn: (dispose: () => void) => T): T {
   return runWithOwner(node, () => untrack(() => fn(() => dispose(node))))
 }
 
-// What names an effect in a report: its function's name, else the start of its source.
-function effectName(node: Computation): string {
-  return sourceStart(node.fn)
-}
-
 // Runs every effect whose sources changed, now.
 // kept: free
 export function flush(): void {
   scheduled = false
 
-  let rounds = 0
-
-  while (renderQueue.length > 0 || userQueue.length > 0) {
-    // An effect writing what it reads, on every run, would never settle.
-    if (++rounds > MAX_ROUNDS) {
-      // Production's names are minified, so only development reads them.
-      const looping = process.env.NODE_ENV === 'production' ? '' : `. Still queued: ${[...new Set([...renderQueue, ...userQueue].map(effectName))].slice(0, 5).join(', ')}`
-
-      renderQueue = []
-      userQueue = []
-      console.error(`[kay] effects still writing what they read after ${MAX_ROUNDS} rounds: stopped${looping}`)
-
-      return
-    }
-
-    const render = renderQueue
-    const user = userQueue
+  // An effect writing what it reads, on every run, would never settle.
+  for (let rounds = 1; renderQueue.length > 0 || userQueue.length > 0; rounds++) {
+    const ran = renderQueue.concat(userQueue)
+    let stuck: Computation[] = []
 
     renderQueue = []
     userQueue = []
 
-    for (const node of render)
+    for (const node of ran) {
       runEffect(node)
 
-    for (const node of user)
-      runEffect(node)
+      // Past the cap, an effect marked by its own run wrote what it read: it is the one that never settles.
+      if (rounds > MAX_ROUNDS && node.state !== CLEAN && node.state !== DISPOSED)
+        stuck.push(node)
+    }
+
+    if (rounds > MAX_ROUNDS) {
+      // A loop through several effects has no such one, so every effect queued is stopped; a stopped effect runs again when what it reads changes, and what only reads a runaway effect's writes keeps running.
+      if (stuck.length === 0)
+        stuck = renderQueue.concat(userQueue)
+
+      for (const node of stuck)
+        node.state = node.state === DISPOSED ? DISPOSED : CLEAN
+
+      // Production's names are minified, so only development reads them.
+      console.error(`[kay] effects still writing what they read after ${MAX_ROUNDS} rounds: stopped${process.env.NODE_ENV === 'production' ? '' : `. Looping: ${[...new Set(stuck.map(node => sourceStart(node.fn)))].slice(0, 5).join(', ')}`}`)
+      rounds = 0
+    }
   }
 }
 

@@ -2126,7 +2126,90 @@ describe('effect and onMount types', () => {
     expect(built.success).toBe(true)
     expect(text).toContain('effects still writing')
 
-    for (const dev of ['no owner', 'is dropped', 'lives until the page goes', 'Still queued'])
+    for (const dev of ['no owner', 'is dropped', 'lives until the page goes', 'Looping'])
       expect(text, dev).not.toContain(dev)
+  })
+
+  describe('an effect that never settles', () => {
+    it('is named and stopped, what reads its writes ends on the last value, and the other effects of the page go on', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      const other = signal('a')
+      const seen: unknown[] = []
+      let loopRuns = 0
+
+      root(() => {
+        // eslint-disable-next-line prefer-arrow-callback -- the name is what the report shows
+        effect(function runaway() {
+          loopRuns++
+          count.set(count() + 1)
+        })
+        effect(() => void seen.push(count()))
+        effect(() => void seen.push(other()))
+      })
+      flush()
+
+      expect(error).toHaveBeenCalledTimes(1)
+      expect(String(error.mock.calls[0]![0])).toContain('Looping: runaway')
+      expect(seen.filter(value => typeof value === 'number').at(-1)).toBe(count())
+
+      const settled = loopRuns
+
+      other.set('b')
+      flush()
+      expect(seen.at(-1)).toBe('b')
+      // Nothing writes `count` any more: the stopped effect did not run again.
+      expect(loopRuns).toBe(settled)
+      error.mockRestore()
+    })
+
+    it('stops a loop through several effects and leaves the others queued behind it to run', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const left = signal(0)
+      const right = signal(0)
+      const other = signal(0)
+      const seen: number[] = []
+
+      root(() => {
+        effect(() => right.set(left() + 1))
+        effect(() => left.set(right() + 1))
+        effect(() => void seen.push(other()))
+      })
+      batch(() => other.set(1))
+      flush()
+      expect(error).toHaveBeenCalledTimes(1)
+      expect(seen.at(-1)).toBe(1)
+      other.set(2)
+      flush()
+      expect(seen.at(-1)).toBe(2)
+      error.mockRestore()
+    })
+
+    it('is stopped inside an effect another one runs, and a disposed effect stays disposed', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      let runs = 0
+      let stop = (): void => undefined
+
+      root((dispose) => {
+        stop = dispose
+        effect(() => {
+          runs++
+          count.set(count() + 1)
+        })
+      })
+      flush()
+      expect(error).toHaveBeenCalledTimes(1)
+      stop()
+      count.set(0)
+      flush()
+
+      const after = runs
+
+      count.set(1)
+      flush()
+      expect(runs).toBe(after)
+      error.mockRestore()
+    })
   })
 })
