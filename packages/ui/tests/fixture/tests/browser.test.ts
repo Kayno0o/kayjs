@@ -1423,6 +1423,25 @@ inBrowser('a CopyButton on a served page', () => {
   }, 120_000)
 })
 
+inBrowser('an autosaving Dialog and SidePanel', () => {
+  test.each([['dialog', 'dialog'], ['panel', 'panel']] as const)('the %s still closes on a click outside and on Escape once something was typed', async (id, name) => {
+    const site = await shared()
+
+    await using page = await site.open('/autosave-overlays')
+
+    for (const close of [async () => page.click('body', { at: { x: 4, y: 4 } }), async () => page.press('Escape')]) {
+      await page.click(`#open-${id}`)
+      await page.waitFor(`#${id}[open]`)
+      await page.fill(`#${id}-field`, '12')
+      await close()
+      await page.waitFor(`#${id}[open]`, { gone: true })
+    }
+
+    await page.waitFor('#closes', { text: `${name} ${name}` })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
   test('hydrates a non-modal SidePanel the server rendered open without closing or reopening it, its close link the IconButton look, above a sticky header', async () => {
     const site = await shared()

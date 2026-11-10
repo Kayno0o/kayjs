@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The space skin's `starfield` draws its dots on a fixed `::before` layer instead of a fixed background, so a long page no longer repaints the viewport on every scroll frame; an app styling `.starfield::before` should know ([setup](../packages/ui/llms/setup.md)).
+- Dialog, SidePanel and FormDialog take `autosave` for fields that save as they are typed: typing no longer locks the close, so a click outside and Escape close the overlay as before anything was typed, and `dirty` still locks it ([kayjs-ui basics](../packages/ui/llms/basics.md)).
 
 ## 1.95.0
 

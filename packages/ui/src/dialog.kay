@@ -27,7 +27,7 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open, title, heading, level = 2, size = 'md', bare = false, dirty = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   // Names the dialog for screen readers, and is the heading unless a `@heading` block draws it.
@@ -40,6 +40,8 @@ const { open, title, heading, level = 2, size = 'md', bare = false, dirty = fals
   bare?: boolean | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
+  // Fields inside save as they are typed, so typing does not lock the close: a click outside and Escape close the dialog as before anything was typed. `dirty` still locks it.
+  autosave?: boolean | undefined
   // `false` shows the dialog over the page without blocking it: the page stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
   modal?: boolean | undefined
   // Controls in the head line, before its close button, such as previous and next.
@@ -77,7 +79,7 @@ function closed() {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={title} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(aria-label={title} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     header(part="head")
       if header

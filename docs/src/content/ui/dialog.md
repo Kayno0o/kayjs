@@ -16,6 +16,8 @@ Typing inside marks the dialog as edited, so a click outside or Escape no longer
 
 <Demo name="dialog/edited" />
 
+Set `autosave` when the fields save as they are typed: typing then locks nothing, and a click outside or Escape closes the dialog as before anything was typed. `dirty` still locks it.
+
 ## Work in progress
 
 Set `dirty` for other work the dialog must not drop, such as a request in flight.

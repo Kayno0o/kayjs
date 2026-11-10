@@ -1378,14 +1378,14 @@ component default
 
 [./dialog.kay] default
 component default
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
 }; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: string }
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
@@ -1546,6 +1546,7 @@ component default
 component default
   action: Action<never, Output, never>
   actions?: Element
+  autosave?: boolean | undefined
   cancelLabel?: string | undefined
   children?: Element
   class?: string | undefined | {
@@ -2445,7 +2446,7 @@ component default
 
 [./side-panel.kay] default
 component default
-  | { actions?: Element; children?: Element; class?: string | undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
@@ -2459,7 +2460,7 @@ component default
     };
   };
 }; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
-  | { actions?: Element; children?: Element; class?: string | undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
@@ -2473,7 +2474,7 @@ component default
     };
   };
 }; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
-  | { actions?: Element; children?: Element; class?: string | undefined | {
+  | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;

@@ -2237,10 +2237,11 @@ function tabOf(href: string | undefined, newTab?: NewTab | undefined): Record<ne
 }
 
 [./lib/overlay] closeWatcher
-function closeWatcher({ modal, docked, dirty, edited, footer }: CloseWatcherState): "any" | "closerequest" | "none"
+function closeWatcher({ modal, docked, dirty, edited, autosave, footer }: CloseWatcherState): "any" | "closerequest" | "none"
 
 [./lib/overlay] CloseWatcherState
 interface CloseWatcherState
+  autosave?: boolean | undefined
   dirty: boolean
   docked?: boolean | undefined
   edited: boolean

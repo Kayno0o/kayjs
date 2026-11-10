@@ -12,19 +12,21 @@ export interface CloseWatcherState {
   dirty: boolean
   // Typed text inside.
   edited: boolean
+  // Fields that save as they are typed leave nothing to lose, so typing does not count.
+  autosave?: boolean | undefined
   // Whether a footer offers a way to close it.
   footer: boolean
 }
 
-// What the `closedby` attribute of an overlay says, from its guard: a click outside or Escape, Escape alone, or neither. Typing inside counts on its own, though Escape still closes a modal with no footer.
-export function closeWatcher({ modal, docked = false, dirty, edited, footer }: CloseWatcherState): 'any' | 'closerequest' | 'none' {
+// What the `closedby` attribute of an overlay says, from its guard: a click outside or Escape, Escape alone, or neither. Typing inside counts on its own unless the overlay `autosave`s, though Escape still closes a modal with no footer.
+export function closeWatcher({ modal, docked = false, dirty, edited, autosave = false, footer }: CloseWatcherState): 'any' | 'closerequest' | 'none' {
   if (docked || dirty)
     return 'none'
 
   if (!modal)
     return 'closerequest'
 
-  if (!edited)
+  if (!edited || autosave)
     return 'any'
 
   return footer ? 'none' : 'closerequest'

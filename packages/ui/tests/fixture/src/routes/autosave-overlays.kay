@@ -1,0 +1,6 @@
+---
+import Autosave from '../components/autosave-overlays.kay'
+import '../app.css'
+---
+main
+  Autosave

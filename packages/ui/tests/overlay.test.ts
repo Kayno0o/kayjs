@@ -2,6 +2,14 @@ import { expect, test } from 'bun:test'
 import fr from '../src/messages/fr'
 import { closeWatcher, followsHref, renderedOpen } from '../src/overlay'
 
+test('autosave leaves typing out of the guard, and dirty and a docked panel still lock it', () => {
+  expect([
+    closeWatcher({ modal: true, dirty: false, edited: true, autosave: true, footer: true }),
+    closeWatcher({ modal: true, dirty: true, edited: true, autosave: true, footer: false }),
+    closeWatcher({ modal: true, docked: true, dirty: false, edited: true, autosave: true, footer: false }),
+  ]).toEqual(['any', 'none', 'none'])
+})
+
 test.each([
   // modal, docked, dirty, edited, footer, closedby
   [true, false, false, false, false, 'any'],

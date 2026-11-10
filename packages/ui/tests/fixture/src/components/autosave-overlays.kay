@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// A Dialog and a SidePanel whose fields save as they are typed, each with a button to open it and a count of what its `onOpenChange` heard.
+const dialog = signal(false)
+const panel = signal(false)
+const closes = signal('')
+---
+button#open-dialog(onClick={() => dialog = true}) Open dialog
+button#open-panel(onClick={() => panel = true}) Open panel
+output#closes {closes()}
+Dialog#dialog(open={dialog()} autosave title="Stored" onOpenChange={shown => { dialog = shown; if (!shown) closes = `${closes()}dialog ` }})
+  input#dialog-field(aria-label="Level")
+SidePanel#panel(open={panel()} autosave title="Sheet" onOpenChange={shown => { panel = shown; if (!shown) closes = `${closes()}panel ` }})
+  input#panel-field(aria-label="Level")

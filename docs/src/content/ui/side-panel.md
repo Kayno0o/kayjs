@@ -54,4 +54,4 @@ With `closeHref`, `onOpenChange` is optional. Leave it out and a server page ren
 
 ## Typed work is kept
 
-As in a Dialog, typing inside marks the panel as edited: a click outside no longer closes it, and Escape closes it only when it has no footer. `dirty` locks it for other work, the close button included. Opening it again starts clean.
+As in a Dialog, typing inside marks the panel as edited: a click outside no longer closes it, and Escape closes it only when it has no footer. `dirty` locks it for other work, the close button included. Opening it again starts clean. `autosave` says the fields save as they are typed: typing then locks nothing, while `dirty` still does.
