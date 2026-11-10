@@ -89,6 +89,32 @@ export interface RemoteLimits {
   timeoutMs: number
 }
 
+export interface ImageLimits {
+  perMinute: number | undefined
+  maxVariants: number | undefined
+  queue: number | undefined
+}
+
+// Unless `images.perMinute`, `images.maxVariants` or `images.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
+const DEFAULT_IMAGE_LIMITS = { perMinute: 120, maxVariants: 256, queue: 128 } as const
+
+// The limits of the image route on variants it has to encode, each a whole number from 1 or `false` for none.
+export function imageLimits(images: Pick<ImagesConfig, 'perMinute' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
+  const read = (name: keyof ImageLimits): number | undefined => {
+    const value = images?.[name] ?? DEFAULT_IMAGE_LIMITS[name]
+
+    if (value === false)
+      return undefined
+
+    if (!Number.isSafeInteger(value) || value < 1)
+      throw new KayError('config-invalid', `kay: images.${name} is ${String(value)}; it takes a whole number from 1, or false for no limit`)
+
+    return value
+  }
+
+  return { perMinute: read('perMinute'), maxVariants: read('maxVariants'), queue: read('queue') }
+}
+
 // `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.
 export function remoteLimits(images: Pick<ImagesConfig, 'remoteMaxSize' | 'remoteTimeout'> | undefined): RemoteLimits {
   return {

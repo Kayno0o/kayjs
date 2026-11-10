@@ -13,7 +13,7 @@ import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/action-clash'
 import { mcpPath, RESOURCE_METADATA } from '../server/api-modules'
 import { basePath } from '../server/base'
-import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs, liveLimits, remoteLimits, shutdownSeconds, timeoutMs } from '../server/config-limits'
+import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs, imageLimits, liveLimits, remoteLimits, shutdownSeconds, timeoutMs } from '../server/config-limits'
 import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
@@ -68,6 +68,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   refused(config, () => liveLimits(options.live))
   refused(config, () => remoteLimits(options.images))
+  refused(config, () => imageLimits(options.images))
   refused(config, () => checkRequestIdHeader(options.observe?.requestIdHeader))
   refused(config, () => checkTimeZone(options.timeZone))
 

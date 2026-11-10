@@ -25,6 +25,13 @@ The call used to stay pending for good once the browser went to the redirect's t
 - A call nobody awaits, as `onClick={() => logout()}`, reports nothing: the runtime ignores the rejection of a redirect. Code that awaits the call and reacts to any error (a `catch` that shows a failure) ignores an `ActionRedirectError` first; kayjs-ui's forms, `attempt` and the chat do. On a full load, `pending()` clears while the old page is still shown, for a moment.
 - The call's own `onError` hooks still skip a redirect, and `onSettled` runs for it.
 
+### A websocket route and the image route have limits by default
+
+No lint can see these: they depend on the traffic an app gets, not on its code.
+
+- A `.ws()` route refuses a client's 21st open socket with 429. An app whose clients share one address (an office behind one NAT, a proxy kay is not told to trust) or open many sockets on one route sets `detail.messages.connections` to its number, or `false` ([API routes](api-routes.md)).
+- The image route answers 429 past 120 new variants a minute for one client or 256 variants of one source, and 503 past 128 waiting draws; variants already made never count. An app that draws more raises `images.perMinute`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
+
 ## 1.95.0
 
 ### The names and the escape 1.91 deprecated are gone

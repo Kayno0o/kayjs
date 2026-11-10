@@ -41,7 +41,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { remoteLimits, timeoutMs } from './config-limits'
+import { imageLimits, remoteLimits, timeoutMs } from './config-limits'
 import { cookieDefaults, defaultCookies, secureCookies } from './cookies'
 import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
@@ -639,6 +639,7 @@ async function imageRouteOf({ project: { root }, options, env, setup: { source, 
     avif: env.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     ttl: options.images?.ttl,
+    limits: imageLimits(options.images),
     saveData: options.client?.saveData,
     remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,

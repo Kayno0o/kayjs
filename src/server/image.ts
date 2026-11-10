@@ -3,6 +3,7 @@ import type { Guard, GuardContext } from '../runtime'
 import type { Duration } from '../runtime/duration'
 import type { Aspect, ImageVariant } from '../runtime/image'
 import type { ActionOptions, GuardedRequest } from './actions'
+import type { ImageLimits } from './config-limits'
 import type { LoadedGuard } from './guards'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
@@ -19,12 +20,13 @@ import { kayLog } from '../runtime/log'
 import { learnedVersion, learnPlaceholder, placeholderColor } from '../runtime/placeholder'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
+import { imageLimits } from './config-limits'
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
 import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 
 import { limiter } from './limit'
-import { clientAddress } from './protection'
+import { clientAddress, overLimit } from './protection'
 import { revalidated } from './public'
 import { cacheKey, remoteAllowed, remotePatterns, remoteVariants } from './remote'
 import { requestUrl } from './request-url'
@@ -51,6 +53,8 @@ export interface ImageRouteOptions {
   ttl?: Duration | undefined
   // `false` answers a visitor saving data the width asked for, as any other, instead of the next one down.
   saveData?: boolean | undefined
+  // What the route may be asked to encode, `images.perMinute`, `images.maxVariants` and `images.queue` with their defaults when left out.
+  limits?: ImageLimits | undefined
   // The security headers, which the route's answers carry themselves.
   security?: Record<string, string> | undefined
   // `images.resolve`, giving an absolute path, run after `images.guard` in the request's locale, as `actions` set it.
@@ -72,6 +76,10 @@ const WEBP_EXTENSION = /\.webp$/
 const MOST_ANSWERED = 1024
 // A longer URL is answered without being kept, so junk query strings cannot pin megabytes.
 const LONGEST_ANSWERED = 2048
+
+const ENCODE_RATE = 'image-encodes'
+const MINUTE_MS = 60_000
+const QUEUE_RETRY_SECONDS = 5
 
 export const DEFAULT_QUALITY = 80
 // Images a build decodes at once, each held whole while its variants are written from it.
@@ -235,6 +243,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
+  const gate = encodeGate(options.limits ?? imageLimits(undefined))
   // The variants, by file version, whose drawing failed, so a request for one, a conditional one included, does not run the failing decode again.
   const undecodable = new Map<string, true>()
   // The color of a runtime image, by the version of its file.
@@ -396,9 +405,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     let file = source.immutable && await Bun.file(built).exists() ? built : cached
 
     const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
-    // A failure belongs to the kind of variant that hit it, so a card or an AVIF failing leaves the widths in WebP alone.
-    const kind = typeof variant === 'object' && variant.aspect ? 'crop' : 'resize'
-    const failure = `${version}\n${format}\n${variant === 'card' ? 'card' : kind}`
+    const failure = failureKey(version, format, variant)
     // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
     const refused = () => own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
 
@@ -410,6 +417,11 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     // Requests for a variant being written wait for that one write.
     if (file === cached && (writing || !await touched(cached))) {
       if (!writing) {
+        const refusal = await gate(request, server, path, name)
+
+        if (refusal)
+          return waitFor(fail(refusal.body, refusal.status), refusal.wait)
+
         // Counted before it waits its turn, so the variants a burst asks for share the decode.
         const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
 
@@ -485,20 +497,60 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     }
   }
 
-  // The oldest entry goes when the map is full, where emptying it would drop every key kept warm.
-  function keep<T>(map: Map<string, T>, key: string, value: T): void {
-    if (map.size >= MOST_ANSWERED && !map.has(key))
-      map.delete(map.keys().next().value!)
-
-    map.set(key, value)
-  }
-
   function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
     if (key.length <= LONGEST_ANSWERED) {
       keep(answered, key, { file, headers })
     }
 
     return new Response(file, { headers: ownHeadersInit(set, headers) })
+  }
+}
+
+// The oldest entry goes when the map is full, where emptying it would drop every key kept warm.
+function keep<T>(map: Map<string, T>, key: string, value: T): void {
+  if (map.size >= MOST_ANSWERED && !map.has(key))
+    map.delete(map.keys().next().value!)
+
+  map.set(key, value)
+}
+
+// A failure belongs to the kind of variant that hit it, so a card or an AVIF failing leaves the widths in WebP alone.
+function failureKey(version: string, format: VariantFormat, variant: ImageVariant): string {
+  if (variant === 'card')
+    return `${version}\n${format}\ncard`
+
+  return `${version}\n${format}\n${variant.aspect ? 'crop' : 'resize'}`
+}
+
+function waitFor(response: Response, seconds: number | undefined): Response {
+  if (seconds !== undefined)
+    response.headers.set('retry-after', String(seconds))
+
+  return response
+}
+
+// What the route checks before it encodes a variant, answering why not or undefined: the draw queue is full, the source has all the variants it may, or the client has asked for too many new ones this minute. A refused variant counts for none of the limits.
+function encodeGate(limits: ImageLimits): (request: Request, server: Context['server'], path: string, name: string) => Promise<{ body: string, status: number, wait?: number } | undefined> {
+  // The variants encoded of each source, for `images.maxVariants`; a source forgotten is counted again from none.
+  const encoded = new Map<string, Set<string>>()
+
+  return async (request, server, path, name) => {
+    if (limits.queue !== undefined && drawing.waiting >= limits.queue)
+      return { body: 'Too many images are being drawn; try again shortly', status: 503, wait: QUEUE_RETRY_SECONDS }
+
+    const names = encoded.get(path) ?? new Set<string>()
+
+    if (limits.maxVariants !== undefined && !names.has(name) && names.size >= limits.maxVariants)
+      return { body: 'Too many variants of this image', status: 429 }
+
+    const wait = limits.perMinute === undefined ? undefined : await overLimit(ENCODE_RATE, clientAddress(request, server), limits.perMinute, MINUTE_MS)
+
+    if (wait !== undefined)
+      return { body: 'Too many new image variants; try again later', status: 429, wait }
+
+    keep(encoded, path, names.add(name))
+
+    return undefined
   }
 }
 

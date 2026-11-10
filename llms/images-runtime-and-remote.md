@@ -74,3 +74,11 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 - A download is cut off past 25 MB or 10 seconds, and an image over 50 megapixels is refused with 413, as an upload is.
 - Since any URL of a listed host may be asked for, a new query each time, at most 500 originals are kept, up to about 13 GB on disk at 25 MB each plus the variants made of them, the least recently used going first with their variants, and one client starts at most 30 downloads a minute, the route answering 429 past them.
 - The variants are served from the site, so the CSP's `img-src` needs no entry for the host.
+
+## Limits on encoding
+
+A variant no file holds yet costs an encode, so the route bounds what a client can ask for; a variant already made, and an imported image's built ones, are never limited.
+- `images.perMinute` (120 by default): the new variants one client may have encoded in a minute, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
+- `images.maxVariants` (256): the distinct variants encoded of one source; past it a new one answers 429, and the ones made are still served.
+- `images.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
+- Each takes a whole number from 1 or `false` for no limit, and `kay check` refuses any other value.

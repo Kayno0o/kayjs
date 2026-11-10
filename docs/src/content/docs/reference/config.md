@@ -146,7 +146,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 
 | Option | Effect |
 | --- | --- |
-| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
+| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the limits on new variants (`perMinute`, `maxVariants`, `queue`), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |

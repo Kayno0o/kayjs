@@ -434,6 +434,12 @@ export interface ImagesConfig {
   remoteMaxSize?: ByteSize | undefined
   // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
   remoteTimeout?: Duration | undefined
+  // The most variants one client may have the image route encode in a minute, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. 120 by default, `false` for no limit.
+  perMinute?: number | false | undefined
+  // The most distinct variants of one source image the route encodes, so a client varying width, quality, crop and format cannot fill the cache; a variant already made is still served. Past it the route answers 429. 256 by default, `false` for no limit.
+  maxVariants?: number | false | undefined
+  // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
+  queue?: number | false | undefined
   // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG, which `webp.quality` leaves alone; `image(src, { quality })` sets one image's variants.
   quality?: number | undefined
   // WebP variants beside the AVIF ones: `{ quality: 75 }` over `quality`, for the variants alone.

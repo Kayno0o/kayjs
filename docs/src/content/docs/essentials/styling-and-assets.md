@@ -340,6 +340,16 @@ img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight })}
 
 Without the size the image keeps its `src` alone.
 
+### Limits on new variants
+
+Each variant the server has to draw costs an encode, so the image route limits what one client can ask for. A client may have 120 new variants drawn a minute (`images.perMinute`) before the route answers 429 with `Retry-After`; one image keeps at most 256 variants (`images.maxVariants`); and once 128 draws are waiting (`images.queue`) the route answers 503 until they clear. A variant that already exists is never limited. Each option takes a whole number, or `false` to turn the limit off.
+
+```ts
+export default defineConfig({
+  images: { perMinute: 600, maxVariants: false },
+})
+```
+
 ### Images from another host
 
 The variants the server draws on request are kept in `.kay/cache/images`. It removes the ones nothing wrote for 30 days, at start and once a day, and draws one again if it is asked for later.
