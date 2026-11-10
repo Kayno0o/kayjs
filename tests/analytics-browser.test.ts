@@ -92,12 +92,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
       const [yes, no] = [...region.querySelectorAll('button')].map(button => getComputedStyle(button))
       const box = getComputedStyle(region)
 
-      return { background: box.backgroundColor, color: box.color, border: box.borderTopColor, radius: box.borderTopLeftRadius, yes: [yes!.backgroundColor, yes!.color], no: no!.borderTopColor }
+      const drawn = (button: CSSStyleDeclaration) => [button.backgroundColor, button.color]
+      const sizes = (button: CSSStyleDeclaration) => [button.padding, button.fontSize, button.borderTopWidth, button.borderTopColor]
+
+      return { background: box.backgroundColor, color: box.color, border: box.borderTopColor, radius: box.borderTopLeftRadius, yes: drawn(yes!), same: JSON.stringify([drawn(yes!), sizes(yes!)]) === JSON.stringify([drawn(no!), sizes(no!)]) }
     })
     const before = await looks()
 
-    // Without kayjs-ui it reads as the page does: text on the page's background, the agree button in the text's color.
+    // Without kayjs-ui it reads as the page does: text on the page's background, both buttons in the text's color. Agreeing and refusing are drawn alike, whatever the tokens.
     expect(before.yes[0]).toBe(before.color)
+    expect(before.same).toBe(true)
     expect(before.radius).toBe('8px')
 
     // A page switching its own theme after the notice opened repaints it.
@@ -109,9 +113,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
       const root = document.documentElement
 
       root.style.colorScheme = 'light'
-      root.style.cssText += ';--color-surface:light-dark(rgb(1, 1, 1), rgb(2, 2, 2));--color-foreground:rgb(3, 3, 3);--color-border-strong:rgb(4, 4, 4);--color-accent:rgb(5, 5, 5);--color-accent-foreground:rgb(6, 6, 6);--color-input:rgb(7, 7, 7);--radius-lg:0px'
+      root.style.cssText += ';--color-surface:light-dark(rgb(1, 1, 1), rgb(2, 2, 2));--color-foreground:rgb(3, 3, 3);--color-border-strong:rgb(4, 4, 4);--color-accent:rgb(5, 5, 5);--color-accent-foreground:rgb(6, 6, 6);--radius-lg:0px'
     })
-    expect(await looks()).toEqual({ background: 'rgb(1, 1, 1)', color: 'rgb(3, 3, 3)', border: 'rgb(4, 4, 4)', radius: '0px', yes: ['rgb(5, 5, 5)', 'rgb(6, 6, 6)'], no: 'rgb(7, 7, 7)' })
+    expect(await looks()).toEqual({ background: 'rgb(1, 1, 1)', color: 'rgb(3, 3, 3)', border: 'rgb(4, 4, 4)', radius: '0px', yes: ['rgb(5, 5, 5)', 'rgb(6, 6, 6)'], same: true })
 
     await page.evaluate(() => document.documentElement.style.colorScheme = 'dark')
     expect((await looks()).background).toBe('rgb(2, 2, 2)')

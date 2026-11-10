@@ -179,7 +179,9 @@ A language you wrote nothing in reads kay's words. If you word the text yourself
 
 The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
 
-The notice and the information line take your site's look. With kayjs-ui they use its surface, text, accent, border and radius, and follow its light and dark schemes. Without it they use the page's own background and text colors. To restyle them, set any of `--kay-notice-background`, `--kay-notice-color`, `--kay-notice-border`, `--kay-notice-radius`, `--kay-notice-shadow`, `--kay-notice-accent`, `--kay-notice-on-accent` or `--kay-notice-line` (the refuse button's border) on `:root`.
+The notice and the information line take your site's look. With kayjs-ui they use its surface, text, accent, border and radius, and follow its light and dark schemes. Without it they use the page's own background and text colors. To restyle them, set any of `--kay-notice-background`, `--kay-notice-color`, `--kay-notice-border`, `--kay-notice-radius`, `--kay-notice-shadow`, `--kay-notice-accent` or `--kay-notice-on-accent` on `:root`.
+
+The agree and refuse buttons are always drawn the same, in the accent colors, so refusing is as easy to see as agreeing.
 
 It stays on screen through page swaps until the visitor chooses. With Fathom or Cloudflare, a refusal after the script loaded reloads the page so it runs no more.
 
