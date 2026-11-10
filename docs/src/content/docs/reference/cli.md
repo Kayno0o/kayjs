@@ -230,7 +230,7 @@ kay dev: http://192.168.1.20:3000 on the network
 
 An address another process holds stops `kay dev`. One past this machine is refused unless `--host` is given too.
 
-In a terminal, `o` opens the address, `r` restarts the server, `c` clears the screen and `q` or Ctrl+C quits. Piped, or under `--format json`, no key is read.
+In a terminal, `o` opens the address, `r` restarts the server, `c` clears the screen and lists the keys again, and `q` or Ctrl+C quits. Piped, or under `--format json`, no key is read.
 
 The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.localhost` name, an IP address or the site's host. Put any other name, such as a tunnel's, in `KAY_DEV_HOSTS`, comma-separated and without ports.
 

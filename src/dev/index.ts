@@ -3,6 +3,7 @@ import type { Readable } from 'node:stream'
 import type { KayErrorOptions } from '../compiler/errors'
 import type { KayConfig } from '../config'
 import type { TypeProblem } from './refuse'
+import type { TerminalKeys } from './session/keys'
 import type { DevPorts, Phase } from './session/ports'
 import type { RestartBatch } from './session/queue'
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -17,6 +18,7 @@ import { startClientBuilder } from './client'
 import { readConfigRecord, writeConfigRecord } from './config-record'
 import { mentionsPackage } from './fingerprint'
 import { ClientController } from './session/client'
+import { readTerminalKeys } from './session/keys'
 import { MAX_CHANGED_FILES, tell } from './session/ports'
 import { ChangeQueue } from './session/queue'
 import { describe, networkAddress, openBrowser, Reporter } from './session/report'
@@ -74,8 +76,6 @@ const PACKAGE_FILE = 'package.json'
 // The fields of package.json that no module resolves with or loads differently for: an edit of only these changes nothing a process or the client build reads.
 const INERT_PACKAGE_FIELDS = new Set(['scripts', 'version', 'description', 'keywords', 'author', 'contributors', 'license', 'homepage', 'repository', 'bugs', 'funding', 'private', 'files', 'engines', 'packageManager', 'publishConfig'])
 const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
-const CTRL_C = '\x03'
-const ESCAPE = '\x1B'
 
 const PORTS: DevPorts = {
   spawnServer: (root, entry, env, stdout, ipc) => Bun.spawn([process.execPath, '--preload', PRELOAD, entry], { cwd: root, env, stdin: 'pipe', stdout, stderr: 'inherit', ipc }),
@@ -97,6 +97,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   // Where the client build of `kay dev` and what it keeps of the config are written.
   const devDir = join(root, KAY_DIR, `dev${testWorker()}`)
   let phase: Phase = 'starting'
+  let terminal: TerminalKeys | undefined
   const currentPhase = () => phase
   const env = await environmentWithoutDotenv(root)
   const reporter = new Reporter(options.log, options.format, options.quiet)
@@ -149,7 +150,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
         if (!reporter.quiet)
           reporter.keys()
 
-        readKeys(options.keys)
+        terminal?.goLive()
       }
     }
     else {
@@ -323,42 +324,22 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     onScratch: () => queue.scratch(),
   })
 
-  // A terminal in raw mode hands over each key as it is pressed, Ctrl+C included, which no longer interrupts; an escape sequence, as Alt+key or an arrow sends, is none of them.
-  const onKey = (chunk: Buffer | string) => {
-    const keys = String(chunk)
+  function pressed(key: string) {
+    if (key === 'o' && servers.address !== undefined) {
+      const address = servers.address
 
-    if (keys.startsWith(ESCAPE))
-      return
-
-    for (const key of keys) {
-      if (key === 'o' && servers.address !== undefined) {
-        const address = servers.address
-
-        openBrowser(address, command => reporter.log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
-      }
-      else if (key === 'r') {
-        restartNow()
-      }
-      else if (key === 'c') {
-        reporter.endRepeat()
-        process.stdout.write(CLEAR_SCREEN)
-      }
-      else if (key === 'q' || key === CTRL_C) {
-        options.onQuit?.()
-      }
+      openBrowser(address, command => reporter.log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
     }
-  }
-  const rawMode = (on: boolean) => {
-    const keys = options.keys as Readable & { setRawMode?: (mode: boolean) => void }
+    else if (key === 'r') {
+      restartNow()
+    }
+    else if (key === 'c') {
+      reporter.endRepeat()
+      process.stdout.write(CLEAR_SCREEN)
 
-    keys.setRawMode?.(on)
-  }
-  const restoreTerminal = () => rawMode(false)
-
-  function readKeys(keys: Readable) {
-    rawMode(true)
-    process.once('exit', restoreTerminal)
-    keys.on('data', onKey)
+      if (!reporter.quiet)
+        reporter.keys()
+    }
   }
 
   // As a change does, but for no file: open pages load the page again.
@@ -370,25 +351,27 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   const stop = async () => {
     phase = 'stopping'
 
-    if (options.keys !== undefined) {
-      options.keys.off('data', onKey)
-      options.keys.pause()
-      restoreTerminal()
-      process.off('exit', restoreTerminal)
-    }
+    terminal?.stopReading()
 
-    queue.close()
-    types.cancelFirstTree()
-    stopWatching()
-    removeDevAddress(root)
-    await queue.idle
-    types.cancelReruns()
-    servers.kill()
-    await types.settle()
-    types.close()
-    await Promise.all([types.checking, ...servers.exits(), client.stop()])
-    await servers.inspector?.stop()
+    try {
+      queue.close()
+      types.cancelFirstTree()
+      stopWatching()
+      removeDevAddress(root)
+      await queue.idle
+      types.cancelReruns()
+      servers.kill()
+      await types.settle()
+      types.close()
+      await Promise.all([types.checking, ...servers.exits(), client.stop()])
+      await servers.inspector?.stop()
+    }
+    finally {
+      terminal?.restore()
+    }
   }
+
+  terminal = options.keys === undefined ? undefined : readTerminalKeys(options.keys, pressed, () => options.onQuit?.())
 
   // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks; a server that never asks, as one with no pages, starts none.
   if (client.building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes)))

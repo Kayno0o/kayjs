@@ -143,7 +143,7 @@
     "max-lines": 625
   },
   "src/dev/index.ts": {
-    "max-lines-per-function": 260
+    "max-lines-per-function": 246
   },
   "src/mcp/tools.ts": {
     "max-lines": 670,
