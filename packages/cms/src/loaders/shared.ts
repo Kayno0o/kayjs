@@ -288,21 +288,7 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
         return
 
       started = true
-
-      try {
-        subscription = await listen?.(() => hurry(0))
-        known = await signature(true)
-      }
-      catch (error) {
-        started = false
-        void subscription?.stop()
-        subscription = undefined
-
-        throw error
-      }
-
-      running.get(id)?.()
-      rearm()
+      stopped = false
 
       // A drop of the collection's own entries made elsewhere, a save here or one another process broadcast, already shows in the database: the next look must not report it again.
       const stopHearing = onKeysInvalidated((_, dropped) => {
@@ -311,13 +297,37 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
 
         return []
       })
-
-      running.set(id, () => {
+      const stop = () => {
         stopped = true
         pollClock.clearTimeout(timer)
         stopHearing()
         void subscription?.stop()
-      })
+      }
+
+      // Registered before the first await, so a watcher that replaces this one while it starts stops it.
+      running.get(id)?.()
+      running.set(id, stop)
+
+      try {
+        const heard = await listen?.(() => hurry(0))
+
+        subscription = heard
+        known = await signature(true)
+      }
+      catch (error) {
+        started = false
+        stop()
+
+        if (running.get(id) === stop)
+          running.delete(id)
+
+        throw error
+      }
+
+      if (stopped)
+        void subscription?.stop()
+      else
+        rearm()
     },
     settle,
   }

@@ -113,6 +113,28 @@ describe('the watcher of a loader backs off while nothing changes', () => {
     expect(await look()).toBe(1000)
   })
 
+  test('a watcher replaced while it starts leaves no timer and no subscription', async () => {
+    const name = fresh()
+    let release = () => undefined as void
+    let unsubscribed = 0
+    const slow = async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+
+      return { delivering: () => true, stop: async () => void unsubscribed++ }
+    }
+    const first = watcher(name, 'scope', '1s', '1s', () => 'same', slow)
+    const starting = first.start()
+
+    await watcher(name, 'scope', '1s', '1s', () => 'same').start()
+    release()
+    await starting
+    await Bun.sleep(0)
+    expect(timers.filter(timer => !timer.cleared)).toHaveLength(1)
+    expect(unsubscribed).toBe(1)
+  })
+
   test('stops looking when a watcher of the same collection replaces it', async () => {
     const name = fresh()
     const first = watcher(name, 'scope', '1s', '1s', () => 'same')
