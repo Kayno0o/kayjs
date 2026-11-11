@@ -61,7 +61,7 @@ const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty
   | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown }
 )>()
 
-// The name a screen reader announces: `label`, else a string title; a markup title names the dialog through its heading.
+// The name a screen reader announces: `label`, else a string title; a markup title names the dialog through its heading, which a `header` block replaces: that one needs a `label`.
 const name = () => label ?? (typeof title === 'string' ? title : undefined)
 const titleId = uid()
 
@@ -85,7 +85,7 @@ function closed() {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={name()} aria-labelledby={name() === undefined ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     header(part="head")
       if header

@@ -81,7 +81,7 @@ const LAUNCHER_GAP = 16
 
 // Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
 const serverOpen = renderedOpen(open, modal, closeHref)
-// The name a screen reader announces: `label`, else a string title; a markup title names the panel through its heading.
+// The name a screen reader announces: `label`, else a string title; a markup title names the panel through its heading, which a `header` block replaces: that one needs a `label`.
 const name = () => label ?? (typeof title === 'string' ? title : undefined)
 const titleId = uid()
 
@@ -328,7 +328,7 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
