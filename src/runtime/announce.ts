@@ -1,7 +1,7 @@
 // Pinned to the top corner: left where it falls, after the page, it would add a pixel to a layout filling the screen and give it a scrollbar.
 const OFFSCREEN = 'position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)'
 const FIRST_WRITE_DELAY = 100
-const NBSP = ' '
+const NBSP = '\u00A0'
 
 // Says `text` to a screen reader through a polite live region, made on first use and kept off screen.
 // It lives in the open modal dialog holding `within` (the focused element by default), since a modal makes the rest of the page inert, and in the page otherwise, outside any form whose `aria-busy` may hold back what changes inside it.
