@@ -41,8 +41,9 @@ const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || (SIZED?.wo
 const SHARDS = Number(process.env.KAY_LAND_SHARDS) || (SIZED?.shards ?? 1)
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
-// How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
+// How long the listing of a failed shard's files may run before its process group is killed.
 const LISTING_LIMIT_MS = 3 * 60_000
+// How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
 const DRAIN_MS = Number(process.env.KAY_LAND_DRAIN_MS) || 5000
 // The step running, whose process group goes with a landing stopped by a signal.
 let running: number | undefined
