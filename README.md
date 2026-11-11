@@ -82,6 +82,7 @@ Every command takes an optional project directory and prints its usage for `--he
 | `kay env` | list the environment variables the project, its libraries and kay declare |
 | `kay doctor` | check Bun, versions, config, environment, port and build, and say how to fix each failure |
 | `kay editor install` | set up the kay language and its server in Helix and Zed |
+| `kay completion` | print the bash, zsh or fish script that completes kay commands in the shell |
 | `kay explain` | list the lints and the errors, or explain one |
 | `kay docs` | print the section of kay's or an installed library's docs that words or a name match |
 | `kay types` | write the types the editor's ESLint reads for `.kay` files, without checking |
