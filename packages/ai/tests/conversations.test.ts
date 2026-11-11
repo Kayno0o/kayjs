@@ -3,6 +3,7 @@ import type { ConversationAnswer } from '../src/conversation-title'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { s as schema } from 'kay'
 import { nameUser } from 'kay/library'
+import { personalData } from 'kay/server'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, anthropic, ask, resuming, tool } from '../src'
@@ -117,6 +118,18 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 async function loaded(id: string, visitor: Visit = {}) {
   return JSON.parse(await visit(said(''), {}, { ...visitor, header: `load:${id}` })) as ConversationAnswer
 }
+
+describe('a conversation owned through a key of the app', () => {
+  it('is still reached by the erase and the export of the signed-in user', async () => {
+    const model = recording()
+
+    await visit(said('hello'), { provider: model.provider, key: 'visitor-key' }, { header: `send:${ID}:0`, user: 'ann' })
+    expect(await conversationStore().get({ owner: 'visitor-key', scope: '/_kay/action/chat', id: ID })).toBeDefined()
+    expect(((await personalData.export('ann')).ai as unknown[]).length).toBe(1)
+    expect(await personalData.erase('ann')).toBe(1)
+    expect(await conversationStore().get({ owner: 'visitor-key', scope: '/_kay/action/chat', id: ID })).toBeUndefined()
+  })
+})
 
 describe('a conversation held on the server', () => {
   it('asks with the stored turns and the posted message, and stores both once the reply ends', async () => {

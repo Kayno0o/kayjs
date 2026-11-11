@@ -8,18 +8,26 @@ import { MOST_CONVERSATIONS, MOST_TURNS, turnsOf, withinResultCap } from './conv
 // The table the Postgres store keeps its conversations in, for a pg-orm `ignoreTables` of an app that creates it with `createConversationTable`.
 export const conversationTable = 'kay_ai_conversations'
 
-const CREATE = 'CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner text NOT NULL, scope text NOT NULL, id text NOT NULL, title text NOT NULL, revision integer NOT NULL, updated_at bigint NOT NULL, turns text NOT NULL, PRIMARY KEY (owner, scope, id))'
-const INDEX = 'CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai_conversations (owner, scope, updated_at)'
+const CREATE = 'CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner text NOT NULL, scope text NOT NULL, id text NOT NULL, title text NOT NULL, revision integer NOT NULL, updated_at bigint NOT NULL, turns text NOT NULL, user_id text, PRIMARY KEY (owner, scope, id))'
+const INDEXES = [
+  'CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai_conversations (owner, scope, updated_at)',
+  'CREATE INDEX IF NOT EXISTS kay_ai_conversations_age ON kay_ai_conversations (updated_at)',
+  'CREATE INDEX IF NOT EXISTS kay_ai_conversations_user ON kay_ai_conversations (user_id)',
+]
 
 interface Row { id: string, title: string, revision: number, updated_at: string, turns: string }
 
-// Creates the table unless it exists, for an app whose role creates nothing: run it as the database's owner, in a boot script, and list `kay_ai_conversations` in pg-orm's `ignoreTables`.
+// Creates the table, its `user_id` column and its indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script, and list `kay_ai_conversations` in pg-orm's `ignoreTables`.
 export async function createConversationTable(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
     await db.unsafe(CREATE)
-    await db.unsafe(INDEX)
+    // A table from before conversations carried their user gets the column.
+    await db.unsafe('ALTER TABLE kay_ai_conversations ADD COLUMN IF NOT EXISTS user_id text')
+
+    for (const index of INDEXES)
+      await db.unsafe(index)
   }
   finally {
     if (typeof source === 'string')
@@ -34,7 +42,7 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await relationsMissing(db, [conversationTable]))
+    if (!await relationsMissing(db, [conversationTable]) && (await db.unsafe<unknown[]>('SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = \'kay_ai_conversations\' AND column_name = \'user_id\'')).length > 0)
       return db
 
     try {
@@ -42,7 +50,7 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-ai: pgConversations needs its kay_ai_conversations table, and its role may not create it: run `await createConversationTable(db)` from kayjs-ai/pg as the database\'s owner, and list `conversationTable` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error('kayjs-ai: pgConversations needs its kay_ai_conversations table with its user_id column and indexes, and its role may not create or alter it: run `await createConversationTable(db)` from kayjs-ai/pg as the database\'s owner, and list `conversationTable` in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }
@@ -79,7 +87,7 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
 
       return row === undefined ? undefined : { ...summaryOf(row), revision: row.revision, turns: turnsOf(row.turns) }
     },
-    async write({ owner, scope, id }: ConversationKey, revision, { drop, add, title }) {
+    async write({ owner, scope, id, user }: ConversationKey, revision, { drop, add, title }) {
       const connection = await connected()
 
       // The row is locked while the revision is checked, so two replicas writing at once cannot both pass it.
@@ -93,13 +101,13 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
         const next = JSON.stringify(withinResultCap([...turns.slice(0, Math.max(0, turns.length - drop)), ...add].slice(-MOST_TURNS)))
 
         if (row !== undefined) {
-          await tx.unsafe('UPDATE kay_ai_conversations SET revision = $4, updated_at = $5, turns = $6 WHERE owner = $1 AND scope = $2 AND id = $3', [owner, scope, id, revision + 1, Date.now(), next])
+          await tx.unsafe('UPDATE kay_ai_conversations SET revision = $4, updated_at = $5, turns = $6, user_id = COALESCE($7, user_id) WHERE owner = $1 AND scope = $2 AND id = $3', [owner, scope, id, revision + 1, Date.now(), next, user ?? null])
 
           return revision + 1
         }
 
         // Two writers creating the same conversation: the one the insert skips lost.
-        const created = await tx.unsafe<unknown[]>('INSERT INTO kay_ai_conversations (owner, scope, id, title, revision, updated_at, turns) VALUES ($1, $2, $3, $4, 1, $5, $6) ON CONFLICT DO NOTHING RETURNING id', [owner, scope, id, title, Date.now(), next])
+        const created = await tx.unsafe<unknown[]>('INSERT INTO kay_ai_conversations (owner, scope, id, title, revision, updated_at, turns, user_id) VALUES ($1, $2, $3, $4, 1, $5, $6, $7) ON CONFLICT DO NOTHING RETURNING id', [owner, scope, id, title, Date.now(), next, user ?? null])
 
         if (created.length === 0)
           return undefined
@@ -122,12 +130,12 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
       if (connection === undefined)
         return []
 
-      const rows = await connection.unsafe<(Row & { scope: string })[]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = $1 ORDER BY updated_at, id', [owner])
+      const rows = await connection.unsafe<(Row & { scope: string })[]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = $1 OR user_id = $1 ORDER BY updated_at, id', [owner])
 
       return rows.map(row => ({ ...summaryOf(row), scope: row.scope, revision: row.revision, turns: turnsOf(row.turns) }))
     },
     async eraseOwner(owner) {
-      return (await (await existing())?.unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE owner = $1 RETURNING id', [owner]))?.length ?? 0
+      return (await (await existing())?.unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE owner = $1 OR user_id = $1 RETURNING id', [owner]))?.length ?? 0
     },
     async deleteOlderThan(before) {
       return (await (await existing())?.unsafe<unknown[]>('DELETE FROM kay_ai_conversations WHERE updated_at < $1 RETURNING id', [before]))?.length ?? 0

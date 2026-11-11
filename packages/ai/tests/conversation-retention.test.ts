@@ -52,6 +52,31 @@ describe('what an erase and an export of a person reach', () => {
   })
 })
 
+describe('a store that cannot erase or export', () => {
+  it('fails the erase and the export, naming the missing method, instead of keeping the data', async () => {
+    const { ownedBy, eraseOwner, ...bare } = sqliteConversations(':memory:')
+
+    void ownedBy
+    void eraseOwner
+    ai({ conversations: bare })
+    await expect(personalData.erase('ann')).rejects.toThrow('eraseOwner')
+    await expect(personalData.export('ann')).rejects.toThrow('ownedBy')
+  })
+})
+
+describe('the user a conversation is erased by', () => {
+  it('is its owner, else the signed-in user stored beside it, rows from before that included', async () => {
+    const store = conversationStore()
+
+    await store.write({ owner: 'custom', user: 'u1', scope: '/a', id: 'c1' }, 0, change)
+    await store.write({ owner: 'u2', scope: '/a', id: 'c2' }, 0, change)
+    expect((await personalData.export('u1')).ai).toHaveLength(1)
+    expect((await personalData.export('u2')).ai).toHaveLength(1)
+    expect(await personalData.erase('u1')).toBe(1)
+    expect(await store.get({ owner: 'custom', scope: '/a', id: 'c1' })).toBeUndefined()
+  })
+})
+
 describe('the age conversations are kept to', () => {
   async function ageOf(days: number, option?: Parameters<typeof ai>[0]): Promise<boolean> {
     ai(option)

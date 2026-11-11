@@ -3,7 +3,7 @@ import type { ConversationStore } from './conversation-store'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { appDatabase, appStore, durationSeconds } from 'kay/library'
+import { appDatabase, appStore, configError, durationSeconds } from 'kay/library'
 import { personalData } from 'kay/server'
 import { pgConversations } from './conversation-pg'
 import { CONVERSATIONS_FILE, sqliteConversations } from './conversation-store'
@@ -66,26 +66,30 @@ export async function purgeAged(store: ConversationStore): Promise<void> {
   }
 }
 
-// What an erase and an export of a user reach, with nothing for the app to declare: registered with kay as this module loads, so a user erased in a process that never held a conversation is still reached.
-personalData.register({
-  name: 'ai',
-  erase: async (user) => {
-    const store = conversationStore()
+// What an erase and an export of a user reach, with nothing for the app to declare: the package entry and `ai()` call this, so a user erased in a process that never held a conversation is still reached. A store that cannot erase or list fails the erase or the export, as the account must not go with its conversations kept.
+export function registerConversationData(): void {
+  personalData.register({
+    name: 'ai',
+    erase: async (user) => {
+      const { eraseOwner } = conversationStore()
 
-    if (store.eraseOwner === undefined) {
-      log.warn('the conversation store has no eraseOwner, so the conversations of an erased user are kept; add one to it')
+      if (eraseOwner === undefined)
+        throw configError('ai', 'conversations', 'the conversation store has no eraseOwner(owner), so a user\'s conversations cannot be erased with their account; add it to the store given to ai({ conversations })')
 
-      return 0
-    }
+      return eraseOwner(user)
+    },
+    export: async (user) => {
+      const { ownedBy } = conversationStore()
 
-    return store.eraseOwner(user)
-  },
-  export: async (user) => {
-    const found = await conversationStore().ownedBy?.(user)
+      if (ownedBy === undefined)
+        throw configError('ai', 'conversations', 'the conversation store has no ownedBy(owner), so a user\'s conversations cannot be exported; add it to the store given to ai({ conversations })')
 
-    return found === undefined || found.length === 0 ? undefined : found.map(({ scope, id, title, updatedAt, turns }) => ({ scope, id, title, updatedAt, turns }))
-  },
-})
+      const found = await ownedBy(user)
+
+      return found.length === 0 ? undefined : found.map(({ scope, id, title, updatedAt, turns }) => ({ scope, id, title, updatedAt, turns }))
+    },
+  })
+}
 
 async function closeHeld(held: Held): Promise<void> {
   try {

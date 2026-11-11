@@ -222,6 +222,7 @@ interface ConversationKey
   id: string
   owner: string
   scope: string
+  user?: string | undefined
 
 [.] ConversationRow
 interface ConversationRow

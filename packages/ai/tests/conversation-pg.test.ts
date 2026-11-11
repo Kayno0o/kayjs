@@ -56,6 +56,43 @@ describe.skipIf(url === '')('pgConversations', () => {
     expect(await store!.get({ owner: 'yan', scope: '/a', id: 'y1' })).toBeUndefined()
   })
 
+  it('reaches a conversation by the signed-in user stored beside its owner, and indexes the age', async () => {
+    const change = { drop: 0, add: [{ role: 'user' as const, content: 'hi' }], title: 't' }
+
+    await store!.write({ owner: 'custom-key', user: 'u9', scope: '/a', id: 'k1' }, 0, change)
+    expect((await store!.ownedBy!('u9')).map(({ id }) => id)).toEqual(['k1'])
+    expect(await store!.eraseOwner!('u9')).toBe(1)
+
+    const check = new Bun.SQL(url)
+
+    expect((await check.unsafe<{ indexname: string }[]>('SELECT indexname FROM pg_indexes WHERE tablename = \'kay_ai_conversations\'')).map(row => row.indexname)).toEqual(expect.arrayContaining(['kay_ai_conversations_age', 'kay_ai_conversations_user']))
+    await check.close()
+  })
+
+  it('adds the user column and the indexes to a table made before them', async () => {
+    const old = `${database}_old`
+
+    await admin!.unsafe(`DROP DATABASE IF EXISTS ${old} WITH (FORCE)`)
+    await admin!.unsafe(`CREATE DATABASE ${old}`)
+
+    const oldUrl = Object.assign(new URL(url), { pathname: `/${old}` }).href
+    const check = new Bun.SQL(oldUrl)
+    const legacy = pgConversations(oldUrl)
+
+    try {
+      await check.unsafe('CREATE TABLE kay_ai_conversations (owner text NOT NULL, scope text NOT NULL, id text NOT NULL, title text NOT NULL, revision integer NOT NULL, updated_at bigint NOT NULL, turns text NOT NULL, PRIMARY KEY (owner, scope, id))')
+      await check.unsafe('INSERT INTO kay_ai_conversations VALUES (\'ann\', \'/a\', \'c\', \'t\', 1, 1, \'[]\')')
+      expect((await legacy.ownedBy!('ann')).map(({ id }) => id)).toEqual(['c'])
+      await legacy.write({ owner: 'k', user: 'ann', scope: '/a', id: 'd' }, 0, { drop: 0, add: [], title: 't' })
+      expect(await legacy.eraseOwner!('ann')).toBe(2)
+    }
+    finally {
+      await legacy.close()
+      await check.close()
+      await admin!.unsafe(`DROP DATABASE IF EXISTS ${old} WITH (FORCE)`)
+    }
+  })
+
   it('creates no table to erase, list or age a person\'s conversations', async () => {
     await admin!.unsafe(`DROP DATABASE IF EXISTS ${database}_empty WITH (FORCE)`)
     await admin!.unsafe(`CREATE DATABASE ${database}_empty`)

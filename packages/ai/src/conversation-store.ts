@@ -41,6 +41,8 @@ export interface ConversationKey {
   owner: string
   scope: string
   id: string
+  // The signed-in user's id when the owner is something else (an `ai({ key })` of the app), kept beside the conversation so an erase or an export of that user reaches it; absent when the owner is the user.
+  user?: string | undefined
 }
 
 export interface ConversationChange {
@@ -61,8 +63,8 @@ export interface ConversationStore {
   // Answer whether the conversation was there.
   rename: (key: ConversationKey, title: string) => Promise<boolean>
   delete: (key: ConversationKey) => Promise<boolean>
-  // The three below let an erase and an export of a user, and the age conversations are kept to, reach the store; a store of the app's own without them is left out of all three, with a warning when one is called. They must not create the store when it does not exist yet.
-  // Every conversation the owner has under any scope, turns included.
+  // The three below let an erase and an export of a user, and the age conversations are kept to, reach the store: without `eraseOwner` or `ownedBy` an erase or an export of a user fails, so no conversation is kept by accident, and without `deleteOlderThan` none is dropped for its age, with a warning. They must not create the store when it does not exist yet.
+  // Every conversation the user has under any scope, turns included: those they own and those stored with their `user`.
   ownedBy?: ((owner: string) => Promise<OwnedConversation[]>) | undefined
   // Deletes every conversation of the owner and answers how many went.
   eraseOwner?: ((owner: string) => Promise<number>) | undefined
@@ -178,22 +180,29 @@ function open(path: string) {
   if (tableNamed(legacy))
     migrate.immediate()
 
-  db.run('CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))')
+  db.run('CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, user_id TEXT, PRIMARY KEY (owner, scope, id))')
+
+  // A table from before conversations carried their user gets the column.
+  if (!db.query<{ name: string }, []>('PRAGMA table_info(kay_ai_conversations)').all().some(column => column.name === 'user_id'))
+    db.run('ALTER TABLE kay_ai_conversations ADD COLUMN user_id TEXT')
+
   db.run('CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai_conversations (owner, scope, updated_at)')
+  db.run('CREATE INDEX IF NOT EXISTS kay_ai_conversations_age ON kay_ai_conversations (updated_at)')
+  db.run('CREATE INDEX IF NOT EXISTS kay_ai_conversations_user ON kay_ai_conversations (user_id)')
 
   const list = db.query<Row, [string, string, number]>('SELECT id, title, revision, updated_at, \'\' AS turns FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3')
   const get = db.query<Row, [string, string, string]>('SELECT id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
-  const upsert = db.query('INSERT INTO kay_ai_conversations (owner, scope, id, title, revision, updated_at, turns) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (owner, scope, id) DO UPDATE SET revision = ?5, updated_at = ?6, turns = ?7')
+  const upsert = db.query('INSERT INTO kay_ai_conversations (owner, scope, id, title, revision, updated_at, turns, user_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) ON CONFLICT (owner, scope, id) DO UPDATE SET revision = ?5, updated_at = ?6, turns = ?7, user_id = COALESCE(?8, user_id)')
   const prune = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id NOT IN (SELECT id FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3)')
   // A rename keeps the conversation's place in the list and among the ones kept, which only its turns move.
   const rename = db.query('UPDATE kay_ai_conversations SET title = ?1 WHERE owner = ?2 AND scope = ?3 AND id = ?4')
   const remove = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
-  const owned = db.query<Row & { scope: string }, [string]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = ?1 ORDER BY updated_at, rowid')
-  const eraseOwner = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1')
+  const owned = db.query<Row & { scope: string }, [string]>('SELECT scope, id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = ?1 OR user_id = ?1 ORDER BY updated_at, rowid')
+  const eraseOwner = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 OR user_id = ?1')
   const older = db.query('DELETE FROM kay_ai_conversations WHERE updated_at < ?1')
 
   // The check of the revision and the write are one transaction, so two processes writing at once cannot both pass it.
-  const write = db.transaction(({ owner, scope, id }: ConversationKey, revision: number, { drop, add, title }: ConversationChange): number | undefined => {
+  const write = db.transaction(({ owner, scope, id, user }: ConversationKey, revision: number, { drop, add, title }: ConversationChange): number | undefined => {
     const row = get.get(owner, scope, id)
 
     if ((row?.revision ?? 0) !== revision)
@@ -202,7 +211,7 @@ function open(path: string) {
     const turns = row === null ? [] : turnsOf(row.turns)
     const next = withinResultCap([...turns.slice(0, Math.max(0, turns.length - drop)), ...add].slice(-MOST_TURNS))
 
-    upsert.run(owner, scope, id, title, revision + 1, Date.now(), JSON.stringify(next))
+    upsert.run(owner, scope, id, title, revision + 1, Date.now(), JSON.stringify(next), user ?? null)
 
     if (row === null)
       prune.run(owner, scope, MOST_CONVERSATIONS)

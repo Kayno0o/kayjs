@@ -1,3 +1,8 @@
+import { registerConversationData } from './conversation-home'
+
+// Loading the entry is enough for an account erase to reach the conversations, `ai()` or not.
+registerConversationData()
+
 export { anthropic } from './anthropic'
 export type { AnthropicOptions } from './anthropic'
 export { ask, replaces, resuming } from './ask'

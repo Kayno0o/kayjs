@@ -4,7 +4,7 @@ import type { ConversationCall } from './resume'
 import type { AiMessage, AiReply, AiToolCall, AskOptions, ProviderMessage, Thinking } from './types'
 import { within } from '@kaynooo/utils/promise'
 import { logFrom } from 'kay'
-import { currentRequest, refundRateLimit } from 'kay/library'
+import { currentRequest, refundRateLimit, userOf } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
 import { usableSources } from './chat-sources'
 import { conversationStore, purgeAged } from './conversation-home'
@@ -161,6 +161,18 @@ async function written(key: string): Promise<void> {
   await within(write, WRITE_WAIT_MS)
 }
 
+// The signed-in user the request names when the conversation is owned by something else, as an `ai({ key })` of the app makes it, so an erase or an export of that user reaches it.
+async function signedIn(request: Request, owner: string): Promise<string | undefined> {
+  try {
+    const user = await userOf(request)
+
+    return typeof user === 'string' && user !== '' && user !== owner ? user : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // Asks with the conversation the Chat posts to: its stored turns, less those a regenerate or an edit replaces, then the posted messages. Once the reply ends the posted messages and the reply are stored, before the reader is told it ended; a revision that moved since the Chat read it is refused with 409, nothing asked.
 export function heldReply(call: HeldCall, prompt: AiMessage[], options: AskOptions, maxInputChars: number, make: (messages: AiMessage[]) => AiReply): AiReply {
   const store = conversationStore()
@@ -173,7 +185,8 @@ export function heldReply(call: HeldCall, prompt: AiMessage[], options: AskOptio
     if (owner === undefined || call.id === undefined)
       throw new AiError('conflict', 'the chat posted to a conversation kept on the server, and no visitor is named any more, as when a session lapsed')
 
-    const key: ConversationKey = { owner, scope: scopeOf(call.request), id: call.id }
+    const user = await signedIn(call.request, owner)
+    const key: ConversationKey = { owner, scope: scopeOf(call.request), id: call.id, ...user !== undefined && { user } }
     const pending = pendingKey(key)
 
     await written(pending)

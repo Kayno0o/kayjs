@@ -3,7 +3,7 @@ import type { AiOptions } from './limits'
 import { checkOptionKeys, underKayDev } from 'kay/library'
 import { api } from 'kay/server'
 import { aiEnv, choose } from './config'
-import { useConversations } from './conversation-home'
+import { registerConversationData, useConversations } from './conversation-home'
 import { recordedAsks } from './dev-log'
 import { configureHooks } from './hooks'
 import { draftProblems, noModelProblems, startDrafting, writeImageAlts, writeKeptImageAlts } from './image-alt'
@@ -41,6 +41,7 @@ export function ai(options: AiOptions = {}): KayExtension {
     startDrafting()
 
   useConversations(options.conversations, options.conversationAge)
+  registerConversationData()
 
   return {
     name: '@kaynooo/kayjs-ai',
