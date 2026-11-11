@@ -59,9 +59,7 @@ export function fieldRequired(): false | 'first' | 'all' {
   return 'all'
 }
 
-// A lone radio is one box of a group, which marks itself.
-
-// Whether the field of this `type` rendering now is marked invalid by the nearest `describeField` above: the first field, or each with `'all'`.
+// Whether the field of this `type` rendering now is marked invalid by the nearest `describeField` above: the first field, or each with `'all'`; a lone radio is one box of a group, which marks itself.
 export function fieldInvalid(type: unknown): boolean {
   const found = readContext(DESCRIBED).value as Description | undefined
 
