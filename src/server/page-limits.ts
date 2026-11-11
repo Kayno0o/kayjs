@@ -122,10 +122,19 @@ export async function quietly<Loaded>(load: () => Promise<Loaded>, fallback: Loa
 
 // Fails the boot for a limit that cannot count, as an endpoint's or an API route's does, instead of the first visit to the page. Only a page or layout whose source names `rateLimit` is imported, so the others stay unloaded until a request reaches them.
 export async function checkPageLimits(routes: readonly { pattern: string, file: string, layouts: string[] }[]): Promise<void> {
+  const naming = new Map<string, Promise<boolean>>()
+  // A file read once, however many routes share it; one whose source is not there, an app shipped without it, is left to its first request.
+  const names = async (file: string) => {
+    if (!naming.has(file))
+      naming.set(file, quietly(async () => (await Bun.file(file).text()).includes('rateLimit'), false))
+
+    return naming.get(file)!
+  }
+
   for (const route of routes) {
     const files = [...route.layouts, route.file]
 
-    if ((await Promise.all(files.map(async file => Bun.file(file).text()))).some(text => text.includes('rateLimit')))
+    if ((await Promise.all(files.map(names))).includes(true))
       pageLimits(route, await Promise.all(files.map(async file => importModule<object>(file))))
   }
 }
