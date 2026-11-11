@@ -182,17 +182,18 @@ jobs:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Each registry is published only when its token is set, so the release works before the accounts exist. A version already there is skipped by the registry's own refusal, which a rerun must not fail on.
+      # Both tools read their token from the environment (VSCE_PAT, OVSX_PAT), so it never sits in a command line, which any process of the runner can list.
       - name: Publish the extension to the Marketplace and Open VSX
         run: |
           cd editors/vscode
           file=$(ls kay-*.vsix)
           if [ -n "$VSCE_PAT" ]; then
-            bunx @vscode/vsce@4.0.0 publish --packagePath "$file" --pat "$VSCE_PAT" --skip-duplicate
+            bunx @vscode/vsce@4.0.0 publish --packagePath "$file" --skip-duplicate
           else
             echo "VSCE_PAT is not set, the Marketplace is skipped"
           fi
           if [ -n "$OVSX_PAT" ]; then
-            bunx ovsx@1.3.0 publish "$file" --pat "$OVSX_PAT" --skip-duplicate
+            bunx ovsx@1.3.0 publish "$file" --skip-duplicate
           else
             echo "OVSX_PAT is not set, Open VSX is skipped"
           fi
