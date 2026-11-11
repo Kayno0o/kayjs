@@ -448,6 +448,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   failurePage?: string | undefined
   forwardAuth?: ForwardAuthOptions | ForwardDomains | undefined
   guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
+  inactive?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: false | undefined
   name?: string | undefined
@@ -680,6 +681,7 @@ interface AuthStore
   delete: (id: string) => MaybePromise<boolean>;
   staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
+  staleInactive?: (inactiveBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   list: (query: {
     search?: string;
     offset: number;
@@ -1390,6 +1392,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   hooks?: (() => Promise<{
   hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onEvent" | "onSignUp" | "profileFields">>;
 }>) | undefined
+  inactive?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: false | undefined
   module?: undefined

@@ -40,7 +40,10 @@ Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__
 | --- | --- | --- |
 | `sessionStorage` `kay-reloaded` | a page of an older build, reloaded once | the tab's life, only a time |
 | `sessionStorage` `kay_editor-refused` | kayjs-cms, for a signed-in visitor who is no editor | the tab's life |
-| `localStorage` `kcms:draft:<entry>` | kayjs-cms, an editor's unsaved draft | a week, dropped once saved |
+| `localStorage` `kcms:draft:<editor>:<entry>` | kayjs-cms, an editor's unsaved draft, offered only to that editor | a week, dropped once saved, and swept when the editor opens and every hour after |
+| `localStorage` `kcms-marks` | kayjs-cms, whether the editor's page outlines its marked fields | until the editor clears it |
+| `localStorage` `kay-push-posted` | `push()`, the endpoint of the push subscription the server last accepted | until the visitor unsubscribes |
+| `sessionStorage` `kay-push-refused` | `push()`, the endpoint a signed-out visitor was refused with | the tab's life |
 | `localStorage` under a name | a `persisted()` signal with `storage: 'local'` | until the app clears it |
 | `localStorage` `kcms-editor` | kayjs-cms, the editor's panel position and size | until the editor clears it |
 | `localStorage` `kcms:rebuilding` | kayjs-cms, a save the site is still rebuilding for | until the rebuild ends |
@@ -48,7 +51,7 @@ Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__
 | IndexedDB `kay-local` | `local()`, the rows an island keeps offline and the writes not yet sent | until the rows are removed, `clear()` runs or the sign-out cookie changes |
 | Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until `offline` is turned off or the worker's version changes |
 
-`kay-reloaded`, `kay_editor-refused`, `kcms:rebuilding` and the editor's draft are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes are preferences they set.
+`kay-reloaded`, `kay_editor-refused`, `kcms:rebuilding`, the editor's draft and the two push keys are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes and the outline switch are preferences they set.
 
 The offline cache keeps the pages `offline.pages` names (the public prerendered ones by default) and the files, and later only responses that are public: never one marked `private` or `no-store`. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
 
@@ -60,15 +63,24 @@ The conversation of a `remember` chat is what the visitor wrote, so tell them.
 - **Sessions** with a store: until they expire or the visitor signs out. `sqliteSessions` drops expired ones every hour.
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `failedTtl` says (7 days for kayjs-mail, without the body).
+- **Bounces and complaints** (kayjs-mail): the address, the reason, who reported it and when, until `mail.unsuppress(address)` or `mail.erase(address)`, so the address is not mailed again.
 - **Mailing lists** (kayjs-mail): a subscriber's address, language, the date of their confirmation and the proof of it (the page of the form and which notice it showed), in your app's database (else `data/mail-list.sqlite`), until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
 - **Live values and presence**: a `live()` value is the app's own data, shared by every visitor, so keep no person in it. A presence member is whatever your page gave, a name say, kept while the tab is open and about 10 seconds after a crash.
 - **Write answers**: the first answer to a write that `local()` sent, rows included, for a week in `store.cache` or in memory.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Notifications**: the title, link and read state of each, 90 days by default or what `ttl` says, the newest 200 per user. See [Notifications](/guides/live-and-realtime#notifications).
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
-- **Missing pages**: the paths visitors found nothing at, in the database of your `store`, SQLite or Postgres, else `data/not-found.sqlite`, until 90 days after the last visit.
+- **Missing pages**: the paths visitors found nothing at, in the database of your `store`, SQLite or Postgres, else `data/not-found.sqlite`, until 90 days after the last visit, forgotten by a check on opening, with the writes and every hour, so a log nobody adds to is swept too.
 
 Every SQLite file kay creates is readable by the server's user alone.
+
+## Services the server sends to
+
+A mail provider (the one `MAIL_URL` names) receives each mail whole: the address, the subject and the body. It is your processor, so sign its data processing agreement, check where it runs and what it keeps, and name it in your privacy notice.
+
+A subscriber's browser vendor runs the push service (Google, Mozilla or Apple) that gets each push, encrypted for that browser. It cannot read the title or the text, but it knows a device of your site's was notified, and when. Say in the notice that notifications go through it.
+
+An AI provider receives what a visitor writes and the files they attach (see [kayjs-ai](/libraries/kayjs-ai)), and an analytics tool you turn on receives what it counts.
 
 ## Third parties the browser contacts
 

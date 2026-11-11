@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth: `inactive: { maxAge }` is an opt-in sweep that deletes a user, other than a guest or one with a role beyond `defaultRoles`, with no session seen for that long ([auth](../packages/auth/llms/passwords-and-mails.md#guests)). The 404 log forgets a path past 90 days on an hourly timer, and kayjs-cms sweeps expired drafts from the browser at load and hourly, not only when one is written ([privacy](privacy.md)).
 - `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
 - `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
 - The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).

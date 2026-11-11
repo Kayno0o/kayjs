@@ -2,7 +2,7 @@ import type { SQL } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
 import { SQL as BunSQL } from 'bun'
-import { afterEach, beforeEach, expect } from 'bun:test'
+import { afterEach, beforeEach, expect, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setupStore } from '../src/server/app-store'
 import { devNotFound } from '../src/server/dev-not-found'
@@ -94,6 +94,24 @@ pgDescribe('the 404 log in Postgres', () => {
     expect(listed[0]!.referrers).toEqual([{ host: 'a.example', hits: 10 }, { host: 'b.example', hits: 9 }])
     await store.clear()
     await store.close()
+  })
+
+  pgIt('forgets a path past 90 days on a timer, with no hit to write', async () => {
+    const day = 24 * 3_600_000
+    const start = Date.now()
+    const store = pgMissingStore(sql, false, false, 20)
+
+    store.hit('/old', 'x.example', () => undefined)
+    expect((await store.list()).map(row => row.path)).toEqual(['/old'])
+    setSystemTime(new Date(start + 91 * day))
+
+    try {
+      await eventually(async () => expect(await store.list()).toEqual([]))
+    }
+    finally {
+      setSystemTime()
+      await store.close()
+    }
   })
 
   pgIt('keeps at most so many paths, forgetting the least hit', async () => {

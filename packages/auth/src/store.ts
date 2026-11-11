@@ -240,6 +240,8 @@ export interface AuthStore {
     staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Up to `limit` users who are not guests, created before `createdBefore` with an email never verified, holding no session and no identity, oldest first; without it unverified accounts are never pruned.
     staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
+    // Up to `limit` users who are not guests, created before `inactiveBefore` and holding no session seen since, oldest first; without it inactive accounts are never pruned.
+    staleInactive?: (inactiveBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     // With `total: false` the caller does not read `total`, so a store may skip counting.
     list: (query: { search?: string, offset: number, limit: number, total?: boolean }) => MaybePromise<{ users: UserRecord[], total: number }>

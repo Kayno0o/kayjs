@@ -22,13 +22,13 @@
     "complexity": 43
   },
   "packages/auth/src/memoryStore.ts": {
-    "max-lines-per-function": 460
+    "max-lines-per-function": 444
   },
   "packages/auth/src/password.ts": {
     "complexity": 52
   },
   "packages/auth/src/pg.ts": {
-    "max-lines-per-function": 283
+    "max-lines-per-function": 268
   },
   "packages/auth/src/setup.ts": {
     "complexity": 55
@@ -230,7 +230,7 @@
     "max-lines-per-function": 195
   },
   "src/server/pg-not-found.ts": {
-    "max-lines-per-function": 201
+    "max-lines-per-function": 198
   },
   "src/server/pg-rooms.ts": {
     "max-lines-per-function": 287

@@ -87,25 +87,7 @@ export function memoryAuth(): AuthStore {
 
         return copy(next)
       },
-      staleGuests(createdBefore, limit) {
-        const withSession = new Set([...sessions.values()].map(session => session.userId))
-
-        return [...users.values()]
-          .filter(user => user.guest && user.createdAt < createdBefore && !withSession.has(user.id))
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-          .slice(0, limit)
-          .map(user => copy(user)!)
-      },
-      staleUnverified(createdBefore, limit) {
-        const withSession = new Set([...sessions.values()].map(session => session.userId))
-        const withIdentity = new Set([...identities.values()].map(identity => identity.userId))
-
-        return [...users.values()]
-          .filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !withSession.has(user.id) && !withIdentity.has(user.id))
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-          .slice(0, limit)
-          .map(user => copy(user)!)
-      },
+      ...staleUsers(users, sessions, identities),
       delete(id) {
         const existed = users.delete(id)
 
@@ -562,6 +544,35 @@ export function memoryAuth(): AuthStore {
 }
 
 // Callers get their own copy, as from a database, so changing one changes nothing stored.
+// The listings of guests, unverified and inactive accounts the prune reads, oldest first.
+function staleUsers(users: Map<string, UserRecord>, sessions: Map<string, SessionRecord>, identities: Map<string, IdentityRecord>): Pick<AuthStore['users'], 'staleGuests' | 'staleUnverified' | 'staleInactive'> {
+  const list = (before: Date, limit: number, stale: (user: UserRecord) => boolean) => [...users.values()]
+    .filter(user => user.createdAt < before && stale(user))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .slice(0, limit)
+    .map(user => copy(user)!)
+  const withSession = () => new Set([...sessions.values()].map(session => session.userId))
+
+  return {
+    staleGuests(createdBefore, limit) {
+      const held = withSession()
+
+      return list(createdBefore, limit, user => user.guest && !held.has(user.id))
+    },
+    staleUnverified(createdBefore, limit) {
+      const held = withSession()
+      const linked = new Set([...identities.values()].map(identity => identity.userId))
+
+      return list(createdBefore, limit, user => !user.guest && user.email !== null && user.emailVerifiedAt === null && !held.has(user.id) && !linked.has(user.id))
+    },
+    staleInactive(inactiveBefore, limit) {
+      const active = new Set([...sessions.values()].filter(session => session.lastSeenAt >= inactiveBefore).map(session => session.userId))
+
+      return list(inactiveBefore, limit, user => !user.guest && !active.has(user.id))
+    },
+  }
+}
+
 function copy(user: UserRecord | undefined): UserRecord | undefined {
   return user && { ...user, roles: [...user.roles], data: structuredClone(user.data ?? {}) }
 }

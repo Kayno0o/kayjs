@@ -186,6 +186,24 @@ describe('missingStore', () => {
     setSystemTime()
   })
 
+  it('forgets a path past 90 days on a timer too, with no hit to write', async () => {
+    const day = 24 * 3_600_000
+    const start = Date.now()
+    const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'), true, 20)
+
+    store.hit('/old', 'x.example', never)
+    expect(store.list().map(row => row.path)).toEqual(['/old'])
+    setSystemTime(new Date(start + 91 * day))
+
+    try {
+      await eventually(() => expect(store.list()).toEqual([]))
+    }
+    finally {
+      setSystemTime()
+      store.close()
+    }
+  })
+
   it('suggests once, when a path is asked for the second time', async () => {
     const store = missingStore(join(await scratchDir('not-found-'), 'missing.sqlite'))
     let asked = 0

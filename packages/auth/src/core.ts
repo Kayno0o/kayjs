@@ -183,6 +183,8 @@ export interface Core {
   guestMaxAge: number
   // Seconds an account registered and never verified is kept, where unverified accounts cannot sign in; for good when undefined.
   unverifiedMaxAge?: number | undefined
+  // Seconds a user with no session seen is kept; for good when undefined.
+  inactiveMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
 

@@ -3,8 +3,14 @@ import { browserKeeper, editorOfBrowser } from '../draft-storage'
 import { cmsDrafts } from '../drafts'
 
 // The page's one set of drafts, shared by every form of the editor, kept in the browser so a reload brings the edits back.
-export const drafts = cmsDrafts({ show: showDraft, keep: browserKeeper(undefined, undefined, editorOfBrowser) })
+const keeper = browserKeeper(undefined, undefined, editorOfBrowser)
 
-// Typing is kept after a pause, so what was typed in the last moments is kept as the page goes.
-if (typeof window !== 'undefined')
+export const drafts = cmsDrafts({ show: showDraft, keep: keeper })
+
+if (typeof window !== 'undefined') {
+  // Typing is kept after a pause, so what was typed in the last moments is kept as the page goes.
   window.addEventListener('pagehide', () => drafts.flush())
+  // The drafts past their week are dropped as the editor opens and every hour it stays open, not only when one is read.
+  keeper.sweep()
+  setInterval(keeper.sweep, 3_600_000)
+}

@@ -327,3 +327,21 @@ describe('taking the other save after a conflict', () => {
     expect(drafts.differences(post, { ...base, data: { ...base.data, title: 'Theirs', seo: { description: 'z' } }, body: '# Theirs' })).toEqual(['seo.description', BODY])
   })
 })
+
+describe('sweeping the kept drafts', () => {
+  it('drops each past its week, whoever it belongs to, with what holds no draft, and nothing else', () => {
+    const storage = memoryStorage()
+    let now = Date.now()
+    const keeper = browserKeeper(() => storage, () => now, () => 'ana')
+
+    keeper.write('posts/old', { entry: post, version: undefined, editedAt: now })
+    now += KEEP_FOR / 2
+    storage.setItem('kcms:draft:bob:posts/old', JSON.stringify({ entry: post, editedAt: now - KEEP_FOR - 1 }))
+    storage.setItem('kcms:draft:ana:junk', 'not json')
+    storage.setItem('other', 'kept')
+    keeper.write('posts/new', { entry: post, version: undefined, editedAt: now })
+    now += KEEP_FOR / 2 + 1
+    keeper.sweep()
+    expect(Array.from({ length: storage.length }, (_, at) => storage.key(at)).toSorted()).toEqual(['kcms:draft:ana:posts/new', 'other'])
+  })
+})

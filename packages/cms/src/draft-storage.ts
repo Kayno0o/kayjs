@@ -55,7 +55,7 @@ function isKept(value: unknown): value is KeptDraft {
 }
 
 // Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give. With `who`, the person the drafts belong to, they are kept under that name and none is read or written while it is undefined, so a draft is never offered to another person.
-export function browserKeeper(get: () => Storage | undefined = storageOf, now: () => number = Date.now, who?: () => string | undefined): DraftKeeper {
+export function browserKeeper(get: () => Storage | undefined = storageOf, now: () => number = Date.now, who?: () => string | undefined): DraftKeeper & { sweep: () => void } {
   const prefix = (): string | undefined => {
     if (who === undefined)
       return PREFIX
@@ -74,6 +74,19 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
     }
     catch {
       return undefined
+    }
+  }
+
+  // A kept item past its week, or one that holds no draft, which the keeper never wrote.
+  function expired(text: string | null): boolean {
+    try {
+      const { editedAt, at } = (JSON.parse(text ?? 'null') ?? {}) as { editedAt?: unknown, at?: unknown }
+      const edited = editedAt ?? at
+
+      return typeof edited !== 'number' || now() - edited > KEEP_FOR
+    }
+    catch {
+      return true
     }
   }
 
@@ -123,6 +136,15 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
         attempt(storage => storage.setItem(at + key, JSON.stringify(kept)))
     },
     remove,
+    // A draft is dropped when it is read past its week, so one nobody opens again stays: this drops each that is past it, whoever it belongs to, or that holds no draft.
+    sweep() {
+      attempt((storage) => {
+        for (const name of Array.from({ length: storage.length }, (_, at) => storage.key(at))) {
+          if (name?.startsWith(PREFIX) && expired(storage.getItem(name)))
+            storage.removeItem(name)
+        }
+      })
+    },
     clear() {
       attempt((storage) => {
         for (const name of Array.from({ length: storage.length }, (_, at) => storage.key(at))) {

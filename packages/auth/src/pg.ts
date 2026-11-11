@@ -234,24 +234,7 @@ export function pgAuth(db: Database): AuthStore {
 
         return toUser(isEmpty(row) ? await users.read.findById(id) : await users.write.updateById(id, row))
       },
-      async staleGuests(createdBefore, limit) {
-        const rows = await db.raw<{ id: string }>`
-          SELECT "id" FROM "kay_users"
-          WHERE "guest" = ${true} AND "created_at" < ${createdBefore} AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
-          ORDER BY "created_at" LIMIT ${limit}`
-
-        return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
-      },
-      async staleUnverified(createdBefore, limit) {
-        const rows = await db.raw<{ id: string }>`
-          SELECT "id" FROM "kay_users"
-          WHERE "guest" = ${false} AND "email" IS NOT NULL AND "email_verified_at" IS NULL AND "created_at" < ${createdBefore}
-            AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
-            AND NOT EXISTS (SELECT 1 FROM "kay_identities" WHERE "kay_identities"."user_id" = "kay_users"."id")
-          ORDER BY "created_at" LIMIT ${limit}`
-
-        return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
-      },
+      ...staleUsers(db, async ids => (await users.read.findMany(q => q.where({ id: { in: ids } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)),
       delete: async id => await users.write.deleteById(id) !== null,
       async list({ search, offset, limit, total: counted = true }) {
         const [rows, total] = await Promise.all([
@@ -585,6 +568,29 @@ function userOf(row: Record<string, unknown>): UserRow {
   }
 
   return user as UserRow
+}
+
+// The listings of guests, unverified and inactive accounts the prune reads: the ids from one query, then the users, oldest first.
+function staleUsers(db: Database, load: (ids: string[]) => Promise<UserRecord[]>): Pick<AuthStore['users'], 'staleGuests' | 'staleUnverified' | 'staleInactive'> {
+  const read = async (rows: { id: string }[]) => rows.length === 0 ? [] : load(rows.map(row => row.id))
+
+  return {
+    staleGuests: async (createdBefore, limit) => read(await db.raw<{ id: string }>`
+      SELECT "id" FROM "kay_users"
+      WHERE "guest" = ${true} AND "created_at" < ${createdBefore} AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
+      ORDER BY "created_at" LIMIT ${limit}`),
+    staleUnverified: async (createdBefore, limit) => read(await db.raw<{ id: string }>`
+      SELECT "id" FROM "kay_users"
+      WHERE "guest" = ${false} AND "email" IS NOT NULL AND "email_verified_at" IS NULL AND "created_at" < ${createdBefore}
+        AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id")
+        AND NOT EXISTS (SELECT 1 FROM "kay_identities" WHERE "kay_identities"."user_id" = "kay_users"."id")
+      ORDER BY "created_at" LIMIT ${limit}`),
+    staleInactive: async (inactiveBefore, limit) => read(await db.raw<{ id: string }>`
+      SELECT "id" FROM "kay_users"
+      WHERE "guest" = ${false} AND "created_at" < ${inactiveBefore}
+        AND NOT EXISTS (SELECT 1 FROM "kay_auth_sessions" WHERE "kay_auth_sessions"."user_id" = "kay_users"."id" AND "kay_auth_sessions"."last_seen_at" >= ${inactiveBefore})
+      ORDER BY "created_at" LIMIT ${limit}`),
+  }
 }
 
 function toUser(row: UserRow | null): UserRecord | undefined {

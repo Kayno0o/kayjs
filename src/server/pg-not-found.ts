@@ -115,10 +115,40 @@ export async function importNotFoundRows(source: PgSource, legacy: LegacyRows): 
   }
 }
 
+async function forgetOld(tx: SQL, now: number): Promise<void> {
+  await query(tx, 'DELETE FROM kay_missing WHERE last_at < $1::bigint', [now - MAX_AGE_MS])
+  await query(tx, 'DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
+}
+
+async function sweepOld(connect: () => Promise<SQL | undefined>, closed: () => boolean): Promise<void> {
+  const connected = await limited('the 404 log finding its tables', connect, READY_TIMEOUT_MS)
+
+  if (connected && !closed())
+    await limited('the 404 log sweep', async () => forgetOld(connected, Date.now()), MAINTENANCE_TIMEOUT_MS)
+}
+
+// Runs `sweep` every `ms` without keeping the process alive, a failure being logged and the next run tried.
+function every(ms: number, sweep: () => Promise<void>): Timer {
+  const timer = setInterval(() => {
+    void (async () => {
+      try {
+        await sweep()
+      }
+      catch (error) {
+        kayLog('warn', `the 404 log could not forget its old paths: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    })()
+  }, ms)
+
+  timer.unref()
+
+  return timer
+}
+
 // The paths visitors found nothing at, and the redirects editors added, kept in the app's Postgres (`kay_missing`, `kay_missing_referrers` and `kay_redirects`), as the SQLite store keeps them in its file: shared by every replica, so a deploy loses nothing.
 // The tables are made by the first use unless `pgData` made them, and a role that may create nothing has the owner run `createDataTables`.
 // A `readOnly` store creates nothing: it answers empty while the tables are missing (looked for again every second) or the role may not read them, and counts no hit; `kay dev` and the reads of a screen use it, so only a production server that counts a 404 makes the tables.
-export function pgMissingStore(source: PgSource, closedByReload = true, readOnly = false): MissingStore {
+export function pgMissingStore(source: PgSource, closedByReload = true, readOnly = false, sweepMs = HOUR_MS): MissingStore {
   const db = connectionOf(source)
   const pending = new Map<string, Pending>()
   let writing: Promise<void> | undefined
@@ -168,16 +198,8 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
     return db
   }
 
-  // At most once an hour, and on the first write, so a site nobody mistypes a URL of keeps nothing old and one that gets many hits pays one delete.
-  const purge = async (tx: SQL, now: number): Promise<boolean> => {
-    if (now - purgedAt < HOUR_MS)
-      return false
-
-    await query(tx, 'DELETE FROM kay_missing WHERE last_at < $1::bigint', [now - MAX_AGE_MS])
-    await query(tx, 'DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
-
-    return true
-  }
+  // Also on a timer, so a log nobody adds to still forgets what is past its 90 days; a store that counts no hit leaves it to the ones that do.
+  const sweeping = readOnly ? undefined : every(sweepMs, async () => sweepOld(connect, () => closed))
 
   const record = async (batch: [string, Pending][]): Promise<void> => {
     const connected = await limited('the 404 log finding its tables', connect, READY_TIMEOUT_MS)
@@ -190,7 +212,11 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
 
     await limited('the 404 log write', async () => connected.begin(async (tx) => {
       await query(tx, 'SELECT pg_advisory_xact_lock(hashtext($1))', [WRITE_LOCK])
-      purged = await purge(tx, now)
+      // At most once an hour with the writes, and on the first one, so a site that gets many hits pays one delete.
+      purged = now - purgedAt >= HOUR_MS
+
+      if (purged)
+        await forgetOld(tx, now)
 
       for (const [path, { hits: seen, firstAt, lastAt, referrers, suggest }] of batch) {
         const [known] = await query<{ hits: string }>(tx, 'SELECT hits::text FROM kay_missing WHERE path = $1', [path])
@@ -277,6 +303,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
 
   const settle = async (): Promise<void> => {
     closed = true
+    clearInterval(sweeping)
 
     try {
       await flush()

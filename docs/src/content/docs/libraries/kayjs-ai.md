@@ -585,6 +585,7 @@ Everything a visitor types into the chat is sent to the AI provider, along with 
 - Rely on a transfer basis for the US, such as the provider's standard contractual clauses or the EU-US Data Privacy Framework. A server of your own, such as Ollama, keeps the text with you.
 - Name the provider, the purpose and the transfer in your privacy notice, where the visitor can read it before writing.
 - Return only the fields an answer needs from an action you offer as a tool, since its result goes to the provider as it is.
+- Attach a file only when the answer needs it: an image or a PDF goes whole, with every face or number it shows, and a recording sent to `transcribe()` is a voice. The same agreement and transfer apply to them.
 
 kayjs-ai writes no log or file of the messages, unless a `Chat` keeps its conversations on the server. It counts each visitor's asks and tokens under a digest of their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
 

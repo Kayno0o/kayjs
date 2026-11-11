@@ -443,7 +443,7 @@ function firstSegment(path: string): string {
 }
 
 // The store in a SQLite file, so a restart or a deploy keeps the counts and the command reading them needs no server.
-export function missingStore(path: string, closedByReload = true): SqliteMissingStore {
+export function missingStore(path: string, closedByReload = true, sweepMs = HOUR_MS): SqliteMissingStore {
   const db: Database = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_missing (path TEXT PRIMARY KEY, hits INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, target TEXT, reason TEXT)')
@@ -467,17 +467,31 @@ export function missingStore(path: string, closedByReload = true): SqliteMissing
   const orphans = db.query('DELETE FROM kay_missing_referrers WHERE path NOT IN (SELECT path FROM kay_missing)')
   let purgedAt = 0
 
-  // At most once an hour, and on opening, so a site nobody mistypes a URL of keeps nothing old and one that gets many hits pays one delete.
-  const purge = (now: number): void => {
-    if (now - purgedAt < HOUR_MS)
-      return
-
+  const sweep = (now: number): void => {
     purgedAt = now
     aged.run(now - MAX_AGE_MS)
     orphans.run()
   }
 
+  // At most once an hour with the writes, and on opening, so a site that gets many hits pays one delete.
+  const purge = (now: number): void => {
+    if (now - purgedAt >= HOUR_MS)
+      sweep(now)
+  }
+
   purge(Date.now())
+
+  // Also on a timer, so a log nobody adds to still forgets what is past its 90 days.
+  const sweeping = setInterval(() => {
+    try {
+      sweep(Date.now())
+    }
+    catch {
+      // The file is gone or closed: the next sweep, or none, tries again.
+    }
+  }, sweepMs)
+
+  sweeping.unref()
 
   const redirects = redirectSet(db)
 
@@ -534,6 +548,7 @@ export function missingStore(path: string, closedByReload = true): SqliteMissing
   }
 
   const settle = (): void => {
+    clearInterval(sweeping)
     writers.delete(flush)
 
     try {

@@ -34,7 +34,7 @@ interface BeforeUploadEvent
 const BODY: typeof BODY
 
 [.] browserKeeper
-function browserKeeper(get?: () => Storage | undefined, now?: () => number, who?: (() => string | undefined) | undefined): DraftKeeper
+function browserKeeper(get?: () => Storage | undefined, now?: () => number, who?: (() => string | undefined) | undefined): DraftKeeper & { sweep: () => void; }
 
 [.] CanQuestion
 interface CanQuestion
