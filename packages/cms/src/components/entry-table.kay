@@ -112,7 +112,7 @@ async function remove(row: EntryRow): Promise<void> {
     await refresh()
 }
 ---
-Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSort={sortBy} selectable={bulkable})
+Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}', { collection: collection.name })} columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSort={sortBy} selectable={bulkable})
   @bulk(keys, clear)
     EntryBulk(collection={collection} rows={rows.filter(row => keys.includes(keyOf(row)))} actions={actions} clear={clear} denied={denied})
   @cell(row, column)

@@ -69,6 +69,7 @@ test('a colour is picked or typed and saved in the code the schema asks for', as
   const [swatch, code] = field('accent').querySelectorAll<HTMLInputElement>('input')
 
   expect(swatch!.type).toBe('color')
+  expect(swatch!.getAttribute('aria-label')).not.toBe(code!.getAttribute('aria-label'))
   expect(swatch!.value).toBe('#112233')
   expect(code!.value).toBe('#112233')
 

@@ -19,9 +19,9 @@ nav.kcms-locales(aria-label={wording('cms.locales.label', 'Translations')})
       span.kcms-locale
         a(href={entryPath(prefix, { collection: entry.collection, slug, locale: item.locale })}) {item.locale}
         if compared === item.locale
-          a(href={entryPath(prefix, entry)}) {wording('cms.locales.stopCompare', 'Hide')}
+          a(href={entryPath(prefix, entry)} aria-label={wording('cms.locales.stopCompareAria', 'Hide the text in {locale}', { locale: item.locale })}) {wording('cms.locales.stopCompare', 'Hide')}
         else
-          a(href={comparePath(item.locale)}) {wording('cms.locales.compare', 'Compare')}
+          a(href={comparePath(item.locale)} aria-label={wording('cms.locales.compareAria', 'Compare with the text in {locale}', { locale: item.locale })}) {wording('cms.locales.compare', 'Compare')}
     else
       span.kcms-locale
         Badge(tone="warning" label={wording('cms.locales.missing', 'Missing')})

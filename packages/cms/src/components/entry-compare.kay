@@ -11,7 +11,7 @@ const texts = translatable(collection).map(field => ({ key: String(field.key), l
 ---
 aside.kcms-compare(aria-label={wording('cms.locales.comparing', 'Text in {locale}', { locale: other.locale })})
   h2.kcms-compare-title {wording('cms.locales.comparing', 'Text in {locale}', { locale: other.locale })}
-  dl
+  dl(lang={other.locale})
     for item of texts key={item.key}
       dt {item.label}
       dd {String(item.text)}

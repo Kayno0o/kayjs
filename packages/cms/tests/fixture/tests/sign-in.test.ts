@@ -51,6 +51,8 @@ test('a wrong password stays on the screen and says so; the right one signs in a
 
   expect(wrong.status).toBe(401)
   expect(wrong.html).toContain('That is not the right password.')
+  expect(wrong.find('input[type=password]')[0]?.attributes['aria-describedby']).toBe('kcms-sign-in-error')
+  expect(wrong.find('#kcms-sign-in-error').length).toBe(1)
   expect((await site.fetch('/admin')).status).toBe(302)
 
   const right = await site.submit(signIn, { password: 'pw-editor', redirect: '/admin/collections/posts?q=a' }, { from: '/admin/sign-in' })

@@ -65,7 +65,7 @@ head
   form.kcms-sign-in-form(action={signIn})
     input(type="hidden" name="redirect" value={back})
     if signIn.failed()?.data as data
-      p.kcms-sign-in-error(role="alert") {data.message}
+      p.kcms-sign-in-error(id="kcms-sign-in-error" role="alert") {data.message}
     FormField(label={wording('cms.signIn.password', 'Password')} name="password" required)
-      input(field="password" type="password" autocomplete="current-password")
+      input(field="password" type="password" autocomplete="current-password" aria-describedby={signIn.failed() ? 'kcms-sign-in-error' : undefined})
     Button(type="submit" tone="accent" label={wording('cms.signIn.submit', 'Sign in')})

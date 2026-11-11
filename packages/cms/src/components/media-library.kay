@@ -77,7 +77,7 @@ async function remove(upload: LibraryUpload): Promise<void> {
 
 const dimensions = (upload: LibraryUpload) => upload.width !== undefined && upload.height !== undefined ? `${upload.width} x ${upload.height}` : undefined
 ---
-Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
+Table.kcms-media(label={wording('cms.media.table', 'Uploads')} columns={columns} rows={uploads} rowKey={upload => upload.key})
   @cell(row, column)
     if column.key === 'preview'
       if IMAGE.test(row.key) && row.width !== undefined && row.height !== undefined

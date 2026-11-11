@@ -59,7 +59,7 @@ const { draftField, publishField, unpublishField } = form.collection
 const locked = () => [draftField, publishField, unpublishField].includes(name) ? form.denied?.publish : undefined
 ---
 if locked()
-  fieldset.kcms-locked(disabled data-tooltip={locked()} tabindex="0")
+  fieldset.kcms-locked(disabled data-tooltip={locked()} tabindex="0" aria-label={field().label})
     FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name} note={note()})
 else
   FieldInput(drafts={form.drafts} entry={form.entry} field={field()} path={name} note={note()})

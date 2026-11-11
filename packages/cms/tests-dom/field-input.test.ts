@@ -448,6 +448,8 @@ test('an image previews with its alt text, which is edited in place, shown only 
 
   expect(refused.querySelector('label.kcms-file-alt input')?.getAttribute('aria-invalid')).toBe('true')
   expect(refused.querySelector('.kcms-file-error')?.textContent).toBe('Required')
+  expect(refused.querySelector('label.kcms-file-alt input')?.getAttribute('aria-describedby')).toBe('alt-id-issue')
+  expect(refused.querySelector('#alt-id-issue')?.textContent).toBe('Required')
   mounted?.unmount()
   expect((await openFile(UPLOADED)).querySelector('label.kcms-file-alt')).toBeNull()
   mounted?.unmount()

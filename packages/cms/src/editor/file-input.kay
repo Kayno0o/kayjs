@@ -176,9 +176,9 @@ function pick(path: string, event: Event): void {
   if image && alt && value !== '' && !many
     label.kcms-file-alt
       span.kcms-file-alt-label {wording('cms.file.alt', 'Alt text')}
-      TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} onInput={text => onAlt?.(text)})
+      TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} aria-describedby={alt.issue === undefined ? undefined : `${alt.id}-issue`} onInput={text => onAlt?.(text)})
     if alt.issue
-      p.kcms-file-error(role="alert") {alt.issue}
+      p.kcms-file-error(id={`${alt.id}-issue`} role="alert") {alt.issue}
   // The width and height of the image are not fields of the form, so their refusal shows here, where the path that left them blank was set.
   if image && !many
     for issue of sizeIssues key={issue.id}

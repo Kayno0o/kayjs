@@ -34,6 +34,7 @@ test('the draft flag and the publish and end dates are locked with the refusal a
 
     expect(locked.disabled).toBe(true)
     expect(locked.getAttribute('data-tooltip')).toBe(REFUSAL)
+    expect(locked.getAttribute('aria-label')).toBeTruthy()
     expect(locked.querySelector(`[data-kcms-path="${name}"]`)).not.toBeNull()
     mounted?.unmount()
   }

@@ -74,7 +74,7 @@ match field.kind
   when 'color'
     FormField(label={label} hint={hint} issue={issue} required={required} group)
       .kcms-color
-        input.kcms-swatch(type="color" aria-label={label} value={HEX.test(text()) ? text().toLowerCase() : '#000000'} onInput={event => { onChange(event.currentTarget.value); touch() }})
+        input.kcms-swatch(type="color" aria-label={wording('cms.field.colorPicker', '{label}, colour picker', { label })} value={HEX.test(text()) ? text().toLowerCase() : '#000000'} onInput={event => { onChange(event.currentTarget.value); touch() }})
         TextInput(placeholder="#1a2b3c" aria-label={label} value={text()} onInput={next => onChange(next === '' && !required ? cleared : next)} onBlur={touch} maxlength={7})
   else
     FormField(label={label} hint={hint} issue={issue} required={required} group)

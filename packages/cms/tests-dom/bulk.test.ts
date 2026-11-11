@@ -156,6 +156,8 @@ test('a duplicate that went through is told', async () => {
   page.happyDOM.setURL('http://localhost/admin/collections/posts')
   const root = await openTable([row('a')])
 
+  expect(root.querySelector('table caption')?.textContent).toBe('Entries of posts')
+
   root.querySelector<HTMLElement>('button[aria-label="Duplicate a"]')!.click()
   await until(() => text().includes('Duplicated'))
   expect(text()).toContain('Duplicated')

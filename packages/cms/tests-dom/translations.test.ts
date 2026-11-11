@@ -66,4 +66,6 @@ test('shows the text of the locale compared, and a link to hide it', async () =>
 
   expect(aside?.textContent).toContain('Hello there')
   expect([...root.querySelectorAll<HTMLAnchorElement>('.kcms-locales a')].map(link => link.textContent)).toContain('Hide')
+  expect(root.querySelector('.kcms-locales a[aria-label="Hide the text in en"]')).not.toBeNull()
+  expect(root.querySelector('.kcms-compare dl')?.getAttribute('lang')).toBe('en')
 })

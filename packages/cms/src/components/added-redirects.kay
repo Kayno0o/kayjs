@@ -42,7 +42,7 @@ const columns: Column<AddedRedirect>[] = [
   { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
 ]
 ---
-Table.kcms-missing.kcms-redirects(columns={columns} rows={redirects} rowKey={row => row.from} selectable)
+Table.kcms-missing.kcms-redirects(label={wording('cms.redirects.title', 'Redirects added here')} columns={columns} rows={redirects} rowKey={row => row.from} selectable)
   @bulk(keys, clear)
     ConfirmDelete(message={wording('cms.redirects.removeMany', keys.length === 1 ? 'Remove 1 redirect? Its path answers 404 again.' : 'Remove {count} redirects? Their paths answer 404 again.', { count: keys.length })} label={wording('cms.redirects.removeSelected', 'Remove {count} selected', { count: keys.length })} failureLabel={wording('cms.redirects.removeFailure', 'Could not remove the redirect')} size="sm" variant="ghost" onConfirm={async () => { if (await removeConfirmed(keys.map(String))) clear() }})
   @cell(row, column)

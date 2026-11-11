@@ -39,6 +39,8 @@ test('the target box offers the site\'s paths and adds a 307, or a 308 once Perm
 
   expect(root.querySelector('input[list]')?.getAttribute('list')).toBe('kcms-paths-/old')
   expect(button(root, 'Add redirect')?.disabled).toBe(true)
+  // The name keeps the visible words first.
+  expect(button(root, 'Add redirect')?.getAttribute('aria-label')?.startsWith('Add redirect')).toBe(true)
 
   await type(root, ' /new ')
   button(root, 'Add redirect')?.click()

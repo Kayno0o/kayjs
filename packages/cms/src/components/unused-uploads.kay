@@ -33,7 +33,7 @@ async function remove(keys: string[]): Promise<boolean> {
   return done
 }
 ---
-Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)
+Table.kcms-uploads(label={wording('cms.uploads.table', 'Unused uploads')} columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)
   @bulk(keys, clear)
     if denied.delete !== undefined
       Refused(label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} reason={denied.delete} size="sm" variant="ghost")
