@@ -381,13 +381,14 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
         return Number(row?.total ?? 0)
       })
     },
+    // A lookup bounds its own read to a second and answers the last redirects read, so it never waits for the tables.
     redirects: limitedStore(pgRedirectSet(connect, (error) => {
       if (told)
         return
 
       told = true
       kayLog('warn', `the redirects added while the site runs cannot be read from the app's Postgres database: ${error instanceof Error ? error.message : String(error)}; the last ones read keep answering`)
-    }, readOnly), 'the redirects store', { ready: connect }),
+    }, readOnly), 'the redirects store', { ready: connect, unlimited: ['snapshot'] }),
     close: settle,
   }
 }
