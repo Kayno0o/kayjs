@@ -109,8 +109,8 @@ export class HtmlTemplate extends TemplateWriter {
   // The names the `try` blocks being written give their `catch`, which an `await` without a `catch` inside falls back to: the runtime hands the function, or one rendering nothing, to the content of the `try`.
   private readonly catches: string[] = []
 
-  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
-    super(b, src, facts)
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, ownMarkup: (name: string, at: number) => boolean, private readonly options: HtmlOptions = {}) {
+    super(b, src, facts, ownMarkup)
     this.mergesAtRuntime = options.classMerge === true
   }
 

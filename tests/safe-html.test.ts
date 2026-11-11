@@ -220,6 +220,12 @@ describe('markup across JSON', () => {
     expect(checks(server('div(innerHTML={`<b>hi</b>`})'))).toBe(false)
     expect(checks(server('div(innerHTML="<b>hi</b>")'))).toBe(false)
     expect(checks(server(`---\n${text}\n---\ndiv(innerHTML={waves})`))).toBe(false)
+
+    // A script's or style's content is text on both sides, so neither vouches for it.
+    const both = (tag: string) => (['html', 'dom'] as const).map(output => checks(compileKay(`---\nconst { x } = props<{ x: string }>()\n---\n${tag}(innerHTML={x})`, 'page.kay', { output }).tsx))
+
+    expect(both('div')).toEqual([true, true])
+    expect(both('style')).toEqual([false, false])
   })
 
   it('arrives plain when nothing vouched for it, and from the browser', () => {

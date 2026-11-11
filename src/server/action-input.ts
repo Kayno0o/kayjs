@@ -31,6 +31,10 @@ export function withoutEmptyFiles(body: unknown): unknown {
   const fields: [string, unknown][] = []
 
   for (const [name, value] of Object.entries(body)) {
+    // As in `withFixedFields`, a `__proto__` field is dropped: it names no input.
+    if (name === '__proto__')
+      continue
+
     if (!Array.isArray(value)) {
       if (!isEmptyFile(value))
         fields.push([name, value])
@@ -45,7 +49,6 @@ export function withoutEmptyFiles(body: unknown): unknown {
       fields.push([name, files])
   }
 
-  // Own properties all, a posted `__proto__` included, where assigning one would change the object's prototype.
   return Object.fromEntries(fields)
 }
 

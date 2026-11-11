@@ -67,7 +67,7 @@
 - An island whose script throws as it hydrates keeps its server markup, lifeless.
 - In production the stack arrives mapped: `kay build` keeps the browser build's source maps beside `dist`, pointed at `.kay` lines and never served, and the server maps each frame of a report with them, so `onError` reads `src/routes/cart.kay:12:7` rather than a minified chunk. A frame of a chunk with no map stays as the browser wrote it. An executable made by `kay build --compile` embeds the maps zstd-compressed and reads one when a report first needs it, and a `kay build --static` export has no server.
 - The browser sends at most 10 distinct errors per page load, leaving out another origin's scripts, whose details it hides.
-- The server takes 20 reports a minute per client, refusing another site's and any over 16 KB.
+- The server takes 20 reports a minute per client and 600 from all clients together, refusing another site's and any over 16 KB.
 
 ### Element size
 

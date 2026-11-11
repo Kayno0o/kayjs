@@ -2678,6 +2678,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('takes `lints.comments` from the config: no unknown-lint problem, and a `kay-allow` with no reason refused', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { comments: { reason: true } } })\n',
+      'src/routes/index.kay': '// kay-allow missing-alt\nimg(src="/a.png" width="1" height="1")\n',
+    })
+
+    try {
+      const found = await check(root, { lints: { comments: { reason: true } } })
+
+      expect(found.filter(d => d.file === join(root, 'kay.config.ts'))).toEqual([])
+      expect(found.map(d => d.code)).toContain('allow-refused')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('lets a static component only islands render pass functions to interactive children, which render inline with the island', async () => {
     const files = {
       'src/components/controls.ts': 'export interface Controls {\n  pick: (value: string) => void\n}\n',

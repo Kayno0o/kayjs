@@ -53,8 +53,8 @@ export class DomTemplate extends TemplateWriter {
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined, classTable?: ClassTable) {
-    super(b, src, facts)
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, ownMarkup: (name: string, at: number) => boolean, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined, classTable?: ClassTable) {
+    super(b, src, facts, ownMarkup)
     this.classTable = classTable
   }
 
@@ -418,9 +418,9 @@ export class DomTemplate extends TemplateWriter {
     return node
   }
 
-  // The helper an `innerHTML` expression goes through to be vouched for at runtime: none for a written-out string or a text import, and none for another property.
-  private markupHelper(property: string, expression: Span): string {
-    return property === 'innerHTML' && checksMarkup(this.src, expression, this.ownMarkup) ? helperName('checkedMarkup') : ''
+  // The helper an `innerHTML` expression goes through to be vouched for at runtime: none for a written-out string or a text import, for a script or style (whose content is text, as the server leaves it), and none for another property.
+  private markupHelper({ property, raw, expression }: { property: string, raw: boolean, expression: Span }): string {
+    return property === 'innerHTML' && !raw && checksMarkup(this.src, expression, this.ownMarkup) ? helperName('checkedMarkup') : ''
   }
 
   // The element's markup for the template, with what the code binds collected along the way.
@@ -543,7 +543,7 @@ export class DomTemplate extends TemplateWriter {
       if (plan.content && !plan.content.bound) {
         const { property, expression } = plan.content
 
-        contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, ${this.markupHelper(property, expression)}(`).addSource(expression).add(')));')
+        contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, ${this.markupHelper(plan.content!)}(`).addSource(expression).add(')));')
       }
 
       if (action) {

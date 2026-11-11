@@ -165,10 +165,8 @@ export interface ElementPlan extends ElementShape {
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
-  constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
-
-  // Set by the codegen: whether a name at an offset is a project file imported as text, markup the app made.
-  ownMarkup: (name: string, at: number) => boolean = () => false
+  // `ownMarkup`: whether a name at an offset is a project file imported as text, markup the app made; the writers check every other `innerHTML` at runtime.
+  constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts, protected readonly ownMarkup: (name: string, at: number) => boolean) {}
 
   // Set for the browser's build, which resolves the literal classes written together while compiling; the server resolves them while rendering, with the same table.
   protected classTable: ClassTable | undefined = undefined

@@ -534,16 +534,14 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      const server = new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } })
+      const server = new HtmlTemplate(b, src, this.facts, this.ownMarkup, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } })
 
-      server.ownMarkup = this.ownMarkup
       server.value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
-      const dom = new DomTemplate(b, src, this.facts, errors, located, this.options.classTable)
+      const dom = new DomTemplate(b, src, this.facts, this.ownMarkup, errors, located, this.options.classTable)
 
-      dom.ownMarkup = this.ownMarkup
       dom.block(visible)
       b.add('\n}\n')
       b.add(dom.declarations(this.navigates()))

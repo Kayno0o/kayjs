@@ -6,7 +6,8 @@ const WORDS = /(^|-)([a-z])/g
 const LINE_BREAK = /[\r\n]/
 const PATTERN = /[*:\s]/
 const TRAILING_SLASH = /\/+$/
-const HEADER_LINE = /^[ \t]+([\w-]+):/gm
+const HEADER_LINE = /^[ \t]+([\w-]+):/
+const INDENTED = /^[ \t]/
 
 function titled(name: string): string {
   return name.replace(WORDS, (_, dash: string, letter: string) => `${dash}${letter.toUpperCase()}`)
@@ -29,9 +30,19 @@ export function headersFile(headers: Record<string, string> | undefined, caches:
   return blocks.join('\n')
 }
 
-// The headers the app's own `_headers` text does not name, so kay's block can follow it and a header the app set wins.
+// The headers the app's own `_headers` text does not name for every path (its `/*` rule), so kay's block can follow it and a header the app set there wins; one it names under another path alone stays, as it does not reach the rest of the site.
 export function unnamedHeaders(headers: Record<string, string>, mine: string): Record<string, string> {
-  const named = new Set(Array.from(mine.matchAll(HEADER_LINE), match => match[1]!.toLowerCase()))
+  const named = new Set<string>()
+  let everywhere = false
+
+  for (const line of mine.split('\n')) {
+    const header = HEADER_LINE.exec(line)
+
+    if (header !== null)
+      everywhere && named.add(header[1]!.toLowerCase())
+    else if (line.trim() !== '' && !INDENTED.test(line))
+      everywhere = line.trim() === '/*'
+  }
 
   return Object.fromEntries(Object.entries(headers).filter(([name]) => !named.has(name.toLowerCase())))
 }
