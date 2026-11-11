@@ -51,6 +51,8 @@ const RAW_TEXT = new Set(['style', 'script'])
 const CONTENT_ATTRIBUTES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 // One string literal, the way CSS with braces is written in a template's text.
 const STRING_LITERAL = /^\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)\s*$/
+// A `media(...)` hydrate with a query between its brackets.
+const MEDIA_HYDRATE = /^media\(\s*\S[^]*\)$/
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a control's `role`.
@@ -541,6 +543,9 @@ class Validator {
 
       if (element.component && (this.options.island !== undefined || this.options.insideIsland) && ISLAND_OPTIONS.has(name))
         this.error(attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
+
+      if (element.component && name === 'hydrate' && attribute.kind === 'static' && attribute.text.startsWith('media(') && !MEDIA_HYDRATE.test(attribute.text))
+        this.error(attribute.name, '`hydrate="media(...)"` needs a media query', { help: 'write the query in the brackets: `hydrate="media(max-width: 40rem)"`' })
 
       if (attribute === serverIsland?.attribute)
         this.serverIsland(serverIsland, failedBlockOf(element, this.src))

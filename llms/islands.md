@@ -66,7 +66,7 @@ input(type="search" bind:value={q} aria-label="Search")
 
 ### Hydrate an island later
 
-`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle:
+`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle, `hydrate="interaction"` until the first pointer, focus, key or touch event inside it, and `hydrate="media(max-width: 40rem)"` until the media query matches, at once when it does and later when it starts to:
 
 ```kay
 ---
@@ -243,10 +243,11 @@ The server and the island's first render read the fallback, `false` unless given
 ### Hydration
 
 - An island hydrates as soon as the page loads, its chunks preloaded; `hydrate="load"` says so, as it is the default.
-- `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded (the page does preload the code that waits for them).
+- `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded (the page does preload the code that waits for them). `hydrate="interaction"` waits for the first `pointerdown`, `focusin`, `keydown` or `touchstart` inside the island, and `hydrate="media(<query>)"` for the query to match (`media(max-width: 40rem)`); `kay check` and the compiler reject `media()` with no query. Both wait like `visible` and `idle`, and a page using none of the four ships none of their code.
+- A `visible` island whose markup has no box (every child `display: none`, or a slot with nothing to show) is watched through its parent too, so it hydrates once the parent nears the viewport; a child that is shown later hydrates it as it scrolls in.
 - A click, input or change on an island still loading is replayed once it hydrated and its effects ran, an island that never hydrates holding its last 50 events at most, one whose chunk fails to load dropping them, and a field's consecutive inputs or changes counting as one.
 - `client: { hydration: { visible: '640px', serverIslands: '200% 0px' } }` in `kay.config.ts` sets how far ahead of the viewport a `visible` island and a deferred server island start loading, as CSS root margins; `'200px'` and `'100% 0px'`, a screen ahead, by default.
 - Only an island takes `hydrate`, and only from a static parent.
-- For a visitor asking for less data (`Save-Data: on`, `prefers-reduced-data`, `saveData: false` turning it off), an island with no `hydrate` hydrates as `visible` does: at once in view, else once it scrolls near, a click meanwhile replayed. `hydrate="load"`, `idle`, `visible` and `client` go as written, so `hydrate="load"` keeps an island that must work at once, and an island holding a form waits like any other. A deferred server island is fetched only once it nears the viewport, not when the browser is idle, and the `Save-Data` page preloads no chunk of an island that waits, only the entry's, the code waiting for the viewport and the chunks of its `hydrate="load"` and `client` islands (marked `data-load` in the page); a component used both ways on a page keeps its chunks, marked `data-wait` too, and still gets the waiting code preloaded.
+- For a visitor asking for less data (`Save-Data: on`, `prefers-reduced-data`, `saveData: false` turning it off), an island with no `hydrate` hydrates as `visible` does: at once in view, else once it scrolls near, a click meanwhile replayed. `hydrate="load"`, `idle`, `visible`, `interaction`, `media(...)` and `client` go as written, so `hydrate="load"` keeps an island that must work at once, and an island holding a form waits like any other. A deferred server island is fetched only once it nears the viewport, not when the browser is idle, and the `Save-Data` page preloads no chunk of an island that waits, only the entry's, the code waiting for the viewport and the chunks of its `hydrate="load"` and `client` islands (marked `data-load` in the page); a component used both ways on a page keeps its chunks, marked `data-wait` too, and still gets the waiting code preloaded.
 
 Shared and persisted state, transitions, error fallbacks, element size, context and unique ids are in [Islands: state to unique ids](islands-state-to-ids.md).

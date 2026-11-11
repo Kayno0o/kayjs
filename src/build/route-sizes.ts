@@ -348,7 +348,7 @@ function givenBy(element: ElementNode, source: string): string[] {
   ]
 }
 
-// Whether a component call is marked `hydrate="visible"` or `hydrate="idle"`, or by a value the build cannot read.
+// Whether a component call is marked `hydrate="visible"`, `"idle"`, `"interaction"` or `"media(...)"`, or by a value the build cannot read.
 function waitsToHydrate(element: ElementNode, source: string): boolean {
   if (!element.component)
     return false
@@ -358,15 +358,19 @@ function waitsToHydrate(element: ElementNode, source: string): boolean {
   if (mark === undefined || mark.kind === 'boolean')
     return false
 
-  return mark.kind !== 'static' || mark.text === 'visible' || mark.text === 'idle'
+  return mark.kind !== 'static' || isWaiting(mark.text)
 }
 
-// Whether the component's `--- module` fence exports `island = { hydrate: 'visible' }` or `'idle'`, which every use that writes no `hydrate` of its own gets.
+function isWaiting(hydrate: string | undefined): boolean {
+  return hydrate === 'visible' || hydrate === 'idle' || hydrate === 'interaction' || hydrate?.startsWith('media(') === true
+}
+
+// Whether the component's `--- module` fence exports `island = { hydrate: 'visible' }` or another waiting value, which every use that writes no `hydrate` of its own gets.
 function asksToWait(source: string): boolean {
   const parsed = parseKay(source)
   const hydrate = exportedHydrate(analyzeScript(source, parsed.script, [], parsed.module))
 
-  return hydrate === 'visible' || hydrate === 'idle'
+  return isWaiting(hydrate)
 }
 
 // A component anywhere, as a package may ship islands; a script only of the app, as the rest is a library whose islands an app imports as components.

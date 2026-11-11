@@ -563,6 +563,17 @@ describe('islands', () => {
     expect(errors('---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([])
   })
 
+  it('takes hydrate="interaction" and a media query, and rejects a media with no query', () => {
+    const use = (value: string) => errors(`---\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="${value}")`)
+
+    expect(use('interaction')).toEqual([])
+    expect(use('media(max-width: 40rem)')).toEqual([])
+    expect(use('media()')).toEqual([expect.stringContaining('needs a media query')])
+    expect(use('media( )')).toEqual([expect.stringContaining('needs a media query')])
+    expect(use('media(')).toEqual([expect.stringContaining('needs a media query')])
+    expect(use('media(min-width: 1px')).toEqual([expect.stringContaining('needs a media query')])
+  })
+
   it('makes the component an island for the values of kay its fences import', () => {
     const source = '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({}), async () => 1)\n---\n---\nimport { memo, signal } from \'kay\'\n\nconst count = signal(0)\nconst double = memo(() => count() * 2)\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()}\n'
 

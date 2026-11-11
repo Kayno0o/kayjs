@@ -8,8 +8,8 @@ import type { Component, JSX } from './jsx'
 declare const ISLAND: unique symbol
 declare const BINDABLE: unique symbol
 
-// When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport; `client` renders it in the browser only, right away.
-export type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
+// When an island hydrates: right away, once the browser is idle, once it scrolls near the viewport, on the first interaction inside it, or once a media query matches (`media(max-width: 40rem)`); `client` renders it in the browser only, right away.
+export type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})` | 'client'
 
 // What an `if` renders its block on, its condition's type without the falsy values, `false` and `0` included as `NonNullable` keeps them.
 export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>

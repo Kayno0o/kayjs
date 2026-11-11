@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: a TreeView node takes `key` in place of `id`, and a Bell or BellInbox item takes `key`, `label` and `href` in place of `id`, `title` and `url`, the item shape of every other list; the old names work until 1.104 and `kay upgrade` rewrites them. kay's inbox answer and `notify()` keep `{ id, title, url }`, which the Bell maps ([upgrading](upgrading.md), [Bell and TreeView](../packages/ui/llms/page-layout-palette-and-trees.md)).
 - Keys typed into a field before its island hydrated are also kept when the island hydrates late (`visible`, `idle`, a streamed block), a newer swap ends the wait, and number and email fields keep theirs, with no caret.
 - One paging vocabulary: `limit` and `offset` for a window, `page`, `pages` and `pageSize` for numbered pages, `total` for the rows a result counts, and a cursor only where an API pages by one. kayjs-ui's `infiniteList()` takes `limit` in place of `pageSize`, and `collectionInfo()` reports `total` in place of `count` ([conventions](component-library-conventions.md#conventions), [Infinite list](../packages/ui/llms/infinite-list.md)).
+- `hydrate="interaction"` hydrates an island on the first pointer, focus, key or touch event inside it, and `hydrate="media(max-width: 40rem)"` once the media query matches, now or later; a `visible` island with no box, every child `display: none`, is watched through its parent too ([When to hydrate](islands.md#hydrate-an-island-later)).
 
 ## 1.99.0
 

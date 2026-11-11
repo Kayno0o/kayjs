@@ -137,10 +137,16 @@ export async function hydrateIslands(registry: IslandRegistry, root: ParentNode 
     if (element.dataset.client === undefined && asksLess())
       element.dataset.hydrate ??= 'visible'
 
-    if (element.dataset.hydrate === 'visible')
+    const waits = element.dataset.hydrate
+
+    if (waits === 'visible')
       void whenHydrating(when => when.whenVisible(element, run), run)
-    else if (element.dataset.hydrate === 'idle')
+    else if (waits === 'idle')
       void whenHydrating(when => when.whenIdle(run), run)
+    else if (waits === 'interaction')
+      void whenHydrating(when => when.whenInteraction(element, run), run)
+    else if (waits?.startsWith('media(') === true)
+      void whenHydrating(when => when.whenMedia(waits.slice(6, -1), run), run)
     else
       eager.push(run())
   }

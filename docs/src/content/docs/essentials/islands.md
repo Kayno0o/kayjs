@@ -148,7 +148,7 @@ An island hydrates as soon as the page loads. Put `hydrate` on its tag, in a sta
 Comments(postId={post.id} hydrate="visible")
 ```
 
-`hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle. A page with such an island, or with a deferred server island, loads the code that does the waiting along with the page, so it is ready sooner.
+`hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle. `hydrate="interaction"` waits until the visitor first touches, clicks into or types in the island, and the click that follows is replayed once it hydrated. `hydrate="media(max-width: 40rem)"` waits until the media query matches: at once if it does, later if it starts to. An island that shows nothing at first, with every child hidden, still hydrates once the space around it nears the viewport. A page with such an island, or with a deferred server island, loads the code that does the waiting along with the page, so it is ready sooner.
 
 A component that wants one of these wherever it is used exports `island` from its `--- module` fence, `export const island = { persist: true, hydrate: 'idle' } as const`, and the `hydrate` and `persist` a parent writes win over it. Only that form is read: `kay check` reports `export { island }` and an `island` export on a component that is no island.
 

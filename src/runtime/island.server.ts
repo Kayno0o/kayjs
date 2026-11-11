@@ -130,6 +130,14 @@ function persistKey(wanted: IslandOptions['persist'], id: string): string | unde
   return wanted === false || wanted === '' ? undefined : wanted
 }
 
+// Whether a `hydrate` makes the island wait, `media(...)` needing a query to wait for.
+function isWaiting(when: string | undefined, id: string): boolean {
+  if (when?.startsWith('media(') === true && (!when.endsWith(')') || when.slice(6, -1).trim() === ''))
+    throw new IslandPropsError(`hydrate="${when}" on ${id} is not a media query: write hydrate="media(max-width: 40rem)"`)
+
+  return when === 'idle' || when === 'visible' || when === 'interaction' || when?.startsWith('media(') === true
+}
+
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
@@ -140,6 +148,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const when = props.hydrate ?? asks?.hydrate
     const persist = persistKey(props.persist ?? asks?.persist, id)
     const browserOnly = client || when === 'client'
+    const waits = isWaiting(when, id)
     const own = 'hydrate' in props || 'persist' in props || USE_FALLBACK in props ? omit(props, 'hydrate', 'persist', USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P : props
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
@@ -173,7 +182,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       rendered.count++
       rendered.used.add(id)
 
-      if (when === 'idle' || when === 'visible') {
+      if (waits) {
         rendered.lazy++
       }
       else {
@@ -193,7 +202,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
       // `load` is written out too, so a visitor asking to save data, whose islands wait by default, sees the one that asked to go at once.
-      const marked = when === 'idle' || when === 'visible' || when === 'load' ? ` data-hydrate="${when}"` : ''
+      const marked = waits || when === 'load' ? ` data-hydrate="${escapeAttribute(when!)}"` : ''
       const chunk = rendered?.chunks?.[id]
       const markup: Html = renderedHtml(`<slot data-component="${escapeAttribute(id)}" data-props=${quotedAttribute(serialized)}${cause === undefined ? '' : ` data-why=${quotedAttribute(cause)}`}${marked}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(prefix)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}${chunk === undefined ? '' : ` data-chunk="${escapeAttribute(chunk)}"`}>${html}</slot>`)
 
