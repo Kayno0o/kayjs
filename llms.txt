@@ -33,7 +33,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
 - [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS
 - [Components](llms/components.md): fences, props, signals, memos, generics, `import.meta.glob`
-- [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen` and stopping them
+- [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen`
 - [Component libraries and extensions](llms/component-libraries.md): shipping components, pages, tabs and commands
 - [Library conventions](llms/component-library-conventions.md): naming and files
 - [Template lines](llms/templates.md): lines, bindings, `if`/`for`/`await`/`try`
