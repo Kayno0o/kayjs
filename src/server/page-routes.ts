@@ -29,7 +29,7 @@ import { answeringPage } from './log'
 import { pageRequested } from './not-found'
 import { hookedResponse, hookedServed } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
-import { inPreview, inSharedDraft, previewRequested, requestDrafts, sharedEntry } from './preview'
+import { inPreview, inSharedDraft, previewRequested, requestDrafts, sharedEntry, standingShare } from './preview'
 import { requestId } from './protection'
 import { hasFlash, renderPage, renderUncaught, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
 import { reportServerError } from './report'
@@ -140,7 +140,8 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (preview !== undefined)
       return forVisitor(async () => preview === 'edit' ? inPreview(render, true, requestDrafts(context.request)) : inPreview(render))
 
-    const shared = await sharedEntry(context.request)
+    const link = sharedEntry(context.request)
+    const shared = link === undefined ? undefined : await standingShare(link)
 
     // One entry's draft on its own page, kept out of search engines and referrers as the link is a secret.
     if (shared !== undefined) {

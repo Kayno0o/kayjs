@@ -531,8 +531,8 @@ export function withoutShareToken(url: URL): void {
     url.searchParams.delete(SHARE_PARAM)
 }
 
-// The entry a request's share link names, when the link is signed by this site for the page asked and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
-export async function sharedEntry(request: Request): Promise<PreviewScope | undefined> {
+// The share link of a request, when the link is signed by this site for the page asked and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
+export function sharedEntry(request: Request): SharedLink | undefined {
   if (!settings)
     return undefined
 
@@ -552,36 +552,49 @@ export async function sharedEntry(request: Request): Promise<PreviewScope | unde
     if (typeof collection !== 'string' || typeof slug !== 'string' || typeof locale !== 'string')
       return undefined
 
-    const scope = { collection, slug, ...locale !== '' && { locale } }
-
-    return await revoked(scope, typeof issued === 'number' ? issued : undefined) ? undefined : scope
+    return { scope: { collection, slug, ...locale !== '' && { locale } }, issued: typeof issued === 'number' ? issued : undefined }
   }
   catch {
     return undefined
   }
 }
 
-// Whether the link of an entry made at `issued` (milliseconds, unknown for a link made before they were kept) is older than the time its entry's links are revoked from. A hook that fails refuses the link, as a link nobody can vouch for is not served.
-async function revoked(scope: PreviewScope, issued: number | undefined): Promise<boolean> {
+// A share link whose signature and expiry held: the entry it names and when it was made (milliseconds, unknown for a link made before kay kept it).
+export interface SharedLink {
+  scope: PreviewScope
+  issued: number | undefined
+}
+
+// How long the app's hook has to answer for an entry's links: a store that hangs must not hold every request that carries one.
+const NOT_BEFORE_TIMEOUT = 1000
+
+// The entry of a share link unless its links were revoked since it was made. A hook that fails, takes too long or answers something that is no time refuses the link, as a link nobody can vouch for is not served.
+export async function standingShare({ scope, issued }: SharedLink): Promise<PreviewScope | undefined> {
   for (const read of [settings?.sharedNotBefore, sharedNotBeforeHook]) {
     if (read === undefined)
       continue
 
     try {
-      const from = await read(scope)
+      const from = await withinTimeout(NOT_BEFORE_TIMEOUT, async () => read({ ...scope }))
       const at = from instanceof Date ? from.getTime() : from
 
-      if (at !== undefined && (issued === undefined || issued < at))
-        return true
+      if (at === undefined || at === null)
+        continue
+
+      if (typeof at !== 'number' || !Number.isFinite(at))
+        throw new TypeError(`it answered ${String(from)}, which is no time`)
+
+      if (issued === undefined || issued < at)
+        return undefined
     }
     catch (error) {
       kayLog('warn', `the time the share links of ${scope.collection}/${scope.slug} are revoked from could not be read, so its links are refused: ${error instanceof Error ? error.message : String(error)}`)
 
-      return true
+      return undefined
     }
   }
 
-  return false
+  return scope
 }
 
 // A link that puts whoever follows it in preview mode, edit mode too with `edit`, and opens `path`, a path of the site written without the base, until `ttl` runs out, an hour by default.

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { t } from 'elysia'
 import { collection } from '../src/content'
@@ -142,6 +143,63 @@ describe('an entry-scoped preview link', () => {
     expect((await visit(app, fresh)).status).toBe(404)
     notBefore = undefined
     expect((await visit(app, old)).status).toBe(200)
+  })
+
+  it('refuses a link made before kay kept its time once a time is answered, and keeps it while none is', async () => {
+    let answer: number | undefined
+    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: () => answer } })
+    const until = String(Math.floor(Date.now() / 1000) + 3600)
+    const entry = Buffer.from(JSON.stringify(['news', 'roadmap', ''])).toString('base64url')
+    const sig = createHmac('sha256', SECRET).update(`share\n${until}\n${entry}\n/news/roadmap`).digest('base64url')
+    const old = `/news/roadmap?kay_preview=${until}.${entry}.${sig}`
+
+    expect((await visit(app, old)).status).toBe(200)
+    answer = 1
+    expect((await visit(app, old)).status).toBe(404)
+
+    // The time is part of what is signed: a link cannot gain one, nor lose it.
+    const link = previewUrl('/news/roadmap', { entry: roadmap })
+    const [untilNew, entryNew, sigNew] = new URL(link, 'http://localhost').searchParams.get('kay_preview')!.split('.') as [string, string, string]
+    const [collection, slug, locale] = JSON.parse(Buffer.from(entryNew, 'base64url').toString()) as string[]
+    const bare = Buffer.from(JSON.stringify([collection, slug, locale])).toString('base64url')
+
+    answer = undefined
+    expect((await visit(app, `/news/roadmap?kay_preview=${untilNew}.${bare}.${sigNew}`)).status).toBe(404)
+  })
+
+  it('refuses every link when the hook answers what is no time, and takes null and undefined for none', async () => {
+    let answer: unknown
+    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: (() => answer) as () => undefined } })
+    const link = previewUrl('/news/roadmap', { entry: roadmap })
+
+    for (const none of [undefined, null]) {
+      answer = none
+      expect((await visit(app, link)).status).toBe(200)
+    }
+
+    for (const bad of [Number.NaN, new Date(Number.NaN), '2020-01-01', Infinity]) {
+      answer = bad
+      expect((await visit(app, link)).status).toBe(404)
+    }
+  })
+
+  it('refuses a link when either the app\'s hook or a library\'s revokes it, and when a hook takes too long', async () => {
+    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: () => undefined } })
+    const link = previewUrl('/news/roadmap', { entry: roadmap })
+
+    try {
+      setSharedNotBefore(() => Date.now() + 60_000)
+      expect((await visit(app, link)).status).toBe(404)
+      setSharedNotBefore(async () => new Promise<undefined>(() => undefined))
+
+      const started = performance.now()
+
+      expect((await visit(app, link)).status).toBe(404)
+      expect(performance.now() - started).toBeLessThan(5000)
+    }
+    finally {
+      setSharedNotBefore(undefined)
+    }
   })
 
   it('serves a link made with no hook asked, and refuses one when the hook fails', async () => {
