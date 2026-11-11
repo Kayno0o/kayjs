@@ -251,6 +251,14 @@ export class Board {
       void this.#move({ item: id, from: containers[from]!.id, to: to.id, index: target.index }, to.items.length + (target.container === from ? 0 : 1))
   }
 
+  // What a container is called, read from its `aria-label` or the element its `aria-labelledby` points at, or nothing.
+  #nameOf(id: Id): string {
+    const el = this.#containers.get(id)
+    const labelled = el?.getAttribute('aria-labelledby')
+
+    return el?.getAttribute('aria-label')?.trim() || (labelled ? labelled.split(/\s+/).map(part => document.getElementById(part)?.textContent?.trim() ?? '').filter(Boolean).join(' ') : '')
+  }
+
   // `kept` is the number of items in the container the item lands in, for a move by key, which is announced and refocused, and left out for a drop.
   async #move(move: BoardMove, kept?: number): Promise<void> {
     this.#moving = true
@@ -265,7 +273,10 @@ export class Board {
     if (kept === undefined)
       return
 
-    announce(wording('ui.dnd.moved', 'Moved to {position} of {count}', { position: move.index + 1, count: kept }), this.#items.get(move.item)?.el)
+    const column = move.to === move.from ? '' : this.#nameOf(move.to)
+    const position = move.index + 1
+
+    announce(column === '' ? wording('ui.dnd.moved', 'Moved to {position} of {count}', { position, count: kept }) : wording('ui.dnd.movedTo', 'Moved to {column}, {position} of {count}', { column, position, count: kept }), this.#items.get(move.item)?.el)
 
     // A keyed list moving the item into another container remounts it, so focus goes to its new node, drawn by the time this continuation runs, as `Sortable` does for its handles.
     const item = this.#items.get(move.item)

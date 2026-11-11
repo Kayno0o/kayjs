@@ -14,7 +14,7 @@ import { wording } from 'kay/words'
 
 const PAGE_SIZE = 50
 
-const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
+const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more', status: 'sr-only' } })
 
 const { icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onLoad, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, failureLabel, clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // The icons to pick from: a set, or a promise of one, filtered by the text typed and paged like an answer; or a function handed `{ q, limit, offset }` that answers the icons matching `q` from the `offset`th on, at most `limit` of them, typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `failureLabel`.
@@ -71,6 +71,8 @@ const pending = signal(true)
 // Whether the last search was rejected.
 const failed = signal(false)
 const failureText = () => failureLabel ?? wording('ui.iconPicker.error', 'The icons could not be loaded.')
+// What a search found, said to a screen reader as the grid changes; a search under way or failed says nothing, as the grid does.
+const resultText = () => pending() || failed() ? '' : icons().length === 0 ? emptyLabel : wording('ui.iconPicker.results', icons().length === 1 ? '1 icon' : '{count} icons', { count: icons().length })
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
@@ -191,6 +193,7 @@ div(part="root" {...rest} ref={ref})
   if name
     input(type="hidden" name={name} value={picked()} disabled={disabled} ref={element => hidden = element})
   input.kui-field-input(part="search" ref={element => { searchBox = element; keepInvalid(element, () => invalid) }} aria-invalid={fieldInvalid(() => invalid)} disabled={disabled} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed = event.currentTarget.value} onKeyDown={keepEnter})
+  span(part="status" role="status") {resultText()}
   ul(part="grid" aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li(part="item")

@@ -534,7 +534,27 @@ describe('Board, from the keyboard', () => {
     press(button(root, 'Ship'), 'ArrowUp')
     await clock.settle()
 
-    expect(said()).toBe('Moved to 1 of 3')
+    expect(said()).toBe('Moved to todo, 1 of 3')
+  })
+
+  test('says the container a card moved into by its aria-labelledby, and by nothing when it has no name', async () => {
+    const { root } = await board()
+    const columns = root.querySelectorAll<HTMLElement>('[role=group]')
+
+    columns[0]!.removeAttribute('aria-label')
+    columns[0]!.setAttribute('aria-labelledby', 'name-a name-b')
+    root.insertAdjacentHTML('beforeend', '<span id="name-a">To</span><span id="name-b">do</span>')
+    clock.start()
+    press(button(root, 'Ship'), 'ArrowUp')
+    await clock.settle()
+
+    expect(said()).toBe('Moved to To do, 1 of 3')
+
+    columns[1]!.removeAttribute('aria-label')
+    press(button(root, 'Plan'), 'ArrowDown')
+    await clock.settle()
+
+    expect(said()).toBe('Moved to 1 of 1')
   })
 
   test('keeps focus on a card its keyed list moved into another container', async () => {

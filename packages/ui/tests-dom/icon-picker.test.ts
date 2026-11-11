@@ -324,3 +324,26 @@ test('icons takes a function handed the page wanted, a promise of a set, and onL
   await settle()
   expect(mounted.root.querySelectorAll('[data-part=option]').length).toBe(2)
 })
+
+test('says how many icons a search found, and that it found none, in a status line', async () => {
+  mounted = await mountComponent(IconPicker, { icons: Promise.resolve(SET.slice(0, 2)), onChange: (name: string) => changes.push(name) })
+  await settle()
+
+  const status = () => mounted!.root.querySelector('[data-part=status]')!
+  const search = mounted.root.querySelector<HTMLInputElement>('[data-part=search]')!
+
+  expect([status().getAttribute('role'), status().textContent]).toEqual(['status', '2 icons'])
+
+  clock.start()
+  search.value = 'home'
+  search.dispatchEvent(new Event('input', { bubbles: true }))
+  await clock.elapse(TYPED_MS)
+
+  expect(status().textContent).toBe('1 icon')
+
+  search.value = 'zzz'
+  search.dispatchEvent(new Event('input', { bubbles: true }))
+  await clock.elapse(TYPED_MS)
+
+  expect(status().textContent).toBe('No icons found.')
+})

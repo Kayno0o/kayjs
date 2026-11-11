@@ -26,6 +26,8 @@ The picker takes a function, so it renders inside an island.
 
 ## Labels
 
+A screen reader hears how many icons a search found (`1 icon`, `12 icons`, or the empty text) from the `ui.iconPicker.results` message.
+
 `searchLabel` names the search box and `placeholder` fills it, `Search icons` and `Search icons…` by default. `gridLabel` names the grid, `Icons`. `searchingLabel`, `emptyLabel`, `failureLabel`, `clearLabel` and `moreLabel` word the searching state, the empty result, a search that failed (`The icons could not be loaded.`), the clear button and the Show more button. Set them to translate the picker.
 
 ## A fixed set
