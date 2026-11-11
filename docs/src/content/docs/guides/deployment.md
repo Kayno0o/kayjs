@@ -101,7 +101,7 @@ CMD ["./server"]
 
 The runtime, Postgres and nginx images are pinned by digest (the build stage by the exact Bun version), so a build gets the bytes `kay new` reviewed. Refresh one with `docker buildx imagetools inspect <tag>`.
 
-Its `compose.prod.yaml` drops every Linux capability of the app and forbids a privilege gain (`cap_drop: [ALL]`, `no-new-privileges`). It publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor.
+Its `compose.prod.yaml` drops every Linux capability of the app and forbids a privilege gain (`cap_drop: [ALL]`, `no-new-privileges`), and the Postgres `migrate` service does the same; `db` keeps only the five capabilities its entrypoint needs. It publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor.
 
 The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. It waits as long as `health.timeout` says, but the `HEALTHCHECK --timeout=6s` above cuts it off, so raise its `--timeout` yourself when you raise `health.timeout` past 5 s.
 

@@ -53,6 +53,10 @@ const APP_COMPOSE = `services:
   db:
     image: ${POSTGRES_IMAGE}
     restart: unless-stopped
+    # The image starts as root, takes the data folder's ownership and drops to postgres: only the capabilities that takes, no privilege gain.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
     environment:
       POSTGRES_USER: app
       # Letters and digits only: it goes into DATABASE_URL below as it is.
@@ -80,6 +84,9 @@ const APP_COMPOSE = `services:
       context: .
       target: build
     command: [bun, run, db:migrate]
+    # It only reads the migrations and talks to the database.
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     environment:
       # The owner: only the migrations change the schema.
       MIGRATE_DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
@@ -132,7 +139,7 @@ const SQLITE_COMPOSE = `services:
           create_host_path: false
 `
 
-function databaseCompose(postgres: boolean): string {
+export function databaseCompose(postgres: boolean): string {
   return postgres ? APP_COMPOSE : SQLITE_COMPOSE
 }
 

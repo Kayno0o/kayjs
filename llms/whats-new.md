@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay new`'s test workflow runs on pull requests and on pushes to `main`, not twice for a pull request's commit, and the Forgejo Pages workflow's `SITE_URL` is `${{ vars.SITE_URL || github.server_url }}` in place of a `pages.example.com` placeholder ([project new and add](project-new-and-add.md)).
 - `markdownHtml` (a user's Markdown, on the server and in an island) writes `loading="lazy"` on its images ([content](content.md)).
 - kayjs-ui: `MapView` loads Leaflet once the map is near the viewport, so one below the fold downloads none of it until it is scrolled to ([charts and MapView](../packages/ui/llms/charts.md)).
+- The scaffolded compose file drops every capability on the Postgres `db` and `migrate` services too, `db` keeping the five its entrypoint needs, with `no-new-privileges` on all three ([production](production.md)).
 - A template `innerHTML={expr}` drops a string nothing vouched for at runtime, as a spread does, written-out strings and text imports aside ([templates](templates-elements-slots-snippets.md), [upgrading](upgrading.md)).
 - `kay build --static` merges its security headers into a `public/_headers` instead of leaving them out, without a header your file names ([static export](prerendering.md#static-export)).
 - A loader's slug follows a folder's slug rules, so one such as `a/../../x` is a content problem naming its entry, not a failed export ([content from a CMS](content-cms.md)).
