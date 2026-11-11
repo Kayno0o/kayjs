@@ -6,7 +6,7 @@ import type { FieldSchema } from './form'
 import type { Html } from './rendered'
 import { isAction } from './action'
 import { NON_ROOT_TRAILING_SLASH } from './base'
-import { fieldDescription, fieldRequired } from './described'
+import { fieldDescription, fieldInvalid, fieldRequired } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
@@ -259,6 +259,11 @@ function requiredAttributes(mode: false | 'first' | 'all', type: unknown, ownAri
   return (ownAria == null && !UNREQUIRABLE_TYPES.has(kind) ? ' aria-required="true"' : '') + (ownNative == null && !UNCONSTRAINABLE_TYPES.has(kind) && !(mode === 'all' && kind === 'checkbox') ? ' required' : '')
 }
 
+// ' aria-invalid="true"' for a field a component around it marks, unless the field wrote its own.
+function invalidAttribute(type: unknown, own: unknown): string {
+  return fieldInvalid(type) && own == null ? ' aria-invalid="true"' : ''
+}
+
 export const UNDESCRIBED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
 
 function hasSource(sources: readonly object[], name: string): boolean {
@@ -273,11 +278,11 @@ function lastValue(sources: readonly object[], name: string): unknown {
 
 // ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids, unless the `type` an expression gave it shows no text to describe.
 // `ownRequired` is what the field's own `aria-required` gives and `ownNative` its own `required`, which keep them once they give a value.
-export function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ownNative?: unknown): string {
+export function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ownNative?: unknown, ownInvalid?: unknown): string {
   if (UNDESCRIBED_TYPES.has(String(type ?? '').toLowerCase()))
     return attribute('aria-describedby', own)
 
-  return attribute('aria-describedby', fieldDescription(own)) + requiredAttributes(fieldRequired(), type, ownRequired, ownNative)
+  return attribute('aria-describedby', fieldDescription(own)) + requiredAttributes(fieldRequired(), type, ownRequired, ownNative) + invalidAttribute(type, ownInvalid)
 }
 
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
@@ -351,6 +356,7 @@ export function element(written: string, sources: readonly object[], content?: (
     markup += attribute('aria-describedby', fieldDescription(described))
 
     markup += requiredAttributes(fieldRequired(), lastValue(sources, 'type'), lastValue(sources, 'aria-required'), lastValue(sources, 'required'))
+    markup += invalidAttribute(lastValue(sources, 'type'), lastValue(sources, 'aria-invalid'))
   }
 
   if (isVoid)

@@ -677,6 +677,9 @@ function controlOf(label: Element | null | undefined): HTMLElement | null
 [./lib/choice-link] linkChoice
 function linkChoice(root: HTMLElement | null | undefined): void
 
+[./lib/choice-link] linkInvalid
+function linkInvalid(root: HTMLElement | null | undefined): void
+
 [./lib/claim] claim
 function claim(job: "toaster" | "tooltips", fallback?: boolean): () => boolean
 

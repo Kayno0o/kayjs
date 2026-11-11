@@ -245,6 +245,8 @@ export interface FieldAria {
   required: PlannedAttribute | undefined
   // The field's own `required`, which a requirement from around it leaves alone.
   native: PlannedAttribute | undefined
+  // The field's own `aria-invalid`, which a mark from around it leaves alone.
+  invalid: PlannedAttribute | undefined
   unrequirable: boolean
 }
 
@@ -255,7 +257,7 @@ export function fieldAriaOf(element: string, type: PlannedAttribute | undefined,
   if (type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     return undefined
 
-  return { type, required: attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required'), native: attributes.find(attribute => 'name' in attribute && attribute.name === 'required'), unrequirable: type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()) }
+  return { type, required: attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required'), native: attributes.find(attribute => 'name' in attribute && attribute.name === 'required'), invalid: attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-invalid'), unrequirable: type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()) }
 }
 
 // A string or a template literal with no `${}` in it.

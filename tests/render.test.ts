@@ -120,6 +120,15 @@ describe('describeField', () => {
     await Bun.write(join(scratch, 'described.kay'), '---\nimport { describe } from \'./describe-field\'\n\nconst { ids } = props<{ ids: string }>()\n\ndescribe(ids)\n---\nlabel\n  slot\n')
   })
 
+  it('gives the first described field aria-invalid, or each field with all, unless the field writes its own or is one box of a group', async () => {
+    await Bun.write(join(scratch, 'describe-invalid.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (invalid: boolean | \'all\') => describeField(\'\', { invalid })\n')
+    await Bun.write(join(scratch, 'described-invalid.kay'), '---\nimport { describe } from \'./describe-invalid\'\n\nconst { invalid } = props<{ invalid: boolean | \'all\' }>()\n\ndescribe(invalid)\n---\nlabel\n  slot\n')
+
+    const html = await renderKay('---\nimport Invalid from \'./described-invalid.kay\'\n\nconst spread = { name: \'s\' }\nconst own = { \'name\': \'o\', \'aria-invalid\': \'false\' }\n---\nInvalid(invalid={true})\n  input(name="a")\n  input(name="b")\nInvalid(invalid={true})\n  input(type="radio" name="r")\n  input(name="c")\nInvalid(invalid="all")\n  input(type="checkbox" name="d")\n  select({...spread})\n  input({...own})\n  input(name="e" aria-invalid="false")\nInvalid(invalid={false})\n  input(name="f")')
+
+    expect(html).toBe('<label><input name="a" aria-invalid="true"><input name="b"></label><label><input type="radio" name="r"><input name="c"></label><label><input type="checkbox" name="d" aria-invalid="true"><select name="s" aria-invalid="true"></select><input name="o" aria-invalid="false"><input name="e" aria-invalid="false"></label><label><input name="f"></label>')
+  })
+
   // The compiler decides a written type, the runtime one an expression or a spread gives.
   it('skips the same input types on the compiled path as at render time', () => {
     expect([...UNDESCRIBED_TYPES]).toEqual([...UNCHECKED_TYPES])

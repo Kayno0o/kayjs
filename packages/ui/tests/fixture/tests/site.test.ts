@@ -1606,3 +1606,17 @@ describe('a SidePanel with a title block and no label', () => {
     expect(panel!['aria-labelledby']).toBe(heading!.id)
   })
 })
+describe('a FormField showing its own issue marks its control in the server render', () => {
+  test('the control of an input, a select or a group of fields takes aria-invalid, a field with none to show or its own aria-invalid does not', async () => {
+    expect(await attributes('/field-issue', '#input input', ['name', 'aria-invalid'])).toEqual([
+      { 'name': 'name', 'aria-invalid': 'true' },
+      { 'name': 'clean', 'aria-invalid': null },
+      { 'name': 'own', 'aria-invalid': 'false' },
+    ])
+    expect(await attributes('/field-issue', '#select select', ['aria-invalid'])).toEqual([{ 'aria-invalid': 'true' }])
+    expect(await attributes('/field-issue', '#plain-group input', ['aria-invalid'])).toEqual([{ 'aria-invalid': 'true' }, { 'aria-invalid': 'true' }])
+    // Inside a form(action), whose own mark of a refused field is written beside it.
+    expect(await attributes('/field-issue', '#action input', ['name', 'aria-invalid'])).toEqual([{ 'name': 'title', 'aria-invalid': 'true' }, { 'name': 'other', 'aria-invalid': null }])
+    expect(((await visit('/field-issue')).html.match(/<input[^>]*name="title"[^>]*>/)?.[0].match(/aria-invalid/g) ?? [])).toHaveLength(1)
+  })
+})

@@ -517,7 +517,7 @@ export class HtmlTemplate extends TemplateWriter {
     const fieldAria = fieldAriaOf(name, type, plan.attributes)
     const describable = fieldAria !== undefined
     let ownDescribed: (() => void) | undefined
-    const fieldDescribed = (own: (() => void) | undefined) => addFieldDescribed(b, own, type, fieldAria)
+    const fieldDescribed = (own: (() => void) | undefined, marked?: () => void) => addFieldDescribed(b, own, type, fieldAria, marked)
 
     markup.text(`<${name}${element.fixed ?? ''}`)
 
@@ -738,15 +738,15 @@ export class HtmlTemplate extends TemplateWriter {
 
         // A refused field's description still takes the ids a component around it hands it, so a later field does not.
         if (described) {
-          const refused = () => {
+          const refused = (tail = describedValue(described)) => {
             b.add('KayFormInvalid')
             fieldArguments()
-            b.add(describedValue(described))
+            b.add(tail)
           }
 
           markup.dynamic(() => {
             if (describable)
-              return fieldDescribed(refused)
+              return fieldDescribed(refused, () => refused(') || undefined'))
 
             b.add(`${helperName('attribute')}("aria-describedby", `)
             refused()

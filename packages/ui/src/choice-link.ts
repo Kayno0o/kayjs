@@ -15,12 +15,30 @@ export function controlOf(label: Element | null | undefined): HTMLElement | null
   return label?.querySelector<HTMLElement>(CHOICE) ?? label?.querySelector<HTMLElement>(CONTROL) ?? null
 }
 
-// Links a choice group to the static FormField around it once the browser has the group: a group is an island, so the server cannot hand it the field's label, hint and message, and a label around several inputs names none of them.
-// A FormField running in the browser keeps the link itself, `paintIssues` the messages of a refused call, and one with `group` names its own fields.
-export function linkChoice(root: HTMLElement | null | undefined): void {
+// The static FormField around a control, when the control is the one its label names and the FormField is not drawn by an island.
+function staticFrame(root: HTMLElement | null | undefined): Element | undefined {
   const frame = root?.closest('[data-kui-field]')
 
   if (!root || !frame || frame.tagName === 'FIELDSET' || liveElements.has(frame) || controlOf(frame.querySelector(':scope > label')) !== root)
+    return undefined
+
+  return frame
+}
+
+// Marks a control an island draws, a checkbox or a switch, invalid while the static FormField around it shows a message: the server drew it detached from the FormField, which knows nothing of it.
+export function linkInvalid(root: HTMLElement | null | undefined): void {
+  const frame = staticFrame(root)
+
+  if (root && frame?.querySelector(':scope > [data-part="issues"][id]'))
+    markInvalid(root, linkChoice, true)
+}
+
+// Links a choice group to the static FormField around it once the browser has the group: a group is an island, so the server cannot hand it the field's label, hint and message, and a label around several inputs names none of them.
+// A FormField running in the browser keeps the link itself, `paintIssues` the messages of a refused call, and one with `group` names its own fields.
+export function linkChoice(root: HTMLElement | null | undefined): void {
+  const frame = staticFrame(root)
+
+  if (!root || !frame)
     return
 
   const text = frame.querySelector(':scope > label [data-part="text"]')

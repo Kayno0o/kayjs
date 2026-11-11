@@ -1946,10 +1946,7 @@ inBrowser('the FormFields a static page gives a Form, SaveForm or FormDialog as 
     const cleared = await read(page)
 
     expect(cleared.map(field => field.messages)).toEqual([['Page note'], [], []])
-    // The call went through, so the form is refreshed with the server's markup, which marks no field for a FormField's own `issue`: the first field is still invalid until that lands, and linked either way.
-    expect(cleared.map(field => field.linked)).toEqual([true, false, false])
-    expect(cleared[0]!.invalid === 'true' || cleared[0]!.invalid === null).toBe(true)
-    expect(cleared.slice(1).map(field => field.invalid)).toEqual([null, null])
+    expect(cleared.map(field => [field.invalid, field.linked])).toEqual([['true', true], [null, false], [null, false]])
     expect(page.errors).toEqual([])
   }, 120_000)
 
@@ -2007,6 +2004,22 @@ inBrowser('the FormFields a static page gives a Form, SaveForm or FormDialog as 
     await page.click('#open')
     await page.waitFor('#handle')
     expect(await page.evaluate(() => [document.querySelectorAll('[data-part="issue"]').length, document.getElementById('handle')!.getAttribute('aria-invalid'), document.getElementById('handle')!.getAttribute('aria-describedby')])).toEqual([0, null, null])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
+inBrowser('a FormField showing its own issue on a static page', () => {
+  test('marks the control an island draws once it hydrates: aria-invalid, or data-invalid on a role=group', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/field-issue')
+
+    await page.waitUntil(() => document.querySelector('#radio [role="radiogroup"][aria-invalid="true"]') !== null)
+
+    expect(await page.evaluate(() => ['radio', 'segmented', 'rating'].map(id => document.querySelector(`#${id} [data-kui-choice]`)?.getAttribute('aria-invalid')))).toEqual(['true', 'true', 'true'])
+    expect(await page.evaluate(() => ['chips', 'drop', 'rows', 'range'].map(id => document.querySelector(`#${id} [data-kui-choice]`)?.getAttribute('data-invalid')))).toEqual(['', '', '', ''])
+    expect(await page.evaluate(() => ['box', 'toggle'].map(id => document.querySelector(`#${id} input`)?.getAttribute('aria-invalid')))).toEqual(['true', 'true'])
+    expect(await page.evaluate(() => document.querySelector('#clean-radio [data-kui-choice]')?.getAttribute('aria-invalid'))).toBeNull()
     expect(page.errors).toEqual([])
   }, 120_000)
 })

@@ -30,7 +30,7 @@ A `required` field is announced as required: its control gets `aria-required="tr
 
 The control also gets the native `required`, so the browser's validation and a post with no JavaScript know the field is required, and so does each field of a `group`, except the boxes of a group of checkboxes: the browser would ask for every one, so they take `aria-required` alone. A control of a type that takes no `required` (a range or a colour input) keeps the `aria-required` where its role has one, and one that sets its own `required` keeps it. Turning `required` off takes both back.
 
-On a static page the server writes the link. Inside an island, as in a FormDialog, the browser keeps it as messages come and go, and marks the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it.
+On a static page the server writes the link, and marks the control `aria-invalid` while a message shows, the page's own `issue` included. Inside an island, as in a FormDialog, the browser keeps it as messages come and go, and marks the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it.
 
 A FileDrop zone is named, described and marked the same way, not its hidden file input.
 

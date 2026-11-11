@@ -1,0 +1,65 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const save = action(t.Object({ title: t.String({ maxLength: 100 }), other: t.String({ maxLength: 100 }) }), () => 'ok')
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
+const columns = [{ key: 'item', label: 'Item' }]
+---
+main
+  form(method="post")
+    section#input
+      FormField(label="Name" issue="Too short")
+        input(name="name" type="text")
+      FormField(label="Clean")
+        input(name="clean" type="text")
+      FormField(label="Own" issue="Too short")
+        input(name="own" type="text" aria-invalid="false")
+    section#select
+      FormField(label="City" issue="Pick one")
+        select(name="city")
+          option(value="a") A
+    section#plain-group
+      FormField(label="Access" group issue="Pick one")
+        input(name="access" type="checkbox")
+        input(name="access" type="checkbox")
+    section#choices
+      FormField#radio(label="Radio" issue="Pick one")
+        RadioGroup(name="radio" options={options} label="Radio")
+      FormField#segmented(label="Segmented" issue="Pick one")
+        Segmented(name="segmented" options={options} label="Segmented")
+      FormField#rating(label="Rating" issue="Pick one")
+        Rating(name="rating" label="Rating")
+      FormField#chips(label="Chips" issue="Pick one")
+        ChipGroup(name="chips" options={options} label="Chips")
+      FormField#drop(label="Drop" issue="Add a file")
+        FileDrop(name="drop")
+      FormField#rows(label="Rows" issue="Add a row")
+        RowsField(name="rows" label="Rows" columns={columns})
+      FormField#range(label="Range" issue="Out of range")
+        RangeInput(label="Range")
+      FormField#box(label="Terms" issue="Accept")
+        Checkbox(name="terms" label="Terms")
+      FormField#toggle(label="News" issue="Choose")
+        Toggle(name="news" label="News")
+      FormField#clean-radio(label="Clean radio")
+        RadioGroup(name="cleanRadio" options={options} label="Clean radio")
+  section#action
+    form(action={save})
+      FormField(label="Title" name="title" issue="Too short")
+        input(name="title")
+      FormField(label="Other" name="other")
+        input(name="other")

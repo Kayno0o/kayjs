@@ -491,7 +491,7 @@ function escapeAttribute(text: string): string
 const FAILED_MARKER: "<!--kay-failed-->"
 
 [./html] fieldDescribed
-function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ownNative?: unknown): string
+function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ownNative?: unknown, ownInvalid?: unknown): string
 
 [./html] formConstraints
 function formConstraints(target: unknown, name: string, written: readonly string[]): string

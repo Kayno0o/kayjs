@@ -1,11 +1,12 @@
 --- <Row extends Record<string, string>>
 import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
-import { defaultKept, onFormReset } from './form-reset'
+import { defaultKept, onFormReset, startRef } from './form-reset'
 import { effect, flush, formErrors, memo, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import type { FieldSize } from './field-look'
 import { FIELD_MESSAGE } from './field-look'
+import { linkChoice } from './choice-link'
 import { formIssues } from './forms'
 import { labelText } from './label-text'
 import Button from './button.kay'
@@ -62,6 +63,11 @@ const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssue
 }>()
 
 let root: HTMLElement | undefined
+
+const ref = startRef<HTMLElement>((element) => {
+  root = element
+  linkChoice(element)
+}, rest.ref)
 let nextId = 0
 // A field with no callback is plain: a refused post of its form, which the server renders it for, gives its rows back, each column posting one value per row.
 function postedRows(): Row[] | undefined {
@@ -234,7 +240,7 @@ onFormReset(() => root, () => {
   commit(start)
 })
 ---
-div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} data-invalid={invalid ? '' : undefined} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
+div(part="root" {...rest} ref={ref} data-kui-choice="" role="group" aria-label={label} data-invalid={invalid ? '' : undefined} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
   if current().length > 0
     div(part="head" aria-hidden="true")
       for column of columns key={column.key}

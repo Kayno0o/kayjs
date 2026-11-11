@@ -1,3 +1,4 @@
+import { linkInvalid } from './choice-link'
 import { controlledInput } from './controlled-input'
 
 interface Options {
@@ -28,7 +29,10 @@ export function controlledCheckbox({ control, checked, onChange, start, settled,
     setDefault: (input, next) => {
       input.defaultChecked = next
     },
-    start,
+    start: (input) => {
+      linkInvalid(input)
+      start?.(input)
+    },
     settled,
     appRef,
   })

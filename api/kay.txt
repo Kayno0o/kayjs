@@ -306,6 +306,7 @@ function describeField(ids: string, options?: DescribeOptions): void
 
 [.] DescribeOptions
 interface DescribeOptions
+  invalid?: "all" | boolean | undefined
   required?: "all" | boolean | undefined
 
 [.] dispatch
