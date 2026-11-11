@@ -51,6 +51,14 @@ function sweep(now: number): void {
       stopped.delete(key)
   }
 
+  // A flood of stops for replies that never come is cut the same way, oldest first.
+  for (const key of stopped.keys()) {
+    if (stopped.size <= MOST_KEPT)
+      break
+
+    stopped.delete(key)
+  }
+
   // A Map iterates oldest first: the finished replies go before any still under way, oldest first.
   for (const wanted of [true, false]) {
     for (const [key, { ended }] of replies) {
