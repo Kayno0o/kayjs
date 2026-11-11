@@ -41,7 +41,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
       root: 'tests/fixtures/navigation',
       browser: { path },
       observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { text: 'Count?', agree: 'Yes', refuse: 'No' } })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, consent: { text: 'Count?', agree: 'Yes', refuse: 'No' } })],
     })
     page = await site.open('/')
   }, 60_000)
@@ -230,7 +230,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
       root: 'tests/fixtures/navigation',
       browser: { path },
       observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })],
     })
     opened = await open.open('/')
   }, 60_000)
@@ -310,7 +310,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
       root: 'tests/fixtures/navigation',
       browser: { path },
       observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true, policyUrl: '/privacy', exclude: ['/second', '/*/admin'] })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, consent: true, privacy: '/privacy', exclude: ['/second', '/*/admin'] })],
     })
     opened = await own.open('/')
   }, 60_000)
@@ -475,7 +475,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
       use: [new Elysia().onRequest(({ request }) => {
         return request.url.endsWith('/notice.js') && failures-- > 0 ? new Response('down', { status: 503 }) : undefined
       })],
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, consent: true })],
     })
     opened = await flaky.open('/')
   }, 60_000)
@@ -720,7 +720,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
       root: 'tests/fixtures/navigation',
       browser: { path },
       observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, consent: true })],
     })
     opened = await words.open('/')
   }, 60_000)
@@ -758,7 +758,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an app\'s 
       root: 'tests/fixtures/navigation',
       browser: { path },
       observe: { onError: () => undefined },
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })],
     })
     opened = await own.open('/')
   }, 60_000)

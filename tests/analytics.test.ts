@@ -102,7 +102,7 @@ async function send(app: Awaited<ReturnType<typeof pages>>, body: unknown, heade
 }
 
 const visit = (more: Record<string, unknown> = {}) => ({ u: PAGE, r: 'https://news.example/story?id=7#c', t: 'Pricing', w: '1920x1080', l: 'fr-FR', ...more })
-const plausible = (more: object = {}): AnalyticsOptions => ({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, ...more })
+const plausible = (more: object = {}): AnalyticsOptions => ({ provider: 'plausible', site: 'example.com', url: `http://localhost:${provider.port}`, ...more })
 
 describe('the script and the page', () => {
   it('serves the tracker from the app and puts it in every page', async () => {
@@ -155,7 +155,7 @@ describe('the notice, its lifetime and what a visit carries', () => {
     ['plausible', { provider: 'plausible' }, 'Plausible'],
     ['umami', { provider: 'umami', websiteId: 'w' }, 'Umami'],
     ['simpleanalytics', { provider: 'simpleanalytics' }, 'Simple Analytics'],
-    ['matomo', { provider: 'matomo', siteId: 1, host: 'https://m.example' }, 'Matomo'],
+    ['matomo', { provider: 'matomo', siteId: 1, url: 'https://m.example' }, 'Matomo'],
     ['ga4', { provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1' }, 'Google Analytics'],
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' }, 'Fathom'],
     ['cloudflare', { provider: 'cloudflare', token: 'tok-123' }, 'Cloudflare Web Analytics'],
@@ -215,14 +215,14 @@ describe('the notice, its lifetime and what a visit carries', () => {
   })
 
   it('links the policy the app names, in the notice and in the information line', async () => {
-    expect(await page(plausible({ policyUrl: '/privacy' }))).toContain('data-policy="/privacy"')
-    expect(await page(plausible({ consent: true, policyUrl: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
+    expect(await page(plausible({ privacy: '/privacy' }))).toContain('data-policy="/privacy"')
+    expect(await page(plausible({ consent: true, privacy: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
     expect(await page(plausible())).not.toContain('data-policy')
-    expect(await page(plausible({ policyUrl: '/privacy', info: { policy: { en: 'Policy', fr: 'Politique' } } }))).toContain('Politique')
+    expect(await page(plausible({ privacy: '/privacy', info: { policy: { en: 'Policy', fr: 'Politique' } } }))).toContain('Politique')
   })
 
-  it.each(['javascript:alert(1)', '//evil.example', '/\\evil.example', 'privacy', ''])('refuses the policy address %p', (policyUrl) => {
-    expect(() => analytics({ ...plausible(), policyUrl })).toThrow('policyUrl')
+  it.each(['javascript:alert(1)', '//evil.example', '/\\evil.example', 'privacy', ''])('refuses the policy address %p', (privacy) => {
+    expect(() => analytics({ ...plausible(), privacy })).toThrow('privacy')
   })
 
   it('remembers an answer 180 days by default, for the information line and the notice alike, and takes up to 13 months', async () => {
@@ -251,7 +251,7 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(JSON.stringify(received)).not.toContain('Pricing')
     received = []
 
-    const umami: AnalyticsOptions = { provider: 'umami', websiteId: 'w', host: `http://localhost:${provider.port}` }
+    const umami: AnalyticsOptions = { provider: 'umami', websiteId: 'w', url: `http://localhost:${provider.port}` }
 
     await send(await site(umami), visit())
     expect((received[0]!.body as { payload: { title: string } }).payload.title).toBe('')
@@ -313,13 +313,13 @@ describe('what each provider is sent', () => {
   })
 
   it('names the site Plausible counts under by the page\'s host when none is set', async () => {
-    await send(await site(plausible({ domain: undefined })), visit())
+    await send(await site(plausible({ site: undefined })), visit())
 
     expect((received[0]!.body as { domain: string }).domain).toBe('localhost')
   })
 
   it('sends Umami the visit as an event of its website, the address in the payload and none in a header', async () => {
-    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/`, titles: true }), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    await send(await site({ provider: 'umami', websiteId: 'site-id', url: `http://localhost:${provider.port}/`, titles: true }), visit(), { 'x-forwarded-for': '198.51.100.9' })
     const [sent] = received
 
     expect(sent!.path).toBe('/api/send')
@@ -328,7 +328,7 @@ describe('what each provider is sent', () => {
   })
 
   it('sends Simple Analytics no address at all, in a header or in the body', async () => {
-    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}` }), visit(), { 'x-forwarded-for': '198.51.100.9' })
+    await send(await site({ provider: 'simpleanalytics', url: `http://localhost:${provider.port}` }), visit(), { 'x-forwarded-for': '198.51.100.9' })
     const [sent] = received
 
     expect(sent!.path).toBe('/events')
@@ -341,7 +341,7 @@ describe('what each provider is sent', () => {
     answer = 500
 
     expect((await send(await site(plausible()), visit())).status).toBe(204)
-    expect((await send(await site({ provider: 'plausible', host: 'http://localhost:1' }), visit())).status).toBe(204)
+    expect((await send(await site({ provider: 'plausible', url: 'http://localhost:1' }), visit())).status).toBe(204)
   })
 })
 
@@ -380,12 +380,12 @@ describe('when a visit is not forwarded', () => {
 
 describe('consent by provider', () => {
   const ASKING = [
-    ['ga4', { provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: 'http://localhost:1' }],
+    ['ga4', { provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: 'http://localhost:1' }],
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' }],
     ['cloudflare', { provider: 'cloudflare', token: 'tok-123' }],
     ['custom', { provider: 'custom', script: 'http://localhost:1/script.js', endpoint: 'http://localhost:1/collect' }],
   ] as const
-  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, ...more })
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, ...more })
   const page = async (options: AnalyticsOptions) => (await (await site(options)).handle(new Request('http://localhost/'))).text()
 
   it.each(ASKING)('%s asks before anything loads when consent is left out, as with consent true', async (_name, options) => {
@@ -440,7 +440,7 @@ describe('consent by provider', () => {
   })
 
   it.each(['plausible', 'umami', 'simpleanalytics', 'matomo'] as const)('%s counts at once and shows the information line and its opt-out', async (name) => {
-    const options = { plausible: { provider: 'plausible' }, umami: { provider: 'umami', websiteId: 'w', host: 'https://u.example' }, simpleanalytics: { provider: 'simpleanalytics' }, matomo: { provider: 'matomo', siteId: 1, host: 'https://m.example' } }[name] as AnalyticsOptions
+    const options = { plausible: { provider: 'plausible' }, umami: { provider: 'umami', websiteId: 'w', url: 'https://u.example' }, simpleanalytics: { provider: 'simpleanalytics' }, matomo: { provider: 'matomo', siteId: 1, url: 'https://m.example' } }[name] as AnalyticsOptions
     const html = await page(options)
 
     expect(html).toContain('data-info')
@@ -457,10 +457,10 @@ describe('consent by provider', () => {
     }
 
     await asks({ provider: 'umami', websiteId: 'w' })
-    await asks({ provider: 'umami', websiteId: 'w', host: 'https://cloud.umami.is' })
-    await asks({ provider: 'umami', websiteId: 'w', host: 'https://u.example' }, 'data-info')
+    await asks({ provider: 'umami', websiteId: 'w', url: 'https://cloud.umami.is' })
+    await asks({ provider: 'umami', websiteId: 'w', url: 'https://u.example' }, 'data-info')
     await asks({ provider: 'umami', websiteId: 'w', consent: false }, 'data-info')
-    await asks({ provider: 'umami', websiteId: 'w', host: 'https://u.example', consent: true })
+    await asks({ provider: 'umami', websiteId: 'w', url: 'https://u.example', consent: true })
   })
 
   it('forwards nothing to Umami Cloud before the yes, and one visit after it', async () => {
@@ -727,7 +727,7 @@ describe('answering at once', () => {
     } })
 
     try {
-      const app = await site({ provider: 'plausible', host: `http://localhost:${slow.port}` })
+      const app = await site({ provider: 'plausible', url: `http://localhost:${slow.port}` })
       const response = await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '203.0.113.240' } }))
 
       expect(response.status).toBe(204)
@@ -743,7 +743,7 @@ describe('answering at once', () => {
 })
 
 describe('Matomo', () => {
-  const matomo = (more: object = {}): AnalyticsOptions => ({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/`, titles: true, ...more })
+  const matomo = (more: object = {}): AnalyticsOptions => ({ provider: 'matomo', siteId: 7, url: `http://localhost:${provider.port}/`, titles: true, ...more })
 
   it('is sent the visit through its tracking API, with no visitor id and no address', async () => {
     await send(await site(matomo()), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -777,7 +777,7 @@ describe('Matomo', () => {
 })
 
 describe('Google Analytics 4', () => {
-  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false, titles: true, ...more })
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false, titles: true, ...more })
 
   it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
     const response = await send(await site(ga4({ address: true })), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -821,7 +821,7 @@ describe('Google Analytics 4', () => {
     warningsReset()
 
     try {
-      await send(await site(ga4({ host: 'http://localhost:1' })), visit())
+      await send(await site(ga4({ url: 'http://localhost:1' })), visit())
     }
     finally {
       for (const spy of spies)
@@ -1152,7 +1152,7 @@ describe('the warnings', () => {
     warningsReset()
 
     try {
-      const app = await site({ provider: 'plausible', host: 'http://localhost:1' })
+      const app = await site({ provider: 'plausible', url: 'http://localhost:1' })
 
       await send(app, { u: 'http://other.example/' })
       await send(app, { u: 'http://other.example/' })
@@ -1174,12 +1174,16 @@ describe('the setup', () => {
   it.each([
     [{ provider: 'nope' }, 'takes provider'],
     [{ provider: 'umami' }, 'websiteId'],
-    [{ provider: 'plausible', host: 'ftp://x.example' }, 'host is'],
-    [{ provider: 'plausible', host: 'https://u:p@x.example' }, 'host is'],
-    [{ provider: 'plausible', host: 'not a url' }, 'host is'],
-    [{ provider: 'matomo', siteId: 1 }, 'host is'],
-    [{ provider: 'matomo', siteId: '', host: 'https://m.example' }, 'siteId'],
-    [{ provider: 'matomo', siteId: 1, host: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],
+    [{ provider: 'plausible', url: 'ftp://x.example' }, 'url is'],
+    [{ provider: 'plausible', url: 'https://u:p@x.example' }, 'url is'],
+    [{ provider: 'plausible', url: 'not a url' }, 'url is'],
+    [{ provider: 'plausible', host: 'not a url' }, 'url is'],
+    [{ provider: 'matomo', siteId: 1, host: 'ftp://m.example' }, 'url is'],
+    [{ provider: 'plausible', privacy: 'privacy' }, 'privacy is'],
+    [{ provider: 'plausible', policyUrl: 'privacy' }, 'privacy is'],
+    [{ provider: 'matomo', siteId: 1 }, 'url is'],
+    [{ provider: 'matomo', siteId: '', url: 'https://m.example' }, 'siteId'],
+    [{ provider: 'matomo', siteId: 1, url: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],
     [{ provider: 'ga4', measurementId: 'UA-1', apiSecret: 'abc' }, 'measurementId'],
     [{ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'a&b' }, 'apiSecret'],
     [{ provider: 'fathom', siteId: 'A B' }, 'siteId'],
@@ -1188,6 +1192,34 @@ describe('the setup', () => {
     [{ provider: 'custom', script: 'https://x.example/s.js', endpoint: 'https://u:p@x.example/c' }, 'endpoint is'],
   ])('refuses %j', (options, message) => {
     expect(() => analytics(options as never)).toThrow(message)
+  })
+})
+
+describe('the option names before 1.98', () => {
+  const page = async (options: AnalyticsOptions) => (await (await site(options)).handle(new Request('http://localhost/'))).text()
+
+  it('reads host, domain, hostname and policyUrl as url, site and privacy, the new name winning', async () => {
+    const old = { host: `http://localhost:${provider.port}`, domain: 'old.example', policyUrl: '/old-privacy' }
+
+    await send(await site({ provider: 'plausible', ...old }), visit())
+    expect((received[0]!.body as { domain: string }).domain).toBe('old.example')
+
+    await send(await site({ provider: 'plausible', ...old, site: 'new.example' }), visit())
+    expect((received[1]!.body as { domain: string }).domain).toBe('new.example')
+
+    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}`, hostname: 'sa.example' }), visit())
+    expect((received[2]!.body as { hostname: string }).hostname).toBe('sa.example')
+
+    expect(await page(plausible({ policyUrl: '/old-privacy', privacy: '/new-privacy' }))).toContain('data-policy="/new-privacy"')
+    expect(await page({ provider: 'plausible', url: 'http://localhost:1', policyUrl: '/old-privacy' })).toContain('data-policy="/old-privacy"')
+  })
+
+  it('reads a Matomo, a GA4 and an Umami written with host', async () => {
+    await send(await site({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/` }), visit())
+    expect(received[0]!.path).toBe('/matomo.php')
+
+    expect(await page({ provider: 'umami', websiteId: 'w', host: 'https://cloud.umami.is' })).toContain('data-consent')
+    expect(await page({ provider: 'umami', websiteId: 'w', host: 'https://u.example' })).toContain('data-info')
   })
 })
 
@@ -1231,20 +1263,20 @@ describe('custom events', () => {
   })
 
   it('sends Umami the event as a named payload with its data', async () => {
-    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
+    await send(await site({ provider: 'umami', websiteId: 'site-id', url: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
 
     expect(lastBody()).toMatchObject({ type: 'event', payload: { website: 'site-id', name: 'signup', data: { plan: 'pro' }, url: '/pricing?utm_source=news' } })
   })
 
   it('sends Simple Analytics the event with its metadata and no address', async () => {
-    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}` }), event('signup', { plan: 'pro' }), { 'x-forwarded-for': '198.51.100.9' })
+    await send(await site({ provider: 'simpleanalytics', url: `http://localhost:${provider.port}` }), event('signup', { plan: 'pro' }), { 'x-forwarded-for': '198.51.100.9' })
 
     expect(lastBody()).toMatchObject({ type: 'event', event: 'signup', metadata: { plan: 'pro' }, path: '/pricing?utm_source=news' })
     expect(JSON.stringify(lastBody())).not.toContain('198.51.100.9')
   })
 
   it('sends GA4 the event under a name and parameters it accepts, the page ones kept', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('File Download: pdf', { 'file-type': 'pdf', 'page_location': 'https://evil.example/' }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('File Download: pdf', { 'file-type': 'pdf', 'page_location': 'https://evil.example/' }))
 
     const [sent] = (lastBody() as { events: { name: string, params: Record<string, unknown> }[] }).events
 
@@ -1253,7 +1285,7 @@ describe('custom events', () => {
   })
 
   it('sends Matomo the event through its category, action and name', async () => {
-    await send(await site({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
+    await send(await site({ provider: 'matomo', siteId: 7, url: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
 
     expect(Object.fromEntries(new URLSearchParams(received[0]!.search))).toMatchObject({ e_c: 'Event', e_a: 'signup', e_n: '{"plan":"pro"}' })
   })
@@ -1417,7 +1449,7 @@ describe('custom events', () => {
   })
 
   it('keeps a GA4 parameter value within Google\'s 100 characters and the parameters within its 25', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('x', { long: 'y'.repeat(300), ...Object.fromEntries(Array.from({ length: 9 }, (_, at) => [`k${at}`, at])) }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('x', { long: 'y'.repeat(300), ...Object.fromEntries(Array.from({ length: 9 }, (_, at) => [`k${at}`, at])) }))
 
     const params = (lastBody() as { events: { params: Record<string, unknown> }[] }).events[0]!.params
 
@@ -1492,7 +1524,7 @@ describe('custom events, guarded and hardened', () => {
   })
 
   it('keeps the first of two props that GA4 names alike', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('x', { 'a-b': 'first', 'a_b': 'second' }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('x', { 'a-b': 'first', 'a_b': 'second' }))
 
     const [sent] = (lastBody() as { events: { params: Record<string, unknown> }[] }).events
 

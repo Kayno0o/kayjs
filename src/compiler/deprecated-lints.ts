@@ -47,6 +47,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { workflow } from \'kay/server\'\n\nconst onboarding = workflow(\'onboarding\', async () => undefined)\n\nawait onboarding.start({ userId }, { id: userId })\n---',
     right: '---\nimport { workflow } from \'kay/server\'\n\nconst onboarding = workflow(\'onboarding\', async () => undefined)\n\nawait onboarding.start({ userId }, { key: userId })\n---',
   },
+  'deprecated-analytics-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.98',
+    site: true,
+    summary: 'An `analytics()` option under its name before 1.98. `host`, the address of a self-hosted service or another endpoint, is `url`, so `host` and the `hosts` list of page hostnames never mean two things. `policyUrl` is `privacy`, as mail and kayjs-ui spell it. `domain` of Plausible and `hostname` of Simple Analytics are `site`; the other providers keep their own word for the id (`websiteId`, `siteId`, `measurementId`, `token`). The old names work until 2.0. Found in the options object written in a call of `analytics` imported from `kay/analytics`, in the TypeScript files and `.kay` files of the project; `domain` and `hostname` need a literal `provider`. The fix renames the key, and writes `url: host` for a shorthand; a key whose new name is written too is reported with no fix.',
+    wrong: '// kay.config.ts\nimport { analytics } from \'kay/analytics\'\n\nexport default { extensions: [analytics({ provider: \'plausible\', domain: \'example.com\', host: \'https://stats.example.com\', policyUrl: \'/privacy\' })] }',
+    right: '// kay.config.ts\nimport { analytics } from \'kay/analytics\'\n\nexport default { extensions: [analytics({ provider: \'plausible\', site: \'example.com\', url: \'https://stats.example.com\', privacy: \'/privacy\' })] }',
+  },
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',

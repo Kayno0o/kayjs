@@ -32,22 +32,23 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
+import { analyticsOptions } from './analytics-options'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
 import { unguardedRoutes, unguardedTools } from './guards'
-
 import { islandOnlyComponents } from './island-only'
-import { largePublicImages } from './large-images'
 
+import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { redirectPermanent } from './redirect-permanent'
-import { removedUiTokens } from './removed-ui-tokens'
 
+import { removedUiTokens } from './removed-ui-tokens'
 import { scheduleTz } from './schedule-tz'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 
@@ -159,6 +160,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => uiHotkey(root, options),
   async ({ root, options }) => scheduleTz(root, options),
   async ({ root, options }) => workflowStartId(root, options),
+  async ({ root, options }) => analyticsOptions(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

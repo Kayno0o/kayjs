@@ -130,11 +130,25 @@ import { defineConfig } from 'kay/server'
 import { analytics } from 'kay/analytics'
 
 export default defineConfig({
-  extensions: [analytics({ provider: 'plausible', domain: 'example.com' })],
+  extensions: [analytics({ provider: 'plausible', site: 'example.com' })],
 })
 ```
 
-Plausible, Umami on your own server (give it `websiteId` and `host`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `host`) work this way. All four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
+Plausible, Umami on your own server (give it `websiteId` and `url`), Simple Analytics (`provider: 'simpleanalytics'`) and Matomo (`siteId` and `url`) work this way. Each names your site with its own option:
+
+| Provider | Option for the site | Needed |
+| --- | --- | --- |
+| `plausible` | `site` (Plausible's domain) | no, the page's host |
+| `simpleanalytics` | `site` (the hostname) | no, the page's host |
+| `umami` | `websiteId` | yes |
+| `matomo` | `siteId` | yes |
+| `fathom` | `siteId` | yes |
+| `ga4` | `measurementId` | yes |
+| `cloudflare` | `token` | yes |
+
+`url` is the address of a self-hosted service (Matomo needs it). Before 1.98 it was `host`, `site` was Plausible's `domain` and Simple Analytics' `hostname`, and `privacy` was `policyUrl`; the old names still work and `kay upgrade` renames them.
+
+The first four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 
 Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains.
 
@@ -146,7 +160,7 @@ The script counts the page when it loads and again after each page swap. It need
 
 ### Google Analytics 4
 
-`provider: 'ga4'` sends each page view to Google Analytics from your server, through its Measurement Protocol. It needs the `measurementId` of your web data stream (`G-` and letters) and an `apiSecret`, which you make in Google Analytics under the data stream's Measurement Protocol API secrets. The secret stays on your server. Use `host: 'https://region1.google-analytics.com'` to collect in the EU.
+`provider: 'ga4'` sends each page view to Google Analytics from your server, through its Measurement Protocol. It needs the `measurementId` of your web data stream (`G-` and letters) and an `apiSecret`, which you make in Google Analytics under the data stream's Measurement Protocol API secrets. The secret stays on your server. Use `url: 'https://region1.google-analytics.com'` to collect in the EU.
 
 ```ts
 analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: true })
@@ -160,7 +174,7 @@ Google does not get the visitor's address unless you give `address: true`, which
 
 If the provider refuses a visit, for example because of a wrong site id, domain or secret, kay logs a warning naming the provider and the status, at most once a minute for each. Check the log when your stats stay empty.
 
-Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address and one id. Keep `host` on https, as the secret travels in the request. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
+Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address and one id. Keep `url` on https, as the secret travels in the request. Because there is no Google tag on the page, check Realtime and the engagement numbers in your reports, which Google builds partly from tag data. A very long page address may also be cut by Google's limit of 100 characters per value.
 
 ### What the tool receives
 
@@ -171,7 +185,7 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 
 ### Asking first
 
-Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without a `host`, or with `cloud.umami.is`) ask by default, as if you wrote `consent: true`, because it is a third party that gets the visitor's address; for Plausible, Simple Analytics, Matomo and an Umami with your own `host` you add it. `consent: false` counts Umami Cloud at once, and the transfer is yours to answer for.
+Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without a `url`, or with `cloud.umami.is`) ask by default, as if you wrote `consent: true`, because it is a third party that gets the visitor's address; for Plausible, Simple Analytics, Matomo and an Umami with your own `host` you add it. `consent: false` counts Umami Cloud at once, and the transfer is yours to answer for.
 
 Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
 
@@ -193,7 +207,7 @@ analytics({
 
 The notice names the tool from your config, for example "with Plausible", so you write no wording for it. The notice reads in English, or in French on a page whose `lang` is `fr`; your own strings win over both.
 
-A language you wrote nothing in reads kay's words. If you word the text yourself, write `{provider}` where the name goes. Add `policyUrl: '/privacy'` (a path written without your `base`, or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
+A language you wrote nothing in reads kay's words. If you word the text yourself, write `{provider}` where the name goes. Add `privacy: '/privacy'` (a path written without your `base`, or an address) and it links to your privacy policy; `policy` in `consent` or `info` words the link.
 
 The notice is a labelled region that Tab reaches, and kay does not move the focus to it when a page loads. When a visitor opens it from a `data-analytics-consent` control, the focus goes to its first button and returns to that control after the answer.
 
@@ -249,7 +263,7 @@ Events work for the tools kay counts for, so not Fathom, Cloudflare or `custom`,
 
 ### Counting without asking
 
-Plausible, Simple Analytics, Matomo and Umami on your own `host` count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
+Plausible, Simple Analytics, Matomo and Umami on your own `url` count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.
 
 The line reads in English, or in French on a page whose `lang` is `fr`; your own strings win over both.
 

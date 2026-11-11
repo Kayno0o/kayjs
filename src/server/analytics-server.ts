@@ -107,13 +107,13 @@ interface Forward {
 const PROVIDERS = {
   plausible: (options: Extract<AnalyticsOptions, { provider: 'plausible' }>, visit: Visit): Forward => ({
     method: 'POST',
-    url: `${(options.host ?? 'https://plausible.io').replace(TRAILING_SLASH, '')}/api/event`,
+    url: `${(options.url ?? 'https://plausible.io').replace(TRAILING_SLASH, '')}/api/event`,
     headers: { 'user-agent': visit.userAgent, 'content-type': 'application/json', ...visit.address !== undefined && { 'x-forwarded-for': visit.address } },
-    body: { name: visit.event?.name ?? 'pageview', url: visit.page.href, domain: options.domain ?? visit.page.hostname, referrer: visit.referrer, ...hasProps(visit.event) && { props: visit.event!.props } },
+    body: { name: visit.event?.name ?? 'pageview', url: visit.page.href, domain: options.site ?? visit.page.hostname, referrer: visit.referrer, ...hasProps(visit.event) && { props: visit.event!.props } },
   }),
   umami: (options: Extract<AnalyticsOptions, { provider: 'umami' }>, visit: Visit): Forward => ({
     method: 'POST',
-    url: `${(options.host ?? 'https://cloud.umami.is').replace(TRAILING_SLASH, '')}/api/send`,
+    url: `${(options.url ?? 'https://cloud.umami.is').replace(TRAILING_SLASH, '')}/api/send`,
     headers: { 'user-agent': visit.userAgent, 'content-type': 'application/json' },
     body: { type: 'event', payload: {
       website: options.websiteId,
@@ -132,11 +132,11 @@ const PROVIDERS = {
 
     return {
       method: 'POST',
-      url: `${(options.host ?? 'https://queue.simpleanalyticscdn.com').replace(TRAILING_SLASH, '')}/events`,
+      url: `${(options.url ?? 'https://queue.simpleanalyticscdn.com').replace(TRAILING_SLASH, '')}/events`,
       headers: { 'content-type': 'application/json' },
       body: {
         type: visit.event === undefined ? 'pageview' : 'event',
-        hostname: options.hostname ?? visit.page.hostname,
+        hostname: options.site ?? visit.page.hostname,
         event: visit.event?.name ?? 'pageview',
         ...hasProps(visit.event) && { metadata: visit.event!.props },
         path: visit.page.pathname + visit.page.search,
@@ -150,7 +150,7 @@ const PROVIDERS = {
   },
   ga4: (options: Extract<AnalyticsOptions, { provider: 'ga4' }>, visit: Visit): Forward => ({
     method: 'POST',
-    url: `${(options.host ?? 'https://www.google-analytics.com').replace(TRAILING_SLASH, '')}/mp/collect?${new URLSearchParams({ measurement_id: options.measurementId, api_secret: options.apiSecret })}`,
+    url: `${(options.url ?? 'https://www.google-analytics.com').replace(TRAILING_SLASH, '')}/mp/collect?${new URLSearchParams({ measurement_id: options.measurementId, api_secret: options.apiSecret })}`,
     headers: { 'content-type': 'application/json' },
     body: {
       client_id: visit.visitor,
@@ -189,7 +189,7 @@ const PROVIDERS = {
       query.set('cip', visit.address)
     }
 
-    return { method: 'GET', url: `${options.host.replace(TRAILING_SLASH, '')}/matomo.php?${query}`, headers: {} }
+    return { method: 'GET', url: `${options.url!.replace(TRAILING_SLASH, '')}/matomo.php?${query}`, headers: {} }
   },
 }
 

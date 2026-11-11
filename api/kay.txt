@@ -1400,7 +1400,7 @@ interface WithPublicFields<Schema extends TSchema>
 function withQuery(changes: Readonly<Record<string, null | number | string | undefined>>): string
 
 [./analytics] analytics
-function analytics(options: AnalyticsOptions): KayExtension<AnyElysia>
+function analytics(written: AnalyticsOptions): KayExtension<AnyElysia>
 
 [./analytics] AnalyticsConsent
 interface AnalyticsConsent
@@ -1431,7 +1431,8 @@ interface CloudflareOptions extends Common
   exclude?: undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "cloudflare"
   titles?: undefined
   token: string
@@ -1452,7 +1453,8 @@ interface CustomOptions extends Common
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
   integrity?: string | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "custom"
   script: string
   titles?: undefined
@@ -1464,7 +1466,8 @@ interface FathomOptions extends Common
   exclude?: undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "fathom"
   siteId: string
   spa?: "auto" | "hash" | "history" | undefined
@@ -1477,40 +1480,39 @@ interface Ga4Options extends Counted
   consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  host?: string | undefined
+  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
   measurementId: string
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "ga4"
   titles?: boolean | undefined
+  url?: string | undefined
 
 [./analytics] MatomoOptions
-interface MatomoOptions extends Counted
-  consent?: AnalyticsConsent | boolean | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
-  exclude?: string[] | undefined
-  host: string
-  hosts?: string[] | undefined
-  info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
-  provider: "matomo"
-  siteId: number | string
-  titles?: boolean | undefined
-  tokenAuth?: string | undefined
+type MatomoOptions = MatomoBase & ({
+  url: string, host?: undefined
+} | {
+  url?: undefined, /** @deprecated The old name of `url`. Removed in 1.102.0;
+  `deprecated-analytics-options` rewrites it. */ host: string
+})
 
 [./analytics] PlausibleOptions
 interface PlausibleOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
-  domain?: string | undefined
+  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ domain?: string | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  host?: string | undefined
+  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "plausible"
+  site?: string | undefined
   titles?: boolean | undefined
+  url?: string | undefined
 
 [./analytics] RouteVitals
 interface RouteVitals
@@ -1524,13 +1526,16 @@ interface SimpleAnalyticsOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  host?: string | undefined
-  hostname?: string | undefined
+  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
+  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ hostname?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "simpleanalytics"
+  site?: string | undefined
   titles?: boolean | undefined
+  url?: string | undefined
 
 [./analytics] track
 function track(ctx: { request: Request; }, name: string, props?: Record<string, unknown> | undefined): Promise<void>
@@ -1540,12 +1545,14 @@ interface UmamiOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  host?: string | undefined
+  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  policyUrl?: string | undefined
+  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
+  privacy?: string | undefined
   provider: "umami"
   titles?: boolean | undefined
+  url?: string | undefined
   websiteId: string
 
 [./analytics] VisitOptions
