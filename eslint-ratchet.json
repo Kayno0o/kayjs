@@ -21,9 +21,6 @@
   "packages/auth/src/createUserCommand.ts": {
     "complexity": 43
   },
-  "packages/auth/src/events.ts": {
-    "complexity": 49
-  },
   "packages/auth/src/memoryStore.ts": {
     "max-lines-per-function": 460
   },

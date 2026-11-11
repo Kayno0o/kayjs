@@ -977,6 +977,7 @@ interface EventContext extends AuthHookContext
 interface EventFields
   account-deleted: Record<never, never>
   banned: { reason?: string; }
+  email-change-requested: { email: string; }
   email-changed: { email: string; }
   impersonation-ended: { expired?: boolean; }
   impersonation-started: Record<never, never>

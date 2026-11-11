@@ -4,7 +4,7 @@ import type { Duration } from '../runtime/duration'
 
 // A link to follow or a code to type, then news of a change to the account.
 export const AUTH_LINK_KINDS = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists'] as const
-export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over', 'impersonation-started'] as const
+export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-change-requested', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over', 'impersonation-started'] as const
 
 export type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
 export type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
@@ -37,6 +37,7 @@ export const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData,
   'new-sign-in': { url: 'https://example.com/account/sessions' },
   'sign-in-locked': {},
   'password-changed': {},
+  'email-change-requested': { detail: 'ada@example.org' },
   'email-changed': { detail: 'ada@example.org' },
   'two-factor-enabled': {},
   'two-factor-disabled': {},
@@ -94,6 +95,7 @@ export const AUTH_MAIL_ENGLISH = {
   'new-sign-in': { subject: 'New sign-in on {site}', lead: 'Your {site} account was just signed into from a device or network it had not used before.', ending: NOT_YOU },
   'sign-in-locked': { subject: 'Sign-in locked on {site}', lead: 'Too many wrong passwords or codes were tried on your {site} account, so signing in to it is paused for a while.', ending: NOT_YOU },
   'password-changed': { subject: 'Password changed on {site}', lead: 'The password of your {site} account was changed, and its other sessions signed out.', ending: NOT_YOU },
+  'email-change-requested': { subject: 'Email change asked on {site}', lead: 'A change of the address of your {site} account to {detail} was asked. It takes effect once that address confirms it; until then {email} still signs into it.', ending: NOT_YOU },
   'email-changed': { subject: 'Email changed on {site}', lead: 'Your {site} account moved from {email} to {detail}. This address no longer signs into it.', ending: CONTACT_SITE },
   'two-factor-enabled': { subject: 'Two-factor turned on on {site}', lead: 'Your {site} account now asks for a code from your authenticator when signing in.', ending: NOT_YOU },
   'two-factor-disabled': { subject: 'Two-factor turned off on {site}', lead: 'Your {site} account no longer asks for a code when signing in.', ending: NOT_YOU },
@@ -133,6 +135,7 @@ export const AUTH_MAIL_FRENCH = {
   'new-sign-in': { subject: 'Nouvelle connexion sur {site}', lead: 'Votre compte {site} vient d\'être utilisé depuis un appareil ou un réseau qu\'il n\'avait jamais utilisé.', ending: NOT_YOU_FR },
   'sign-in-locked': { subject: 'Connexion suspendue sur {site}', lead: 'Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.', ending: NOT_YOU_FR },
   'password-changed': { subject: 'Mot de passe modifié sur {site}', lead: 'Le mot de passe de votre compte {site} a été modifié, et ses autres sessions déconnectées.', ending: NOT_YOU_FR },
+  'email-change-requested': { subject: 'Changement d\'adresse demandé sur {site}', lead: 'Un changement de l\'adresse de votre compte {site} vers {detail} a été demandé. Il ne prend effet qu\'une fois cette adresse confirmée ; d\'ici là, {email} permet toujours de s\'y connecter.', ending: NOT_YOU_FR },
   'email-changed': { subject: 'Adresse modifiée sur {site}', lead: 'Votre compte {site} est passé de {email} à {detail}. Cette adresse ne permet plus de s\'y connecter.', ending: CONTACT_SITE_FR },
   'two-factor-enabled': { subject: 'Double authentification activée sur {site}', lead: 'Votre compte {site} demande désormais un code de votre application d\'authentification à chaque connexion.', ending: NOT_YOU_FR },
   'two-factor-disabled': { subject: 'Double authentification désactivée sur {site}', lead: 'Votre compte {site} ne demande plus de code à la connexion.', ending: NOT_YOU_FR },

@@ -116,5 +116,5 @@ A change to what protects an account is mailed to its verified address, never an
 - `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `keptThisOne` whether the session asking stayed signed in.
 - `organization-handed-over`, `organizationId`: mailed to the member an organization passes to when its only owner's account is deleted and no owner was named (an admin's `admin.deleteUser`, a stale guest or unverified account pruned), naming the organization, with no `actor`.
 - `impersonation-started`, with the admin as `actor`: mailed when an admin signs in as the user, to a verified address only and best effort: an unverified address gets none, and a failing mailer is logged while the impersonation goes on (see the admin section).
-- `email-changed`, mailed to the address left, `email` the new one.
+- `email-change-requested`, `email` the address asked for: mailed to the address the account is leaving the moment `email.change` sends its link, while its owner can still act. `email-changed` follows, mailed to the address left, `email` the new one, once the link is confirmed.
 - `provider-linked` and `provider-unlinked`, `provider`; `passkey-added` and `passkey-removed`, `name`; `token-created`, `name` its label.

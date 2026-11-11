@@ -522,7 +522,7 @@ describe('changing an email', () => {
     const find = store.users.findByEmail
     let stale = true
 
-    store.users.findByEmail = (email) => {
+    store.users.findByEmail = async (email) => {
       if (stale && email === 'ada@new.test') {
         stale = false
 

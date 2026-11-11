@@ -47,6 +47,8 @@ export interface EventFields {
   'new-sign-in': Record<never, never>
   'sign-in-locked': Record<never, never>
   'password-changed': Record<never, never>
+  // `email` is the address asked for, which the account has not moved to yet.
+  'email-change-requested': { email: string }
   // `email` is the new address.
   'email-changed': { email: string }
   'two-factor-enabled': Record<never, never>
@@ -104,6 +106,7 @@ function impersonationEnd(detail: string | undefined): EventFields['impersonatio
 export function eventFields(event: AuthEvent, detail: string | undefined): EventFields[AuthEvent] {
   const text = detail === undefined || detail === '' ? undefined : detail
 
+  // eslint-disable-next-line ts/switch-exhaustiveness-check -- the default hands the rest to `noticeFields`, which takes only them, so a new event still has to be placed
   switch (event) {
     case 'signed-in':
       return text?.startsWith(OAUTH_PREFIX) ? { method: 'oauth', provider: text.slice(OAUTH_PREFIX.length) } : { method: text ?? 'unknown' }
@@ -129,6 +132,23 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
     case 'oauth-client-approved':
     case 'oauth-client-revoked':
       return { client: text ?? '' }
+    case 'impersonation-ended':
+      return impersonationEnd(text)
+    case 'signed-out':
+    case 'unbanned':
+    case 'impersonation-started':
+      return {}
+    default:
+      return noticeFields(event, text)
+  }
+}
+
+// The events that tell the user of a change to what protects the account.
+type NoticeEvent = 'email-change-requested' | 'email-changed' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'account-deleted'
+
+function noticeFields(event: NoticeEvent, text: string | undefined): EventFields[NoticeEvent] {
+  switch (event) {
+    case 'email-change-requested':
     case 'email-changed':
       return { email: text ?? '' }
     case 'provider-linked':
@@ -140,11 +160,6 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
       return text === undefined ? {} : { name: text }
     case 'signed-out-everywhere':
       return { keptThisOne: text === 'this-one-kept' }
-    case 'impersonation-ended':
-      return impersonationEnd(text)
-    case 'signed-out':
-    case 'unbanned':
-    case 'impersonation-started':
     case 'new-sign-in':
     case 'sign-in-locked':
     case 'password-changed':

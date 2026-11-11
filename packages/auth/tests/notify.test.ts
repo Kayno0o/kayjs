@@ -64,11 +64,21 @@ describe('changes to what protects the account', () => {
     expect(events.map(entry => entry.event)).toContain('password-changed')
   })
 
+  test('asking for another address warns the old one at once, before the new one confirms', async () => {
+    const { ada, mails } = await verified()
+
+    await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
+    await Bun.sleep(20)
+
+    expect(mails.find(mail => mail.kind === 'email-change-requested')).toMatchObject({ to: 'ada@example.com', name: 'Site', detail: 'ada@new.test' })
+    expect(mails.find(mail => mail.kind === 'change-email')).toMatchObject({ to: 'ada@new.test' })
+  })
+
   test('moving to another address warns the old one', async () => {
     const { ada, mails } = await verified()
 
     await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
-    await ada.call('email.confirmChange', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
+    await ada.call('email.confirmChange', new URL(mails.findLast(mail => mail.kind === 'change-email')!.url!).searchParams.get('token')!)
 
     expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', name: 'Site', detail: 'ada@new.test' })
     expect(mails.at(-1)!.text).toContain('ada@new.test')

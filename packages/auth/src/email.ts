@@ -261,7 +261,13 @@ export async function changeEmail(state: RequestState, proof: Proof, email: stri
   if (await state.core.store.users.findByEmail(address))
     return rejected({ email: 'taken' })
 
-  return mailFor(state, record, 'change-email', address, null)
+  const sent = await mailFor(state, record, 'change-email', address, null)
+
+  // The address the account is leaving hears of it now, while its owner can still react, not only once the new one confirms.
+  if (sent.ok)
+    await securityNotice(state, record, 'email-change-requested', address)
+
+  return sent
 }
 
 // Moves the account to the address the link was sent to, and ends the user's other sessions.

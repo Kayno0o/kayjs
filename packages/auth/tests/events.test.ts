@@ -131,6 +131,7 @@ describe('onEvent', () => {
       'new-sign-in': [[undefined, {}]],
       'sign-in-locked': [[undefined, {}]],
       'password-changed': [[undefined, {}]],
+      'email-change-requested': [['ada@new.test', { email: 'ada@new.test' }]],
       'email-changed': [['ada@new.test', { email: 'ada@new.test' }]],
       'two-factor-enabled': [[undefined, {}]],
       'two-factor-disabled': [[undefined, {}]],
