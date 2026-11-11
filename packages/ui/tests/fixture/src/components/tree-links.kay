@@ -1,5 +1,6 @@
 ---
 import type { TreeNode } from '@kaynooo/kayjs-ui'
+import { nodeKey } from '@kaynooo/kayjs-ui/lib/tree'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 // What the test reads back: the menu entries run, the stars clicked, and the selection and rows the tree reports.
@@ -16,4 +17,4 @@ const nodes: TreeNode[] = [
 ---
 TreeView#tree(nodes={nodes} label="Projects" onSelectedChange={onSelect})
   @actions(node)
-    button.star(type="button" data-id={node.id} onClick={() => onStar(node.id)}) Star
+    button.star(type="button" data-id={nodeKey(node)} onClick={() => onStar(nodeKey(node))}) Star

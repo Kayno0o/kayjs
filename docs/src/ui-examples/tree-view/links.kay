@@ -1,6 +1,7 @@
 ---
 import { signal } from 'kay'
 import type { TreeNode } from '@kaynooo/kayjs-ui'
+import { nodeKey } from '@kaynooo/kayjs-ui'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
@@ -18,6 +19,6 @@ const toggle = (id: string) => starred.set(list => list.includes(id) ? list.filt
   TreeView(nodes={nodes} label="Projects" selected="blog" expanded={['apps']})
     @actions(node)
       if node.href
-        button.cursor-pointer(type="button" aria-label={`Star ${node.label}`} aria-pressed={starred().includes(node.id) ? 'true' : 'false'} onClick={() => toggle(node.id)})
-          Icon(icon={starred().includes(node.id) ? 'star' : 'plus'})
+        button.cursor-pointer(type="button" aria-label={`Star ${node.label}`} aria-pressed={starred().includes(nodeKey(node)) ? 'true' : 'false'} onClick={() => toggle(nodeKey(node))})
+          Icon(icon={starred().includes(nodeKey(node)) ? 'star' : 'plus'})
   p Right click a project for its menu.

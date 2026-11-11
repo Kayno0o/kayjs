@@ -139,13 +139,21 @@ interface GroupedAvatar
   status?: AvatarStatus | undefined
   statusLabel?: string | undefined
 
+[./lib/bell] bellItem
+function bellItem<Item extends BellItem>(item: Item): Item & { key: string; label: string; href?: string | undefined; }
+
 [./lib/bell] BellItem
-interface BellItem
-  id: string
-  newTab?: NewTab | undefined
-  read?: boolean | undefined
-  title: string
-  url?: string | undefined
+type BellItem = BellItemBase & ({
+  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: string | undefined
+} | {
+  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: string
+}) & ({
+  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ title?: string | undefined
+} | {
+  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ title: string
+}) & {
+  href?: string | undefined, /** @deprecated Use `href`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ url?: string | undefined
+}
 
 [./lib/bell] BellItems
 type BellItems<Item extends BellItem = BellItem> = readonly Item[] | (() => PromiseLike<readonly Item[]> | readonly Item[])
@@ -1521,6 +1529,9 @@ interface NavLink extends NavItem
 [./lib/index] NewTab
 type NewTab = boolean | 'auto'
 
+[./lib/index] nodeKey
+function nodeKey<Id extends TreeId>(node: { key?: Id | undefined; id?: Id | undefined; }): Id
+
 [./lib/index] OptionsQuery
 interface OptionsQuery
   q: string
@@ -1835,14 +1846,11 @@ interface ToolbarTools
 type TreeId = string | number
 
 [./lib/index] TreeNode
-interface TreeNode<Id extends TreeId = string>
-  children?: TreeChildren<Id> | undefined
-  href?: string | undefined
-  icon?: IconProps | IconSlot | undefined
-  id: Id
-  label: string
-  menu?: readonly MenuEntry[] | undefined
-  newTab?: NewTab | undefined
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({
+  key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+} | {
+  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id
+})
 
 [./lib/index] ui
 function ui(): KayExtension<AnyElysia>
@@ -2978,6 +2986,9 @@ type ToastTone = Tone
 [./lib/tone] Tone
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
+[./lib/tree] nodeKey
+function nodeKey<Id extends TreeId>(node: { key?: Id | undefined; id?: Id | undefined; }): Id
+
 [./lib/tree] TreeChildren
 type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)
 
@@ -2997,14 +3008,11 @@ function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeI
 type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
 
 [./lib/tree] TreeNode
-interface TreeNode<Id extends TreeId = string>
-  children?: TreeChildren<Id> | undefined
-  href?: string | undefined
-  icon?: IconProps | IconSlot | undefined
-  id: Id
-  label: string
-  menu?: readonly MenuEntry[] | undefined
-  newTab?: NewTab | undefined
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({
+  key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+} | {
+  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id
+})
 
 [./lib/tree] treePath
 function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined

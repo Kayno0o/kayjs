@@ -19,7 +19,5 @@ test('item names from before 1.99 and 1.100 still draw: text, value, title, id a
   expect(root.querySelector('#audio a[href="https://example.com/intro"]')).not.toBeNull()
   expect(root.querySelector('#gallery [aria-label="Mars"]')).not.toBeNull()
   expect(root.querySelector('#tree [aria-selected=true]')?.textContent).toContain('Leaf')
-  expect(root.querySelector('#bell a[href="/plain"]')).not.toBeNull()
-  expect(text('#bell')).toContain('Review asked')
   expect(root.querySelector('[data-part=tile][aria-current=true]')?.textContent).toContain('Atlas')
 })

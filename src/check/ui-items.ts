@@ -27,7 +27,7 @@ interface ItemLint {
 
 // The kayjs-ui components whose item keys were renamed in 1.99, by the file they are imported from.
 const ITEMS: ItemLint = {
-  code,
+  code: 'deprecated-ui-items',
   since: '1.99',
   components: {
     'timeline': { prop: 'entries', renames: [['text', 'label']] },
@@ -135,7 +135,7 @@ async function itemLint(root: string, options: CheckOptions, lint: ItemLint): Pr
               end: property.end,
               message: `\`${old}\` of a ${element.name} item is \`${current}\` since ${since}: an item of every kayjs-ui list is \`{ key, label, description, href, icon, tone, disabled }\`; \`${old}\` still works until it is removed`,
               help: `write \`${current}\``,
-              code: 'deprecated-ui-items',
+              code,
               severity: level === 'warn' ? 'warning' : 'error',
               ...edits && { fixes: [{ title: `Write \`${current}\``, edits, safe: true }] },
             })

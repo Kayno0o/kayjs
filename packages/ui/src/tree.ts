@@ -26,8 +26,8 @@ interface TreeNodeBase<Id extends TreeId> {
 export type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({ key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined } | { key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id })
 
 // The identity of a node, its `key` or the older `id`.
-export function nodeKey<Id extends TreeId>(node: TreeNode<Id>): Id {
-  return node.key ?? node.id
+export function nodeKey<Id extends TreeId>(node: { key?: Id | undefined, id?: Id | undefined }): Id {
+  return (node.key ?? node.id)!
 }
 
 export type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)

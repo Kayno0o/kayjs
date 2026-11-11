@@ -2,12 +2,11 @@
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
-import BellInbox from '@kaynooo/kayjs-ui/bell-inbox.kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
-// Every list under the item names before 1.99 and 1.100, which still draw; a cast keeps the `deprecated-ui-items` lint from rewriting them.
+// Every list under the item names before 1.99 and 1.100 (a Bell's are in bell-item.test.ts), which still draw; a cast keeps the `deprecated-ui-items` lint from rewriting them.
 function old<T>(items: unknown): T {
   return items as T
 }
@@ -17,8 +16,6 @@ const apps = old<{ id: string, href: string, label: string }[]>([{ id: 'atlas', 
 const chapters = old<{ title: string, start: number, url: string }[]>([{ title: 'Intro', start: 0, url: 'https://example.com/intro' }])
 const items = old<{ key: number, kind: 'image', thumb: string, preview: string, title: string }[]>([{ key: 1, kind: 'image', thumb: '/t.png', preview: '/p.png', title: 'Mars' }])
 const nodes = old<{ id: string, label: string, children?: { id: string, label: string }[] }[]>([{ id: 'root', label: 'Root', children: [{ id: 'leaf', label: 'Leaf' }] }])
-const notes = old<{ id: string, title: string, url?: string }[]>([{ id: 'n1', title: 'Deploy done', url: '/plain' }, { id: 'n2', title: 'Review asked' }])
-const reads: (string | undefined)[] = []
 ---
 Timeline#timeline(entries={entries} label="Day")
 Accordion#accordion(items={sections})
@@ -28,4 +25,3 @@ AppSwitcher#apps(apps={apps} current="atlas" open={true})
 AudioPlayer#audio(src="/a.mp3" chapters={chapters})
 MediaGallery#gallery(items={items})
 TreeView#tree(label="Files" nodes={nodes} expanded={['root']} selected="leaf")
-BellInbox#bell(items={notes} open={true} onRead={id => reads.push(id)})

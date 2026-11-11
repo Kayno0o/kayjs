@@ -4,7 +4,7 @@ import type { TreeNode } from '@kaynooo/kayjs-ui'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 const nodes: TreeNode[] = [
-  { id: 'group', label: 'Group', children: [{ id: 'here', label: 'Here', href: '/tree-links', menu: [{ label: 'Rename', onSelect: () => undefined }] }, { id: 'other', label: 'Other', href: '/tree-links?view=b' }] },
+  { key: 'group', label: 'Group', children: [{ key: 'here', label: 'Here', href: '/tree-links', menu: [{ label: 'Rename', onSelect: () => undefined }] }, { key: 'other', label: 'Other', href: '/tree-links?view=b' }] },
 ]
 ---
 main
