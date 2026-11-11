@@ -508,7 +508,7 @@ A highlighter, a `transform` or a `preprocess` whose output changes with no chan
 
 ## Markdown in an island
 
-`markdownHtml` from `kay/markdown` renders Markdown a user writes as sanitized HTML. Use it for an editor's preview or a chat reply streaming in. Tables, images (loaded lazily) and task lists are kept, and scripts and handlers are dropped. Each task list checkbox sits in a `label` with its item's text, in every Markdown body, so a screen reader names it.
+`markdownHtml` from `kay/markdown` renders Markdown a user writes as sanitized HTML. Use it for an editor's preview or a chat reply streaming in. Tables, images (loaded lazily) and task lists are kept, and scripts and handlers are dropped. Each task list checkbox sits in a `label` with its item's text, in every Markdown body, so a screen reader names it; the checkbox of an item with no text is hidden from a screen reader.
 
 ```kay
 ---

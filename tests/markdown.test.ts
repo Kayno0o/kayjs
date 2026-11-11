@@ -236,8 +236,12 @@ describe('task list checkboxes', () => {
     }
   })
 
-  it('leaves a box with no text as it is, and a hostile line quick', () => {
-    expect(markdownHtml('- [ ]\n  - [ ] sub')).not.toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled></label>')
+  it('hides the box of an item with no text from a screen reader, and keeps a hostile line quick', () => {
+    const html = markdownHtml('- [ ]\n  - [ ] sub')
+
+    expect(html).not.toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled></label>')
+    expect(html).toContain('<li class="task-list-item"><input aria-hidden="true" type="checkbox" class="task-list-item-checkbox" disabled>')
+    expect(html).toContain('<label><input type="checkbox" class="task-list-item-checkbox" disabled>sub</label>')
 
     const started = performance.now()
 
