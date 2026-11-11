@@ -775,6 +775,7 @@ component default
   expandLabel?: string | undefined
   failedLabel?: string | undefined
   failureLabel?: string | undefined
+  fieldLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -820,6 +821,7 @@ component default
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
+  startedLabel?: string | undefined
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
@@ -988,6 +990,7 @@ component default
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
   failedLabel?: string | undefined
   failureLabel?: string | undefined
+  fieldLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -1030,6 +1033,7 @@ component default
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
+  startedLabel?: string | undefined
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined

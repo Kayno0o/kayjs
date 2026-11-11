@@ -401,6 +401,34 @@ it('offers no regenerate while an approval waits or right after its answer, and 
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('names the field apart from the log, and each approval button by its tool, and focuses Allow', async () => {
+  await using page = await site.open('/replaceable-approving')
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('May I add it?')
+  await page.fill('.kai-chat-form textarea', 'Add milk')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-approval')
+
+  expect(await page.evaluate(() => [document.querySelector('.kai-chat-log')?.getAttribute('aria-label'), document.querySelector('.kai-chat-form textarea')?.getAttribute('aria-label')])).toEqual(['Assistant', 'Message'])
+  expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-approval button')].map(button => button.getAttribute('aria-label')))).toEqual(['Allow: add_note', 'Deny: add_note'])
+  expect(await focused(page)).toBe('button.kui-btn|Allow: add_note')
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('says a new conversation started in the status line, once, until the next turn', async () => {
+  await using page = await site.open('/citing')
+
+  await send(page, 'hello', 'hello')
+  await page.click('.kai-chat-new')
+  await page.waitFor('.kai-chat-status p', { text: 'New conversation started' })
+
+  await send(page, 'again', 'again')
+
+  expect(await page.count('.kai-chat-status p')).toBe(0)
+  expect(page.errors).toEqual([])
+}, 120_000)
+
 it('keeps an open edit through an Allow and a Deny, and saves it after', async () => {
   await using page = await site.open('/replaceable-approving')
 

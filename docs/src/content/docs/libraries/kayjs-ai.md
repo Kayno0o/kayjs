@@ -138,7 +138,7 @@ A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path
 
 Every text is looked up in the app's catalogs under an `ai.chat.<name>` key first (`ai.chat.send`, `ai.chat.greeting`, `ai.chat.open`, `ai.chat.running` and so on), and kayjs-ai ships the French of each, so a site on `lang: 'fr'` needs no setup; a key the app words in its own `src/messages/<locale>.ts` replaces it.
 
-Every label is also a prop, which replaces the message: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel`. The wording keys keep their names, such as `ai.chat.error`.
+Every label is also a prop, which replaces the message: `fieldLabel` (the name of the field, so it is not read like the message list, which `label` names), `startedLabel` (said to a screen reader when the conversation starts over), `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel`. The wording keys keep their names, such as `ai.chat.error`.
 
 The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`. A call held for the visitor's yes has `approvalLabel`, `allowLabel`, `denyLabel`, `allowedLabel` and `deniedLabel`.
 
