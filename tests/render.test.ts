@@ -10,6 +10,7 @@ import { transformKay } from '../src/build/transform'
 import { UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from '../src/compiler/ast'
 import { collectHead } from '../src/runtime/head'
 import { child, UNREQUIRABLE_TYPES as RUNTIME_UNREQUIRABLE, UNDESCRIBED_TYPES } from '../src/runtime/html'
+import { trustHtml } from '../src/runtime/sanitize'
 import { renderLocale, renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -415,14 +416,14 @@ describe('static server output', () => {
 
   it('sets content from innerHTML, textContent and a textarea value, and marks the selected option', async () => {
     const source = '---\nconst { markup, text, choice } = props<{ markup: string, text: string, choice: string }>()\n---\ndiv(innerHTML={markup})\ndiv(textContent={text})\ntextarea(value={text})\nselect(value={choice})\n  option(value="a") A\n  option(value="b") B\n  option C'
-    const html = await renderKay(source, { markup: '<b>x</b>', text: '<i>', choice: 'C' })
+    const html = await renderKay(source, { markup: trustHtml('<b>x</b>'), text: '<i>', choice: 'C' })
 
     expect(html).toBe('<div><b>x</b></div><div>&lt;i></div><textarea>&lt;i></textarea><select value="C"><option value="a">A</option><option value="b">B</option><option selected>C</option></select>')
   })
 
   it('writes an innerHTML holding a comment, a style and a script as it is, and keeps escaping a script and a style element text', async () => {
     const body = '<p>a</p><!-- c --><style>b{}</style><script>if (a < b) x()</script>'
-    const html = await renderKay('---\nconst { markup } = props<{ markup: string }>()\n---\ndiv(innerHTML={markup})\nstyle {markup}', { markup: body })
+    const html = await renderKay('---\nconst { markup } = props<{ markup: string }>()\n---\ndiv(innerHTML={markup})\nstyle {markup}', { markup: trustHtml(body) })
 
     expect(html).toBe(`<div>${body}</div><style><p>a</p><\\!-- c --><style>b{}<\\/style><script>if (a < b) x()<\\/script></style>`)
   })
