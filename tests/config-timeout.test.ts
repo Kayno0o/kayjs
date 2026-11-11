@@ -10,7 +10,7 @@ it('has every command that ends by itself load the config within a time limit', 
   const unlimited: string[] = []
 
   for (const file of readdirSync(dir).filter(name => name.endsWith('.ts') && !WAITING.has(name))) {
-    if (/\bloadConfig\(/.test(await Bun.file(join(dir, file)).text()))
+    if ((/\bloadConfig\(/).test(await Bun.file(join(dir, file)).text()))
       unlimited.push(file)
   }
 

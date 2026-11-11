@@ -5,6 +5,7 @@ import { accessibilityLints } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
+import { CONTENT_LINTS } from './content-lints'
 import { I18N_LINTS } from './i18n-lints'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
@@ -486,14 +487,7 @@ export const LINTS = {
     wrong: 'export const posts = collection(\'src/content/posts\', { schema, trusted: true })',
     right: 'export const posts = collection(\'src/content/posts\', { schema })',
   },
-  'held-back-reference': {
-    level: 'warn',
-    group: 'code',
-    site: true,
-    summary: 'An entry shown on the site whose `reference()` field names an entry its collection holds back from production, a draft or one outside its `publishAt` and `unpublishAt` dates, so the page renders without it. `kay check` only notes it, as publishing the referenced entry fixes it, and the build does not fail.',
-    wrong: 'author: ada (in an entry shown, while authors/ada.md has `draft: true`)',
-    right: 'publish authors/ada.md, or point the reference at a shown entry',
-  },
+
   'old-bun-image': {
     level: 'deny',
     group: 'code',
@@ -705,6 +699,7 @@ export const LINTS = {
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
   ...ROUTE_LINTS,
+  ...CONTENT_LINTS,
   ...DEPRECATED_LINTS,
 } as const satisfies Record<string, Lint>
 

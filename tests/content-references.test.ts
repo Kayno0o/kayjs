@@ -107,19 +107,19 @@ describe('a dangling reference', () => {
       'authors/soon.md': '---\nname: Soon\nat: 2999-01-01\n---\n',
       'authors/bob.md': AUTHOR,
       'news/fr/shown.md': post('author: ada\neditors:\n  - soon\n  - bob\n'),
-      'news/fr/held.md': `${post('author: ada\n').replace('title: Hello', 'title: Held\ndraft: true')}`,
+      'news/fr/held.md': post('author: ada\n').replace('title: Hello', 'title: Held\ndraft: true'),
     })
 
     try {
       const config = join(copy, 'src/content.config.ts')
 
-      await Bun.write(config, `${(await Bun.file(config).text()).replace('collection(\'content/authors\', { schema: t.Object({ name: t.String() }) })', 'collection(\'content/authors\', { schema: t.Object({ name: t.String(), draft: t.Optional(t.Boolean()), at: t.Optional(t.Date()) }), draft: \'draft\', publishAt: \'at\' })').replace('title: t.String(),', 'title: t.String(), draft: t.Optional(t.Boolean()),').replace('localized: true,', 'localized: true, draft: \'draft\',')}`)
+      await Bun.write(config, (await Bun.file(config).text()).replace('collection(\'content/authors\', { schema: t.Object({ name: t.String() }) })', 'collection(\'content/authors\', { schema: t.Object({ name: t.String(), draft: t.Optional(t.Boolean()), at: t.Optional(t.Date()) }), draft: \'draft\', publishAt: \'at\' })').replace('title: t.String(),', 'title: t.String(), draft: t.Optional(t.Boolean()),').replace('localized: true,', 'localized: true, draft: \'draft\','))
 
       const { problems } = await checkContent(copy, undefined, true)
 
       expect(problems.map(problem => `${problem.file.split('/src/').at(-1)}:${problem.line} ${problem.code}`).sort()).toEqual([
         'content/news/fr/shown.md:4 held-back-reference',
-        'content/news/fr/shown.md:6 held-back-reference',
+        'content/news/fr/shown.md:5 held-back-reference',
       ])
       expect(await writeContentManifests(resolve(copy), join(copy, 'out'), undefined)).toBeGreaterThan(0)
     }
