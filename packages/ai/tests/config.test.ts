@@ -99,11 +99,25 @@ describe('the base URLs', () => {
     expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: env.AI_BASE_URL }).provider.name).toBe('openai')
   })
 
+  it('refuse credentials in the URL, without echoing them', () => {
+    for (const base of ['https://user:secret@api.example.com/v1', 'https://token@api.example.com/v1', 'http://user:secret@localhost:11434/v1']) {
+      expect(() => fresh({ NODE_ENV: 'production', AI_BASE_URL: base }), base).toThrow('holds credentials in the URL')
+      expect(() => openai({ baseUrl: base })).toThrow('openai({ baseUrl }) holds credentials')
+    }
+
+    try {
+      fresh({ NODE_ENV: 'production', AI_BASE_URL: 'https://user:secret@api.example.com/v1' })
+    }
+    catch (error) {
+      expect(String(error)).not.toContain('secret')
+    }
+  })
+
   it('treat only the loopback names as loopback, whatever resembles them', () => {
     for (const base of ['http://127.evil.com', 'http://localhost.evil.com', 'http://localhost@evil.com', 'http://127.0.0.1.evil.com', 'http://localhost./v1', 'http://[::ffff:127.0.0.1]', 'http://a.localhost'])
       expect(() => fresh({ NODE_ENV: 'production', AI_BASE_URL: base, OPENAI_API_KEY: 'k' }), base).toThrow('AI_INSECURE')
 
-    for (const base of ['http://LOCALHOST:1/v1', 'http://evil.com@localhost', 'http://127.1', 'http://[0:0:0:0:0:0:0:1]'])
+    for (const base of ['http://LOCALHOST:1/v1', 'http://127.1', 'http://[0:0:0:0:0:0:0:1]'])
       expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: base, OPENAI_API_KEY: 'k' }).provider.name, base).toBe('openai')
   })
 

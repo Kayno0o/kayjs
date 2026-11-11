@@ -19,5 +19,9 @@ export function checkedRoot(root: string, name: string, key: string | undefined,
   if (url.protocol === 'http:' && key !== undefined && insecure !== true && !loopback(url.hostname))
     throw configError('ai', 'baseUrl', `${name} is plain http to ${url.hostname} and a key would go out in clear; use https, or set AI_INSECURE=true (insecure: true) for a network you trust, such as a compose network`)
 
+  // A password in the address would travel in every error message and log line that names the root; the key option and the variables are where credentials go.
+  if (url.username !== '' || url.password !== '')
+    throw configError('ai', 'baseUrl', `${name} holds credentials in the URL; pass the key as apiKey (OPENAI_API_KEY, ANTHROPIC_API_KEY) instead`)
+
   return root
 }
