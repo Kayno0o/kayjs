@@ -9,11 +9,11 @@ import { decodeEntities, isFunctionAt } from './expression'
 import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
-import { addGroupChecked, groupValue, staticAttributeText } from './plan'
+import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from './plan'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'branches', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 // The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
 const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
 
@@ -418,6 +418,11 @@ export class DomTemplate extends TemplateWriter {
     return node
   }
 
+  // The helper an `innerHTML` expression goes through to be vouched for at runtime: none for a written-out string or a text import, and none for another property.
+  private markupHelper(property: string, expression: Span): string {
+    return property === 'innerHTML' && checksMarkup(this.src, expression, this.ownMarkup) ? helperName('checkedMarkup') : ''
+  }
+
   // The element's markup for the template, with what the code binds collected along the way.
   private templateOf(element: ElementNode, node: TemplateNode, bindings: Binding[]): string {
     const { b } = this
@@ -538,7 +543,7 @@ export class DomTemplate extends TemplateWriter {
       if (plan.content && !plan.content.bound) {
         const { property, expression } = plan.content
 
-        contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, (`).addSource(expression).add(')));')
+        contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, ${this.markupHelper(property, expression)}(`).addSource(expression).add(')));')
       }
 
       if (action) {

@@ -150,6 +150,29 @@ describe('a dynamic tag', () => {
   })
 })
 
+describe('innerHTML bound in a template in the browser', () => {
+  const mount = site({
+    'main.kay': '---\nimport { sanitizeHtml, trustHtml } from \'kay\'\n\nconst raw = \'<i>raw-tpl-1</i>\' as string\nconst cast = (\'<i>cast-tpl-1</i>\' + \'\') as unknown as ReturnType<typeof trustHtml>\n---\ndiv.written(innerHTML={\'<b>written-tpl-1</b>\'})\ndiv.trusted(innerHTML={trustHtml(raw)})\ndiv.sanitized(innerHTML={sanitizeHtml(raw)})\ndiv.cast(innerHTML={cast})\ndiv.empty(innerHTML={null as never})\n',
+  })
+
+  it('drops a string nothing vouched for even when a cast told the type check to trust it, and keeps written-out, trusted and sanitized markup', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { root, dispose } = await mount()
+
+    try {
+      expect(root.querySelector('.written')!.innerHTML).toBe('<b>written-tpl-1</b>')
+      expect(root.querySelector('.trusted')!.innerHTML).toBe('<i>raw-tpl-1</i>')
+      expect(root.querySelector('.sanitized')!.innerHTML).toBe('<i>raw-tpl-1</i>')
+      expect(root.querySelector('.cast')!.innerHTML).toBe('')
+      expect(root.querySelector('.empty')!.innerHTML).toBe('')
+    }
+    finally {
+      warn.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('a spread onto an element in the browser', () => {
   const mount1 = site({
     'main.kay': '---\nimport { sanitizeHtml, trustHtml } from \'kay\'\n\nconst raw = \'<i>raw-dom-1</i>\'\nconst marked = trustHtml(\'<b>marked-dom-1</b>\')\nconst loaded = JSON.parse(JSON.stringify({ innerHTML: marked }))\n---\ndiv.trusted({...{ innerHTML: marked }})\ndiv.sanitized({...{ innerHTML: sanitizeHtml(\'<u>s</u><script>x</script>\') }})\ndiv.raw({...{ innerHTML: raw }})\ndiv.derived({...{ innerHTML: `${marked}<img src=x>` }})\nsvg.drawn({...{ innerHTML: trustHtml(\'<path d="M0 0"/>\') }})\nsvg.rawsvg({...{ innerHTML: \'<path d="raw"/>\' }})\nmath.rawmath({...{ innerHTML: \'<mi>raw</mi>\' }})\ndiv.json({...loaded})\n',

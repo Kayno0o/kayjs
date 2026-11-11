@@ -9,16 +9,16 @@ import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf }
 import { decodeEntities } from './expression'
 import { addFieldDescribed } from './field-described'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addStyleArguments, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addStyleArguments, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
-import { addGroupChecked, BEHAVIOUR, fieldAriaOf, groupValue, staticAttributeText } from './plan'
+import { addGroupChecked, BEHAVIOUR, checkedContent, describedValue, fieldAriaOf, groupValue, staticAttributeText } from './plan'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'checkedMarkup', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
 
 // The helper writing an element's content expression that is not raw text: an `innerHTML` as the markup it is, anything else as text.
 function contentHelper(content: { property: string, raw: boolean } | undefined): string {
@@ -506,7 +506,7 @@ export class HtmlTemplate extends TemplateWriter {
     const plan = this.plan(element, this.options.errors)
     const { target, field, action, described, link } = plan
     // What writes the content or the selected value: a bound one reads its signal.
-    let content = plan.content && read(plan.content.expression, plan.content.bound)
+    let content = checkedContent(this.b, helperName('checkedMarkup'), this.src, this.ownMarkup, plan.content, plan.content && read(plan.content.expression, plan.content.bound))
     const selected = plan.selected && read(plan.selected.expression, plan.selected.bound)
     // The attribute a refused post's value goes back in, and what the template gives it otherwise.
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined

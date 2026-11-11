@@ -65,7 +65,12 @@ export function spreadAttributes<T>(source: T): T {
   return kept as T
 }
 
-// The markup of an `innerHTML` a spread brings, or nothing when none vouched for it: warned of in development each time, in production once per process.
+// What a template's `innerHTML={expression}` writes when the expression is not written out: a string nothing vouched for is dropped as a spread's is, so a value the type check was told to trust (`as`, `any`) cannot carry markup in. Rendered markup and `null` pass.
+export function checkedMarkup(value: unknown): unknown {
+  return typeof value === 'string' ? vouchedMarkup(value) : value
+}
+
+// The markup of an `innerHTML` a spread or a template brings, or nothing when none vouched for it: warned of in development each time, in production once per process.
 function vouchedMarkup(value: unknown): unknown {
   if (value == null || isVouched(value))
     return value
@@ -74,7 +79,7 @@ function vouchedMarkup(value: unknown): unknown {
 
   if (!production || !dropped) {
     dropped = production
-    kayLog('warn', 'a spread brought an `innerHTML` that nothing vouched for, so it was dropped: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made, called where it is used, as the process keeps only the markup most recently vouched for, for every user. Markup read from a request, a cookie or localStorage has to be vouched for again.')
+    kayLog('warn', 'an `innerHTML` that nothing vouched for was dropped: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made, called where it is used, as the process keeps only the markup most recently vouched for, for every user. Markup read from a request, a cookie or localStorage has to be vouched for again.')
   }
 
   return undefined

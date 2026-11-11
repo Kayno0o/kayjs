@@ -257,3 +257,30 @@ export function fieldAriaOf(element: string, type: PlannedAttribute | undefined,
 
   return { type, required: attributes.find(attribute => 'name' in attribute && attribute.name === 'aria-required'), native: attributes.find(attribute => 'name' in attribute && attribute.name === 'required'), unrequirable: type?.kind === 'text' && UNREQUIRABLE_TYPES.has(type.text.toLowerCase()) }
 }
+
+// A string or a template literal with no `${}` in it.
+const WRITTEN_OUT = /^(?:'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)$/s
+
+// Whether an `innerHTML` expression is read at runtime for a vouch: a string written out or a text import is the app's own, anything else is a value the type check may have been told to trust.
+export function checksMarkup(src: string, expression: Span, ownMarkup: (name: string, at: number) => boolean): boolean {
+  const text = src.slice(expression.start, expression.end).trim()
+
+  return !WRITTEN_OUT.test(text) && !ownMarkup(text, expression.start)
+}
+
+// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error after the template's own, else the template's own or none.
+export function describedValue(described: { id: string, own?: string }): string {
+  return `) ? ${JSON.stringify(described.own === undefined ? described.id : `${described.own} ${described.id}`)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
+}
+
+// The write of an `innerHTML` expression wrapped in `helper`, which vouches for it at runtime unless `checksMarkup` says the app wrote it out; any other content, or none, as it is.
+export function checkedContent(b: CodeBuilder, helper: string, src: string, ownMarkup: (name: string, at: number) => boolean, content: { property: string, raw: boolean, expression: Span } | undefined, write: (() => void) | undefined): (() => void) | undefined {
+  if (write === undefined || content?.property !== 'innerHTML' || content.raw || !checksMarkup(src, content.expression, ownMarkup))
+    return write
+
+  return () => {
+    b.add(`${helper}(`)
+    write()
+    b.add(')')
+  }
+}

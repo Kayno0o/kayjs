@@ -17,6 +17,7 @@ export const RAW_ELEMENTS = new Set(['script', 'style'])
 // Properties that set an element's content rather than an attribute.
 export const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
 const LESS_THAN = /</g
+
 const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
 // The attributes naming URLs of the site, which a path from its root in goes under its base.
@@ -101,11 +102,6 @@ export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
 }
 
-// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error after the template's own, else the template's own or none.
-export function describedValue(described: { id: string, own?: string }): string {
-  return `) ? ${JSON.stringify(described.own === undefined ? described.id : `${described.own} ${described.id}`)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
-}
-
 export interface StyleProp {
   property: string
   expression: Span
@@ -170,6 +166,9 @@ export interface ElementPlan extends ElementShape {
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
   constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
+
+  // Set by the codegen: whether a name at an offset is a project file imported as text, markup the app made.
+  ownMarkup: (name: string, at: number) => boolean = () => false
 
   // Set for the browser's build, which resolves the literal classes written together while compiling; the server resolves them while rendering, with the same table.
   protected classTable: ClassTable | undefined = undefined

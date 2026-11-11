@@ -9,7 +9,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite-types'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, isSlot, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
@@ -20,6 +20,7 @@ import { planLoads } from './load-plan'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
+import { ownMarkupOf } from './own-markup'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { reactiveValue } from './script'
 import { kayCtxImport } from './script-shared'
@@ -29,11 +30,6 @@ import { headTagProblem, sharedImports } from './validate'
 const HORIZONTAL_SPACE = /^[ \t]*/
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
-
-const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
-const KEY_COLON = /^\s*:/
-
-const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
 
 export interface GenerateOptions {
   name: string
@@ -193,6 +189,8 @@ class ModuleShell {
   // The loads of the fence a refresh may name, and the elements it may leave as the page shows them: server markup only.
   private readonly loadPlan: LoadPlan | undefined
   private jsxTemplate: JsxTemplate | undefined
+  // Whether a name at an offset is a project file imported as text, markup the app made.
+  private readonly ownMarkup: (name: string, at: number) => boolean
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
@@ -211,6 +209,7 @@ class ModuleShell {
     const owned = options.pageFile === true && facts.parts ? { ...facts, parts: { ...facts.parts, merges: false } } : facts
 
     this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
+    this.ownMarkup = ownMarkupOf(this.src, file.template, [...script.imports, ...this.fence?.imports ?? []])
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
     this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true && options.namedRefresh === true ? planLoads(this.file, this.fence, options.moduleId) : undefined
@@ -259,77 +258,8 @@ class ModuleShell {
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
       plain: this.plainNames(),
-      ownMarkup: this.ownMarkup(),
+      ownMarkup: this.ownMarkup,
     }, this.sites)
-  }
-
-  // Whether `name` at `at` is a project file imported as text, `import waves from './waves.svg' with { type: 'text' }`: markup the app made, as a written-out `innerHTML` is.
-  private ownMarkup(): (name: string, at: number) => boolean {
-    const bindings = [...this.script.imports, ...this.fence?.imports ?? []]
-    const own = new Set(bindings.filter(binding => !binding.typeOnly && binding.imported === 'default' && binding.source.startsWith('.') && !binding.source.split('/').includes('node_modules') && TEXT_ATTRIBUTE.test(this.src.slice(binding.declaration.start, binding.declaration.end))).map(binding => binding.local))
-
-    if (own.size === 0)
-      return () => false
-
-    // A loop item, a snippet or slot parameter, an alias or a `const` of the template may take an import's name, and then holds any string within the span it is bound in.
-    const shadows = new Map<string, Span[]>()
-    const bound = (span: Span | undefined, scope: Span, destructured = false) => {
-      if (span === undefined)
-        return
-
-      const text = this.src.slice(span.start, span.end)
-
-      for (const match of text.matchAll(WORD)) {
-        // The key of `{ key: name }` binds nothing.
-        if (destructured && KEY_COLON.test(text.slice(match.index + match[0].length)))
-          continue
-
-        if (own.has(match[0]))
-          shadows.set(match[0], [...shadows.get(match[0]) ?? [], scope])
-      }
-    }
-    const scan = (nodes: readonly Node[]) => {
-      for (const node of nodes) {
-        if (node.kind === 'for') {
-          // The item is not bound in the `else` block.
-          const loop = { start: node.start, end: node.children.at(-1)?.end ?? node.start }
-
-          bound(node.item, loop, true)
-          bound(node.index, loop)
-        }
-        else if (node.kind === 'slot') {
-          bound(node.params, node, true)
-        }
-        else if (node.kind === 'snippet') {
-          bound(node.params, node)
-        }
-        else if (node.kind === 'await') {
-          for (const branch of [node.resolved, node.rejected]) {
-            if (branch)
-              bound(branch.alias, branch, true)
-          }
-        }
-        else if (node.kind === 'try') {
-          if (node.rejected)
-            bound(node.rejected.alias, node.rejected, true)
-        }
-        else if (node.kind === 'const') {
-          // Seen by the lines after it at its indentation and by their children.
-          bound(node.pattern, { start: node.start, end: nodes.at(-1)?.end ?? node.end }, true)
-        }
-        else if (node.kind === 'if') {
-          for (const branch of node.branches)
-            bound(branch.alias, branch, true)
-        }
-
-        for (const block of childBlocks(node))
-          scan(block)
-      }
-    }
-
-    scan(this.file.template)
-
-    return (name, at) => own.has(name) && !shadows.get(name)?.some(span => at >= span.start && at < span.end)
   }
 
   run(): Generated {
@@ -604,12 +534,16 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } }).value(visible)
+      const server = new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } })
+
+      server.ownMarkup = this.ownMarkup
+      server.value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
       const dom = new DomTemplate(b, src, this.facts, errors, located, this.options.classTable)
 
+      dom.ownMarkup = this.ownMarkup
       dom.block(visible)
       b.add('\n}\n')
       b.add(dom.declarations(this.navigates()))

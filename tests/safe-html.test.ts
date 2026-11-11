@@ -2,8 +2,9 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { iconProps as fileIconProps, iconModule, installedIconSets } from '../src/build/icons'
+import { compileKay } from '../src/compiler'
 import { decodeCall } from '../src/runtime/action'
-import { child, dynamic, element, spreadAttributes } from '../src/runtime/html'
+import { checkedMarkup, child, dynamic, element, spreadAttributes } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { isVouched, vouch } from '../src/runtime/safe-html'
 import { sanitizeHtml, trustHtml } from '../src/runtime/sanitize'
@@ -193,6 +194,32 @@ describe('markup across JSON', () => {
     const fresh = decodeServerValue('[{"html":1},["SafeHtml",2],"!<b>only-the-server-1</b>"]') as { html: string }
 
     expect(isVouched(fresh.html)).toBe(true)
+  })
+
+  it('checks the innerHTML of a template as a spread is checked, passing rendered markup and null, and a template compiles the check only for a value not written out', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(checkedMarkup('<img src=x onerror=alert(1)>')).toBeUndefined()
+      expect(checkedMarkup(trustHtml('<b>t</b>'))).toBe('<b>t</b>')
+      expect(checkedMarkup(null)).toBeNull()
+      expect(checkedMarkup(undefined)).toBeUndefined()
+      expect(checkedMarkup(['x'])).toEqual(['x'])
+    }
+    finally {
+      warn.mockRestore()
+    }
+
+    const server = (source: string) => compileKay(source, 'page.kay', { output: 'html' }).tsx
+    const text = 'import waves from \'./waves.svg\' with { type: \'text\' }'
+    const checks = (code: string) => code.includes('KayCheckedMarkup(')
+
+    expect(checks(server('---\nconst { x } = props<{ x: string }>()\n---\ndiv(innerHTML={x})'))).toBe(true)
+    expect(checks(server('---\nconst { x } = props<{ x: string }>()\n---\ndiv(innerHTML={`<b>${x}</b>`})'))).toBe(true)
+    expect(checks(server('div(innerHTML={\'<b>hi</b>\'})'))).toBe(false)
+    expect(checks(server('div(innerHTML={`<b>hi</b>`})'))).toBe(false)
+    expect(checks(server('div(innerHTML="<b>hi</b>")'))).toBe(false)
+    expect(checks(server(`---\n${text}\n---\ndiv(innerHTML={waves})`))).toBe(false)
   })
 
   it('arrives plain when nothing vouched for it, and from the browser', () => {
