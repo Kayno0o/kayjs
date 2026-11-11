@@ -81,7 +81,7 @@ export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'wi
   const name = object === undefined && given !== undefined ? legacy.name : `${what}.rateLimit.max`
 
   if (!Number.isSafeInteger(max) || (max as number) < 1)
-    throw new KayError('config-invalid', `kay: ${name.includes('.') ? name : `${what}.${name}`} is ${String(max)}; it takes a whole number from 1${legacy.value === false || rateLimit === false ? ', or false for no limit' : ''}`)
+    throw new KayError('config-invalid', `kay: ${name.includes('.') ? name : `${what}.${name}`} is ${String(max)}; it takes a whole number from 1, or false for no limit`)
 
   return { max: max as number, windowMs: object === undefined ? MINUTE_MS : optionMs(object.window, `${what}.rateLimit.window`) }
 }
