@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { forwardOf, returnTarget } from '../src/forwardAuth'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp } from './helpers/app'
+import { authenticator } from './helpers/authenticator'
 
 const PASSWORD = 'correct horse battery'
 const PORTAL = 'https://auth.example.test'
@@ -192,6 +193,29 @@ describe('a proxy asking whether to let a request through', () => {
 
     await admin.callOk('twoFactor.enable', await totpCode(set.setup.secret, totpStep()))
     expect((await admin.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(204)
+  })
+
+  test('a session signed in with a passkey passes requireTwoFactor', async () => {
+    const app = testApp({ site: PORTAL, pages: true, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
+    const made = await app.auth.admin.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
+
+    if (!made.ok)
+      throw new Error('no user')
+
+    const device = authenticator({ origin: PORTAL })
+    const owner = app.browser()
+
+    await owner.post(`/sign-in/${made.user.id}`, {})
+
+    const { options } = await owner.callOk('passkeys.registrationOptions', { password: PASSWORD })
+
+    await owner.callOk('passkeys.register', await device.create(options), 'key')
+
+    const viaPasskey = app.browser()
+
+    expect((await owner.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(401)
+    await viaPasskey.call('passkeys.signIn', await device.get(await viaPasskey.call('passkeys.signInOptions')))
+    expect((await viaPasskey.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(204)
   })
 
   test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {
