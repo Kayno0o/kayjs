@@ -137,7 +137,7 @@ describe('savedHandler stop', () => {
 // The server's stream as a test drives it: the ids it pushes, and the moment it refuses.
 function pushing() {
   const heard: ((event: { value: string }) => void)[] = []
-  const refused: (() => void)[] = []
+
   let started = 0
 
   return {
@@ -151,21 +151,13 @@ function pushing() {
 
         return () => void heard.splice(heard.indexOf(listener), 1)
       },
-      onError: (listener: () => void) => {
-        refused.push(listener)
-
-        return () => void refused.splice(refused.indexOf(listener), 1)
-      },
     },
     hear: (value: string) => {
       for (const listener of heard.slice())
         listener({ value })
     },
-    refuse: () => {
-      for (const listener of refused.slice())
-        listener()
-    },
-    listeners: () => heard.length + refused.length,
+
+    listeners: () => heard.length,
   }
 }
 
@@ -188,17 +180,41 @@ describe('whenLive pushed', () => {
     expect(server.listeners()).toBe(0)
   })
 
-  test('keeps waiting when the replacing server still shows the old page', async () => {
+  test('reads the page again a few times when the server was replaced before the rebuild', async () => {
     const server = pushing()
     const page = pageSaying('old', 'old', 'new', 'new')
-    const live = whenLive('/talk', { instances: server.instances, pause: never, read: page.read })
+    // Only the retries of a replacement go by: the slow reads wait.
+    const retries = async (ms: number) => ms === 5000 ? undefined : never()
+    const live = whenLive('/talk', { instances: server.instances, pause: retries, read: page.read })
 
     await until(() => server.started === 1)
     server.hear('one')
     server.hear('two')
-    await until(() => page.reads.length === 2)
-    server.hear('three')
     expect(await live).toBe(true)
+    expect(page.reads).toHaveLength(4)
+  })
+
+  test('sees a page go live with no instance change at all, on its slow reads', async () => {
+    const server = pushing()
+    const page = pageSaying('old', 'old', 'new', 'new')
+    const delays: number[] = []
+    const slow = async (ms: number) => {
+      delays.push(ms)
+
+      return ms >= 15_000 ? undefined : never()
+    }
+
+    expect(await whenLive('/talk', { instances: server.instances, window: 120_000, pause: slow, read: page.read })).toBe(true)
+    expect(delays).toEqual([15_000, 15_000, 15_000])
+    expect(server.listeners()).toBe(0)
+  })
+
+  test('slows its reads to every 30 s after the first minute', async () => {
+    const delays: number[] = []
+    const pause = async (ms: number) => void delays.push(ms)
+
+    await whenLive('/talk', { instances: pushing().instances, window: 150_000, pause, read: pageSaying('same').read })
+    expect(delays.slice(0, 6)).toEqual([15_000, 15_000, 15_000, 15_000, 30_000, 30_000])
   })
 
   test('is not live once the window passes with no replacement', async () => {
@@ -218,16 +234,6 @@ describe('whenLive pushed', () => {
     expect(await live).toBe(false)
     expect(server.listeners()).toBe(0)
   })
-
-  test('reads on an interval when the server refuses the stream', async () => {
-    const server = pushing()
-    const page = pageSaying('old', 'old', 'new', 'new')
-    const live = whenLive('/talk', { instances: server.instances, ...quick, read: page.read })
-
-    await until(() => server.started === 1)
-    server.refuse()
-    expect(await live).toBe(true)
-  })
 })
 
 describe('savedHandler pushed', () => {
@@ -239,9 +245,9 @@ describe('savedHandler pushed', () => {
     const saved = savedHandler(() => '/talk', state => states.push(state), () => finished++, { instances: server.instances, read: page.read })
 
     saved({ rebuilding: true })
-    await until(() => server.listeners() === 2)
+    await until(() => server.listeners() === 1)
     saved({ rebuilding: true })
-    await until(() => server.listeners() === 2 && page.reads.length === 2)
+    await until(() => server.listeners() === 1 && page.reads.length === 2)
     server.hear('one')
     server.hear('two')
     await until(() => finished === 1)

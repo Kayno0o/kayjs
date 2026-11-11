@@ -807,7 +807,9 @@ Publish, Unpublish, Publish now and Clear schedule each change one field and sav
 
 If you decline the question about edits not saved when Delete takes you to the collection, Rename to the entry under its new slug, or Create to the new entry, the form is replaced by a notice with a link to where you were going.
 
-After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`. The editor learns of the rebuild from the server: once the site is replaced by the rebuilt one, the editor's connection to it opens on the new one, and the page is read then, with no timer. If the server refuses that connection, the page is read every 4 seconds instead.
+After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`.
+
+The editor learns of a rebuild from the server: once the rebuilt site replaces it, the editor's connection reopens on the new one and the page is read then, and again a few times over the next 20 seconds if it has not changed yet. The page is also read every 15 seconds, then every 30, for the whole wait, for a site built and served elsewhere, whose cms server never restarts.
 
 A commit shows on the site once it has rebuilt from it. The Forgejo, GitHub or GitLab token needs write access to the repository's contents, and the commit is the token's user's, unless `author` names an editor, which `github()` records as both author and committer and `gitlab()` as the author.
 

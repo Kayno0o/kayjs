@@ -6,5 +6,5 @@ import instanceApi from '../api/instance'
 export function serverInstances(): Instances {
   const link = stream(instanceApi, '/', { start: false })
 
-  return { start: () => link.start(), onData: link.onData, onError: link.onError }
+  return { start: () => link.start(), onData: link.onData }
 }

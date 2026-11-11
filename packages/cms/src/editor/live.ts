@@ -23,13 +23,11 @@ export async function readPage(url: string): Promise<string | undefined> {
   }
 }
 
-// The server's word of which instance answers, a stream that opens with its id and is held open: a rebuild replaces the instance, so the id heard next is another, with no page read to find it out.
+// The server's word of which instance answers, a stream that opens with its id and is held open: a rebuild that replaces the server changes the id heard next.
 export interface Instances {
   // Opens the stream; once is enough.
   start: () => void
   onData: (listener: (event: { value: string }) => void) => () => void
-  // Called when the server refuses the stream, so nothing pushes and the page is read on an interval instead.
-  onError: (listener: () => void) => () => void
 }
 
 interface Watch {
@@ -39,46 +37,56 @@ interface Watch {
   window?: number
   // Ends the watch early, as a newer save has taken over.
   cancelled?: () => boolean
-  // Where the server pushes the instance it runs, which makes the watch wait for a replacement instead of reading on an interval.
+  // Where the server pushes the instance it runs, which makes the watch read the page when it is replaced, besides the slow reads it always makes.
   instances?: Instances
-  // Ends the push watch as `cancelled` does for the interval one: a newer save, or the form going away.
+  // Ends the watch as `cancelled` does for the interval one: a newer save, or the form going away.
   signal?: AbortSignal
+  // How long the poll waits before its read number `round` (from 0), instead of `interval`.
+  delayOf?: (round: number) => number
 }
 
-// Reads the public page once the server behind the editor was replaced, which a rebuild does, and not on an interval: live when it then differs from how it stood right after the save and holds still for two reads. Reads on an interval after all when the server refuses the stream. False when the window passes first or the watch ends.
+// The slow reads that run beside the push: a site built and served elsewhere never replaces the cms's own server.
+const SLOW_MS = 15_000
+const SLOWER_MS = 30_000
+const SLOW_ROUNDS = 4
+// A replaced server may come before the rebuilt page does: the page is read again this often, this many times.
+const RETRY_MS = 5000
+const RETRIES = 4
+
+// Reads the public page when the server behind the editor is replaced, which a rebuild does, and retries a few times over the next seconds, and on a slow interval all the while, for a site that is built and served elsewhere: live when the page then differs from how it stood right after the save and holds still for two reads. False when the window passes first or the watch ends.
 async function whenReplaced(url: string, instances: Instances, watch: Watch): Promise<boolean> {
-  const { read = readPage, window = REBUILD_WINDOW, signal } = watch
+  const { read = readPage, pause = sleep, window = REBUILD_WINDOW, signal } = watch
   const before = await read(url) ?? ''
 
   return new Promise<boolean>((resolve) => {
-    const stops: (() => void)[] = []
+    let stop: (() => void) | undefined
+    let done = false
+    const ended = () => done
     let heard: string | undefined
     let checking = Promise.resolve()
     let timer: ReturnType<typeof setTimeout> | undefined
 
     const end = (live: boolean) => {
+      if (done)
+        return
+
+      done = true
       clearTimeout(timer)
-
-      for (const stop of stops)
-        stop()
-
+      stop?.()
       resolve(live)
     }
 
+    if (signal?.aborted === true) {
+      end(false)
+
+      return
+    }
+
     timer = setTimeout(end, window, false)
-
     signal?.addEventListener('abort', () => end(false), { once: true })
+    void (async () => end(await poll(url, before, { ...watch, delayOf: round => round < SLOW_ROUNDS ? SLOW_MS : SLOWER_MS, cancelled: () => done || watch.cancelled?.() === true })))()
 
-    stops.push(instances.onError(() => {
-      // Reads on an interval from here on, from how the page stood when the save went through, for a window of its own.
-      clearTimeout(timer)
-      for (const stop of stops)
-        stop()
-
-      void (async () => end(await poll(url, before, watch)))()
-    }))
-
-    stops.push(instances.onData(({ value }) => {
+    stop = instances.onData(({ value }) => {
       const replaced = heard !== undefined && value !== heard
 
       heard = value
@@ -92,24 +100,26 @@ async function whenReplaced(url: string, instances: Instances, watch: Watch): Pr
       checking = (async () => {
         await after
 
-        const now = await read(url)
+        for (let attempt = 0; attempt <= RETRIES && !ended(); attempt++) {
+          if (attempt > 0)
+            await pause(RETRY_MS)
 
-        if (now === undefined || now === before || signal?.aborted === true)
-          return
+          const now = done ? undefined : await read(url)
 
-        if (await read(url) === now)
-          end(true)
+          if (now !== undefined && now !== before && await read(url) === now) {
+            end(true)
+
+            return
+          }
+        }
       })()
-    }))
+    })
 
-    if (signal?.aborted === true)
-      end(false)
-    else
-      instances.start()
+    instances.start()
   })
 }
 
-// Reads the public page until it differs from how it stood right after the save and then holds still for two reads, so a rebuild that is under way, or a page that changes on each request, does not count. False when the window passes first or the watch is cancelled: a page that does not show the saved fields never turns live. With `instances` the page is read when the server's instance changes instead, as long as the server pushes it.
+// Reads the public page until it differs from how it stood right after the save and then holds still for two reads, so a rebuild that is under way, or a page that changes on each request, does not count. False when the window passes first or the watch is cancelled: a page that does not show the saved fields never turns live. With `instances` the page is also read at once when the server's instance changes.
 export async function whenLive(url: string, watch: Watch = {}): Promise<boolean> {
   if (watch.instances)
     return whenReplaced(url, watch.instances, watch)
@@ -117,11 +127,14 @@ export async function whenLive(url: string, watch: Watch = {}): Promise<boolean>
   return poll(url, await (watch.read ?? readPage)(url) ?? '', watch)
 }
 
-async function poll(url: string, before: string, { read = readPage, pause = sleep, interval = LIVE_INTERVAL, window = REBUILD_WINDOW, cancelled = () => false, signal }: Watch): Promise<boolean> {
+async function poll(url: string, before: string, { read = readPage, pause = sleep, interval = LIVE_INTERVAL, window = REBUILD_WINDOW, cancelled = () => false, signal, delayOf }: Watch): Promise<boolean> {
   let candidate: string | undefined
 
-  for (let waited = 0; waited < window; waited += interval) {
-    await pause(interval)
+  for (let waited = 0, round = 0; waited < window; round++) {
+    const delay = delayOf?.(round) ?? interval
+
+    waited += delay
+    await pause(delay)
 
     if (cancelled() || signal?.aborted === true)
       return false
