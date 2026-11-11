@@ -105,10 +105,6 @@ function unverifiedMaxAge(email: EmailOptions | undefined): number | undefined {
   return email.requireVerified ?? true ? DEFAULT_UNVERIFIED_MAX_AGE : undefined
 }
 
-function inactiveAge(inactive: { maxAge: Duration } | undefined): { inactiveMaxAge: number } | undefined {
-  return inactive && { inactiveMaxAge: wholeSeconds(inactive.maxAge, 'inactive.maxAge') }
-}
-
 function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated' }): number {
   return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
 }
@@ -319,7 +315,6 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
 
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
-    ...inactiveAge(options.inactive),
     onExport: hooked(options.exportData, user => ({ user })),
     onEvent: options.onEvent,
 

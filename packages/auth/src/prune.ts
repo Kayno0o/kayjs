@@ -33,17 +33,16 @@ async function prune(core: Core, settings: SessionSettings, now: number): Promis
 
   await pruneStale(core, now, 'guest')
   await pruneStale(core, now, 'unverified')
-  await pruneStale(core, now, 'inactive')
 }
 
 function staleKept(core: Core): boolean {
-  return core.store.users.staleGuests !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined) || (core.inactiveMaxAge !== undefined && core.store.users.staleInactive !== undefined)
+  return core.store.users.staleGuests !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined)
 }
 
-// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first, as do those with no session seen for `inactive.maxAge` when it is set. One whose `onDelete` fails stays, to be tried again the next run, and the run goes on past it and past any that is kept.
-async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified' | 'inactive'): Promise<void> {
-  const maxAge = { guest: core.guestMaxAge, unverified: core.unverifiedMaxAge, inactive: core.inactiveMaxAge }[kind]
-  const list = { guest: core.store.users.staleGuests, unverified: core.store.users.staleUnverified, inactive: core.store.users.staleInactive }[kind]
+// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run, and the run goes on past it and past any that is kept.
+async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified'): Promise<void> {
+  const maxAge = kind === 'guest' ? core.guestMaxAge : core.unverifiedMaxAge
+  const list = kind === 'guest' ? core.store.users.staleGuests : core.store.users.staleUnverified
 
   if (maxAge === undefined || !list)
     return
@@ -64,7 +63,7 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified' 
           continue
 
         try {
-          if (await stillStale(core, account.id, now, kind)) {
+          if (await stillStale(core, account.id, kind)) {
             await (await import('./erase')).eraseUser(core, account)
             deleted++
 
@@ -89,8 +88,8 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified' 
   }
 }
 
-// Read again just before the erase: a guest registered since the list was read is a real account, an inactive one who signed in since is back, and an unverified or inactive one given a role beyond the default ones was set up on purpose, as registering again does not replace it.
-async function stillStale(core: Core, id: string, now: number, kind: 'guest' | 'unverified' | 'inactive'): Promise<boolean> {
+// Read again just before the erase: a guest registered since the list was read is a real account, and an unverified one given a role beyond the default ones was set up on purpose, as registering again does not replace it.
+async function stillStale(core: Core, id: string, kind: 'guest' | 'unverified'): Promise<boolean> {
   const current = await core.store.users.get(id)
 
   if (!current)
@@ -99,13 +98,5 @@ async function stillStale(core: Core, id: string, now: number, kind: 'guest' | '
   if (kind === 'guest')
     return current.guest
 
-  if (current.guest || !current.roles.every(role => core.defaultRoles.includes(role)))
-    return false
-
-  if (kind === 'unverified')
-    return current.emailVerifiedAt === null
-
-  const seen = new Date(now - core.inactiveMaxAge! * 1000)
-
-  return current.createdAt < seen && (await core.store.sessions.listByUser(id)).every(session => session.lastSeenAt < seen)
+  return !current.guest && current.emailVerifiedAt === null && current.roles.every(role => core.defaultRoles.includes(role))
 }

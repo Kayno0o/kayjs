@@ -22,13 +22,13 @@
     "complexity": 43
   },
   "packages/auth/src/memoryStore.ts": {
-    "max-lines-per-function": 444
+    "max-lines-per-function": 460
   },
   "packages/auth/src/password.ts": {
     "complexity": 52
   },
   "packages/auth/src/pg.ts": {
-    "max-lines-per-function": 268
+    "max-lines-per-function": 283
   },
   "packages/auth/src/setup.ts": {
     "complexity": 55

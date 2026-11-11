@@ -84,8 +84,6 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 
   // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `beforeDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
-  // Opt-in, off by default: deletes a user who is not a guest, holds only the default roles and has had no session seen for `maxAge` (a string such as '2y'), calling `beforeDelete` as for any user. An account never signed in is dated by its creation. Sessions are deleted once past their lifetime, so `maxAge` should be well past it. The store prunes at most once an hour.
-  inactive?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
   exportData?: ((event: { user: User }) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. A throw is logged and reported with source `auth.onEvent`. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.

@@ -315,8 +315,6 @@ When the guest registers, the account keeps their id, so the app's data stays th
 
 An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`, where an account never verified may be in use and goes once its session ends. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
-Inactive accounts stay until you say otherwise. Set `inactive: { maxAge: '2y' }` in `authCore` to delete a user, once per hour in the background, who is not a guest, holds only the `defaultRoles` and has no session seen for that long; an account that never signed in is dated by its creation. Sessions are deleted once past their lifetime, so keep `maxAge` well beyond it. `beforeDelete` is called as for any user, and a store without `staleInactive` keeps every account.
-
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
 `signUp: false` in `authCore` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
