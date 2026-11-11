@@ -113,12 +113,12 @@ const RELEASE_TRIES = 3
 // Events kept for a wait that does not name them yet, per run: past it the oldest is dropped.
 export const INBOX_LIMIT = 50
 
-// The most characters a run's kept results may take in all, which a worker reads whole each time it takes the run: a run past this fails, as one that has to keep large results elsewhere and return their ids.
+// The most characters a run's input, events and kept results may take in all, which a worker reads whole each time it takes the run: a run past this fails, as one that has to keep large results elsewhere and return their ids.
 export const PAYLOAD_LIMIT = 2_000_000
 
 function withinLimit(size: number, name: string, run: string, steps: number): void {
   if (size > PAYLOAD_LIMIT)
-    throw new GiveUpError(`kay: workflow('${name}') run '${run}' keeps ${Math.round(size / 1000)} KB of results after ${steps} steps, past the ${PAYLOAD_LIMIT / 1000} KB a run may keep: return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs`)
+    throw new GiveUpError(`kay: workflow('${name}') run '${run}' keeps ${Math.round(size / 1000)} KB of input, events and results after ${steps} steps, past the ${PAYLOAD_LIMIT / 1000} KB a run may keep: return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs`)
 }
 
 // A wait without timeout is due never: the last instant a Date holds.
@@ -221,9 +221,12 @@ function keptChange<Input>(name: string, head: Payload<Input>, memo: Entry[], ro
   const values = memo.slice(rows.stored).map(entry => stringify(entry))
   const size = rows.bytes + values.reduce((sum, text) => sum + text.length, 0)
 
-  withinLimit(size, name, head.run, memo.length)
+  const payload = stringify({ ...head, kept: { count: memo.length, bytes: size, last: memo.slice(-STEP_NAMES).map(labelOf) } })
 
-  return { change: { payload: stringify({ ...head, kept: { count: memo.length, bytes: size, last: memo.slice(-STEP_NAMES).map(labelOf) } }), runAt, steps: { from: rows.stored, values } }, size }
+  // The input and the events no wait named count with the results, as a worker reads them all each time it takes the run.
+  withinLimit(size + payload.length, name, head.run, memo.length)
+
+  return { change: { payload, runAt, steps: { from: rows.stored, values } }, size }
 }
 
 // What an event wakes a waiting run with: its result added as a step, a row of its own on a store that keeps them, moving a run kept in the old shape to rows with it, else a member of the payload's list.

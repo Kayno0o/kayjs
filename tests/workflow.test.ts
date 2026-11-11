@@ -480,6 +480,92 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(seen).toEqual(['one', 'one', 'two'])
   })
 
+  it('fails a run whose input and events no wait named pass the limit, as its results do', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(noop)
+    const store = await open()
+    const failures: string[] = []
+    const flow = workflow<string>(named(), async ({ step }) => {
+      await step.run('one', () => 'a')
+    }, { store, onError: ({ error }) => void failures.push((error as Error).message) })
+    const id = await flow.start('x'.repeat(PAYLOAD_LIMIT))
+
+    await flow.drain()
+    expect(failures[0]).toContain('past the')
+    expect(await flow.status(id)).toMatchObject({ status: 'failed' })
+
+    const events = workflow<undefined>(named(), async ({ step }) => {
+      await step.run('one', () => 'a')
+      await step.sleep('1h')
+      await step.run('two', () => 'b')
+    }, { store, onError: ({ error }) => void failures.push((error as Error).message) })
+    const other = await events.start()
+
+    await events.drain()
+    await events.send(other, 'big', 'y'.repeat(PAYLOAD_LIMIT))
+    later(2 * MINUTE * 60)
+    await events.drain()
+    expect(failures).toHaveLength(2)
+    expect(await events.status(other)).toMatchObject({ status: 'failed' })
+    errors.mockRestore()
+  })
+
+  it('takes a run again after a crash following a kept step, reading the results back without running them again', async () => {
+    const store = await open()
+    const calls: string[] = []
+    const seen: string[] = []
+    let crash = true
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      seen.push(await step.run('one', () => {
+        calls.push('one')
+
+        return 'first'
+      }))
+
+      if (crash) {
+        crash = false
+
+        throw new Error('crashed between steps')
+      }
+
+      seen.push(await step.run('two', () => 'second'))
+    }, { store, backoff: '1s' })
+    const id = await flow.start()
+
+    await flow.drain()
+    expect(await flow.status(id)).toMatchObject({ status: 'sleeping', steps: 1 })
+    later(2000)
+    await flow.drain()
+    expect(calls).toEqual(['one'])
+    expect(seen).toEqual(['first', 'first', 'second'])
+  })
+
+  it('resumes a run revived after it failed from the steps it kept', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(noop)
+    const store = await open()
+    const calls: string[] = []
+    let fail = true
+    const name = named()
+    const flow = workflow<undefined>(name, async ({ step }) => {
+      await step.run('one', () => void calls.push('one'))
+      await step.run('two', () => {
+        if (fail)
+          throw new Error('boom')
+
+        calls.push('two')
+      })
+    }, { store, attempts: 1 })
+    const id = await flow.start()
+
+    await flow.drain()
+    expect(await flow.status(id)).toMatchObject({ status: 'failed', steps: 1 })
+    fail = false
+    expect(await store.revive!((await store.failed(`workflow:${name}`))[0]!.id, Date.now())).toBe(true)
+    await flow.drain()
+    expect(calls).toEqual(['one', 'two'])
+    expect(await flow.status(id)).toBeUndefined()
+    errors.mockRestore()
+  })
+
   it('keeps a run\'s results as rows of the store, the payload staying small, and drops them with the run', async () => {
     const store = await open()
     const name = named()
