@@ -2,7 +2,7 @@ import type { Command } from './command'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { configCheckOptions, writeShadowTypes } from '../check'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { asksForHelp, printFailure, projectRoot, takeFormat } from './command'
 import { dropStaleLintCache } from './lint-cache'
@@ -48,7 +48,7 @@ export const lint: Command = {
     buildingWithoutEnv()
 
     try {
-      await writeShadowTypes(root, configCheckOptions(await loadConfig(root)))
+      await writeShadowTypes(root, configCheckOptions(await loadConfigWithin(root)))
     }
     catch (error) {
       printFailure('lint', error, format)

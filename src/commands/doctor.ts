@@ -9,7 +9,7 @@ import { Database } from 'bun:sqlite'
 import { version as runningVersion } from '../../package.json'
 import { KAY_DIR } from '../build/assets'
 import { bunProblem } from '../bun'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { readDevAddress } from '../dev/address'
 import { loopbackTaken } from '../dev/loopback'
 import { sqlitePath } from '../server/app-database'
@@ -159,7 +159,7 @@ function versionsCheck(root: string): Check {
 
 async function configCheck(root: string): Promise<Check> {
   try {
-    const config = await loadConfig(root)
+    const config = await loadConfigWithin(root)
 
     if (config.i18n !== undefined)
       localeSettings(config.i18n)

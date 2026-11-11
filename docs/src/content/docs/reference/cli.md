@@ -5,6 +5,8 @@ description: The kay commands to scaffold, run, check, build and format a projec
 ---
 Every command takes an optional project directory, the current one by default, and prints its usage and options for `--help`. An unknown command, or an option or argument a command does not take, prints the error with a hint, the nearest command or option for a typo, and exits 2; a command that ran and failed exits 1. `kay --help` lists every command, `kay --version` prints the version, and `--plain` or `--color never` turns the colour off.
 
+A command that ends by itself reads `kay.config.ts` for 30 seconds at most, and fails naming it when the config awaits something that never settles. `kay start`, `kay render` and `kay dev` wait as long as it takes.
+
 ```sh
 bunx -p @kaynooo/kayjs kay new my-app
 cd my-app

@@ -17,8 +17,8 @@ export async function loadConfig(root: string, fresh = false): Promise<LoadedCon
 
 const CONFIG_TIMEOUT = 30_000
 
-// `loadConfig` for a command or an editor that must not hang on a config awaiting something that never comes, such as a database that does not answer: it fails after `timeout` ms, the import left to finish or not.
-export async function loadConfigWithin(root: string, timeout = CONFIG_TIMEOUT): Promise<KayConfig> {
+// `loadConfig` for a command that ends by itself, or an editor, which must not hang on a config awaiting something that never comes, such as a database that does not answer: it fails after `timeout` ms, the import left to finish or not.
+export async function loadConfigWithin(root: string, timeout = CONFIG_TIMEOUT): Promise<LoadedConfig> {
   let timer: ReturnType<typeof setTimeout> | undefined
 
   try {

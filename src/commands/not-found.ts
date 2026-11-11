@@ -4,7 +4,7 @@ import type { Command } from './command'
 import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { databaseOf } from '../server/app-database'
 import { buildingWithoutEnv } from '../server/env-state'
 import { answeredBy, notFoundHome, openMissing } from '../server/not-found'
@@ -50,7 +50,7 @@ export const notFound: Command = {
     buildingWithoutEnv()
 
     try {
-      const config = await withStdoutOnStderr(async () => loadConfig(root))
+      const config = await withStdoutOnStderr(async () => loadConfigWithin(root))
       const home = typeof values.file === 'string' ? { kind: 'sqlite', file: values.file } as const : notFoundHome(databaseOf(config.store), root)
       const where = home.kind === 'pg' ? 'the app\'s Postgres database' : relative(process.cwd(), home.file) || home.file
       const redirects = Object.keys(config.redirects ?? {})
@@ -152,7 +152,7 @@ export const notFound: Command = {
 }
 
 // The host and served-path rules of a runtime redirect.
-async function runtimeRules(root: string, config: Awaited<ReturnType<typeof loadConfig>>, dryRun: boolean): Promise<RuntimeRules> {
+async function runtimeRules(root: string, config: Awaited<ReturnType<typeof loadConfigWithin>>, dryRun: boolean): Promise<RuntimeRules> {
   // Loaded here: the type checker's modules are heavy, and only this path needs them.
   const [{ configCheckOptions }, { servedPathsOf }] = await Promise.all([import('../check'), import('../check/shadow-types')])
   const served = await servedPathsOf(root, configCheckOptions(config))

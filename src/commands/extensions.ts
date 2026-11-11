@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 
 const SPACES = /\s+/
@@ -32,7 +32,7 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
 
   buildingWithoutEnv()
 
-  const config = await loadConfig(root)
+  const config = await loadConfigWithin(root)
   const commands: ExtensionCommand[] = []
   const clashes: string[] = []
   const groups = new Set(own.filter(name => name.includes(' ')).map(name => name.slice(0, name.indexOf(' '))))

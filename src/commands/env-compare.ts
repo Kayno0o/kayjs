@@ -2,7 +2,7 @@ import type { CheckDiagnostic } from '../check'
 import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { CONTENT_CONFIG } from '../project'
 import { fileFormOf } from '../server/env-state'
 
@@ -228,7 +228,7 @@ async function resolveImport(base: string): Promise<string | undefined> {
 // The content config the project names, `src/content.config.ts` by default, for the config may not load.
 async function contentConfig(root: string): Promise<string> {
   try {
-    return resolve(root, (await loadConfig(root)).contentConfig ?? CONTENT_CONFIG)
+    return resolve(root, (await loadConfigWithin(root)).contentConfig ?? CONTENT_CONFIG)
   }
   catch {
     return resolve(root, CONTENT_CONFIG)

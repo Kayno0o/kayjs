@@ -3,7 +3,7 @@ import type { Command } from './command'
 import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { messagesFile } from '../server/i18n'
 import { acceptDrafts } from '../server/message-drafts'
@@ -135,7 +135,7 @@ async function translated(command: string, path: string | undefined, format: 'te
   let config: KayConfig
 
   try {
-    config = await loadConfig(root)
+    config = await loadConfigWithin(root)
   }
   catch (error) {
     printFailure(command, error, format)

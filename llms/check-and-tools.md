@@ -1,5 +1,7 @@
 # Check, inspect and tool commands
 
+A command that ends by itself reads `kay.config.ts` for at most 30 seconds and fails naming it when the config awaits something that never settles; `start`, `render` and `dev` wait as long as it takes.
+
 ## Common tasks
 
 ### Check the project

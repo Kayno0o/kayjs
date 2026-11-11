@@ -6,7 +6,7 @@ import process from 'node:process'
 import { A11yRefusedError, auditSite } from '../a11y/audit'
 import { declaration, failed, formatReport, NO_PAGE_AUDITED, reportOf, tally } from '../a11y/report'
 import { KAY_DIR } from '../build/assets'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
 
@@ -36,7 +36,7 @@ export const a11y: Command = {
     buildingWithoutEnv()
 
     try {
-      const config = await loadConfig(root)
+      const config = await loadConfigWithin(root)
       const standard = (values.standard as Standard | undefined) ?? (FRENCH.test(config.i18n?.defaultLocale ?? config.lang ?? '') ? 'rgaa' : 'wcag')
       const quiet = values.quiet === true || format === 'json'
       const audit = await withStdoutOnStderr(async () => auditSite(root, config, (page) => {

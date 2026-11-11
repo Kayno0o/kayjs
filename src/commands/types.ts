@@ -1,6 +1,6 @@
 import type { Command } from './command'
 import { configCheckOptions, writeShadowTypes } from '../check'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, projectRoot } from './command'
 
@@ -23,7 +23,7 @@ export const types: Command = {
     buildingWithoutEnv()
 
     try {
-      const { files } = await writeShadowTypes(root, configCheckOptions(await loadConfig(root)))
+      const { files } = await writeShadowTypes(root, configCheckOptions(await loadConfigWithin(root)))
 
       if (format === 'json')
         printDocument({ files: files.size, dir: '.kay/types' })

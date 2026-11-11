@@ -4,7 +4,7 @@ import type { Command } from './command'
 import type { EnvFiles } from './env-compare'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { projectPaths } from '../project'
 import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, fileFormOf, listingEnv } from '../server/env-state'
@@ -108,7 +108,7 @@ export const env: Command = {
 
 // The files kay.config.ts names, else the project's own; none when `env` is `false`.
 async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
-  const { env } = await loadConfig(root)
+  const { env } = await loadConfigWithin(root)
 
   return env === false ? undefined : env ?? await defaultEnvFiles(root)
 }
@@ -124,7 +124,7 @@ function resolvedUnder(root: string, path: string): string[] {
 }
 
 export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
-  const config = await loadConfig(root)
+  const config = await loadConfigWithin(root)
   const declared = listingEnv()
   const shown = (file: string) => relative(root, file)
   const unread: { file: string, error: string }[] = []

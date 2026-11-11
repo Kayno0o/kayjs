@@ -9,7 +9,7 @@ import { formatBuildReport } from '../build/report'
 import { KayCompileError } from '../build/transform'
 import { fromCompile } from '../check/shadow-types'
 import { errorCodeOf } from '../compiler/errors'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { ContentError } from '../content/validate'
 import { buildingWithoutEnv } from '../server/env-state'
 import { ExportError } from '../server/prerender'
@@ -83,7 +83,7 @@ export const build: Command = {
     let result: BuildResult
 
     try {
-      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true, values['deny-warnings'] === true, values['verify-load'] === true), onProgress: progress?.update })
+      result = await buildProject(root, await loadConfigWithin(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true, values['deny-warnings'] === true, values['verify-load'] === true), onProgress: progress?.update })
     }
     finally {
       progress?.stop()
@@ -184,7 +184,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
   process.on('exit', ended)
 
   try {
-    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfig(root), { ...options, onStage, onProgress }))
+    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfigWithin(root), { ...options, onStage, onProgress }))
   }
   catch (error) {
     process.off('exit', ended)

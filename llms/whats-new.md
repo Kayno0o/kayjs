@@ -24,6 +24,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
+- `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
+- `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
 - The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).
 - `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
 - `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).

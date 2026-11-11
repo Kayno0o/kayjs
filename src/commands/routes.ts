@@ -14,7 +14,7 @@ import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { extensionApps, PLUGINS_DIR, serverExtensions } from '../config-extensions'
-import { loadConfig } from '../config-loader'
+import { loadConfigWithin } from '../config-loader'
 import { isRouteOf } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
@@ -102,7 +102,7 @@ export const routes: Command = {
 }
 
 export async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
-  const config = await loadConfig(root)
+  const config = await loadConfigWithin(root)
   const content = await checkContent(root, config.contentConfig, config.site !== undefined)
   const { routes: routesDir } = projectPaths(root, config)
   const mounts = routeMounts(root, config.extensions)
