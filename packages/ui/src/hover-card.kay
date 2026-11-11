@@ -159,6 +159,10 @@ effect(() => {
 
   clearTimeout(leaving)
 
+  // A card that moved to another anchor from under the pointer never gets its pointerleave.
+  if (target)
+    hovered = false
+
   if (!target && panel?.isConnected && panel.matches(':popover-open')) {
     closeSoon()
 

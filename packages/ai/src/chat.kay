@@ -412,6 +412,12 @@ function recordKey(event: KeyboardEvent) {
 }
 
 // The button beside the field resets, then puts the cursor back in the field.
+// The status line is for an empty conversation only: a turn ends its announcement.
+effect(() => {
+  if (history().length > 0)
+    fresh = false
+})
+
 function startOver() {
   reset()
   queueMicrotask(() => field?.focus())
