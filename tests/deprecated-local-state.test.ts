@@ -53,6 +53,21 @@ describe('deprecated-local-state', () => {
     }
   })
 
+  it('leaves the words of a template and the names it binds itself alone', async () => {
+    const page = `---\n${HEAD}---\np call notes.pending() to count what waits\nmarkdown\n  Use notes.pending() here\nfor notes of lists\n  p {notes.pending()}\nawait load() then notes\n  p {notes.pending()}\nSlotted\n  @row(notes)\n    p {notes.pending()}\np {notes.pending()}\n`
+    const root = await project({ 'src/routes/page.kay': page })
+
+    try {
+      const found = await localState(root, {})
+
+      expect(found).toHaveLength(1)
+      expect(found[0]!.line).toBe(page.split('\n').length - 1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves other receivers alone: another module\'s local, a name bound twice, an emitter and other properties', async () => {
     const other = 'import { local } from \'./mine\'\n\nconst notes = local()\n\nnotes.pending()\nnotes.status()\n'
     const twice = `${HEAD}\nexport function again(notes: { pending: () => number }) {\n  return notes.pending()\n}\nfunction other() {\n  const notes = new Map()\n\n  return notes\n}\n`

@@ -1,35 +1,33 @@
 import type { CheckDiagnostic } from '.'
 import type { Fix, Span } from '../compiler/ast'
 import { extname } from 'node:path'
+import { parseProgram } from '../compiler/estree'
 import { importEdits, prologueLength } from '../compiler/import-edits'
 import { offsetAt } from '../compiler/mapping'
 import { parseExpanded } from '../compiler/markdown-block'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { unknownName } from './export-homes'
 
-const FIRST_IMPORT = /^import\b/m
 const STARTS_BLANK = /^[ \t]*\r?\n/
-const IMPORT_FROM = /^import[^\n]*from\s*(['"])[^\n]*$/m
 const TRAILING_COMMA = /,$/
 // Names common enough in an app that a missing one is as likely a local forgotten as kay's: their import is offered, never applied unasked.
 const GENERIC = new Set(['html', 'image', 'session', 'mount', 'head', 'island', 'cache', 'collection', 'files', 'pages'])
-const STATEMENT_END = /;\s*$/
-const REGEXP_CHARACTERS = /[.*+?^${}()|[\]\\/]/g
 
-// The edits that import `wanted` (names by entry) into a TypeScript module: into its import of that entry, else a line before its first import, written in the quotes and the semicolon style its imports use.
+// The edits that import `wanted` (names by entry) into a TypeScript module: into its import of that entry, else a line before its first import, written in the quotes and the semicolon style its imports use. The imports are the module's own statements, not a line of a template literal or a comment that starts with the word.
 export function moduleImportEdits(source: string, wanted: ReadonlyMap<string, string[]>): Fix['edits'] {
-  const first = IMPORT_FROM.exec(source)
-  const quote = first?.[1] ?? '\''
-  const semicolon = first !== null && STATEMENT_END.test(first[0])
+  const imports = parseProgram(source, { recover: true }).program.body.filter(statement => statement.type === 'ImportDeclaration')
+  const first = imports[0]
+  const quote = first === undefined ? '\'' : source[first.source.start]!
+  const semicolon = first !== undefined && source[first.end - 1] === ';'
   const edits: Fix['edits'] = []
   const lines: string[] = []
 
   for (const [entry, names] of wanted) {
-    const declaration = new RegExp(`^import\\s*\\{([^}]*)\\}\\s*from\\s*(['"])${entry.replaceAll(REGEXP_CHARACTERS, '\\$&')}\\2`, 'm').exec(source)
+    const declaration = imports.find(statement => statement.importKind === 'value' && statement.source.value === entry && statement.specifiers.length > 0 && statement.specifiers.every(specifier => specifier.type === 'ImportSpecifier'))
 
     if (declaration) {
-      const open = declaration.index + declaration[0].indexOf('{') + 1
-      const kept = declaration[1]!.trimEnd().replace(TRAILING_COMMA, '').trimEnd()
+      const open = declaration.start + source.slice(declaration.start, declaration.end).indexOf('{') + 1
+      const kept = source.slice(open, source.lastIndexOf('}', declaration.source.start)).trimEnd().replace(TRAILING_COMMA, '').trimEnd()
 
       edits.push({ start: open + kept.length, end: open + kept.length, text: `${kept === '' ? ' ' : ', '}${names.join(', ')}` })
     }
@@ -39,12 +37,11 @@ export function moduleImportEdits(source: string, wanted: ReadonlyMap<string, st
   }
 
   if (lines.length > 0) {
-    const imports = FIRST_IMPORT.exec(source)
-    const at = imports?.index ?? prologueLength(source)
+    const at = first?.start ?? prologueLength(source)
     const eol = source.includes('\r\n') ? '\r\n' : '\n'
     const rest = source.slice(at)
 
-    edits.push({ start: at, end: at, text: `${lines.join(eol)}${eol}${imports || rest.trim() === '' || STARTS_BLANK.test(rest) ? '' : eol}` })
+    edits.push({ start: at, end: at, text: `${lines.join(eol)}${eol}${first || rest.trim() === '' || STARTS_BLANK.test(rest) ? '' : eol}` })
   }
 
   return edits

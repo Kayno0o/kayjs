@@ -785,6 +785,16 @@ describe('brace-in-attribute', () => {
     expect(fixes('---\n---\np the const name here\na(title="{name}") go\n')).toEqual([false])
   })
 
+  it('offers the safe fix only where the name is in scope: a loop row outside its loop, or a declaration inside a function, is no name there', () => {
+    const fixes = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.flatMap(d => d.fixes ?? []).map(fix => fix.safe)
+
+    expect(fixes('---\nconst items = [1]\n---\nfor item of items\n  a(title="{item}") go\na(title="{item}") go\n')).toEqual([true, false])
+    expect(fixes('---\nconst load = async () => 1\n---\nawait load() then count\n  a(title="{count}") go\ncatch error\n  a(title="{count}") go\n')).toEqual([true, false])
+    expect(fixes('---\nfunction format() {\n  const label = "a"\n  return label\n}\n---\na(title="{label}") go\n')).toEqual([false])
+    expect(fixes('---\nconst name = "a"\n---\na(title="{name}") go\n')).toEqual([true])
+    expect(fixes('const label = "a"\na(title="{label}") go\nconst other = "b"\na(title="{other}") go\na(title="{later}") go\nconst later = 1\n')).toEqual([true, true, false])
+  })
+
   it('collapses a class value running over lines in the template literal', () => {
     expect(fixed(`${head}a(class="\n  p-1 {name}\n") go\n`)).toEqual([`${head}a(class={\`p-1 \${name}\`}) go\n`])
   })

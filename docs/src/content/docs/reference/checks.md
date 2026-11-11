@@ -103,7 +103,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-route` | deny | security | A route no guard covers that does not set `guards: false`, on a site with a guard of its own or with `requireGuards: true`: the server answers it 403 |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `island-marker` | deny | islands | `--- island` on a page, layout or special page, which are never islands |
-| `island-prop` | deny | islands | A component that is not an island passing one a value its type says cannot be sent: a function, a block with parameters, a symbol or an object holding one; `--- island` on the component is the fix |
+| `island-prop` | deny | islands | A component that is not an island passing one a value its type says cannot be sent: a function, a block with parameters, a symbol or an object holding one; `--- island` on the component is the fix, which `--fix` leaves for you to apply |
 | `hydration-mismatch` | deny | islands | An island reading the clock, `Math.random()` or a locale-less `Intl` or `toLocale*String` while it renders, which the server and the browser compute apart; allow a deliberate read with `// kay-allow hydration-mismatch` |
 | `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a timer, a promise callback or after an `await` (nothing stops them), or in an inline handler (each event adds one); call them in the component script or inside `root()`; a named or conditional handler is not seen |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
@@ -112,10 +112,10 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `default-locale-path` | warn | i18n | An `i18n.paths` entry translating a pattern for the default locale, whose links never localize |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
-| `old-bun-image` | deny | code | A Dockerfile building from a Bun older than the one kay needs |
+| `old-bun-image` | deny | code | A Dockerfile building from a Bun older than the one kay needs; `--fix` moves the tag, and leaves an image pinned by digest |
 | `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |
 | `unused-selector` | warn | code | A rule in a `--- style` fence whose last compound no element of the template can have |
-| `unreachable-selector` | deny | code | A rule in a `--- style` fence ending on `:root`, `html` or `body`, which the scope attribute never matches |
+| `unreachable-selector` | deny | code | A rule in a `--- style` fence ending on `:root`, `html` or `body`, which the scope attribute never matches; `:global(...)` is the offered fix, which `--fix` leaves |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height`, unless its classes or `style` reserve the box, as `aspect-video w-full` |
 | `large-public-image` | warn | performance | An `img`, a CSS `url()` or `image-set()` string, a social card `meta`, `seo.image`, or a Markdown image, HTML `img` or frontmatter `image:` using a public image over 256 KiB, as a path or an address under `site` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |

@@ -2,6 +2,8 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node } from '../compiler/estree'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
+import { parseKay } from '../compiler/parser'
+import { boundAt, proseSpans, templateScopes } from '../compiler/template-scopes'
 import { walk } from './ast'
 import { bindings, boundOnce } from './bindings'
 import { scan } from './renamed-exports'
@@ -23,7 +25,7 @@ export async function localState(root: string, options: CheckOptions): Promise<C
   if (lintLevel('deprecated-local-state', options.lints) === 'allow')
     return []
 
-  return scan(root, options, 'deprecated-local-state', LOCAL, ({ parsed, source, report }) => {
+  return scan(root, options, 'deprecated-local-state', LOCAL, ({ file, parsed, source, report }) => {
     const receivers = new Set<string>()
 
     for (const { ast } of parsed) {
@@ -92,7 +94,11 @@ export async function localState(root: string, options: CheckOptions): Promise<C
 
     // The template, outside the fences: the same reads written as text.
     const fences = parsed.map(({ base, text }) => [base, base + text.length] as const)
-    const outside = (index: number) => !fences.some(([from, to]) => index >= from && index < to)
+    const template = file.endsWith('.kay') ? parseKay(source) : undefined
+    const scopes = template ? templateScopes(template) : []
+    const prose = template ? proseSpans(template) : []
+    // A name the template binds itself, or a word of its text, is no read of the collection.
+    const outside = (index: number, name: string) => !fences.some(([from, to]) => index >= from && index < to) && !prose.some(span => index >= span.start && index < span.end) && !boundAt(scopes, name, index)
 
     for (const name of receivers) {
       const own = escaped(name)
@@ -100,7 +106,7 @@ export async function localState(root: string, options: CheckOptions): Promise<C
       const compared = new Set<number>()
 
       for (const match of source.matchAll(new RegExp(`${head}(status)\\(\\)\\s*(?:[!=]==?)\\s*(['"])([\\w-]+)\\2`, 'g'))) {
-        if (!outside(match.index))
+        if (!outside(match.index, name))
           continue
 
         const at = match.index + name.length + 1
@@ -113,7 +119,7 @@ export async function localState(root: string, options: CheckOptions): Promise<C
       for (const match of source.matchAll(new RegExp(`${head}(pending|status)\\b`, 'g'))) {
         const at = match.index + name.length + 1
 
-        if (!outside(match.index) || compared.has(at))
+        if (!outside(match.index, name) || compared.has(at))
           continue
 
         if (match[1] === 'pending')

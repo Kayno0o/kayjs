@@ -164,11 +164,12 @@ describe('unreachable-selector', () => {
     expect(lints('--- style\n@media (prefers-color-scheme: dark) { :root { --x: 1 } }\n---\n.card hi\n', 'unreachable-selector').map(d => d.at)).toEqual([':root'])
   })
 
-  it('has a safe fix writing :global(...) around the compound, before a pseudo-element', () => {
+  it('offers a fix writing :global(...) around the compound, before a pseudo-element, that `--fix` leaves: it turns a dead rule live', () => {
     const source = '--- style\nhtml, body.dark, html::before { x: y }\n---\np hi\n'
     const fixes = compileKay(source, 'src/list.kay', { check: true }).diagnostics.flatMap(d => d.fixes ?? [])
 
-    expect(fixes.every(fix => fix.safe === true)).toBe(true)
+    expect(fixes).toHaveLength(3)
+    expect(fixes.some(fix => fix.safe)).toBe(false)
     expect(fixed(source)).toEqual([
       '--- style\n:global(html), body.dark, html::before { x: y }\n---\np hi\n',
       '--- style\nhtml, :global(body.dark), html::before { x: y }\n---\np hi\n',

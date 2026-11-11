@@ -44,13 +44,14 @@ describe('old-bun-image', () => {
     })
   })
 
-  it('fixes each stage to the oldest Bun kay runs on, keeping the variant and dropping a digest', async () => {
+  it('fixes each stage to the oldest Bun kay runs on, keeping the variant, and leaves a stage pinned by digest to be fixed by hand', async () => {
     await withFiles({ Dockerfile: `FROM oven/bun:1.4.3 AS build\nFROM oven/bun:1.4.2-alpine@${DIGEST} AS run\nCOPY --from=build /app /app\n` }, async (root) => {
       const problems = dockerfileProblems(root, undefined, '>=1.4.4')
 
-      expect(await applySafeFixes(root, problems)).toBe(2)
-      expect(await Bun.file(join(root, 'Dockerfile')).text()).toBe('FROM oven/bun:1.4.4 AS build\nFROM oven/bun:1.4.4-alpine AS run\nCOPY --from=build /app /app\n')
-      expect(dockerfileProblems(root, undefined, '>=1.4.4')).toEqual([])
+      expect(problems.map(problem => problem.fixes![0]!.safe)).toEqual([true, false])
+      expect(await applySafeFixes(root, problems)).toBe(1)
+      expect(await Bun.file(join(root, 'Dockerfile')).text()).toBe(`FROM oven/bun:1.4.4 AS build\nFROM oven/bun:1.4.2-alpine@${DIGEST} AS run\nCOPY --from=build /app /app\n`)
+      expect(dockerfileProblems(root, undefined, '>=1.4.4')).toHaveLength(1)
     })
   })
 

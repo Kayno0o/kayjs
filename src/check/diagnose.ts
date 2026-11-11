@@ -89,7 +89,7 @@ function blockName(message: string, source: string, span: Span | undefined): str
   return written !== undefined && PLAIN_NAME.test(written) && message.includes('kayAlways: true') && !message.includes('kayPath') ? written : undefined
 }
 
-// What an island-prop lint offers: `--- island` on the component, which is safe where the value is always a function.
+// What an island-prop lint offers: `--- island` on the component. It is offered and never applied by `--fix`, as it turns a static component into an island that ships its code to the browser.
 function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: ShadowFile): Pick<Diagnosed, 'fixes' | 'help'> | undefined {
   if (lint.code !== 'island-prop')
     return undefined
@@ -102,8 +102,7 @@ function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: S
 
   const fix = islandFence(file)
 
-  // A `static` pin is the author's decision: the fix is offered and never applied by `--fix`.
-  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true && file.pin?.kind !== 'static' }] }
+  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: false }] }
 }
 
 // A block with no parameters is markup, so one a component calls with values is a type error on `Element`: the help names the parameters its prop is typed with.

@@ -50,7 +50,7 @@ export function dockerfileProblems(root: string, levels: LintLevels | undefined,
         code: 'old-bun-image',
         message: `${name} builds from \`oven/bun:${version}\`, under the Bun ${range} kay needs`,
         help: `build from \`oven/bun:${minimum}${variant}\`${digest === undefined ? '' : ', dropping its digest'}, or newer`,
-        fixes: [{ title: `build from oven/bun:${minimum}${variant}`, safe: true, edits: [{ start, end: match.index + whole.length, text: `${minimum}${variant}` }] }],
+        fixes: [{ title: `build from oven/bun:${minimum}${variant}`, safe: digest === undefined, edits: [{ start, end: match.index + whole.length, text: `${minimum}${variant}` }] }],
       })
     }
   }

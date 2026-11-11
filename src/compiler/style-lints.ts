@@ -166,7 +166,7 @@ export function styleLints(file: KayFile): Diagnostic[] {
           message: `\`${part.ownText.trim()}\` can never match in a \`--- style\` fence`,
           note: 'kay ends each selector on the component\'s scope attribute, and `html`, `body` and `:root` carry none',
           help: 'write the element as `:global(...)`, or style it from a stylesheet the page imports',
-          ...wrapped === undefined || wrapped === '' ? {} : { fixes: [{ title: `Write \`:global(${wrapped})\``, safe: true, edits: [{ start: from, end: from + wrapped.length, text: `:global(${wrapped})` }] }] },
+          ...wrapped === undefined || wrapped === '' ? {} : { fixes: [{ title: `Write \`:global(${wrapped})\``, safe: false, edits: [{ start: from, end: from + wrapped.length, text: `:global(${wrapped})` }] }] },
           checkOnly: true,
         })
       }

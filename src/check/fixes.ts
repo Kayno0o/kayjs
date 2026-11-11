@@ -30,7 +30,8 @@ export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[
 
     const source = await Bun.file(file).text()
 
-    await Bun.write(file, taken.sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source))
+    // Applied from the end backwards; at one start a replacement goes before an insertion, which then lands in front of what it replaced.
+    await Bun.write(file, taken.sort((a, b) => b.start - a.start || b.end - a.end).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source))
   }
 
   return fixed

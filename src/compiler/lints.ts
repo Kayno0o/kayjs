@@ -1,4 +1,5 @@
 import type { Diagnostic, ElementNode, ForNode, KayFile, Node, TextChunk } from './ast'
+import type { Scope } from './template-scopes'
 import { accessibilityLints } from './a11y'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
@@ -8,6 +9,7 @@ import { VOID_ELEMENTS } from './markup'
 import { nestingLints } from './nesting'
 import { ROUTE_LINTS } from './route-lints'
 import { styleLints } from './style-lints'
+import { declaredBefore, templateScopes } from './template-scopes'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
 export type LintLevel = 'allow' | 'warn' | 'deny'
@@ -863,6 +865,8 @@ export function templateLints(file: KayFile): Diagnostic[] {
     return false
   })
 
+  const scopes = templateScopes(file)
+
   // `literal` inside an element whose text shows code, where a tag is meant as written.
   walkNodes(file.template, false, (node, literal) => {
     if (node.kind === 'text') {
@@ -872,7 +876,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
       }
     }
     else if (node.kind === 'element') {
-      bracesInAttributes(file.source, node, found)
+      bracesInAttributes(file.source, node, scopes, found)
 
       return literal || LITERAL_TEXT.has(node.name)
     }
@@ -889,17 +893,8 @@ export function templateLints(file: KayFile): Diagnostic[] {
   return [...found, ...nestingLints(file), ...accessibilityLints(file), ...styleLints(file)]
 }
 
-// Whether the file declares `name` as a value: a `const`, a prop or import, a loop or `then` name.
-function declares(source: string, name: string): boolean {
-  const word = name.replaceAll('$', '\\$')
-
-  const line = '^[ \\t]*(?:export[ \\t]+)?(?:async[ \\t]+)?'
-
-  return new RegExp(`${line}(?:const|let|var|function|snippet|class)[ \\t]+${word}(?![\\w$])|${line}import[ \\t]+(?:type[ \\t]+)?${word}(?![\\w$])|^[ \\t]*(?:await\\b[^\\n]*[ \\t])?(?:then|catch)[ \\t]+${word}(?![\\w$])|${line}(?:const|let|var|import|for)\\b[^\\n]*[{\\[,][ \\t]*${word}[ \\t]*(?:[,}\\]:=]|of\\b|as\\b)|^[ \\t]*for[ \\t]+[^\\n]*\\b${word}[ \\t]+of\\b`, 'm').test(source)
-}
-
 // `title="Hello {name}"`: a quoted value is literal, so the braces would reach the page.
-function bracesInAttributes(source: string, element: ElementNode, found: Diagnostic[]) {
+function bracesInAttributes(source: string, element: ElementNode, scopes: Scope[], found: Diagnostic[]) {
   // A component's quoted prop is its own string to read, such as a `{n}` placeholder it fills in.
   if (element.component)
     return
@@ -919,8 +914,8 @@ function bracesInAttributes(source: string, element: ElementNode, found: Diagnos
     const replacement = whole ? `{${first[1]}}` : `{\`${text.replaceAll(BRACED, (_, expression: string) => `\${${expression}}`)}\`}`
     const start = attribute.value.start - 1
     const end = attribute.value.end + 1
-    // The fix reads the name, so it is safe only for one the file declares.
-    const safe = declares(source, first[1]!.split(PATH_START)[0]!)
+    // The fix reads the name, so it is safe only for one the fences declare or the template binds where the attribute stands.
+    const safe = declaredBefore(source, first[1]!.split(PATH_START)[0]!, attribute.value.start, scopes)
 
     found.push({
       start: attribute.value.start + first.index,

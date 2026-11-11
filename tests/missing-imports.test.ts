@@ -18,6 +18,15 @@ describe('a name a file uses with no import', () => {
     expect(apply('import { x } from "./x";\n', { kay: ['signal'] })).toBe('import { signal } from "kay";\nimport { x } from "./x";\n')
   })
 
+  it('finds its place in the module\'s own import statements, not in a template literal or a comment holding a line that starts with import', () => {
+    const apply = (source: string, wanted: Record<string, string[]>) => moduleImportEdits(source, new Map(Object.entries(wanted))).toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+
+    expect(apply('const sql = `\nimport { s } from \'kay/server\'\n`\nexport const a = 1\n', { kay: ['signal'] })).toBe('import { signal } from \'kay\'\n\nconst sql = `\nimport { s } from \'kay/server\'\n`\nexport const a = 1\n')
+    expect(apply('/*\nimport { s } from "kay/server"\n*/\nimport { x } from \'./x\'\n', { 'kay/server': ['files'] })).toBe('/*\nimport { s } from "kay/server"\n*/\nimport { files } from \'kay/server\'\nimport { x } from \'./x\'\n')
+    expect(apply('const sql = `\nimport { s } from \'kay/server\'\n`\nimport { y } from \'./y\'\n', { 'kay/server': ['files'] })).toBe('const sql = `\nimport { s } from \'kay/server\'\n`\nimport { files } from \'kay/server\'\nimport { y } from \'./y\'\n')
+    expect(apply('import.meta.dir\n', { kay: ['signal'] })).toBe('import { signal } from \'kay\'\n\nimport.meta.dir\n')
+  })
+
   async function project(files: Record<string, string>): Promise<string> {
     const root = await scratchDir('missing-imports-')
     const tsconfig = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] })
