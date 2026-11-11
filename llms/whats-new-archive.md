@@ -2,6 +2,20 @@
 
 What each release before 1.93 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased (continued)
+
+- `kay lint --help` and `kay test --help` open with what kay adds, then print keslint's and `bun test`'s help; `kay test --format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` as one document with the report on stderr, `kay lint --format json` hands keslint ESLint's JSON, and `kay new --help` describes `--editor` ([commands](check-and-tools.md)).
+- A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
+- A call whose action redirects rejects with `ActionRedirectError` (its `location`) once the browser has gone there, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
+- `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([Effects and lifecycle](effects.md)).
+- A `required` FormField and `describeField({ required })` write the native `required` as well as `aria-required`, server-rendered, and RadioGroup, Segmented, Rating, Checkbox, Toggle and ChipGroup take a typed `required` ([FormField](../packages/ui/llms/forms-and-steps.md)).
+- kayjs-auth's stock register page draws a purpose line and a link to the privacy policy under the form with `pages: { privacy, purpose }`, and a production start warns when sign-up is open without `privacy` ([auth setup](../packages/auth/llms/setup.md)).
+- A request an API route's or an endpoint file's guards refuse now counts against its `rateLimit`, and over the limit gets 429 in place of the refusal, so a password is no longer guessed at full speed; `basicAuth` also limits wrong credentials per client, 10 every 5 minutes, with its own `rateLimit` option (`false` turns it off) ([rate limits](rate-limits.md), [API routes](api-routes.md)).
+- `localePath()`, `localize()` and `alternate()` collapse a leading `//` or `/\` of the path they get, so a language switcher on a path the visitor typed never links to another site ([locales](locales.md)).
+- A YAML anchor bomb or an alias pointing at its own node in an entry's frontmatter or data file is refused as an entry problem, instead of exhausting memory at build ([content](content.md)).
+- A `local()` mirror and its queue are emptied when another person signs in, not only at sign-out: kayjs-auth tags each sign-in and each start or end of an impersonation, and `forgetLocalMirrors(request, person)` does it for an app's own ([local collections](local-collections.md)).
+- An effect that never settles is stopped after 1000 rounds and named in development, and the page's other effects keep running instead of staying stale ([components](components.md)).
+
 ## 1.92.0
 
 - kayjs-ui `AppHeader`, `SiteNav`, `TabNav` and `SideNav` given no links draw nothing to navigate with: no nav landmark, no menu toggle opening an empty popover, no menu button, so the `class={{ nav: links.length === 0 ? 'hidden' : '' }}` workaround goes ([navigation](../packages/ui/llms/tables-navigation-and-layout.md)).

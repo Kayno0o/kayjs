@@ -36,17 +36,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `RowsField` shows an action's refusal of a row cell (`<name>_<key>.<n>`, `<name>.<n>`, or a bare `<name>_<key>`) under its row instead of a toast, takes `size`, and a FormField shows a refusal of one item of a list (`tags.1`) ([forms](../packages/ui/llms/forms.md#rowsfield)).
 - kayjs-ui: `TextInput` and `Combobox` take `icon`, drawn inside the box at its start with the text after it and hidden from screen readers, and a `type="search"` TextInput draws the search icon on its own (`icon={false}` leaves it out) ([forms](../packages/ui/llms/forms.md)).
 - An action call and an api `call()` take `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md), [api from islands](api-from-islands.md)).
-- `kay lint --help` and `kay test --help` open with what kay adds, then print keslint's and `bun test`'s help; `kay test --format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` as one document with the report on stderr, `kay lint --format json` hands keslint ESLint's JSON, and `kay new --help` describes `--editor` ([commands](check-and-tools.md)).
-- A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
-- A call whose action redirects rejects with `ActionRedirectError` (its `location`) once the browser has gone there, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
-- `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([Effects and lifecycle](effects.md)).
-- A `required` FormField and `describeField({ required })` write the native `required` as well as `aria-required`, server-rendered, and RadioGroup, Segmented, Rating, Checkbox, Toggle and ChipGroup take a typed `required` ([FormField](../packages/ui/llms/forms-and-steps.md)).
-- kayjs-auth's stock register page draws a purpose line and a link to the privacy policy under the form with `pages: { privacy, purpose }`, and a production start warns when sign-up is open without `privacy` ([auth setup](../packages/auth/llms/setup.md)).
-- A request an API route's or an endpoint file's guards refuse now counts against its `rateLimit`, and over the limit gets 429 in place of the refusal, so a password is no longer guessed at full speed; `basicAuth` also limits wrong credentials per client, 10 every 5 minutes, with its own `rateLimit` option (`false` turns it off) ([rate limits](rate-limits.md), [API routes](api-routes.md)).
-- `localePath()`, `localize()` and `alternate()` collapse a leading `//` or `/\` of the path they get, so a language switcher on a path the visitor typed never links to another site ([locales](locales.md)).
-- A YAML anchor bomb or an alias pointing at its own node in an entry's frontmatter or data file is refused as an entry problem, instead of exhausting memory at build ([content](content.md)).
-- A `local()` mirror and its queue are emptied when another person signs in, not only at sign-out: kayjs-auth tags each sign-in and each start or end of an impersonation, and `forgetLocalMirrors(request, person)` does it for an app's own ([local collections](local-collections.md)).
-- An effect that never settles is stopped after 1000 rounds and named in development, and the page's other effects keep running instead of staying stale ([components](components.md)).
+
+The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
 ## 1.95.0
 
