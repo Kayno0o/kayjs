@@ -13,7 +13,7 @@ const columns: Column<ConfiguredRedirect>[] = [
   { key: 'status', header: wording('cms.redirects.status', 'Status') },
 ]
 ---
-Table.kcms-missing.kcms-config-redirects(label={wording('cms.redirects.configured', 'Redirects of the configuration')} columns={columns} rows={redirects} rowKey={row => row.from})
+Table.kcms-missing.kcms-config-redirects(label={wording('cms.redirects.configTitle', 'Redirects in kay.config.ts')} columns={columns} rows={redirects} rowKey={row => row.from})
   @cell(row, column)
     if column.key === 'to' && row.status === 410
       small {wording('cms.redirects.gone', 'Gone, no target')}

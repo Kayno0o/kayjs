@@ -174,6 +174,7 @@ export default defineMessages({
     field: {
       add: 'Ajouter',
       clear: 'Vider',
+      colorPicker: '{label}, sélecteur de couleur',
       counter: '{count} / {max}',
       invalidJson: '{field} n\'est pas du JSON valide',
       item: 'Élément {n}',
@@ -276,6 +277,7 @@ export default defineMessages({
     locales: {
       body: 'Corps',
       compare: 'Comparer',
+      compareAria: 'Comparer avec le texte en {locale}',
       comparing: 'Texte en {locale}',
       complete: 'Toutes les entrées sont traduites',
       empty: 'Vide : {locale} a un texte.',
@@ -287,10 +289,12 @@ export default defineMessages({
       same: 'Identique à {locale} : pas encore traduit.',
       sameShort: 'identique',
       stopCompare: 'Masquer',
+      stopCompareAria: 'Masquer le texte en {locale}',
       title: 'Traductions',
       translate: 'Traduire en {locale}',
     },
     media: {
+      table: 'Fichiers envoyés',
       blocked: 'Les fichiers ne peuvent pas être listés',
       cancel: 'Annuler',
       deleteOne: 'Supprimer {name} ? Vérifiez qu\'aucune page ni aucun formulaire en cours ne l\'utilise : c\'est définitif.',
@@ -319,7 +323,7 @@ export default defineMessages({
     },
     missing: {
       add: 'Ajouter la redirection',
-      addAria: 'Rediriger {path} vers {target}',
+      addAria: 'Ajouter la redirection de {path} vers {target}',
       clear: 'Vider la liste',
       clearMessage: 'Oublier toutes les adresses listées ? Elles reviennent dans la liste quand des visiteurs les redemandent.',
       copy: 'Copier la redirection',
@@ -471,6 +475,7 @@ export default defineMessages({
       label: 'Partager l\'aperçu',
       noPage: 'Cette entrée n\'a pas de page à partager',
       refused: 'Pas de lien',
+
       shown: 'Lien valable une semaine : {link}',
     },
     slug: {
@@ -508,6 +513,7 @@ export default defineMessages({
       renameUnread: '{names} n\'a pas pu être lu pour trouver les entrées référençant {slug}, le renommage n\'a donc pas eu lieu : réessayez',
     },
     table: {
+      entries: 'Entrées de {collection}',
       editing: 'En cours de modification par {names}',
       editingUnnamed: 'En cours de modification',
       actions: 'Actions',
@@ -564,6 +570,7 @@ export default defineMessages({
       tooSmall: '{name} fait {width} sur {height} pixels. {need}',
     },
     uploads: {
+      table: 'Fichiers inutilisés',
       blocked: 'Les fichiers ne peuvent pas être vérifiés',
       blockedHint: '{reasons}. Rien n\'est listé tant qu\'une entrée ou une collection est illisible, puisqu\'elle peut utiliser n\'importe quel fichier.',
       collectionRead: '{collection} ne peut pas être lue',

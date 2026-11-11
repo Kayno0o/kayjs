@@ -68,6 +68,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.entry.viewLive',
   'cms.field.add',
   'cms.field.clear',
+  'cms.field.colorPicker',
   'cms.field.counter',
   'cms.field.invalidJson',
   'cms.field.item',
