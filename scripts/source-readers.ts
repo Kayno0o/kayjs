@@ -13,6 +13,7 @@ export const SOURCE_READERS = [
   'tests/kept-pages.test.ts',
   'tests/log-prefix.test.ts',
   'tests/markers.test.ts',
+  'tests/new-tab-marks.test.ts',
   'tests/packages.test.ts',
   'tests/pg-order.test.ts',
   'tests/privacy-storage.test.ts',
