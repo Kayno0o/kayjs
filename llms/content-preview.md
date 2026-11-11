@@ -2,6 +2,12 @@
 
 Preview links, share links and the editor of a CMS; loaded collections are in [Loaded collections](content-cms.md).
 
+## Common tasks
+
+- Show drafts to an editor on the live site: [Preview mode](#preview-mode).
+- Share one draft entry with someone who cannot sign in, and revoke its links: [Preview mode](#preview-mode).
+- Edit the collections from the site itself: [A CMS editing the collections](#a-cms-editing-the-collections).
+
 ## Reference
 
 ### Preview mode

@@ -1,5 +1,12 @@
 # Audit a site's accessibility
 
+## Common tasks
+
+- Audit every page and draft the accessibility statement: `kay a11y`, or `kay a11y --standard wcag --declaration docs/accessibility.md`.
+- Fail CI on a finding: run `kay a11y --quiet`, which exits 1 on any finding or failed page.
+
+## Reference
+
 `kay a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--dry-run] [--format text|json] [--quiet]` boots the project's server as `kay dev` does, opens every page the build knows in one headless Chrome (`BUN_CHROME_PATH`, else the PATH) and runs axe-core on it, which the app installs as a dev dependency ([peers](checks.md#peer-packages)); it needs no config:
 
 ```sh
