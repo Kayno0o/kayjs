@@ -2,6 +2,7 @@
 import type { JSX, Snippet, Source } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { FieldSize } from './field-look'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
@@ -33,7 +34,7 @@ const { source, tone = source === undefined ? 'neutral' : 'danger', label, size 
   retryLabel?: string | undefined
   label?: string | undefined
   // `sm` is a line of text without the box, such as under a form's fields.
-  size?: 'sm' | 'md' | undefined
+  size?: Exclude<FieldSize, 'lg'> | undefined
   // Drawn before the text: the icon of the tone for `true`, or an icon of your own. Without it a notice draws none.
   icon?: IconSlot | IconProps | boolean | undefined
   // At the end of the notice, such as a retry button or a link: a `@actions` block.

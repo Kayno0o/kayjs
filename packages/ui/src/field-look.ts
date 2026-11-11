@@ -1,3 +1,4 @@
+import type { Size } from './size'
 import { effect, markInvalid, untrack } from 'kay'
 
 // The utilities a Checkbox and a FormField draw with, which ContactForm's messages and kayjs-cms's field inputs take from here so a restyle of one reaches the copies.
@@ -18,7 +19,7 @@ export const FIELD_MESSAGE = {
 // The label type a Slider, a ColorInput and a FormField write their label in, and a Segmented or a ChipGroup given `showLabel` its own.
 export const LABEL_TEXT = 'text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]'
 
-export type FieldSize = 'sm' | 'md' | 'lg'
+export type FieldSize = Exclude<Size, 'xs'>
 
 // The look a TextInput, a Textarea and a Select draw their box with, less its padding and type, which FIELD_BOX and FIELD_SELECT_BOX add; `aria-invalid` turns the line and the focus ring to the danger colour. 'kui-field-input' is the field's name for an app's CSS and the skins, and the hook of the rule that gives the raw controls of a FormField this look. The focus outline doubles the accent border, so focus reads by more than a colour change.
 export const FIELD_LOOK = 'kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]'

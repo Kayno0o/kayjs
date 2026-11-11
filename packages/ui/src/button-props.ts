@@ -1,6 +1,7 @@
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { Size } from './size'
 import type { Tone } from './tone'
 import { lockedButton } from './locked-button'
 
@@ -10,7 +11,7 @@ export interface Look {
   variant?: 'solid' | 'ghost' | 'inline' | undefined
   // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one, `warning` and `info` for a cautious or an informing one.
   tone?: Tone | undefined
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  size?: Size | undefined
   // Drawn before the label.
   icon?: IconSlot | IconProps | undefined
   // Spins in place of the icon while what the press started is under way.

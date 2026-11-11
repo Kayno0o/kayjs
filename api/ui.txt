@@ -122,7 +122,7 @@ interface DescriptionItem
 function dismissToast(id: number, reason?: ToastDismissReason): void
 
 [.] FieldSize
-type FieldSize = 'sm' | 'md' | 'lg'
+type FieldSize = Exclude<Size, 'xs'>
 
 [.] FilterField
 interface FilterField
@@ -429,6 +429,9 @@ function scheme(cookie?: string): "dark" | "light" | undefined
 interface SideNavGroup
   label?: string | undefined
   links: readonly NavLink[]
+
+[.] Size
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 [.] SortDirection
 type SortDirection = 'asc' | 'desc'
@@ -821,7 +824,7 @@ component default
   placement?: PopoverPlacement | undefined
   rest?: ((people: readonly GroupedAvatar[]) => Element) | undefined
   retryLabel?: string | undefined
-  size?: "lg" | "md" | "sm" | "xl" | "xs" | undefined
+  size?: "xl" | Size | undefined
 
 [./avatar.kay] default
 component default
@@ -910,7 +913,7 @@ component default
   class?: string | undefined | { root?: string | undefined; }
   href?: string | undefined
   label: string
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   tone?: Tone | undefined
   type?: "button" | "reset" | "submit" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
@@ -1261,7 +1264,7 @@ component default
   open?: boolean | undefined
   pendingLabel?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   success?: string | undefined
   title?: string | undefined
   tone?: Tone | undefined
@@ -1329,7 +1332,7 @@ component default
   label: string
   onCopy?: ((text: string) => unknown) | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   text: (() => Promise<string> | string) | string
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
@@ -1693,7 +1696,7 @@ component default
   href?: string | undefined
   icon: (() => Element) | Html | IconProps | Node | Range | bigint | boolean | null | number | readonly Element[] | string | undefined
   label: string
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   tone?: Tone | undefined
   type?: "button" | "reset" | "submit" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
@@ -1991,7 +1994,7 @@ component default
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
   retryLabel?: string | undefined
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   style?: string | undefined
   tone?: Tone | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined

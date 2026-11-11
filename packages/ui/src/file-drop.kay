@@ -1,6 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { ByteSize } from 'kay/library'
+import type { FieldSize } from './field-look'
 import { byteCount, listen, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import { acceptsFile } from './accept'
@@ -43,7 +44,7 @@ const { accept, multiple = false, paste = false, disabled = false, invalid, name
   // A message of the page's own, such as `add.error('photo')` after a plain form post, shown under the zone.
   issue?: string | undefined
   // `sm` is a slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
-  size?: 'sm' | 'md' | undefined
+  size?: Exclude<FieldSize, 'lg'> | undefined
   // The largest file the zone takes: bytes or a string such as `'2mb'`. A larger file goes to `onReject` with the reason `size`.
   maxSize?: ByteSize | undefined
   // The most files the zone takes, counting the ones it already keeps; one without `multiple`. The files beyond go to `onReject` with the reason `count`.

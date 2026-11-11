@@ -15,6 +15,7 @@ import Menu from './menu.kay'
 import { actionOf, checkboxOf, headingOf, menuGroups, radioOf, submenuOf, withPopup } from './menu'
 import { tabOf } from './outside'
 import Popover from './popover.kay'
+import type { Size } from './size'
 import type { Tone } from './tone'
 
 // The class given to a Menu goes to its trigger, as it always did: `root` is the trigger and the popover is `menu`.
@@ -61,7 +62,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   label: string
   // The trigger's icon, such as a row of dots; not needed for a menu opened `at` a point.
   icon?: IconSlot | IconProps | undefined
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  size?: Size | undefined
   // The trigger's form, as an IconButton's.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
   tone?: Tone | undefined

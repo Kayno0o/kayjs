@@ -3,6 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { GroupedAvatar } from './avatar-group'
 import type { OptionsSource } from './options-source'
 import type { PopoverPlacement } from './popover'
+import type { Size } from './size'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
 import Avatar from './avatar.kay'
@@ -31,7 +32,7 @@ const { avatars, max = 4, size = 'md', label, moreLabel, moreHref, placement = '
   // How many avatars are drawn before the overflow chip takes the rest; the chip is left out when they all fit.
   max?: number | undefined
   // Every avatar's size, whatever the entries say, the chip's included.
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | undefined
+  size?: Size | 'xl' | undefined
   // Names the group for screen readers: `Project members`.
   label?: string | undefined
   // Names the overflow chip: a string where `{count}` stands for the people it holds, or a function of that count; `{count} more` by default, from the `ui.avatarGroup.more` message.

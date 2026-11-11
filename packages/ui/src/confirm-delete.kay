@@ -6,6 +6,7 @@ import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
+import type { Size } from './size'
 import type { Tone } from './tone'
 
 // 'kui-confirm-delete-link' stays on the link trigger as its name for an app's CSS and the always-hidden guard.
@@ -55,7 +56,7 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
   pendingLabel?: string | undefined
   cancelLabel?: string | undefined
   // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger takes the tone's look.
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  size?: Size | undefined
   // The icon trigger's form, as an IconButton's, which then takes the tone as its own: danger-coloured by default, neutral for `tone="neutral"`. Without it the icon stays neutral.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
 }>()

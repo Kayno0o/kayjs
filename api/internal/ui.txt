@@ -35,7 +35,7 @@ function fieldInvalid(invalid: () => boolean | undefined): "true" | undefined
 function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 
 [./field-look] FieldSize
-type FieldSize = 'sm' | 'md' | 'lg'
+type FieldSize = Exclude<Size, 'xs'>
 
 [./field-look] GROUP_INVALID
 const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] data-[invalid]:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
@@ -540,7 +540,7 @@ interface Look
   busy?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | undefined
-  size?: "lg" | "md" | "sm" | "xs" | undefined
+  size?: Size | undefined
   spinner?: boolean | undefined
   tone?: Tone | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
@@ -1070,7 +1070,7 @@ function fieldInvalid(invalid: () => boolean | undefined): "true" | undefined
 function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 
 [./lib/field-look] FieldSize
-type FieldSize = 'sm' | 'md' | 'lg'
+type FieldSize = Exclude<Size, 'xs'>
 
 [./lib/field-look] GROUP_INVALID
 const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] data-[invalid]:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
@@ -1311,7 +1311,7 @@ interface DescriptionItem
 function dismissToast(id: number, reason?: ToastDismissReason): void
 
 [./lib/index] FieldSize
-type FieldSize = 'sm' | 'md' | 'lg'
+type FieldSize = Exclude<Size, 'xs'>
 
 [./lib/index] FilterField
 interface FilterField
@@ -1621,6 +1621,9 @@ function scheme(cookie?: string): "dark" | "light" | undefined
 interface SideNavGroup
   label?: string | undefined
   links: readonly NavLink[]
+
+[./lib/index] Size
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 [./lib/index] SortDirection
 type SortDirection = 'asc' | 'desc'
@@ -2616,6 +2619,9 @@ function shade(color: string, value: number): string | undefined
 interface SideNavGroup
   label?: string | undefined
   links: readonly NavLink[]
+
+[./lib/size] Size
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 [./lib/source] asyncRows
 function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks?: AsyncRowsHooks<Row>): AsyncRows<Row>

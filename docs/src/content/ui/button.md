@@ -6,7 +6,7 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 ## Variants
 
-`variant` names the form: `solid` (the default), `ghost` or `inline`. `tone` names the meaning: `neutral` (the default), `accent` for the main action, `success` for a confirming one, `danger` for a destructive one, `warning` or `info`. Every component with a `tone` takes the same six, and `Tone` is exported. `size` goes from `xs` to `lg`, `md` by default.
+`variant` names the form: `solid` (the default), `ghost` or `inline`. `tone` names the meaning: `neutral` (the default), `accent` for the main action, `success` for a confirming one, `danger` for a destructive one, `warning` or `info`. Every component with a `tone` takes the same six, and `Tone` is exported. `size` goes from `xs` to `lg`, `md` by default, and `Size` is exported the same way.
 
 
 <Demo name="button/variants" />

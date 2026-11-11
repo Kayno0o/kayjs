@@ -1,5 +1,6 @@
 ---
 import type { Duration, JSX } from 'kay'
+import type { Size } from './size'
 import { copyToClipboard } from '@kaynooo/utils/browser/clipboard'
 import { durationMs, onCleanup, recipe, signal } from 'kay'
 import { attempt } from './toast'
@@ -23,7 +24,7 @@ const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', cop
   html?: string | undefined
   // As a Button's: `solid`, `ghost` or `inline`.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  size?: Size | undefined
   // How long the button says `copiedLabel` once the copy went through.
   copiedFor?: Duration | undefined
   // What the button says once the copy went through.
