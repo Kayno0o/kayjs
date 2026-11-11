@@ -205,7 +205,7 @@
     "complexity": 51
   },
   "src/runtime/reactive.ts": {
-    "max-lines": 609
+    "max-lines": 606
   },
   "src/runtime/swap-kept.ts": {
     "complexity": 46
@@ -223,8 +223,8 @@
     "max-lines": 684
   },
   "src/server/image.ts": {
-    "max-lines-per-function": 196,
-    "complexity": 63
+    "max-lines-per-function": 194,
+    "complexity": 62
   },
   "src/server/literal-writes.ts": {
     "complexity": 41
