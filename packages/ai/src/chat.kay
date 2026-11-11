@@ -16,9 +16,10 @@ import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
-import { filesOf, POSTED_CHARACTERS } from './chat-history'
+import { conversationKey, filesOf, POSTED_CHARACTERS } from './chat-history'
 import { createAttachments, fileKey, fileSizeLimit } from './chat-attachments'
 import { createChatSession } from './chat-session'
+import { eventText } from './chat-events'
 import { imagePrefixes, keepReplyImages } from './reply-images'
 import Calls from './chat-calls.kay'
 import Sources from './chat-sources.kay'
@@ -219,7 +220,7 @@ const following = followLog(() => log, { threshold: PINNED_PX })
 // The conversation held on the server that the page shows, named by its address, or by this browser for a chat on every page.
 // kay-allow once-read-prop: chosen when the chat is created
 const inBrowser = conversationIn === 'browser'
-const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted<string | undefined>(`kai-chat-conversation:${action.url}`, undefined, { storage: 'local' }) : queryParam<string | undefined>('conversation')
+const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted<string | undefined>(conversationKey(action.url), undefined, { storage: 'local' }) : queryParam<string | undefined>('conversation')
 const session = createChatSession({
   get action() { return action },
   initial: untrack(() => initial),
@@ -388,10 +389,10 @@ function sendFrom(event: Event) {
   // Cancelled to tell the sender the chat heard it, which a launcher waits for while the chat loads.
   event.preventDefault()
 
-  const text = (event as CustomEvent<unknown>).detail
+  const text = eventText((event as CustomEvent<unknown>).detail)
 
-  if (typeof text === 'string' && text.trim() !== '')
-    void send(text.trim())
+  if (text !== undefined)
+    void send(text)
 }
 
 // The microphone of `transcribe`, which is only created for a chat taking one: the recorder's own chunk loads only then.
@@ -633,12 +634,12 @@ onMount(() => {
 function draftFrom(event: Event) {
   event.preventDefault()
 
-  const text = (event as CustomEvent<unknown>).detail
+  const text = eventText((event as CustomEvent<unknown>).detail)
 
-  if (typeof text !== 'string' || text.trim() === '')
+  if (text === undefined)
     return
 
-  session.prefill(text.trim())
+  session.prefill(text)
   field?.focus()
 }
 
@@ -756,7 +757,7 @@ function listTakeFocus(element: HTMLElement, button: string) {
   queueMicrotask(() => element.focus())
 }
 ---
-section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-layout={(layout ?? variant) === 'plain' ? 'plain' : 'bubble'} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai-chat-new', reset); element.addEventListener('kai-chat-send', sendFrom); element.addEventListener('kai-chat-draft', draftFrom) }})
+section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-layout={(layout ?? variant) === 'plain' ? 'plain' : 'bubble'} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai:chat-new', reset); for (const name of ['kai:chat-send', 'kai-chat-send']) element.addEventListener(name, sendFrom); for (const name of ['kai:chat-draft', 'kai-chat-draft']) element.addEventListener(name, draftFrom) }})
   // The visitor's conversations, each a link of the page, which the chat follows to show it, or a button for a chat named by the browser, which a page swap would leave.
   if conversations
     nav(part="conversations" aria-label={conversationsLabel})

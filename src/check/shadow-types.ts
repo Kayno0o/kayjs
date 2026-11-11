@@ -37,6 +37,7 @@ import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
+import { eventNames } from './event-names'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
 import { unguardedRoutes, unguardedTools } from './guards'
@@ -161,6 +162,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => workflowStartId(root, options),
   async ({ root, options }) => analyticsOptions(root, options),
   ({ root, options }) => deprecatedConfigKeys(root, options),
+  async ({ root, options }) => eventNames(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

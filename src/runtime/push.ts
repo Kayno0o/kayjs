@@ -68,8 +68,11 @@ async function worker(): Promise<ServiceWorkerRegistration | undefined> {
   return await within(navigator.serviceWorker.ready, READY_TIMEOUT_MS) ?? undefined
 }
 
-const POSTED_KEY = 'kay-push-posted'
-const REFUSED_KEY = 'kay-push-refused'
+const POSTED_KEY = 'kay:push-posted'
+const REFUSED_KEY = 'kay:push-refused'
+// The names before 1.99, read once and moved to the new ones, so a browser keeps its record; the move goes with 1.103.
+const LEGACY_POSTED_KEY = 'kay-push-posted'
+const LEGACY_REFUSED_KEY = 'kay-push-refused'
 
 // Reads, writes (a string) or removes (null) a key of a storage that may be blocked.
 function kept(storage: () => Storage, key: string, value?: string | null): string | null {
@@ -88,10 +91,25 @@ function kept(storage: () => Storage, key: string, value?: string | null): strin
 }
 
 // The endpoint the server last accepted from this browser, so a load can tell a subscription the browser rotated while no page or worker could tell the server.
-const posted = (endpoint?: string | null): string | null => kept(() => localStorage, POSTED_KEY, endpoint)
+function posted(endpoint?: string | null): string | null {
+  const old = kept(() => localStorage, LEGACY_POSTED_KEY)
+
+  if (old !== null) {
+    kept(() => localStorage, LEGACY_POSTED_KEY, null)
+
+    if (kept(() => localStorage, POSTED_KEY) === null)
+      kept(() => localStorage, POSTED_KEY, old)
+  }
+
+  return kept(() => localStorage, POSTED_KEY, endpoint)
+}
 
 // The endpoint a signed-out visitor was refused with, for the rest of this tab's session, so a load does not post it again.
-const refused = (endpoint?: string | null): string | null => kept(() => sessionStorage, REFUSED_KEY, endpoint)
+function refused(endpoint?: string | null): string | null {
+  kept(() => sessionStorage, LEGACY_REFUSED_KEY, null)
+
+  return kept(() => sessionStorage, REFUSED_KEY, endpoint)
+}
 
 // Bumped by `subscribe()` and `unsubscribe()`, so a reconcile that began before one never records an endpoint after it.
 let turn = 0

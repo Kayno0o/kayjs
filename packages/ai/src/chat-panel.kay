@@ -2,6 +2,7 @@
 import type { Snippet } from 'kay'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
+import { eventText } from './chat-events'
 
 const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
 
@@ -84,7 +85,7 @@ effect(() => {
 
 // The chat inside is told to start over; it hears the event once the launcher hydrated.
 function startOver() {
-  panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-new'))
+  panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai:chat-new', { detail: {} }))
   queueMicrotask(() => panel?.querySelector('textarea')?.focus())
 }
 
@@ -114,9 +115,9 @@ const RETRY_MS = 50
 const RETRY_LIMIT = 200
 
 // Hands the text to the chat once it is there to hear it: the launcher hydrates when the browser is idle, and a listener cancels the event it takes.
-function forward(type: string, text: unknown, tries = 0) {
+function forward(type: string, text: string, tries = 0) {
   const chat = panel?.querySelector('.kai-chat')
-  const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: text, cancelable: true }))
+  const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: type.includes(':') ? { text } : text, cancelable: true }))
 
   if (!handled && !disposed && tries < RETRY_LIMIT)
     setTimeout(forward, RETRY_MS, type, text, tries + 1)
@@ -127,14 +128,17 @@ function relay(event: Event) {
   if (event.target instanceof Node && panel?.contains(event.target))
     return
 
-  const text = (event as CustomEvent<unknown>).detail
+  const text = eventText((event as CustomEvent<unknown>).detail)
 
-  if (typeof text !== 'string' || text.trim() === '')
+  if (text === undefined)
     return
 
   visitorOpens()
   forward(event.type, text)
 }
+
+// `kai:chat-open|send|draft` on the document; the `kai-chat-*` names on the window are the old ones, heard until 1.103.
+const heard = () => [[document, ['kai:chat-open', 'kai:chat-send', 'kai:chat-draft']], [window, ['kai-chat-open', 'kai-chat-send', 'kai-chat-draft']]] as const
 
 effect(() => {
   disposed = false
@@ -142,17 +146,22 @@ effect(() => {
   untrack(hashMatches)
   window.addEventListener('hashchange', hashMatches)
   document.addEventListener('click', linkClicked)
-  window.addEventListener('kai-chat-open', visitorOpens)
-  window.addEventListener('kai-chat-send', relay)
-  window.addEventListener('kai-chat-draft', relay)
+  for (const [target, names] of heard()) {
+    target.addEventListener(names[0], visitorOpens)
+    target.addEventListener(names[1], relay)
+    target.addEventListener(names[2], relay)
+  }
 
   onCleanup(() => {
     disposed = true
     document.removeEventListener('click', linkClicked)
     window.removeEventListener('hashchange', hashMatches)
-    window.removeEventListener('kai-chat-open', visitorOpens)
-    window.removeEventListener('kai-chat-send', relay)
-    window.removeEventListener('kai-chat-draft', relay)
+
+    for (const [target, names] of heard()) {
+      target.removeEventListener(names[0], visitorOpens)
+      target.removeEventListener(names[1], relay)
+      target.removeEventListener(names[2], relay)
+    }
   })
 })
 

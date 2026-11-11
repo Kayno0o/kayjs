@@ -30,7 +30,8 @@ describe('the install offer kept from the first moment', () => {
     const html = await (await plain.fetch('/')).text()
     const script = [...html.matchAll(/<script>([^<]*)<\/script>/g)].map(match => match[1]!).find(text => text.includes(OFFER))!
     const listeners = new Map<string, (event: object) => void>()
-    const scope: Record<string, unknown> = { Event: class { constructor(readonly type: string) {} }, addEventListener: (type: string, listener: (event: object) => void) => listeners.set(type, listener), dispatchEvent: () => true }
+    const announced: string[] = []
+    const scope: Record<string, unknown> = { Event: class { constructor(readonly type: string) {} }, CustomEvent: class { constructor(readonly type: string, readonly init: { detail: object }) {} }, addEventListener: (type: string, listener: (event: object) => void) => listeners.set(type, listener), dispatchEvent: (event: { type: string }) => announced.push(`window ${event.type}`) > 0, document: { dispatchEvent: (event: { type: string, init: { detail: object } }) => announced.push(`document ${event.type} ${JSON.stringify(event.init.detail)}`) > 0 } }
 
     scope.window = scope
     runInNewContext(script, scope)
@@ -42,6 +43,8 @@ describe('the install offer kept from the first moment', () => {
     listeners.get(OFFER)!(offer)
     expect(offer.defaultPrevented).toBe(true)
     expect(scope.$kayInstall).toBe(offer)
+    // `kay:install` on the document with an object detail, and on the window as before 1.99.
+    expect(announced).toEqual(['document kay:install {"available":true}', 'window kay:install'])
   })
 
   it('is on no other page: a counter island, an island using webPush alone', async () => {

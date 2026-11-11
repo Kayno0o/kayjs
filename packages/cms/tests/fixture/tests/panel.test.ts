@@ -104,7 +104,7 @@ test('a drag of the edge resizes the editor and keeps the layout once, when the 
 
     Object.assign(window, { writes })
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key === 'kcms-editor')
+      if (key === 'kcms:editor')
         writes.push(value)
 
       return keep.call(this, key, value)

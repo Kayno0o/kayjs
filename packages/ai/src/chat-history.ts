@@ -151,3 +151,24 @@ export function keepPending(key: string, id: string | undefined): void {
 export function newReplyId(): string {
   return randomId()
 }
+
+const LEGACY_CONVERSATION_PREFIX = 'kai-chat-conversation:'
+
+// The local storage key naming the conversation a chat shows for an action, `kai:chat-conversation:<url>`. A value kept under the old `kai-chat-conversation:` name is moved to it once, so a visitor keeps the conversation they were in; the move goes with 1.103.
+export function conversationKey(url: string): string {
+  const key = `kai:chat-conversation:${url}`
+
+  try {
+    const old = localStorage.getItem(`${LEGACY_CONVERSATION_PREFIX}${url}`)
+
+    if (old !== null) {
+      if (localStorage.getItem(key) === null)
+        localStorage.setItem(key, old)
+
+      localStorage.removeItem(`${LEGACY_CONVERSATION_PREFIX}${url}`)
+    }
+  }
+  catch {}
+
+  return key
+}

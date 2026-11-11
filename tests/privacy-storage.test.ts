@@ -9,7 +9,7 @@ const CALLED = /(?:new Bun\.Cookie|cookies\.set)\(\s*'([^']+)'/g
 // The value a constant such as `kay_analytics=yes` adds to the cookie's name.
 const VALUE = /=.*/
 // Names built from a template or by a helper, which no pattern above sees.
-const BUILT = ['ksteps_', 'kcms:draft:', 'kcms:rebuilding', 'kcms-editor', 'kay_editor-refused', 'kay_session', 'kay-w']
+const BUILT = ['ksteps_', 'kcms:draft:', 'kcms:rebuilding', 'kcms:editor', 'kay:editor-refused', 'kay_session', 'kay-w']
 
 async function sourceFiles(): Promise<string[]> {
   const found: string[] = []
@@ -49,7 +49,7 @@ describe('the privacy pages name every cookie and storage key', () => {
   it('finds the cookies and keys the sources set', async () => {
     const names = [...(await storedNames()).keys()]
 
-    expect(names).toEqual(expect.arrayContaining(['kay_flash', 'kay_locale', 'kay_preview', 'kay_analytics', 'kay_user', 'kay_editor', 'kay_editor_session', 'kay-reloaded']))
+    expect(names).toEqual(expect.arrayContaining(['kay_flash', 'kay_locale', 'kay_preview', 'kay_analytics', 'kay_user', 'kay_editor', 'kay_editor_session', 'kay:reloaded']))
   })
 
   for (const [label, file] of [['llms/privacy.md', 'llms/privacy.md'], ['the docs privacy page', 'docs/src/content/docs/guides/privacy.md']] as const) {

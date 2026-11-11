@@ -179,9 +179,9 @@ Chat(action={reply} label="Assistant")
 
 `Chat` calls `onSend({ messages })`, `onReply(turn)` with the finished turn, `onStop()`, `onError({ message, status })`, `onToolCall(call)`, `onRegenerate()`, `onEdit(text)` and `onSuggestion(text)` as each happens, once each, so analytics or a save of the turn needs no wrapper around the action. A callback that throws is logged and leaves the chat alone. `suggestions` also takes a function, returning the list or a promise of it, for questions that depend on the page or the visitor.
 
-A `ChatLauncher` opens on a link to `#chat` (the `hash` prop changes the fragment, `false` turns it off) and on a `kai-chat-open` event on `window`.
+A `ChatLauncher` opens on a link to `#chat` (the `hash` prop changes the fragment, `false` turns it off) and on a `kai:chat-open` event on `document`.
 
-To start a question from your own link, dispatch a `kai-chat-send` event on `window` to send it, or `kai-chat-draft` to put it in the field for the visitor to read first, with the text as the event's `detail`: the launcher opens the panel and hands the text over once the chat has loaded. A `Chat` of its own hears the same events on its `.kai-chat` element.
+To start a question from your own link, dispatch a `kai:chat-send` event on `document` with `{ text }` as its `detail` to send it, or `kai:chat-draft` to put it in the field for the visitor to read first, with the text as the event's `detail`: the launcher opens the panel and hands the text over once the chat has loaded. A `Chat` of its own hears the same events on its `.kai-chat` element.
 
 <ReadMore href="/llms/kayjs-ai-chat-events">The order the callbacks run in, and the events.</ReadMore>
 

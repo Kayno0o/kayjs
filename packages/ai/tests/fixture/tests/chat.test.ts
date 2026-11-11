@@ -417,6 +417,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await slow.count('.kai-chat-turn[data-role="user"]')).toBe(1)
   })
 
+  test('a kai:chat-send event with { text } sends it as the next message, and kai:chat-draft puts it in the field', async () => {
+    const page = await site.open('/assistant')
+
+    await page.evaluate(() => {
+      document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: ' Spoken words ' } }))
+    })
+    await page.waitFor('.kai-chat-turn[data-role="assistant"]')
+    await replied(page)
+    expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Spoken words')
+
+    await page.evaluate(() => {
+      document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Drafted' } }))
+    })
+    expect(await page.value('textarea')).toBe('Drafted')
+  })
+
   test('a kai-chat-send event sends its text as the next message, keeping the draft, and is ignored for blank text and while a reply is under way', async () => {
     const send = (page: Awaited<ReturnType<typeof site.open>>, detail: unknown) => page.evaluate((detail) => {
       document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai-chat-send', { detail }))

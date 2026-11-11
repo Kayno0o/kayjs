@@ -56,3 +56,12 @@ describe('revealing a box', () => {
     expect(revealBy({ top: 300, bottom: 900 }, visible)).toBe(300)
   })
 })
+
+test('a layout kept under the name before 1.99 is read, and moved on the next write', () => {
+  const kept: Record<string, string> = { 'kcms-editor': '{"dock":"bottom","bottom":300}' }
+  const storage = { getItem: (key: string) => kept[key] ?? null, setItem: (key: string, value: string) => void (kept[key] = value), removeItem: (key: string) => void delete kept[key] }
+
+  expect(readLayout(storage)).toEqual({ open: true, dock: 'bottom', bottom: 300 })
+  writeLayout(storage, { open: true, dock: 'bottom', bottom: 300 })
+  expect(Object.keys(kept)).toEqual(['kcms:editor'])
+})

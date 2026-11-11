@@ -12,7 +12,7 @@ function onPage(build: string): boolean {
   return document.querySelector(BUILD_TAG)?.getAttribute('content') === build
 }
 
-const STORAGE_KEY = 'kay-reloaded'
+const STORAGE_KEY = 'kay:reloaded'
 // A page is not reloaded again within this time, whatever it still says: a cache in front of the server may keep serving the old page, and replicas on two builds may alternate.
 const REPEAT_MS = 60_000
 

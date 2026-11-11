@@ -20,7 +20,7 @@ async function open(width: number, height: number, corner: string) {
   await page.evaluate((layout) => {
     localStorage.clear()
     sessionStorage.clear()
-    localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner: layout, max: false, bottom: 320, right: 448 }))
+    localStorage.setItem('kay:dev-layout', JSON.stringify({ dock: 'float', corner: layout, max: false, bottom: 320, right: 448 }))
   }, corner)
   await page.reload()
   await page.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot?.querySelector('.bar') != null && document.querySelector('.kcms-editor[open]') !== null && document.documentElement.classList.contains('kcms-dock-side') !== document.documentElement.classList.contains('kcms-dock-bottom'))
@@ -100,7 +100,7 @@ test('a drawer docked at the right keeps the full window height beside the edito
   const page = await open(1280, 800, 'bottom-left')
 
   await page.evaluate(() => {
-    localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'right', corner: 'bottom-left', max: false, bottom: 320, right: 448 }))
+    localStorage.setItem('kay:dev-layout', JSON.stringify({ dock: 'right', corner: 'bottom-left', max: false, bottom: 320, right: 448 }))
     sessionStorage.clear()
   })
   await page.reload()
@@ -111,7 +111,7 @@ test('a drawer docked at the right keeps the full window height beside the edito
   expect(drawer.height).toBe(800)
 
   await page.evaluate(() => {
-    localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner: 'bottom-left', max: false, bottom: 320, right: 448, box: { left: 20, top: 10, width: 500, height: 780 } }))
+    localStorage.setItem('kay:dev-layout', JSON.stringify({ dock: 'float', corner: 'bottom-left', max: false, bottom: 320, right: 448, box: { left: 20, top: 10, width: 500, height: 780 } }))
     sessionStorage.clear()
   })
   await page.reload()

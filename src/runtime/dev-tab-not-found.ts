@@ -5,7 +5,7 @@ import type { DevTab, DevTool } from './dev-tool'
 const NOT_FOUND_URL = '/_kay/dev/not-found'
 // Copied from dev-tool-constants.ts, as a tab module imports nothing.
 const HEAD_HEADER = 'x-kay-dev'
-const BUILT_EVENT = 'kay-dev-built'
+const BUILT_EVENT = 'kay:dev-built'
 const REFERRER_LIMIT = 3
 
 // The paths a production run recorded visitors found nothing at, most hit first, each with the hosts they came from and the target kay suggests; a click writes the redirect into kay.config.ts, as `kay not-found --redirect` does. Fetched as the tab shows and again after each restart.
@@ -92,7 +92,7 @@ export default function notFoundTab(tool: DevTool, tab: DevTab): () => void {
 
   reread = () => void list()
   tab.panel.append(bar.element, status, body)
-  win.addEventListener(BUILT_EVENT, reread, { signal })
+  win.document.addEventListener(BUILT_EVENT, reread, { signal })
   reread()
 
   return () => reread()

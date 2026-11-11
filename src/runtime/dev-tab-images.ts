@@ -1,7 +1,7 @@
 import type { DevKit, DevTab, DevTool } from './dev-tool'
 
 // The Images tab's code, fetched at once as its badge counts what is wrong with the page's images, with the tool's shared helpers from `tool.kit`.
-const BUILT_EVENT = 'kay-dev-built'
+const BUILT_EVENT = 'kay:dev-built'
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
 const OVERSIZED = 4
 const IMAGE_ROUTES = new Set(['/_kay/images'])
@@ -240,7 +240,7 @@ export default function imagesTab(tool: DevTool, tab: DevTab): () => void {
   tab.panel.append(bar.element, content)
   doc.addEventListener('load', schedule, { capture: true, signal })
   doc.addEventListener('error', schedule, { capture: true, signal })
-  win.addEventListener(BUILT_EVENT, () => {
+  win.document.addEventListener(BUILT_EVENT, () => {
     answers.clear()
     schedule()
   }, { signal })

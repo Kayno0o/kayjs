@@ -19,7 +19,7 @@ const LAST_RETRY_MS = 30_000
 // A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
 const REFUSAL_MS = 60_000
 // Fired by live-value.client.ts when it asks for new proofs.
-const RENEW_EVENT = 'kay-renew'
+const RENEW_EVENT = 'kay:renew'
 
 // The longest a refresh waits for a swap in progress: one that never clears `aria-busy` (failed or aborted) would otherwise park every later invalidation.
 export const IDLE_MS = 20_000
@@ -58,7 +58,7 @@ const waitingIslands = new Set<HTMLElement>()
 const fetchingIslands = new Map<HTMLElement, Map<string, number>>()
 
 // An app swapping no pages would reload the page for it, which a renewal is not worth.
-addEventListener(RENEW_EVENT, () => {
+document.addEventListener(RENEW_EVENT, () => {
   for (const slot of navigation.hooks === undefined ? [] : holding)
     askIsland(slot)
 })

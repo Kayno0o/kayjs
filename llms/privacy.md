@@ -117,17 +117,17 @@ export async function archive(scan: File) {
 ### Browser storage
 
 - IndexedDB `kay-local` (`local()`): the rows of each collection as the person sees them, the writes not yet sent and the refusals to show; the app's data, so as personal as the rows are; necessary for the feature the app offers, until the rows are removed, `clear()` runs or the sign-out cookie changes.
-- `sessionStorage` `kay-reloaded`: the time of the last reload kay made for a page of an older build, so it never reloads twice within a minute; necessary, the tab's life, nothing personal.
-- `sessionStorage` `kay_editor-refused` (kayjs-cms): the sign-in value the editor check refused, so a signed-in visitor who is no editor costs one request per tab; necessary, the tab's life.
+- `sessionStorage` `kay:reloaded`: the time of the last reload kay made for a page of an older build, so it never reloads twice within a minute; necessary, the tab's life, nothing personal.
+- `sessionStorage` `kay:editor-refused` (kayjs-cms): the sign-in value the editor check refused, so a signed-in visitor who is no editor costs one request per tab; necessary, the tab's life.
 - `localStorage` `kcms:draft:<editor>:<entry>` (kayjs-cms): an editor's unsaved draft of an entry, whatever they typed, offered only to that editor; necessary for the editor who asked to keep it, a week, dropped once saved, and every one past its week is swept as the editor opens and hourly while it stays open, not only when read.
 - `localStorage` `kcms-marks` (kayjs-cms): `on` or `off`, whether the editor's page outlines its marked fields; a preference, until the editor clears it.
-- `localStorage` `kay-push-posted` (`push()`): the push endpoint the server last accepted from this browser, a URL naming its subscription, so a load can tell one the browser rotated; necessary for the notifications the visitor asked for, until they unsubscribe.
-- `sessionStorage` `kay-push-refused` (`push()`): the endpoint a signed-out visitor was refused with, so a load does not post it again; necessary, the tab's life.
+- `localStorage` `kay:push-posted` (`push()`): the push endpoint the server last accepted from this browser, a URL naming its subscription, so a load can tell one the browser rotated; necessary for the notifications the visitor asked for, until they unsubscribe.
+- `sessionStorage` `kay:push-refused` (`push()`): the endpoint a signed-out visitor was refused with, so a load does not post it again; necessary, the tab's life.
 - `localStorage` under the name of a `persisted(name, ..., { storage: 'local' })` signal, as the cookies above.
-- `localStorage` `kcms-editor` (kayjs-cms): where the editor's panel sits and how big it is; a preference, until the editor clears it.
+- `localStorage` `kcms:editor` (kayjs-cms): where the editor's panel sits and how big it is; a preference, until the editor clears it.
 - `localStorage` `kcms:rebuilding` (kayjs-cms): the time of a save the site is still rebuilding for, so the notice shows in every tab; necessary, dropped when the rebuild ends.
 - `sessionStorage` under the `remember` key of kayjs-ai's `Chat` and `ChatLauncher` (none unless named): the conversation's text, up to 200,000 characters, what the visitor wrote included; the tab's life, nothing without `remember`.
-- `localStorage` `kai-chat-conversation:<action URL>` (kayjs-ai's `ChatLauncher` with `keepOnServer` or `conversations`, or a `Chat` with `conversationIn="browser"`): the id of the conversation shown, which reads nothing without the visitor's session; necessary, until a new conversation.
+- `localStorage` `kai:chat-conversation:<action URL>` (kayjs-ai's `ChatLauncher` with `keepOnServer` or `conversations`, or a `Chat` with `conversationIn="browser"`): the id of the conversation shown, which reads nothing without the visitor's session; necessary, until a new conversation.
 - `localStorage` under the `listWidthKey` of kayjs-ui's `SplitLayout` (none unless named): the list's width, a preference.
 - With `offline`, the service worker and its Cache Storage `kay-w<version>`: the pages `offline.pages` names (the public prerendered ones by default) and the files, and the public pages and files it fetched later that answered 200 without `private` or `no-store`; each copy changes with the build and the cache stays until `offline` is turned off or the worker's version changes. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
 

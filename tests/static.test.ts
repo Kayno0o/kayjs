@@ -221,7 +221,7 @@ describe('kay build --static', () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const code = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
 
-    expect(code.filter(text => text.includes('kay-reloaded'))).toHaveLength(1)
+    expect(code.filter(text => text.includes('kay:reloaded'))).toHaveLength(1)
     expect(code.filter(text => text.includes('x-kay-build'))).toEqual([])
     expect(code.some(text => text.includes('meta[name="kay-build"]'))).toBe(true)
   })
@@ -266,9 +266,9 @@ describe('kay build --static', () => {
     const read = async (url: string) => Bun.file(join(out, url.slice(BASE.length))).text()
     const eager = [...(await eagerJs(scriptUrls((await get('/')).text), read)).values()].map(({ code }) => code)
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
-    const holding = await Promise.all(chunks.map(async chunk => (await Bun.file(join(out, chunk)).text()).includes('kay-reloaded')))
+    const holding = await Promise.all(chunks.map(async chunk => (await Bun.file(join(out, chunk)).text()).includes('kay:reloaded')))
 
-    expect(eager.filter(code => code.includes('kay-reloaded'))).toHaveLength(1)
+    expect(eager.filter(code => code.includes('kay:reloaded'))).toHaveLength(1)
     // A new chunk the entry imports is checked not to load on idle before it is listed here.
     expect(lazyChunks(eager)).toEqual(LAZY_CHUNKS)
     // A chunk loaded later is gone once a deploy dropped the chunks, so the reload could not run from it.

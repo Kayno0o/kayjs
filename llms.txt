@@ -1,20 +1,20 @@
 # kay
 
-> kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to HTML on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line.
+> kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to HTML on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line.
 
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it, in both: `count = 0`, `count += step` and `count++` compile to `.set`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template and the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it: `count = 0`, `count += step` and `count++` compile to `.set`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
 - An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
-- Browser-only globals (`window`, `document`) are read in `effect`, `onMount` or a `--- client` component; reading one while rendering throws on the server.
+- Browser globals (`window`, `document`) are read in `effect`, `onMount` or a `--- client` component; reading one while rendering throws on the server.
 - Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'`; a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met: read it, not the browser.
-- Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; each is reported with what kay writes instead.
+- Pug features that do not exist, each reported with what kay writes instead: `- code` lines, `#{}`, `!{}`, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`.
 
 ## Libraries
 
@@ -109,7 +109,8 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Upgrading, older releases](llms/upgrading-archive.md): the minors before 1.95
 - [What's new](llms/whats-new.md): what each recent release adds
 - [What's new, older releases](llms/whats-new-archive.md): the releases before 1.97
-- [Privacy and personal data](llms/privacy.md): what kay keeps, for how long, erasing a person
+- [Privacy and personal data](llms/privacy.md): what kay keeps, how long, erasing a person
+- [Events and names](llms/events.md): DOM events, cookie and key rules
 - [Notifications](llms/notifications.md): `notify()`, the Bell
 - [Analytics and Web Vitals](llms/analytics.md): visits and load times, consent
 - [Eco-design](llms/eco-design.md): the RGESN criteria met

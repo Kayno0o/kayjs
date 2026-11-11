@@ -22,7 +22,7 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
 
   // The sign-in this browser holds, which the guard refused once already: the answer is kept for the tab, so a signed-in visitor who is no editor costs one request, not one per page.
   const cookie = (name: string) => new RegExp(`(?:^|; )${name}=([^;]*)`).exec(document.cookie)?.[1]
-  const refusedKey = `${hint}-refused`
+  const refusedKey = 'kay:editor-refused'
 
   // The guard answers: the hint outlives the session or dies before it, so the session decides, both ways.
   const verify = async (signIn: string | undefined) => {

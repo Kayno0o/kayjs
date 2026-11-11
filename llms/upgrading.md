@@ -2,6 +2,16 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.99.0
+
+### DOM events are `<lib>:<verb>` on `document`
+
+`kay-renew`, `kay-dev-built` and `kay-dev-types` (on the window, a string `detail` for the last two), `kay:install` (on the window), the chat's `kai-chat-open`, `kai-chat-send` and `kai-chat-draft` (on the window, the text as `detail`) and `kui-hold-defaults` (on the form, an array as `detail`) are now `kay:renew`, `kay:dev-built`, `kay:dev-types`, `kay:install`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft` and `kui:hold-defaults`, fired on `document` (the last bubbling from its form) with an object `detail`: `{ text }` for the chat's, `{ problems }` for `kay:dev-types`, a parsed object for `kay:dev-built`, `{ available }` for `kay:install`, `{ adopt }` for `kui:hold-defaults`. The old names still fire, on their old target with their old `detail`, and the chat still hears its old ones, for three minors; `kay upgrade` rewrites a listener of `kay-renew` or `kay:install` and a dispatch of the chat's events it can read (`deprecated-event-names`), and reports the rest. [Events](events.md) lists them all.
+
+### Storage keys are `<lib>:<name>`
+
+`kay-reloaded`, `kay-push-posted`, `kay-push-refused`, `kay_editor-refused`, `kay-dev`, `kay-dev-layout`, `kai-chat-conversation:<url>` and `kcms-editor` are `kay:reloaded`, `kay:push-posted`, `kay:push-refused`, `kay:editor-refused`, `kay:dev`, `kay:dev-layout`, `kai:chat-conversation:<url>` and `kcms:editor`. The push record, the chat's shown conversation and the editor's layout move from the old key the first time they are read; the others start again. An app reading one of these keys by name reads the new one.
+
 ## 1.98.0
 
 ### `analytics()` takes `url`, `site` and `privacy`

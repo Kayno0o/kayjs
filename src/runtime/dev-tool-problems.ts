@@ -183,11 +183,11 @@ export function problemsTab(doc: Document, tool: DevTool, state: DevState, save:
   const typed = (event: Event) => {
     const block = doc.getElementById(TYPE_PROBLEMS) ?? doc.head.appendChild(Object.assign(doc.createElement('script'), { id: TYPE_PROBLEMS, type: 'application/json' }))
 
-    block.textContent = String((event as CustomEvent<string>).detail)
+    block.textContent = JSON.stringify((event as CustomEvent<{ problems: string[] }>).detail.problems)
     readChecks()
   }
 
-  win.addEventListener(TYPES_EVENT, typed)
+  doc.addEventListener(TYPES_EVENT, typed)
 
   // What was logged before this loaded, then each problem as it is logged, a microtask later so a failure here never breaks the call that logged.
   const early = Array.isArray(win.$kayProblems) ? win.$kayProblems as DevProblem[] : []
@@ -227,7 +227,7 @@ export function problemsTab(doc: Document, tool: DevTool, state: DevState, save:
   return {
     stop: () => {
       swaps.disconnect()
-      win.removeEventListener(TYPES_EVENT, typed)
+      doc.removeEventListener(TYPES_EVENT, typed)
       // Problems logged from now on wait for the next tool.
       win.$kayProblems = [] as DevProblem[]
     },

@@ -206,12 +206,12 @@ describe('a subscription the browser rotated', () => {
   const body = { endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' }, replaces: 'https://push.example/old' }
 
   it('is posted once, naming the endpoint it replaces, then not again on the next load', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     ;(await pageLoad('rotated')).state()
-    await untilHolds(() => posts.length > 0 && localStorage.getItem('kay-push-posted') === 'https://push.example/abc')
+    await untilHolds(() => posts.length > 0 && localStorage.getItem('kay:push-posted') === 'https://push.example/abc')
     expect(posts).toEqual([{ url: '/app/_kay/push/subscribe', body }])
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/abc')
     ;(await pageLoad('reloaded')).state()
     // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
@@ -228,45 +228,56 @@ describe('a subscription the browser rotated', () => {
   })
 
   it('is not posted again once the server accepted that endpoint', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/abc')
+    localStorage.setItem('kay:push-posted', 'https://push.example/abc')
     subscription = fakeSubscription()
     await module.webPush.subscribe()
     expect(posts).toEqual([{ url: '/app/_kay/push/subscribe', body: { endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } } }])
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/abc')
   })
 
   it('is not posted again after a 401 on a second load of the same tab, and is once the person subscribes', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     sessionStorage.clear()
     subscription = fakeSubscription()
     answer = 401
     ;(await pageLoad('signed-out-1')).state()
-    await untilHolds(() => posts.length > 0 && sessionStorage.getItem('kay-push-refused') !== null)
+    await untilHolds(() => posts.length > 0 && sessionStorage.getItem('kay:push-refused') !== null)
     ;(await pageLoad('signed-out-2')).state()
     // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(1)
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/old')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/old')
     answer = 204
     expect(await module.webPush.subscribe()).toBe('subscribed')
-    expect(sessionStorage.getItem('kay-push-refused')).toBeNull()
+    expect(sessionStorage.getItem('kay:push-refused')).toBeNull()
   })
 
   it('forgets the record when the server says the endpoint is not this person\'s, so another person is not subscribed', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     answer = 403
     ;(await pageLoad('other-user')).state()
-    await untilHolds(() => localStorage.getItem('kay-push-posted') === null)
-    expect(localStorage.getItem('kay-push-posted')).toBeNull()
+    await untilHolds(() => localStorage.getItem('kay:push-posted') === null)
+    expect(localStorage.getItem('kay:push-posted')).toBeNull()
     ;(await pageLoad('other-user-again')).state()
     // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(1)
   })
 
-  it('is tried again on the next load after a server failure', async () => {
+  it('moves the record kept under its name before 1.99 to the new one, keeping it', async () => {
     localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    subscription = fakeSubscription()
+    answer = 500
+    ;(await pageLoad('legacy-key')).state()
+    await untilHolds(() => posts.length > 0)
+    expect(localStorage.getItem('kay-push-posted')).toBeNull()
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/old')
+    expect(posts[0]!.body).toMatchObject({ replaces: 'https://push.example/old' })
+  })
+
+  it('is tried again on the next load after a server failure', async () => {
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     answer = 500
     ;(await pageLoad('failing-1')).state()
@@ -276,7 +287,7 @@ describe('a subscription the browser rotated', () => {
     // Nothing more happens: a third post would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(2)
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/old')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/old')
   })
 
   it('works with localStorage and sessionStorage throwing', async () => {
@@ -305,7 +316,7 @@ describe('a subscription the browser rotated', () => {
   })
 
   it('never records the endpoint of a reconcile in flight when the person unsubscribes', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     release = Promise.withResolvers<void>()
 
@@ -320,12 +331,12 @@ describe('a subscription the browser rotated', () => {
 
     release.resolve()
     expect(await done).toBe(true)
-    expect(localStorage.getItem('kay-push-posted')).toBeNull()
+    expect(localStorage.getItem('kay:push-posted')).toBeNull()
     expect(posts.map(each => each.url)).toEqual(['/app/_kay/push/subscribe', '/app/_kay/push/unsubscribe'])
   })
 
   it('never records the endpoint a probe held when subscribe() replaces it meanwhile', async () => {
-    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    localStorage.setItem('kay:push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     release = Promise.withResolvers<void>()
 
@@ -343,19 +354,19 @@ describe('a subscription the browser rotated', () => {
     expect(await done).toBe('subscribed')
     // Nothing happens: the stale reconcile would record its endpoint once it finishes, within this time.
     await Bun.sleep(20)
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/abc')
   })
 })
 
 describe('push.unsubscribe', () => {
   it('tells the server and the browser, and forgets the record', async () => {
     await module.webPush.subscribe()
-    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
+    expect(localStorage.getItem('kay:push-posted')).toBe('https://push.example/abc')
     posts = []
     expect(await module.webPush.unsubscribe()).toBe(true)
     expect(posts).toEqual([{ url: '/app/_kay/push/unsubscribe', body: { endpoint: 'https://push.example/abc' } }])
     expect(subscription).toBeNull()
-    expect(localStorage.getItem('kay-push-posted')).toBeNull()
+    expect(localStorage.getItem('kay:push-posted')).toBeNull()
     expect(module.webPush.state()).toBe('off')
     expect(await module.webPush.unsubscribe()).toBe(false)
   })
@@ -375,12 +386,29 @@ describe('installPrompt', () => {
     expect(await module.installPrompt.show()).toBe('unavailable')
 
     Object.assign(window, { $kayInstall: offer })
-    window.dispatchEvent(new Event('kay:install'))
+    document.dispatchEvent(new CustomEvent('kay:install', { detail: { available: true } }))
     expect(module.installPrompt.available()).toBe(true)
     expect(await module.installPrompt.show()).toBe('accepted')
     expect(prompted).toBe(1)
     expect(module.installPrompt.available()).toBe(false)
     expect(await module.installPrompt.show()).toBe('unavailable')
+  })
+
+  it('announces an offer as kay:install on the document with an object detail, and on the window as before', async () => {
+    const heard: string[] = []
+    const onDocument = (event: Event) => heard.push(`document ${JSON.stringify((event as CustomEvent).detail)}`)
+    const onWindow = () => heard.push('window')
+    const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: 'dismissed' as const }) })
+
+    Object.assign(window, { $kayInstall: undefined })
+    module.installPrompt.available()
+    document.addEventListener('kay:install', onDocument)
+    window.addEventListener('kay:install', onWindow)
+    window.dispatchEvent(offer)
+    document.removeEventListener('kay:install', onDocument)
+    window.removeEventListener('kay:install', onWindow)
+    expect(heard).toEqual(['document {"available":true}', 'window'])
+    await module.installPrompt.show()
   })
 
   it('holds an offer the browser makes after the island hydrated, with no early script', async () => {

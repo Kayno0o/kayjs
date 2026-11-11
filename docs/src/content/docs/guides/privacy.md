@@ -38,20 +38,20 @@ Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__
 
 | Key | Set by | Kept |
 | --- | --- | --- |
-| `sessionStorage` `kay-reloaded` | a page of an older build, reloaded once | the tab's life, only a time |
-| `sessionStorage` `kay_editor-refused` | kayjs-cms, for a signed-in visitor who is no editor | the tab's life |
+| `sessionStorage` `kay:reloaded` | a page of an older build, reloaded once | the tab's life, only a time |
+| `sessionStorage` `kay:editor-refused` | kayjs-cms, for a signed-in visitor who is no editor | the tab's life |
 | `localStorage` `kcms:draft:<editor>:<entry>` | kayjs-cms, an editor's unsaved draft, offered only to that editor | a week, dropped once saved, and swept when the editor opens and every hour after |
 | `localStorage` `kcms-marks` | kayjs-cms, whether the editor's page outlines its marked fields | until the editor clears it |
-| `localStorage` `kay-push-posted` | `push()`, the endpoint of the push subscription the server last accepted | until the visitor unsubscribes |
-| `sessionStorage` `kay-push-refused` | `push()`, the endpoint a signed-out visitor was refused with | the tab's life |
+| `localStorage` `kay:push-posted` | `push()`, the endpoint of the push subscription the server last accepted | until the visitor unsubscribes |
+| `sessionStorage` `kay:push-refused` | `push()`, the endpoint a signed-out visitor was refused with | the tab's life |
 | `localStorage` under a name | a `persisted()` signal with `storage: 'local'` | until the app clears it |
-| `localStorage` `kcms-editor` | kayjs-cms, the editor's panel position and size | until the editor clears it |
+| `localStorage` `kcms:editor` | kayjs-cms, the editor's panel position and size | until the editor clears it |
 | `localStorage` `kcms:rebuilding` | kayjs-cms, a save the site is still rebuilding for | until the rebuild ends |
 | `sessionStorage` under `remember` | kayjs-ai `Chat`, only when you name a key | the tab's life; the conversation's text, up to 200,000 characters |
 | IndexedDB `kay-local` | `local()`, the rows an island keeps offline and the writes not yet sent | until the rows are removed, `clear()` runs or the sign-out cookie changes |
 | Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until `offline` is turned off or the worker's version changes |
 
-`kay-reloaded`, `kay_editor-refused`, `kcms:rebuilding`, the editor's draft and the two push keys are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes and the outline switch are preferences they set.
+`kay:reloaded`, `kay:editor-refused`, `kcms:rebuilding`, the editor's draft and the two push keys are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes and the outline switch are preferences they set.
 
 The offline cache keeps the pages `offline.pages` names (the public prerendered ones by default) and the files, and later only responses that are public: never one marked `private` or `no-store`. A page of `offline.pages` that holds a visitor's render is kept as it was served, so list only public ones.
 

@@ -132,10 +132,10 @@ describe('the dev tool', () => {
     // The check ends with the error fixed and another found.
     const other = 'error[TS2345]: Argument of type \'number\' is not assignable to parameter of type \'string\'.\n --> src/routes/other.kay:4:3'
 
-    window.dispatchEvent(new CustomEvent('kay-dev-types', { detail: JSON.stringify([other]) }))
+    document.dispatchEvent(new CustomEvent('kay:dev-types', { detail: { problems: [other] } }))
     expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title'], ['error', other]])
 
-    window.dispatchEvent(new CustomEvent('kay-dev-types', { detail: '[]' }))
+    document.dispatchEvent(new CustomEvent('kay:dev-types', { detail: { problems: [] } }))
     expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title']])
   })
 
@@ -491,7 +491,7 @@ describe('the dev tool', () => {
     const published = (): string[] => [...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ').match(/--kay-dev-bar-[a-z-]+/g) ?? []
 
     for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as [string, string[]][]) {
-      localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner }))
+      localStorage.setItem('kay:dev-layout', JSON.stringify({ dock: 'float', corner }))
       tool = startDevTool(document, loadTab)
       await turn()
       expect(published()).toEqual(expected)
@@ -519,7 +519,7 @@ describe('the dev tool', () => {
     const shown = () => [...shadow().querySelectorAll<HTMLElement>('.grip')].filter(grip => grip.hidden === false).map(grip => grip.dataset.edge)
     const dockTo = (label: string) => shadow().querySelector<HTMLButtonElement>(`.icon[aria-label="${label}"]`)!.click()
 
-    localStorage.setItem('kay-dev-layout', '{"dock":"sideways","corner":"middle","box":{"left":"x"},"bottom":"tall"}')
+    localStorage.setItem('kay:dev-layout', '{"dock":"sideways","corner":"middle","box":{"left":"x"},"bottom":"tall"}')
     tool = startDevTool(document, loadTab)
     await turn()
 
@@ -540,7 +540,7 @@ describe('the dev tool', () => {
 
     // Up grows a drawer docked at the bottom, never past its smallest height: happy-dom lays nothing out, so the drawer measures 0 high.
     key({ key: 'ArrowUp' }, shadow().querySelector('.grip.n')!)
-    expect((JSON.parse(localStorage.getItem('kay-dev-layout')!) as { bottom: number }).bottom).toBe(180)
+    expect((JSON.parse(localStorage.getItem('kay:dev-layout')!) as { bottom: number }).bottom).toBe(180)
 
     dockTo('Dock to the right')
     expect(padding()).toContain('padding-right: 448px')
@@ -554,10 +554,10 @@ describe('the dev tool', () => {
     tool.stop()
     tool = undefined
     expect(document.adoptedStyleSheets).toHaveLength(0)
-    expect(sessionStorage.getItem('kay-dev')).not.toContain('dock')
+    expect(sessionStorage.getItem('kay:dev')).not.toContain('dock')
 
     // A layout stored as no object at all.
-    localStorage.setItem('kay-dev-layout', 'null')
+    localStorage.setItem('kay:dev-layout', 'null')
     tool = startDevTool(document, loadTab)
     await turn()
     expect(shadow().querySelector('.ui.floating')).not.toBeNull()
@@ -780,7 +780,7 @@ describe('the dev tool', () => {
   it('says nothing on the bar of a rebuild, and keeps no state of one for the page', async () => {
     tool = startDevTool(document, loadTab)
     await turn()
-    window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/index.kay', ms: 58 }) }))
+    document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'src/routes/index.kay', ms: 58 } }))
 
     expect(shadow().querySelector('.built')).toBeNull()
     expect(bar()).toEqual(['kay'])
@@ -1190,7 +1190,7 @@ describe('the dev tool', () => {
 
       // A restart may change the routes: the tab shown asks again.
       status = 500
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
+      document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'src/routes/x.kay', ms: 1 } }))
       await eventually(() => expect(shadow().querySelector('#kay-dev-routes-under-test .empty')?.textContent).toBe('Could not list the routes: the server answered 500'))
 
       expect(fetched).toHaveLength(2)
@@ -1242,7 +1242,7 @@ describe('the dev tool', () => {
       expect(calls.at(-1)).toEqual(['POST /_kay/dev/not-found', JSON.stringify({ path: '/old', to: '/new' })])
 
       recorded = false
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
+      document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'kay.config.ts', ms: 1 } }))
       await eventually(() => expect(shadow().querySelector('#kay-dev-not-found .empty')?.textContent).toContain('kay dev records none'))
     }
     finally {
@@ -1471,7 +1471,7 @@ describe('the dev tool', () => {
       // No public field: nothing reaches the browser, and the tab says so after the restart.
       await rm(join(dir, 'src/env.ts'))
       app = await pages({ root: dir, dirs: { routes }, dev: true })
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
+      document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'kay.config.ts', ms: 1 } }))
       await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env'))
 
       expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-env .count')!.hidden).toBe(true)
@@ -1479,7 +1479,7 @@ describe('the dev tool', () => {
       // Only a missing route means none: a failing server, or a page answering in its place, is told as a failure.
       for (const answer of [new Response(null, { status: 503 }), new Response('<p>Home</p>', { headers: { 'content-type': 'text/html' } })]) {
         fetching.mockImplementation((async () => answer.clone()) as unknown as typeof window.fetch)
-        window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
+        document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'kay.config.ts', ms: 1 } }))
         await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('Could not read the public env'))
       }
     }
@@ -1584,7 +1584,7 @@ describe('the dev tool', () => {
       expect(asked).toHaveLength(5)
       expect(rows().at(-5)).toContain('the server answered 404')
 
-      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
+      document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'src/routes/x.kay', ms: 1 } }))
       await eventually(() => expect(rows().at(-5)).toContain('avif, 43.9 KB'))
 
       expect(asked.filter(request => request.includes('gone'))).toHaveLength(2)

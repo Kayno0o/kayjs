@@ -100,9 +100,16 @@ describe('a live value set just after a connection that followed a refusal', () 
     page(['unread', 3])
     renewed = script(['unread', 5])
     answers = [403, connection]
+
+    const heard: string[] = []
+
+    document.addEventListener('kay:renew', event => heard.push(`document ${JSON.stringify((event as CustomEvent).detail)}`), { once: true })
+    window.addEventListener('kay-renew', () => heard.push('window'), { once: true })
     follow('unread', 0)
     await until(() => shown.get('unread') === 3)
     await until(() => posted.length === 2)
+    // The renewal is `kay:renew` on the document with an object detail, and `kay-renew` on the window until 1.103.
+    expect(heard).toEqual(['document {}', 'window'])
     // The snapshot and the update land together, before the value is read again.
     connection.send([['unread', 5]], [['unread', 7]])
     await until(() => shown.get('unread') === 7)

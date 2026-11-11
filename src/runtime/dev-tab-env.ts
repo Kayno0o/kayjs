@@ -3,7 +3,7 @@ import type { DevTab, DevTool } from './dev-tool'
 // The Env tab's code, fetched at once as its badge counts the variables that look like secrets, with the tool's shared helpers from `tool.kit`.
 const ENV_URL = '/_kay/env.js'
 const MODULE_START = 'export default '
-const BUILT_EVENT = 'kay-dev-built'
+const BUILT_EVENT = 'kay:dev-built'
 
 // Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
 const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH_?(?:KEY|TOKEN|SECRET)|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
@@ -128,7 +128,7 @@ export default function envTab(tool: DevTool, tab: DevTab): () => void {
 
   reread = () => void read()
   tab.panel.append(bar.element, content)
-  win.addEventListener(BUILT_EVENT, reread, { signal })
+  win.document.addEventListener(BUILT_EVENT, reread, { signal })
   reread()
 
   return () => reread()

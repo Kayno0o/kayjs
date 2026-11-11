@@ -3,7 +3,7 @@ import type { DevTab, DevTool } from './dev-tool'
 
 // The Routes tab's code, fetched the first time the tab opens, with the tool's shared helpers from `tool.kit`.
 const ROUTES_URL = '/_kay/dev/routes'
-const BUILT_EVENT = 'kay-dev-built'
+const BUILT_EVENT = 'kay:dev-built'
 const ROUTE_KINDS: Record<Exclude<DevRoute['kind'], 'plumbing'>, string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
 const DOCS_ORIGIN = 'https://kayjs.kaynooo.fr'
 
@@ -74,7 +74,7 @@ export default function routesTab(tool: DevTool, tab: DevTab): () => void {
   }
 
   tab.panel.append(bar.element, body)
-  win.addEventListener(BUILT_EVENT, () => {
+  win.document.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
       void list()
   }, { signal: tool.kit.signal })

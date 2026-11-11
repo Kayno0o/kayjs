@@ -17,7 +17,7 @@ Each topic is one file, read whole with one command:
 - [Chat blocks](llms/chat-blocks.md): `@turn`, `@actions`, `@call`, `@source`, `@empty` and `@footer` replacing how a turn, the buttons under it, a tool call (a result card), a cited source, the empty chat and the area under the form are drawn, forwarded by `ChatLauncher`
 - [Hooks around an ask](llms/hooks.md): `ai({ beforeRequest, onStep, onToolCall, onSuccess, onError })` and the same names per `ask`, added to the ones of `ai()`, to log, redact, moderate, bill or trace every ask without wrapping it, what each gets and when, and the fake
 - [Regenerating and editing](llms/chat-regenerate.md): `regenerate` and `editable` on `Chat`, what leaves the log and the history, `replaces()` for a server keeping the conversation, Try again, the edit field's keys and words
-- [Chat events and control](llms/chat-events.md): `Chat`'s `onSend`, `onReply`, `onStop`, `onError`, `onToolCall`, `onRegenerate`, `onEdit` and `onSuggestion` and the order they run in, `ChatLauncher`'s `open`, `onOpenChange` and `hash`, the `kai-chat-open`, `kai-chat-send` and `kai-chat-draft` events, `suggestions` as a function
+- [Chat events and control](llms/chat-events.md): `Chat`'s `onSend`, `onReply`, `onStop`, `onError`, `onToolCall`, `onRegenerate`, `onEdit` and `onSuggestion` and the order they run in, `ChatLauncher`'s `open`, `onOpenChange` and `hash`, the `kai:chat-open`, `kai:chat-send` and `kai:chat-draft` events, `suggestions` as a function
 - [Chat sources](llms/chat-sources.md): `ask({ sources })` and what `Chat` does with the `[n]` a reply cites: links, the cited list under the turn, `remember`, `initial`
 - [Limits and the token budget](llms/limits.md): `ai({ rateLimit, budget, key })`, the stores, when tokens count, the `limited` error and a failing store
 - [Personal data and the AI notice](llms/personal-data.md): what goes to the provider (US transfers, DPA, the privacy notice), what kayjs-ai keeps, the disclosure line `Chat` shows and how to word it
@@ -30,3 +30,14 @@ Each topic is one file, read whole with one command:
 ## Environment
 
 Every variable starts `AI_`, but the vendors keep their own names (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`). `AI_INSECURE=true` lets a key go over plain http to a host that is not loopback, as `MAIL_INSECURE=true` of kayjs-mail sends without STARTTLS to a server you trust.
+
+## Events
+
+`<lib>:<verb>` on `document`, an object `detail`, as every event of the table in kay's `llms/events.md` is; the `kai-chat-*` names on the window, with the text as `detail`, are heard until 1.103.
+
+| Event | Does | `detail` |
+| --- | --- | --- |
+| `kai:chat-open` | opens a `ChatLauncher` | `{}` |
+| `kai:chat-send` | sends the text as the next message | `{ text }` |
+| `kai:chat-draft` | puts the text in the field | `{ text }` |
+| `kai:chat-new` | a launcher tells its chat to start over, on `.kai-chat` | `{}` |

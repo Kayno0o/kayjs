@@ -73,6 +73,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" variant="tile")',
     right: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" layout="tile")',
   },
+  'deprecated-event-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    site: true,
+    summary: 'An event under its name before 1.99. Every public DOM event is `<lib>:<verb>` on the `document` with an object `detail`: `kay:renew`, `kay:install`, `kay:dev-built`, `kay:dev-types`, `kai:chat-open`, `kai:chat-send` and `kai:chat-draft` (`detail: { text }`), where `kay-renew`, `kay-dev-built`, `kay-dev-types` and the chat\'s `kai-chat-*` were dashed, on the window, with no detail or a bare string. The old names still fire, on their old target with their old detail, until 1.103. Found in the TypeScript files and `.kay` scripts of the project, on a literal name and the window (or no object); a handler written in a template is not read, nor an event on another element, as `kai-chat-send` on a `.kai-chat` element or `kui-hold-defaults` on a form. The fix moves a listener for `kay-renew` or `kay:install` to the document, and a dispatch of `kai-chat-open`, or of `kai-chat-send` or `kai-chat-draft` with a text `detail` written as `{ detail: text }`; a listener of `kay-dev-built` or `kay-dev-types`, whose `detail` changed, and a dispatch written otherwise are reported with no fix.',
+    wrong: 'import { gate } from \'./gate\'\n\nwindow.dispatchEvent(new CustomEvent(\'kai-chat-send\', { detail: gate() }))\naddEventListener(\'kay-renew\', () => gate())',
+    right: 'import { gate } from \'./gate\'\n\ndocument.dispatchEvent(new CustomEvent(\'kai:chat-send\', { detail: { text: gate() } }))\ndocument.addEventListener(\'kay:renew\', () => gate())',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
@@ -99,4 +108,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.96' },
   { since: '1.97' },
   { since: '1.98' },
+  { since: '1.99' },
 ]

@@ -132,7 +132,7 @@ it('the launcher keeps its conversation on the server, named by the browser rath
   await page.waitFor('.kai-chat-conversation[data-current] .kai-chat-conversation-link', { text: 'launcher question' })
 
   expect(await page.evaluate(() => location.search)).toBe('')
-  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('kai-chat-conversation:')))).toHaveLength(1)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('kai:chat-conversation:')))).toHaveLength(1)
 
   // A page loaded afresh, not swapped, finds the conversation in the browser.
   await page.goto('/held-launcher/two')

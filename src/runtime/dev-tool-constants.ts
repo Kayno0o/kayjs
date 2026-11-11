@@ -1,12 +1,12 @@
 // The addresses, storage keys and patterns the parts of the dev tool share. Split from dev-tool.ts, which the dev server serves with the modules it imports.
 
 export const HOST = 'kay-dev'
-export const STATE_KEY = 'kay-dev'
-export const LAYOUT_KEY = 'kay-dev-layout'
+export const STATE_KEY = 'kay:dev'
+export const LAYOUT_KEY = 'kay:dev-layout'
 export const CHECK_PROBLEMS = 'kay-check-problems'
 // The type errors `kay dev` found, in a block of their own that the `types` event it sends rewrites.
 export const TYPE_PROBLEMS = 'kay-type-problems'
-export const TYPES_EVENT = 'kay-dev-types'
+export const TYPES_EVENT = 'kay:dev-types'
 export const REQUEST = 'kay-dev-request'
 export const HEAD_HEADER = 'x-kay-dev'
 export const REQUEST_URL = '/_kay/dev/request'

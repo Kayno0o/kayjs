@@ -187,10 +187,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     const fetched = await fetches()
 
     slowIsland = 3000
-    await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
+    await tab.evaluate(() => document.dispatchEvent(new CustomEvent('kay:renew', { detail: {} })))
     await untilHolds(() => islandLoads().length > loads)
     // The island is being fetched, the server holding its answer.
-    await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
+    await tab.evaluate(() => document.dispatchEvent(new CustomEvent('kay:renew', { detail: {} })))
     await tab.waitUntil((count: number) => performance.getEntriesByType('resource').filter(entry => entry.name.includes('kay_island=')).length > count, { timeout: '15s' }, fetched)
     // A second fetch, had the renewal queued one, would be asked as the first answered, so a short window is all there is to wait out.
     await Bun.sleep(1000)

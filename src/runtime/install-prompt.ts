@@ -28,6 +28,12 @@ function onServer(): boolean {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined'
 }
 
+// `kay:install` on the document tells the offer changed; the same name on the window, with no detail, is the old form, dispatched too until 1.103.
+function announce(): void {
+  document.dispatchEvent(new CustomEvent('kay:install', { detail: { available: Boolean((globalThis as Installable).$kayInstall) } }))
+  dispatchEvent(new Event('kay:install'))
+}
+
 let installable: (() => boolean) | undefined
 
 function installSignal(): () => boolean {
@@ -36,16 +42,16 @@ function installSignal(): () => boolean {
 
   const [read, write] = createSignal<boolean>(Boolean((globalThis as Installable).$kayInstall))
 
-  addEventListener('kay:install', () => write(Boolean((globalThis as Installable).$kayInstall)))
+  document.addEventListener('kay:install', () => write(Boolean((globalThis as Installable).$kayInstall)))
   // The page's own listener, for an app without `push()`: an offer made before this island hydrated is lost to it, one made after is held from here on.
   addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault()
     ;(globalThis as Installable).$kayInstall = event as InstallEvent
-    dispatchEvent(new Event('kay:install'))
+    announce()
   })
   addEventListener('appinstalled', () => {
     ;(globalThis as Installable).$kayInstall = null
-    dispatchEvent(new Event('kay:install'))
+    announce()
   })
   installable = read
 
@@ -81,7 +87,7 @@ export const installPrompt = {
 
       // An offer is used once; the browser makes another when it sees fit.
       ;(globalThis as Installable).$kayInstall = null
-      dispatchEvent(new Event('kay:install'))
+      announce()
 
       return outcome
     }

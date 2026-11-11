@@ -1,7 +1,9 @@
 import { onCleanup, onMount } from 'kay'
 import { warnUnnamed } from './unnamed'
 
-const HOLD = 'kui-hold-defaults'
+// Dispatched by a form that saves, bubbling so the document hears it too; `detail.adopt` takes what each control holds. `kui-hold-defaults` on the form, with `adopt` itself as the detail, is the old name, dispatched too until 1.103.
+const HOLD = 'kui:hold-defaults'
+const LEGACY_HOLD = 'kui-hold-defaults'
 
 function formOf(element: Element): HTMLFormElement | null {
   if (element instanceof HTMLFormElement)
@@ -92,7 +94,7 @@ export function onFormDefaults(element: () => Element | undefined, hold: () => (
     if (!form)
       return
 
-    const listener = (event: Event) => (event as CustomEvent<(() => void)[]>).detail.push(hold())
+    const listener = (event: Event) => (event as CustomEvent<{ adopt: (() => void)[] }>).detail.adopt.push(hold())
 
     form.addEventListener(HOLD, listener)
     onCleanup(() => form.removeEventListener(HOLD, listener))
@@ -118,7 +120,8 @@ export function defaultKept<Value>(element: () => Element | undefined, current: 
 export function holdDefaults(form: HTMLFormElement): () => void {
   const adopt: (() => void)[] = []
 
-  form.dispatchEvent(new CustomEvent(HOLD, { detail: adopt }))
+  form.dispatchEvent(new CustomEvent(HOLD, { detail: { adopt }, bubbles: true }))
+  form.dispatchEvent(new CustomEvent(LEGACY_HOLD, { detail: adopt }))
 
   return () => {
     for (const keep of adopt)

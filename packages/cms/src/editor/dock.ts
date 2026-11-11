@@ -11,7 +11,9 @@ export interface Layout {
   open: boolean
 }
 
-const KEY = 'kcms-editor'
+const KEY = 'kcms:editor'
+// The name before 1.99: read when the new one holds nothing and removed on the next write, so a layout is kept; it goes with 1.103.
+const LEGACY_KEY = 'kcms-editor'
 // 64rem and 40rem, where the editor first fits beside the page and where it stops fitting there at all.
 const WIDE = 1024
 const NARROW = 640
@@ -30,7 +32,7 @@ export function browserStorage(): Storage | undefined {
 
 export function readLayout(storage: Pick<Storage, 'getItem'> | undefined): Layout {
   try {
-    const read: unknown = JSON.parse(storage?.getItem(KEY) ?? '{}')
+    const read: unknown = JSON.parse(storage?.getItem(KEY) ?? storage?.getItem(LEGACY_KEY) ?? '{}')
 
     if (typeof read !== 'object' || read === null)
       return DEFAULT_LAYOUT
@@ -49,9 +51,10 @@ export function readLayout(storage: Pick<Storage, 'getItem'> | undefined): Layou
   }
 }
 
-export function writeLayout(storage: Pick<Storage, 'setItem'> | undefined, layout: Layout): void {
+export function writeLayout(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'removeItem'>> | undefined, layout: Layout): void {
   try {
     storage?.setItem(KEY, JSON.stringify(layout))
+    storage?.removeItem?.(LEGACY_KEY)
   }
   catch {}
 }

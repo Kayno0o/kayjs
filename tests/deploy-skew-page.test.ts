@@ -67,7 +67,7 @@ describe('a page noticing a deploy', () => {
     expect(await skew(answer('bbb', 404))).toBe(true)
     expect(reload).toHaveBeenCalledTimes(1)
     expect(navigation.stale).toBe(true)
-    expect(Number(sessionStorage.getItem('kay-reloaded'))).toBeGreaterThan(0)
+    expect(Number(sessionStorage.getItem('kay:reloaded'))).toBeGreaterThan(0)
 
     // The page the reload loaded still says it is the old one, as a cache in front of the server may keep it: no second reload.
     expect(await noticed(answer('bbb', 404))).toBe(false)
@@ -207,7 +207,7 @@ describe('a page noticing a deploy', () => {
     fetched.mockResolvedValue(answer('ccc'))
     expect(await probe()).toBe(false)
 
-    sessionStorage.setItem('kay-reloaded', String(now - 61_000))
+    sessionStorage.setItem('kay:reloaded', String(now - 61_000))
     expect(await probe()).toBe(true)
     expect(reload).toHaveBeenCalledTimes(2)
   })
