@@ -1,6 +1,57 @@
 # What's new, older releases
 
-What each release before 1.97 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.98 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.97.0
+
+- The 404 log forgets a path past 90 days on an hourly timer, and kayjs-cms sweeps expired drafts from the browser at load and hourly, not only when one is written ([privacy](privacy.md)).
+- kayjs-mail's outbox page now streams through `eventStream`, exported from `kay/library` for libraries, so the stream is drained when the server stops ([event streams](api-from-islands.md)); kayjs-cms's editor learns that a saved change is live when the server is replaced by the rebuilt one, over a stream of the instance's id, and no longer reads the page every 4 seconds ([screens](../packages/cms/llms/screens-replacing.md)).
+- kayjs-mail's outbox page now streams through `eventStream`, exported from `kay/library` for libraries, so the stream is drained when the server stops ([event streams](api-from-islands.md)); kayjs-cms's editor learns that a saved change is live when the server is replaced by the rebuilt one, over a stream of the instance's id, and reads the page at once then, besides a slow read every 15 to 30 seconds, instead of every 4 seconds ([screens](../packages/cms/llms/screens-replacing.md)).
+- kayjs-cms adds a Revoke shared links button on an entry, which refuses every preview link already shared for it and is noted in the activity ([CMS history](../packages/cms/llms/history.md)).
+- `preview.sharedNotBefore` in kay.config.ts (and `setSharedNotBefore` from `kay/server`) revokes an entry's share links: it answers the time before which no link of that entry is accepted, and an older link is refused as expired ([preview mode](content-preview.md)).
+- kayjs-cms names more of its controls for assistive technology: the tables carry a hidden caption, a locked field's group a name, the Compare and Hide links the locale, the colour swatch its own name, "Add redirect" keeps its words first, and an alt-text or sign-in error is linked to its input; the new texts are the `cms.table.entries`, `cms.media.table`, `cms.uploads.table`, `cms.redirects.configured`, `cms.locales.compareAria`, `cms.locales.stopCompareAria` and `cms.field.colorPicker` wordings, and `cms.missing.addAria` now opens with "Add redirect".
+- kayjs-ui: `Size` (`xs` to `lg`) is exported beside `Tone`, and every control's `size` prop is typed from it ([basics](../packages/ui/llms/basics.md)).
+- kayjs-ui: Toaster and CommandPalette take `shortcut`, a full chord like SaveForm's, and `false` or `null` turns it off on all three; `hotkey` is deprecated, and `kay upgrade` rewrites it ([toasts](../packages/ui/llms/toasts.md), [upgrading](upgrading.md)).
+
+- `announce(text, within?)` from `kay` is the one screen-reader announcer: a pending block, a page swap and kayjs-ui's `announce` (now this function) share one live region ([navigation](navigation.md)).
+
+- A `role="group"` (ChipGroup, RangeInput, FileDrop, RowsField) is marked `data-invalid` in place of `aria-invalid`, which ARIA does not allow there; `focusInvalid` and `markInvalid` follow it ([navigation](navigation.md), [upgrading](upgrading.md)).
+
+- kayjs-ui: IconPicker says how many icons a search found (`ui.iconPicker.results`), and a `Board` item moved by key into another container says its name (`ui.dnd.movedTo`) ([pickers](../packages/ui/llms/pickers.md), [drag and drop](../packages/ui/llms/charts-drag-and-media.md)).
+
+- kayjs-ui: with several series, each series of a BarChart after the first is hatched in its own pattern, on its bars and in the legend, as LineChart dashes its lines ([charts](../packages/ui/llms/charts.md)).
+
+- The checkbox of a Markdown task-list item with no text is `aria-hidden`, as nothing could name it ([content](content-markdown-to-caching.md)).
+
+- kayjs-ui: a FormField around a FileDrop names, describes and marks the zone, not its hidden file input ([forms](../packages/ui/llms/forms.md)).
+
+- kayjs-ui: the `text-2xs` size is 10px (it was 9.6px), so chart ticks, calendar weekdays, gallery counters and table cell labels stay readable ([restyle](../packages/ui/llms/restyle.md)).
+
+- kayjs-ui: a HoverCard can be hovered, as its text can be read at length: it stays while the pointer is on it after the app cleared the anchor, and it no longer hides behind its own invisible anchor stand-in ([popovers](../packages/ui/llms/basics.md)).
+
+- kayjs-ai: the chat's field is named `Message` (`fieldLabel`) apart from the log, the Allow and Deny buttons of a held tool call carry the tool's name and Allow takes focus, and starting a conversation over is said to screen readers (`startedLabel`) ([Chat](../packages/ai/llms/chat.md)).
+
+- kayjs-ui: a required FormField shows the word `required` after the `*` (`ui.field.required`, French included), and a DateInput inside a FormField is named by the label text, not by its calendar button ([forms](../packages/ui/llms/forms-and-steps.md)); every literal `target="_blank"` link in kayjs-ui, kayjs-mail and kayjs-cms carries `data-new-tab`, so a screen reader hears it opens in a new tab.
+
+- `typescript7` and `axe-core` are optional peers of kay, no longer installed in production: `kay new` adds both to `devDependencies`, a missing one stops `kay check`, `kay a11y` and the dev tool's checks with the `bun add -d` command to run, `kay doctor` has a `peers` check, and `kay upgrade` adds them to an existing app ([tools](check-and-tools.md), [upgrading](upgrading.md)).
+- `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
+- `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
+- The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).
+- `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
+- `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).
+- The MCP `add` tool takes `install: true` with `apply: true`, which runs `bun add` and `bun install` so a library the project lacks (`auth`, `mail`, `cms`, `ai`, `ui`) can be added from an agent ([editor and agent commands](editor-and-agent-commands.md)).
+- A hanging `onStop` hook is given up on after `serve.shutdownTimeout`, so the hooks after it and the stores' closing still run ([production](production.md)); the 404 log and redirects of a `pgData` store give up on a database call after 8 seconds, logged ([routing](routing-endpoints-and-base.md)); `keepalive` calls share the browser's 64 KB cap between them, the one past it going as a plain post ([actions from islands](actions-from-islands.md)).
+- `kay check --fix` applies only fixes that keep behaviour: `island-prop`'s `--- island`, `unreachable-selector`'s `:global(...)` and an `old-bun-image` pinned by digest are offered, not applied. The `brace-in-attribute` fix reads the scope of the name, the missing-import fix finds the imports of a module from its syntax, two fixes at one place apply in a fixed order, and `deprecated-local-state` leaves a template's prose and names it binds itself alone ([checks](lints.md)).
+- `kay mcp` refuses a `render` that POSTs and the `test` tool unless it was started with `--write`, as both run the app's code against its database, and `not_found` hands the paths visitors typed as data, cut at 120 characters ([MCP commands](editor-and-agent-commands.md)).
+- A `workflow()` run writes each step's result once, as a row of its own beside its job, so a step costs the same in a run of 2,000 steps as in one of ten; runs kept before resume and move to rows at their next step ([queues](queues.md)).
+- A queue keeps at most 2,000 characters of a failure's error, and a `workflow()` run fails with no retry once its kept results pass 2 MB, naming what to do ([queues](queues.md)).
+- `kay new`'s test workflow runs on pull requests and on pushes to `main`, not twice for a pull request's commit, and the Forgejo Pages workflow's `SITE_URL` is `${{ vars.SITE_URL || github.server_url }}` in place of a `pages.example.com` placeholder ([project new and add](project-new-and-add.md)).
+- `markdownHtml` (a user's Markdown, on the server and in an island) writes `loading="lazy"` on its images ([content](content.md)).
+- kayjs-ai: an API root holding credentials in its URL (`https://user:pass@host`) is refused, naming the variable, as the key variables and options are where they go ([asking](../packages/ai/llms/asking.md)).
+- kayjs-mail: the dev outbox file `.kay/mail-outbox.json` is written readable by its owner alone (0600) ([mail](../packages/mail/llms/contact-form-and-testing.md)).
+- Links the libraries draw in a new tab by hand (kayjs-ui's subscribe form, app switcher and map attribution, kayjs-mail's, kayjs-auth's privacy link, kayjs-cms's) carry `rel="noopener noreferrer"`, as kayjs-ui's `OUTSIDE` does.
+- kayjs-ui: `MapView` loads Leaflet once the map is near the viewport, so one below the fold downloads none of it until it is scrolled to ([charts and MapView](../packages/ui/llms/charts.md)).
+- `/_kay/draft` answers 429 with `Retry-After` to an editor past 300 drafts a minute, and the browser error and CSP report routes answer 429 once all clients together pass 600 a minute, on top of each client's own limit ([edit mode](content-edit.md), [security](proxy-and-security.md)).
 
 ## 1.97.0 (continued)
 
@@ -41,50 +92,5 @@ What each release before 1.97 added, and the end of a newest release that was cu
 - `RowsField` shows an action's refusal of a row cell (`<name>_<key>.<n>`, `<name>.<n>`, or a bare `<name>_<key>`) under its row instead of a toast, takes `size`, and a FormField shows a refusal of one item of a list (`tags.1`) ([forms](../packages/ui/llms/forms.md#rowsfield)).
 - kayjs-ui: `TextInput` and `Combobox` take `icon`, drawn inside the box at its start with the text after it and hidden from screen readers, and a `type="search"` TextInput draws the search icon on its own (`icon={false}` leaves it out) ([forms](../packages/ui/llms/forms.md)).
 - An action call and an api `call()` take `keepalive: true`, for a save made from `pagehide` or `beforeunload`; a body over the browser's 64 KB cap is sent without it ([actions from islands](actions-from-islands.md), [api from islands](api-from-islands.md)).
-
-## 1.95.0
-
-- A page opens its one live connection once the islands it hydrates as it loads have all subscribed, however late their code arrives, instead of a second one when an island is slow ([live values](live-values.md)).
-- kay 1.95 no longer makes a component an island for the function or block it passes one (`island-prop` is the answer, with `--- island` its fix), reads `// kay-island` and `// kay-static` as comments, and adds no import for a `kay` value or `t` used without one, which is a type error: the deprecations `promoted-island`, `island-comment` and `implicit-import` are removed ([Islands](islands.md#islands), [Every name is imported](components.md#every-name-is-imported)).
-- A component exports `island = { hydrate, persist }` from its `--- module` fence for the defaults it wants wherever it is used, a parent's own `hydrate` and `persist` winning ([islands](islands.md#hydrate-an-island-later)). kayjs-ai `ChatLauncher` is an island by it, persisted and hydrating with its chat when the browser is idle; a static page or layout giving it a function or a block with parameters gets `island-prop` from `kay check`, as for any island, its fix writing `--- island`.
-- An `s.Optional` env field whose `<NAME>_FILE` names a missing, unreadable or empty file is left unset with one warning naming the file, instead of stopping the boot; a required field still stops it ([environment](environment.md)).
-- On Postgres (`pgData`, `pgJobs`) a write reaches the other processes at once: a job enqueued in one starts in another idle one within a second, and a live value or an `invalidate` reaches another worker's clients within a second after a quiet stretch, through `LISTEN`/`NOTIFY` (one extra connection per serving process). Polling stays as the fallback, and a database that refuses `LISTEN` keeps it alone ([jobs](queues.md))
-- `requireGuards` unset now refuses (403) each page, endpoint and API module no guard covers on a site with a guard of its own, and `kay check` reports each as an `unguarded-route` error; `requireGuards: false` keeps the old behaviour ([guards](guards.md), [upgrading](upgrading.md)).
-- The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
-- kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` ([charts](../packages/ui/llms/charts.md)).
-- kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` or a button when given `onMark` ([charts](../packages/ui/llms/charts.md)).
-- `kay dev` runs no type check after an edit that changes no type: the static text of a `.kay` template, in a file with no type error ([dev server](dev-server.md)).
-- `mcp: { instructions }` is sent as the `instructions` of the MCP `initialize` answer, guidance spanning tools that a client shows its model before any tool description, and `site.mcp.initialize()` in `kay/test` reads it ([API routes](api-routes.md)).
-- `sanitizeHtml` takes `lazyImages: true`, which writes `loading="lazy"` on every kept `img` that has no `loading` of its own ([templates](templates-elements-slots-snippets.md)).
-- The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
-
-## 1.97.0 (continued)
-
-- `kay build --static` merges its security headers into a `public/_headers` instead of leaving them out, without a header your file names ([static export](prerendering.md#static-export)).
-- A loader's slug may not climb out of the site, so one such as `a/../../x` is a content problem naming its entry, not a failed export ([content from a CMS](content-cms.md)).
-- `lints: { comments: { reason, file, denied } }` in kay.config.ts makes a `// kay-allow` comment need a ` -- reason`, refuses `kay-allow-file`, or keeps a lint set to `deny` out of a comment's reach; a comment it refuses is reported as `allow-refused` ([lints](lints.md#allow-a-lint-on-one-line)).
-- `fetchPublic` sends the `headers` you set on a redirect hop to the same origin only; a hop to another origin keeps `accept`, `accept-language` and `user-agent`, so a credential, cookie or API key stays with its own host.
-- kayjs-cms: `forgejo()`, `github()` and `gitlab()` refuse a redirect from the forge, so a renamed repository needs its new `repo` in the config, and read at most 64 KB of an error body ([setup](../packages/cms/llms/setup.md)).
-- kayjs-cms: `fourEyes` refuses an approval by a person the guard cannot name, as it cannot tell them from the sender, with a new `cms.review.unnamedApproval` wording ([review](../packages/cms/llms/review.md)); a guard of your own gives `cms({ member })` to approve under it.
-- kayjs-auth: asking for another address mails the address the account is leaving at once, as an `email-change-requested` notice and event, where only the confirmation told it before; and `email.confirmChange` answers `invalid` when another account takes the address in the same instant, instead of failing ([security mails](../packages/auth/llms/passwords-and-mails.md#security-mails)).
-- kayjs-auth: `organizations.members` gives the others' emails only to a member who manages members ([admin and organizations](../packages/auth/llms/admin-and-organizations.md)).
-- kayjs-auth: `forwardAuth`'s route asks the second factor as a sign-in does: the app's `twoFactor.require` holds there, and a session signed in with a passkey passes `requireTwoFactor` ([forward auth](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-auth: the consent page says a self-registered client's name was not checked, with a new `auth.consent.unverified` wording, French included ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-cms: a share link made for an entry is a `share` line of the activity log, with the person who made it, and a new `cms.activity.share` wording ([the activity log](../packages/cms/llms/history.md)).
-- kayjs-cms: a role limited by `collections` or `own` is given the titles of a collection to pick from only when it reads it or a collection it reaches has a reference field to it, and the entries named in a delete confirmation are those it may read ([roles](../packages/cms/llms/options.md)).
-
-## 1.96.0 (continued)
-
-- `kay lint --help` and `kay test --help` open with what kay adds, then print keslint's and `bun test`'s help; `kay test --format json` prints `{ ok, exitCode, pass, fail, skip, tests, files }` as one document with the report on stderr, `kay lint --format json` hands keslint ESLint's JSON, and `kay new --help` describes `--editor` ([commands](check-and-tools.md)).
-- A call whose action redirects rejects with `ActionRedirectError` (its `location`) as the browser navigates, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
-- A call whose action redirects rejects with `ActionRedirectError` (its `location`) once the browser has gone there, so `pending()` clears and `settled()` resolves, instead of never settling ([actions from islands](actions-from-islands.md)).
-- `every`, `watch`, `listen`, `shortcut`, `guardLeave`, `followLog` and `presence` return a function that stops them before the island ends, and take `{ signal }`, an `AbortSignal` that stops them when aborted ([Effects and lifecycle](effects.md)).
-- A `required` FormField and `describeField({ required })` write the native `required` as well as `aria-required`, server-rendered, and RadioGroup, Segmented, Rating, Checkbox, Toggle and ChipGroup take a typed `required` ([FormField](../packages/ui/llms/forms-and-steps.md)).
-- kayjs-auth's stock register page draws a purpose line and a link to the privacy policy under the form with `pages: { privacy, purpose }`, and a production start warns when sign-up is open without `privacy` ([auth setup](../packages/auth/llms/setup.md)).
-- A request an API route's or an endpoint file's guards refuse now counts against its `rateLimit`, and over the limit gets 429 in place of the refusal, so a password is no longer guessed at full speed; `basicAuth` also limits wrong credentials per client, 10 every 5 minutes, with its own `rateLimit` option (`false` turns it off) ([rate limits](rate-limits.md), [API routes](api-routes.md)).
-- `localePath()`, `localize()` and `alternate()` collapse a leading `//` or `/\` of the path they get, so a language switcher on a path the visitor typed never links to another site ([locales](locales.md)).
-- A YAML anchor bomb or an alias pointing at its own node in an entry's frontmatter or data file is refused as an entry problem, instead of exhausting memory at build ([content](content.md)).
-- A `local()` mirror and its queue are emptied when another person signs in, not only at sign-out: kayjs-auth tags each sign-in and each start or end of an impersonation, and `forgetLocalMirrors(request, person)` does it for an app's own ([local collections](local-collections.md)).
-- An effect that never settles is stopped after 1000 rounds and named in development, and the page's other effects keep running instead of staying stale ([components](components.md)).
 
 Releases before 1.96 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

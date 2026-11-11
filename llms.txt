@@ -108,7 +108,7 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
 - [Upgrading, older releases](llms/upgrading-archive.md): the minors before 1.96
 - [What's new](llms/whats-new.md): what each recent release adds
-- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.97
+- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.98
 - [Privacy and personal data](llms/privacy.md): what kay keeps, how long, erasing a person
 - [Events and names](llms/events.md): DOM events, cookie and key rules
 - [Notifications](llms/notifications.md): `notify()`, the Bell
