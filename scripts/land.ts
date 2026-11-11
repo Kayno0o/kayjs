@@ -1,4 +1,4 @@
-import { appendFile } from 'node:fs/promises'
+import { appendFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -9,6 +9,7 @@ import { hostEnv } from './host-env'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { describeSamples, describeScope, sampleScope, scopeLimit, scopeMemory, sizeForScope } from './scope-memory'
+import { describeSilentExit, junitFiles } from './silent-exit'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { nicedCommand, slotPrefix } from './step-command'
 import { subprocessTests } from './subprocess-tests'
@@ -114,17 +115,43 @@ async function step(label: string, argv: string[], cwd = '.', lock?: string) {
   }
 }
 
+// The files a test step's run lists and those that reported a result, the first from the same run with a test filter nothing matches, which loads each file and runs none of them.
+async function shardFiles(argv: string[], report: string) {
+  const listing = `${report}.list`
+
+  await Bun.spawn(['sh', '-c', 'exec "$@" >/dev/null 2>&1', 'sh', ...nicedCommand([...argv, '--test-name-pattern=^$never', '--reporter=junit', `--reporter-outfile=${listing}`])], { stdin: 'ignore' }).exited
+
+  const files = { listed: await reportedFiles(listing), reported: await reportedFiles(report) }
+
+  await rm(listing, { force: true })
+  await rm(report, { force: true })
+
+  return files
+}
+
+async function reportedFiles(path: string): Promise<string[]> {
+  try {
+    return junitFiles(await Bun.file(path).text())
+  }
+  catch {
+    return []
+  }
+}
+
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
 async function run(label: string, argv: string[], cwd: string, lock?: string) {
   const started = performance.now()
   const before = scopeMemory()
   const sampler = sampleScope()
+  // A test step's junit report lists the files that reported a result, which tells a dead worker's file when the output does not.
+  const report = lock === TESTS_LOCK ? join(os.tmpdir(), `kay-land-${process.pid}-${Date.now()}.xml`) : undefined
+  const command = report === undefined ? argv : [...argv, '--reporter=junit', `--reporter-outfile=${report}`]
 
   process.stdout.write(`${label}: `)
   await appendFile(LOG, `$ ${label}\n`)
 
   // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
-  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...nicedCommand(argv)], { cwd, env: lock === undefined ? process.env : { ...process.env, KAY_LAND_LOCKED: lock }, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
+  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...nicedCommand(command)], { cwd, env: lock === undefined ? process.env : { ...process.env, KAY_LAND_LOCKED: lock }, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {
@@ -166,6 +193,9 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
   if (exitCode === 0 && !hung) {
     console.log(`ok, ${seconds} s${peak}`)
 
+    if (report !== undefined)
+      await rm(report, { force: true })
+
     return
   }
 
@@ -177,6 +207,13 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
 
   if (crashed.length > 0 || exitCode === 137)
     crashed.push(describeScope(scopeMemory(), before))
+
+  if (report !== undefined && !hung && exitCode !== 137) {
+    const silent = describeSilentExit({ exitCode, lines, held: sampled?.held, limit: scopeLimit(), before, after: scopeMemory(), ...(failures.length === 0 && crashed.length === 0 ? await shardFiles(argv, report) : { listed: [], reported: [] }) })
+
+    if (silent !== undefined)
+      crashed.push(silent)
+  }
 
   console.error([...failures, ...crashed, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].filter(Boolean).join('\n\n'))
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)

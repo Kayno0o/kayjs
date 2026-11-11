@@ -5,10 +5,15 @@ import { dirname } from 'node:path'
 export interface ScopeMemory {
   peak: number
   oomKills: number
+  // memory.events' `max` (times the limit was hit and reclaim ran) and `oom` (times reclaim failed), the counters that move before a kill.
+  max: number
+  oom: number
 }
 
 const CGROUP_LINE = /^0::(.+)$/m
 const OOM_KILL = /^oom_kill (\d+)$/m
+const EVENT_MAX = /^max (\d+)$/m
+const EVENT_OOM = /^oom (\d+)$/m
 
 function read(path: string): string | undefined {
   try {
@@ -27,7 +32,12 @@ export function scopeMemory(): ScopeMemory | undefined {
   if (folder === undefined || peak === undefined)
     return undefined
 
-  return { peak: Number(peak), oomKills: Number(OOM_KILL.exec(read(`/sys/fs/cgroup${folder}/memory.events`) ?? '')?.[1] ?? 0) }
+  return { peak: Number(peak), ...parseEvents(read(`/sys/fs/cgroup${folder}/memory.events`) ?? '') }
+}
+
+// The counters of a memory.events file, 0 for one it does not list.
+export function parseEvents(events: string): Pick<ScopeMemory, 'oomKills' | 'max' | 'oom'> {
+  return { oomKills: Number(OOM_KILL.exec(events)?.[1] ?? 0), max: Number(EVENT_MAX.exec(events)?.[1] ?? 0), oom: Number(EVENT_OOM.exec(events)?.[1] ?? 0) }
 }
 
 const MB = 1024 * 1024
