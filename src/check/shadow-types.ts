@@ -40,18 +40,15 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
-
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { redirectPermanent } from './redirect-permanent'
-
 import { removedUiTokens } from './removed-ui-tokens'
 import { scheduleTz } from './schedule-tz'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
-
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
