@@ -42,7 +42,7 @@ const SCHEMA_KEY = /^\s*([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+):\s*s\.(?:Optional|String
 const ROOT = join(import.meta.dir, '..')
 const ANY = new Set(['NODE_ENV'])
 // What a host, the OS or a tool sets, or the app's own name in a template string, which kay reads without owning.
-const FOREIGN = new Set(['BROWSER', 'DATABASE_URL', 'FORCE_COLOR', 'GITHUB_WORKSPACE', 'HOST', 'LOCALAPPDATA', 'MIGRATE_DATABASE_URL', 'NODE_PORT', 'NO_COLOR', 'PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'PORT', 'SITE_BASE', 'SITE_URL', 'TRACKER_PASSWORD', 'TRACKER_USER', 'UMAMI_HOST', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'X'])
+const FOREIGN = new Set(['BROWSER', 'DATABASE_URL', 'FORCE_COLOR', 'GITHUB_WORKSPACE', 'HOST', 'LOCALAPPDATA', 'MIGRATE_DATABASE_URL', 'NODE_PORT', 'NO_COLOR', 'PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'PORT', 'SHELL', 'SITE_BASE', 'SITE_URL', 'TRACKER_PASSWORD', 'TRACKER_USER', 'UMAMI_HOST', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'X', 'XDG_CONFIG_HOME'])
 const BUN = /^BUN_/
 const VENDOR = new Set(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'])
 // kayjs-ai's switch for its own tests, read where `ask` picks a provider.
