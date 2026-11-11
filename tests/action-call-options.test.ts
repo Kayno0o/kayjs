@@ -730,6 +730,25 @@ describe('keepalive', () => {
     expect(sent).toEqual([undefined, undefined])
   })
 
+  it('shares the 64 KB between the calls in flight: the one past it goes as a plain fetch', async () => {
+    const sent: (boolean | undefined)[] = []
+
+    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async (_url: string, init?: RequestInit) => {
+      sent.push(init?.keepalive)
+      await Bun.sleep(20)
+
+      return new Response(stringify('ok'), { headers: { 'content-type': 'application/json' } })
+    }) as unknown as typeof fetch))
+
+    const stub = actionStub('/_kay/action/keep') as unknown as Call
+    const text = 'x'.repeat(40 * 1024)
+
+    await Promise.all([stub({ text }, { keepalive: true }), stub({ text }, { keepalive: true })])
+    // What the first held is free again once it answered.
+    await stub({ text }, { keepalive: true })
+    expect(sent).toEqual([true, undefined, true])
+  })
+
   it('stays on for a body of exactly 64 KB', async () => {
     const sent = keepaliveSent()
     const stub = actionStub('/_kay/action/keep') as unknown as Call

@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
+- A hanging `onStop` hook is given up on after 5 seconds, so the hooks after it and the stores' closing still run ([production](production.md)); the 404 log and redirects of a `pgData` store give up on a database call after 8 seconds, logged ([routing](routing-endpoints-and-base.md)); `keepalive` calls share the browser's 64 KB cap between them, the one past it going as a plain post ([actions from islands](actions-from-islands.md)).
 - `mount()` returns a handle, `{ update(props), dispose }` that is still callable as the disposer, and takes a function for its props, `() => ({ title: title() })`, whose signals the mount follows ([a page kay does not serve](navigation-from-code.md#a-page-kay-does-not-serve)).
 - kayjs-ui: `NavigationProgress` is a thin top bar following `navigation.pending()` with a delay before it shows, and the link a visit follows carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script ([page layout](../packages/ui/llms/page-layout-palette-and-trees.md), [navigating from code](navigation-from-code.md)).
 - kayjs-ui: `Meter` announces `value` out of `max` (3 of 10 is 3, not 30) and takes `formatValue`, `showValue` and a `@reading` block for its value as text, `thresholds` to colour the fill by value and `size`; `Progress` takes the same ([kayjs-ui basics](../packages/ui/llms/basics.md)).

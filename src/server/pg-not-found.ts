@@ -5,6 +5,7 @@ import type { PgSource } from './pg-jobs'
 import { kayLog } from '../runtime/log'
 import { FLUSH_MS, holdHit, HOUR_MS, MAX_AGE_MS, MAX_PATHS, MAX_PENDING, MAX_REFERRERS } from './missing-hits'
 import { connectionOf, privilegeRefused, relationsMissing } from './pg-jobs'
+import { limited, limitedStore, READY_TIMEOUT_MS } from './pg-limit'
 import { pgRedirectSet } from './pg-redirects'
 import { escaped, query } from './pg-sql'
 import { onReload } from './reload'
@@ -179,7 +180,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
   }
 
   const record = async (batch: [string, Pending][]): Promise<void> => {
-    const connected = await connect()
+    const connected = await limited('the 404 log finding its tables', connect, READY_TIMEOUT_MS)
 
     if (!connected)
       return
@@ -187,7 +188,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
     const now = Date.now()
     let purged = false
 
-    await connected.begin(async (tx) => {
+    await limited('the 404 log write', async () => connected.begin(async (tx) => {
       await query(tx, 'SELECT pg_advisory_xact_lock(hashtext($1))', [WRITE_LOCK])
       purged = await purge(tx, now)
 
@@ -221,7 +222,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
             await query(tx, 'INSERT INTO kay_missing_referrers (path, host, hits) VALUES ($1, $2, $3::bigint) ON CONFLICT (path, host) DO UPDATE SET hits = kay_missing_referrers.hits + $3::bigint', [path, host, more])
         }
       }
-    })
+    }))
 
     if (purged)
       purgedAt = now
@@ -258,13 +259,13 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
   const reading = async <T>(empty: T, use: (db: SQL) => Promise<T>): Promise<T> => {
     await flush()
 
-    const connected = await connect()
+    const connected = await limited('the 404 log finding its tables', connect, READY_TIMEOUT_MS)
 
     if (!connected)
       return empty
 
     try {
-      return await use(connected)
+      return await limited('the 404 log read', async () => use(connected))
     }
     catch (error) {
       if (readOnly && privilegeRefused(error))
@@ -380,13 +381,13 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
         return Number(row?.total ?? 0)
       })
     },
-    redirects: pgRedirectSet(connect, (error) => {
+    redirects: limitedStore(pgRedirectSet(connect, (error) => {
       if (told)
         return
 
       told = true
       kayLog('warn', `the redirects added while the site runs cannot be read from the app's Postgres database: ${error instanceof Error ? error.message : String(error)}; the last ones read keep answering`)
-    }, readOnly),
+    }, readOnly), 'the redirects store', { ready: connect }),
     close: settle,
   }
 }

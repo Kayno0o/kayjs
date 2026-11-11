@@ -8,6 +8,7 @@ import { queue as makeQueue } from '../src/server'
 import { pgCache } from '../src/server/pg-cache'
 import { connectionOf, pgJobs } from '../src/server/pg-jobs'
 import { limitedStore, STORE_TIMEOUT_MS } from '../src/server/pg-limit'
+import { pgMissingStore } from '../src/server/pg-not-found'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgNotifications, pgRates, pgSessions } from '../src/server/pg-stores'
 import { forgetQueue } from '../src/server/queue'
@@ -17,7 +18,9 @@ cleanUpAfterFile()
 
 // A handle whose connection never answers a statement, as one the server dropped.
 const never = async () => new Promise<never>(() => undefined)
-const silent: PgHandle = { db: async () => Object.assign(never, { unsafe: never, begin: never }) as unknown as SQL }
+// Finds the 404 log tables, then goes silent.
+const silentDb = Object.assign(never, { unsafe: async (text: string) => (text.includes('to_regclass') ? [{ missing: false }] : never()), begin: never }) as unknown as SQL
+const silent: PgHandle = { db: async () => silentDb }
 
 // Runs `work` with the log collected, then puts the sink back.
 async function collecting(work: () => Promise<void>): Promise<string[]> {
@@ -44,6 +47,8 @@ describe('the Postgres stores under a database that does not answer', () => {
       rates: async () => pgRates(silent).hit('a', 60_000),
       cache: async () => pgCache(silent).get('a'),
       notifications: async () => pgNotifications(silent).unread('a', 0),
+      missingList: async () => pgMissingStore(silentDb).list(),
+      redirects: async () => pgMissingStore(silentDb).redirects.add('/a', '/b', 307, { hosts: [], configured: {}, served: () => ['/b'] }),
     }
     const lines = await collecting(async () => {
       const started = performance.now()

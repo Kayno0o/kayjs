@@ -7,7 +7,7 @@ import { callBody, fieldText } from './call-body'
 import { trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
 import { durationSeconds } from './duration'
-import { fits } from './keepalive'
+import { withKeepalive } from './keepalive'
 import { listenerSet } from './listener-set'
 import { serverResource } from './live-resource.server'
 import { pageData } from './page-data'
@@ -1133,7 +1133,7 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
   try {
     response = sent.body instanceof FormData && progress && typeof XMLHttpRequest !== 'undefined'
       ? await (await import('./upload')).uploaded(method.toUpperCase(), url, headers, sent.body, progress, signal)
-      : await fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal }, ...keepalive === true && fits(sent.body) && { keepalive: true } })
+      : await withKeepalive(keepalive === true, sent.body, async extra => fetch(url, { method: method.toUpperCase(), headers, body: sent.body ?? null, ...signal && { signal }, ...extra }))
   }
   catch (failure) {
     if (signal?.aborted === true)

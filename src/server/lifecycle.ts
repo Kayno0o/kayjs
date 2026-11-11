@@ -20,6 +20,7 @@ export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
 const HEALTH_CACHE_MS = 3000
 const CLOSE_TIMEOUT_MS = 5000
+const STOP_HOOK_TIMEOUT_MS = 5000
 const REQUEST_POLL_MS = 25
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
@@ -286,11 +287,13 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   await runStopHooks(app)
 }
 
-// Runs each `onStop` hook in turn, awaiting it: for an app that never listened too, as a plugin may have started its timers when it was set up.
-export async function runStopHooks(app: AnyElysia): Promise<void> {
+// Runs each `onStop` hook in turn, awaiting it for a few seconds at most, so one that hangs leaves the others and the stores their turn: for an app that never listened too, as a plugin may have started its timers when it was set up.
+export async function runStopHooks(app: AnyElysia, timeoutMs = STOP_HOOK_TIMEOUT_MS): Promise<void> {
   for (const hook of app.event.stop ?? []) {
     try {
-      await hook.fn(app)
+      await withTimeout((async () => {
+        await hook.fn(app)
+      })(), timeoutMs, 'an onStop hook')
     }
     catch (error) {
       await reportBackgroundError('an onStop hook failed', error)

@@ -13,7 +13,7 @@ import { withBase, withoutBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
-import { fits } from './keepalive'
+import { withKeepalive } from './keepalive'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
 import { randomId } from './random-id'
@@ -490,7 +490,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
       sentOnce()
 
     try {
-      return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal }, ...call?.options?.keepalive && fits(body) && { keepalive: true } }))
+      return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : withKeepalive(call?.options?.keepalive === true, body, async extra => fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal }, ...extra })))
     }
     catch (error) {
       if (typeof error === 'object' && error !== null)
