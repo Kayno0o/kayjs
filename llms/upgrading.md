@@ -40,6 +40,10 @@ No lint can see these: they depend on the traffic an app gets, not on its code.
 
 A browser's mirror and unsent writes made before this version carry no person, so the first sign-in that tags the browser empties them, even for the same person: they cannot be told from another's. Nothing to change; a write queued offline across the upgrade and a sign-in is lost once, so release it while the browsers are online.
 
+### The auth result and stream `onOpen` lints of 1.92 are gone
+
+`deprecated-auth-error` and `deprecated-stream-open` go, their three minors over: run `kay upgrade` on 1.95 first and it rewrites what it can. A `result.error === 'limited'` left over is now TypeScript's own error, a string compared with an `ErrorShape`: read `result.error.code`. A `.onOpen(reconnected => ...)` left over still compiles and runs on every open: write `.onOpen(({ reconnected }) => ...)`.
+
 ## 1.95.0
 
 ### The names and the escape 1.91 deprecated are gone

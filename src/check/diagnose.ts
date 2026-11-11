@@ -16,7 +16,6 @@ import { WRITABLE } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
-import { authErrorKind } from './auth-error'
 import { unknownNameHelp } from './export-homes'
 import { loopIndexFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
@@ -138,16 +137,6 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
     const offered = level === 'allow' ? undefined : unsendableFix(lint, shadow)
 
     return level === 'allow' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
-  }
-
-  // A kayjs-auth result's `error` compared with a kind, which `kay check` also fixes and the editor reports as it stands.
-  const authError = span && authErrorKind(shadow.file, shadow.source, offset, diagnostic.code, diagnostic.message)
-
-  if (authError) {
-    const level = levelAt('deprecated-auth-error', offset)
-
-    if (level !== 'allow')
-      return { code: 'deprecated-auth-error', severity: severityOf(level), message: authError.message, help: authError.help, span }
   }
 
   // Unread code is the `unread-name` lint; a name kay generated, which the template reads in a way it does not spell out, is no code of the user's.

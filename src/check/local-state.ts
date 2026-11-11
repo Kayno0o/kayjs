@@ -3,8 +3,8 @@ import type { Node } from '../compiler/estree'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { walk } from './ast'
+import { bindings, boundOnce } from './bindings'
 import { scan } from './renamed-exports'
-import { bindings, boundOnce } from './stream-on'
 
 const LOCAL = /\blocal\b/
 const COMPARISONS = new Set(['===', '!==', '==', '!='])

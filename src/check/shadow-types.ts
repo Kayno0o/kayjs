@@ -52,7 +52,6 @@ import { removedUiTokens } from './removed-ui-tokens'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
-import { streamOpen } from './stream-on'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 import { uiTypes } from './ui-types'
@@ -151,7 +150,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
-  async ({ root, options }) => streamOpen(root, options),
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
   ({ root, options }) => redirectPermanent(root, options),
