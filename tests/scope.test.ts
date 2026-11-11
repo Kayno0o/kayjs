@@ -121,8 +121,8 @@ function kayFacts(program: Program): Facts {
   return facts
 }
 
-// A constructor parameter property declares its name for oxc's pass, where Babel's crawl leaves it out.
-const PARAMETER_PROPERTY = /\bconstructor\s*\([^)]*\b(?:public|private|protected|readonly)\b/
+// A constructor parameter property declares its name for oxc's pass, where Babel's crawl leaves it out; a parameter's own parentheses, a function type say, are stepped over.
+const PARAMETER_PROPERTY = /\bconstructor\s*\((?:[^()]|\([^()]*\))*\b(?:public|private|protected|readonly)\b/
 
 function compare(code: string, label: string, lang: Lang = 'tsx') {
   const { program, errors } = parseProgram(code, { lang, recover: true })
