@@ -10,6 +10,7 @@ import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
 import type { Guard, GuardContext } from './runtime/index'
 import type { Localized } from './runtime/localized'
+import type { PreviewScope } from './runtime/preview'
 import type { JsonLd } from './runtime/seo'
 import type { McpConfig } from './server/api-modules'
 import type { AppHooks } from './server/app-hooks'
@@ -259,6 +260,8 @@ export interface PreviewConfig {
   secret?: string | undefined
   // How long a visitor stays in preview mode once in, a string such as '2h'; an hour by default.
   maxAge?: Duration | undefined
+  // Revokes the share links `previewUrl(path, { entry })` made for an entry: given the entry, it answers the time (a `Date` or milliseconds) before which no link of it is accepted, or nothing when none is revoked. A link made earlier is refused as an expired one, so no list of links is kept; kayjs-cms supplies this itself.
+  sharedNotBefore?: ((entry: PreviewScope) => Date | number | undefined | Promise<Date | number | undefined>) | undefined
 }
 
 export interface LiveConfig {

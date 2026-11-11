@@ -63,6 +63,16 @@ interface PreviewSettings {
   secrets: string[]
   maxAge: number
   base: string
+  sharedNotBefore?: PreviewConfig['sharedNotBefore']
+}
+
+type NotBefore = NonNullable<PreviewConfig['sharedNotBefore']>
+
+// What a library asks, beside the app's own `preview.sharedNotBefore`, for the time before which an entry's share links are refused; kayjs-cms gives it so.
+let sharedNotBeforeHook: NotBefore | undefined
+
+export function setSharedNotBefore(read: NotBefore | undefined): void {
+  sharedNotBeforeHook = read
 }
 
 // Edit cookies kept at once, so the collections they read cannot grow without bound; the oldest goes first.
@@ -119,7 +129,7 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
     warnLowEntropy(all as string[], '`preview.secret` in kay.config.ts')
 
   useStampSecret(all as string[], 'preview')
-  settings = { secrets: all as string[], maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
+  settings = { secrets: all as string[], maxAge: wholeSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base, ...config.sharedNotBefore && { sharedNotBefore: config.sharedNotBefore } }
 }
 
 // A key of preview's own, derived from the app's secret so what signs a preview link never passes for the session's or the stamps'.
@@ -522,7 +532,7 @@ export function withoutShareToken(url: URL): void {
 }
 
 // The entry a request's share link names, when the link is signed by this site for the page asked and has not expired; undefined for any other request, and for a link in a request that already has the preview cookie.
-export function sharedEntry(request: Request): PreviewScope | undefined {
+export async function sharedEntry(request: Request): Promise<PreviewScope | undefined> {
   if (!settings)
     return undefined
 
@@ -537,13 +547,41 @@ export function sharedEntry(request: Request): PreviewScope | undefined {
     return undefined
 
   try {
-    const [collection, slug, locale] = JSON.parse(Buffer.from(entry, 'base64url').toString()) as unknown[]
+    const [collection, slug, locale, issued] = JSON.parse(Buffer.from(entry, 'base64url').toString()) as unknown[]
 
-    return typeof collection === 'string' && typeof slug === 'string' && typeof locale === 'string' ? { collection, slug, ...locale !== '' && { locale } } : undefined
+    if (typeof collection !== 'string' || typeof slug !== 'string' || typeof locale !== 'string')
+      return undefined
+
+    const scope = { collection, slug, ...locale !== '' && { locale } }
+
+    return await revoked(scope, typeof issued === 'number' ? issued : undefined) ? undefined : scope
   }
   catch {
     return undefined
   }
+}
+
+// Whether the link of an entry made at `issued` (milliseconds, unknown for a link made before they were kept) is older than the time its entry's links are revoked from. A hook that fails refuses the link, as a link nobody can vouch for is not served.
+async function revoked(scope: PreviewScope, issued: number | undefined): Promise<boolean> {
+  for (const read of [settings?.sharedNotBefore, sharedNotBeforeHook]) {
+    if (read === undefined)
+      continue
+
+    try {
+      const from = await read(scope)
+      const at = from instanceof Date ? from.getTime() : from
+
+      if (at !== undefined && (issued === undefined || issued < at))
+        return true
+    }
+    catch (error) {
+      kayLog('warn', `the time the share links of ${scope.collection}/${scope.slug} are revoked from could not be read, so its links are refused: ${error instanceof Error ? error.message : String(error)}`)
+
+      return true
+    }
+  }
+
+  return false
 }
 
 // A link that puts whoever follows it in preview mode, edit mode too with `edit`, and opens `path`, a path of the site written without the base, until `ttl` runs out, an hour by default.
@@ -563,7 +601,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
       throw new KayError('config-invalid', 'kay: previewUrl() was given `entry` and `edit`: a link to one entry\'s draft does not open edit mode')
 
     const { collection, slug, locale = '' } = options.entry
-    const entry = Buffer.from(JSON.stringify([collection, slug, locale])).toString('base64url')
+    const entry = Buffer.from(JSON.stringify([collection, slug, locale, Date.now()])).toString('base64url')
     const link = new URL(path, 'http://site')
 
     link.searchParams.set(SHARE_PARAM, [until, entry, sign(current, shareText(String(until), entry, sharedPath(link.pathname)))].join('.'))

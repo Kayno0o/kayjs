@@ -140,7 +140,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (preview !== undefined)
       return forVisitor(async () => preview === 'edit' ? inPreview(render, true, requestDrafts(context.request)) : inPreview(render))
 
-    const shared = sharedEntry(context.request)
+    const shared = await sharedEntry(context.request)
 
     // One entry's draft on its own page, kept out of search engines and referrers as the link is a secret.
     if (shared !== undefined) {

@@ -3720,6 +3720,9 @@ interface SessionStore extends StoreBase
   ping?: (() => unknown) | undefined
   set: (id: string, data: SessionData, maxAgeMs: number) => MaybePromise<void>
 
+[./server] setSharedNotBefore
+function setSharedNotBefore(read: ((entry: PreviewScope) => Date | Promise<Date | number | undefined> | number | undefined) | undefined): void
+
 [./server] shutdown
 function shutdown(app: AnyElysia, force?: boolean, hookTimeoutMs?: number): Promise<void>
 

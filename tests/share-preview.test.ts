@@ -3,7 +3,7 @@ import { t } from 'elysia'
 import { collection } from '../src/content'
 import { cached } from '../src/runtime/cache'
 import { previewUrl } from '../src/server'
-import { inSharedDraft } from '../src/server/preview'
+import { inSharedDraft, setSharedNotBefore } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { news } from './fixtures/cms/src/content.config'
 import { pages } from './shared-pages'
@@ -112,6 +112,63 @@ describe('an entry-scoped preview link', () => {
 
     setSystemTime(new Date(Date.now() + 8 * 24 * 3600_000))
     expect(await refused(`${until}.${entry}.${sig}`)).toBe(404)
+  })
+
+  it('refuses a link older than the time its entry\'s links are revoked from, and accepts a newer one', async () => {
+    let notBefore: Date | number | undefined
+    const asked: unknown[] = []
+    const sharedNotBefore = (entry: { slug: string }) => {
+      asked.push(entry)
+
+      return entry.slug === 'roadmap' ? notBefore : undefined
+    }
+    const app = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore } })
+    const old = previewUrl('/news/roadmap', { entry: roadmap })
+
+    expect((await visit(app, old)).status).toBe(200)
+    expect(asked).toEqual([roadmap])
+
+    setSystemTime(new Date(Date.now() + 5000))
+    notBefore = new Date()
+    expect((await visit(app, old)).status).toBe(404)
+
+    setSystemTime(new Date(Date.now() + 5000))
+
+    const fresh = previewUrl('/news/roadmap', { entry: roadmap })
+
+    expect((await visit(app, fresh)).status).toBe(200)
+    // Another entry's links are untouched, and a number counts in milliseconds.
+    notBefore = Date.now() + 1000
+    expect((await visit(app, fresh)).status).toBe(404)
+    notBefore = undefined
+    expect((await visit(app, old)).status).toBe(200)
+  })
+
+  it('serves a link made with no hook asked, and refuses one when the hook fails', async () => {
+    const plain = await pages({ ...options, prebuilt: false })
+    const link = previewUrl('/news/roadmap', { entry: roadmap })
+
+    expect((await visit(plain, link)).status).toBe(200)
+
+    const failing = await pages({ ...options, prebuilt: false, preview: { secret: SECRET, sharedNotBefore: async () => Promise.reject(new Error('store down')) } })
+
+    expect((await visit(failing, link)).status).toBe(404)
+  })
+
+  it('refuses a link a library revoked through setSharedNotBefore, even without the app\'s hook', async () => {
+    const app = await pages({ ...options, prebuilt: false })
+    const link = previewUrl('/news/roadmap', { entry: roadmap })
+
+    setSharedNotBefore(() => Date.now() + 60_000)
+
+    try {
+      expect((await visit(app, link)).status).toBe(404)
+    }
+    finally {
+      setSharedNotBefore(undefined)
+    }
+
+    expect((await visit(app, link)).status).toBe(200)
   })
 
   it('follows no rename: the link names the slug it was made for', async () => {
