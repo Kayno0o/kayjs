@@ -181,7 +181,10 @@ export function serveUntypedRoutes(plugin: Elysia, core: Core): void {
     .get(route, async (ctx) => {
       const answer = (await import('./forwardRoutes')).answerForward
 
-      return answer(ctx, core, forward, (ctx as unknown as { auth: Auth }).auth, (role, user) => core.access.isGranted(role, user.roles))
+      const { auth } = ctx as unknown as { auth: Auth }
+      const { lacksTwoFactor } = await import('./requiredTwoFactor')
+
+      return answer(ctx, core, forward, auth, (role, user) => core.access.isGranted(role, user.roles), async user => lacksTwoFactor(auth[STATE], user, { wanted: forward.requireTwoFactor ? true : undefined }))
     })
     // Back from signing in to the guarded site, if it is on the domains the app allows, else home.
     // kay-allow external-redirect: `returnTarget` keeps only an https URL on the allowed domains

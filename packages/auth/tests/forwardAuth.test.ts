@@ -168,6 +168,32 @@ describe('a proxy asking whether to let a request through', () => {
     expect(locationOf(await browser.fetch('/auth/forward')).pathname).toBe('/account-area/account/security')
   })
 
+  test('the app\'s twoFactor.require holds the forward route too, requireTwoFactor or not', async () => {
+    const app = testApp({ site: PORTAL, pages: true, admin: 'admin', twoFactor: { require: ['admin'] }, forwardAuth: 'example.test' })
+    const signIn = async (roles: ('admin' | 'editor')[], username: string) => {
+      const made = await app.auth.admin.createUser({ username, password: PASSWORD, emailVerified: true, roles })
+
+      if (!made.ok)
+        throw new Error('no user')
+
+      const browser = app.browser()
+
+      await browser.post(`/sign-in/${made.user.id}`, {})
+
+      return browser
+    }
+
+    const admin = await signIn(['admin'], 'chief')
+
+    expect((await admin.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(401)
+    expect((await (await signIn(['editor'], 'clerk')).fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(204)
+
+    const set = await admin.callOk('twoFactor.setUp', { password: PASSWORD })
+
+    await admin.callOk('twoFactor.enable', await totpCode(set.setup.secret, totpStep()))
+    expect((await admin.fetch('/auth/forward', { headers: { 'x-original-url': GUARDED } })).status).toBe(204)
+  })
+
   test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {
     const app = testApp({ site: PORTAL, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
     const made = await app.auth.admin.createUser({ username: 'plain', password: PASSWORD, emailVerified: true })

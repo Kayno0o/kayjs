@@ -30,7 +30,7 @@ function headerValue(value: string): string {
 }
 
 // The answer to the route a reverse proxy asks before it lets a request through to a site it guards.
-export async function answerForward(ctx: { request: Request }, core: Core, forward: ForwardAuthCore, auth: ForwardUser, granted: (role: string, user: BareUser) => boolean): Promise<Response> {
+export async function answerForward(ctx: { request: Request }, core: Core, forward: ForwardAuthCore, auth: ForwardUser, granted: (role: string, user: BareUser) => boolean, lacksTwoFactor: (user: BareUser) => Promise<boolean>): Promise<Response> {
   const route = `${core.prefix}/forward`
   const { request } = ctx
   const { searchParams } = new URL(request.url)
@@ -45,7 +45,8 @@ export async function answerForward(ctx: { request: Request }, core: Core, forwa
     if (wanted.length > 0 && !wanted.some(role => granted(role, person)))
       return new Response(null, { status: 403, headers })
 
-    if (!forward.requireTwoFactor || person.twoFactor) {
+    // The same test as a sign-in's: the app's `twoFactor.require`, and everyone with `requireTwoFactor`; a passkey sign-in, or an admin acting as the user, satisfies it.
+    if (!await lacksTwoFactor(person)) {
       const name = person.username ?? person.email ?? person.id
 
       return new Response(null, { status: 204, headers: { ...headers, 'remote-user': headerValue(name), 'remote-name': headerValue(name), 'remote-email': headerValue(person.email ?? ''), 'remote-groups': headerValue(person.roles.join(',')) } })

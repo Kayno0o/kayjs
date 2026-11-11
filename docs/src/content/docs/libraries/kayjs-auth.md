@@ -705,7 +705,7 @@ authCore({
 
 The session cookie takes the domain of the host it is set on, among the ones `forwardAuth` names, so the guarded sites receive it.
 
-A host on none of them keeps a cookie of its own, and a `domain` given to `session()` wins. With `auth()` in kay.config.ts, `auth({ cookie: 'login', forwardAuth: 'example.com' })` is all it takes. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
+A host on none of them keeps a cookie of its own, and a `domain` given to `session()` wins. With `auth()` in kay.config.ts, `auth({ cookie: 'login', forwardAuth: 'example.com' })` is all it takes. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` asks everyone for two-factor, and the `twoFactor.require` of the app holds here as it does for a guard.
 
 Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
