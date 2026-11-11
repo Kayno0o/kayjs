@@ -395,7 +395,7 @@ test('the file name of an upload is a link opening it in a new tab, beside a but
 
   expect(link.getAttribute('href')).toBe(UPLOADED)
   expect(link.getAttribute('target')).toBe('_blank')
-  expect(link.getAttribute('rel')).toBe('noopener')
+  expect(link.getAttribute('rel')).toBe('noopener noreferrer')
   expect(link.textContent).toBe('abc.40x30.png')
   expect(root.querySelector('.kcms-file-path')).toBeNull()
   root.querySelector<HTMLButtonElement>('.kcms-file-name button')!.click()
