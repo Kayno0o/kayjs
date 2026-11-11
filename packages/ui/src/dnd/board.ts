@@ -7,6 +7,8 @@ import { armPointerDrag, boundsOf, ghostOf, on, scrollerOf, swallowClick } from 
 
 type Id = number | string
 
+const SPACES = /\s+/
+
 // A move of `item` from container `from` into container `to`, at `index` among the items already there, the moved one left out.
 export interface BoardMove {
   item: Id
@@ -256,7 +258,12 @@ export class Board {
     const el = this.#containers.get(id)
     const labelled = el?.getAttribute('aria-labelledby')
 
-    return el?.getAttribute('aria-label')?.trim() || (labelled ? labelled.split(/\s+/).map(part => document.getElementById(part)?.textContent?.trim() ?? '').filter(Boolean).join(' ') : '')
+    const own = el?.getAttribute('aria-label')?.trim() ?? ''
+
+    if (own !== '' || labelled === null || labelled === undefined)
+      return own
+
+    return labelled.split(SPACES).map(part => document.getElementById(part)?.textContent?.trim() ?? '').filter(text => text !== '').join(' ')
   }
 
   // `kept` is the number of items in the container the item lands in, for a move by key, which is announced and refocused, and left out for a drop.
