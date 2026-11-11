@@ -52,6 +52,9 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<B
 
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_SPEAK_CHARS
 
+  if (maxInputChars !== Infinity && !(Number.isInteger(maxInputChars) && maxInputChars >= 1))
+    throw configError('ai', 'maxInputChars', `speak({ maxInputChars }) is ${maxInputChars}; it takes a whole number of 1 or more, or Infinity`)
+
   if (text.length > maxInputChars)
     throw new AiError('too-long', `the text holds ${text.length} characters, past the ${maxInputChars} that maxInputChars allows`)
 

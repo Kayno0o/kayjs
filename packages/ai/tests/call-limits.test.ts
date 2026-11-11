@@ -105,6 +105,13 @@ describe('the size of what is sent', () => {
     expect((await failure(speak('Hello', { maxInputChars: 4 }))).kind).toBe('too-long')
   })
 
+  it('refuses a maxInputChars that is not a whole number from 1 or Infinity, which would lift the cap by accident', async () => {
+    for (const bad of [Number.NaN, 0, -1, 1.5])
+      await expect(speak('Hi', { maxInputChars: bad })).rejects.toThrow('maxInputChars')
+
+    expect((await speak('Hi', { maxInputChars: Infinity })).size).toBeGreaterThan(0)
+  })
+
   it('refuses a recording past 10 MB to transcribe, a larger one with maxSize', async () => {
     const big = new Blob([new Uint8Array(10 * 1024 * 1024 + 1)])
 
