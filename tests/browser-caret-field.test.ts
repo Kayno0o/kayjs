@@ -170,6 +170,39 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     }
   }, 60_000)
 
+  // A number field has no selection, so the keys typed in flight are kept without a caret.
+  it('keeps what was typed into a number field while the navigate was in flight', async () => {
+    const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+    try {
+      const page = await site.open('/slow-number')
+      const { promise: sent, resolve: send } = Promise.withResolvers<void>()
+      const { promise: typed, resolve: answer } = Promise.withResolvers<void>()
+
+      await page.route(url => url.pathname === '/slow-number' && url.searchParams.get('q') === '12', async (request) => {
+        const held = await request.fetch()
+
+        send()
+        await typed
+        await request.fulfill({ ...held, body: held.text() })
+      })
+      await page.click('.field')
+      await page.type('12')
+      await sent
+      await page.type('34')
+      answer()
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === '12')
+
+      expect(await page.evaluate(() => [document.activeElement === document.querySelector('.field'), document.querySelector<HTMLInputElement>('.field')!.value])).toEqual([true, '1234'])
+
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === '1234')
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   // Keys typed after the swap and before the island hydrated land in the server's markup, which hydration writes its value over: they are kept and reach the island as an input event.
   const afterSwap = {
     'production': {},

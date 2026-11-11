@@ -1,7 +1,7 @@
 ---
 import { navigate } from 'kay'
 
-const { value, area, delay = 150 } = props<{ value: string, area?: boolean, delay?: number }>()
+const { value, area, delay = 150, type } = props<{ value: string, area?: boolean, delay?: number, type?: string }>()
 let timer: ReturnType<typeof setTimeout> | undefined
 
 // Searches as you type, the way a live search page does: the value comes back from the URL, so each swap hydrates the field afresh.
@@ -15,4 +15,4 @@ const search = (event: Event) => {
 if area
   textarea.field(name="q" aria-label="Search" onInput={search}) {value}
 else
-  input.field(name="q" aria-label="Search" value={value} onInput={search})
+  input.field(name="q" type={type} aria-label="Search" value={value} onInput={search})

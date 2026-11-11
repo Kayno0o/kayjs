@@ -123,7 +123,12 @@ function putBack(now: Element | null, typed: Typed | undefined): void {
     now.setSelectionRange(typed.start, typed.end, typed.direction)
 }
 
-// Keys typed into an island's field after the swap and before the island hydrated land in the server's markup, which hydration then writes its own value over. Called as the swap hands the body to hydration, it notes them as they come into the focused field and puts them back once its island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. A newer swap, or a bound of 30 s (an island that never hydrates), ends the watch with nothing restored.
+// The field itself, or the one hydration put in its place.
+function found(field: Field, id = field.id): Element | null {
+  return field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field)
+}
+
+// Keys typed into an island's field after the swap and before the island hydrated land in the server's markup, which hydration then writes its own value over. Called as the swap hands the body to hydration, it notes them as they come into the focused field and puts them back once its island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. A newer swap, or a bound of 30 s (an island that never hydrates, or whose hydration failed, as the event fires only on success), ends the watch with nothing restored.
 export function watchTyped(): void {
   for (const end of watching)
     end()
@@ -155,7 +160,7 @@ export function watchTyped(): void {
   timer = setTimeout(end, WATCH_BOUND_MS)
   island.addEventListener(HYDRATED, () => {
     end()
-    putBack(field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field), typed)
+    putBack(found(field, id), typed)
   }, { once: true, signal: heard.signal })
 }
 
@@ -177,7 +182,7 @@ export function keepTyped(part: ParentNode): void {
     island.addEventListener(HYDRATED, () => {
       clearTimeout(timer)
       heard.abort()
-      putBack(field?.isConnected ? field : null, typed)
+      putBack(field ? found(field) : null, typed)
     }, { ...options, once: true })
   }
 }
