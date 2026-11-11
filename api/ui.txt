@@ -1,3 +1,6 @@
+[.] AccordionItem
+type AccordionItem = AccordionItemBase & Keyed & Labelled
+
 [.] ActionSource
 type ActionSource<Row, Target extends Action<never, unknown>> = {
   action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter;
@@ -19,11 +22,11 @@ interface AttemptOptions<Data = unknown>
   success?: string | undefined
 
 [.] AudioChapter
-interface AudioChapter
-  newTab?: NewTab | undefined
-  start: number
-  title: string
-  url?: string | undefined
+type AudioChapter = AudioChapterBase & ({
+  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined
+} | {
+  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string
+})
 
 [.] AudioCue
 interface AudioCue
@@ -205,10 +208,11 @@ interface MediaItem
   full?: string
   key: number | string
   kind: "image" | "video"
+  label?: string
   preview: string
   src?: string
   thumb: string
-  title?: string
+  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string
 
 [.] MenuAction
 interface MenuAction extends MenuItemBase
@@ -504,14 +508,11 @@ interface StepItem<Key extends string = string>
   state?: "error" | "skipped" | undefined
 
 [.] SwitcherApp
-interface SwitcherApp
-  description?: string | undefined
-  href: string
-  icon?: IconProps | IconSlot | undefined
-  id: string
-  label: string
-  newTab?: NewTab | undefined
-  rel?: string | undefined
+type SwitcherApp = SwitcherAppBase & ({
+  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id?: string | undefined
+} | {
+  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id: string
+})
 
 [.] themeMode
 function themeMode(cookie?: string): Signal<ThemeMode>
@@ -520,15 +521,11 @@ function themeMode(cookie?: string): Signal<ThemeMode>
 type ThemeMode = 'light' | 'dark' | 'system'
 
 [.] TimelineEntry
-interface TimelineEntry<Key extends string | number = string>
-  href?: string | undefined
-  icon?: IconProps | IconSlot | undefined
-  key: Key
-  newTab?: NewTab | undefined
-  pickable?: boolean | undefined
-  text: string
-  time: string
-  tone?: Tone | undefined
+type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({
+  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined
+} | {
+  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string
+})
 
 [.] toast
 const toast: {
@@ -648,7 +645,7 @@ interface UiSettings
 component default
   boxed?: boolean | undefined
   class?: string | undefined | { root?: string | undefined; }
-  items: readonly { value: string; title: string; open?: boolean | undefined; disabled?: boolean | undefined; meta?: string | undefined; }[]
+  items: readonly AccordionItem[]
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: ((value: string) => Element) | undefined
   multiple?: boolean | undefined

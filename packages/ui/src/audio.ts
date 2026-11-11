@@ -5,14 +5,14 @@ interface AudioChapterBase {
   start: number
   // A page about the chapter, opened beside it.
   href?: string | undefined
-  /** @deprecated Use `href`, which wins when both are given. Removed in 1.103. */
+  /** @deprecated Use `href`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */
   url?: string | undefined
   // Opens the page in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
 }
 
 // A chapter: `label` names it, `title` being the name it had before 1.99.
-export type AudioChapter = AudioChapterBase & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ title: string })
+export type AudioChapter = AudioChapterBase & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string })
 
 export function chapterLabel(chapter: AudioChapter): string {
   return chapter.label ?? chapter.title

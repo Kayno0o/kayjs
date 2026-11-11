@@ -20,7 +20,7 @@ interface TimelineEntryBase<Key extends string | number> {
 }
 
 // What the entry says. `text` is the name it had before 1.99, deprecated: `label` wins when both are given.
-export type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ text?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ text: string })
+export type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string })
 
 // The words of an entry, `label` or the older `text`.
 export function entryLabel(entry: TimelineEntry<string | number>): string {

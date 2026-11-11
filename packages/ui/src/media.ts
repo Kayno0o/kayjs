@@ -13,7 +13,7 @@ export interface MediaItem {
   captions?: string
   // What the item is called: the caption, and the name screen readers read.
   label?: string
-  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */
+  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */
   title?: string
 }
 

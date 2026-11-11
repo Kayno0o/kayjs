@@ -5,8 +5,8 @@ interface AccordionItemBase {
   meta?: string | undefined
 }
 
-type Keyed = { key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103. */ value?: string | undefined } | { key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103. */ value: string }
-type Labelled = { label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */ title: string }
+type Keyed = { key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ value?: string | undefined } | { key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ value: string }
+type Labelled = { label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string }
 
 // One section of an Accordion. `key` is what `value`, `onChange` and the blocks carry; `value` and `title` are the names `key` and `label` had before 1.99.
 export type AccordionItem = AccordionItemBase & Keyed & Labelled
