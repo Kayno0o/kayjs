@@ -531,7 +531,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await write(page, 'button.addb', 'two')
     await page.click('button.remove')
     // The click returns before the remove reaches IndexedDB: going online earlier lets the refusal land first and the read below miss it.
-    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '3', { timeout: 15_000 })
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '3', { timeout: '15s' })
 
     await page.online()
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
