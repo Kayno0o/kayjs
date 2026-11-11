@@ -67,7 +67,7 @@ Dialog(open={editing()} title="Rename" onOpenChange={() => editing = false})
 ### Popover, HoverCard, TooltipHost
 
 ```kay
-Popover(placement="bottom-end")
+Popover(label="More" placement="bottom-end")
   @trigger(attributes)
     IconButton({...attributes} icon="chevron" label="More")
   Button(label="Duplicate" onClick={duplicate})

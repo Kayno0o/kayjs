@@ -5,7 +5,7 @@ import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Palette from '~icons/tabler/palette'
 import { palette, pickTheme, scheme, SCHEMES, THEMES } from '../theme'
 ---
-Popover(class="flex flex-col gap-2 p-3" placement="bottom-end")
+Popover(class="flex flex-col gap-2 p-3" label="Theme" placement="bottom-end")
   @trigger(attributes)
     IconButton({...attributes} icon={Palette} label="Theme" variant="ghost")
   p.theme-picker-label Theme

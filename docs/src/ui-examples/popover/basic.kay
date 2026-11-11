@@ -4,7 +4,7 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import { toast } from '@kaynooo/kayjs-ui'
 ---
-Popover(placement="bottom-start")
+Popover(label="More actions" placement="bottom-start")
   @trigger(attributes)
     IconButton({...attributes} icon="plus" label="More")
   .flex.flex-col.gap-1.p-2
