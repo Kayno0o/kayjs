@@ -18,7 +18,9 @@ import { appStore } from './app-store'
 import { cappedError, MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
-import { inMemory } from './memory-mark'
+import { statusOf } from './job-status'
+import { stepsQueue } from './job-steps'
+import { memoryJobs } from './memory-jobs'
 import { forgetShownJobs, showJobs } from './queue-live'
 import { forgetDrain, inFlightWork, LISTENED_IDLE_POLL, POLL_MS, Scheduler } from './queue-scheduler'
 import { onReload } from './reload'
@@ -72,7 +74,10 @@ export interface JobStore extends StoreBase {
   // The waiting and running jobs of the queue by when they are due, the earliest first, `limit` of them at most, each with its status as `state` tells it at `now`: what a queue with `live` shows its pages, read in one query. A store without it is listed with `jobs` and asked `state` job by job.
   live?: ((queue: string, now: number, limit?: number) => MaybePromise<StoredJobState[]>) | undefined
   // Rewrites a job in place: its payload, and when it is due when `runAt` is given. With `{ until }`, only while that hold is still the job's, and the run counts as having started once (a checkpoint of a run that goes on); with `{ payload, now }`, only while the job is not held and its payload is still that text (an event waking a waiting run). Resolves with whether it applied. `workflow` needs it.
-  update?: ((id: string, change: { payload: string, runAt?: number | undefined }, guard: { until: number } | { payload: string, now: number }) => MaybePromise<boolean>) | undefined
+  // `change.steps` keeps `values`, devalue text, as the job's steps from the index `from` on, in the same write that applies, so a run's results are not written again at each step; a store that takes it has `steps` too.
+  update?: ((id: string, change: { payload: string, runAt?: number | undefined, steps?: { from: number, values: string[] } | undefined }, guard: { until: number } | { payload: string, now: number }) => MaybePromise<boolean>) | undefined
+  // The steps `update` kept for the job, in order; a store without it keeps a workflow run's results in its payload, as an older kay did. They go with the job, whichever way it goes.
+  steps?: ((id: string) => MaybePromise<string[]>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole. Only while the hold `until` is still the job's when it is given.
   // Resolves with `false` when the hold was another's and nothing was written, as `retry` does.
   fail: (id: string, error: string, payload?: string, until?: number) => MaybePromise<boolean | void>
@@ -290,7 +295,12 @@ export function sqliteJobs(path: string): JobStore {
       return row ? { ...toJob(row), heldUntil: until } : undefined
     },
     complete(id, until) {
-      open(true)!.remove.run(id, until ?? null, until ?? null)
+      const { remove, dropSteps } = open(true)!
+
+      db!.transaction(() => {
+        if (remove.run(id, until ?? null, until ?? null).changes === 1)
+          dropSteps.run(stepsQueue(id))
+      })()
     },
     retry(id, runAt, error, until) {
       return open(true)!.retry.run(runAt, error, id, until ?? null, until ?? null).changes === 1
@@ -302,12 +312,23 @@ export function sqliteJobs(path: string): JobStore {
       open(true)!.progress.run(progress, id, until)
     },
     update(id, change, guard) {
-      const { updateHeld, updateIdle } = open(true)!
+      const { updateHeld, updateIdle, putStep } = open(true)!
 
-      if ('until' in guard)
-        return updateHeld.run(change.payload, change.runAt ?? null, id, guard.until).changes === 1
+      return db!.transaction(() => {
+        const applied = 'until' in guard
+          ? updateHeld.run(change.payload, change.runAt ?? null, id, guard.until).changes === 1
+          : updateIdle.run(change.payload, change.runAt ?? null, id, guard.payload, guard.now).changes === 1
 
-      return updateIdle.run(change.payload, change.runAt ?? null, id, guard.payload, guard.now).changes === 1
+        if (applied && change.steps) {
+          for (const [index, value] of change.steps.values.entries())
+            putStep.run(`${id}:${change.steps.from + index}`, stepsQueue(id), value, change.steps.from + index)
+        }
+
+        return applied
+      })()
+    },
+    steps(id) {
+      return open(false)?.stepsOf.all(stepsQueue(id)).map(row => row.payload) ?? []
     },
     state(queue, ref, now) {
       const statements = open(false)
@@ -326,7 +347,17 @@ export function sqliteJobs(path: string): JobStore {
       return open(true)!.fail.run(error, payload ?? null, id, until ?? null, until ?? null).changes === 1
     },
     prune(queue, before) {
-      return open(false)?.purge.run(queue, before).changes ?? 0
+      const statements = open(false)
+
+      if (!statements)
+        return 0
+
+      return db!.transaction(() => {
+        for (const { id } of statements.purgeable.all(queue, before))
+          statements.dropSteps.run(stepsQueue(id))
+
+        return statements.purge.run(queue, before).changes
+      })()
     },
     failed(queue, limit) {
       return open(false)?.failed.all(queue, limit ?? -1).map(toJob) ?? []
@@ -369,13 +400,6 @@ type StateRow = JobRow & { failed: number, held_until: number | null }
 // What a run that outlasted `lostAfter` fails with, in milliseconds below a second.
 function lostAfterText(milliseconds: number): string {
   return `it ran past lostAfter, ${milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${Math.round(milliseconds / 1000)} s`}`
-}
-
-function statusOf(failed: boolean, heldUntil: number, now: number): StoredJobState['status'] {
-  if (failed)
-    return 'failed'
-
-  return heldUntil > now ? 'running' : 'waiting'
 }
 
 const JOB_COLUMNS = 'id, queue, payload, attempts, run_at, error, job_key, progress'
@@ -423,6 +447,11 @@ function prepareJobs(db: Database) {
   const live = db.query<StateRow, [string, number]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND failed = 0 ORDER BY run_at LIMIT ?`)
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ? AND (? IS NULL OR held_until = ?)')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
+  const purgeable = db.query<{ id: string }, [string, number]>('SELECT id FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
+  // A step is a failed row of the queue `stepsQueue(job)` at its index, so no worker takes it and the job's queries never see it.
+  const putStep = db.query('INSERT OR REPLACE INTO kay_jobs (id, queue, payload, attempts, run_at, failed) VALUES (?, ?, ?, 0, ?, 1)')
+  const stepsOf = db.query<{ payload: string }, [string]>('SELECT payload FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
+  const dropSteps = db.query('DELETE FROM kay_jobs WHERE queue = ?')
   const failed = db.query<JobRow, [string, number]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at LIMIT ?`)
   const revive = db.query('UPDATE kay_jobs SET failed = 0, attempts = 0, run_at = ?, held_until = NULL WHERE id = ? AND failed = 1')
   const all = db.query<JobRow, [string, number | null, number | null, number]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND (? IS NULL OR failed = ?) ORDER BY run_at LIMIT ?`)
@@ -431,156 +460,10 @@ function prepareJobs(db: Database) {
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, holder, claim, remove, retry, release, progress, updateHeld, updateIdle, byKey, byId, live, fail, purge, failed, revive, all, next, lock, pruneLocks }
+  return { insert, holder, claim, remove, retry, release, progress, updateHeld, updateIdle, byKey, byId, live, fail, purge, purgeable, putStep, stepsOf, dropSteps, failed, revive, all, next, lock, pruneLocks }
 }
 
-// Jobs kept in this process's memory, gone with it: what tests run on.
-export function memoryJobs(): JobStore {
-  const jobs = new Map<string, StoredJob & { failed?: boolean }>()
-  const locks = new Set<string>()
-  const waiting = (queue: string) => [...jobs.values()].filter(job => job.queue === queue && !job.failed)
-  const stored = ({ heldUntil: _, failed: __, ...job }: StoredJob & { failed?: boolean }): StoredJob => job
-  // Whether a write about the job still comes from the run holding it: one that names no hold (a removal by id) always does.
-  const holds = (job: StoredJob | undefined, until: number | undefined): job is StoredJob => job !== undefined && (until === undefined || job.heldUntil === until)
-
-  return inMemory({
-    add(job) {
-      const holder = job.key === undefined ? undefined : waiting(job.queue).find(other => other.key === job.key)
-
-      if (holder)
-        return holder.id
-
-      jobs.set(job.id, { ...job })
-
-      return undefined
-    },
-    claim(queue, now, until) {
-      const job = waiting(queue).filter(job => job.runAt <= now && (job.heldUntil ?? 0) <= now).sort((a, b) => a.runAt - b.runAt)[0]
-
-      if (!job)
-        return undefined
-
-      job.heldUntil = until
-      job.attempts++
-      delete job.progress
-
-      return { ...stored(job), heldUntil: until }
-    },
-    complete(id, until) {
-      if (holds(jobs.get(id), until))
-        jobs.delete(id)
-    },
-    retry(id, runAt, error, until) {
-      const job = jobs.get(id)
-
-      if (!holds(job, until))
-        return false
-
-      Object.assign(job, { runAt, error, heldUntil: undefined })
-
-      return true
-    },
-    release(id, until, runAt) {
-      const job = jobs.get(id)
-
-      if (job?.heldUntil === until) {
-        delete job.heldUntil
-        job.attempts--
-
-        if (runAt !== undefined)
-          job.runAt = runAt
-      }
-    },
-    progress(id, until, progress) {
-      const job = jobs.get(id)
-
-      if (job?.heldUntil === until)
-        job.progress = progress
-    },
-    update(id, change, guard) {
-      const job = jobs.get(id)
-
-      if (!job || job.failed)
-        return false
-
-      if ('until' in guard) {
-        if (job.heldUntil !== guard.until)
-          return false
-
-        job.attempts = 1
-      }
-      else if ((job.heldUntil ?? 0) > guard.now || job.payload !== guard.payload) {
-        return false
-      }
-
-      job.payload = change.payload
-
-      if (change.runAt !== undefined)
-        job.runAt = change.runAt
-
-      return true
-    },
-    state(queue, ref, now) {
-      const matches = [...jobs.values()].filter(job => job.queue === queue && ('key' in ref ? job.key === ref.key : job.id === ref.id))
-      const job = matches.find(other => !other.failed) ?? matches.filter(other => other.failed).sort((a, b) => b.runAt - a.runAt)[0]
-
-      return job ? { ...stored(job), status: statusOf(job.failed === true, job.heldUntil ?? 0, now) } : undefined
-    },
-    live(queue, now, limit) {
-      return waiting(queue).sort((a, b) => a.runAt - b.runAt).slice(0, limit).map(job => ({ ...stored(job), status: statusOf(false, job.heldUntil ?? 0, now) }))
-    },
-    fail(id, error, payload, until) {
-      const job = jobs.get(id)
-
-      if (!holds(job, until))
-        return false
-
-      Object.assign(job, { failed: true, error, heldUntil: undefined, ...payload !== undefined && { payload } })
-
-      return true
-    },
-    prune(queue, before) {
-      const purged = [...jobs.values()].filter(job => job.queue === queue && job.failed && job.runAt < before)
-
-      for (const job of purged)
-        jobs.delete(job.id)
-
-      return purged.length
-    },
-    failed(queue, limit) {
-      return [...jobs.values()].filter(job => job.queue === queue && job.failed).sort((a, b) => a.runAt - b.runAt).slice(0, limit).map(stored)
-    },
-    jobs(queue, options) {
-      return [...jobs.values()].filter(job => job.queue === queue && (options?.failed === undefined || (job.failed === true) === options.failed)).sort((a, b) => a.runAt - b.runAt).slice(0, options?.limit).map(stored)
-    },
-    revive(id, runAt) {
-      const job = jobs.get(id)
-
-      if (!job?.failed || (job.key !== undefined && waiting(job.queue).some(other => other.key === job.key)))
-        return false
-
-      Object.assign(job, { failed: false, attempts: 0, runAt })
-      delete job.heldUntil
-
-      return true
-    },
-    nextRunAt(queue) {
-      const times = waiting(queue).map(job => Math.max(job.runAt, job.heldUntil ?? 0))
-
-      return times.length === 0 ? undefined : Math.min(...times)
-    },
-    lock(name, slot) {
-      const key = `${name}\n${slot}`
-
-      if (locks.has(key))
-        return false
-
-      locks.add(key)
-
-      return true
-    },
-  })
-}
+export { memoryJobs }
 
 // What a queue or a locked schedule names no store of its own uses, opened on first use.
 export function defaultJobStore(): JobStore {

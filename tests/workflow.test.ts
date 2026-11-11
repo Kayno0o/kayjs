@@ -1,6 +1,6 @@
 import type { JobStore } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
-import { parse } from 'devalue'
+import { parse, stringify } from 'devalue'
 import { workflow as makeWorkflow, memoryJobs, pgJobs, queue } from '../src/server'
 import { forgetQueue, queueAdmins } from '../src/server/queue'
 import { INBOX_LIMIT, PAYLOAD_LIMIT } from '../src/server/workflow'
@@ -423,6 +423,104 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     await flow.start()
     await flow.drain()
     expect(done).toEqual(['after'])
+  })
+
+  it('writes about as much for a step of a long run as for one of a short run, each result kept once', async () => {
+    const written = async (count: number) => {
+      const store = await open()
+      let bytes = 0
+      const counting: JobStore = {
+        ...store,
+        update: async (id, change, guard) => {
+          bytes += change.payload.length + (change.steps?.values.reduce((sum, text) => sum + text.length, 0) ?? 0)
+
+          return store.update!(id, change, guard)
+        },
+      }
+      const flow = workflow<undefined>(named(), async ({ step }) => {
+        for (let index = 0; index < count; index++)
+          await step.run('work', () => `${index}:${'x'.repeat(200)}`)
+
+        await step.sleep('1h')
+      }, { store: counting })
+      const id = await flow.start()
+
+      await flow.drain()
+
+      expect(await flow.status(id)).toMatchObject({ status: 'sleeping', steps: count + 1 })
+
+      return bytes
+    }
+    const small = await written(1000)
+    const large = await written(2000)
+
+    // Bytes sent to the store rather than time, which a loaded host skews: a step rewriting every result before it would make the ratio 4.
+    expect(large / small).toBeLessThan(2.3)
+    expect(large / small).toBeGreaterThan(1.7)
+  }, 60_000)
+
+  it('keeps a run\'s results as rows of the store, the payload staying small, and drops them with the run', async () => {
+    const store = await open()
+    const name = named()
+    const flow = workflow<undefined>(name, async ({ step }) => {
+      for (let index = 0; index < 30; index++)
+        await step.run(`s${index}`, () => 'x'.repeat(1000))
+
+      await step.sleep('1h')
+      await step.run('after', () => 'done')
+    }, { store })
+    const id = await flow.start()
+
+    await flow.drain()
+
+    const job = (await store.state!(`workflow:${name}`, { key: id }, Date.now()))!
+
+    expect(job.payload.length).toBeLessThan(2000)
+    expect(await store.steps!(job.id)).toHaveLength(31)
+    expect(await flow.status(id)).toMatchObject({ status: 'sleeping', steps: 31 })
+    later(2 * 60 * MINUTE)
+    await flow.drain()
+    expect(await flow.status(id)).toBeUndefined()
+    expect(await store.steps!(job.id)).toEqual([])
+  })
+
+  it('resumes a run kept in the old shape, its steps in the payload, and moves them to rows', async () => {
+    const store = await open()
+    const name = named()
+    const calls: string[] = []
+    const flow = workflow<undefined>(name, async ({ step }) => {
+      const first = await step.run('first', () => 1)
+
+      calls.push(`got ${first}`)
+      await step.run('second', () => void calls.push('second'))
+      await step.sleep('1h')
+    }, { store })
+
+    await store.add({ id: 'job-old', queue: `workflow:${name}`, payload: stringify({ run: 'old', input: undefined, memo: [{ kind: 'run', name: 'first', value: 7 }] }), attempts: 0, runAt: Date.now(), key: 'old' })
+    await flow.drain()
+    expect(calls).toEqual(['got 7', 'second'])
+    expect(await flow.status('old')).toMatchObject({ status: 'sleeping', steps: 3 })
+
+    const job = (await store.state!(`workflow:${name}`, { key: 'old' }, Date.now()))!
+
+    expect(job.payload).not.toContain('memo')
+    expect(await store.steps!(job.id)).toHaveLength(3)
+  })
+
+  it('wakes a run waiting in the old shape with an event', async () => {
+    const store = await open()
+    const name = named()
+    const got: unknown[] = []
+    const flow = workflow<undefined, { go: number }>(name, async ({ step }) => {
+      await step.run('first', () => 1)
+      got.push(await step.waitFor('go'))
+    }, { store })
+
+    await store.add({ id: 'job-wait', queue: `workflow:${name}`, payload: stringify({ run: 'old', input: undefined, memo: [{ kind: 'run', name: 'first', value: 1 }], waiting: { event: 'go', index: 1 }, started: true }), attempts: 0, runAt: 8.64e15, key: 'old' })
+    expect(await flow.send('old', 'go', 5)).toBe(true)
+    await flow.drain()
+    expect(got).toEqual([5])
+    expect(await flow.status('old')).toBeUndefined()
   })
 
   it('fails a run whose kept results pass the limit, naming what to do, and does not retry it', async () => {

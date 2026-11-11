@@ -244,7 +244,7 @@
     "complexity": 54
   },
   "src/server/queue.ts": {
-    "max-lines": 781,
+    "max-lines": 692,
     "max-lines-per-function": 321
   },
   "src/server/render-document.ts": {
@@ -260,7 +260,7 @@
     "complexity": 44
   },
   "src/server/workflow.ts": {
-    "max-lines-per-function": 189
+    "max-lines-per-function": 186
   },
   "src/test/browser.ts": {
     "max-lines": 882,

@@ -95,7 +95,10 @@ interface Entry {
 interface Payload<Input> {
   run: string
   input: Input
-  memo: Entry[]
+  // The kept steps of a run kept before steps had rows of their own, and `[]` of one just started: a store with `steps` moves them to rows the first time it keeps the run, and a store without it keeps them here.
+  memo?: Entry[] | undefined
+  // The run's steps as rows of the store hold them: how many, how many characters in all, and the labels of the last ones.
+  kept?: { count: number, bytes: number, last: string[] } | undefined
   // Events sent before the run waited for them, taken in order by the waits that name them.
   inbox?: { event: string, data: unknown }[] | undefined
   // Set while the run waits for an event, until its timeout.
@@ -110,14 +113,12 @@ const RELEASE_TRIES = 3
 // Events kept for a wait that does not name them yet, per run: past it the oldest is dropped.
 export const INBOX_LIMIT = 50
 
-// The most characters a run's kept results may take in all: every step writes them whole, so the cost of a run grows with the square of its steps, and a run past this fails, as one that has to keep large results elsewhere and return their ids.
+// The most characters a run's kept results may take in all, which a worker reads whole each time it takes the run: a run past this fails, as one that has to keep large results elsewhere and return their ids.
 export const PAYLOAD_LIMIT = 2_000_000
 
-function withinLimit(text: string, name: string, run: string, steps: number): string {
-  if (text.length > PAYLOAD_LIMIT)
-    throw new GiveUpError(`kay: workflow('${name}') run '${run}' keeps ${Math.round(text.length / 1000)} KB of results after ${steps} steps, past the ${PAYLOAD_LIMIT / 1000} KB a run may keep: every step writes them all again, so return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs`)
-
-  return text
+function withinLimit(size: number, name: string, run: string, steps: number): void {
+  if (size > PAYLOAD_LIMIT)
+    throw new GiveUpError(`kay: workflow('${name}') run '${run}' keeps ${Math.round(size / 1000)} KB of results after ${steps} steps, past the ${PAYLOAD_LIMIT / 1000} KB a run may keep: return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs`)
 }
 
 // A wait without timeout is due never: the last instant a Date holds.
@@ -139,6 +140,9 @@ export interface RunView {
 const STEP_NAMES = 20
 const NAME_CHARS = 100
 
+const labelOf = (entry: Entry) => entry.kind === 'sleep' ? 'sleep' : `${entry.kind} ${entry.name}`.slice(0, NAME_CHARS)
+const stepsDone = (payload: Payload<unknown>) => payload.kept?.count ?? payload.memo?.length ?? 0
+
 export const WORKFLOW_PREFIX = 'workflow:'
 
 // What a queue job of `workflow:<name>` is, read from its stored payload; undefined when the payload is not a run's.
@@ -152,12 +156,16 @@ export function runView(status: 'waiting' | 'running' | 'failed', payloadText: s
     return undefined
   }
 
-  if (!Array.isArray(payload?.memo) || !payload.memo.every(entry => typeof entry?.kind === 'string' && typeof entry.name === 'string') || (payload.waiting !== undefined && typeof payload.waiting.event !== 'string'))
+  const { memo, kept } = payload ?? {}
+  const shaped = kept === undefined
+    ? Array.isArray(memo) && memo.every(entry => typeof entry?.kind === 'string' && typeof entry.name === 'string')
+    : typeof kept?.count === 'number' && Array.isArray(kept.last) && kept.last.every(label => typeof label === 'string')
+
+  if (!shaped || (payload.waiting !== undefined && typeof payload.waiting.event !== 'string'))
     return undefined
 
-  const label = (entry: Entry) => entry.kind === 'sleep' ? 'sleep' : `${entry.kind} ${entry.name}`.slice(0, NAME_CHARS)
-  const steps = payload.memo.slice(-STEP_NAMES).map(label)
-  const done = payload.memo.length
+  const steps = kept === undefined ? memo!.slice(-STEP_NAMES).map(labelOf) : kept.last
+  const done = stepsDone(payload)
   const until = runAt < NEVER ? { until: runAt } : {}
 
   if (status === 'waiting' && payload.waiting)
@@ -183,6 +191,59 @@ function needs(store: JobStore, name: string): { [Method in 'update' | 'release'
   return { update: update.bind(store), release: release.bind(store), state: state.bind(store) }
 }
 
+// A store that fails to release the run would have the queue retry it, moving its due time: ask again first.
+async function releasing(release: NonNullable<JobStore['release']>, id: string, until: number): Promise<void> {
+  for (let tries = 1; ; tries++) {
+    try {
+      await release(id, until)
+
+      return
+    }
+    catch (error) {
+      if (tries === RELEASE_TRIES)
+        throw error
+
+      await Bun.sleep(100 * tries)
+    }
+  }
+}
+
+// The write that keeps a run after a step: the payload and, with `rows` (how many steps and characters the store has as rows), the steps it lacks; without them, the payload with all steps in it.
+function keptChange<Input>(name: string, head: Payload<Input>, memo: Entry[], rows: { stored: number, bytes: number } | undefined, runAt: number | undefined) {
+  if (rows === undefined) {
+    const text = stringify({ ...head, memo })
+
+    withinLimit(text.length, name, head.run, memo.length)
+
+    return { change: { payload: text, runAt }, size: 0 }
+  }
+
+  const values = memo.slice(rows.stored).map(entry => stringify(entry))
+  const size = rows.bytes + values.reduce((sum, text) => sum + text.length, 0)
+
+  withinLimit(size, name, head.run, memo.length)
+
+  return { change: { payload: stringify({ ...head, kept: { count: memo.length, bytes: size, last: memo.slice(-STEP_NAMES).map(labelOf) } }), runAt, steps: { from: rows.stored, values } }, size }
+}
+
+// What an event wakes a waiting run with: its result added as a step, a row of its own on a store that keeps them, moving a run kept in the old shape to rows with it, else a member of the payload's list.
+function woke(store: JobStore, payload: Payload<unknown>, entry: Entry, runAt: number): Parameters<NonNullable<JobStore['update']>>[1] {
+  const { memo, kept, ...rest } = payload
+
+  if (store.steps === undefined)
+    return { payload: stringify({ ...rest, memo: [...memo ?? [], entry], waiting: undefined }), runAt }
+
+  const added = [...memo ?? [], entry]
+  const values = added.map(item => stringify(item))
+  const count = (kept?.count ?? 0) + added.length
+
+  return {
+    payload: stringify({ ...rest, kept: { count, bytes: (kept?.bytes ?? 0) + values.reduce((sum, text) => sum + text.length, 0), last: [...kept?.last ?? [], ...added.map(labelOf)].slice(-STEP_NAMES) }, waiting: undefined }),
+    runAt,
+    steps: { from: kept?.count ?? 0, values },
+  }
+}
+
 // A flow of steps that survives restarts, sleeps without holding a process and waits for events: `start` it from an action, `app.use(flow)` in the server to run it, `send` it an event.
 // The function runs again from its top each time the run is taken, and each finished step gives its kept result back, so what lies between steps must give the same answer every time. The run is one job of the queue `workflow:<name>` kept under its id, and its results are kept in that job after each step.
 export function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options: WorkflowOptions<Input> = {}): Workflow<Input, Known> {
@@ -191,9 +252,15 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
   const storeOf = () => own ?? defaultJobStore()
 
   const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>, hold: RunHold) => {
-    const { update, release } = needs(storeOf(), name)
+    const store = storeOf()
+    const { update, release } = needs(store, name)
     const { until } = hold
-    const memo = [...payload.memo]
+    // With a store that has `steps`, each step is written once as a row of its own, so a step costs what its result does whatever the run's length; one without keeps them all in the payload.
+    const rows = store.steps === undefined ? undefined : await store.steps(job.id)
+    const memo = [...payload.memo ?? [], ...rows?.map(text => parse(text) as Entry) ?? []]
+    // How many of them the store has as rows, and how many characters those take.
+    let stored = rows?.length ?? 0
+    let bytes = payload.kept?.bytes ?? 0
     const inbox = [...payload.inbox ?? []]
     let at = 0
     let busy = false
@@ -211,32 +278,22 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     // A kept step starts the attempts again, as the store does for the stored count.
     const keep = async (waiting?: Payload<Input>['waiting'], runAt?: number) => {
-      const kept = await update(job.id, { payload: withinLimit(stringify({ ...payload, memo, inbox, waiting, started: true }), name, payload.run, memo.length), runAt }, { until })
+      const { change, size } = keptChange(name, { run: payload.run, input: payload.input, inbox, waiting, started: true }, memo, rows === undefined ? undefined : { stored, bytes }, runAt)
+      const kept = await update(job.id, change, { until })
 
-      if (kept)
+      if (kept) {
         job.attempts = 1
+        stored = memo.length
+        bytes = size
+      }
 
       return kept
     }
 
     // A write refused means the run was cancelled or went to another process: nothing more of it is ours to do.
     const suspend = async (waiting?: Payload<Input>['waiting'], runAt?: number): Promise<never> => {
-      if (await keep(waiting, runAt)) {
-        // A store that fails here would have the queue retry the run, moving its due time: ask again first.
-        for (let tries = 1; ; tries++) {
-          try {
-            await release(job.id, until)
-
-            break
-          }
-          catch (error) {
-            if (tries === RELEASE_TRIES)
-              throw error
-
-            await Bun.sleep(100 * tries)
-          }
-        }
-      }
+      if (await keep(waiting, runAt))
+        await releasing(release, job.id, until)
 
       return halt()
     }
@@ -398,8 +455,8 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       return update(run.job.id, { payload: stringify({ ...run.payload, inbox }) }, { payload: run.job.payload, now })
     }
 
-    const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitMemo }]
-    const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
+    const entry: Entry = { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitMemo }
+    const woken = await update(run.job.id, woke(store, run.payload, entry, now), { payload: run.job.payload, now })
 
     if (woken)
       admin.wake()
@@ -427,7 +484,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       if (id === '')
         throw new KayError('config-invalid', `kay: workflow('${name}') was started with an empty id; an id is a non-empty string`)
 
-      await queued.enqueue({ run: id, input: input as Input, memo: [] }, { key: id, ...startOptions.delay !== undefined && { delay: startOptions.delay } })
+      await queued.enqueue({ run: id, input: input as Input, memo: [] } satisfies Payload<Input>, { key: id, ...startOptions.delay !== undefined && { delay: startOptions.delay } })
 
       return id
     },
@@ -439,7 +496,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
         return undefined
 
       const { job, payload } = run
-      const base = { steps: payload.memo.length, ...job.error !== undefined && { error: job.error } }
+      const base = { steps: stepsDone(payload), ...job.error !== undefined && { error: job.error } }
 
       if (job.status === 'waiting' && payload.waiting)
         return { status: 'waiting', event: payload.waiting.event, ...base }

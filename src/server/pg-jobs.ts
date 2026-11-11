@@ -1,6 +1,7 @@
 import type { SQL } from 'bun'
 import type { JobStore, StoredJob, StoredJobState } from './queue'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { stepsQueue } from './job-steps'
 import { limitedStore } from './pg-limit'
 import { CHANNEL, hear } from './pg-notify'
 import { onReload } from './reload'
@@ -398,7 +399,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     async complete(id, until) {
       const db = await open()
 
-      await db`DELETE FROM kay_jobs WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint)`
+      await db`WITH gone AS (DELETE FROM kay_jobs WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id) DELETE FROM kay_jobs WHERE queue = ${stepsQueue(id)} AND EXISTS (SELECT 1 FROM gone)`
     },
     async retry(id, runAt, error, until) {
       const db = await open()
@@ -418,10 +419,19 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     async update(id, change, guard) {
       const db = await open()
 
-      if ('until' in guard)
-        return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at), attempts = 1 WHERE id = ${id} AND NOT failed AND held_until = ${guard.until}::bigint RETURNING id, queue) SELECT id, pg_notify(${CHANNEL}, 'jobs' || chr(10) || queue) FROM moved`)).length === 1
+      // The steps ride in the same statement as rows of their own, so they are kept exactly when the update applies; the values go as one JSON text.
+      const from = change.steps?.from ?? 0
+      const values = JSON.stringify(change.steps?.values ?? [])
 
-      return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at) WHERE id = ${id} AND NOT failed AND payload = ${guard.payload} AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) RETURNING id, queue) SELECT id, pg_notify(${CHANNEL}, 'jobs' || chr(10) || queue) FROM moved`)).length === 1
+      if ('until' in guard)
+        return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at), attempts = 1 WHERE id = ${id} AND NOT failed AND held_until = ${guard.until}::bigint RETURNING id, queue), put AS (INSERT INTO kay_jobs (id, queue, payload, attempts, run_at, failed) SELECT moved.id || ':' || (${from}::bigint + s.n - 1)::text, ${stepsQueue(id)}::text, s.value, 0, ${from}::bigint + s.n - 1, true FROM moved, jsonb_array_elements_text((${values}::text)::jsonb) WITH ORDINALITY AS s(value, n) ON CONFLICT (id) DO UPDATE SET payload = excluded.payload) SELECT id, pg_notify(${CHANNEL}, 'jobs' || chr(10) || queue) FROM moved`)).length === 1
+
+      return (await rowsOf<{ id: string }>(db`WITH moved AS (UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at) WHERE id = ${id} AND NOT failed AND payload = ${guard.payload} AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) RETURNING id, queue), put AS (INSERT INTO kay_jobs (id, queue, payload, attempts, run_at, failed) SELECT moved.id || ':' || (${from}::bigint + s.n - 1)::text, ${stepsQueue(id)}::text, s.value, 0, ${from}::bigint + s.n - 1, true FROM moved, jsonb_array_elements_text((${values}::text)::jsonb) WITH ORDINALITY AS s(value, n) ON CONFLICT (id) DO UPDATE SET payload = excluded.payload) SELECT id, pg_notify(${CHANNEL}, 'jobs' || chr(10) || queue) FROM moved`)).length === 1
+    },
+    async steps(id) {
+      const db = await open()
+
+      return (await rowsOf<{ payload: string }>(db`SELECT payload FROM kay_jobs WHERE queue = ${stepsQueue(id)} AND failed ORDER BY run_at`)).map(row => row.payload)
     },
     async state(queue, ref) {
       const db = await open()
@@ -444,7 +454,7 @@ export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): Jo
     },
     async prune(queue, before) {
       const db = await open()
-      const purged = await rowsOf<{ id: string }>(db`DELETE FROM kay_jobs WHERE queue = ${queue} AND failed AND run_at < ${before}::bigint RETURNING id`)
+      const purged = await rowsOf<{ id: string }>(db`WITH gone AS (DELETE FROM kay_jobs WHERE queue = ${queue} AND failed AND run_at < ${before}::bigint RETURNING id), steps AS (DELETE FROM kay_jobs WHERE queue IN (SELECT ${stepsQueue('')}::text || id FROM gone)) SELECT id FROM gone`)
 
       return purged.length
     },

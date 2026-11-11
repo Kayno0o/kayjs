@@ -2843,9 +2843,14 @@ interface JobStore extends StoreBase
   retry: (id: string, runAt: number, error: string, until?: number | undefined) => MaybePromise<boolean | void>
   revive?: ((id: string, runAt: number) => MaybePromise<boolean>) | undefined
   state?: ((queue: string, ref: { id: string; } | { key: string; }, now: number) => MaybePromise<StoredJobState | undefined>) | undefined
+  steps?: ((id: string) => MaybePromise<string[]>) | undefined
   update?: ((id: string, change: {
   payload: string;
   runAt?: number | undefined;
+  steps?: undefined | {
+    from: number;
+    values: string[];
+  };
 }, guard: {
   payload: string;
   now: number;

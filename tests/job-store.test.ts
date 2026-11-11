@@ -314,6 +314,40 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
       expect(await store.update!(added.id, { payload: 'c' }, { payload: 'a', now: clockNow() })).toBe(false)
       expect((await store.jobs!('q'))[0]).toMatchObject({ payload: 'b', runAt: 7 })
     })
+
+    it('keeps steps with a write that applies, from the index given, and none with one that does not', async () => {
+      const store = await open()
+      const added = job({ payload: 'a' })
+
+      await store.add(added)
+      expect(await store.steps!(added.id)).toEqual([])
+
+      const held = heldOf(await claimFor(store))
+
+      expect(await store.update!(added.id, { payload: 'b', steps: { from: 0, values: ['one', 'two'] } }, { until: held + 1 })).toBe(false)
+      expect(await store.steps!(added.id)).toEqual([])
+      expect(await store.update!(added.id, { payload: 'b', steps: { from: 0, values: ['one', 'two'] } }, { until: held })).toBe(true)
+      expect(await store.update!(added.id, { payload: 'c', steps: { from: 2, values: ['three'] } }, { until: held })).toBe(true)
+      expect(await store.update!(added.id, { payload: 'd', steps: { from: 1, values: ['2b'] } }, { until: held })).toBe(true)
+      expect(await store.steps!(added.id)).toEqual(['one', '2b', 'three'])
+      await store.complete(added.id, held)
+      expect(await store.steps!(added.id)).toEqual([])
+    })
+
+    it('drops the steps of a failed job with the job when it is pruned', async () => {
+      const store = await open()
+      const added = job({ runAt: 1 })
+
+      await store.add(added)
+
+      const held = heldOf(await store.claim('q', clockNow(), clockNow() + LONG))
+
+      await store.update!(added.id, { payload: 'b', steps: { from: 0, values: ['one'] } }, { until: held })
+      await store.fail(added.id, 'boom')
+      expect(await store.steps!(added.id)).toEqual(['one'])
+      expect(await store.prune!('q', 100)).toBe(1)
+      expect(await store.steps!(added.id)).toEqual([])
+    })
   })
 
   describe('a run past its hold', () => {
