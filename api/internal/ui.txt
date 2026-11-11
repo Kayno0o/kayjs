@@ -1846,10 +1846,12 @@ interface ToolbarTools
 type TreeId = string | number
 
 [./lib/index] TreeNode
-type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({
-  key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
+  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+} & ({
+  key: NoInfer<Id>
 } | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id
+  id: NoInfer<Id>
 })
 
 [./lib/index] ui
@@ -3008,10 +3010,12 @@ function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeI
 type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
 
 [./lib/tree] TreeNode
-type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({
-  key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
+  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+} & ({
+  key: NoInfer<Id>
 } | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id
+  id: NoInfer<Id>
 })
 
 [./lib/tree] treePath

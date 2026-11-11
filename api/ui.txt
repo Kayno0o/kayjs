@@ -625,10 +625,12 @@ interface ToolbarTools
 type TreeId = string | number
 
 [.] TreeNode
-type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & ({
-  key: Id, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
+  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+} & ({
+  key: NoInfer<Id>
 } | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: Id
+  id: NoInfer<Id>
 })
 
 [.] ui
