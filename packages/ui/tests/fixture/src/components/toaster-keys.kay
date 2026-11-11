@@ -1,0 +1,10 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+// A Toaster told its key by `shortcut`, by the deprecated `hotkey`, or by neither.
+const { shortcut, hotkey } = props<{ shortcut?: string | false | null, hotkey?: string | null }>()
+---
+button#saved(onClick={() => toast.success('Saved')}) Save
+// kay-allow deprecated-ui-hotkey: the deprecated alias is what this fixture tests
+Toaster(shortcut={shortcut} hotkey={hotkey})

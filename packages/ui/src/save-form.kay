@@ -49,8 +49,8 @@ const { action, refused, saved, onSave, onError, onDiscard, dirty, save, status,
   confirmLabel?: string | undefined
   // Keeps Save off while the app says the draft cannot be saved, such as an invalid one; the string is the reason, shown as Save's tooltip, which the keyboard reaches too. The shortcut is off with it.
   saveDisabled?: string | boolean | undefined
-  // The keys that save, `mod+s` (Ctrl or Cmd with S) by default; `false` binds none. Written as kay's `shortcut` takes them.
-  shortcut?: string | false | undefined
+  // The keys that save, `mod+s` (Ctrl or Cmd with S) by default; `false` or `null` binds none. Written as kay's `shortcut` takes them.
+  shortcut?: string | false | null | undefined
 }>()
 
 const issues = signal<Record<string, string>>({})

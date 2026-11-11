@@ -23,7 +23,7 @@ afterEach(() => {
 
 type Answer = string | { errors: Record<string, string> }
 
-async function saveForm(save: (input: { name: string }) => Promise<Answer>, shortcut?: string | false) {
+async function saveForm(save: (input: { name: string }) => Promise<Answer>, shortcut?: string | false | null) {
   mounted = await mountComponent(SaveFormComponent, { save, onSave: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
 
   return mounted.root
@@ -382,6 +382,20 @@ describe('SaveForm', () => {
     await settle()
 
     expect(event.defaultPrevented).toBe(false)
+    expect(saved).toEqual(['Grace'])
+    mounted?.unmount()
+
+    const none = await saveForm(async input => input.name, null)
+
+    type(none, 'Hopper')
+    await settle()
+
+    const nulled = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true })
+
+    none.querySelector('#name')!.dispatchEvent(nulled)
+    await settle()
+
+    expect(nulled.defaultPrevented).toBe(false)
     expect(saved).toEqual(['Grace'])
   })
 

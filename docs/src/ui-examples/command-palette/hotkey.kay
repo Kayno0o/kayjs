@@ -9,4 +9,4 @@ const entries: PaletteEntry[] = [
 ]
 ---
 p Press Ctrl+J, or Cmd+J on a Mac.
-CommandPalette(hotkey="j" entries={entries})
+CommandPalette(shortcut="mod+j" entries={entries})

@@ -25,7 +25,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> } = {}) {
+async function palette(props: { recent?: string[], shortcut?: string | false | null, hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> } = {}) {
   mounted = await mountComponent(Palette, {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -90,6 +90,49 @@ describe('CommandPalette', () => {
     await settle()
 
     expect(dialog.open).toBe(true)
+  })
+
+  test('opens on the full chord of `shortcut`, and on none of the default key then', async () => {
+    const { dialog } = await palette({ shortcut: 'mod+j' })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+
+    expect(dialog.open).toBe(false)
+
+    press(window, 'j', { ctrlKey: true })
+    await settle()
+
+    expect(dialog.open).toBe(true)
+  })
+
+  test('opens on Ctrl or Cmd with K by default, and `shortcut` wins over the deprecated `hotkey`', async () => {
+    const { dialog } = await palette({ shortcut: 'mod+j', hotkey: 'p' })
+
+    press(window, 'p', { ctrlKey: true })
+    await settle()
+
+    expect(dialog.open).toBe(false)
+    mounted!.unmount()
+
+    const other = await palette()
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+
+    expect(other.dialog.open).toBe(true)
+  })
+
+  test('`false` and `null` leave opening to the app', async () => {
+    for (const off of [false, null] as const) {
+      const { dialog } = await palette({ shortcut: off })
+
+      press(window, 'k', { ctrlKey: true })
+      await settle()
+
+      expect(dialog.open, String(off)).toBe(false)
+      mounted!.unmount()
+    }
   })
 
   test('leaves opening to the app without a hotkey, and puts recently followed links on top', async () => {

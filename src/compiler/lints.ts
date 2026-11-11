@@ -733,29 +733,7 @@ export function isLint(code: string | undefined): code is LintName {
 // Set by `kay upgrade` for the checks it runs, to the version the app came from: a lint about a change of default speaks to an app crossing it, and only then.
 export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
-// Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
-export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[] = [
-  { since: '1.46', removedIn: '1.51' },
-  { since: '1.51', removedIn: '1.56' },
-  { since: '1.52', removedIn: '1.56' },
-  { since: '1.55', removedIn: '1.60' },
-  { since: '1.56', removedIn: '1.60' },
-  { since: '1.69', removedIn: '1.73' },
-  { since: '1.70', removedIn: '1.74' },
-  { since: '1.71', removedIn: '1.74' },
-  { since: '1.72', removedIn: '1.75' },
-  { since: '1.74', removedIn: '1.77' },
-  { since: '1.81', removedIn: '1.85' },
-  { since: '1.82', removedIn: '1.86' },
-  { since: '1.84', removedIn: '1.88' },
-  { since: '1.87', removedIn: '1.91' },
-  { since: '1.88', removedIn: '1.92' },
-  { since: '1.89', removedIn: '1.93' },
-  { since: '1.90', removedIn: '1.94' },
-  { since: '1.91', removedIn: '1.95' },
-  { since: '1.92' },
-  { since: '1.96' },
-]
+export { DEPRECATION_MINORS } from './deprecated-lints'
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
 export function minorOf(version: string): [number, number] | undefined {

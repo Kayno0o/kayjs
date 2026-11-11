@@ -46,8 +46,8 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
-  // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
+const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = [], onRecentChange, shortcut: keys, hotkey, siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
+  // Shows the palette; the shortcut opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   entries: PaletteEntry[]
@@ -56,7 +56,9 @@ const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = 
   // Hrefs of the links followed from it, most recent first, listed on top while the query is empty; `onRecentChange` hands the new list over for the app to keep.
   recent?: string[] | undefined
   onRecentChange?: ((recent: string[]) => unknown) | undefined
-  // Ctrl or Cmd and this key opens and closes it from anywhere, unless something handled the key first; `null` leaves opening to the app.
+  // The keys that open and close it from anywhere, `mod+k` (Ctrl or Cmd with K) by default, unless something handled the key first; `false` or `null` leaves opening to the app. Written as kay's `shortcut` takes them.
+  shortcut?: string | false | null | undefined
+  // Deprecated: the key that, with Ctrl or Cmd, does the same as `shortcut`; `shortcut="mod+j"` for `hotkey="j"`.
   hotkey?: string | null | undefined
   // Searches the text of the site's pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `limit` of them, after the entries it matches, under `siteSearchLabel`. Read once, as the palette is set up.
   siteSearch?: boolean | { limit?: number | undefined } | undefined
@@ -213,7 +215,7 @@ function setShown(next: boolean) {
   onOpenChange?.(next)
 }
 
-// A close event lands a task after the dialog closed, so one the hotkey has already reopened it past is stale.
+// A close event lands a task after the dialog closed, so one the shortcut has already reopened it past is stale.
 function closed() {
   if (dialog?.open)
     return
@@ -223,7 +225,7 @@ function closed() {
   setShown(false)
 }
 
-shortcut(() => hotkey ? `mod+${hotkey}` : null, () => setShown(!(dialog?.open ?? shown())))
+shortcut(() => keys === undefined ? (hotkey === undefined ? 'mod+k' : hotkey && `mod+${hotkey}`) || null : keys || null, () => setShown(!(dialog?.open ?? shown())))
 
 // A section the site search found is not kept as recent: the list only shows the entries' own links.
 function followed(link: PaletteLink, found: boolean) {

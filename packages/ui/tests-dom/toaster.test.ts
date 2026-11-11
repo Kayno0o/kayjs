@@ -3,6 +3,7 @@ import { afterEach, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import HostsLate from '../tests/fixture/src/components/hosts-late.kay'
 import Hosts from '../tests/fixture/src/components/hosts.kay'
+import ToasterKeys from '../tests/fixture/src/components/toaster-keys.kay'
 import Toasts from '../tests/fixture/src/components/toasts.kay'
 import { click } from './dom'
 
@@ -206,4 +207,47 @@ test('the fallback Toaster takes the toasts over, none lost or doubled, once the
 
   expect([...root.querySelectorAll('.kui-toaster')].map(item => item.getAttribute('data-position'))).toEqual(['bottom-right'])
   expect(messages()).toEqual(['Saved', 'Again'])
+})
+
+function pressed(key: string, init: KeyboardEventInit) {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+
+  window.dispatchEvent(event)
+
+  return event
+}
+
+async function keyed(props: Record<string, unknown>) {
+  mounted = await mountComponent(ToasterKeys, props)
+  click(mounted.root.querySelector('#saved'))
+  await settle()
+}
+
+test('a Toaster takes the full chord of `shortcut`, and alt+t no longer moves the focus', async () => {
+  await keyed({ shortcut: 'alt+j' })
+
+  expect(pressed('t', { altKey: true }).defaultPrevented).toBe(false)
+  expect(pressed('j', { altKey: true }).defaultPrevented).toBe(true)
+  expect(document.activeElement?.closest('.kui-toast')).not.toBeNull()
+})
+
+test('a Toaster keeps the deprecated `hotkey` working beside Alt, and `shortcut` wins over it', async () => {
+  await keyed({ hotkey: 'j' })
+
+  expect(pressed('j', { altKey: true }).defaultPrevented).toBe(true)
+  mounted!.unmount()
+
+  await keyed({ hotkey: 'j', shortcut: 'alt+m' })
+
+  expect(pressed('j', { altKey: true }).defaultPrevented).toBe(false)
+  expect(pressed('m', { altKey: true }).defaultPrevented).toBe(true)
+})
+
+test('`false` and `null` turn the Toaster\'s key off', async () => {
+  for (const off of [false, null]) {
+    await keyed({ shortcut: off })
+
+    expect(pressed('t', { altKey: true }).defaultPrevented, String(off)).toBe(false)
+    mounted!.unmount()
+  }
 })

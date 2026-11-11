@@ -20,4 +20,38 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { redirects: { \'/sale\': { to: \'/offers\', permanent: false } } }',
     right: '// kay.config.ts\nexport default { redirects: { \'/sale\': { to: \'/offers\', status: 307 } } }',
   },
+  'deprecated-ui-hotkey': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.97',
+    site: true,
+    summary: '`hotkey` of a kayjs-ui Toaster or CommandPalette, `shortcut` since 1.97: the full chord, as SaveForm\'s `shortcut` already is (`alt+t` for the Toaster, `mod+k` for the CommandPalette by default), with `false` or `null` turning it off on all three. `hotkey` still works. Found on a `Toaster` or `CommandPalette` element of a `.kay` file of an app using kayjs-ui. The fix writes `shortcut` with the Alt (Toaster) or Ctrl or Cmd (CommandPalette) chord for a literal key, and `shortcut={null}` for `hotkey={null}`; any other value is reported with no fix.',
+    wrong: '---\nimport Toaster from \'@kaynooo/kayjs-ui/toaster.kay\'\n---\nToaster(hotkey="j")',
+    right: '---\nimport Toaster from \'@kaynooo/kayjs-ui/toaster.kay\'\n---\nToaster(shortcut="alt+j")',
+  },
 } as const satisfies Record<string, Lint>
+
+// Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
+export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[] = [
+  { since: '1.46', removedIn: '1.51' },
+  { since: '1.51', removedIn: '1.56' },
+  { since: '1.52', removedIn: '1.56' },
+  { since: '1.55', removedIn: '1.60' },
+  { since: '1.56', removedIn: '1.60' },
+  { since: '1.69', removedIn: '1.73' },
+  { since: '1.70', removedIn: '1.74' },
+  { since: '1.71', removedIn: '1.74' },
+  { since: '1.72', removedIn: '1.75' },
+  { since: '1.74', removedIn: '1.77' },
+  { since: '1.81', removedIn: '1.85' },
+  { since: '1.82', removedIn: '1.86' },
+  { since: '1.84', removedIn: '1.88' },
+  { since: '1.87', removedIn: '1.91' },
+  { since: '1.88', removedIn: '1.92' },
+  { since: '1.89', removedIn: '1.93' },
+  { since: '1.90', removedIn: '1.94' },
+  { since: '1.91', removedIn: '1.95' },
+  { since: '1.92' },
+  { since: '1.96' },
+  { since: '1.97' },
+]

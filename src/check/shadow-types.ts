@@ -54,6 +54,7 @@ import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
+import { uiHotkey } from './ui-hotkey'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
 
@@ -153,6 +154,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
   ({ root, options }) => redirectPermanent(root, options),
+  async ({ root, options }) => uiHotkey(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

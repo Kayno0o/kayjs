@@ -1219,6 +1219,7 @@ component default
   search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
   searchError?: string | undefined
   searchLabel?: string | undefined
+  shortcut?: false | null | string | undefined
   siteSearch?: boolean | undefined | { limit?: number | undefined; }
   siteSearchError?: string | undefined
   siteSearchLabel?: string | undefined
@@ -2437,7 +2438,7 @@ component default
   saveLabel?: string | undefined
   saved?: string | undefined
   savingLabel?: string | undefined
-  shortcut?: false | string | undefined
+  shortcut?: false | null | string | undefined
   status?: string | undefined
   validate?: "blur" | "submit" | false | undefined
 
@@ -3113,6 +3114,7 @@ component default
   hotkey?: null | string | undefined
   limit?: number | undefined
   position?: "bottom-center" | "bottom-left" | "bottom-right" | "top-center" | "top-left" | "top-right" | undefined
+  shortcut?: false | null | string | undefined
   toast?: ((item: Toast, dismiss: () => void) => Element) | undefined
 
 [./toggle.kay] default

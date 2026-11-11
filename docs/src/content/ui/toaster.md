@@ -58,10 +58,10 @@ To keep what a refusal carries instead of its words, such as the output of a com
 
 `onRefused` is awaited, and one that throws or rejects is logged and toasts `failure`. A failure that is no refusal, such as a network error or a 5xx answer, still toasts `failure`, and `attempt` resolves to `undefined` either way.
 
-## Dismiss label and hotkey
+## Dismiss label and shortcut
 
 `dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.
 
-`hotkey` is the key that, with Alt, moves the focus to the first toast's first button, its action when it has one, `t` by default. Pass `hotkey={null}` to turn it off.
+`shortcut` is the keys that move the focus to the first toast's first button, its action when it has one, `alt+t` by default, written as kay's `shortcut` takes them. Pass `shortcut={false}` or `{null}` to turn it off. `hotkey="t"`, the key beside Alt, still works and `kay upgrade` rewrites it.
 
 Other attributes, such as a `data-testid` or an `aria-label`, go on the toast stack's element.
