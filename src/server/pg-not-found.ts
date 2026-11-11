@@ -123,12 +123,14 @@ async function forgetOld(tx: SQL, now: number): Promise<void> {
 async function sweepOld(connect: () => Promise<SQL | undefined>, closed: () => boolean): Promise<void> {
   const connected = await limited('the 404 log finding its tables', connect, READY_TIMEOUT_MS)
 
-  if (connected && !closed())
-    // Under the lock the writes take, so a sweep and a write of two replicas do not run at once.
-    await limited('the 404 log sweep', async () => connected.begin(async (tx) => {
-      await query(tx, 'SELECT pg_advisory_xact_lock(hashtext($1))', [WRITE_LOCK])
-      await forgetOld(tx, Date.now())
-    }), MAINTENANCE_TIMEOUT_MS)
+  if (!connected || closed())
+    return
+
+  // Under the lock the writes take, so a sweep and a write of two replicas do not run at once.
+  await limited('the 404 log sweep', async () => connected.begin(async (tx) => {
+    await query(tx, 'SELECT pg_advisory_xact_lock(hashtext($1))', [WRITE_LOCK])
+    await forgetOld(tx, Date.now())
+  }), MAINTENANCE_TIMEOUT_MS)
 }
 
 // Runs `sweep` every `ms` without keeping the process alive, a failure being logged and the next run tried.
