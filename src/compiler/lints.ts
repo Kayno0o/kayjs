@@ -5,7 +5,6 @@ import { accessibilityLints } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
-import { CONTENT_LINTS } from './content-lints'
 import { I18N_LINTS } from './i18n-lints'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
@@ -487,7 +486,6 @@ export const LINTS = {
     wrong: 'export const posts = collection(\'src/content/posts\', { schema, trusted: true })',
     right: 'export const posts = collection(\'src/content/posts\', { schema })',
   },
-
   'old-bun-image': {
     level: 'deny',
     group: 'code',
@@ -699,7 +697,6 @@ export const LINTS = {
     right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
   },
   ...ROUTE_LINTS,
-  ...CONTENT_LINTS,
   ...DEPRECATED_LINTS,
 } as const satisfies Record<string, Lint>
 

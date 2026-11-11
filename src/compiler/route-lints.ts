@@ -1,6 +1,6 @@
 import type { Lint } from './lints'
 
-// The lints of the files under `src/routes`, with the other lints in `LINTS`.
+// The lints of the files under `src/routes` and of the content entries, with the other lints in `LINTS`.
 export const ROUTE_LINTS = {
   'unguarded-route': {
     level: 'deny',
@@ -25,5 +25,13 @@ export const ROUTE_LINTS = {
     summary: 'A status page (`_401.kay`, `_403.kay`, `_429.kay` or `_503.kay`) in a directory with no route: a status page answers for the routes of its directory and below, so no page ever renders it.',
     wrong: '// src/routes/_403.kay, with no route in src/routes/',
     right: '// src/routes/admin/_403.kay, beside the pages it answers for',
+  },
+  'held-back-reference': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'An entry shown on the site whose `reference()` field names an entry its collection holds back from production, a draft or one outside its `publishAt` and `unpublishAt` dates, so the page renders without it. `kay check` only notes it, as publishing the referenced entry fixes it, and the build does not fail.',
+    wrong: 'author: ada (in an entry shown, while authors/ada.md has `draft: true`)',
+    right: 'publish authors/ada.md, or point the reference at a shown entry',
   },
 } as const satisfies Record<string, Lint>
