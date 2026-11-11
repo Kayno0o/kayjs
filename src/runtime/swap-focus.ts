@@ -98,3 +98,35 @@ async function showRefusal(form: HTMLFormElement | undefined, control: number): 
 
   return refusal.showRefusal(form, control, announce)
 }
+
+// Keys typed into the focused field after the swap and before its island hydrated land in the server's markup, which hydration then writes its own value over. They are noted as they come, and the function returned (called once the hydration is done) puts them back and fires `input` so the island hears them, the caret after them.
+export function watchTyped(): (() => void) | undefined {
+  const field = document.activeElement
+
+  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement))
+    return undefined
+
+  const id = field.id
+  let typed: { value: string, start: number, end: number } | undefined
+  const note = (event: Event) => {
+    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null)
+      typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd }
+  }
+
+  document.addEventListener('input', note, true)
+
+  return () => {
+    document.removeEventListener('input', note, true)
+
+    const now = field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field)
+
+    if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.selectionStart === null)
+      return
+
+    if (now.value !== typed.value)
+      now.value = typed.value
+
+    now.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    now.setSelectionRange(typed.start, typed.end)
+  }
+}

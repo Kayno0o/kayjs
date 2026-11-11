@@ -149,6 +149,68 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     }
   }, 60_000)
 
+  // Keys typed after the swap and before the island hydrated land in the server's markup, which hydration writes its value over: they are kept and reach the island as an input event.
+  const afterSwap = {
+    'production': {},
+    'dev': { dev: true },
+    'a trailing slash': { trailingSlash: 'always' as const },
+  }
+
+  for (const [kind, options] of Object.entries(afterSwap)) {
+    it(`keeps keys typed before a swapped-in field hydrates (${kind}) and tells the island`, async () => {
+      const site = await testSite({ root: 'tests/fixtures/caret-field', ...options, browser: { path } })
+
+      try {
+        const page = await site.open('trailingSlash' in options ? '/bound/' : '/bound')
+
+        // The keys arrive right as the swap hands the body to hydration, before the island's chunk resolves.
+        await page.evaluate(() => {
+          document.addEventListener('kay:navigate', () => {
+            const field = document.activeElement as HTMLInputElement
+
+            field.value += 'sia'
+            field.setSelectionRange(field.value.length, field.value.length)
+            field.dispatchEvent(new InputEvent('input', { bubbles: true }))
+          }, { once: true })
+        })
+        await page.click('.field')
+        await page.type('ely')
+        await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'elysia')
+
+        expect(await page.evaluate(() => {
+          const f = document.querySelector<HTMLInputElement>('.field')!
+
+          return [document.activeElement === f, f.value, f.selectionStart]
+        })).toEqual([true, 'elysia', 6])
+        expect(page.errors).toEqual([])
+      }
+      finally {
+        await site.close()
+      }
+    }, 60_000)
+  }
+
+  it('keeps keys typed at once after a swap on a throttled CPU', async () => {
+    const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+    try {
+      const page = await site.open('/bound')
+
+      await page.cdp('Emulation.setCPUThrottlingRate', { rate: 20 })
+      await page.click('.field')
+      await page.type('ely')
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'ely')
+      await page.type('sia')
+      await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'elysia')
+
+      expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('.field')!.value)).toBe('elysia')
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+
   it('keeps it under a trailing slash', async () => {
     const site = await testSite({ root: 'tests/fixtures/caret-field', trailingSlash: 'always', browser: { path } })
 

@@ -1,0 +1,15 @@
+---
+import { debounced, effect, navigate, signal, watch } from 'kay'
+
+const { value } = props<{ value: string }>()
+const typed = signal(value)
+let box: HTMLInputElement | undefined
+
+// Searches once typing pauses, as the docs show; the field takes the value its parent holds, as kayjs-ui's TextInput does, which hydration runs once the island is in.
+watch(debounced(typed, '150ms'), q => void navigate({ query: { q } }, { replace: true }))
+effect(() => {
+  if (box && box.value !== value)
+    box.value = value
+})
+---
+input.field(name="q" aria-label="Search" value={value} ref={(input: HTMLInputElement) => box = input} onInput={event => typed = event.currentTarget.value})
