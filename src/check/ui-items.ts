@@ -16,16 +16,18 @@ interface ItemProp {
   renames: readonly (readonly [string, string])[]
 }
 
-// The kayjs-ui components whose item keys were renamed in 1.99, by component name.
+// The kayjs-ui components whose item keys were renamed in 1.99, by the file they are imported from.
 const COMPONENTS: Record<string, ItemProp> = {
-  Timeline: { prop: 'entries', renames: [['text', 'label']] },
-  Accordion: { prop: 'items', renames: [['value', 'key'], ['title', 'label']] },
-  MediaGallery: { prop: 'items', renames: [['title', 'label']] },
-  AppSwitcher: { prop: 'apps', renames: [['id', 'key']] },
-  AudioPlayer: { prop: 'chapters', renames: [['title', 'label'], ['url', 'href']] },
+  'timeline': { prop: 'entries', renames: [['text', 'label']] },
+  'accordion': { prop: 'items', renames: [['value', 'key'], ['title', 'label']] },
+  'media-gallery': { prop: 'items', renames: [['title', 'label']] },
+  'app-switcher': { prop: 'apps', renames: [['id', 'key']] },
+  'audio-player': { prop: 'chapters', renames: [['title', 'label'], ['url', 'href']] },
 }
 
-const NEEDLE = /\b(?:Timeline|Accordion|MediaGallery|AppSwitcher|AudioPlayer)\b/
+const LIBRARY_FILE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
+
+const NEEDLE = /kayjs-ui\/(?:timeline|accordion|media-gallery|app-switcher|audio-player)\.kay/
 const KAY_FILE = /\.kay$/
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
@@ -41,16 +43,31 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
   for (const file of await findProjectFiles(root, KAY_FILE, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
 
-    if (!NEEDLE.test(source) || !source.includes('kayjs-ui'))
+    if (!NEEDLE.test(source))
       continue
 
     const levelAt = lintLevels(source, options.lints)
     const parsed = parseKay(source)
-    const bindings = parsed.script ? constBindings(parseProgram(source.slice(parsed.script.start, parsed.script.end), { lang: 'tsx', recover: true, offset: parsed.script.start }).program) : new Map<string, Expression>()
+    const program = parsed.script ? parseProgram(source.slice(parsed.script.start, parsed.script.end), { lang: 'tsx', recover: true, offset: parsed.script.start }).program : undefined
+    const bindings = program ? constBindings(program) : new Map<string, Expression>()
+    const bound = new Map<string, ItemProp>()
+
+    // The names the file gives the components it imports from kayjs-ui, so a component of its own with the same name is left alone.
+    for (const statement of program?.body ?? []) {
+      if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
+        continue
+
+      const spec = LIBRARY_FILE.exec(statement.source.value) && COMPONENTS[LIBRARY_FILE.exec(statement.source.value)![1]!]
+
+      for (const specifier of statement.specifiers) {
+        if (spec && specifier.type === 'ImportDefaultSpecifier')
+          bound.set(specifier.local.name, spec)
+      }
+    }
     const seen = new Set<number>()
 
     for (const element of elementsIn(parsed.template)) {
-      const spec = element.component ? COMPONENTS[element.name] : undefined
+      const spec = element.component ? bound.get(element.name) : undefined
 
       if (spec === undefined)
         continue

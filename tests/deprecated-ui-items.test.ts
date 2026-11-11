@@ -46,13 +46,17 @@ describe('deprecated-ui-items', () => {
     const both = `${HEAD}---\nTimeline(label="Day" entries={[{ key: 'a', time: '1', text: 'Old', label: 'New' }]})\n`
     const other = `${HEAD}---\nMenu(items={[{ value: 'a', title: 'A' }]})\nTimeline(label="Day" entries={entries})\nAccordion(items={items.map(one => ({ value: one, title: one }))} panel={() => null})\n`
     const unrelated = '---\nimport Timeline from \'./timeline.kay\'\n---\nTimeline(entries={[{ key: \'a\', time: \'1\', text: \'Old\' }]})\n'
-    const root = await project({ 'src/routes/a.kay': both, 'src/routes/b.kay': other, 'src/routes/c.kay': unrelated })
+    const local = '---\nimport Toast from \'@kaynooo/kayjs-ui/toaster.kay\'\nimport Timeline from \'./timeline.kay\'\n---\nTimeline(entries={[{ key: \'a\', time: \'1\', text: \'Mine\' }]})\n'
+    const aliased = '---\nimport Line from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nLine(label="Day" entries={[{ key: \'a\', time: \'1\', text: \'Old\' }]})\n'
+    const root = await project({ 'src/routes/a.kay': both, 'src/routes/b.kay': other, 'src/routes/c.kay': unrelated, 'src/routes/d.kay': local })
 
     try {
       const found = await uiItems(root, {})
 
       expect(found).toHaveLength(1)
       expect(found[0]!.fixes).toBeUndefined()
+      await Bun.write(join(root, 'src/routes/e.kay'), aliased)
+      expect(await uiItems(root, {})).toHaveLength(2)
       expect(await uiItems(root, { lints: { 'deprecated-ui-items': 'allow' } })).toEqual([])
     }
     finally {
