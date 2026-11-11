@@ -2,7 +2,7 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.96.0
+## 1.97.0
 
 ### `kay mcp` needs `--write` to POST and to test
 
@@ -13,6 +13,12 @@ A run whose kept results (its input, results and inbox, as text) pass 2,000,000 
 ### A template `innerHTML` is checked at runtime
 
 `innerHTML={expr}` on an element now drops a string nothing vouched for with `sanitizeHtml`, `trustHtml` or an icon import, as a spread already did, so a value cast to `SafeHtml` (`as`, `any`) no longer carries markup in; the element stays empty and development warns. A string written out and a project file imported as text are not checked. Wrap the value in `sanitizeHtml(...)` or `trustHtml(...)` where it is used. No `kay check` lint recognises it: a cast leaves no trace once the types are erased.
+
+### kayjs-cms: a forge redirect fails, and `fourEyes` needs a named approver
+
+`forgejo()`, `github()` and `gitlab()` refuse a redirect from the forge, where they followed it with the token: a repository renamed or moved needs its new `repo` in the config. With `cms({ fourEyes: true })`, an approval by a person the guard cannot name (no id, no name) is refused, as it cannot be told from the sender: an app with its own guard passes `cms({ member })` so each person is named.
+
+## 1.96.0
 
 ### `permanent` of a redirect is deprecated
 
