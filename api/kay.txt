@@ -3716,7 +3716,7 @@ interface SessionStore extends StoreBase
   set: (id: string, data: SessionData, maxAgeMs: number) => MaybePromise<void>
 
 [./server] shutdown
-function shutdown(app: AnyElysia, force?: boolean): Promise<void>
+function shutdown(app: AnyElysia, force?: boolean, hookTimeoutMs?: number): Promise<void>
 
 [./server] signed
 const signed: { sign(use: string, value: string, options?: SignOptions): string; verify(use: string, value: string, token: unknown): boolean; }
