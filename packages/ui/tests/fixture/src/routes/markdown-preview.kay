@@ -1,0 +1,5 @@
+---
+import PreviewNote from '../components/preview-note.kay'
+---
+main
+  PreviewNote(html="<h1>Title</h1><p>Body</p>")

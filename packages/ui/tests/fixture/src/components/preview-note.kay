@@ -1,0 +1,13 @@
+--- island
+import { trustHtml } from 'kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+
+// A note opened with its preview on and the first preview rendered by the server; `preview` answers what the same text renders to, a moment later.
+const { html } = props<{ html: string }>()
+const preview = async (markdown: string) => {
+  await new Promise(resolve => setTimeout(resolve, 50))
+
+  return `<h1>Title</h1><p>${markdown.slice(markdown.indexOf('\n') + 1)}!</p>`
+}
+---
+MarkdownEditor#editor(aria-label="Note" value={'# Title\nBody'} previewing={true} previewHtml={trustHtml(html)} preview={preview})

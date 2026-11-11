@@ -1884,6 +1884,8 @@ component default
   bar?: string | undefined;
   barFailed?: string | undefined;
   extra?: string | undefined;
+  preview?: string | undefined;
+  previewBody?: string | undefined;
 }
   invalid?: boolean | undefined
   keysHint?: string | undefined
@@ -1894,6 +1896,7 @@ component default
   onPreviewChange?: ((previewing: boolean) => unknown) | undefined
   preview?: ((markdown: string) => Promise<string>) | undefined
   previewClass?: string | undefined
+  previewHtml?: SafeHtml | undefined
   previewTrusted?: boolean | undefined
   previewing?: boolean | undefined
   toolbar?: boolean | readonly ("bold" | "bulletList" | "heading" | "image" | "italic" | "link" | "numberedList")[] | undefined

@@ -1,5 +1,5 @@
 ---
-import type { JSX, Snippet } from 'kay'
+import type { JSX, SafeHtml, Snippet } from 'kay'
 import type { TextEdit, ToolbarAction, ToolbarTools } from './markdown-edit'
 import { readDataTransferEntries } from '@kaynooo/utils/browser/clipboard'
 import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
@@ -22,9 +22,9 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
   image: imageEdit,
 }
 
-const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5' } })
+const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5', preview: 'kui-markdown-preview', previewBody: 'kui-markdown-preview-body kui-prose' } })
 
-const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar = true, actions, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar = true, actions, preview, previewing, onPreviewChange, previewTrusted = false, previewHtml, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // Marks the editor as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
   // The text to start with; an editor whose parent passes other text follows it.
@@ -49,6 +49,8 @@ const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar =
   preview?: ((markdown: string) => Promise<string>) | undefined
   // Inserts the preview's HTML as it comes, for an app whose renderer already sanitizes the text it renders.
   previewTrusted?: boolean | undefined
+  // The HTML of the preview for `value`, such as `markdownHtml(body)` computed on the server: the pane shows it in the server render and until the text is edited, when `preview` answers in its place, so a page loads with the text rendered and nothing shifts.
+  previewHtml?: SafeHtml | undefined
   // Whether the preview shows, when the parent sets it; the Preview button toggles it on its own, and `onPreviewChange` reports each change so a parent driving `previewing` can set it back.
   previewing?: boolean | undefined
   onPreviewChange?: ((previewing: boolean) => unknown) | undefined
@@ -96,7 +98,8 @@ function builtIn(): readonly ToolbarAction[] {
 
   return chosen
 }
-const text = signal(untrack(() => value))
+const startText = untrack(() => value)
+const text = signal(startText)
 const previewShown = signal(untrack(() => previewing ?? false))
 
 // The text `onChange` last heard, or the parent last handed.
@@ -428,5 +431,8 @@ div(part="wrap")
           div(part="extra")
             | {actions(tools)}
     if previewShown() && preview
+      if previewView().length === 0 && previewHtml !== undefined
+        div(part="preview" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy="false")
+          div(part="previewBody" class={previewClass} innerHTML={previewHtml})
       for View of previewView() key={View}
-        View(text={text()} render={preview} trusted={previewTrusted} class={previewParts()})
+        View(text={text()} render={preview} trusted={previewTrusted} initial={previewHtml} initialFor={startText} class={previewParts()})

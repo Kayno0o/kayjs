@@ -1,4 +1,5 @@
 ---
+import type { SafeHtml } from 'kay'
 import { effect, onCleanup, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import { wording } from 'kay/words'
 
@@ -10,19 +11,28 @@ const look = recipe({ parts: { root: 'kui-markdown-preview', failed: 'kui-markdo
 // What rendered Markdown keeps besides formatted text, as the site's own Markdown does; scripts, handlers and unsafe URLs never survive.
 const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'], th: ['align'], td: ['align'] } }
 
-const { text, render, trusted = false } = props<{
+const { text, render, trusted = false, initial, initialFor } = props<{
   text: string
   trusted?: boolean
+  // The HTML the server drew for the text the editor started with: kept, as drawn, until the text is edited and `render` answers for it.
+  initial?: SafeHtml | undefined
+  // The text `initial` was drawn for.
+  initialFor?: string | undefined
   render: (markdown: string) => Promise<string>
 }>()
 
 const rendered = signal<string | undefined>(undefined)
+const held = signal(untrack(() => initial))
 const failed = signal(false)
 // Counts the renders asked for, so a slow answer to an older text never lands over a newer one.
 let asked = 0
 
 effect(() => {
   const markdown = text
+
+  if (untrack(held) !== undefined && markdown === initialFor)
+    return
+
   const turn = ++asked
   const timer = setTimeout(async () => {
     try {
@@ -30,6 +40,7 @@ effect(() => {
 
       if (turn === asked) {
         rendered = html
+        held = undefined
         failed = false
       }
     }
@@ -44,8 +55,8 @@ effect(() => {
   onCleanup(() => clearTimeout(timer))
 })
 ---
-div(part="root" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy={rendered() === undefined && !failed() ? 'true' : 'false'})
+div(part="root" role="region" aria-label={wording('ui.markdownEditor.preview', 'Preview')} aria-busy={rendered() === undefined && held() === undefined && !failed() ? 'true' : 'false'})
   if failed()
     p(part="failed") {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
   else
-    div.kui-prose(part="body" innerHTML={trusted ? trustHtml(rendered() ?? '') : sanitizeHtml(rendered() ?? '', KEPT)})
+    div.kui-prose(part="body" innerHTML={held() ?? (trusted ? trustHtml(rendered() ?? '') : sanitizeHtml(rendered() ?? '', KEPT))})

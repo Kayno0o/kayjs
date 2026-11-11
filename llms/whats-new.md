@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - Every public DOM event is `<lib>:<verb>` on `document` with an object `detail`: `kay:renew`, `kay:install`, `kay:dev-built`, `kay:dev-types`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft` and `kui:hold-defaults`; the old names fire too until 1.103, and `deprecated-event-names` finds what `kay check` can read, with a fix where the handler changes nothing else. Cookies are `kay_<name>` and storage keys `<lib>:<name>`, in one [table of events and the two rules](events.md).
 - `analytics()` and `vitals()` take `awaitConsent` in place of `consent`, which now names only the visitor's answer; kayjs-ai's `ask()` takes `effort` and `approval` in place of `reasoning` and `confirm`, and `Chat` takes `showReasoning` and `waitingLabel` in place of `reasoning` and `thinkingLabel`. The old names keep working and `kay upgrade` renames them ([analytics](analytics.md), [upgrading](upgrading.md)).
+- kayjs-ui: MarkdownEditor takes `previewHtml`, the preview of its starting text drawn by the server and kept until an edit, so a page opened with `previewing` loads rendered instead of empty ([MarkdownEditor](../packages/ui/llms/markdown-editor.md)).
 - kayjs-ui: a RowsField `@cell` is drawn once per row and keeps its control when a row above it is removed or added; its `index` is now a function, `index()`, so the cell's name follows the row ([RowsField](../packages/ui/llms/forms.md), upgrade line in [upgrading](upgrading.md)).
 
 ## 1.98.0
