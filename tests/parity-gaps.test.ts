@@ -209,7 +209,7 @@ describe('effects writing what they read', () => {
       reactive.flush()
       stop()
       expect(runs).toBeLessThanOrEqual(1001)
-      expect(String(failed.mock.calls[0]?.[0])).toContain('Still queued: climbing')
+      expect(String(failed.mock.calls[0]?.[0])).toContain('Looping: climbing')
     }
     finally {
       failed.mockRestore()
