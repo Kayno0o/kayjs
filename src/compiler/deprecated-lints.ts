@@ -61,9 +61,9 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.98',
     site: true,
-    summary: 'A kay.config.ts key under its name before 1.98, which still works: `serve.apiPath` is `serve.apiPrefix` (a prefix, as every library\'s `prefix`), `subset` and `weight` of a Fontsource font are `subsets` and `weights`, and `live.perMinute` is `live.rate`, `{ max, window }` as every rate limit option is. Found in the config object of kay.config.ts, through a `const` it names. The fix renames the key, writes a lone name or weight in a list, and writes `perMinute: 60` as `rate: { max: 60, window: \'1m\' }`; a value that is not a literal, or an object that holds the new key already, is reported with no fix.',
+    summary: 'A kay.config.ts key under its name before 1.98, which still works: `serve.apiPath` is `serve.apiPrefix` (a prefix, as every library\'s `prefix`), `subset` and `weight` of a Fontsource font are `subsets` and `weights`, `live.perMinute` and `images.perMinute` are `live.rateLimit` and `images.rateLimit`, and a number `mcp.rateLimit` is `{ max, window }`, as every rate limit option is. Found in the config object of kay.config.ts, through a `const` it names. The fix renames the key, writes a lone name or weight in a list, and writes `perMinute: 60` (or `mcp: { rateLimit: 60 }`) as `rateLimit: { max: 60, window: \'1m\' }`; a value that is not a literal, or an object that holds the new key already, is reported with no fix.',
     wrong: '// kay.config.ts\nexport default { serve: { apiPath: \'/v1\' }, live: { perMinute: 60 } }',
-    right: '// kay.config.ts\nexport default { serve: { apiPrefix: \'/v1\' }, live: { rate: { max: 60, window: \'1m\' } } }',
+    right: '// kay.config.ts\nexport default { serve: { apiPrefix: \'/v1\' }, live: { rateLimit: { max: 60, window: \'1m\' } } }',
   },
   'deprecated-ui-props': {
     level: 'warn',

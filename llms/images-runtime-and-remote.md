@@ -78,8 +78,8 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 ## Limits on encoding
 
 A variant no file holds yet costs an encode, so the route bounds what a client can ask for; a variant already made, and an imported image's built ones, are never limited.
-- `images.perMinute` (120 by default): the new variants one client may have encoded in a minute, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
-- `images.maxVariants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `perMinute`.
+- `images.rateLimit` (`{ max: 120, window: '1m' }` by default): the new variants one client may have encoded in a window, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
+- `images.maxVariants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `rateLimit`.
 - Requests asking for the same new variant at once count once.
 - `images.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
 - Each takes a whole number from 1 or `false` for no limit, and `kay check` refuses any other value.

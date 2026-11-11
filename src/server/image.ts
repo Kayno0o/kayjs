@@ -55,7 +55,7 @@ export interface ImageRouteOptions {
   ttl?: Duration | undefined
   // `false` answers a visitor saving data the width asked for, as any other, instead of the next one down.
   saveData?: boolean | undefined
-  // What the route may be asked to encode, `images.perMinute`, `images.maxVariants` and `images.queue` with their defaults when left out.
+  // What the route may be asked to encode, `images.rateLimit`, `images.maxVariants` and `images.queue` with their defaults when left out.
   limits?: ImageLimits | undefined
   // The security headers, which the route's answers carry themselves.
   security?: Record<string, string> | undefined

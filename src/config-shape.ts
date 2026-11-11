@@ -28,7 +28,7 @@ const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: list(str) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
-const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rate: bag({ max: num, window: duration }), perMinute: num }
+const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rateLimit: either(lit(false), bag({ max: num, window: duration })), perMinute: num }
 const JOBS: Record<keyof JobsConfig, Rule> = { guard: guardOption, path: str }
 const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
@@ -36,7 +36,7 @@ const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
-const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, perMinute: either(num, lit(false)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: guardOption }
+const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(lit(false), bag({ max: num, window: duration })), perMinute: either(num, lit(false)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: guardOption }
 const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof KayConfig, Rule> = {
   dirs: bag(DIRS),

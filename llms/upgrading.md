@@ -7,9 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `analytics()` takes `url`, `site` and `privacy`
 
 `host` of an `analytics()` provider (the service address, which Matomo requires) is `url`, so it no longer shares a word with the `hosts` list of page hostnames. `domain` of Plausible and `hostname` of Simple Analytics are `site`; `websiteId`, `siteId`, `measurementId` and `token` stay, being each provider's own word. `policyUrl` is `privacy`, as in mail and kayjs-ui. The old names still work for three minors, and `kay upgrade` renames them (`deprecated-analytics-options`); an options object built outside the call is not found by the lint but is still read.
-### `serve.apiPath`, `live.perMinute`, `subset` and `weight` of a Fontsource font
+### `serve.apiPath`, `live.perMinute`, `images.perMinute`, `mcp.rateLimit`, `subset` and `weight` of a Fontsource font
 
-`serve.apiPath` is `serve.apiPrefix`, a prefix as every library's `prefix` is. `live: { perMinute: 120 }` is `live: { rate: { max: 120, window: '1m' } }`, the shape of every rate limit option. A Fontsource entry's `subset` is `subsets` and a `weight` it never took is `weights`. The old keys still work for three minors, and `kay upgrade` rewrites them (`deprecated-config-keys`).
+`serve.apiPath` is `serve.apiPrefix`, a prefix as every library's `prefix` is. `live: { perMinute: 120 }` is `live: { rateLimit: { max: 120, window: '1m' } }`, `images: { perMinute: 120 }` is `images: { rateLimit: { max: 120, window: '1m' } }` (`false` stays `rateLimit: false`) and `mcp: { rateLimit: 60 }` is `mcp: { rateLimit: { max: 60, window: '1m' } }`, the shape of every rate limit option. A Fontsource entry's `subset` is `subsets` and a `weight` it never took is `weights`. The old keys still work for three minors, and `kay upgrade` rewrites them (`deprecated-config-keys`).
 
 ### `tz` of `schedule()` is `timeZone`
 
@@ -95,7 +95,7 @@ The call used to stay pending for good once the browser went to the redirect's t
 No lint can see these: they depend on the traffic an app gets, not on its code.
 
 - A `.ws()` route refuses a client's 21st open socket with 429. An app whose clients share one address (an office behind one NAT, a proxy kay is not told to trust) or open many sockets on one route sets `detail.messages.connections` to its number, or `false` ([API routes](api-routes.md)).
-- The image route answers 429 past 120 new variants a minute for one client and 503 past 128 waiting draws, and keeps at most 256 cached variants of one source, removing the oldest to make room; variants already made never count against the rate. An app that draws more raises `images.perMinute`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
+- The image route answers 429 past 120 new variants a minute for one client and 503 past 128 waiting draws, and keeps at most 256 cached variants of one source, removing the oldest to make room; variants already made never count against the rate. An app that draws more raises `images.rateLimit`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
 
 ### A `local()` mirror is emptied at the first sign-in after the upgrade
 

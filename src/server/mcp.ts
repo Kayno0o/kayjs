@@ -4,6 +4,7 @@ import type { Tool, ToolResult } from '../mcp/protocol'
 import type { ServerAction } from '../runtime/action'
 import type { ActionOptions } from './actions'
 import type { BodyLimit } from './body'
+import type { RateWindowMs } from './config-limits'
 import type { LoadedGuard } from './guards'
 import type { Operation, ToolText } from './openapi'
 import type { ToolOutputs } from './tool-outputs'
@@ -387,7 +388,6 @@ function json(value: unknown): string {
 }
 
 const RATE_NAME = 'kay:mcp'
-const MINUTE_MS = 60_000
 
 export interface McpOptions {
   title: string
@@ -401,8 +401,8 @@ export interface McpOptions {
   metadataPaths: string[]
   // Where the endpoint is served, `/mcp` by default.
   path: string
-  // The requests a client may send it a minute, or undefined for no limit.
-  perMinute: number | undefined
+  // The requests a client may send it in a window, or undefined for no limit.
+  rateLimit: RateWindowMs | undefined
   // Sent as `instructions` of `initialize`, from `mcp.instructions`.
   instructions?: string | undefined
   // Set with `mcp.key`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
@@ -588,7 +588,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     if (isCrossSite(request))
       return new Response('Cross-site request refused', { status: 403 })
 
-    const wait = options.perMinute === undefined ? undefined : await overLimit(RATE_NAME, clientAddress(request, server), options.perMinute, MINUTE_MS)
+    const wait = options.rateLimit === undefined ? undefined : await overLimit(RATE_NAME, clientAddress(request, server), options.rateLimit.max, options.rateLimit.windowMs)
 
     if (wait !== undefined)
       return tooManyRequests(wait)

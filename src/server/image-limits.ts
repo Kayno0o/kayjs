@@ -12,7 +12,6 @@ export interface EncodeRefusal {
 }
 
 const ENCODE_RATE = 'image-encodes'
-const MINUTE_MS = 60_000
 const QUEUE_RETRY_SECONDS = 5
 // The sources whose cached variants are listed in memory; one forgotten is read from the folder again.
 const MOST_SOURCES = 1024
@@ -63,7 +62,7 @@ export function encodeGate(limits: ImageLimits, dir: string, forgotten: { clear:
       if (limits.queue !== undefined && drawing.waiting >= limits.queue)
         return { body: 'Too many images are being drawn; try again shortly', status: 503, wait: QUEUE_RETRY_SECONDS }
 
-      const wait = limits.perMinute === undefined ? undefined : await overLimit(ENCODE_RATE, clientAddress(request, server), limits.perMinute, MINUTE_MS)
+      const wait = limits.rate === undefined ? undefined : await overLimit(ENCODE_RATE, clientAddress(request, server), limits.rate.max, limits.rate.windowMs)
 
       if (wait !== undefined)
         return { body: 'Too many new image variants; try again later', status: 429, wait }

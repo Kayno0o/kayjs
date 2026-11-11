@@ -138,7 +138,7 @@ describe('the key', () => {
   })
 
   it('counts the refused requests against the rate limit, so guessing is bounded', async () => {
-    const app = await served({}, { mcp: { key: KEY, rateLimit: 3 }, proxy: { hops: 1 } })
+    const app = await served({}, { mcp: { key: KEY, rateLimit: { max: 3, window: '1m' } }, proxy: { hops: 1 } })
     // A client of its own, as the counts are the process's.
     const client = { 'x-forwarded-for': '203.0.113.77' }
 

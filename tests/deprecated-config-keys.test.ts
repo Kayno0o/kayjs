@@ -24,11 +24,34 @@ describe('deprecated-config-keys', () => {
       expect(found.map(one => [one.line, one.fixes?.[0]?.safe ?? null])).toEqual([[3, true], [7, true], [9, true], [9, true], [10, true], [10, true]])
       expect(found.every(one => one.code === 'deprecated-config-keys')).toBe(true)
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay\'\n\nconst serve = { apiPrefix: \'/v1\' }\n\nexport default defineConfig({\n  serve,\n  live: { connections: 3, rate: { max: 60, window: \'1m\' } },\n  fonts: [\n    { fontsource: \'@fontsource/inter\', subsets: [\'latin\'], weights: [400] },\n    { fontsource: \'@fontsource/inter\', subsets: [\'latin\', \'greek\'], weights: [400, 700] },\n    { family: \'Mine\', src: \'a.woff2\', weight: 400 },\n  ],\n})\n')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay\'\n\nconst serve = { apiPrefix: \'/v1\' }\n\nexport default defineConfig({\n  serve,\n  live: { connections: 3, rateLimit: { max: 60, window: \'1m\' } },\n  fonts: [\n    { fontsource: \'@fontsource/inter\', subsets: [\'latin\'], weights: [400] },\n    { fontsource: \'@fontsource/inter\', subsets: [\'latin\', \'greek\'], weights: [400, 700] },\n    { family: \'Mine\', src: \'a.woff2\', weight: 400 },\n  ],\n})\n')
       expect(deprecatedConfigKeys(root, {})).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('writes images.perMinute and a number mcp.rateLimit as { max, window }, and false as false', async () => {
+    const root = await project('export default {\n  images: { perMinute: 30, maxVariants: false },\n  mcp: { rateLimit: 60 },\n  live: { perMinute: 5 },\n}\n')
+    const off = await project('export default { images: { perMinute: false }, mcp: { rateLimit: false } }\n')
+
+    try {
+      const found = deprecatedConfigKeys(root, {})
+
+      expect(found.map(one => one.line)).toEqual([2, 3, 4])
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('export default {\n  images: { rateLimit: { max: 30, window: \'1m\' }, maxVariants: false },\n  mcp: { rateLimit: { max: 60, window: \'1m\' } },\n  live: { rateLimit: { max: 5, window: \'1m\' } },\n}\n')
+      expect(deprecatedConfigKeys(root, {})).toEqual([])
+
+      const [fix] = deprecatedConfigKeys(off, {})
+
+      expect(deprecatedConfigKeys(off, {})).toHaveLength(1)
+      await applySafeFixes(off, [fix!])
+      expect(await Bun.file(join(off, 'kay.config.ts')).text()).toBe('export default { images: { rateLimit: false }, mcp: { rateLimit: false } }\n')
+    }
+    finally {
+      await Promise.all([rm(root, { recursive: true, force: true }), rm(off, { recursive: true, force: true })])
     }
   })
 
@@ -47,7 +70,7 @@ describe('deprecated-config-keys', () => {
   })
 
   it('reports nothing for the new names, and nothing at allow', async () => {
-    const clean = await project('export default { serve: { apiPrefix: \'/v1\' }, live: { rate: { max: 1, window: \'1m\' } }, fonts: [{ fontsource: \'@fontsource/inter\', subsets: [\'latin\'] }] }\n')
+    const clean = await project('export default { serve: { apiPrefix: \'/v1\' }, live: { rateLimit: { max: 1, window: \'1m\' } }, images: { rateLimit: false }, mcp: { rateLimit: { max: 1, window: \'1m\' } }, fonts: [{ fontsource: \'@fontsource/inter\', subsets: [\'latin\'] }] }\n')
     const old = await project('export default { serve: { apiPath: \'/v1\' } }\n')
 
     try {

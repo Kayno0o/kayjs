@@ -1,5 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayConfig } from '../config'
+import type { RateLimit } from '../runtime/action'
+import type { RateWindowMs } from './config-limits'
 import type { RouteMount } from './routes'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
@@ -8,6 +10,7 @@ import { KayError } from '../compiler/errors'
 import { apiPrefixOf } from '../config-shape'
 import { projectPaths } from '../project'
 import { TRAILING_SLASH } from '../runtime/base'
+import { rateLimitOf } from './config-limits'
 import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
 
 // The API modules of a project and where they are served, apart from `./api` so `kay check` and the editor, which only list them, load no Elysia.
@@ -49,8 +52,8 @@ const SERVED_PATH = /^\/[\w.~-]+(?:\/[\w.~-]+)*$/
 export interface McpConfig {
   // Where the endpoint is served, `/mcp` by default.
   path?: string | undefined
-  // The most requests one client may send the endpoint a minute, 120 by default, or `false` for no limit; a tool call also meets the limits of the action or route it calls.
-  rateLimit?: number | false | undefined
+  // The most requests one client may send the endpoint in a window, `{ max: 120, window: '1m' }` by default, or `false` for no limit; a tool call also meets the limits of the action or route it calls. A number, the requests a minute, is the form before 1.98, which `kay check` rewrites.
+  rateLimit?: Pick<RateLimit, 'max' | 'window'> | number | false | undefined
   // Requires this key as a bearer token (`Authorization: Bearer <key>`) on the endpoint and so on every tool call, compared in constant time, for an agent that holds a static key instead of signing in: `true` reads `KAY_MCP_KEY`, else the file `KAY_MCP_KEY_FILE` names; a string is the key; `{ file }` reads the environment, else that file, made with a random key on first use. At least 16 characters, read once at boot. A production server with `true` and no key does not boot; elsewhere every request is refused. With the key set the endpoint is open to `proxy.key`'s check, as the bearer is its credential.
   key?: boolean | string | { file: string } | undefined
   // What the server tells a model about itself on `initialize`, as the MCP spec's `instructions`: guidance spanning tools, such as which to call first, that no single tool's description carries.
@@ -60,17 +63,9 @@ export interface McpConfig {
 // The requests a client may send the MCP endpoint a minute unless `mcp.rateLimit` says otherwise.
 export const MCP_PER_MINUTE = 120
 
-// The endpoint's limit per client and minute, or undefined for none.
-export function mcpRateLimit(value: boolean | McpConfig | undefined): number | undefined {
-  const limit = typeof value === 'object' ? value.rateLimit : undefined
-
-  if (limit === false)
-    return undefined
-
-  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1))
-    throw new KayError('config-invalid', `kay: mcp.rateLimit is the requests a client may send a minute, a whole number from 1, or false for no limit; got ${String(limit)}`)
-
-  return limit ?? MCP_PER_MINUTE
+// The endpoint's limit per client, or undefined for none.
+export function mcpRateLimit(value: boolean | McpConfig | undefined): RateWindowMs | undefined {
+  return rateLimitOf('mcp', typeof value === 'object' ? value.rateLimit : undefined, { name: 'mcp.rateLimit', value: undefined }, MCP_PER_MINUTE)
 }
 
 // The path an MCP endpoint is served at, or undefined while `mcp` is off.

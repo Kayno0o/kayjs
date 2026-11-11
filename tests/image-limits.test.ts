@@ -25,7 +25,7 @@ afterAll(async () => {
 
 describe('the image route limits', () => {
   it('limits the variants a client makes in a minute, never one already made, and says when to come back', async () => {
-    const app = await site({ perMinute: 2, maxVariants: false })
+    const app = await site({ rateLimit: { max: 2, window: '1m' }, maxVariants: false })
 
     expect((await app.handle(variant(10))).status).toBe(200)
     expect((await app.handle(variant(20))).status).toBe(200)
@@ -39,7 +39,7 @@ describe('the image route limits', () => {
   })
 
   it('counts the client behind a trusted proxy by its forwarded address', async () => {
-    const app = await site({ perMinute: 1, maxVariants: false }, { proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, maxVariants: false }, { proxy: 1 })
 
     expect((await app.handle(variant(35, { 'x-forwarded-for': '203.0.113.1' }))).status).toBe(200)
     expect((await app.handle(variant(40, { 'x-forwarded-for': '203.0.113.1' }))).status).toBe(429)
@@ -47,7 +47,7 @@ describe('the image route limits', () => {
   })
 
   it('limits a site under a base the same way', async () => {
-    const app = await site({ perMinute: 1, maxVariants: false }, { base: '/app', proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, maxVariants: false }, { base: '/app', proxy: 1 })
     const from = { 'x-forwarded-for': '203.0.113.9' }
 
     expect((await app.handle(variant(50, from))).status).toBe(200)
@@ -55,14 +55,14 @@ describe('the image route limits', () => {
   })
 
   it('leaves the rate off with false', async () => {
-    const app = await site({ perMinute: false, maxVariants: false })
+    const app = await site({ rateLimit: false, maxVariants: false })
 
     for (const quality of [60, 65, 70, 75, 80])
       expect((await app.handle(variant(quality))).status).toBe(200)
   })
 
   it('keeps the variants of one source to the cap by removing the oldest, so no client locks another out', async () => {
-    const app = await site({ perMinute: false, maxVariants: 2 }, { proxy: 1 })
+    const app = await site({ rateLimit: false, maxVariants: 2 }, { proxy: 1 })
     const cached = (quality: number) => [...new Bun.Glob(`**/*-320-q${quality}.webp`).scanSync(join(root, '.kay'))].length
     const from = (address: string) => ({ 'x-forwarded-for': address })
 
@@ -80,7 +80,7 @@ describe('the image route limits', () => {
   })
 
   it('counts the concurrent first requests for one variant once', async () => {
-    const app = await site({ perMinute: 1, maxVariants: false }, { proxy: 1 })
+    const app = await site({ rateLimit: { max: 1, window: '1m' }, maxVariants: false }, { proxy: 1 })
     const from = { 'x-forwarded-for': '203.0.113.30' }
     const answers = await Promise.all([5, 5, 5].map(async quality => app.handle(variant(quality, from))))
 
@@ -89,7 +89,7 @@ describe('the image route limits', () => {
   })
 
   it('answers 503 with Retry-After once the queue of waiting draws is full', async () => {
-    const app = await site({ perMinute: false, maxVariants: false, queue: 1 })
+    const app = await site({ rateLimit: false, maxVariants: false, queue: 1 })
     const crops = ['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16', '1/1']
     const answers = await Promise.all(Array.from({ length: 40 }, async (_, index) => app.handle(variant(5 + (index % 20) * 5, {}, `&crop=${crops[index % 7]}`))))
     const refused = answers.filter(answer => answer.status === 503)
@@ -101,10 +101,15 @@ describe('the image route limits', () => {
 
   it('refuses a limit that is no whole number from 1', () => {
     expect(() => imageLimits({ perMinute: 0 })).toThrow('images.perMinute')
+    expect(() => imageLimits({ rateLimit: { max: 0, window: '1m' } })).toThrow('images.rateLimit.max is 0')
+    expect(() => imageLimits({ rateLimit: { max: 1, window: '1m' }, perMinute: 1 })).toThrow('both rateLimit and its older spelling images.perMinute')
     expect(() => imageLimits({ queue: 1.5 })).toThrow('images.queue')
     expect(() => imageLimits({ maxVariants: -1 })).toThrow('images.maxVariants')
-    expect(imageLimits({ perMinute: false, queue: false, maxVariants: false })).toEqual({ perMinute: undefined, queue: undefined, maxVariants: undefined })
-    expect(imageLimits(undefined).perMinute).toBeGreaterThan(0)
+    expect(imageLimits({ rateLimit: false, queue: false, maxVariants: false })).toEqual({ rate: undefined, queue: undefined, maxVariants: undefined })
+    expect(imageLimits({ perMinute: false }).rate).toBeUndefined()
+    expect(imageLimits({ perMinute: 7 }).rate).toEqual({ max: 7, windowMs: 60_000 })
+    expect(imageLimits({ rateLimit: { max: 3, window: '10s' } }).rate).toEqual({ max: 3, windowMs: 10_000 })
+    expect(imageLimits(undefined).rate).toEqual({ max: 120, windowMs: 60_000 })
   })
 })
 

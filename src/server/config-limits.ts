@@ -1,4 +1,5 @@
 import type { HealthConfig, ImagesConfig, LiveConfig } from '../config'
+import type { RateLimit } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
@@ -53,26 +54,46 @@ export function timeoutMs(value: Duration | false | undefined, what: string): nu
 }
 
 const DEFAULT_PER_MINUTE = 120
+const DEFAULT_IMAGE_PER_MINUTE = 120
 const MINUTE_MS = 60_000
 
 // How many connections one client holds at once unless `live.connections` says otherwise: a few tabs, not a flood.
 export const MAX_CONNECTIONS = 20
 
+// A rate limit as the server counts it: `max` requests in `windowMs`.
+export interface RateWindowMs {
+  max: number
+  windowMs: number
+}
+
+// A `rateLimit` option of the config: `{ max, window }`, `false` for none, or the number a minute it was before 1.98 (`legacy`, read under `legacy.name`, which is `perMinute` or the number form of `rateLimit` itself). Left out, `fallback` a minute.
+export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'window'> | number | false | undefined, legacy: { name: string, value: number | false | undefined }, fallback: number): RateWindowMs | undefined {
+  if (rateLimit !== undefined && legacy.value !== undefined && typeof rateLimit !== 'number')
+    throw new KayError('config-invalid', `kay: ${what} sets both rateLimit and its older spelling ${legacy.name}; keep rateLimit`)
+
+  const given = typeof rateLimit === 'number' ? rateLimit : rateLimit ?? legacy.value
+
+  if (given === false)
+    return undefined
+
+  const object = typeof given === 'object' ? given : undefined
+  const max = object?.max ?? (object === undefined ? given : undefined) ?? fallback
+  const name = object === undefined && given !== undefined ? legacy.name : `${what}.rateLimit.max`
+
+  if (!Number.isSafeInteger(max) || (max as number) < 1)
+    throw new KayError('config-invalid', `kay: ${name.includes('.') ? name : `${what}.${name}`} is ${String(max)}; it takes a whole number from 1${legacy.value === false || rateLimit === false ? ', or false for no limit' : ''}`)
+
+  return { max: max as number, windowMs: object === undefined ? MINUTE_MS : optionMs(object.window, `${what}.rateLimit.window`) }
+}
+
 // `live` from kay.config.ts with its defaults, each limit a whole number from 1.
-export function liveLimits(config: LiveConfig | undefined): { connections: number, max: number, windowMs: number } {
-  if (config?.rate !== undefined && config.perMinute !== undefined)
-    throw new KayError('config-invalid', 'kay: live sets both rate and its older spelling perMinute; keep rate')
-
+export function liveLimits(config: LiveConfig | undefined): { connections: number, rate: RateWindowMs | undefined } {
   const connections = config?.connections ?? MAX_CONNECTIONS
-  const max = config?.rate?.max ?? config?.perMinute ?? DEFAULT_PER_MINUTE
-  const named = config?.rate === undefined ? ['perMinute', max] as const : ['rate.max', max] as const
 
-  for (const [name, value] of [['connections', connections], named] as const) {
-    if (!Number.isSafeInteger(value) || value < 1)
-      throw new KayError('config-invalid', `kay: live.${name} is ${String(value)}; it takes a whole number from 1`)
-  }
+  if (!Number.isSafeInteger(connections) || connections < 1)
+    throw new KayError('config-invalid', `kay: live.connections is ${String(connections)}; it takes a whole number from 1`)
 
-  return { connections, max, windowMs: config?.rate === undefined ? MINUTE_MS : optionMs(config.rate.window, 'live.rate.window') }
+  return { connections, rate: rateLimitOf('live', config?.rateLimit, { name: 'live.perMinute', value: config?.perMinute }, DEFAULT_PER_MINUTE) }
 }
 
 // Refuses a `timeZone` the engine does not know.
@@ -108,17 +129,17 @@ export interface RemoteLimits {
 }
 
 export interface ImageLimits {
-  perMinute: number | undefined
+  rate: RateWindowMs | undefined
   maxVariants: number | undefined
   queue: number | undefined
 }
 
-// Unless `images.perMinute`, `images.maxVariants` or `images.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
-const DEFAULT_IMAGE_LIMITS = { perMinute: 120, maxVariants: 256, queue: 128 } as const
+// Unless `images.rateLimit`, `images.maxVariants` or `images.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
+const DEFAULT_IMAGE_LIMITS = { maxVariants: 256, queue: 128 } as const
 
 // The limits of the image route on variants it has to encode, each a whole number from 1 or `false` for none.
-export function imageLimits(images: Pick<ImagesConfig, 'perMinute' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
-  const read = (name: keyof ImageLimits): number | undefined => {
+export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'perMinute' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
+  const read = (name: 'maxVariants' | 'queue'): number | undefined => {
     const value = images?.[name] ?? DEFAULT_IMAGE_LIMITS[name]
 
     if (value === false)
@@ -130,7 +151,7 @@ export function imageLimits(images: Pick<ImagesConfig, 'perMinute' | 'maxVariant
     return value
   }
 
-  return { perMinute: read('perMinute'), maxVariants: read('maxVariants'), queue: read('queue') }
+  return { rate: rateLimitOf('images', images?.rateLimit, { name: 'images.perMinute', value: images?.perMinute }, DEFAULT_IMAGE_PER_MINUTE), maxVariants: read('maxVariants'), queue: read('queue') }
 }
 
 // `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.

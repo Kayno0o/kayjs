@@ -19,7 +19,7 @@ interface Rename {
   at: string[]
   from: string
   to: string
-  // How the value moves with the key: kept, wrapped in a list when it is one literal, or turned into `{ max, window: '1m' }`.
+  // How the value moves with the key: kept, wrapped in a list when it is one literal, or turned into `{ max, window: '1m' }` (`false` kept); a key that keeps its name, as `mcp.rateLimit`, is only the number form.
   value: 'same' | 'list' | 'perMinute'
   // A key only an object holding this one carries, as `weight` of a Fontsource entry, which a font's own `weight` is not.
   with?: string
@@ -31,7 +31,9 @@ export const RENAMED_KEYS: readonly Rename[] = [
   { at: ['serve'], from: 'apiPath', to: 'apiPrefix', value: 'same', since: '1.98' },
   { at: ['fonts'], from: 'subset', to: 'subsets', value: 'list', with: 'fontsource', since: '1.98' },
   { at: ['fonts'], from: 'weight', to: 'weights', value: 'list', with: 'fontsource', since: '1.98' },
-  { at: ['live'], from: 'perMinute', to: 'rate', value: 'perMinute', since: '1.98' },
+  { at: ['live'], from: 'perMinute', to: 'rateLimit', value: 'perMinute', since: '1.98' },
+  { at: ['images'], from: 'perMinute', to: 'rateLimit', value: 'perMinute', since: '1.98' },
+  { at: ['mcp'], from: 'rateLimit', to: 'rateLimit', value: 'perMinute', since: '1.98' },
 ]
 
 function named(properties: readonly Node[], name: string): Property | undefined {
@@ -64,8 +66,8 @@ function objectsAt(config: ObjectNode, path: string[], bindings: Bindings): Obje
   return found
 }
 
-// A config key under its name before 1.98: `serve.apiPath` is `serve.apiPrefix`, `subset` and `weight` of a Fontsource font `subsets` and `weights`, and `live.perMinute` is `live.rate` as `{ max, window }`.
-// The key is renamed, a lone name or number written in a list, and `perMinute: 60` written as `rate: { max: 60, window: '1m' }`; a value that is not a literal, or an object that already holds the new key, is reported with no fix.
+// A config key under its name before 1.98: `serve.apiPath` is `serve.apiPrefix`, `subset` and `weight` of a Fontsource font `subsets` and `weights`, and `live.perMinute` and `images.perMinute` are `rateLimit` as `{ max, window }`, and a number `mcp.rateLimit` is `{ max, window }` too.
+// The key is renamed, a lone name or number written in a list, and `perMinute: 60` written as `rateLimit: { max: 60, window: '1m' }`; a value that is not a literal, or an object that already holds the new key, is reported with no fix.
 export function deprecatedConfigKeys(root: string, options: CheckOptions): CheckDiagnostic[] {
   if (lintLevel('deprecated-config-keys', options.lints) === 'allow')
     return []
@@ -89,13 +91,14 @@ export function deprecatedConfigKeys(root: string, options: CheckOptions): Check
     for (const object of objectsAt(config, rename.at, bindings)) {
       const properties = propertiesOf(object, bindings)
       const old = named(properties, rename.from)
+      const sameKey = rename.from === rename.to
 
-      if (!old || (rename.with !== undefined && !named(properties, rename.with)) || levelAt('deprecated-config-keys', old.start) === 'allow')
+      if (!old || (sameKey && !(old.value.type === 'Literal' && typeof old.value.value === 'number')) || (rename.with !== undefined && !named(properties, rename.with)) || levelAt('deprecated-config-keys', old.start) === 'allow')
         continue
 
       // Written in the object itself, not spread in from a const another object may share.
       const own = (object.properties as readonly Node[]).includes(old)
-      const free = own && !old.computed && !old.shorthand && !named(properties, rename.to)
+      const free = own && !old.computed && !old.shorthand && (sameKey || !named(properties, rename.to))
       const value = old.value
       const literal = value.type === 'Literal' && (typeof value.value === 'string' || typeof value.value === 'number')
       let edits: { start: number, end: number, text: string }[] | undefined
@@ -105,16 +108,18 @@ export function deprecatedConfigKeys(root: string, options: CheckOptions): Check
       else if (free && rename.value === 'list' && (value.type === 'ArrayExpression' || literal))
         edits = value.type === 'ArrayExpression' ? [{ start: old.key.start, end: old.key.end, text: rename.to }] : [{ start: old.start, end: old.end, text: `${rename.to}: [${source.slice(value.start, value.end)}]` }]
       else if (free && rename.value === 'perMinute' && value.type === 'Literal' && typeof value.value === 'number')
-        edits = [{ start: old.start, end: old.end, text: `rate: { max: ${source.slice(value.start, value.end)}, window: '1m' }` }]
+        edits = [{ start: old.start, end: old.end, text: `${rename.to}: { max: ${source.slice(value.start, value.end)}, window: '1m' }` }]
+      else if (free && rename.value === 'perMinute' && value.type === 'Literal' && value.value === false)
+        edits = [{ start: old.start, end: old.end, text: `${rename.to}: false` }]
 
       const path = [...rename.at, rename.from].join('.')
-      const help = rename.value === 'perMinute' ? 'write `rate: { max, window }`, `perMinute: 120` being `rate: { max: 120, window: \'1m\' }`' : `write \`${rename.to}\``
+      const help = rename.value === 'perMinute' ? `write \`${rename.to}: { max, window }\`, \`${rename.from}: 120\` being \`${rename.to}: { max: 120, window: '1m' }\`` : `write \`${rename.to}\``
 
       found.push({
         file: join(root, CONFIG_FILE),
         ...positionAt(source, old.start),
         end: old.end,
-        message: `\`${path.replace(FONTS_PREFIX, '')}\` of kay.config.ts is deprecated since ${rename.since}: the key is \`${rename.to}\``,
+        message: sameKey ? `\`${path}\` of kay.config.ts as a number is deprecated since ${rename.since}: it takes \`{ max, window }\`` : `\`${path.replace(FONTS_PREFIX, '')}\` of kay.config.ts is deprecated since ${rename.since}: the key is \`${rename.to}\``,
         help,
         code: 'deprecated-config-keys',
         severity: levelAt('deprecated-config-keys', old.start) === 'warn' ? 'warning' : 'error',

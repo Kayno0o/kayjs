@@ -529,7 +529,7 @@ function readRequest(text: string): LiveRequest | undefined {
 
 // `POST /_kay/live`: one event stream per page carrying the live values its islands read. A value is sent only to a request holding the proof a page that read it carried, so a guard on the page covers it.
 export function serveLive(app: Elysia, config?: LiveConfig): void {
-  const { connections, max, windowMs } = liveLimits(config)
+  const { connections, rate } = liveLimits(config)
 
   checkLiveWrites(checkSendable)
   app.post(LIVE_ROUTE, async ({ request, server }) => {
@@ -539,7 +539,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REQUEST_BYTES)
       return new Response(null, { status: 413 })
 
-    if (await overLimit(LIMIT, clientAddress(request, server), max, windowMs) !== undefined)
+    if (rate !== undefined && await overLimit(LIMIT, clientAddress(request, server), rate.max, rate.windowMs) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REQUEST_BYTES)
