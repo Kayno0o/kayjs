@@ -1,6 +1,44 @@
 # Upgrading, older releases
 
-What each minor release before 1.93 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.95 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.94.0
+
+### The old names and import paths 1.90 deprecated are gone
+
+`kay check` no longer flags them, so run `kay upgrade` on 1.93 first if an app still has any. `context` of `kay` is `createContext`; `dataTables`, `jobTables` (of `kay/server`, the table names; `kay/pg-orm`'s `jobTables` is unchanged), `EveryOptions` and `ApiRateLimit` of `kay/server` are `dataTableNames`, `jobTableNames`, `ScheduleEveryOptions` and `RateLimit`; kayjs-mail's `cssColours`, `Reply`, `Attachment` and `WaitOptions` are `cssColors`, `MailReply`, `MailAttachment` and `MailWaitOptions`; kayjs-ai's `Reply`, `Attachment`, `ToolCall`, `Message` and `LimitOptions` are `AiReply`, `AiAttachment`, `AiToolCall`, `AiMessage` and `AskLimit`; kayjs-cms's `Action`, `DraftEntry`, `Member` of `/room` and `SeedEntry` of `/pg` and `/sqlite` are `CmsAction`, `CmsDraftEntry`, `CmsMember` and `CmsSeedEntry`; kayjs-auth's `guard`, `Member`, `ProofOfWorkOptions` and `Limit` are `authGuard`, `AuthMember`, `AuthProofOfWorkOptions` and `AuthRateLimit`; kayjs-ui's `editing` and `Editing` are `rowEditing` and `RowEditing`. kayjs-auth's credential rules are imported from `@kaynooo/kayjs-auth/rules` and kayjs-cms's `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, as their roots no longer repeat them. `kay env` no longer warns about `KAYJS_AUTH_DATABASE_URL` and `MAIL_INBOUND_SECRET`.
+
+### The kayjs-ui and kayjs-ai names 1.90 deprecated are gone
+
+Their lints (`deprecated-ui-actions`, `deprecated-ui-failures`, `deprecated-open-change`, `deprecated-chat-icons`, `deprecated-size-limits`) go with them: run `kay upgrade` on 1.93 first and it rewrites every one that has a safe fix. On 1.94 the old names are type errors, or ignored where a block has no type.
+
+- `@head` of Card, `@action` of FormField, `@end` of AppHeader, `@trailing` of TreeView and `@toolbarExtra` of MarkdownEditor are `@actions`; ConfirmDelete's `trigger` string is `triggerLook`.
+- `failure` of CopyButton, ConfirmDelete, FormDialog, RecordButton, SaveForm and AudioPlayer, `errorLabel` of IconPicker and ImageCropper and `errorMessage` of Chat are `failureLabel`; CopyButton's `onFail(error)` is `onError({ error })`.
+- `onToggle` of Table and TreeView is `onOpenChange`.
+- Chat and ChatLauncher draw their buttons' icons from `icons={{ send: SendIcon }}`, no longer from `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon`, `@recordIcon`, `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`.
+- `maxAttachmentBytes` of `ask` and `maxFileSize` of Chat are `maxSize`; an extension's `maxSize` map is `maxSizeByPath`.
+
+### kayjs-auth and kayjs-mail drop what 1.90 and 1.91 deprecated
+
+- `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` and `createAuth()`, and `pages` of `auth()`, no longer take `true`: leave the option out, as it is on by default, or write `false` or an object. `deprecated-auth-options` is gone, so `kay upgrade` no longer drops them, and a `true` is a type error.
+- `KAYJS_AUTH_DATABASE_URL` and `MAIL_INBOUND_SECRET` are no longer read: set `AUTH_DATABASE_URL` and `MAIL_EVENTS_INBOUND`.
+
+### kayjs-mail views get the site's origin as `site` everywhere
+
+The confirmation view of a list got the origin, its footer got the host: both now get `site` as the origin and `host` as the host, as the contact view's `site` already was. A view of your own that reads `site` from the footer and shows it as a name reads `host` instead; no lint can see a changed value.
+
+### An unused `for` loop index is an `unread-name` error
+
+`for x, i of xs` with `i` read nowhere is reported by `unread-name`, as an unused `const` is, whatever `noUnusedParameters` says. `kay upgrade` (or `kay check --fix`) drops the `, i` and keeps the item and the `key`; to keep an index nothing reads, write it `_i`.
+
+## 1.93.0
+
+### The kayjs-ui prop names 1.89 deprecated are gone
+
+Their `deprecated-ui-props` lint goes with them: run `kay upgrade` on 1.92 first and it rewrites every one. On 1.93 the old names are type errors.
+
+- `isDisabled` on DateInput and DateRangeInput, the per-day predicate, is `disabledDay`.
+- Widget's `isEmpty` is `empty`, and its `@empty` block is `@emptyState`.
 
 ## 1.92.0
 
@@ -121,32 +159,5 @@ Every other source reads `pending()` as a boolean and `status()` as `idle|loadin
 ### `onOpen` of a socket, a stream and an action's stream is told `{ reconnected }`
 
 `feed.onOpen(reconnected => ...)` is `feed.onOpen(({ reconnected }) => ...)`, the one object argument every [hook](hooks.md) takes; a callback taking no argument is unchanged. The old form still compiles, as an object is truthy, so `onOpen(reconnected => reconnected && refetch())` now runs on every open, the first included. `kay check` flags it as `deprecated-stream-open` on a name the file binds once to `stream(` or `socket(` from `kay`, with a safe fix for an arrow of one plain parameter (a function reference is reported, not fixed); a stream reached through a property, a parameter or an action's answer is changed by hand. A mock of a `stream()`, a `socket()` or an `ActionStream` written out as an object must add `onError` and `onClose`, a mock of a `resource()` `onData` and `onError`, and of a `track()` handle `onSuccess` and `onError`.
-
-## 1.92.0 (continued)
-
-### An island is decided by the component's own code, and every name is imported
-
-What a component passes never makes it an island any more. `kay upgrade` runs the fixes below, and `kay check` reports the rest.
-
-- `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` compute the same on both sides. A component whose only `kay` value is one of them is static now, with the same markup, and no lint says so; `kay explain island <file>` gives a role.
-
-### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
-
-`notify` names one thing, the inbox of `kay/server`; the helper a library runs its `onX` hooks with is `dispatch(source, hooks, event)` now. The old names work until 1.95, and `kay check` flags an import of them as `deprecated-hook-dispatch`, with a safe fix that `kay upgrade` applies.
-
-### The 404 log functions of `kay/library` return promises, and a `pgData` store gains three tables
-
-`unansweredPaths`, `dismissMissing`, `clearMissing`, `runtimeRedirects`, `addRuntimeRedirect`, `removeRuntimeRedirect` and `redirectMovedPage` are imported from `kay/library` and now return promises, so a call that used the answer at once awaits it: the 404 log and the redirects added while the site runs live in the Postgres of a `pgData` store, which only a promise can read. An app whose `pgData` role may not create tables has the owner run `await createDataTables(db)` from `kay/server` once (`kay_missing`, `kay_missing_referrers` and `kay_redirects` join `dataTableNames`, so pg-orm's `ignoreTables` lists them); until then the first boot names the missing tables. A `data/not-found.sqlite` beside a `pgData` app is moved into them at the next start.
-
-### The roots of kayjs-mail and kayjs-ai stop exporting the store names that moved in 1.88
-
-`pgLists`, `createMailListTables`, `mailListTables`, `pgSuppressions`, `createMailSuppressionTable` and `sqliteSuppressions` are imported from `@kaynooo/kayjs-mail/pg` and `@kaynooo/kayjs-mail/sqlite`, and `sqliteConversations` from `@kaynooo/kayjs-ai/sqlite` (`pgConversations` is in `/pg`). `kay check` cannot tell an import it should move, so no lint ships: change the import path.
-
-### kayjs-ui's `Toast.message` may be markup and `ToastAction.run` is optional
-
-`Toast.message` is `string | Snippet` and a `ToastAction` is a button (`run`) or a link (`href`, with an optional `run`), so code reading `toasts()` as strings, or calling `item.action.run()`, fails to type-check: narrow with `typeof item.message === 'string'` and call `item.action.run?.()`. `kay check` cannot see it, the types being the only change, so there is no safe fix. Calls to `toast.*(...)` and `dismissToast(id)` are unchanged.
-### The image resizer is `/_kay/images`, and jobs live in `src/plugins/jobs.ts`
-
-The route that resizes an image is `/_kay/images?src=...&w=...`, beside the variants under `/_kay/images/`; the `/_kay/image` it had keeps answering, for cached pages and links you wrote, until 1.95. A link you wrote by hand moves to the new path; kay's own `image()` URLs change at the next build. Queues, workflows and schedules are defined and mounted in `src/plugins/jobs.ts` (`export default` the queue); a `src/jobs.ts` that a plugin or `src/server.ts` imports still works, and `kay check` warns (`unmounted-jobs`) of one nothing imports. No lint rewrites either, as `kay upgrade` rewrites text inside a file and moves no file.
 
 Releases before 1.92 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
