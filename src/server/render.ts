@@ -13,7 +13,7 @@ import type { ClientBuild, PrerenderedPage } from './client'
 import type { StoredEncoding } from './compress'
 import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
-import type { Refusal, ServedRoute } from './guards'
+import type { ServedRoute } from './guards'
 import type { EditorModule } from './render-document'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { HeaderCopies } from './security'
@@ -41,11 +41,13 @@ import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
 import { FLASH_COOKIE, flashForOther, flashName, flashPath, handedOverFlash, readFlash } from './flash'
+import { guardRuns, refusalOutcome } from './guard-runs'
 import { runGuards } from './guards'
 import { DEFAULT_LANG } from './i18n'
 import { inLiveReads, retryForViewer } from './live'
 import { errorPage } from './overlay'
 import { calmDeadline, pageErrorOf } from './page-error'
+import { pageLimits, pageOverLimit } from './page-limits'
 import { chainSetting, pagePrerender } from './page-settings'
 import { pageToken } from './prerendered'
 import { withoutShareToken } from './preview'
@@ -195,6 +197,8 @@ export function sharedContext<T extends RequestContext>(request: Request, copy: 
   return (record.sharedContext ??= copy()) as T
 }
 
+export { refusalOutcome }
+
 export interface Rendering {
   ctx: PageContext<Record<string, unknown>>
   headers: Headers
@@ -289,22 +293,17 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
       noteRedirect(options.dev, rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
   }
 
-  return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+  // A request a guard refuses counts against the page's limits too, and over them it gets the 429 in place of the refusal.
+  const over = refusal && await pageOverLimit(route, await chainOf(route, options), rendering)
+
+  return refusal && renderFailure(over ?? refusal.error, refusal.guard.special, rendering, new Map(), client, options)
 }
 
-// What each guard did, for the dev tool: a guard's redirect goes out through `renderFailure` with the same spelling, so its outcome names the `Location` sent.
-// Those before a refusal passed, the one refusing says how, the rest did not run.
-function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined, spelling?: RenderOptions['redirectSpelling']): NonNullable<Rendering['guards']> {
-  const refused = refusal ? guards.indexOf(refusal.guard) : -1
+// The route's modules, layouts first, imported once and known after that.
+async function chainOf(route: ServedRoute, options: RenderOptions): Promise<PageModule[]> {
+  const { files } = routeChain(route)
 
-  return guards.map((guard, index) => {
-    const file = projectPath(guard.file)
-
-    if (index < refused || refused === -1)
-      return { file, outcome: 'passed' }
-
-    return { file, outcome: index > refused ? 'did not run' : refusalOutcome(refusal!.error, spelling) }
-  })
+  return knownModules(files, options) ?? await importAll(files, options)
 }
 
 // Whether `kay build` writes this page ahead, from its `prerender` setting or a server island its template reaches; read off the source in development only, where the compiler is loaded anyway.
@@ -354,17 +353,6 @@ async function reachesIsland(file: string): Promise<boolean> {
   }
 }
 
-// The redirect names the `Location` that goes out, spelled as the response spells it.
-export function refusalOutcome(error: unknown, spelling?: RenderOptions['redirectSpelling']): string {
-  if (error instanceof Redirect)
-    return `redirected to ${spelling?.(error.location) ?? error.location} (${error.status})`
-
-  if (error instanceof Denied)
-    return `denied with ${error.status}${error.message === '' ? '' : `: ${error.message}`}`
-
-  return error instanceof NotFound ? 'answered not found' : `failed: ${error instanceof Error ? error.message : String(error)}`
-}
-
 // Past the route's guards, its modules and their loads; a refusal or a failed load answers as the page would.
 // A route with no guard, whose modules are imported and load nothing, answers at once.
 function loadRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): LoadedRoute | Response | Promise<LoadedRoute | Response> {
@@ -393,7 +381,7 @@ function loadChain(route: ServedRoute, rendering: Rendering, client: ClientBuild
   const { files } = routeChain(route)
   const modules = timing || options.dev ? undefined : knownModules(files, options)
 
-  if (modules === undefined || modules.some(module => module.load))
+  if (modules === undefined || modules.some(module => module.load) || (!options.prerendering && pageLimits(route, modules).length > 0))
     return loadChainAsync(route, files, rendering, client, options, timing, guards)
 
   const loaded = new Map<string, Loaded>()
@@ -433,6 +421,11 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
 
     readRouteQuery(files, modules, rendering, options)
     retimePage(modules, rendering, options)
+
+    const over = options.prerendering ? undefined : await pageOverLimit(route, modules, rendering)
+
+    if (over)
+      return await renderFailure(over, route.special, rendering, loaded, client, options)
 
     const timings = timing ? Array.from<number>({ length: files.length }) : undefined
 
@@ -553,12 +546,19 @@ function storedEncodings(encoded: ServedPage['encoded']): { names: StoredEncodin
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
-  const rendering = readsRequest(route, context.request, options) ? createRendering(context, params, options, route.contextKeys) : undefined
+  const modules = await chainOf(route, options)
+  const limited = pageLimits(route, modules).length > 0
+  const rendering = limited || readsRequest(route, context.request, options) ? createRendering(context, params, options, route.contextKeys) : undefined
   const refusing = rendering && refused(route, rendering, client, withEditor(route, options))
   const refusal = refusing === undefined ? undefined : await refusing
 
   if (refusal)
     return refusal
+
+  const over = rendering && limited ? await pageOverLimit(route, modules, rendering) : undefined
+
+  if (over)
+    return renderFailure(over, route.special, rendering!, new Map(), client, options)
 
   const headers = rendering?.headers ?? startingPageHeaders(context, options.pageHeaders)
 
@@ -600,7 +600,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
     headers.set('cache-control', page.cacheControl)
 
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
-  if (route.guards.length > 0)
+  if (route.guards.length > 0 || limited)
     headers.set('cache-control', 'private, no-cache')
 
   if (matchesEtag(context.request.headers.get('if-none-match'), etag)) {

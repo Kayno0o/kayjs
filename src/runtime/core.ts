@@ -419,7 +419,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `ttl` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
+// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `ttl`, `rateLimit` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
@@ -433,6 +433,8 @@ export interface PageSettings {
   layouts?: false
   // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.
   guards?: false
+  // At most `max` requests from one client, or from whatever `key` names, every `window`, counted after the guards for each page apart (a layout's applies to every page under it, the innermost that sets one winning, `false` lifting it); past that it answers 429 with `Retry-After` through the nearest `_429.kay` or `_error.kay`. A page with one is counted on every request, a prerendered copy included.
+  rateLimit?: RateLimit | RateLimit[] | false | undefined
   // The longest the page may take to answer, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the page answers 504 through the nearest `_error.kay`; the innermost layout or page that sets it wins.
   timeout?: Duration | false
   // The schema `ctx.query` is read against; a query it refuses answers 400.

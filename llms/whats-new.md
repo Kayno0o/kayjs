@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A page or a layout takes `rateLimit` in `page` as an endpoint, an action or an API route does: `{ max, window, key? }` or a list, counted after the guards in `store.rates`, answering 429 with `Retry-After` through `_error.kay`; a layout's applies to each page under it, a page overriding it ([Rate limits](rate-limits.md)).
+
 ## 1.99.0
 
 - Keys typed into a text field a page swap just brought in, before its island hydrated, are kept and reach the island as an `input` event, the caret after them; a field that writes its parent's value back as it hydrates no longer drops them.

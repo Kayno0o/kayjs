@@ -30,6 +30,7 @@ import { guardRequirement } from './guard-requirement'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
+import { keptStop } from './page-limits'
 import { readsOf } from './page-reads'
 import { chainSetting, chainTtl, pagePrerender, pageSetting, routedCollections } from './page-settings'
 import { matchedParams } from './params'
@@ -196,9 +197,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const revalidate = revalidatePeriod(file, chainTtl(chain))
     const cacheControl = sharedCacheControl(file, revalidate, chainSetting(chain, 'cacheControl'))
 
-    // A copy that goes stale is rendered again for every visitor with the request a page reads, which an unmarked page was never asked to.
-    if (auto && revalidate !== undefined)
-      return skip('sets `ttl`, which has a stale copy render again for every visitor')
+    if (keptStop(file, revalidate, chain, auto, skip))
+      return []
 
     const prerender = pagePrerender(module, route)
     // The collection's route lists it, which no `prerender` export says, so there is none to drop.

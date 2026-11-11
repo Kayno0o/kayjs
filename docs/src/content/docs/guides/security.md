@@ -232,6 +232,21 @@ It counts in the app's `store.rates` unless you give `store`, and in memory with
 
 <ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
+## Rate limit a page or an endpoint
+
+A page, a layout or an endpoint file takes `rateLimit` in its `page` settings, the same `max`, `window` and `key` as an action. A public search page or a feed is the usual target.
+
+```kay
+--- server
+export const page = { rateLimit: { max: 30, window: '1m' } }
+---
+h1 Search
+```
+
+Past the limit the page answers 429 with `Retry-After`, drawn by the nearest `_429.kay` or `_error.kay`. It counts after the guards, and a request a guard refuses counts too, so a guard cannot be guessed at full speed. A layout's limit applies to every page under it, each counting apart, and a page's own `rateLimit` replaces it; `rateLimit: false` lifts it. To share one budget across a section, count in a guard with `rateLimit(name, ...)` below.
+
+A prerendered page with a limit is still counted by the kay server, and answered for that visitor alone. `kay build` warns when it writes one, as a static host cannot count.
+
 ## Rate limit a guard or an API route
 
 Outside an action, use `rateLimit(name, { max, window })` from `kay/server`. Call `hit` with the request, and it gives the seconds to wait once the client is over the limit.

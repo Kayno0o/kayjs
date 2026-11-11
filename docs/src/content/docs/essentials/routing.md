@@ -130,7 +130,7 @@ export const page = { prerender: true, ttl: '1h' }
 ---
 ```
 
-`prerender`, `keep`, `ttl` and `cacheControl` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `query` is covered in [Data loading](/essentials/data-loading), and `sitemap` and `noindex` in [Head and SEO](/essentials/head-and-seo). `kay check` types the object, so an unknown key is an error.
+`prerender`, `keep`, `ttl` and `cacheControl` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `query` is covered in [Data loading](/essentials/data-loading), and `sitemap` and `noindex` in [Head and SEO](/essentials/head-and-seo). `rateLimit` limits how often one client may load the page, see [Rate limits](/guides/security#rate-limit-a-page-or-an-endpoint). `kay check` types the object, so an unknown key is an error.
 
 ## Loading data
 

@@ -786,6 +786,7 @@ interface PageSettings
   noindex?: boolean
   prerender?: boolean | object
   query?: TSchema
+  rateLimit?: RateLimit | RateLimit[] | false | undefined
   reload?: true
   search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
