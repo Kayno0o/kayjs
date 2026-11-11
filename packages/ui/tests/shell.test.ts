@@ -148,7 +148,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
 
     await page.click('#linked')
     await page.waitFor('.kui-toast a[data-part=action]')
-    expect(await page.text('[role=alert]')).toContain('See it')
+    // The region of the Toaster that owns the toasts fills on its mount, which may follow the toast's own frame.
+    await page.waitUntil(() => [...document.querySelectorAll('[role=alert]')].some(region => region.textContent.includes('See it')))
     await page.click('.kui-toast a[data-part=action]')
     await page.waitUntil(() => location.pathname === '/shell')
     await page.waitUntil(() => document.querySelector('.kui-toast') === null)
