@@ -53,18 +53,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `/_kay/draft` answers 429 with `Retry-After` to an editor past 300 drafts a minute, and the browser error and CSP report routes answer 429 once all clients together pass 600 a minute, on top of each client's own limit ([edit mode](content-edit.md), [security](proxy-and-security.md)).
 - The scaffolded compose file drops every capability on the Postgres `db` and `migrate` services too, `db` keeping the five its entrypoint needs, with `no-new-privileges` on all three ([production](production.md)).
 - A template `innerHTML={expr}` drops a string nothing vouched for at runtime, as a spread does, written-out strings and text imports aside ([templates](templates-elements-slots-snippets.md), [upgrading](upgrading.md)).
-- `kay build --static` merges its security headers into a `public/_headers` instead of leaving them out, without a header your file names ([static export](prerendering.md#static-export)).
-- A loader's slug may not climb out of the site, so one such as `a/../../x` is a content problem naming its entry, not a failed export ([content from a CMS](content-cms.md)).
-- `lints: { comments: { reason, file, denied } }` in kay.config.ts makes a `// kay-allow` comment need a ` -- reason`, refuses `kay-allow-file`, or keeps a lint set to `deny` out of a comment's reach; a comment it refuses is reported as `allow-refused` ([lints](lints.md#allow-a-lint-on-one-line)).
-- `fetchPublic` sends the `headers` you set on a redirect hop to the same origin only; a hop to another origin keeps `accept`, `accept-language` and `user-agent`, so a credential, cookie or API key stays with its own host.
-- kayjs-cms: `forgejo()`, `github()` and `gitlab()` refuse a redirect from the forge, so a renamed repository needs its new `repo` in the config, and read at most 64 KB of an error body ([setup](../packages/cms/llms/setup.md)).
-- kayjs-cms: `fourEyes` refuses an approval by a person the guard cannot name, as it cannot tell them from the sender, with a new `cms.review.unnamedApproval` wording ([review](../packages/cms/llms/review.md)); a guard of your own gives `cms({ member })` to approve under it.
-- kayjs-auth: asking for another address mails the address the account is leaving at once, as an `email-change-requested` notice and event, where only the confirmation told it before; and `email.confirmChange` answers `invalid` when another account takes the address in the same instant, instead of failing ([security mails](../packages/auth/llms/passwords-and-mails.md#security-mails)).
-- kayjs-auth: `organizations.members` gives the others' emails only to a member who manages members ([admin and organizations](../packages/auth/llms/admin-and-organizations.md)).
-- kayjs-auth: `forwardAuth`'s route asks the second factor as a sign-in does: the app's `twoFactor.require` holds there, and a session signed in with a passkey passes `requireTwoFactor` ([forward auth](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-auth: the consent page says a self-registered client's name was not checked, with a new `auth.consent.unverified` wording, French included ([OAuth server](../packages/auth/llms/oauth-server-and-tokens.md)).
-- kayjs-cms: a share link made for an entry is a `share` line of the activity log, with the person who made it, and a new `cms.activity.share` wording ([the activity log](../packages/cms/llms/history.md)).
-- kayjs-cms: a role limited by `collections` or `own` is given the titles of a collection to pick from only when it reads it or a collection it reaches has a reference field to it, and the entries named in a delete confirmation are those it may read ([roles](../packages/cms/llms/options.md)).
+
+The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
 ## 1.96.0
 
@@ -103,20 +93,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
-## 1.95.0
-
-- A page opens its one live connection once the islands it hydrates as it loads have all subscribed, however late their code arrives, instead of a second one when an island is slow ([live values](live-values.md)).
-- kay 1.95 no longer makes a component an island for the function or block it passes one (`island-prop` is the answer, with `--- island` its fix), reads `// kay-island` and `// kay-static` as comments, and adds no import for a `kay` value or `t` used without one, which is a type error: the deprecations `promoted-island`, `island-comment` and `implicit-import` are removed ([Islands](islands.md#islands), [Every name is imported](components.md#every-name-is-imported)).
-- A component exports `island = { hydrate, persist }` from its `--- module` fence for the defaults it wants wherever it is used, a parent's own `hydrate` and `persist` winning ([islands](islands.md#hydrate-an-island-later)). kayjs-ai `ChatLauncher` is an island by it, persisted and hydrating with its chat when the browser is idle; a static page or layout giving it a function or a block with parameters gets `island-prop` from `kay check`, as for any island, its fix writing `--- island`.
-- An `s.Optional` env field whose `<NAME>_FILE` names a missing, unreadable or empty file is left unset with one warning naming the file, instead of stopping the boot; a required field still stops it ([environment](environment.md)).
-- On Postgres (`pgData`, `pgJobs`) a write reaches the other processes at once: a job enqueued in one starts in another idle one within a second, and a live value or an `invalidate` reaches another worker's clients within a second after a quiet stretch, through `LISTEN`/`NOTIFY` (one extra connection per serving process). Polling stays as the fallback, and a database that refuses `LISTEN` keeps it alone ([jobs](queues.md))
-- `requireGuards` unset now refuses (403) each page, endpoint and API module no guard covers on a site with a guard of its own, and `kay check` reports each as an `unguarded-route` error; `requireGuards: false` keeps the old behaviour ([guards](guards.md), [upgrading](upgrading.md)).
-- The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
-- kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` ([charts](../packages/ui/llms/charts.md)).
-- kayjs-ui's LineChart and BarChart take `marks`, events drawn as a dashed rule on the x axis with a title under the pointer and for screen readers, and a link when they have an `href` or a button when given `onMark` ([charts](../packages/ui/llms/charts.md)).
-- `kay dev` runs no type check after an edit that changes no type: the static text of a `.kay` template, in a file with no type error ([dev server](dev-server.md)).
-- `mcp: { instructions }` is sent as the `instructions` of the MCP `initialize` answer, guidance spanning tools that a client shows its model before any tool description, and `site.mcp.initialize()` in `kay/test` reads it ([API routes](api-routes.md)).
-- `sanitizeHtml` takes `lazyImages: true`, which writes `loading="lazy"` on every kept `img` that has no `loading` of its own ([templates](templates-elements-slots-snippets.md)).
-- The cookies an app sets are `HttpOnly`, `SameSite=Lax`, `Secure` over https and under the `base` with no `security.cookies` setting; `cookies: false` turns it off ([sessions](server.md#sessions), [upgrading](upgrading.md)).
-
-Releases before 1.95 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.96 are in [What's new, older releases](whats-new-archive.md).
