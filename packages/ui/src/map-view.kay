@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletPath, LeafletView, MapMarker, MapPoint } from './map-view'
 import { effect, mediaQuery, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
-import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
+import { comesIntoView, drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
 import { steppedPoint } from './plot'
 
 const look = recipe({
@@ -71,6 +71,7 @@ onMount(() => {
   let gone = false
   let view: LeafletView | undefined
   let observer: ResizeObserver | undefined
+  const waiting = canvas ? comesIntoView(canvas) : undefined
 
   // A computed `light dark` leaves the choice to the system.
   const readScheme = (prefersDark: boolean) => {
@@ -86,6 +87,12 @@ onMount(() => {
 
   void (async () => {
     let leaflet: LeafletApi
+
+    // Leaflet is a chunk of its own, loaded once the map is near the viewport: a map below the fold costs nothing until it is scrolled to.
+    await waiting?.near
+
+    if (gone)
+      return
 
     try {
       // Leaflet ships no types, and an app with @types/leaflet resolves them: @ts-expect-error would fail there, so the import is ignored and cast to the surface above.
@@ -349,6 +356,7 @@ onMount(() => {
 
   onCleanup(() => {
     gone = true
+    waiting?.stop()
     observer?.disconnect()
     themes?.disconnect()
     view?.remove()

@@ -1899,6 +1899,9 @@ function lockedButton<T extends object>(attributes: T): T & { "type": "button"; 
 [./lib/locked-button] lockedLink
 function lockedLink<T extends object>(attributes: T): T
 
+[./lib/map-view] comesIntoView
+function comesIntoView(element: Element): { near: Promise<void>; stop: () => void; }
+
 [./lib/map-view] drawnPoints
 function drawnPoints(lines: readonly (readonly MapPoint[])[], markers: readonly MapMarker[]): MapPoint[]
 

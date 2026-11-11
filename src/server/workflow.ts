@@ -110,6 +110,16 @@ const RELEASE_TRIES = 3
 // Events kept for a wait that does not name them yet, per run: past it the oldest is dropped.
 export const INBOX_LIMIT = 50
 
+// The most characters a run's kept results may take in all: every step writes them whole, so the cost of a run grows with the square of its steps, and a run past this fails, as one that has to keep large results elsewhere and return their ids.
+export const PAYLOAD_LIMIT = 2_000_000
+
+function withinLimit(text: string, name: string, run: string, steps: number): string {
+  if (text.length > PAYLOAD_LIMIT)
+    throw new GiveUpError(`kay: workflow('${name}') run '${run}' keeps ${Math.round(text.length / 1000)} KB of results after ${steps} steps, past the ${PAYLOAD_LIMIT / 1000} KB a run may keep: every step writes them all again, so return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs`)
+
+  return text
+}
+
 // A wait without timeout is due never: the last instant a Date holds.
 export const NEVER = 8.64e15
 
@@ -201,7 +211,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     // A kept step starts the attempts again, as the store does for the stored count.
     const keep = async (waiting?: Payload<Input>['waiting'], runAt?: number) => {
-      const kept = await update(job.id, { payload: stringify({ ...payload, memo, inbox, waiting, started: true }), runAt }, { until })
+      const kept = await update(job.id, { payload: withinLimit(stringify({ ...payload, memo, inbox, waiting, started: true }), name, payload.run, memo.length), runAt }, { until })
 
       if (kept)
         job.attempts = 1

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
 import { Elysia } from 'elysia'
 import { queue as makeQueue, memoryJobs, retryLater, shutdown } from '../src/server'
+import { ERROR_CHARS } from '../src/server/config-limits'
 import { beginDrain, stopGraceMs } from '../src/server/drain'
 import { forgetQueue } from '../src/server/queue'
 import { cleanUpAfterFile, kinds } from './job-stores'
@@ -70,6 +71,21 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       expect(second).toBe(first)
       expect(await jobs.drain()).toBe(1)
       expect(ran).toEqual(['first'])
+    })
+
+    it('keeps at most ERROR_CHARS of a failure, saying how much was cut', async () => {
+      const errors = spyOn(console, 'error').mockImplementation(noop)
+      const jobs = queue<number>(named(), () => {
+        throw new Error('x'.repeat(ERROR_CHARS + 500))
+      }, { store: await open(), attempts: 1 })
+
+      await jobs.enqueue(1, { key: 'long' })
+      await jobs.drain()
+
+      const { error } = (await jobs.job('long'))!
+
+      expect(error).toBe(`${'x'.repeat(ERROR_CHARS)}... (500 more characters)`)
+      errors.mockRestore()
     })
 
     it('accepts the key again once its job completed, and once it was kept as failed', async () => {

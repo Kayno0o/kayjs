@@ -12,6 +12,29 @@ export interface MapMarker {
 export const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 export const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
 
+// How far outside the viewport a map still counts as in view, so Leaflet is loaded a little before the visitor reaches it.
+const NEAR_MARGIN = 300
+
+// Resolves once `element` is within NEAR_MARGIN px of the viewport, at once where there is no IntersectionObserver; `stop` ends the wait, which then never resolves. A map in a hidden box waits until it is shown.
+export function comesIntoView(element: Element): { near: Promise<void>, stop: () => void } {
+  if (typeof IntersectionObserver === 'undefined')
+    return { near: Promise.resolve(), stop: () => undefined }
+
+  let observer: IntersectionObserver | undefined
+
+  const near = new Promise<void>((resolve) => {
+    observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        observer?.disconnect()
+        resolve()
+      }
+    }, { rootMargin: `${NEAR_MARGIN}px` })
+    observer.observe(element)
+  })
+
+  return { near, stop: () => observer?.disconnect() }
+}
+
 // Every point the map draws, which it fits into view.
 export function drawnPoints(lines: readonly (readonly MapPoint[])[], markers: readonly MapMarker[]): MapPoint[] {
   return [...lines.flat(), ...markers.map(marker => marker.at)]

@@ -15,7 +15,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
-import { MAX_TIMER_MS } from './config-limits'
+import { cappedError, MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
 import { inMemory } from './memory-mark'
@@ -183,6 +183,7 @@ const PURGE_MS = 60 * 60 * 1000
 // A store that fails marking a finished job is asked this many times, waiting a little longer between each, before the job is left to be taken again.
 const COMPLETE_TRIES = 3
 const COMPLETE_RETRY_MS = 100
+
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst, unless the store notifies (`pgJobs` does, through LISTEN) and then only a lost notification does.
 const DEFAULT_IDLE_POLL = '10s'
 const DEFAULT_PATH = 'data/jobs.sqlite'
@@ -853,7 +854,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
         return true
       }
 
-      const message = error instanceof Error ? error.message : String(error)
+      const message = cappedError(error instanceof Error ? error.message : String(error))
 
       if (error instanceof RetryLater)
         kayLog('warn', `a job of queue('${name}') asked to run again later, but its store has no release(), so the run counts as failed`)

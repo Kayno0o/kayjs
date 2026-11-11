@@ -1,10 +1,28 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
 import MapDriven from '../tests/fixture/src/components/map-driven.kay'
 import MapFixture from '../tests/fixture/src/components/map-view.kay'
 
 let mounted: Mounted | undefined
+const { IntersectionObserver: original } = globalThis
+
+// A map loads Leaflet once it is near the viewport, which happy-dom's observer never reports: these maps are in view.
+beforeAll(() => {
+  globalThis.IntersectionObserver = class {
+    constructor(private callback: IntersectionObserverCallback) {}
+
+    observe(target: Element) {
+      queueMicrotask(() => this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver))
+    }
+
+    disconnect = () => undefined
+  } as unknown as typeof IntersectionObserver
+})
+
+afterAll(() => {
+  globalThis.IntersectionObserver = original
+})
 
 afterEach(() => {
   mounted?.unmount()

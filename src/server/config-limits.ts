@@ -11,6 +11,13 @@ const DEFAULT_CHECK_TIMEOUT = '5s'
 
 export const MAX_TIMER_MS = 2 ** 31 - 1
 
+// The most characters of a failure kept with its job: an error carrying a response body or a command's output would fill the store, which the jobs page and the dev tool read whole.
+export const ERROR_CHARS = 2000
+
+export function cappedError(message: string): string {
+  return message.length > ERROR_CHARS ? `${message.slice(0, ERROR_CHARS)}... (${message.length - ERROR_CHARS} more characters)` : message
+}
+
 // The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.
 export function healthTimeoutMs(config: HealthConfig | undefined): number {
   const ms = durationSeconds(config?.timeout ?? DEFAULT_CHECK_TIMEOUT, 'health.timeout') * 1000

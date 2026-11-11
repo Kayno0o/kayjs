@@ -28,7 +28,7 @@ ${host === 'forgejo' ? '        if: steps.tools.outputs.bun != \'true\'\n' : ''}
         run: bun install --frozen-lockfile`
 }
 
-// Every push is checked and tested before anything deploys it; the container build checks again, as `kay build` does. With `postgres`, the tests copy a database per test file on a Postgres service.
+// Every pull request commit and every push to main is checked and tested before anything deploys it (a push to a branch with a pull request open runs through the request alone, not twice); the container build checks again, as `kay build` does. With `postgres`, the tests copy a database per test file on a Postgres service.
 export function testWorkflow({ has, host, runner }: Setup): string {
   const database = has('postgres') && has('tests')
 
@@ -37,6 +37,8 @@ export function testWorkflow({ has, host, runner }: Setup): string {
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -125,8 +127,8 @@ ${workflowSetup(host)}`,
           SITE_URL: https://\${{ github.repository_owner }}.github.io
           SITE_BASE: /\${{ github.event.repository.name }}`
           : `
-          # The host your Forgejo instance publishes Pages on: replace it with yours.
-          SITE_URL: https://pages.example.com
+          # The forge's own address until a repository variable named SITE_URL gives the host your instance publishes Pages on.
+          SITE_URL: \${{ vars.SITE_URL || github.server_url }}
           SITE_BASE: /\${{ github.repository }}`}
         run: bun run build`,
     `      - name: Format

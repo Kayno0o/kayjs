@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
 import { workflow as makeWorkflow, memoryJobs, pgJobs, queue } from '../src/server'
 import { forgetQueue, queueAdmins } from '../src/server/queue'
-import { INBOX_LIMIT } from '../src/server/workflow'
+import { INBOX_LIMIT, PAYLOAD_LIMIT } from '../src/server/workflow'
 import { cleanUpAfterFile, freshPg, kinds, pgDescribe, replicas } from './job-stores'
 
 cleanUpAfterFile()
@@ -410,6 +410,27 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(await after.drain()).toBe(1)
     expect(failures[0]).toContain('changed under a run')
     expect(await after.status(id)).toMatchObject({ status: 'failed' })
+  })
+
+  it('fails a run whose kept results pass the limit, naming what to do, and does not retry it', async () => {
+    const errors = spyOn(console, 'error').mockImplementation(noop)
+    const store = await open()
+    const failures: string[] = []
+    let runs = 0
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      runs++
+      await step.run('small', () => 'a')
+      await step.run('large', () => 'x'.repeat(PAYLOAD_LIMIT))
+      await step.run('never', () => 'b')
+    }, { store, attempts: 3, onError: ({ error }) => void failures.push((error as Error).message) })
+    const id = await flow.start()
+
+    await flow.drain()
+    expect(runs).toBe(1)
+    expect(failures[0]).toContain('past the')
+    expect(failures[0]).toContain('return an id')
+    expect(await flow.status(id)).toMatchObject({ status: 'failed', steps: 1 })
+    errors.mockRestore()
   })
 
   it('takes a try around a step as no way to swallow a sleep', async () => {

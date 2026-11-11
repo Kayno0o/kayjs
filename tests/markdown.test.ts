@@ -141,7 +141,8 @@ describe('markdownHtml', () => {
     const html = islandMarkdown('| a |\n|:-:|\n| ![x](/x.png "t") |\n\n- [x] done\n\n<script>alert(1)</script><input> [l](javascript:alert(1)) \uE000')
 
     expect(html).toContain('<th align="center">a</th>')
-    expect(html).toContain('<img src="/x.png" alt="x" title="t">')
+    expect(html).toContain('<img src="/x.png" alt="x" title="t" loading="lazy">')
+    expect<string>(markdownHtml('![x](/x.png)')).toBe('<p><img src="/x.png" alt="x" loading="lazy"></p>\n')
     expect(html).toContain('<li class="task-list-item"><label><input type="checkbox" class="task-list-item-checkbox" disabled checked>done</label></li>')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('href="javascript')
