@@ -541,7 +541,7 @@ describe('FormField', () => {
     const [hint] = field.find('#field [data-part="hint"]')
     const [input] = field.find('#field input')
 
-    expect(field.find('#field label').map(label => label.text)).toEqual(['Name*'])
+    expect(field.find('#field label').map(label => label.text)).toEqual(['Name* required'])
     expect(field.find('#field [data-part="required"]').map(star => star.attributes['aria-hidden'])).toEqual(['true'])
     // Static on a page of its own, the server links the control to its hint; the message region takes an id once it holds one.
     expect(input!.attributes['aria-describedby']).toBe(hint!.attributes.id)

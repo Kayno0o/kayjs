@@ -66,6 +66,13 @@ test('a required field\'s control is announced as required, the star beside its 
   expect(mounted.root.querySelector('[data-part="required"]')?.getAttribute('aria-hidden')).toBe('true')
 })
 
+test('the star of a required field is followed by the word, for a visitor who does not know the convention', async () => {
+  mounted = await mountComponent(RequiredFields, {})
+  await settle()
+
+  expect([...mounted.root.querySelectorAll('[data-part="required"]')].map(star => star.textContent)).toEqual(['* required', '* required', '* required'])
+})
+
 test('each field of a required group is announced as required, a FormField nested in it left alone', async () => {
   mounted = await mountComponent(RequiredFields, {})
   await settle()

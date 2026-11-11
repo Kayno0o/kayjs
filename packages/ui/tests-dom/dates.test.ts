@@ -177,6 +177,16 @@ describe('DateInput', () => {
     expect(input.value).toBe('2026-10-21')
   })
 
+  test('inside a FormField the input is named by the label text, not by the calendar button its label also holds', async () => {
+    const root = await dates()
+    const input = root.querySelector<HTMLInputElement>('#held')!
+    const text = root.querySelector('.kui-label-text')!
+
+    expect(text.id).not.toBe('')
+    expect(input.getAttribute('aria-labelledby')).toBe(text.id)
+    expect(root.querySelector('#date')!.hasAttribute('aria-labelledby')).toBe(false)
+  })
+
   test('a click on the panel inside a FormField does not reach its label, which would close the calendar', async () => {
     const root = await dates()
 

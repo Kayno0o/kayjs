@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX, Snippet } from 'kay'
-import { effect, memo, onMount, postedValue, recipe, signal, untrack } from 'kay'
+import { effect, memo, onMount, postedValue, recipe, signal, uid, untrack } from 'kay'
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
 import { fieldRef } from './form-reset'
 import Icon from './icon.kay'
@@ -83,6 +83,20 @@ const weeks = memo(() => monthWeeks(cursor(), first()))
 const names = memo(() => weekdays(pageLocale(), first()))
 
 const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
+
+// A FormField wraps the control in its label, so the calendar button's name would join the input's: the input is named by the label's own text instead.
+effect(() => {
+  if (!ready() || rest['aria-label'] !== undefined || rest['aria-labelledby'] !== undefined)
+    return
+
+  const labelText = box?.closest('label')?.querySelector('.kui-label-text')
+
+  if (!labelText)
+    return
+
+  labelText.id ||= uid()
+  box?.setAttribute('aria-labelledby', labelText.id)
+})
 
 // Whether a day cannot be chosen, outside the bounds or refused by the app.
 const refusedDay = (iso: string) => disabledDay?.(iso) === true

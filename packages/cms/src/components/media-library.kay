@@ -81,10 +81,10 @@ Table.kcms-media(label={wording('cms.media.table', 'Uploads')} columns={columns}
   @cell(row, column)
     if column.key === 'preview'
       if IMAGE.test(row.key) && row.width !== undefined && row.height !== undefined
-        a(href={row.url} target="_blank" rel="noopener noreferrer" aria-label={wording('cms.file.open', 'Open {name} in a new tab', { name: row.name })})
+        a(href={row.url} target="_blank" rel="noopener noreferrer" data-new-tab aria-label={wording('cms.file.open', 'Open {name} in a new tab', { name: row.name })})
           img.kcms-media-thumb(src={row.url} width={row.width} height={row.height} sizes="64px" alt="" loading="lazy" decoding="async")
       else
-        a.kcms-media-file(href={row.url} target="_blank" rel="noopener noreferrer") {row.key.split('.').at(-1)}
+        a.kcms-media-file(href={row.url} target="_blank" rel="noopener noreferrer" data-new-tab) {row.key.split('.').at(-1)}
     else if column.key === 'name'
       if renaming() === row.key
         form.kcms-media-rename(onKeyDown={(event) => { if (event.key === 'Escape') renaming = undefined }} onSubmit={(event) => { event.preventDefault(); void rename(row) }})

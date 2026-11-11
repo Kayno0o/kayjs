@@ -16,6 +16,8 @@ The field is a native `input type="date"`, so a form posts its value with no Jav
 
 The calendar opens on the chosen day, or today. The arrows move by day and week, Home and End to the ends of the week, PageUp and PageDown by month and with Shift by year, Enter or Space picks the day and Escape closes it, focus going back to the button. The days are named in full for screen readers and the month is announced as it changes.
 
+Inside a FormField the input is named by the field's label text alone, not by the calendar button the label also holds.
+
 The button, month and Today labels read the `ui.dateInput.*` messages, or `openLabel`, `previousLabel`, `nextLabel` and `todayLabel`.
 
 ## Opened by the app

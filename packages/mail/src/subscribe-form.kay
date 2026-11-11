@@ -32,7 +32,7 @@ form(class="kmail-subscribe" action={action} novalidate)
   p(class="kmail-subscribe-notice")
     | {notice}{' '}
     if policy
-      a(href={policy} target="_blank" rel="noopener noreferrer") {privacyLabel}
+      a(href={policy} target="_blank" rel="noopener noreferrer" data-new-tab) {privacyLabel}
   input(type="hidden" name="wording" value={shownWording})
   button(type="submit") {submitLabel}
   if action.succeeded()

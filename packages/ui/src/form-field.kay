@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
+import { wording } from 'kay/words'
 import { fieldIssueList, fieldLinks, fieldNamed } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
@@ -40,6 +41,8 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
   actions?: Snippet
 }>()
 
+// The star alone is a convention a visitor may not know (RGAA 11.10), so the word follows it; a screen reader gets the control's own aria-required instead.
+const requiredWord = wording('ui.field.required', 'required')
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
 // Each told by who gave it, for the browser to replace those of a call without touching the page's own.
@@ -57,7 +60,7 @@ if group
       span(part="text")
         | {label}
         if required
-          span(part="required" aria-hidden="true") *
+          span(part="required" aria-hidden="true") * {requiredWord}
     slot
     if actions
       span(part="action")
@@ -75,7 +78,7 @@ else
         span(part="text" id={links.label})
           | {label}
           if required
-            span(part="required" aria-hidden="true") *
+            span(part="required" aria-hidden="true") * {requiredWord}
       slot
     if actions
       span(part="action")

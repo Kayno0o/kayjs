@@ -9,5 +9,5 @@ shipWords()
 if sessionEnded()
   .kcms-session-ended.kcms-refusal(role="alert")
     p {wording('cms.session.ended', 'Your session has ended, so this was not saved. Your edits are kept here.')}
-    a(href={signInHref()} target="_blank" rel="noopener noreferrer") {wording('cms.session.signIn', 'Sign in again')}
+    a(href={signInHref()} target="_blank" rel="noopener noreferrer" data-new-tab) {wording('cms.session.signIn', 'Sign in again')}
     p {wording('cms.session.then', 'Then come back to this tab and save again.')}

@@ -48,7 +48,7 @@ form(part="root" {...rest} action={action} novalidate)
   p(part="notice")
     | {notice()}{' '}
     if policy() as link
-      a(part="link" href={link} target="_blank" rel="noopener noreferrer") {privacyLabel}
+      a(part="link" href={link} target="_blank" rel="noopener noreferrer" data-new-tab) {privacyLabel}
   input(type="hidden" name="wording" value={shownWording()})
   Button(type="submit" tone="accent" label={submitLabel})
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
