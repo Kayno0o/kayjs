@@ -32,7 +32,7 @@ The control also gets the native `required`, so the browser's validation and a p
 
 On a static page the server writes the link. Inside an island, as in a FormDialog, the browser keeps it as messages come and go, and marks the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it.
 
-A choice made of several inputs (RadioGroup, Segmented, ChipGroup, Rating, RangeInput) is the described field, not its first input: the group is named by the field's label (one with its own `label` or `aria-label` keeps it), described by the hint and message, marked `aria-invalid` while one shows, and `aria-required` when it is a radio group. A static page's group links itself once the browser has it. With `group`, the fieldset names the choice instead, and each input inside takes the mark.
+A choice made of several inputs (RadioGroup, Segmented, ChipGroup, Rating, RangeInput) or a FileDrop zone is the described field, not its first input: the group is named by the field's label (one with its own `label` or `aria-label` keeps it), described by the hint and message, marked `aria-invalid` while one shows, and `aria-required` when it is a radio group. A static page's group links itself once the browser has it. With `group`, the fieldset names the choice instead, and each input inside takes the mark.
 
 Inside an island, a `group` with a message marks every input, select and textarea inside it the same way. So kay's `focusInvalid` shows the tab holding the group and focuses its first field.
 
