@@ -4,6 +4,7 @@ import { kayLog } from '../runtime/log'
 import { importModule } from './bundle'
 import { chainSetting } from './page-settings'
 import { apiLimitWait, checkApiLimit } from './protection'
+import { requestRecord } from './request-record'
 import { readPersonally } from './scope'
 import { Denied } from './signals'
 
@@ -17,8 +18,7 @@ type Given = RateLimit | RateLimit[] | false | undefined
 const NONE: PageLimit[] = []
 // The limits of each chain of modules a route answers with, read once.
 const chains = new WeakMap<object[], PageLimit[]>()
-// What a request was told when it was counted, so a render run again for the viewer does not count it twice.
-const waits = new WeakMap<Request, number | undefined>()
+
 // The entries of each limit object by route, kept so a limit's counter is made once and the same one answers every request.
 const entries = new WeakMap<object, Map<string, PageLimit[]>>()
 
@@ -74,8 +74,9 @@ export async function pageOverLimit(route: { pattern: string }, modules: object[
 
   readPersonally(ctx.request)
 
-  const wait = waits.has(ctx.request)
-    ? waits.get(ctx.request)
+  const record = requestRecord(ctx.request)
+  const wait = record.pageLimit
+    ? record.pageLimit.wait
     : await apiLimitWait(limits, ctx.request, undefined, () => ({
       request: ctx.request,
       locale: ctx.locale,
@@ -85,7 +86,7 @@ export async function pageOverLimit(route: { pattern: string }, modules: object[
       locals: ctx.locals,
     }))
 
-  waits.set(ctx.request, wait)
+  record.pageLimit = { wait }
 
   if (wait === undefined)
     return undefined

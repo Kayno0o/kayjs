@@ -80,6 +80,8 @@ export class RequestRecord {
   // The rate limit hits an action counted, which a call that started no work takes back, and the key each limit counted it under.
   refundableHits: { limiter: Limiter, key: string, resetAt: number }[] | undefined = undefined
   countedKeys: Map<object, string> | undefined = undefined
+  // What a page's rate limits told the request when it was counted, so a render run again for the viewer does not count it twice.
+  pageLimit: { wait: number | undefined } | undefined = undefined
   // What kay's own response took off its context (the security headers, the id and the build), so a render run again for the viewer starts from them and an error answer gets them back; and whether it got them back, after which a render its timeout left running takes nothing off again.
   startedHeaders: { own: Record<string, string>, hooked: Record<string, string> } | undefined = undefined
   headersRestored: true | undefined = undefined
