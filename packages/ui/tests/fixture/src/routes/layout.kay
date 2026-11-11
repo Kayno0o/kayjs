@@ -72,4 +72,4 @@ main
   article#app-switcher
     AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Switch")
       @actions
-        AppSwitcher(id="family" apps={[{ id: 'atlas', href: 'https://atlas.example.com/', label: 'Atlas', icon: 'globe', description: 'Maps' }, { id: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble' }, { id: 'relay', href: 'https://relay.example.com/', label: 'Relay', newTab: true, rel: 'noopener noreferrer' }]} current="hubble")
+        AppSwitcher(id="family" apps={[{ key: 'atlas', href: 'https://atlas.example.com/', label: 'Atlas', icon: 'globe', description: 'Maps' }, { key: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble' }, { key: 'relay', href: 'https://relay.example.com/', label: 'Relay', newTab: true, rel: 'noopener noreferrer' }]} current="hubble")

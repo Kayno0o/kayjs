@@ -2,8 +2,8 @@
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 
 const items = [
-  { value: 'lens', title: 'Lens', open: true },
-  { value: 'mount', title: 'Mount', open: true },
+  { key: 'lens', label: 'Lens', open: true },
+  { key: 'mount', label: 'Mount', open: true },
 ]
 ---
 Accordion(items={items} multiple)

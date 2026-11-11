@@ -216,10 +216,10 @@ export const COMPONENTS = {
 
 // Every component the library exports, with props that draw it.
 export const CASES: Record<string, Record<string, unknown>> = {
-  'accordion': { items: [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }], panel: (value: string) => value },
+  'accordion': { items: [{ key: 'mars', label: 'Mars' }, { key: 'venus', label: 'Venus', open: true }], panel: (value: string) => value },
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
-  'app-switcher': { apps: [{ id: 'atlas', href: '/atlas', label: 'Atlas', icon }, { id: 'hubble', href: '/hubble', label: 'Hubble' }], current: 'hubble' },
-  'audio-player': { src: '/episode.mp3', title: 'Episode', chapters: [{ title: 'Intro', start: 0 }, { title: 'News', start: 30 }], cues: [{ start: 0, end: 10, text: 'Hello' }] },
+  'app-switcher': { apps: [{ key: 'atlas', href: '/atlas', label: 'Atlas', icon }, { key: 'hubble', href: '/hubble', label: 'Hubble' }], current: 'hubble' },
+  'audio-player': { src: '/episode.mp3', title: 'Episode', chapters: [{ label: 'Intro', start: 0 }, { label: 'News', start: 30 }], cues: [{ start: 0, end: 10, text: 'Hello' }] },
   'avatar': { name: 'Grace', label: 'Grace', status: 'online' },
   'avatar-group': { avatars: [{ name: 'Ada' }, { name: 'Grace' }, { name: 'Linus' }], max: 2, label: 'Team' },
   'badge': { label: 'Draft', icon },
@@ -302,7 +302,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'theme-toggle': {},
   'time-input': { 'aria-label': 'Start', 'value': '09:30' },
   'toaster': {},
-  'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'neutral' }], label: 'Day', selected: 'a', onSelectedChange: noop },
+  'timeline': { entries: [{ key: 'a', time: '08:00', label: 'Home', icon }, { key: 'b', time: '09:00', label: 'Gap', tone: 'neutral' }], label: 'Day', selected: 'a', onSelectedChange: noop },
   'toggle': { label: 'Digest' },
   'toolbar': { label: 'Actions', caption: 'Mars', children: 'Move' },
   'tooltip': { text: 'Published on Monday', children: 'Published' },

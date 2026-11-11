@@ -15,7 +15,7 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 const { calls } = props<{ calls: string[] }>()
 
 const planets = [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]
-const apps = [{ id: 'atlas', href: '/atlas', label: 'Atlas' }]
+const apps = [{ key: 'atlas', href: '/atlas', label: 'Atlas' }]
 const multi = signal(false)
 const date = signal(false)
 const combo = signal(false)

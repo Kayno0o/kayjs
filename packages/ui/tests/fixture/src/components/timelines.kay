@@ -7,14 +7,14 @@ const { onSelect } = props<{ onSelect: (key: string | undefined, text: string) =
 
 const picked = signal<string | undefined>('b')
 const entries = [
-  { key: 'a', time: '08:00', text: 'Home', icon: 'info' as const },
-  { key: 'b', time: '09:00', text: 'Walk' },
-  { key: 'c', time: '10:00', text: 'Gap', tone: 'neutral' as const, pickable: false },
+  { key: 'a', time: '08:00', label: 'Home', icon: 'info' as const },
+  { key: 'b', time: '09:00', label: 'Walk' },
+  { key: 'c', time: '10:00', label: 'Gap', tone: 'neutral' as const, pickable: false },
 ]
 
-function select(key: string | undefined, entry: { text: string }) {
+function select(key: string | undefined, entry: { label?: string | undefined }) {
   picked = key
-  onSelect(key, entry.text)
+  onSelect(key, entry.label ?? '')
 }
 ---
 Timeline#bound(entries={entries} label="Day" selected={picked()} onSelectedChange={select})

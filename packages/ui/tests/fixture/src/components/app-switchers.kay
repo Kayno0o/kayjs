@@ -3,11 +3,11 @@ import type { SwitcherApp } from '@kaynooo/kayjs-ui'
 import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 
 const apps: SwitcherApp[] = [
-  { id: 'atlas', href: '/atlas', label: 'Atlas', icon: 'globe' },
-  { id: 'aurora', href: '/aurora', label: 'Aurora' },
-  { id: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble', description: 'Telescope' },
-  { id: 'relay', href: '/relay', label: 'Relay' },
-  { id: 'sage', href: '/sage', label: 'Sage' },
+  { key: 'atlas', href: '/atlas', label: 'Atlas', icon: 'globe' },
+  { key: 'aurora', href: '/aurora', label: 'Aurora' },
+  { key: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble', description: 'Telescope' },
+  { key: 'relay', href: '/relay', label: 'Relay' },
+  { key: 'sage', href: '/sage', label: 'Sage' },
 ]
 ---
 AppSwitcher(id="plain" apps={apps} current="aurora")

@@ -4,13 +4,13 @@ import '../app.css'
 
 // `/episode.wav` is 30 seconds of silence; `#long` has no source and a chapter past the hour.
 const chapters = [
-  { title: 'Intro', start: 0 },
-  { title: 'News', start: 10, url: 'https://example.com/news' },
-  { title: 'Outro', start: 20 },
+  { label: 'Intro', start: 0 },
+  { label: 'News', start: 10, href: 'https://example.com/news' },
+  { label: 'Outro', start: 20 },
 ]
 const long = [
-  { title: 'Start', start: 0 },
-  { title: 'Late', start: 36_003_661 },
+  { label: 'Start', start: 0 },
+  { label: 'Late', start: 36_003_661 },
 ]
 const cues = [
   { start: 0, end: 10, text: 'Hello.' },

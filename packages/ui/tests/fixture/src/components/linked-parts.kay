@@ -8,9 +8,9 @@ import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 const { onSelect } = props<{ onSelect: (key: string | undefined) => void }>()
 
 const entries = [
-  { key: 'a', time: '08:30', text: 'Plain' },
-  { key: 'b', time: '09:00', text: 'Linked', href: 'https://example.com/b' },
-  { key: 'c', time: '09:30', text: 'Picked', href: 'https://example.com/c' },
+  { key: 'a', time: '08:30', label: 'Plain' },
+  { key: 'b', time: '09:00', label: 'Linked', href: 'https://example.com/b' },
+  { key: 'c', time: '09:30', label: 'Picked', href: 'https://example.com/c' },
 ]
 ---
 Avatar#avatar-link(name="Ada Lovelace" href="https://example.com/ada")

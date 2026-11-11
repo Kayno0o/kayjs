@@ -7,9 +7,9 @@ const { onPosition, onChapter, events } = props<{ onPosition: (seconds: number) 
 
 const seconds = signal(0)
 const chapters = [
-  { title: 'Intro', start: 0 },
-  { title: 'News', start: 30, url: 'https://example.com/news' },
-  { title: 'Outro', start: 90 },
+  { label: 'Intro', start: 0 },
+  { label: 'News', start: 30, href: 'https://example.com/news' },
+  { label: 'Outro', start: 90 },
 ]
 const cues = [
   { start: 0, end: 10, text: 'Hello.' },
@@ -20,7 +20,7 @@ const cues = [
 ---
 AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={chapters} cues={cues} position={seconds()} onPositionChange={(value) => { seconds = value; onPosition(value) }} onChapterChange={onChapter} onPlay={() => events?.push('play')} onPause={() => events?.push('pause')} onEnd={() => events?.push('ended')} onError={({ error, event }) => events?.push(`error ${error instanceof DOMException ? error.name : 'media'} ${event?.type}`)})
   @actions(chapter, index)
-    button.act(type="button") {`Like ${chapter.title} ${index}`}
+    button.act(type="button") {`Like ${chapter.label} ${index}`}
 AudioPlayer#plain(src="/plain.mp3")
 button#jump(type="button" onClick={() => seconds = 45}) Jump
 button#late(type="button" onClick={() => seconds = 90}) Late

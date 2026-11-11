@@ -1,0 +1,24 @@
+--- island
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
+import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+
+// Every list under the item names before 1.99, which still draw; a cast keeps the `deprecated-ui-items` lint from rewriting them.
+function old<T>(items: unknown): T {
+  return items as T
+}
+const entries = old<{ key: string, time: string, text: string }[]>([{ key: 'a', time: '08:00', text: 'Home' }])
+const sections = old<{ value: string, title: string }[]>([{ value: 'mars', title: 'Mars' }])
+const apps = old<{ id: string, href: string, label: string }[]>([{ id: 'atlas', href: '/atlas', label: 'Atlas' }])
+const chapters = old<{ title: string, start: number, url: string }[]>([{ title: 'Intro', start: 0, url: 'https://example.com/intro' }])
+const items = old<{ key: number, kind: 'image', thumb: string, preview: string, title: string }[]>([{ key: 1, kind: 'image', thumb: '/t.png', preview: '/p.png', title: 'Mars' }])
+---
+Timeline#timeline(entries={entries} label="Day")
+Accordion#accordion(items={sections})
+  @panel(key)
+    p {key}
+AppSwitcher#apps(apps={apps} current="atlas" open={true})
+AudioPlayer#audio(src="/a.mp3" chapters={chapters})
+MediaGallery#gallery(items={items})

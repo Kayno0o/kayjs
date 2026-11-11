@@ -6,9 +6,9 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import { SILENCE } from './clip'
 
 const chapters: AudioChapter[] = [
-  { title: 'Welcome', start: 0 },
-  { title: 'The news', start: 5 },
-  { title: 'Goodbye', start: 10 },
+  { label: 'Welcome', start: 0 },
+  { label: 'The news', start: 5 },
+  { label: 'Goodbye', start: 10 },
 ]
 const liked = signal<number[]>([])
 

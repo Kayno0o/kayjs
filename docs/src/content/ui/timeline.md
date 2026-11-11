@@ -4,7 +4,7 @@ description: A vertical list of time-stamped entries, one of which can be picked
 
 <Demo name="timeline/basic" />
 
-Each entry has a `key`, a `time` (a time or a range, worded as you like), a `text`, and optionally an `icon` and a `tone`. The entries show in the order you pass them, so pass them in time order. `label` names the list for screen readers.
+Each entry has a `key`, a `time` (a time or a range, worded as you like), a `label`, and optionally an `icon` and a `tone`. The entries show in the order you pass them, so pass them in time order. `label` names the list for screen readers.
 
 ## Tones
 

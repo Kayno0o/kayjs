@@ -2,7 +2,7 @@
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 
 const { multiple = false, level } = props<{ multiple?: boolean, level?: 1 | 2 | 3 | 4 | 5 | 6 }>()
-const items = [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }, { value: 'earth', title: 'Earth' }]
+const items = [{ key: 'mars', label: 'Mars' }, { key: 'venus', label: 'Venus', open: true }, { key: 'earth', label: 'Earth' }]
 ---
 Accordion(items={items} multiple={multiple} level={level})
   @panel(value)

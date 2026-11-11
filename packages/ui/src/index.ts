@@ -1,3 +1,4 @@
+export type { AccordionItem } from './accordion'
 export type { SwitcherApp } from './app-switcher'
 export type { AudioChapter, AudioCue } from './audio'
 export type { ChartMark, SparkMark } from './chart-marks'

@@ -5,9 +5,9 @@ import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 
 const picked = signal<string | undefined>('lunch')
 const entries: TimelineEntry[] = [
-  { key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 'info' },
-  { key: 'gap', time: '09:10 - 09:40', text: 'Nothing reported', tone: 'neutral', pickable: false },
-  { key: 'lunch', time: '12:15 - 13:30', text: 'Lunch', icon: 'info', tone: 'success' },
+  { key: 'home', time: '08:00 - 09:10', label: 'At home', icon: 'info' },
+  { key: 'gap', time: '09:10 - 09:40', label: 'Nothing reported', tone: 'neutral', pickable: false },
+  { key: 'lunch', time: '12:15 - 13:30', label: 'Lunch', icon: 'info', tone: 'success' },
 ]
 ---
 .flex.flex-col.gap-2.max-w-md

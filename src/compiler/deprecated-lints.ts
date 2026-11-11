@@ -109,6 +109,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default { extensions: [cms({ collections: { products: { form: { hide: [\'sku\'] } } } })] }',
     right: '// kay.config.ts\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default { extensions: [cms({ collections: { products: { form: { exclude: [\'sku\'] } } } })] }',
   },
+  'deprecated-ui-items': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    site: true,
+    summary: 'An item key of a kayjs-ui list under its name before 1.99, so every item is `{ key, label, description?, href?, icon?, tone?, disabled? }`, with `value` only where it is a form value. A Timeline entry\'s `text` is `label`; an Accordion item\'s `value` and `title` are `key` and `label`; a MediaGallery item\'s `title` is `label`; an AppSwitcher app\'s `id` is `key`; an AudioPlayer chapter\'s `title` and `url` are `label` and `href`. The old names work until 1.103, the new ones winning when both are given. Found in a literal array given as `entries`, `items`, `apps` or `chapters` of such a component in a `.kay` file of an app using kayjs-ui, written there or bound to a `const` of the file\'s script. The fix renames the key, and writes `label: text` for a shorthand; an item holding the new key already is reported with no fix.',
+    wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={[{ key: \'a\', time: \'08:30\', text: \'Opened\' }]})',
+    right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={[{ key: \'a\', time: \'08:30\', label: \'Opened\' }]})',
+  },
   'deprecated-ai-props': {
     level: 'warn',
     group: 'deprecated',

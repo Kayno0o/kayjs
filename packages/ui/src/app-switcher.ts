@@ -2,10 +2,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { NewTab } from './outside'
 
-// An app of the family an AppSwitcher links to.
-export interface SwitcherApp {
-  // Matched against the switcher's `current` to mark the app on screen.
-  id: string
+interface SwitcherAppBase {
   href: string
   label: string
   // Drawn above the name; an app with none shows the first letter of its name.
@@ -16,4 +13,11 @@ export interface SwitcherApp {
   newTab?: NewTab | undefined
   // The tile's `rel` when it opens in a new tab, `noopener noreferrer` by default.
   rel?: string | undefined
+}
+
+// An app of the family an AppSwitcher links to. `key` is matched against the switcher's `current` to mark the app on screen; `id` is the name it had before 1.99.
+export type SwitcherApp = SwitcherAppBase & ({ key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103. */ id?: string | undefined } | { key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103. */ id: string })
+
+export function appKey(app: SwitcherApp): string {
+  return app.key ?? app.id
 }

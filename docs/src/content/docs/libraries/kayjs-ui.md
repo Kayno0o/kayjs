@@ -154,6 +154,8 @@ Every field follows one convention: `onInput` is the live value and `onChange` t
 
 A title, a heading or a tab is a string by default, and a block puts markup in its place: `@title` on Card, PageHeader and the other heads, `@title` on Dialog, SidePanel and FormDialog, and a block named after one entry, such as `@tab(tab)`, on Tabs, TabNav, Breadcrumb, SiteNav, Carousel and MediaGallery. Card, CardRow, Avatar, Badge and a Timeline entry take `href` and become a link. [All of them](/llms/kayjs-ui-slots-and-links).
 
+The items of every list have one shape: a `key` that tells them apart, a `label`, and, where the component draws them, a `description`, an `href`, an `icon`, a `tone` and `disabled`. A Menu entry, a Timeline entry, an Accordion item, an AppSwitcher app, an AudioPlayer chapter and a MediaGallery item all read alike. Only a field's value stays `value`: the option of a Select, Combobox or MultiSelect, which is what the form posts. The names these lists used before 1.99 (`text`, `title`, `id`, `url` and an Accordion's `value`) still work until 1.103, and `kay check --fix` rewrites them.
+
 Every titled component takes `level` (1 to 6) for its heading. The defaults follow where the component usually sits: `h1` for PageHeader, `h2` for PageSection, Widget and Dialog, `h3` for Card. EmptyState, CollapsibleSection and Accordion draw a paragraph or a span until `level` makes the title a heading.
 
 ## Restyle a component

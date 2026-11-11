@@ -1,6 +1,7 @@
 --- <Key extends string | number>
 import type { JSX, Snippet } from 'kay'
 import type { TimelineEntry } from './timeline'
+import { entryLabel } from './timeline'
 import { tabOf } from './outside'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
@@ -69,16 +70,16 @@ else
             span(part="time") {entry.time}
             if entry.icon
               Icon(icon={entry.icon} part="icon")
-            span(part="text") {entry.text}
+            span(part="text") {entryLabel(entry)}
         else if selectable() && entry.pickable !== false
           button(part="entry" type="button" aria-pressed={picked() === entry.key} onClick={() => pick(entry)})
             span(part="time") {entry.time}
             if entry.icon
               Icon(icon={entry.icon} part="icon")
-            span(part="text") {entry.text}
+            span(part="text") {entryLabel(entry)}
         else
           div(part="entry")
             span(part="time") {entry.time}
             if entry.icon
               Icon(icon={entry.icon} part="icon")
-            span(part="text") {entry.text}
+            span(part="text") {entryLabel(entry)}

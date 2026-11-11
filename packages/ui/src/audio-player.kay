@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { AudioChapter, AudioCue } from './audio'
 import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
-import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
+import { chapterAt, chapterHref, chapterLabel, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
 
@@ -327,7 +327,7 @@ effect(() => {
     return
 
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: chapter?.title ?? title ?? '',
+    title: chapter ? chapterLabel(chapter) : title ?? '',
     artist: artist ?? '',
     album: chapter ? title ?? '' : '',
     artwork: artwork ? [{ src: artwork }] : [],
@@ -363,16 +363,16 @@ div(part="root" {...rest})
             li(part="mark" style={placed(entry.chapter.start)})
       input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
   if chapters[current()]
-    p(part="now") {chapters[current()]!.title}
+    p(part="now") {chapterLabel(chapters[current()]!)}
   if chapters.length > 0
     ol(part="chapters" aria-label={chaptersLabel})
       for chapter, index of chapters key={index}
         li(part="chapter")
           button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
             span(part="start") {clock(chapter.start)}
-            span(part="title") {chapter.title}
-          if chapter.url
-            IconButton(href={chapter.url} {...tabOf(chapter.url, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
+            span(part="title") {chapterLabel(chapter)}
+          if chapterHref(chapter) as href
+            IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapterLabel(chapter))} variant="ghost" size="sm")
           if actions
             span(part="actions")
               | {actions(chapter, index)}
@@ -382,7 +382,7 @@ div(part="root" {...rest})
         for group of groups() key={group.chapter}
           div(part="group")
             if chapters[group.chapter]
-              p(part="groupTitle") {chapters[group.chapter]!.title}
+              p(part="groupTitle") {chapterLabel(chapters[group.chapter]!)}
             p(part="cues")
               for cue, offset of group.cues key={offset}
                 button(part="cue" type="button" data-index={group.first + offset} tabindex={group.first + offset === stop() ? '0' : '-1'} onFocus={() => focused = group.first + offset} aria-current={group.first + offset === cueNow() ? 'true' : undefined} onClick={() => void seek(cue.start, true)}) {`${cue.text} `}

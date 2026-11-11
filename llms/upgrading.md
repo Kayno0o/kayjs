@@ -22,6 +22,9 @@ The option that waits for the visitor's yes is `awaitConsent`, so `consent` mean
 ### kayjs-cms: `form.hide` is `exclude`
 
 A list of what to leave out is `exclude` and a list of what to keep `include`, in every library, as `analytics({ exclude })` has it. The form layout of a collection, `cms({ collections: { posts: { form: { hide: ['sku'] } } } })`, takes `exclude` in place of `hide`. The old name still works for three minors, `exclude` winning when both are given, and `kay upgrade` renames it (`deprecated-filter-options`). The names that are not lists of what to include or leave out stay: `allow` of kayjs-auth (a hook that admits a sign-in, as `authorize` does), `denied` of kayjs-cms (a record of reasons by action), and `except` and `to` of `rooms.publish` (one member or connection).
+### kayjs-ui items: `label`, `key`, `href`
+
+The items of a Timeline, Accordion, MediaGallery, AppSwitcher and AudioPlayer take the names every list item has: a Timeline entry's `text` is `label`, an Accordion item's `value` and `title` are `key` and `label` (`@panel(key)` receives the key), a MediaGallery item's `title` is `label`, an AppSwitcher app's `id` is `key`, and an AudioChapter's `title` and `url` are `label` and `href`. The old names work until 1.103, the new ones winning when both are given. `kay upgrade` rewrites a literal array, or one bound to a `const` of the page's script (`deprecated-ui-items`); an item built elsewhere, or read as `entry.text`, is changed by hand.
 
 ### RowsField's `@cell` block gets `index` as a function
 

@@ -9,7 +9,7 @@ import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
 const picture = (colour: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="${colour}"/></svg>`)}`
-const items = [{ key: 1, kind: 'image' as const, thumb: picture('#6c8ef5'), preview: picture('#6c8ef5'), title: 'Blue' }, { key: 2, kind: 'image' as const, thumb: picture('#f58fb0'), preview: picture('#f58fb0'), title: 'Pink' }]
+const items = [{ key: 1, kind: 'image' as const, thumb: picture('#6c8ef5'), preview: picture('#6c8ef5'), label: 'Blue' }, { key: 2, kind: 'image' as const, thumb: picture('#f58fb0'), preview: picture('#f58fb0'), label: 'Pink' }]
 const tiles = [{ id: 1, height: 80 }, { id: 2, height: 120 }, { id: 3, height: 60 }, { id: 4, height: 100 }]
 ---
 //- The browser-drawn chart and media parts, for the browser test to read their computed styles.

@@ -8,7 +8,7 @@ description: An audio player with chapters, a transcript that follows the voice,
 
 ## Chapters
 
-A chapter has a `title`, a `start` in seconds and optionally a `url`. Pass them in time order, as the player never sorts them. They show as a list of buttons that seek and play, as marks on the timeline, and the previous and next buttons step between them. The chapter playing is marked, and a chapter with a `url` gets a link beside it, in a new tab for another site so the audio keeps playing.
+A chapter has a `label`, a `start` in seconds and optionally an `href`. Pass them in time order, as the player never sorts them. They show as a list of buttons that seek and play, as marks on the timeline, and the previous and next buttons step between them. The chapter playing is marked, and a chapter with an `href` gets a link beside it, in a new tab for another site so the audio keeps playing.
 
 The previous button restarts the chapter once it is more than 3 seconds in, and goes to the one before otherwise, as a music player's back button does.
 

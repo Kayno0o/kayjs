@@ -2,9 +2,9 @@
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 
 const items = [
-  { value: 'shipping', title: 'Shipping', open: true },
-  { value: 'returns', title: 'Returns' },
-  { value: 'warranty', title: 'Warranty' },
+  { key: 'shipping', label: 'Shipping', open: true },
+  { key: 'returns', label: 'Returns' },
+  { key: 'warranty', label: 'Warranty' },
 ]
 ---
 Accordion(items={items})

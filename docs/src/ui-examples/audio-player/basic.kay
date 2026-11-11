@@ -5,9 +5,9 @@ import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
 import { SILENCE } from './clip'
 
 const chapters: AudioChapter[] = [
-  { title: 'Welcome', start: 0 },
-  { title: 'The news', start: 5, url: 'https://kayjs.dev' },
-  { title: 'Goodbye', start: 10 },
+  { label: 'Welcome', start: 0 },
+  { label: 'The news', start: 5, href: 'https://kayjs.dev' },
+  { label: 'Goodbye', start: 10 },
 ]
 const cues: AudioCue[] = [
   { start: 0, end: 2.5, text: 'Hello and welcome.' },

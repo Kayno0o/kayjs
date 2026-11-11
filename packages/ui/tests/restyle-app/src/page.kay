@@ -206,7 +206,7 @@ SiteFavicon#favicon(name="Kay" src="/favicon.png")
 IconPicker#icon-picker(icons={async () => []})
 MarkdownEditor#markdown
 BarChart#bars(label="Runs" labels={['a', 'b']} xLabels legend series={[{ name: 'S', values: [1, 2] }, { name: 'T', values: [2, 1] }]})
-Accordion#accordion(items={[{ value: 'a', title: 'A' }]})
+Accordion#accordion(items={[{ key: 'a', label: 'A' }]})
   @panel(value)
     p {value}
 Skeleton#skeleton(lines={2})

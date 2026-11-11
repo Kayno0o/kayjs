@@ -8,7 +8,7 @@ description: A grid button opening tiles that link the sibling apps of a family.
 
 ## Apps
 
-`apps` is a list of `{ id, href, label, icon, description }`. `current` is the `id` of the app on screen: its tile is marked with `aria-current` and drawn bold with a bar under it, so the mark is not a colour alone. An app with no `icon` shows the first letter of its name. `description` is shown as the tile's tooltip.
+`apps` is a list of `{ key, href, label, icon, description }`. `current` is the `key` of the app on screen: its tile is marked with `aria-current` and drawn bold with a bar under it, so the mark is not a colour alone. An app with no `icon` shows the first letter of its name. `description` is shown as the tile's tooltip.
 
 ## Same tab or a new one
 

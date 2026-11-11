@@ -11,7 +11,15 @@ export interface MediaItem {
   src?: string
   // A video's WebVTT captions, which a deaf visitor reads what is said by.
   captions?: string
+  // What the item is called: the caption, and the name screen readers read.
+  label?: string
+  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103. */
   title?: string
+}
+
+// The name of an item, `label` or the older `title`.
+export function mediaLabel(item: MediaItem): string | undefined {
+  return item.label ?? item.title
 }
 
 const HLS_PLAYLIST = /\.m3u8(?:$|\?)/
