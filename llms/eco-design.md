@@ -46,7 +46,7 @@ Comments(postId={postId} hydrate="visible")
 
 ### Keep a request off every keystroke
 
-`debounced(typed, '300ms')` gives a value once typing has paused, so a search runs once instead of per key; the complete island is in [Components](components.md#react-to-a-change-or-to-typing-once-it-pauses).
+`debounced(typed, '300ms')` gives a value once typing has paused, so a search runs once instead of per key; the complete island is in [Effects and lifecycle](effects.md#react-to-a-change-or-to-typing-once-it-pauses).
 
 ## Reference
 
@@ -74,7 +74,7 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 | 4.4 The visitor decides on a third-party service | App | `analytics()` waits for the visitor's yes with `consent`, and a persisted signal keeps the answer for any other script, loaded only once it is yes | [Privacy](privacy.md#load-a-script-only-once-the-visitor-agreed) |
 | 4.5 Native components | App | A form field is a native `input`, `textarea` or `select`; whether the app swaps them for custom widgets is its own | [Actions](actions.md#forms) |
 | 4.8 Few downloaded fonts | App | `fonts` self-hosts font files, each family gets a metric-matched fallback, and a font of several subsets loads only the files the page's text needs; how many families the app declares is its choice | [Fonts](sitemap-search-fonts.md#fonts) |
-| 4.9 Few server requests while typing | App | `debounced` gives a value once typing has paused | [Components](components.md#react-to-a-change-or-to-typing-once-it-pauses) |
+| 4.9 Few server requests while typing | App | `debounced` gives a value once typing has paused | [Effects and lifecycle](effects.md#react-to-a-change-or-to-typing-once-it-pauses) |
 | 4.10 Input format shown, no useless requests on submit | Met | `field` renders the constraints the schema gives (`required`, lengths) so the browser checks them with no request, and kay's script checks the form against the schema in the browser with the schema's messages | [Forms](actions.md#forms) |
 | 4.11 File size and format shown before upload | App | An action refuses a post over `maxSize` (1 MB by default) with a message naming the most it may send; showing the limit before the transfer is the app's | [Body limit](action-protection.md#body-limit) |
 

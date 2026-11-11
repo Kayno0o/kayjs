@@ -1,6 +1,73 @@
 # Effects and lifecycle
 
-How a component runs code after its render, when a value changes, on a timer or on a window event, and how each of these stops. [Components](components.md) shows them in its common tasks.
+How a component runs code after its render, when a value changes, on a timer or on a window event, and how each of these stops; props, signals and the rest of a component are in [Components](components.md).
+
+## Common tasks
+
+### Run code when a value changes
+
+`effect` runs once the render is done, in the browser, and again whenever a signal it read changes:
+
+```kay
+---
+import { signal, effect } from 'kay'
+
+const query = signal('')
+
+effect(() => {
+  localStorage.setItem('query', query())
+})
+---
+input(bind:value={query} aria-label="Search")
+```
+
+### React to a change, or to typing once it pauses
+
+`watch` from `kay` runs on each change of what it watches, not on its first read, handed the value before; `debounced` gives a value once it has stopped changing for a while:
+
+```kay
+---
+import { debounced, watch, signal, onCleanup } from 'kay'
+
+const typed = signal('')
+const found = signal<string[]>([])
+
+watch(debounced(typed, '300ms'), async (query) => {
+  // Registered before the await: a slower answer to an older query is dropped.
+  let stale = false
+
+  onCleanup(() => stale = true)
+
+  const people = query === '' ? [] : await (await fetch(`/api/people?q=${encodeURIComponent(query)}`)).json()
+
+  if (!stale)
+    found = people
+})
+---
+input(bind:value={typed} aria-label="Search people")
+ul
+  for name of found()
+    li {name}
+```
+
+### Run code on a timer or a window event
+
+`every` and `listen` from `kay` run while the island lives, never on the server:
+
+```kay
+---
+import { every, listen, signal } from 'kay'
+
+const seconds = signal(0)
+const key = signal('')
+
+every('1s', () => seconds++)
+listen(window, 'keydown', event => key = event.key)
+---
+p {seconds()}s on the page, last key {key()}
+```
+
+## Reference
 
 - `effect(fn)` runs once the render is done and again whenever what it read changes.
 - `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too.
