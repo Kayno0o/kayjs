@@ -5,12 +5,12 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. It is written by assigning it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, and `count.set(c => c * 2)` still works. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, as `count.set(c => c * 2)` does. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
 - An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
-- `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
+- `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a `--- client` component; reading one while rendering throws on the server.
 - Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'`; a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met: read it, not the browser.
@@ -28,12 +28,12 @@ Each of kay's own libraries ships its `llms.txt` and `llms/`: open the one a tas
 
 ## Docs
 
-To build a site, read [Build a site](llms/site.md) first. The topic files below cover the rest; `bunx kay docs <words>` prints the section of these or a library's files that matches.
+To build a site, read [Build a site](llms/site.md) first, then the topics below; `bunx kay docs <words>` prints the matching section of these or of a library's.
 
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
 - [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS
 - [Components](llms/components.md): fences, props, signals, memos, generics, `import.meta.glob`
-- [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen`, and how they stop
+- [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen` and stopping them
 - [Component libraries and extensions](llms/component-libraries.md): shipping components, pages, tabs and commands
 - [Library conventions](llms/component-library-conventions.md): naming and files
 - [Template lines](llms/templates.md): lines, bindings, `if`/`for`/`await`/`try`
