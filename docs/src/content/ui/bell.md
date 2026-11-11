@@ -18,6 +18,6 @@ A notification that arrives while the page is open is announced to screen reader
 
 ## Your own notifications
 
-`items` takes a list of `{ id, title, read?, url? }` that the page read, in place of the inbox. The `Bell` then draws for anyone, signed in or not, and `unread` sets the count, the unread items by default. A page with a `Bell` is rendered for each request even then.
+`items` takes a list of `{ key, label, read?, href? }` that the page read, in place of the inbox. The `Bell` then draws for anyone, signed in or not, and `unread` sets the count, the unread items by default. A page with a `Bell` is rendered for each request even then.
 
 To load the notifications in the browser, hear a read or draw each row yourself, use [BellInbox](/ui/bell-inbox) inside an island.

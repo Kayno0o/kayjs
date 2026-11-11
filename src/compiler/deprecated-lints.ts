@@ -118,6 +118,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={[{ key: \'a\', time: \'08:30\', text: \'Opened\' }]})',
     right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={[{ key: \'a\', time: \'08:30\', label: \'Opened\' }]})',
   },
+  'deprecated-ui-item-keys': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.100',
+    site: true,
+    summary: 'An item key of a kayjs-ui TreeView or Bell under its name before 1.100, so they take the item shape of every other list: a tree node\'s `id` is `key`, and a notification\'s `id`, `title` and `url` are `key`, `label` and `href`. The old names work until 1.103, the new ones winning when both are given; kay\'s own `notifications.inbox` answer and the `notify()` options keep `id`, `title` and `url`, and the Bell maps them. Found in a literal array given as `nodes` of a TreeView (its nested `children` arrays too) or `items` of a Bell or BellInbox, in a `.kay` file of an app using kayjs-ui, written there or bound to a `const` of the file\'s script. The fix renames the key, and writes `key: id` for a shorthand; an item holding the new key already is reported with no fix.',
+    wrong: '---\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\n---\nTreeView(label="Files" nodes={[{ id: \'a\', label: \'A\' }]})',
+    right: '---\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\n---\nTreeView(label="Files" nodes={[{ key: \'a\', label: \'A\' }]})',
+  },
   'deprecated-ai-props': {
     level: 'warn',
     group: 'deprecated',
@@ -153,4 +162,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.97' },
   { since: '1.98' },
   { since: '1.99' },
+  { since: '1.100' },
 ]

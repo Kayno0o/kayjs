@@ -6,7 +6,7 @@ const open = signal(false)
 const log = signal<string[]>([])
 ---
 button#show(onClick={() => open = true}) Show
-BellInbox(items={[{ id: 'a', title: 'Deploy done' }, { id: 'b', title: 'Review asked' }]} open={open()} onOpenChange={shown => { open = shown; log = [...log(), String(shown)] }})
+BellInbox(items={[{ key: 'a', label: 'Deploy done' }, { key: 'b', label: 'Review asked' }]} open={open()} onOpenChange={shown => { open = shown; log = [...log(), String(shown)] }})
   @trigger(attributes, unread)
     button#bell({...attributes}) Inbox ({unread()})
 p#log {log().join(',')}

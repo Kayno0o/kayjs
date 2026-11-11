@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.100.0
+
+### kayjs-ui TreeView and Bell items: `key`, `label`, `href`
+
+A TreeNode's `id` is `key`, and a Bell or BellInbox item's `id`, `title` and `url` are `key`, `label` and `href`, as in every other list (`onRead` and `onSelectedChange` still carry the key). The old names work until 1.103, the new ones winning when both are given. `kay upgrade` rewrites a literal array, nested `children` included, or one bound to a `const` of the page's script (`deprecated-ui-item-keys`); an item built elsewhere, such as the result of a `map`, is renamed by hand. What `notifications.inbox()` answers and `notify()` takes is unchanged, `{ id, title, url }`: the Bell maps it, so an `@item(note)` block reads `note.key`, `note.label` and `note.href` with the old three still there.
+
 ## 1.99.0
 
 ### DOM events are `<lib>:<verb>` on `document`

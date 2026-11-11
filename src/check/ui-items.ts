@@ -14,20 +14,43 @@ interface ItemProp {
   prop: string
   // The old key of an item and its new one.
   renames: readonly (readonly [string, string])[]
+  // The key of an item holding the items below it, as a tree's `children`: they are read too.
+  nested?: string
+}
+
+// One deprecated lint over the items of kayjs-ui lists: the components it covers by the file they are imported from, and the minor that renamed their keys.
+interface ItemLint {
+  code: 'deprecated-ui-items' | 'deprecated-ui-item-keys'
+  since: string
+  components: Record<string, ItemProp>
 }
 
 // The kayjs-ui components whose item keys were renamed in 1.99, by the file they are imported from.
-const COMPONENTS: Record<string, ItemProp> = {
-  'timeline': { prop: 'entries', renames: [['text', 'label']] },
-  'accordion': { prop: 'items', renames: [['value', 'key'], ['title', 'label']] },
-  'media-gallery': { prop: 'items', renames: [['title', 'label']] },
-  'app-switcher': { prop: 'apps', renames: [['id', 'key']] },
-  'audio-player': { prop: 'chapters', renames: [['title', 'label'], ['url', 'href']] },
+const ITEMS: ItemLint = {
+  code,
+  since: '1.99',
+  components: {
+    'timeline': { prop: 'entries', renames: [['text', 'label']] },
+    'accordion': { prop: 'items', renames: [['value', 'key'], ['title', 'label']] },
+    'media-gallery': { prop: 'items', renames: [['title', 'label']] },
+    'app-switcher': { prop: 'apps', renames: [['id', 'key']] },
+    'audio-player': { prop: 'chapters', renames: [['title', 'label'], ['url', 'href']] },
+  },
+}
+
+// The ones renamed in 1.100: a tree's nodes and the notifications of a Bell.
+const ITEM_KEYS: ItemLint = {
+  code: 'deprecated-ui-item-keys',
+  since: '1.100',
+  components: {
+    'tree-view': { prop: 'nodes', renames: [['id', 'key']], nested: 'children' },
+    'bell': { prop: 'items', renames: [['id', 'key'], ['title', 'label'], ['url', 'href']] },
+    'bell-inbox': { prop: 'items', renames: [['id', 'key'], ['title', 'label'], ['url', 'href']] },
+  },
 }
 
 const LIBRARY_FILE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 
-const NEEDLE = /kayjs-ui\/(?:timeline|accordion|media-gallery|app-switcher|audio-player)\.kay/
 const KAY_FILE = /\.kay$/
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
@@ -35,15 +58,28 @@ type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { 
 // The item keys of a kayjs-ui Timeline, Accordion, MediaGallery, AppSwitcher or AudioPlayer an app writes under the name they had before 1.99, so every item is `{ key, label, description?, href?, icon?, tone?, disabled? }`.
 // Found in a literal array given as the list, written there or bound to a `const` of the file's script; `{ text }` becomes `label: text`, and an item holding the new key already is reported with no fix.
 export async function uiItems(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-ui-items', options.lints) === 'allow')
+  return itemLint(root, options, ITEMS)
+}
+
+// The same for a TreeView's nodes, nested `children` included, and a Bell's or BellInbox's notifications, under the names they had before 1.100.
+export async function uiItemKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return itemLint(root, options, ITEM_KEYS)
+}
+
+async function itemLint(root: string, options: CheckOptions, lint: ItemLint): Promise<CheckDiagnostic[]> {
+  const { code, since, components } = lint
+
+  if (lintLevel(code, options.lints) === 'allow')
     return []
+
+  const needle = new RegExp(`kayjs-ui/(?:${Object.keys(components).join('|')})\\.kay`)
 
   const found: CheckDiagnostic[] = []
 
   for (const file of await findProjectFiles(root, KAY_FILE, { project: true, ownOnly: true })) {
     const source = await Bun.file(file).text()
 
-    if (!NEEDLE.test(source))
+    if (!needle.test(source))
       continue
 
     const levelAt = lintLevels(source, options.lints)
@@ -57,7 +93,7 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
       if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
         continue
 
-      const spec = LIBRARY_FILE.exec(statement.source.value) && COMPONENTS[LIBRARY_FILE.exec(statement.source.value)![1]!]
+      const spec = LIBRARY_FILE.exec(statement.source.value) && components[LIBRARY_FILE.exec(statement.source.value)![1]!]
 
       for (const specifier of statement.specifiers) {
         if (spec && specifier.type === 'ImportDefaultSpecifier')
@@ -76,7 +112,7 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
         if (attribute.kind !== 'expression' || source.slice(attribute.name.start, attribute.name.end) !== spec.prop)
           continue
 
-        for (const item of itemsOf(source, attribute.expression, bindings)) {
+        for (const item of itemsOf(source, attribute.expression, bindings, spec.nested)) {
           for (const [old, current] of spec.renames) {
             const property = item.properties.find((one): one is Property => one.type === 'Property' && keyName(one) === old)
 
@@ -85,7 +121,7 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
 
             seen.add(property.start)
 
-            const level = levelAt('deprecated-ui-items', property.start)
+            const level = levelAt(code, property.start)
 
             if (level === 'allow')
               continue
@@ -97,7 +133,7 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
               file,
               ...positionAt(source, property.start),
               end: property.end,
-              message: `\`${old}\` of a ${element.name} item is \`${current}\` since 1.99: an item of every kayjs-ui list is \`{ key, label, description, href, icon, tone, disabled }\`; \`${old}\` still works until it is removed`,
+              message: `\`${old}\` of a ${element.name} item is \`${current}\` since ${since}: an item of every kayjs-ui list is \`{ key, label, description, href, icon, tone, disabled }\`; \`${old}\` still works until it is removed`,
               help: `write \`${current}\``,
               code: 'deprecated-ui-items',
               severity: level === 'warn' ? 'warning' : 'error',
@@ -113,7 +149,7 @@ export async function uiItems(root: string, options: CheckOptions): Promise<Chec
 }
 
 // The object literals of the array an attribute gives, which a name bound to a literal array in the script stands for.
-function itemsOf(source: string, span: { start: number, end: number }, bindings: Map<string, Expression>): NodeOfType<'ObjectExpression'>[] {
+function itemsOf(source: string, span: { start: number, end: number }, bindings: Map<string, Expression>, nested?: string): NodeOfType<'ObjectExpression'>[] {
   let list: Expression | undefined
 
   try {
@@ -127,12 +163,20 @@ function itemsOf(source: string, span: { start: number, end: number }, bindings:
   const array = inner.type === 'Identifier' ? bindings.get(inner.name) : inner
   const literal = array && unwrapped(array)
 
-  if (literal?.type !== 'ArrayExpression')
-    return []
+  return literal?.type === 'ArrayExpression' ? objectsOf(literal, nested) : []
+}
 
-  return literal.elements.flatMap((element) => {
+// The objects of an array literal, and when `nested` names a key, those of the array it holds in each, at any depth.
+function objectsOf(array: NodeOfType<'ArrayExpression'>, nested: string | undefined): NodeOfType<'ObjectExpression'>[] {
+  return array.elements.flatMap((element) => {
     const item = element && unwrapped(element)
 
-    return item?.type === 'ObjectExpression' ? [item] : []
+    if (item?.type !== 'ObjectExpression')
+      return []
+
+    const below = nested === undefined ? undefined : item.properties.find((one): one is Property => one.type === 'Property' && keyName(one) === nested)?.value
+    const children = below && unwrapped(below)
+
+    return [item, ...children?.type === 'ArrayExpression' ? objectsOf(children, nested) : []]
   })
 }

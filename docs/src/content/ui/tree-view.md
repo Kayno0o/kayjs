@@ -4,7 +4,7 @@ description: Nested nodes, such as folders, with branches that open and close an
 
 <Demo name="tree-view/basic" />
 
-`nodes` holds the tree. Each node has an `id`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one. Ids are strings, or numbers in a `TreeNode<number>[]`.
+`nodes` holds the tree. Each node has a `key`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one. Keys are strings, or numbers in a `TreeNode<number>[]`.
 
 ## Selection
 

@@ -6,9 +6,9 @@ import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 const starred = signal<string[]>([])
 const nodes: TreeNode[] = [
-  { id: 'apps', label: 'Apps', children: [
-    { id: 'kay', label: 'kay', href: '#kay', menu: [{ label: 'Copy link', onSelect: () => undefined }, 'separator', { label: 'Remove', tone: 'danger', onSelect: () => undefined }] },
-    { id: 'blog', label: 'Blog', href: '#blog' },
+  { key: 'apps', label: 'Apps', children: [
+    { key: 'kay', label: 'kay', href: '#kay', menu: [{ label: 'Copy link', onSelect: () => undefined }, 'separator', { label: 'Remove', tone: 'danger', onSelect: () => undefined }] },
+    { key: 'blog', label: 'Blog', href: '#blog' },
   ] },
 ]
 

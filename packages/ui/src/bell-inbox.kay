@@ -1,9 +1,10 @@
 --- <Item extends BellItem>
 import type { JSX, Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps } from './bell'
+import { bellItem } from './bell'
 
 import type { PopoverPlacement, PopoverTriggerProps } from './popover'
-import { call, effect, recipe, resource, signal } from 'kay'
+import { call, effect, memo, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
@@ -37,7 +38,7 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   items?: BellItems<Item> | undefined
   // The unread count of a custom source; the unread items of `items` by default.
   unread?: number | undefined
-  // Called with the id of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
+  // Called with the key of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
   onRead?: ((id: string | undefined) => unknown) | undefined
   // Shows the list when the page sets it; the button, a click outside and Escape open and close it on their own.
   open?: boolean | undefined
@@ -57,12 +58,12 @@ const inbox = custom ? undefined : resource(inboxApi, '/')
 const load = typeof source === 'function' ? source : undefined
 const asked = load ? resource(async () => await load()) : undefined
 
-const items = (): readonly BellItem[] => {
-  if (!custom)
-    return inbox?.value()?.items ?? []
+// Every item with `key`, `label` and `href` filled from the names before 1.100, the inbox's `{ id, title, url }` included.
+const items = memo((): readonly (Item & ReturnType<typeof bellItem>)[] => {
+  const listed: readonly BellItem[] = !custom ? inbox?.value()?.items ?? [] : typeof source === 'function' ? asked?.value() ?? [] : source ?? []
 
-  return typeof source === 'function' ? asked?.value() ?? [] : source ?? []
-}
+  return listed.map(note => bellItem(note) as Item & ReturnType<typeof bellItem>)
+})
 // A function source still on its first answer has nothing to say yet, so the list does not claim to be empty.
 const waiting = () => asked !== undefined && asked.value() === undefined && asked.error() === undefined
 const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.value()?.unread ?? 0
@@ -83,12 +84,12 @@ effect(() => {
   if (typeof source === 'function' ? asked?.value() === undefined : inbox?.value() === undefined)
     return
 
-  const fresh = items().find(note => !note.read && known !== undefined && !known.has(note.id))
+  const fresh = items().find(note => !note.read && known !== undefined && !known.has(note.key))
 
-  known = new Set(items().map(note => note.id))
+  known = new Set(items().map(note => note.key))
 
   if (fresh)
-    announced = wording('ui.bell.new', '', { title: fresh.title }) || wording('ui.bellInbox.announce', 'New notification: {title}', { title: fresh.title })
+    announced = wording('ui.bell.new', '', { title: fresh.label }) || wording('ui.bellInbox.announce', 'New notification: {title}', { title: fresh.label })
 })
 
 // A failed call changes nothing: the live update or the next visit shows how the inbox stands.
@@ -123,23 +124,23 @@ span(part="root" {...rest})
     div(part="list" aria-label={label})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
-      for note of items() key={note.id}
-        if linked(note.url) as url
-          a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.id)})
+      for note of items() key={note.key}
+        if linked(note.href) as url
+          a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.key)})
             if drawRow
-              | {drawRow(note as Item)}
+              | {drawRow(note)}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
-              span(part="title") {note.title}
+              span(part="title") {note.label}
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
         else
-          button(part="item" type="button" onClick={() => send(note.id)})
+          button(part="item" type="button" onClick={() => send(note.key)})
             if drawRow
-              | {drawRow(note as Item)}
+              | {drawRow(note)}
             else
               span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
-              span(part="title") {note.title}
+              span(part="title") {note.label}
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0 && (!custom || onRead)

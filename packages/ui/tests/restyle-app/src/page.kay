@@ -185,7 +185,7 @@ SplitLayout#split(sidebarTitle="Filters" resizableList)
     p dhead
   @detail
     p detail
-TreeView#tree(label="Files" selected="b" expanded={['a']} nodes={[{ id: 'a', label: 'A', icon: 'info', children: [{ id: 'b', label: 'B' }] }, { id: 'c', label: 'C' }]})
+TreeView#tree(label="Files" selected="b" expanded={['a']} nodes={[{ key: 'a', label: 'A', icon: 'info', children: [{ key: 'b', label: 'B' }] }, { key: 'c', label: 'C' }]})
 VirtualList#virtual(label="Rows" items={[1, 2]})
   @item(row)
     p {row}

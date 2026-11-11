@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A page or a layout takes `rateLimit` in `page` as an endpoint, an action or an API route does: `{ max, window, key? }` or a list, counted after the guards in `store.rates`, answering 429 with `Retry-After` through `_error.kay`; a layout's applies to each page under it, a page overriding it ([Rate limits](rate-limits.md)).
+- kayjs-ui: a TreeView node takes `key` in place of `id`, and a Bell or BellInbox item takes `key`, `label` and `href` in place of `id`, `title` and `url`, the item shape of every other list; the old names work until 1.103 and `kay upgrade` rewrites them. kay's inbox answer and `notify()` keep `{ id, title, url }`, which the Bell maps ([upgrading](upgrading.md), [Bell and TreeView](../packages/ui/llms/page-layout-palette-and-trees.md)).
 
 ## 1.99.0
 

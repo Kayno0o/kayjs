@@ -3,11 +3,11 @@ import { describe, expect, test } from 'bun:test'
 import { treeHasMenu, treeHere, treeKey, treePath, treeRows } from '../src/tree'
 
 const nodes: TreeNode[] = [
-  { id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs', children: [{ id: 'api', label: 'API' }] }, { id: 'notes', label: 'Notes' }] },
-  { id: 'empty', label: 'Empty', children: [] },
-  { id: 'inbox', label: 'Inbox' },
+  { key: 'work', label: 'Work', children: [{ key: 'specs', label: 'Specs', children: [{ key: 'api', label: 'API' }] }, { key: 'notes', label: 'Notes' }] },
+  { key: 'empty', label: 'Empty', children: [] },
+  { key: 'inbox', label: 'Inbox' },
 ]
-const ids = (open: string[]) => treeRows(nodes, new Set(open)).map(row => `${row.node.id} ${row.level} ${row.position}/${row.size} ${row.parent ?? '-'}`)
+const ids = (open: string[]) => treeRows(nodes, new Set(open)).map(row => `${row.node.key} ${row.level} ${row.position}/${row.size} ${row.parent ?? '-'}`)
 
 describe('treeRows', () => {
   test('shows the roots, and the children of each open branch under it', () => {
@@ -56,7 +56,7 @@ describe('typeahead', () => {
 })
 
 test('takes numbers as ids, 0 included', () => {
-  const numbered: TreeNode<number>[] = [{ id: 0, label: 'Root', children: [{ id: 1, label: 'Leaf' }] }]
+  const numbered: TreeNode<number>[] = [{ key: 0, label: 'Root', children: [{ key: 1, label: 'Leaf' }] }]
   const open = new Set([0])
 
   expect([treePath(numbered, 1), treeKey(treeRows(numbered, open), 1, 'ArrowLeft', open), treeKey(treeRows(numbered, open), 0, 'ArrowLeft', open)]).toEqual([[0], { focus: 0 }, { close: 0 }])
@@ -64,11 +64,11 @@ test('takes numbers as ids, 0 included', () => {
 
 describe('treeHere', () => {
   const linked: TreeNode[] = [
-    { id: 'all', label: 'All', href: '/projects' },
-    { id: 'group', label: 'Group', children: [{ id: 'beta', label: 'Beta', href: '/projects/beta' }, { id: 'list', label: 'List', href: '/projects/beta?view=list' }, { id: 'anchor', label: 'Anchor', href: '#top' }] },
-    { id: 'home', label: 'Home', href: '/' },
-    { id: 'slashed', label: 'Slashed', href: '/docs/' },
-    { id: 'outside', label: 'Outside', href: '//example.com/outside' },
+    { key: 'all', label: 'All', href: '/projects' },
+    { key: 'group', label: 'Group', children: [{ key: 'beta', label: 'Beta', href: '/projects/beta' }, { key: 'list', label: 'List', href: '/projects/beta?view=list' }, { key: 'anchor', label: 'Anchor', href: '#top' }] },
+    { key: 'home', label: 'Home', href: '/' },
+    { key: 'slashed', label: 'Slashed', href: '/docs/' },
+    { key: 'outside', label: 'Outside', href: '//example.com/outside' },
   ]
   const at = (address: string) => treeHere(linked, new URL(address, 'http://kay.invalid'))
 
@@ -97,6 +97,6 @@ describe('treeHasMenu', () => {
   test('finds a menu at any depth, an empty one counting for none', () => {
     const item = { label: 'Rename', onSelect: () => undefined }
 
-    expect([treeHasMenu(nodes), treeHasMenu([{ id: 'a', label: 'A', menu: [] }]), treeHasMenu([{ id: 'a', label: 'A', children: [{ id: 'b', label: 'B', menu: [item] }] }])]).toEqual([false, false, true])
+    expect([treeHasMenu(nodes), treeHasMenu([{ key: 'a', label: 'A', menu: [] }]), treeHasMenu([{ key: 'a', label: 'A', children: [{ key: 'b', label: 'B', menu: [item] }] }])]).toEqual([false, false, true])
   })
 })

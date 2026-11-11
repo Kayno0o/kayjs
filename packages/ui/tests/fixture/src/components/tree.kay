@@ -8,8 +8,8 @@ const { onSelect } = props<{ onSelect: (id: string, node: TreeNode) => void }>()
 
 const picked = signal<string | undefined>('notes')
 const nodes = signal<TreeNode[]>([
-  { id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs', children: [{ id: 'api', label: 'API' }] }, { id: 'notes', label: 'Notes', icon: 'info' }] },
-  { id: 'inbox', label: 'Inbox' },
+  { key: 'work', label: 'Work', children: [{ key: 'specs', label: 'Specs', children: [{ key: 'api', label: 'API' }] }, { key: 'notes', label: 'Notes', icon: 'info' }] },
+  { key: 'inbox', label: 'Inbox' },
 ])
 
 function select(id: string, node: TreeNode) {

@@ -100,7 +100,7 @@ const noop = () => undefined
 const action = Object.assign(async () => undefined, { pending: () => false, url: '/_kay/action/contract', error: () => undefined, succeeded: () => false })
 const icon = 'plus'
 const rows = [{ key: 'a', label: 'Mars', value: 2, display: 'two' }, { key: 'b', label: 'Venus', value: 1 }]
-const tree = [{ id: 'mars', label: 'Mars', children: [{ id: 'phobos', label: 'Phobos' }] }, { id: 'venus', label: 'Venus' }]
+const tree = [{ key: 'mars', label: 'Mars', children: [{ key: 'phobos', label: 'Phobos' }] }, { key: 'venus', label: 'Venus' }]
 const options = [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]
 const media = [{ key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png' }, { key: 2, kind: 'image', thumb: '/b-thumb.png', preview: '/b.png' }]
 const days = Array.from({ length: 14 }, (_, index) => ({ date: `2026-09-${String(index + 1).padStart(2, '0')}`, value: index % 3, count: index % 3 }))

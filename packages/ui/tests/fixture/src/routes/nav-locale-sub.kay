@@ -7,7 +7,7 @@ import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 const links = [{ href: '/nav-locale', label: 'Here' }, { href: '/nav-locale-sub', label: 'Sub' }]
-const nodes = [{ id: 'here', label: 'Here', href: '/nav-locale' }, { id: 'sub', label: 'Sub', href: '/nav-locale-sub' }]
+const nodes = [{ key: 'here', label: 'Here', href: '/nav-locale' }, { key: 'sub', label: 'Sub', href: '/nav-locale-sub' }]
 ---
 main
   SiteNav#site(links={links} current={here} label="Site")

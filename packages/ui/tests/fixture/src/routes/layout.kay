@@ -18,7 +18,7 @@ main
         a(href="/table") New
       p Every moon of Mars.
   article#tree
-    TreeView(nodes={[{ id: 'mars', label: 'Mars', children: [{ id: 'phobos', label: 'Phobos' }] }, { id: 'venus', label: 'Venus' }]} label="Planets" selected="phobos")
+    TreeView(nodes={[{ key: 'mars', label: 'Mars', children: [{ key: 'phobos', label: 'Phobos' }] }, { key: 'venus', label: 'Venus' }]} label="Planets" selected="phobos")
   article#bare-header
     PageHeader(title="Rings")
   article#section

@@ -8,16 +8,16 @@ const waiting: (() => void)[] = []
 let healed = false
 
 const nodes = [
-  { id: 'remote', label: 'Remote', children: async () => new Promise<{ id: string, label: string }[]>((resolve) => { waiting.push(() => resolve([{ id: 'file', label: 'File' }])) }) },
-  { id: 'flaky', label: 'Flaky', children: async () => {
+  { key: 'remote', label: 'Remote', children: async () => new Promise<{ key: string, label: string }[]>((resolve) => { waiting.push(() => resolve([{ key: 'file', label: 'File' }])) }) },
+  { key: 'flaky', label: 'Flaky', children: async () => {
     calls.push('flaky call')
 
     if (!healed)
       throw new Error('down')
 
-    return [{ id: 'ok', label: 'Ok' }]
+    return [{ key: 'ok', label: 'Ok' }]
   } },
-  { id: 'plain', label: 'Plain', children: [{ id: 'leaf', label: 'Leaf' }] },
+  { key: 'plain', label: 'Plain', children: [{ key: 'leaf', label: 'Leaf' }] },
 ]
 ---
 button#release(type="button" onClick={() => waiting.shift()?.()}) Release

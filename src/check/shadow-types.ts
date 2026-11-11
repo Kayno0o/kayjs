@@ -60,7 +60,7 @@ import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 import { uiHotkey } from './ui-hotkey'
-import { uiItems } from './ui-items'
+import { uiItemKeys, uiItems } from './ui-items'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
 import { workflowStartId } from './workflow-start-id'
@@ -163,6 +163,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => redirectPermanent(root, options),
   async ({ root, options }) => uiHotkey(root, options),
   async ({ root, options }) => uiItems(root, options),
+  async ({ root, options }) => uiItemKeys(root, options),
   async ({ root, options }) => scheduleTz(root, options),
   async ({ root, options }) => workflowStartId(root, options),
   async ({ root, options }) => analyticsOptions(root, options),

@@ -6,12 +6,12 @@ import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 const { onAction, onStar, onSelect } = props<{ onAction: (label: string) => void, onStar: (id: string) => void, onSelect: (id: string) => void }>()
 
 const nodes: TreeNode[] = [
-  { id: 'group', label: 'Group', children: [
-    { id: 'alpha', label: 'Alpha', href: '/projects/alpha', menu: [{ label: 'Rename', onSelect: () => onAction('rename alpha') }, 'separator', { label: 'Delete', tone: 'danger', onSelect: () => onAction('delete alpha') }] },
-    { id: 'beta', label: 'Beta', href: '/projects/beta' },
+  { key: 'group', label: 'Group', children: [
+    { key: 'alpha', label: 'Alpha', href: '/projects/alpha', menu: [{ label: 'Rename', onSelect: () => onAction('rename alpha') }, 'separator', { label: 'Delete', tone: 'danger', onSelect: () => onAction('delete alpha') }] },
+    { key: 'beta', label: 'Beta', href: '/projects/beta' },
   ] },
-  { id: 'list', label: 'List', href: '/projects/beta?view=list' },
-  { id: 'plain', label: 'Plain' },
+  { key: 'list', label: 'List', href: '/projects/beta?view=list' },
+  { key: 'plain', label: 'Plain' },
 ]
 ---
 TreeView#tree(nodes={nodes} label="Projects" onSelectedChange={onSelect})
