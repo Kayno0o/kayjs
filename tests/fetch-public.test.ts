@@ -172,6 +172,44 @@ describe('fetchPublic limits', () => {
     await server.stop()
   })
 
+  test('a redirect to another origin drops the credentials the caller set, and a redirect inside one origin keeps them', async () => {
+    const seen: Record<string, string | null>[] = []
+    const other = serving((request) => {
+      seen.push({ authorization: request.headers.get('authorization'), cookie: request.headers.get('cookie'), key: request.headers.get('x-api-key'), accept: request.headers.get('accept') })
+
+      return new Response('ok')
+    })
+    const first = serving((request) => {
+      const path = new URL(request.url).pathname
+
+      seen.push({ authorization: request.headers.get('authorization'), cookie: request.headers.get('cookie'), key: request.headers.get('x-api-key'), accept: request.headers.get('accept') })
+
+      return path === '/start' ? Response.redirect(`http://127.0.0.1:${other.port}/elsewhere`, 302) : new Response('ok')
+    })
+    const headers = { 'Authorization': 'Bearer secret', 'Cookie': 'sid=1', 'X-Api-Key': 'k', 'Accept': 'text/plain' }
+
+    await (await fetchPublic(`${first.url}/start`, { redirect: 2, allowPrivate: local, headers })).text()
+
+    expect(seen).toEqual([
+      { authorization: 'Bearer secret', cookie: 'sid=1', key: 'k', accept: 'text/plain' },
+      { authorization: null, cookie: null, key: null, accept: 'text/plain' },
+    ])
+
+    // The same origin keeps them.
+    seen.length = 0
+    await first.stop()
+
+    const same = serving((request) => {
+      seen.push({ authorization: request.headers.get('authorization'), cookie: null, key: null, accept: null })
+
+      return new URL(request.url).pathname === '/a' ? Response.redirect(`${same.url}/b`, 302) : new Response('ok')
+    })
+
+    await (await fetchPublic(`${same.url}/a`, { redirect: 2, allowPrivate: local, headers })).text()
+    expect(seen.map(each => each.authorization)).toEqual(['Bearer secret', 'Bearer secret'])
+    await Promise.all([other.stop(), same.stop()])
+  })
+
   test('redirect: \'error\' (the default) refuses the first redirect without following it', async () => {
     const server = serving(request => new URL(request.url).pathname === '/moved' ? Response.redirect(`${new URL(request.url).origin}/x`, 302) : new Response('x'))
 

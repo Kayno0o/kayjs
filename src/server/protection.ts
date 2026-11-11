@@ -55,8 +55,8 @@ const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 const LEADING_ZEROS = /^0+(?=.)/
 const BRACKETED_PORT = /^\[([^\]]+)\](:\d{1,5})?$/
 const V4_PORT = /^([\d.]+):\d{1,5}$/
-// Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
-const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
+// Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included, an IPv6 one by its whole first group as an address prints it (`fcb::` is `0fcb::`, a public one): where a proxy in front of the server connects from.
+const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i
 
 interface ActionLimit {
   name: string

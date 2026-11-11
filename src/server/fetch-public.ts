@@ -4,6 +4,8 @@ import { FETCH_TIMEOUT_MS } from './config-limits'
 
 const BRACKETS = /^\[|\]$/g
 const DEFAULT_MAX_BYTES = 1024 * 1024
+// The only headers a redirect to another origin keeps: a credential, a cookie or an API key the caller set is for the first origin alone.
+const KEPT_ACROSS_ORIGINS = new Set(['accept', 'accept-language', 'user-agent'])
 
 export interface FetchPublicOptions {
   // How long the whole exchange, body included, may take, in milliseconds. Default 10 seconds.
@@ -12,6 +14,7 @@ export interface FetchPublicOptions {
   maxBytes?: number | undefined
   // How many redirects are followed, each hop checked as the first was, or 'error' (the default) to refuse the first one.
   redirect?: number | 'error' | undefined
+  // Sent on the first request, and on each redirect hop to the same origin; a hop to another origin gets `accept`, `accept-language` and `user-agent` only.
   headers?: Record<string, string> | undefined
   // Only a test replaces these two: the name lookup, and which hosts may be at a private address.
   resolve?: Resolver | undefined
@@ -80,7 +83,8 @@ async function readCapped(response: Response, maxBytes: number): Promise<Uint8Ar
 
 // Fetches a URL on the public internet: the host is resolved once and refused unless every answer is a public address, the connection goes to that checked address, and every redirect hop is checked again. The answer is whole, with its body read within `maxBytes` and `timeout`.
 export async function fetchPublic(url: string | URL, options: FetchPublicOptions = {}): Promise<Response> {
-  const { timeout = FETCH_TIMEOUT_MS, maxBytes = DEFAULT_MAX_BYTES, redirect = 'error', headers = {}, resolve = resolveHost, allowPrivate } = options
+  const { timeout = FETCH_TIMEOUT_MS, maxBytes = DEFAULT_MAX_BYTES, redirect = 'error', resolve = resolveHost, allowPrivate } = options
+  let headers = options.headers ?? {}
   const signal = AbortSignal.timeout(timeout)
   let target = new URL(url)
 
@@ -97,7 +101,12 @@ export async function fetchPublic(url: string | URL, options: FetchPublicOptions
       if (redirect === 'error' || hops >= redirect)
         throw new Error(`${target.href} redirects, which is not followed`)
 
-      target = new URL(location, target)
+      const next = new URL(location, target)
+
+      if (next.origin !== target.origin)
+        headers = Object.fromEntries(Object.entries(headers).filter(([name]) => KEPT_ACROSS_ORIGINS.has(name.toLowerCase())))
+
+      target = next
 
       continue
     }
