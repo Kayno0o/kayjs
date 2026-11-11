@@ -270,7 +270,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'page-header': { title: 'Moons', description: 'Every moon' },
   'page-section': { title: 'Moons', children: 'Phobos' },
   'pagination': { page: 2, pages: 5, url: '/posts' },
-  'popover': { trigger: noop },
+  'popover': { trigger: noop, label: 'Panel' },
   'progress': { value: 40, label: 'Export' },
   'qr-code': { value: 'https://kaynooo.fr', label: 'Site' },
   'radio-group': { label: 'Planet', options, value: 'mars' },

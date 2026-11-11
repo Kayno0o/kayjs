@@ -1559,9 +1559,13 @@ interface Plate
 [./lib/index] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
+[./lib/index] PopoverRole
+type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})
+
 [./lib/index] PopoverTriggerProps
 interface PopoverTriggerProps
   aria-expanded: "false" | "true"
+  aria-haspopup?: "dialog" | "grid" | "listbox" | "menu" | "tree" | "true" | undefined
   popovertarget: string
   style: string
 
@@ -2521,11 +2525,18 @@ function whenReleased(show: () => void): void
 [./lib/popover] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
+[./lib/popover] PopoverRole
+type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})
+
 [./lib/popover] PopoverTriggerProps
 interface PopoverTriggerProps
   aria-expanded: "false" | "true"
+  aria-haspopup?: "dialog" | "grid" | "listbox" | "menu" | "tree" | "true" | undefined
   popovertarget: string
   style: string
+
+[./lib/popup-role] popupOf
+function popupOf(role: string): "dialog" | "grid" | "listbox" | "menu" | "tree" | "true" | undefined
 
 [./lib/props-without] without
 function without(props: object, ...keys: string[]): Record<string, unknown>

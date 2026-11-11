@@ -84,7 +84,7 @@ describe('MultiSelect', () => {
 
     expect(root.querySelector('.kui-multi-select [data-part=empty]')?.textContent).toBe('No match')
     expect(root.querySelector('.kui-multi-select [data-part=empty]')?.getAttribute('role')).toBe('status')
-    expect(root.querySelector('#planets')?.getAttribute('role')).toBe('group')
+    expect(root.querySelector('#planets')?.getAttribute('role')).toBe('dialog')
   })
 
   test('keeps what is picked in the options\' order, sums it up on the trigger, and posts each value', async () => {

@@ -3,8 +3,8 @@ import type { Duration, JSX } from 'kay'
 import { durationMs, effect, onCleanup, recipe, signal } from 'kay'
 import { claim } from './claim'
 
-// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on.
-const CARRIER = '[data-tooltip], [data-hint]'
+// An element carries its tooltip as `data-tooltip`, and where it sits as `data-tooltip-placement`, a CSS `position-area`, `top` by default. `data-hint` is a tooltip for the pointer alone, for text the keyboard has no stop on. `data-tooltip-content` names, by id, a hidden element whose children the tooltip shows in place of a string, which `Tooltip`'s `@content` block draws.
+const CARRIER = '[data-tooltip], [data-hint], [data-tooltip-content]'
 // The anchor name the tooltip's recipe positions against.
 const ANCHOR = '--tooltip-anchor'
 const WHITESPACE = /\s+/
@@ -14,7 +14,7 @@ const CONTROL = 'a[href], button, input, select, textarea, summary, label, [cont
 const PANEL_ID = 'kui-tooltip'
 
 // 'kui-tooltip' stays as the component's name for an app's CSS. Anchored to whichever element TooltipHost names --tooltip-anchor.
-const look = recipe({ parts: { root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
+const look = recipe({ parts: { content: 'contents', root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
 
 const { showDelay = '80ms', hideDelay = '150ms', fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
   // How long the pointer or focus rests on an element before its tooltip shows.
@@ -25,15 +25,35 @@ const { showDelay = '80ms', hideDelay = '150ms', fallback = false, ...rest } = p
   fallback?: boolean | undefined
 }>()
 
-const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
+interface Aim { element: HTMLElement, text: string, content?: HTMLElement | undefined }
+
+const aimed = signal<Aim | null>(null)
 let at: HTMLElement | null = null
 let timer: ReturnType<typeof setTimeout> | undefined
 const panel = signal<HTMLElement>()
+let holder: HTMLElement | undefined
 const owns = claim('tooltips', fallback)
 
 // The element carrying a tooltip that an event's target is, or sits inside.
 function found(event: Event): HTMLElement | null {
   return event.target instanceof Element ? event.target.closest<HTMLElement>(CARRIER) : null
+}
+
+// What an element's tooltip says: its string, or the plain text of its content block, which the tooltip draws as it is.
+function aimAt(element: HTMLElement | null): Aim | undefined {
+  if (!element)
+    return undefined
+
+  const text = element.dataset.tooltip ?? element.dataset.hint
+
+  if (text)
+    return { element, text }
+
+  const id = element.dataset.tooltipContent
+  const content = id ? document.getElementById(id) ?? undefined : undefined
+  const said = content?.textContent?.trim()
+
+  return content && said ? { element, text: said, content } : undefined
 }
 
 function hide() {
@@ -50,23 +70,23 @@ function onto(next: HTMLElement | null) {
   at = next
   clearTimeout(timer)
 
-  const text = next?.dataset.tooltip ?? next?.dataset.hint
+  const aim = aimAt(next)
 
   // An element whose popover is open shows no tooltip, which would sit over the popover it opened.
-  if (!next || !text || next.getAttribute('aria-expanded') === 'true') {
+  if (!next || !aim || next.getAttribute('aria-expanded') === 'true') {
     timer = setTimeout(() => aimed = null, durationMs(hideDelay))
 
     return
   }
 
-  timer = setTimeout(() => aimed = { element: next, text }, durationMs(showDelay))
+  timer = setTimeout(() => aimed = aimAt(next) ?? null, durationMs(showDelay))
 }
 
 function focused(event: FocusEvent) {
   const next = found(event)
 
   // A press has just closed the tooltip on purpose, so only a focus the browser rings, a tab, opens one, and a hint never opens by focus.
-  if (!next || (next.matches(':focus-visible') && next.dataset.tooltip !== undefined))
+  if (!next || (next.matches(':focus-visible') && next.dataset.hint === undefined))
     onto(next)
 }
 
@@ -93,9 +113,9 @@ function over(event: PointerEvent) {
 function pressed(event: PointerEvent) {
   const next = found(event)
 
-  const text = next?.dataset.tooltip ?? next?.dataset.hint
+  const aim = aimAt(next)
 
-  if (event.pointerType === 'mouse' || !next || !text || aimed()?.element === next || next.getAttribute('aria-expanded') === 'true' || (next.dataset.hint === undefined && next.matches(CONTROL))) {
+  if (event.pointerType === 'mouse' || !next || !aim || aimed()?.element === next || next.getAttribute('aria-expanded') === 'true' || (next.dataset.hint === undefined && next.matches(CONTROL))) {
     hide()
 
     return
@@ -103,7 +123,7 @@ function pressed(event: PointerEvent) {
 
   clearTimeout(timer)
   at = next
-  aimed = { element: next, text }
+  aimed = aim
 }
 
 // Escape closes the tooltip and leaves the key to whatever else it does; it stays closed until the pointer or the focus moves to another element.
@@ -180,10 +200,16 @@ effect(() => {
 
   element.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
 
+  // A content block is copied in as it stands, so a block's own markup shows, and the original stays hidden where it is.
+  if (target.content && holder)
+    holder.replaceChildren(...[...target.content.childNodes].map(node => node.cloneNode(true)))
+
   if (!element.matches(':popover-open'))
     element.showPopover()
 
   onCleanup(() => {
+    holder?.replaceChildren()
+
     if (own)
       target.element.style.setProperty('anchor-name', own)
     else
@@ -201,4 +227,6 @@ effect(() => {
 ---
 // Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
 if owns()
-  div(part="root" {...rest} id={PANEL_ID} ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}
+  div(part="root" {...rest} id={PANEL_ID} ref={element => panel = element} popover="manual" role="tooltip")
+    | {aimed()?.content ? '' : aimed()?.text}
+    span(part="content" ref={element => holder = element})

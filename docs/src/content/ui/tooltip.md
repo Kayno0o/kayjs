@@ -6,6 +6,8 @@ description: Text with a tooltip that the keyboard reaches as well as the pointe
 
 `Tooltip` renders a `span` with `data-tooltip` set to `text` and `tabindex="0"`, so the keyboard lands on it and [TooltipHost](/ui/tooltip-host) shows the tooltip there as it does under the pointer. Render one `TooltipHost` in the root layout. Without it nothing shows.
 
+For more than a string, give an `@content` block instead of `text`: its markup, a bold name over a line of detail say, is drawn in the tooltip. The keyboard reaches it the same way, and the screen reader hears its text.
+
 `placement` says where the tooltip sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`. Any other attribute of a `span` goes on the element.
 
 A button with a reason it is off needs no wrapper: a [Button](/ui/button) that is `disabled` and has a `data-tooltip` stays reachable.

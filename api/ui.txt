@@ -367,9 +367,13 @@ interface Plate
 [.] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
+[.] PopoverRole
+type PopoverRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid' | 'group' | 'region' | 'none' | (string & {})
+
 [.] PopoverTriggerProps
 interface PopoverTriggerProps
   aria-expanded: "false" | "true"
+  aria-haspopup?: "dialog" | "grid" | "listbox" | "menu" | "tree" | "true" | undefined
   popovertarget: string
   style: string
 
@@ -2193,9 +2197,11 @@ component default
   children?: Element
   class?: string | undefined | { root?: string | undefined; anchor?: string | undefined; }
   id?: string | undefined
+  label?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
+  role?: PopoverRole | undefined
   style?: string | undefined
   trigger?: ((attributes: PopoverTriggerProps) => Element) | undefined
 
@@ -3154,7 +3160,7 @@ component default
 
 [./tooltip-host.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; content?: string | undefined; }
   fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   hideDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   showDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -3162,7 +3168,8 @@ component default
 [./tooltip.kay] default
 component default
   children?: Element
-  class?: string | undefined | { root?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; content?: string | undefined; }
+  content?: Element
   placement?: string | undefined
   text?: string | undefined
 

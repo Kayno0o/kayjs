@@ -242,7 +242,7 @@ function focusLeft(event: FocusEvent) {
 }
 ---
 div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined : name})
-  Popover(id={id} placement={placement} open={open} part="panel" role="group" aria-label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
+  Popover(id={id} placement={placement} open={open} part="panel" label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // A combobox opening a dialog, the role that takes `aria-invalid`, `aria-required` and `aria-describedby`, as a FormField sets them. Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
       button.kui-field-input({...attributes} data-size={fieldSize(size)} ref={element => keepInvalid(element, () => invalid)} aria-invalid={fieldInvalid(() => invalid)} role="combobox" aria-haspopup="dialog" part="trigger" type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(pool(), picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})

@@ -268,7 +268,7 @@ div(ref={element => root = element})
   TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={sent ?? value} onInput={live} onChange={heard})
   if ready()
     // The panel's click is cancelled so a FormField's label, which holds it in the DOM, does not move focus to the field and close the calendar.
-    Popover(part="panel" open={opened()} role="dialog" aria-label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
+    Popover(part="panel" open={opened()} label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
       @trigger(attributes)
         button({...attributes} part="trigger" type="button" aria-label={openLabel} disabled={rest.disabled || rest.readonly})
           Icon(icon="calendar")

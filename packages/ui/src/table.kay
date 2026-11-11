@@ -521,7 +521,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
   if selectable || exportable || columnToggle
     div(part="selection")
       if columnToggle
-        Popover(placement="bottom-start" part="columnsPanel" aria-label={columnsLabel})
+        Popover(placement="bottom-start" part="columnsPanel" label={columnsLabel})
           @trigger(attributes)
             Button({...attributes} label={columnsLabel} variant="ghost" size="sm")
           for column of columns() key={column.key}

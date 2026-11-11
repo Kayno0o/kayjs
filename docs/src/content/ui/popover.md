@@ -8,6 +8,10 @@ description: A panel anchored to a trigger, built on the browser's popover.
 
 The `@trigger(attributes)` block renders the button, which spreads the `attributes` it is handed. A click on it toggles the panel, and a click outside or Escape closes it. `placement` is `bottom-start`, `bottom-end`, `top-start` or `top-end`, flipped by the browser when there is no room.
 
+## Role and name
+
+The panel is a `dialog` by default, and `role` changes it: `menu`, `listbox`, `tree` and `grid` also set the trigger's `aria-haspopup` to that value, any other role leaves it off, and `none` drops the role for content that carries its own. `label` names the panel with `aria-label`; a string has no element to point `aria-labelledby` at, so a panel with a visible heading takes `aria-labelledby="heading-id"` instead.
+
 ## Controlled
 
 `open` shows or hides the panel from the page, and `onOpenChange(open)` runs however it changed. A page driving `open` sets its own value back there.

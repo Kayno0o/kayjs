@@ -1,19 +1,24 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import type { PopoverPlacement, PopoverTriggerProps } from './popover'
+import type { PopoverPlacement, PopoverRole, PopoverTriggerProps } from './popover'
 import { effect, recipe, signal, uid } from 'kay'
+import { popupOf } from './popup-role'
 import { trackPointer, whenReleased } from './pointer-held'
 
 // 'kui-popover' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({ parts: { anchor: '', root: 'kui-popover inset-auto mx-0 my-1 [position-try-fallbacks:flip-block,flip-inline] rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-0 text-foreground data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start] data-[placement=right-start]:[position-area:inline-end_span-block-end]' } })
 
-const { id, open = false, placement = 'bottom-start', trigger, at, onOpenChange, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'style'> & {
+const { id, open = false, placement = 'bottom-start', role = 'dialog', label, trigger, at, onOpenChange, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'onToggle' | 'style' | 'role'> & {
   // Written after the component's own declarations, so it wins.
   style?: string | undefined
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own.
   open?: boolean | undefined
+  // What the panel is to assistive technology, `dialog` by default; the trigger's `aria-haspopup` follows it. `menu`, `listbox`, `tree` and `grid` are what `aria-haspopup` knows, any other role leaves it off, and `none` leaves the panel without one when the content inside carries its own, as a Menu's list does.
+  role?: PopoverRole | undefined
+  // Names the panel as `aria-label`, since a string has no element to point `aria-labelledby` at: an app with a visible heading passes `aria-labelledby` with its id instead, which wins as the browser reads it. A panel with a role other than `none` needs one or the other.
+  label?: string | undefined
   // Where the panel sits against its trigger, flipped by the browser when there is no room there.
   placement?: PopoverPlacement | undefined
   // Renders the button that toggles the panel, which spreads the attributes it is handed: `@trigger(attributes)`, then `button({...attributes})`.
@@ -60,6 +65,10 @@ const triggerProps: PopoverTriggerProps = {
   get 'aria-expanded'() {
     return shown() ? 'true' : 'false'
   },
+  // Follows `role`, and is left off for a role with no popup value.
+  get 'aria-haspopup'() {
+    return popupOf(role)
+  },
   'style': `anchor-name: ${anchor}`,
 }
 
@@ -73,5 +82,5 @@ if at
   span(part="anchor" aria-hidden="true" style={`position: fixed; left: ${at.x}px; top: ${at.y}px; width: 0; height: 0; pointer-events: none; anchor-name: ${anchor}`})
 else if trigger
   | {trigger(triggerProps)}
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={[`position-anchor: ${anchor}`, style].filter(Boolean).join('; ')} onToggle={toggled})
+div(part="root" aria-label={label} {...rest} role={role} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={[`position-anchor: ${anchor}`, style].filter(Boolean).join('; ')} onToggle={toggled})
   slot

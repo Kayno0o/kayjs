@@ -1,0 +1,27 @@
+--- island
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
+---
+main
+  Popover(id="plain" label="Filters")
+    @trigger(attributes)
+      button#plain-trigger({...attributes}) Filters
+    p Body
+  Popover(id="listbox" role="listbox" label="Colours")
+    @trigger(attributes)
+      button#listbox-trigger({...attributes}) Colours
+  Popover(id="grouped" role="group" label="Group")
+    @trigger(attributes)
+      button#group-trigger({...attributes}) Group
+  Popover(id="headed" aria-labelledby="heading")
+    @trigger(attributes)
+      button#headed-trigger({...attributes}) Headed
+    h2#heading Settings
+  Menu#menu(items={[{ label: 'One' }]} label="Actions" icon="chevron")
+  Tooltip#rich(placement="bottom")
+    @content
+      b Name
+      | : detail
+    | Hover me
+  Tooltip#plain-tip(text="Just text") Text

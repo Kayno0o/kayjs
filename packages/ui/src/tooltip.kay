@@ -1,17 +1,24 @@
 ---
-import type { JSX } from 'kay'
-import { recipe } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import { recipe, uid } from 'kay'
 
 // 'kui-tooltip-target' stays as the component's name for an app's CSS.
-const look = recipe({ parts: { root: 'kui-tooltip-target' } })
+const look = recipe({ parts: { root: 'kui-tooltip-target', content: 'hidden' } })
 
-const { text, placement, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'tabindex'> & {
-  // What the tooltip says, shown by TooltipHost as the pointer or the keyboard lands on the element. Without one the span is plain text, no tab stop.
+const { text, placement, content, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'tabindex'> & {
+  // What the tooltip says, shown by TooltipHost as the pointer or the keyboard lands on the element. Without one, or a `content` block, the span is plain text, no tab stop.
   text?: string | undefined
   // Where it sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`.
   placement?: string | undefined
+  // Draws the tooltip's body as markup in place of `text`, such as a bold name over a line of detail: TooltipHost copies it in as the tooltip shows. It wins over `text`.
+  content?: Snippet | undefined
 }>()
+
+const contentId = uid()
 ---
-// Text carrying a tooltip, which the keyboard reaches as the pointer does: a `span` with `data-tooltip` alone is not a tab stop.
-span(part="root" {...rest} tabindex={text ? '0' : undefined} data-tooltip={text || undefined} data-tooltip-placement={placement})
+// Text carrying a tooltip, which the keyboard reaches as the pointer does: a `span` with `data-tooltip` alone is not a tab stop. A `content` block sits in a hidden span beside it, which the tooltip reads by id.
+span(part="root" {...rest} tabindex={text || content ? '0' : undefined} data-tooltip={content ? undefined : text || undefined} data-tooltip-content={content ? contentId : undefined} data-tooltip-placement={placement})
   slot
+if content
+  span(part="content" id={contentId} hidden)
+    | {content}

@@ -295,7 +295,7 @@ function choose(entry: MenuRadio, index: number) {
   })
 }
 ---
-Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={opened => {
+Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} role="none" open={open} part="menu" onOpenChange={opened => {
   if (opened && waits())
     void load()
   else if (opened && !openedByPointer())

@@ -25,7 +25,7 @@ const isOpen = (root: Element, selector: string) => root.querySelector<HTMLEleme
 
 test.each([
   ['multi', '#open-multi', '#multi'],
-  ['date', '#open-date', '[role=dialog][popover]'],
+  ['date', '#open-date', '[popover][aria-label="Choose a date"]'],
   ['switcher', '#open-switcher', '#switcher'],
 ])('%s opens from the app and reports the browser closing it', async (name, button, panel) => {
   const { root, calls } = await picker()

@@ -114,7 +114,7 @@ async function send(id?: string) {
 }
 ---
 span(part="root" {...rest})
-  Popover(placement={placement} part="menu" open={open} onOpenChange={onOpenChange})
+  Popover(placement={placement} role="none" part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
       if trigger
         | {trigger(named(attributes), unread)}

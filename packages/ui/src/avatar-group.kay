@@ -94,7 +94,7 @@ div(part="root" {...rest} role={label ? 'group' : undefined} aria-label={label} 
       a(part="more" href={moreHref} aria-label={moreName()})
         {chip()}
     else
-      Popover(placement={placement} open={open} part="panel" onOpenChange={onOpenChange})
+      Popover(placement={placement} label={moreName()} open={open} part="panel" onOpenChange={onOpenChange})
         @trigger(attributes)
           button(part="more" type="button" {...attributes} aria-label={moreName()})
             {chip()}
