@@ -19,6 +19,14 @@ async function load(config: string): Promise<unknown> {
 }
 
 describe('config values checked once at load', () => {
+  it('accepts a guard, a list or { load } for each guard option', () => {
+    const guard = () => undefined
+
+    expect(invalidConfigValues({ jobs: { guard: { load: () => guard } }, images: { guard: [guard, guard] } })).toEqual([])
+    expect(invalidConfigValues({ images: { guard: { load: () => guard } }, jobs: { guard: [guard] }, manifest: { themeColor: { light: '#fff', dark: '#000' } }, live: { rate: { max: 1, window: '1m' } } })).toEqual([])
+    expect(invalidConfigValues({ images: { guard: 'no' } })).toHaveLength(1)
+  })
+
   it('accepts Infinity where it is documented, reads it back in a message, and shortens or hides what it prints', () => {
     expect(invalidConfigValues({ images: { maxDensity: Infinity } })).toEqual([])
     expect(invalidConfigValues({ images: { maxDensity: NaN } })).toEqual(['`images.maxDensity` is NaN, expected a number'])

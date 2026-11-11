@@ -7,6 +7,7 @@ import { nearest } from './nearest'
 // Every key the config and its nested bags take, each with the check of its value, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
 // A key takes `true` to accept any value while its type is too open to check; a lane adding a key to `KayConfig` adds it here, beside its type, with a check from `config-rules.ts` (`str`, `bool`, `oneOf('a', 'b')`, `list(str)`, `bag({ ... })`, `either(...)`), and a bag it holds as a `Record<keyof ItsInterface, Rule>` passed to `bag`.
 const localized = either(str, map(str))
+const guardOption = either(fn, list(fn), bag({ load: fn }))
 const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(lit(false), map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(list(str), bool), cookies: either(lit(false), bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
 const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: map(map(str)), messages: str }
 const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
@@ -28,14 +29,14 @@ const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: list(str) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
 const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rate: bag({ max: num, window: duration }), perMinute: num }
-const JOBS: Record<keyof JobsConfig, Rule> = { guard: either(fn, list(fn)), path: str }
+const JOBS: Record<keyof JobsConfig, Rule> = { guard: guardOption, path: str }
 const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
-const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, perMinute: either(num, lit(false)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: fn }
+const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, perMinute: either(num, lit(false)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: guardOption }
 const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof KayConfig, Rule> = {
   dirs: bag(DIRS),
