@@ -1,6 +1,6 @@
 import type { CmsDraftEntry } from '../src/kay/contract'
 import { describe, expect, it, spyOn } from 'bun:test'
-import { browserKeeper, KEEP_FOR } from '../src/draft-storage'
+import { browserKeeper, KEEP_FOR, sweepEvery } from '../src/draft-storage'
 import { cmsDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
 import { until } from './until'
@@ -343,5 +343,38 @@ describe('sweeping the kept drafts', () => {
     now += KEEP_FOR / 2 + 1
     keeper.sweep()
     expect(Array.from({ length: storage.length }, (_, at) => storage.key(at)).toSorted()).toEqual(['kcms:draft:ana:posts/new', 'other'])
+  })
+})
+
+describe('sweeping on a timer', () => {
+  it('sweeps at once and leaves one timer however often it starts, and none once stopped', () => {
+    const owner: Record<symbol, unknown> = {}
+    const live = new Set<unknown>()
+    const set = spyOn(globalThis, 'setInterval').mockImplementation(((callback: () => void) => {
+      const timer = { callback }
+
+      live.add(timer)
+
+      return timer
+    }) as never)
+    const clear = spyOn(globalThis, 'clearInterval').mockImplementation((timer: unknown) => void live.delete(timer))
+    let swept = 0
+    const keeper = { sweep: () => void swept++ }
+
+    try {
+      sweepEvery(keeper, 1000, owner)
+      sweepEvery(keeper, 1000, owner)
+
+      const stop = sweepEvery(keeper, 1000, owner)
+
+      expect(swept).toBe(3)
+      expect(live.size).toBe(1)
+      stop()
+      expect(live.size).toBe(0)
+    }
+    finally {
+      set.mockRestore()
+      clear.mockRestore()
+    }
   })
 })

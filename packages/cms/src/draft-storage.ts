@@ -54,6 +54,25 @@ function isKept(value: unknown): value is KeptDraft {
   return typeof editedAt === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as CmsDraftEntry).collection === 'string' && typeof (entry as CmsDraftEntry).slug === 'string' && typeof (entry as CmsDraftEntry).data === 'object' && (entry as CmsDraftEntry).data !== null
 }
 
+const SWEPT_BY = Symbol.for('kcms.draftSweep')
+
+// Sweeps the kept drafts now and every `every` ms, a page that loads this again (a reload of the module in dev) stopping the timer of the one before it; the returned function stops it.
+export function sweepEvery(keeper: { sweep: () => void }, every: number, owner: Record<symbol, unknown> = globalThis): () => void {
+  clearInterval(owner[SWEPT_BY] as ReturnType<typeof setInterval> | undefined)
+  keeper.sweep()
+
+  const timer = setInterval(keeper.sweep, every)
+
+  owner[SWEPT_BY] = timer
+
+  return () => {
+    clearInterval(timer)
+
+    if (owner[SWEPT_BY] === timer)
+      owner[SWEPT_BY] = undefined
+  }
+}
+
 // Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give. With `who`, the person the drafts belong to, they are kept under that name and none is read or written while it is undefined, so a draft is never offered to another person.
 export function browserKeeper(get: () => Storage | undefined = storageOf, now: () => number = Date.now, who?: () => string | undefined): DraftKeeper & { sweep: () => void } {
   const prefix = (): string | undefined => {
