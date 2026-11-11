@@ -752,7 +752,7 @@ For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?r
 
 An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuth` and `pgAuth` do), your app is its own OAuth authorization server.
 
-The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. Once the user allows it, the agent gets a token.
+The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. An agent that registered itself chooses its own name, so the page says nothing checked it (`auth.consent.unverified`); one named by a metadata document shows the host the document lives at. Once the user allows it, the agent gets a token.
 
 That token is one of kayjs-auth's bearer tokens. So `user()`, `via()`, `requireUser({ scope })` and your gates see the user and the scopes as they do for any token.
 

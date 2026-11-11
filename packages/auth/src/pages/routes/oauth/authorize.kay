@@ -61,6 +61,8 @@ Panel(landmark={landmark} title={wording('auth.consent.title', 'Allow access')})
     p {wording('auth.consent.intro', '{client} wants to use your account.', { client: outcome.client.name })}
     if outcome.client.host
       p.text-muted {wording('auth.consent.from', 'This app lives at {host}. Only continue if you started this sign-in.', { host: outcome.client.host })}
+    else
+      p.text-muted {wording('auth.consent.unverified', 'The app named itself; nothing checked that name. Only continue if you started this sign-in.')}
     p.text-muted {wording('auth.consent.returnsTo', 'After you decide, you go back to {host}.', { host: outcome.redirectHost })}
     p {wording('auth.consent.scopes', 'It will be allowed to')}
     ul.list-disc.pl-5
