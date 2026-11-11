@@ -119,7 +119,7 @@ cms({
 })
 ```
 
-`collections` lists the collections the role reaches. In any other the role sees no screen, no entry and no upload, and the content list leaves it out.
+`collections` lists the collections the role reaches. In any other the role sees no screen, no entry and no upload, and the content list leaves it out. A reference field still offers the titles of a collection the role cannot open, as long as a collection the role reaches has a field pointing at it, and the entries listed in a delete confirmation are only those the role may read.
 
 `own` names a field of the entry that holds its writer, the signed-in person's id with kayjs-auth, else their email, else their name. The role then changes only the entries whose field matches. It can still read the others, with their buttons disabled and the reason as a tooltip.
 

@@ -1,11 +1,11 @@
 import type { GuardContext } from 'kay'
-import type { Doing, Target } from './access'
+import type { Doing, Member, Target } from './access'
 import type { CmsAction } from './roles'
 import { READ_METHODS } from 'kay/library'
 import { allows, forbidden, memberOf, ownerStamps, permits, scoped } from './access'
 import { stamps } from './authors'
 import { leavesPublication, restrain } from './publishing'
-import { referrersWith } from './references'
+import { referencingCollections, referrersWith } from './references'
 import { settings } from './settings'
 import { entryScreen } from './store'
 import { trashed } from './trash'
@@ -178,7 +178,7 @@ async function needs(ctx: GuardContext, path: string, place: Place): Promise<Che
     if (kind === 'files' && collection === 'rules')
       return []
 
-    // The choices of a reference field: titles, from any collection, so a field can point where the role cannot go.
+    // The choices of a reference field are answered by `enforceRoles` (`mayPick`).
     return kind === 'entries' && read ? [] : [{ doing: 'read', target: { collection } }]
   }
 
@@ -212,6 +212,19 @@ async function needs(ctx: GuardContext, path: string, place: Place): Promise<Che
   return checks
 }
 
+// Whether the person may be given the titles of `collection` to pick from: they read it, or read a collection with a reference field to it, so a field can point where the role cannot go and no further.
+async function mayPick(member: Member | undefined, collection: string): Promise<boolean> {
+  if (await permits(member, 'read', { collection }))
+    return true
+
+  for (const referring of await referencingCollections(collection)) {
+    if (await permits(member, 'read', { collection: referring.name }))
+      return true
+  }
+
+  return false
+}
+
 // Refuses a request the signed-in person's roles do not cover: every action, in the collection and on the entry it names. Hiding a control is for the person's comfort; this is the check.
 export async function enforceRoles(ctx: GuardContext, path: string): Promise<void> {
   const { method } = ctx.request
@@ -222,7 +235,11 @@ export async function enforceRoles(ctx: GuardContext, path: string): Promise<voi
   const asked = settings().can !== undefined
   const checks = (await needs(ctx, path, place)).filter(({ doing }) => limited || asked || (doing !== 'read' && doing !== 'edit' && doing !== 'move'))
   // A read nothing limits does not look the person up.
-  const member = checks.length === 0 && READ_METHODS.has(method) ? undefined : await memberOf(ctx)
+  const picking = kind === 'entries' && place.alone && READ_METHODS.has(method) && (limited || asked)
+  const member = checks.length === 0 && !picking && READ_METHODS.has(method) ? undefined : await memberOf(ctx)
+
+  if (picking && !await mayPick(member, collection!))
+    return forbidden(ctx, 'read', { collection })
 
   for (const { doing, target } of checks) {
     if (!await permits(member, doing, target))

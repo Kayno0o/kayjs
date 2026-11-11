@@ -17,12 +17,15 @@ const stored = new Map<string, Data>()
 // The entries that name each `<collection>/<slug>` in a reference field.
 const referrers = new Map<string, { collection: string, data: Data }[]>()
 const trash = new Map<string, Data>()
+// The collections with a reference field to each collection.
+const pointing = new Map<string, string[]>()
 // The collections that fail to read.
 const unreadable = new Set<string>()
 
 function reset(): void {
   stored.clear()
   referrers.clear()
+  pointing.clear()
   trash.clear()
   unreadable.clear()
   stored.set('posts/mine', { title: 'Mine', draft: false, author: 'u1' })
@@ -41,6 +44,7 @@ void mock.module('../src/store', () => ({
   entryScreen: async ({ collection, slug, locale }: { collection: string, slug: string, locale?: string }) => ({ collection: { problem: unreadable.has(collection) ? 'failed' : undefined }, entry: (locale === undefined || locale === 'en') && stored.has(`${collection}/${slug}`) ? { data: stored.get(`${collection}/${slug}`) } : undefined }),
 }))
 void mock.module('../src/references', () => ({
+  referencingCollections: async (target: string) => (pointing.get(target) ?? []).map(name => ({ name })),
   referrersWith: async (collection: string, slugs: string[]) => new Map(slugs.map(slug => [slug, (referrers.get(`${collection}/${slug}`) ?? []).map(({ collection: name, data }) => ({ collection: { name }, entry: { data }, label: '' }))])),
 }))
 void mock.module('../src/trash', () => ({
@@ -133,7 +137,16 @@ describe('a role limited to collections', () => {
     }
   })
 
-  test('reads, lists and uploads only in its collections, the choices of a reference field aside', async () => {
+  test('is given the choices of a collection only when a collection it reaches refers to it', async () => {
+    expect(await send(me, 'GET', '/entries/pages')).toBe(403)
+    pointing.set('pages', ['events'])
+    expect(await send(me, 'GET', '/entries/pages')).toBe(403)
+    pointing.set('pages', ['events', 'posts'])
+    expect(await send(me, 'GET', '/entries/pages')).toBe(200)
+    expect(await send(me, 'GET', '/entries/posts')).toBe(200)
+  })
+
+  test('reads, lists and uploads only in its collections', async () => {
     expect(await send(me, 'GET', '/entries/posts/theirs')).toBe(200)
     expect(await send(me, 'GET', '/entries/pages/about')).toBe(403)
     expect(await send(me, 'GET', '/slugs/posts')).toBe(200)
@@ -144,7 +157,6 @@ describe('a role limited to collections', () => {
     expect(await send(me, 'POST', '/files/posts')).toBe(200)
     expect(await send(me, 'POST', '/files/pages')).toBe(403)
     expect(await send(me, 'GET', '/markdown/image?collection=pages&slug=a&path=b.png')).toBe(403)
-    expect(await send(me, 'GET', '/entries/pages')).toBe(200)
     expect(await send(me, 'GET', '/files/rules')).toBe(200)
   })
 
@@ -219,7 +231,8 @@ describe('a role limited to its own entries', () => {
     }
   })
 
-  test('reads the entries of others, and lists them', async () => {
+  test('reads the entries of others, and is given the choices of its collection', async () => {
+    expect(await send(me, 'GET', '/entries/posts')).toBe(200)
     expect(await send(me, 'GET', '/entries/posts/theirs')).toBe(200)
     expect(await send(me, 'GET', '/slugs/posts')).toBe(200)
   })

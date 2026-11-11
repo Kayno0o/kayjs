@@ -46,13 +46,33 @@ export interface Referrer {
 }
 
 // The entries that name each slug of `target` in a reference field, as `Collection: title`, by slug. Reads the collections whose schema holds a reference to `target` and no other; one that fails to read is left out.
-export async function referrersOf(target: string, slugs: Iterable<string>): Promise<Map<string, string[]>> {
+export async function referrersOf(target: string, slugs: Iterable<string>, readable: (referrer: Referrer) => boolean | Promise<boolean> = () => true): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>()
 
-  for (const [slug, found] of await referrersWith(target, slugs))
-    result.set(slug, [...new Set(found.map(each => each.label))])
+  for (const [slug, found] of await referrersWith(target, slugs)) {
+    const shown: Referrer[] = []
+
+    for (const each of found) {
+      if (await readable(each))
+        shown.push(each)
+    }
+
+    result.set(slug, [...new Set(shown.map(each => each.label))])
+  }
 
   return result
+}
+
+// The collections whose schema holds a reference to `target`, those a reference picker of it is for. Empty when the collections fail to read.
+export async function referencingCollections(target: string): Promise<CollectionInfo[]> {
+  try {
+    return (await collections({ counts: false })).filter(collection => refersTo(fieldsOf(collection.schema), target))
+  }
+  catch (error) {
+    log.error(`the collections failed to read for the pickers of ${target}`, error)
+
+    return []
+  }
 }
 
 // A collection that could hold references to the target failed to read, so the entries naming it are not all known. `names` is empty when the list of collections itself failed.
