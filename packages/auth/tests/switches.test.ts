@@ -126,6 +126,6 @@ describe('feature switches', () => {
     expect(await ada.call('passkeys.proofOptions')).toMatchObject(OFF)
     expect(await ada.call('passkeys.list')).toEqual([])
     // Its options have no result type to answer `off` with: a page asks `features()` first, and a call anyway is the app's mistake, thrown naming the option.
-    expect(await ada.call('passkeys.signInOptions')).toContain('passkeys: false')
+    expect(String(await ada.call('passkeys.signInOptions'))).toContain('passkeys: false')
   })
 })
