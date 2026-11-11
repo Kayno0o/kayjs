@@ -14,7 +14,7 @@ The value axis spans the highest reading rounded up to 1, 2, 4, 6, 8 or 10 times
 
 ## Colour and notes per bar
 
-A series takes an optional CSS `color`, otherwise the next `--color-chart-*` token. `colors` gives one colour per label and wins over it, so a bar can show its status, and `notes` adds one message per label to that bar's tooltip. A column with no height keeps a short stub where its series gives it a `notes` entry, or a `colors` one with a reading, so a failed run recorded as 0 still shows. A colour is no cue for everyone, so give a failed bar a note.
+A series takes an optional CSS `color`, otherwise the next `--color-chart-*` token. With several series, each after the first is also hatched in its own pattern, on its bars and in the legend, so they stay apart without their colours. `colors` gives one colour per label and wins over it, so a bar can show its status, and `notes` adds one message per label to that bar's tooltip. A column with no height keeps a short stub where its series gives it a `notes` entry, or a `colors` one with a reading, so a failed run recorded as 0 still shows. A colour is no cue for everyone, so give a failed bar a note.
 
 <Demo name="bar-chart/status" />
 

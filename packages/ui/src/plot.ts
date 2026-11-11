@@ -86,6 +86,24 @@ export interface ChartSeries {
 // The dash each series of a LineChart draws with, by its place in the list, so lines stay apart without their colours: solid, then patterns in px of a 2px stroke, no dash shorter than the stroke is wide.
 export const SERIES_DASHES = ['', '6 3', '2 3', '10 3 2 3', '2 6', '8 2 2 2'] as const
 
+// The stripe each series of a BarChart past the first is hatched with over its colour, by its place in the list, as LineChart's dashes tell its lines apart: in the page's background colour, so it reads on any series colour in both themes.
+const STRIPE = 'color-mix(in srgb, var(--color-background) 65%, transparent)'
+const SERIES_PATTERNS = [
+  '',
+  `repeating-linear-gradient(45deg, ${STRIPE} 0 2px, transparent 2px 4px)`,
+  `radial-gradient(${STRIPE} 0.9px, transparent 1.4px) 0 0 / 4px 4px`,
+  `repeating-linear-gradient(90deg, ${STRIPE} 0 1px, transparent 1px 3px)`,
+  `repeating-linear-gradient(135deg, ${STRIPE} 0 2px, transparent 2px 4px)`,
+  `repeating-linear-gradient(0deg, ${STRIPE} 0 1px, transparent 1px 3px)`,
+] as const
+
+// The style of a bar of series `index` and the key of its legend: its colour, hatched by its place in the list when `patterned`, so series are told apart without their colours.
+export function seriesFill(color: string, index: number, patterned: boolean): string {
+  const pattern = patterned ? SERIES_PATTERNS[index % SERIES_PATTERNS.length]! : ''
+
+  return pattern === '' ? `background-color: ${color}` : `background-color: ${color}; background-image: ${pattern}`
+}
+
 // A horizontal sample of a dashed line as a CSS background, for the legend to show each series as its line draws.
 export function dashSample(color: string, dash: string): string {
   const lengths = dash.split(' ').filter(Boolean).map(Number)

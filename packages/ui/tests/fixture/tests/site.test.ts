@@ -863,7 +863,8 @@ describe('charts', () => {
     expect(stacked).toContain('data-stacked=""')
     expect(stacked.match(/data-part="bar" data-stacked=""/g)).toHaveLength(4)
     expect(bars).not.toContain('data-stacked=""')
-    expect(stacked).toMatch(/<li class="[^"]*" data-part="legendItem"><span class="[^"]*" data-part="key" style="background-color: red"><\/span>Failed<\/li>/)
+    expect(stacked).toMatch(/<li class="[^"]*" data-part="legendItem"><span class="[^"]*" data-part="key" style="background-color: red; background-image: repeating-linear-gradient\(45deg[^"]*"><\/span>Failed<\/li>/)
+    expect([...stacked.matchAll(/data-part="bar" data-stacked="" style="height: [\d.]+%; background-color: [^;"]+(; background-image)?/g)].map(match => match[1] !== undefined)).toEqual([false, true, false, true])
     expect(await page('no-bars')).toMatch(/^<p class="kui-bar-chart-empty [^"]*kui-bar-chart [^"]*" data-part="root">No runs<\/p>$/)
   })
 

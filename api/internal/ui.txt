@@ -2499,6 +2499,9 @@ interface ScatterPoint
 [./lib/plot] SERIES_DASHES
 const SERIES_DASHES: readonly ["", "6 3", "2 3", "10 3 2 3", "2 6", "8 2 2 2"]
 
+[./lib/plot] seriesFill
+function seriesFill(color: string, index: number, patterned: boolean): string
+
 [./lib/plot] steppedPoint
 function steppedPoint(key: string, index: number, count: number): number | undefined
 

@@ -9,7 +9,7 @@ import type { NewTab } from './outside'
 import type { PlacedEvent } from './chart-marks'
 import { activeMarks, chartTooltip, EVENT_LOOK, markKind, placeEvents, TOOLTIP_LOOK } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
-import { barRatios, PALETTE, steppedPoint, valueTicks } from './plot'
+import { barRatios, PALETTE, seriesFill, steppedPoint, valueTicks } from './plot'
 import { wording } from 'kay/words'
 
 const look = recipe({
@@ -87,6 +87,8 @@ const headingTexts = memo(() => headings(labels, times(), formatLabel))
 const gaps = () => `--bar-gaps: ${Math.max(labels.length - 1, 1)}`
 const edge = (at: number) => labels.length < 2 ? undefined : at === 0 ? 'start' : at === labels.length - 1 ? 'end' : undefined
 const colors = (item: BarSeries, index: number, at: number) => item.colors?.[at] ?? item.color ?? PALETTE[index % PALETTE.length]!
+// With several series each is also hatched by its place, so the bars and the legend are told apart without their colours.
+const fill = (item: BarSeries, index: number, at: number) => seriesFill(colors(item, index, at), index, series.length > 1)
 
 // The bar the keyboard stands at, the latest one until it moves.
 const stop = signal<number | null>(null)
@@ -178,9 +180,9 @@ const nothing = () => emptyLabel ?? wording('ui.barChart.empty', 'No data yet.')
 snippet bars(at: number)
   for item, index of series key={item.name}
     if ratios().heights[index]![at]
-      span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
+      span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; ${fill(item, index, at)}`})
     else if marked(item, at)
-      span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={`background-color: ${colors(item, index, at)}`})
+      span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={fill(item, index, at)})
 if labels.length === 0
   // The app's id and class stay on whichever element shows.
   if empty
@@ -230,5 +232,5 @@ else
       ul(part="legend")
         for item, index of series key={item.name}
           li(part="legendItem")
-            span(part="key" style={`background-color: ${colors(item, index, -1)}`})
+            span(part="key" style={fill(item, index, -1)})
             | {item.name}

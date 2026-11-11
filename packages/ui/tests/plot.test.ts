@@ -3,7 +3,7 @@ import { monthStarts } from '../src/contribution'
 import { stepIndex } from '../src/cycle'
 import { isPlayable } from '../src/media'
 import { pickedShown, selectionSummary, toggledValue } from '../src/multi-select'
-import { axisExtent, axisPercent, barRatios, dashSample, dotSize, steppedPoint, valueTicks } from '../src/plot'
+import { axisExtent, axisPercent, barRatios, dashSample, dotSize, seriesFill, steppedPoint, valueTicks } from '../src/plot'
 import { rangeFrom } from '../src/range'
 
 const OPTIONS = [{ value: 'rpg', label: 'RPG' }, { value: 'fps', label: 'Shooter' }, { value: 'sim', label: 'Simulation' }]
@@ -34,6 +34,17 @@ describe('axes', () => {
   test('samples a dashed line as a repeating gradient, a solid one as a plain colour', () => {
     expect(dashSample('red', '')).toBe('background-color: red')
     expect(dashSample('red', '10 3 2 3')).toBe('background-image: repeating-linear-gradient(90deg, red 0px 10px, transparent 10px 13px, red 13px 15px, transparent 15px 18px)')
+  })
+
+  test('hatches each series of a bar chart past the first, so they are told apart without colour, and none with a single series', () => {
+    expect(seriesFill('red', 0, true)).toBe('background-color: red')
+    expect(seriesFill('red', 1, false)).toBe('background-color: red')
+
+    const patterns = [1, 2, 3, 4, 5].map(index => seriesFill('red', index, true))
+
+    expect(new Set(patterns).size).toBe(5)
+    expect(patterns.every(style => style.startsWith('background-color: red; background-image: '))).toBe(true)
+    expect(seriesFill('red', 6, true)).toBe(seriesFill('red', 0, true))
   })
 
   test('steps a point along the line by key, clamped to its ends, and ignores other keys', () => {
