@@ -211,7 +211,7 @@ describe('the production jobs page for a workflow run', () => {
       await step.run('charge <b>', () => 1)
       await step.waitFor('paid')
     }, { store: memoryJobs() })
-    const id = await flow.start(undefined, { id: 'order-1' })
+    const id = await flow.start(undefined, { key: 'order-1' })
 
     await flow.drain()
 
@@ -235,7 +235,7 @@ describe('the production jobs page for a workflow run', () => {
     await flow.drain()
     expect(await flow.status(id)).toBeUndefined()
 
-    const second = await flow.start(undefined, { id: 'order-2' })
+    const second = await flow.start(undefined, { key: 'order-2' })
 
     await flow.drain()
 

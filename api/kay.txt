@@ -3786,7 +3786,8 @@ function sqliteSessions(path: string): DeletableSessionStore
 [./server] StartOptions
 interface StartOptions
   delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  id?: string | undefined
+  /** @deprecated The old name of `key`, which wins when both are given. Removed in 1.102.0; `deprecated-workflow-start-id` rewrites it. */ id?: string | undefined
+  key?: string | undefined
 
 [./server] StoreBase
 interface StoreBase

@@ -49,8 +49,8 @@ import { redirectPermanent } from './redirect-permanent'
 import { removedUiTokens } from './removed-ui-tokens'
 
 import { scheduleTz } from './schedule-tz'
-
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
+
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
@@ -58,6 +58,7 @@ import { typingOptions } from './tsgo'
 import { uiHotkey } from './ui-hotkey'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
+import { workflowStartId } from './workflow-start-id'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -157,6 +158,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => redirectPermanent(root, options),
   async ({ root, options }) => uiHotkey(root, options),
   async ({ root, options }) => scheduleTz(root, options),
+  async ({ root, options }) => workflowStartId(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

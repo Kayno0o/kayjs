@@ -298,7 +298,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
   it('shows a run sleeping, then waiting for an event with its steps, and sends the event', async () => {
     const { flow, queueName } = await flowOf('send')
     const site = await app()
-    const id = await flow.start(undefined, { id: 'order-1' })
+    const id = await flow.start(undefined, { key: 'order-1' })
 
     await flow.drain()
 
@@ -351,7 +351,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     const wf = `workflow:${queueName}`
     const jobOf = async () => (await listed(site)).find(queued => queued.name === wf)!.jobs[0]!
 
-    await flow.start(undefined, { id: 'one' })
+    await flow.start(undefined, { key: 'one' })
     await flow.drain()
 
     const { id } = await jobOf()
@@ -361,7 +361,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     expect((await jobOf()).workflow!.state).toBe('waiting')
     expect((await act(site, 'send', wf, id, HEADERS, '{"amount": 12}')).status).toBe(200)
     await flow.drain()
-    await flow.start(undefined, { id: 'two' })
+    await flow.start(undefined, { key: 'two' })
     await flow.drain()
     expect((await act(site, 'send', wf, (await jobOf()).id, HEADERS, '  ')).status).toBe(200)
     await flow.drain()
@@ -379,9 +379,9 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     const site = await app()
     const wf = `workflow:${queueName}`
 
-    await flow.start(true, { id: 'twin' })
+    await flow.start(true, { key: 'twin' })
     await flow.drain()
-    await flow.start(false, { id: 'twin' })
+    await flow.start(false, { key: 'twin' })
     await flow.drain()
 
     const jobs = (await listed(site)).find(queued => queued.name === wf)!.jobs

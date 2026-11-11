@@ -47,6 +47,8 @@ A production server (`NODE_ENV=production`) runs each schedule once across all i
 
 In a rolling deploy, old and new builds with a changed job both run, as their locks differ. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
 
+A `lock` is not a `key`: a `key` makes a repeated start a no-op while the job lives, where a `lock` is taken afresh each time the schedule falls due and lets one process run it, which is why it also takes `false`.
+
 The upkeep kay and its libraries run on a timer works the same way: expired sessions and notifications in Postgres, kayjs-auth's prune, kayjs-mail's list sweep and kayjs-cms's history sweep each run once per pass across the processes sharing a database.
 
 Each counts in `kay_job_runs_total` as `maintenance:<name>`, shows in the dev tool's Jobs tab, and stops with the server. What belongs to one host stays per process: the sqlite session and notification stores, image variants and loader watchers.
@@ -320,10 +322,10 @@ export const onboarding = workflow<{ userId: string }, { visited: undefined }>('
 })
 ```
 
-Use it like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`. An action starts a run with one call and sends it an event with another. The `id` names the run, so an app can use its own, a user's id say.
+Use it like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`. An action starts a run with one call and sends it an event with another. The `key` names the run, as it names a queue's job, so an app can use its own, a user's id say: while a run with that key is live, starting it again starts nothing. `id` still works in its place until 2.0, and `kay upgrade` renames it.
 
 ```ts
-await onboarding.start({ userId }, { id: userId })
+await onboarding.start({ userId }, { key: userId })
 await onboarding.send(userId, 'visited')
 ```
 

@@ -193,7 +193,7 @@ new Elysia()
 - A run that throws is logged and the next one comes as planned.
 - `schedule('30s', job)` runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `timeZone`; a run outlasting its length skips the runs it overlaps.
 - A length that is not positive is a type error, or fails the boot when computed.
-- `lock`, `store`, the overlap and the shutdown work as for a cron.
+- `lock`, `store`, the overlap and the shutdown work as for a cron. `lock` is not a `key` of `enqueue()` or `start()`: it is taken afresh for each time the schedule falls due, one process runs it, and it takes `false`, where a `key` makes a repeated start a no-op while it lives.
 - `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time.
 - On stop its signal aborts and the server waits for it to return.
 - Work that throws is logged and not started again.

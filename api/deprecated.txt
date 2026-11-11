@@ -1,5 +1,6 @@
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
 kay [./server] ScheduleOptions.tz	1.102.0	deprecated-schedule-tz	The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it.
+kay [./server] StartOptions.id	1.102.0	deprecated-workflow-start-id	The old name of `key`, which wins when both are given. Removed in 1.102.0; `deprecated-workflow-start-id` rewrites it.
 kay [.] Local.pending	2.0.0	deprecated-local-state	The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it.
 kay [.] Local.status	2.0.0	deprecated-local-state	`syncStatus()` reads these states, `unsynced` for `pending`; `status()` is `idle|loading|ready|failed` at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it.
 ui [./lib/index] PaletteLink.external	2.0.0	-	Use `newTab: true`, which wins when both are given. Removed in 2.0.0. No lint: the prop is set on an object a command or a data function builds, as often as on a tag.

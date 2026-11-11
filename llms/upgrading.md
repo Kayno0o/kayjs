@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 `schedule(cron, job, { tz })` takes `timeZone`, the name of the `timeZone` in `kay.config.ts` it falls back to. `tz` still works for three minors, and `kay upgrade` renames it (`deprecated-schedule-tz`).
 
+### `id` of a workflow's `start()` is `key`
+
+`workflow.start(input, { id })` takes `key`, the name `enqueue()` gives the caller-chosen identity that makes a repeat a no-op; `id` stays the identity a run returns. `id` still works for three minors, and `kay upgrade` renames it (`deprecated-workflow-start-id`).
+
 ### Stat and Chat write `data-layout`, not `data-variant`
 
 `Stat` and `Chat` (and the `ChatLauncher` chat) take `layout` in place of `variant` and mark their root `data-layout`: CSS on `[data-variant=tile]` (Stat) or `[data-variant=plain]` (Chat) reads `[data-layout=tile]` and `[data-layout=plain]` now. The `variant` prop still works, rewritten by `deprecated-ui-props`.

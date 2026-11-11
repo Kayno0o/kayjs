@@ -38,6 +38,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { tz: \'Europe/Paris\' })\n---',
     right: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { timeZone: \'Europe/Paris\' })\n---',
   },
+  'deprecated-workflow-start-id': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.98',
+    site: true,
+    summary: '`id` in the options of a workflow\'s `start()`, `key` since 1.98: the caller-chosen identity that makes a repeat a no-op is `key` in `enqueue()` and now in `start()`, `id` naming only the generated identity a run returns. The old form still works, `key` winning when both are given. Found on `name.start(input, { id })` where `name` is bound to a `workflow()` call imported from `kay/server` or `kay`, anywhere in the project. The fix renames the key, and writes `key: id` for a shorthand `{ id }`; an object holding a `key` already is reported with no fix.',
+    wrong: '---\nimport { workflow } from \'kay/server\'\n\nconst onboarding = workflow(\'onboarding\', async () => undefined)\n\nawait onboarding.start({ userId }, { id: userId })\n---',
+    right: '---\nimport { workflow } from \'kay/server\'\n\nconst onboarding = workflow(\'onboarding\', async () => undefined)\n\nawait onboarding.start({ userId }, { key: userId })\n---',
+  },
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',
