@@ -17,7 +17,6 @@ const MAX_REPORTS_PER_BODY = 20
 const MAX_FIELD_LENGTH = 2048
 const REQUESTS_PER_MINUTE = 30
 const MINUTE_MS = 60_000
-
 // What the rate limit counts reports under, apart from any action's.
 const REPORTS = 'kay:csp-reports'
 // Past this many distinct violations, the oldest are forgotten and may be logged again.

@@ -11,7 +11,6 @@ export const ERROR_REPORTS = '/_kay/error'
 const MAX_REPORT_BYTES = 16 * 1024
 const MAX_URL_LENGTH = 2048
 const REPORTS_PER_MINUTE = 20
-
 const MINUTE_MS = 60_000
 // What the rate limit counts reports under, apart from any action's.
 const REPORTS = 'kay:error-reports'

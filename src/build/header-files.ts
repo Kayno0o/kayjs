@@ -40,7 +40,7 @@ export function unnamedHeaders(headers: Record<string, string>, mine: string): R
 
     if (header !== null)
       everywhere && named.add(header[1]!.toLowerCase())
-    else if (line.trim() !== '' && !INDENTED.test(line))
+    else if (line.trim() !== '' && !INDENTED.test(line) && !line.startsWith('#'))
       everywhere = line.trim() === '/*'
   }
 
