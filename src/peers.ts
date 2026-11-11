@@ -2,7 +2,7 @@ import process from 'node:process'
 import { peerDependencies } from '../package.json'
 import { kayLog } from './runtime/log'
 
-// The optional peers kay loads when a command needs them, never on import, so an app that never runs that command installs none of them. Nothing here imports kay's runtime: the ESLint processor, which runs under Node, reaches this file.
+// The optional peers kay loads when a command needs them, never on import, so an app that never runs that command installs none of them. Nothing here imports kay's runtime but `runtime/log`, which imports nothing: the ESLint processor, which runs under Node, reaches this file.
 export type Peer = keyof Pick<typeof peerDependencies, 'axe-core' | 'typescript7'>
 
 export const PEERS: Peer[] = ['typescript7', 'axe-core']
