@@ -15,7 +15,13 @@ export const MAX_TIMER_MS = 2 ** 31 - 1
 export const ERROR_CHARS = 2000
 
 export function cappedError(message: string): string {
-  return message.length > ERROR_CHARS ? `${message.slice(0, ERROR_CHARS)}... (${message.length - ERROR_CHARS} more characters)` : message
+  if (message.length <= ERROR_CHARS)
+    return message
+
+  // A cut between the halves of a surrogate pair would leave one alone.
+  const kept = message.charCodeAt(ERROR_CHARS - 1) >= 0xD800 && message.charCodeAt(ERROR_CHARS - 1) <= 0xDBFF ? ERROR_CHARS - 1 : ERROR_CHARS
+
+  return `${message.slice(0, kept)}... (${message.length - kept} more characters)`
 }
 
 // The milliseconds a health check may take, `health.timeout` read once per use: a value that is no positive duration throws naming the option.

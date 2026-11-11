@@ -71,6 +71,8 @@ In a terminal with none of these options, `kay new` asks for a preset, then for 
 
 Without `--forge`, `kay new` reads the `origin` remote. A remote on github.com gets a GitHub Actions workflow in `.github/workflows`. Any other remote, or none, gets a Forgejo workflow in `.forgejo/workflows`.
 
+The test workflow runs on every pull request commit and on every push to `main`, so a pull request's commit is not tested twice. The Forgejo Pages workflow builds with `SITE_URL` from a repository variable of that name, and the forge's own address while it is unset: set the variable to the host your Forgejo instance publishes Pages on, or the site's canonical links and sitemap name the forge.
+
 The workflow can read the repository and nothing more, except a Pages workflow, which gets the permission it publishes with. Each action it uses is pinned to the commit of a release, with the version in a comment.
 
 Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports it for Claude Code, and a `.mcp.json` that registers [`kay mcp`](/guides/other-editors) for it, so the agent has kay's tools with no `claude mcp add`.

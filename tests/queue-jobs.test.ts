@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
 import { Elysia } from 'elysia'
 import { queue as makeQueue, memoryJobs, retryLater, shutdown } from '../src/server'
-import { ERROR_CHARS } from '../src/server/config-limits'
+import { cappedError, ERROR_CHARS } from '../src/server/config-limits'
 import { beginDrain, stopGraceMs } from '../src/server/drain'
 import { forgetQueue } from '../src/server/queue'
 import { cleanUpAfterFile, kinds } from './job-stores'
@@ -86,6 +86,14 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       expect(error).toBe(`${'x'.repeat(ERROR_CHARS)}... (500 more characters)`)
       errors.mockRestore()
+    })
+
+    it('does not cut a surrogate pair in two when it caps an error', () => {
+      const message = `${'x'.repeat(ERROR_CHARS - 1)}😀tail`
+      const capped = cappedError(message)
+
+      expect(capped).toBe(`${'x'.repeat(ERROR_CHARS - 1)}... (${message.length - ERROR_CHARS + 1} more characters)`)
+      expect(cappedError('short')).toBe('short')
     })
 
     it('accepts the key again once its job completed, and once it was kept as failed', async () => {

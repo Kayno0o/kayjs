@@ -412,6 +412,19 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(await after.status(id)).toMatchObject({ status: 'failed' })
   })
 
+  it('keeps a run whose results come just under the limit going', async () => {
+    const store = await open()
+    const done: string[] = []
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      await step.run('large', () => 'x'.repeat(PAYLOAD_LIMIT - 100_000))
+      await step.run('after', () => void done.push('after'))
+    }, { store })
+
+    await flow.start()
+    await flow.drain()
+    expect(done).toEqual(['after'])
+  })
+
   it('fails a run whose kept results pass the limit, naming what to do, and does not retry it', async () => {
     const errors = spyOn(console, 'error').mockImplementation(noop)
     const store = await open()

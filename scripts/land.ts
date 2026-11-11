@@ -9,7 +9,7 @@ import { hostEnv } from './host-env'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { describeSamples, describeScope, sampleScope, scopeLimit, scopeMemory, sizeForScope } from './scope-memory'
-import { describeSilentExit, junitFiles } from './silent-exit'
+import { describeSilentExit, reportedFiles } from './silent-exit'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { nicedCommand, slotPrefix } from './step-command'
 import { subprocessTests } from './subprocess-tests'
@@ -41,6 +41,7 @@ const SHARDS = Number(process.env.KAY_LAND_SHARDS) || (SIZED?.shards ?? 1)
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
+const LISTING_LIMIT_MS = 3 * 60_000
 const DRAIN_MS = Number(process.env.KAY_LAND_DRAIN_MS) || 5000
 // The step running, whose process group goes with a landing stopped by a signal.
 let running: number | undefined
@@ -116,26 +117,17 @@ async function step(label: string, argv: string[], cwd = '.', lock?: string) {
 }
 
 // The files a test step's run lists and those that reported a result, the first from the same run with a test filter nothing matches, which loads each file and runs none of them.
+// The step has just failed, so the listing is given a few minutes and killed with its children past them.
 async function shardFiles(argv: string[], report: string) {
   const listing = `${report}.list`
 
-  await Bun.spawn(['sh', '-c', 'exec "$@" >/dev/null 2>&1', 'sh', ...nicedCommand([...argv, '--test-name-pattern=^$never', '--reporter=junit', `--reporter-outfile=${listing}`])], { stdin: 'ignore' }).exited
+  await Bun.spawn(['sh', '-c', 'exec "$@" >/dev/null 2>&1', 'sh', ...nicedCommand([...argv, '--test-name-pattern=^$never', '--reporter=junit', `--reporter-outfile=${listing}`])], { stdin: 'ignore', timeout: LISTING_LIMIT_MS, killSignal: 'SIGKILL' }).exited
 
   const files = { listed: await reportedFiles(listing), reported: await reportedFiles(report) }
 
   await rm(listing, { force: true })
-  await rm(report, { force: true })
 
   return files
-}
-
-async function reportedFiles(path: string): Promise<string[]> {
-  try {
-    return junitFiles(await Bun.file(path).text())
-  }
-  catch {
-    return []
-  }
 }
 
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
@@ -214,6 +206,9 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
     if (silent !== undefined)
       crashed.push(silent)
   }
+
+  if (report !== undefined)
+    await rm(report, { force: true })
 
   console.error([...failures, ...crashed, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].filter(Boolean).join('\n\n'))
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)

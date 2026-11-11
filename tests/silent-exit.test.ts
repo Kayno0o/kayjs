@@ -1,6 +1,9 @@
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { parseEvents } from '../scripts/scope-memory'
-import { describeSilentExit, junitFiles } from '../scripts/silent-exit'
+import { describeSilentExit, junitFiles, reportedFiles } from '../scripts/silent-exit'
+
+import { scratchDir } from './scratch'
 
 const MB = 1024 * 1024
 const before = { peak: 0, oomKills: 0, max: 3, oom: 0 }
@@ -29,6 +32,13 @@ describe('a test shard that exits nonzero with no failed test', () => {
     expect(text).toBe('exit 1 with no failed test: the held memory is not known; the scope\'s memory.events is not readable here; the shard\'s files are not known.')
   })
 
+  it('blames no file when the run wrote no report', () => {
+    const text = describeSilentExit({ exitCode: 1, lines, held: 1, limit: 2, before, after, listed, reported: [] })
+
+    expect(text).toContain('no report was written, so which of the shard\'s 3 files ran is not known')
+    expect(text).not.toContain('did not report')
+  })
+
   it('leaves a run that names its cause alone', () => {
     const input = { exitCode: 1, held: 1, limit: 2, before, after, listed, reported: [] }
 
@@ -40,7 +50,7 @@ describe('a test shard that exits nonzero with no failed test', () => {
   it('caps the files it names', () => {
     const many = Array.from({ length: 13 }, (_, index) => `tests/f${index}.test.ts`)
 
-    expect(describeSilentExit({ exitCode: 1, lines, held: 1, limit: 2, before, after, listed: many, reported: [] })).toContain(', and 3 more')
+    expect(describeSilentExit({ exitCode: 1, lines, held: 1, limit: 2, before, after, listed: many, reported: ['tests/other.test.ts'] })).toContain(', and 3 more')
   })
 })
 
@@ -49,6 +59,15 @@ describe('what a shard reports', () => {
     const xml = '<testsuites><testsuite name="tests/a.test.ts" file="tests/a.test.ts" tests="1"><testsuite name="a" file="tests/a.test.ts" line="3"></testsuite></testsuite><testsuite name="tests/b.test.ts" file="tests/b.test.ts"></testsuite></testsuites>'
 
     expect(junitFiles(xml)).toEqual(['tests/a.test.ts', 'tests/b.test.ts'])
+  })
+
+  it('reads a junit file from disk, and none where it was not written', async () => {
+    const dir = await scratchDir('silent-exit-')
+    const file = join(dir, 'report.xml')
+
+    await Bun.write(file, '<testsuites><testsuite name="a" file="tests/a.test.ts"></testsuite></testsuites>')
+    expect(await reportedFiles(file)).toEqual(['tests/a.test.ts'])
+    expect(await reportedFiles(join(dir, 'missing.xml'))).toEqual([])
   })
 
   it('reads the counters of memory.events', () => {

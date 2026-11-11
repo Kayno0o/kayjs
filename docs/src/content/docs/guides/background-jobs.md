@@ -347,7 +347,7 @@ The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`,
 
 `onStart` is told once per run, not after each sleep, wait or retry. A stop during the first attempt, before any step is kept, may tell it again, as may a run stored by an older kay. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
 
-The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them.
+The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them. Every step writes them all again, so a run may keep 2 million characters of results at most: past that it fails, without a retry, and its error says so. Return an id from a step that makes a large result and keep the result elsewhere. A queue keeps at most 2,000 characters of a failure's error.
 
 In tests, `runJobs()` runs the due steps and `setSystemTime` moves a sleep or a timeout along.
 
