@@ -78,7 +78,7 @@
   --radius-lg: 0.5rem;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
-  --text-2xs: 0.6rem;
+  --text-2xs: 0.625rem;
   --text-2xs--line-height: 1.4;
   --tracking-label: 0.15em;
   /* Density scales the card, inline and section gaps and the field insets: 1 by default, 0.75 packs them tighter and 1.25 looser. */

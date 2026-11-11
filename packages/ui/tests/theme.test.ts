@@ -944,6 +944,13 @@ describe('the properties of the recipes', () => {
     expect(css).toMatch(new RegExp(`> \\.kui-btn[^{]*\\{\\s*height: var\\(${escaped}\\)`))
   })
 
+  test('keeps the smallest text at 10px, which chart ticks, calendar weekdays and gallery counters read at', async () => {
+    const css = await Bun.file(`${ROOT}src/theme.css`).text()
+    const sizes = [...css.matchAll(/--text-2xs: ([\d.]+)rem;/g)].map(match => Number(match[1]) * 16)
+
+    expect(sizes).toEqual([10])
+  })
+
   test('keeps the chart series colours in the build, an own override of one included', async () => {
     for (const css of [await built(''), await built('@theme { --color-chart-1: red; }')]) {
       for (const index of [2, 3, 4, 5, 6])
