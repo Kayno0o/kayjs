@@ -139,6 +139,17 @@ describe('loaded collections', () => {
     expect((await notes.get('b'))?.data.title).toBe('Second')
   })
 
+  it('refuses a loader slug the folder rules refuse as a content problem, one that would climb out of the export', async () => {
+    const bad = ['a/../../x', '/a', 'a//b', 'a/', '.', 'a\\b', 'a?b', 'a#b', 'a\nb', ' ']
+    const notes = collection({ name: 'notes-slugs', load: () => [...bad.map(slug => ({ slug, data: { title: 'X' } })), { slug: 'fr/ok', data: { title: 'Ok' } }] as [] }, { schema })
+
+    const refused = await rejection(notes.all())
+
+    expect(refused).toBeInstanceOf(ContentError)
+    expect((refused as ContentError).problems).toHaveLength(bad.length)
+    expect((refused as ContentError).problems.every(problem => problem.message.includes('a slug is a path of non-empty parts'))).toBe(true)
+  })
+
   it('refuses entries the schema refuses, a missing or repeated slug, and anything but an array, loading again on the next read', async () => {
     let given: unknown = [{ slug: 'a', data: { title: 1 } }, { slug: 'a', data: { title: 'Again' } }, { data: {} }]
     const notes = collection({ name: 'notes-refused', load: () => given as [] }, { schema })

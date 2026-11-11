@@ -565,6 +565,11 @@ export function translationKey(entry: { slug: string, data: unknown }): string {
   return typeof given === 'string' && given !== '' ? given : entry.slug
 }
 
+// Whether a value is a slug: a path of non-empty parts, none `.` or `..`, with no backslash, control character, `?` or `#`.
+export function isSlug(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '' && !value.split('/').some(part => part === '' || part === '.' || part === '..') && !BAD_SLUG.test(value)
+}
+
 // The slug of the entry a file holds: its `slug` field when it sets one, after its locale's folder in a localized collection, else the file's path.
 // A slug is a path of the site, so one with an empty, `.` or `..` part, a backslash, a control character, `?` or `#` is refused.
 export function entrySlug(name: string, data: unknown, localized: boolean, line: number): string {
@@ -574,7 +579,7 @@ export function entrySlug(name: string, data: unknown, localized: boolean, line:
   if (given === undefined)
     return fromPath
 
-  if (typeof given !== 'string' || given.trim() === '' || given.split('/').some(part => part === '' || part === '.' || part === '..') || BAD_SLUG.test(given))
+  if (!isSlug(given))
     throw new MarkdownError(`slug is ${JSON.stringify(given)}: a slug is a path of non-empty parts, none . or .., with no backslash, control character, ? or #`, line)
 
   if (!localized)

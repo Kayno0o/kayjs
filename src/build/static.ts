@@ -28,7 +28,7 @@ import { withoutSlash } from '../server/routes'
 import { securityHeaders } from '../server/security'
 import { siteOrigin } from '../server/seo'
 import { cachedCopies, pruneCopies } from './compressed'
-import { headersFile, nginxHeaders } from './header-files'
+import { headersFile, nginxHeaders, unnamedHeaders } from './header-files'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 interface App {
@@ -273,7 +273,10 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
 
   await Bun.write(nginx, nginxHeaders(headers ?? {}))
 
-  const text = headersFile(headers, caches)
+  const file = join(out, '_headers')
+  // The app's own `public/_headers` stays first, kay's block follows it, and a header the app already names is not repeated.
+  const mine = existsSync(file) ? await Bun.file(file).text() : undefined
+  const text = headersFile(headers && mine !== undefined ? unnamedHeaders(headers, mine) : headers, caches)
 
   if (text === '')
     return written
@@ -286,10 +289,8 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
   if (own.length > 0)
     kayLog('warn', `${own.join(', ')} set${own.length === 1 ? 's' : ''} security on the page or a layout, which the exported headers do not carry: the site-wide policy applies to ${own.length === 1 ? 'it' : 'them'} unless the host sends other headers for the path`)
 
-  const file = join(out, '_headers')
-
-  if (existsSync(file)) {
-    kayLog('warn', `public/_headers is kept as it is, so the ${headers ? 'security headers kay computed are not in it; they are in headers.nginx.conf' : 'cache-control of the pages with a `ttl` is not in it'}`)
+  if (mine !== undefined) {
+    await Bun.write(file, `${mine.trimEnd()}\n\n${text}`)
 
     return written
   }

@@ -6,6 +6,7 @@ const WORDS = /(^|-)([a-z])/g
 const LINE_BREAK = /[\r\n]/
 const PATTERN = /[*:\s]/
 const TRAILING_SLASH = /\/+$/
+const HEADER_LINE = /^[ \t]+([\w-]+):/gm
 
 function titled(name: string): string {
   return name.replace(WORDS, (_, dash: string, letter: string) => `${dash}${letter.toUpperCase()}`)
@@ -26,6 +27,13 @@ export function headersFile(headers: Record<string, string> | undefined, caches:
   }
 
   return blocks.join('\n')
+}
+
+// The headers the app's own `_headers` text does not name, so kay's block can follow it and a header the app set wins.
+export function unnamedHeaders(headers: Record<string, string>, mine: string): Record<string, string> {
+  const named = new Set(Array.from(mine.matchAll(HEADER_LINE), match => match[1]!.toLowerCase()))
+
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !named.has(name.toLowerCase())))
 }
 
 // The headers as `add_header` lines for an nginx `include`, repeated by the config in every location with an `add_header` of its own, as nginx drops the inherited ones there.

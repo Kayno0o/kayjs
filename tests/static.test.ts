@@ -482,7 +482,7 @@ describe('kay build --static', () => {
     expect(headersFile(undefined, caches)).toBe(`/\n  Cache-Control: ${control}\n\n/repo/ok\n  Cache-Control: ${control}\n\n/repo/ok/\n  Cache-Control: ${control}\n`)
   })
 
-  it('warns of the pages setting their own security and of CSP reports, keeps a public _headers, and writes no headers with security off', async () => {
+  it('warns of the pages setting their own security and of CSP reports, merges the headers into a public _headers, and writes no headers with security off', async () => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
     const config = join(fixture, 'kay.config.ts')
@@ -490,16 +490,21 @@ describe('kay build --static', () => {
 
     try {
       await Bun.write(join(fixture, 'src/routes/embed.kay'), '--- server\nexport const page = { security: { csp: { \'frame-src\': [\'https://video.example\'] } } }\n---\nh1 Embed\n')
-      await Bun.write(join(fixture, 'public/_headers'), '/*\n  X-Mine: yes\n')
+      await Bun.write(join(fixture, 'public/_headers'), '/*\n  X-Mine: yes\n  Content-Security-Policy: default-src \'none\'\n')
       await Bun.write(config, original.replace('robots:', 'security: { reports: true },\n  robots:'))
 
       const reported = await exportSite(elsewhere, fixture)
 
       expect(reported.errors).toContain('/embed set')
       expect(reported.errors).toContain('security.reports: true sends CSP reports to an endpoint a static site lacks')
-      expect(reported.errors).toContain('public/_headers is kept as it is')
       expect(reported.code).toBe(0)
-      expect(await Bun.file(join(elsewhere, '_headers')).text()).toBe('/*\n  X-Mine: yes\n')
+
+      const merged = await Bun.file(join(elsewhere, '_headers')).text()
+
+      // The app's rules stay first, kay's follow them, and a header the app names (here the CSP) is not sent twice.
+      expect(merged.startsWith('/*\n  X-Mine: yes\n  Content-Security-Policy: default-src \'none\'\n')).toBe(true)
+      expect(merged).toContain('X-Content-Type-Options: nosniff')
+      expect(merged.match(/Content-Security-Policy:/g)).toHaveLength(1)
 
       const nginx = await Bun.file(join(elsewhere, 'headers.nginx.conf')).text()
 
