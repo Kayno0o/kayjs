@@ -85,7 +85,7 @@ export default {
 }
 ```
 
-A single colour works too, and `manifest.themeColor` is the fallback. A page that writes its own `theme-color` meta replaces the site's one for the same `media`.
+A single colour works too, and `manifest.themeColor` is the fallback; it takes a pair as well, though the manifest itself holds one `theme_color` and gets the light colour. A page that writes its own `theme-color` meta replaces the site's one for the same `media`.
 
 With `site` set, every page gets a canonical link, `og:title`, `og:description`, `og:url` and `twitter:card`.
 

@@ -46,7 +46,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `navigation`, `onBeforeNavigate`, `onNavigate` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), a hook that may cancel one, and a hook after each shown page. See [Islands](/essentials/islands#page-navigation) |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
-| `apiUrl` | Where a route of an API module is served, under `base` and `serve.apiPath`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
+| `apiUrl` | Where a route of an API module is served, under `base` and `serve.apiPrefix`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |
 | `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |
 | `refuse` | Thrown in an action or a `beforeX` hook to stop it with a message, field errors and data, answered as `ctx.fail` is; elsewhere it is a 500. See [Hooks](/guides/hooks#changing-or-refusing) |

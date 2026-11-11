@@ -158,8 +158,12 @@ describe('images.remote caps', () => {
 
 describe('live limits', () => {
   it('default to 20 connections and 120 openings a minute, and refuse anything but whole numbers from 1', () => {
-    expect(liveLimits(undefined)).toEqual({ connections: 20, perMinute: 120 })
-    expect(liveLimits({ connections: 3 })).toEqual({ connections: 3, perMinute: 120 })
+    expect(liveLimits(undefined)).toEqual({ connections: 20, max: 120, windowMs: 60_000 })
+    expect(liveLimits({ connections: 3 })).toEqual({ connections: 3, max: 120, windowMs: 60_000 })
+    expect(liveLimits({ perMinute: 30 })).toEqual({ connections: 20, max: 30, windowMs: 60_000 })
+    expect(liveLimits({ rate: { max: 5, window: '10s' } })).toEqual({ connections: 20, max: 5, windowMs: 10_000 })
+    expect(() => liveLimits({ rate: { max: 5, window: '10s' }, perMinute: 5 })).toThrow('both rate and its older spelling perMinute')
+    expect(() => liveLimits({ rate: { max: 0, window: '1m' } })).toThrow('live.rate.max is 0')
 
     for (const value of [0, 1.5, -2, Number.NaN, Infinity])
       expect(() => liveLimits({ connections: value })).toThrow('live.connections is')

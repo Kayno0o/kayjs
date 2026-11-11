@@ -16,7 +16,7 @@ const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
 const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
 const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
 const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
-const SERVE: Record<keyof ServeConfig, Rule> = { apiPath: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
+const SERVE: Record<keyof ServeConfig, Rule> = { apiPrefix: str, apiPath: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
 const OBSERVE: Record<keyof ObserveConfig, Rule> = { log: true, serverTiming: bool, requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
 const HYDRATION = bag({ visible: str, serverIslands: str })
 const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool, pageTimeout: duration }
@@ -27,12 +27,12 @@ const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
 const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: list(str) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
-const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, perMinute: num }
+const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, rate: bag({ max: num, window: duration }), perMinute: num }
 const JOBS: Record<keyof JobsConfig, Rule> = { guard: either(fn, list(fn)), path: str }
 const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
 const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
 const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
-const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: str, backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
+const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
 const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, perMinute: either(num, lit(false)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: fn }
@@ -110,7 +110,7 @@ export const REMOVED_KEYS: Record<string, string> = {
   publicDir: 'dirs.public',
   maxSize: 'limits.body',
   maxSizeByPath: 'limits.byPath',
-  apiPath: 'serve.apiPath',
+  apiPath: 'serve.apiPrefix',
   compress: 'serve.compress',
   compressionDictionary: 'serve.compressionDictionary',
   shutdownTimeout: 'serve.shutdownTimeout',
@@ -126,6 +126,11 @@ export const REMOVED_KEYS: Record<string, string> = {
   hydration: 'client.hydration',
   prefetch: 'client.prefetch',
   saveData: 'client.saveData',
+}
+
+// Where the API is served: `serve.apiPrefix`, else the older `serve.apiPath`, which is read for three minors.
+export function apiPrefixOf(serve: ServeConfig | undefined): string | undefined {
+  return serve?.apiPrefix ?? serve?.apiPath
 }
 
 export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const

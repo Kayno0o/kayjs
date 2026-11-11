@@ -5,6 +5,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { TS_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { apiPrefixOf } from '../config-shape'
 import { projectPaths } from '../project'
 import { TRAILING_SLASH } from '../runtime/base'
 import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
@@ -35,9 +36,9 @@ export const KAY_PREFIX = '/_kay/'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
-// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `serve.apiPath` in kay.config.ts otherwise.
+// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `serve.apiPrefix` in kay.config.ts otherwise.
 export function apiPathOf(value: string | undefined): string {
-  return value === undefined ? API_PREFIX : servedPath(value, 'serve.apiPath')
+  return value === undefined ? API_PREFIX : servedPath(value, 'serve.apiPrefix')
 }
 // Where `mcp` serves the app's tools.
 export const MCP_PATH = '/mcp'
@@ -129,12 +130,12 @@ const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 export async function projectApi(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'serve'>): Promise<ApiModule[]> {
   const [app, ...mounts] = apiTrees(root, config)
 
-  return scanApi(app!.dir, mounts, apiPathOf(config.serve?.apiPath))
+  return scanApi(app!.dir, mounts, apiPathOf(apiPrefixOf(config.serve)))
 }
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
 export function apiTrees(root: string, config: Pick<KayConfig, 'dirs' | 'extensions' | 'serve'>): RouteMount[] {
-  const apiPath = apiPathOf(config.serve?.apiPath)
+  const apiPath = apiPathOf(apiPrefixOf(config.serve))
 
   return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))
 }

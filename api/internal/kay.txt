@@ -977,6 +977,9 @@ interface FetchPublicOptions
 [./library] GENERATE_SECRET
 const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
 
+[./library] GuardOption
+type GuardOption = Guard | Guard[] | LazyGuard
+
 [./library] hear
 function hear(db: SQL, kind: string, name: string | undefined, wake: () => void): Promise<Subscription>
 
@@ -1011,6 +1014,9 @@ function isEmail(input: unknown): input is string
 
 [./library] isUrlAttribute
 function isUrlAttribute(name: string): boolean
+
+[./library] joinGuards
+function joinGuards(option: GuardOption): Guard
 
 [./library] JsonSchema
 interface JsonSchema

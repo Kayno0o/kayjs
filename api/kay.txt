@@ -1490,6 +1490,9 @@ interface Ga4Options extends Counted
   titles?: boolean | undefined
   url?: string | undefined
 
+[./analytics] GuardOption
+type GuardOption = Guard | Guard[] | LazyGuard
+
 [./analytics] MatomoOptions
 type MatomoOptions = MatomoBase & ({
   url: string, host?: undefined
@@ -1564,7 +1567,7 @@ function vitals(options?: VitalsOptions): KayExtension<AnyElysia>
 [./analytics] VitalsOptions
 interface VitalsOptions
   consent?: boolean | undefined
-  guard?: Guard | LazyGuard | undefined
+  guard?: GuardOption | false | undefined
   prefix?: string | undefined
 
 [./analytics] vitalsReport

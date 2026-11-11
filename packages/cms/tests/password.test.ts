@@ -178,6 +178,32 @@ describe('the secret and the lazily loaded guard', () => {
   })
 })
 
+describe('a guard option that is a list or false', () => {
+  test('a list runs in order, the first refusal answering, and a password guard in it still signs in', async () => {
+    const { configure, settings } = await import('../src/settings')
+    const { activePasswords } = await import('../src/password')
+    const passwords = passwordGuard('list-pw')
+    const ran: string[] = []
+
+    configure({ guard: [() => void ran.push('first'), passwords] })
+    expect(activePasswords()?.match('list-pw')).toBe('editor')
+    expect(await statusOf(context(), settings().guard)).toBe(401)
+    expect(ran).toEqual(['first'])
+
+    configure({ guard: [() => undefined, () => undefined] })
+    expect(await statusOf(context(), settings().guard)).toBe(200)
+  })
+
+  test('false admits everyone, where no guard admits nobody', async () => {
+    const { configure, settings } = await import('../src/settings')
+
+    configure({})
+    expect(settings().guard).toBeUndefined()
+    configure({ guard: false })
+    expect(await statusOf(context(), settings().guard)).toBe(200)
+  })
+})
+
 describe('signing out', () => {
   test('signing out ends the cookie and deletes both names', async () => {
     const { configure } = await import('../src/settings')

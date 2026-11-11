@@ -37,7 +37,6 @@ const MAX_WATCHED = 500
 const MAX_KEY_LENGTH = 256
 // A tab's id: letters, digits and hyphens, so it never reads as part of a presence member beside it in the store.
 const TAB_ID = /^[\w-]{1,64}$/
-const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
 // A page's proof and watch list both carry its keys, so this many of the longest fit the request.
@@ -530,7 +529,7 @@ function readRequest(text: string): LiveRequest | undefined {
 
 // `POST /_kay/live`: one event stream per page carrying the live values its islands read. A value is sent only to a request holding the proof a page that read it carried, so a guard on the page covers it.
 export function serveLive(app: Elysia, config?: LiveConfig): void {
-  const { connections, perMinute } = liveLimits(config)
+  const { connections, max, windowMs } = liveLimits(config)
 
   checkLiveWrites(checkSendable)
   app.post(LIVE_ROUTE, async ({ request, server }) => {
@@ -540,7 +539,7 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REQUEST_BYTES)
       return new Response(null, { status: 413 })
 
-    if (await overLimit(LIMIT, clientAddress(request, server), perMinute, MINUTE_MS) !== undefined)
+    if (await overLimit(LIMIT, clientAddress(request, server), max, windowMs) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REQUEST_BYTES)

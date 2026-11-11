@@ -53,21 +53,26 @@ export function timeoutMs(value: Duration | false | undefined, what: string): nu
 }
 
 const DEFAULT_PER_MINUTE = 120
+const MINUTE_MS = 60_000
 
 // How many connections one client holds at once unless `live.connections` says otherwise: a few tabs, not a flood.
 export const MAX_CONNECTIONS = 20
 
 // `live` from kay.config.ts with its defaults, each limit a whole number from 1.
-export function liveLimits(config: LiveConfig | undefined): { connections: number, perMinute: number } {
-  const connections = config?.connections ?? MAX_CONNECTIONS
-  const perMinute = config?.perMinute ?? DEFAULT_PER_MINUTE
+export function liveLimits(config: LiveConfig | undefined): { connections: number, max: number, windowMs: number } {
+  if (config?.rate !== undefined && config.perMinute !== undefined)
+    throw new KayError('config-invalid', 'kay: live sets both rate and its older spelling perMinute; keep rate')
 
-  for (const [name, value] of [['connections', connections], ['perMinute', perMinute]] as const) {
+  const connections = config?.connections ?? MAX_CONNECTIONS
+  const max = config?.rate?.max ?? config?.perMinute ?? DEFAULT_PER_MINUTE
+  const named = config?.rate === undefined ? ['perMinute', max] as const : ['rate.max', max] as const
+
+  for (const [name, value] of [['connections', connections], named] as const) {
     if (!Number.isSafeInteger(value) || value < 1)
       throw new KayError('config-invalid', `kay: live.${name} is ${String(value)}; it takes a whole number from 1`)
   }
 
-  return { connections, perMinute }
+  return { connections, max, windowMs: config?.rate === undefined ? MINUTE_MS : optionMs(config.rate.window, 'live.rate.window') }
 }
 
 // Refuses a `timeZone` the engine does not know.

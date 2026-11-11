@@ -264,7 +264,7 @@ export function manifestJson(name: string | undefined, description: string | und
     scope: scope === undefined ? undefined : base + scope,
     display: manifest.display,
     orientation: manifest.orientation,
-    theme_color: manifest.themeColor,
+    theme_color: typeof manifest.themeColor === 'object' ? manifest.themeColor.light : manifest.themeColor,
     background_color: manifest.backgroundColor,
     shortcuts: manifest.shortcuts?.map((shortcut, index) => ({ name: shortcut.name, short_name: shortcut.shortName, description: shortcut.description, url: page(shortcut.url, `shortcuts[${index}].url`) })),
   })

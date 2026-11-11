@@ -4,11 +4,11 @@ import type { BudgetConfig } from './build/budget'
 import type { Listed as RouteListing } from './commands/routes'
 import type { LintLevels } from './compiler/lints'
 import type { Highlighter, MarkdownPreprocess, MarkdownTransform } from './content/markdown'
-import type { ActionHooks, ActionProtect, ProtectionMessages } from './runtime/action'
+import type { ActionHooks, ActionProtect, ProtectionMessages, RateLimit } from './runtime/action'
 import type { ByteSize } from './runtime/byte-size'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
-import type { Guard, GuardContext } from './runtime/index'
+import type { GuardContext } from './runtime/index'
 import type { Localized } from './runtime/localized'
 import type { PreviewScope } from './runtime/preview'
 import type { JsonLd } from './runtime/seo'
@@ -18,6 +18,7 @@ import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
 
+import type { GuardOption } from './server/lazy-guard'
 import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
@@ -157,7 +158,9 @@ export interface LimitsConfig {
 }
 
 export interface ServeConfig {
-  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPath: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
+  // The prefix the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
+  apiPrefix?: string | undefined
+  /** @deprecated The old name of `apiPrefix`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
   apiPath?: string | undefined
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
@@ -267,12 +270,15 @@ export interface PreviewConfig {
 export interface LiveConfig {
   // How many live connections one client address holds at once, 20 by default: a few tabs, not a flood. One more answers 429.
   connections?: number | undefined
-  // How many it may open in a minute, 120 by default.
+  // How many openings a client address may make in a window, `{ max: 120, window: '1m' }` by default, the shape of every rate limit in kay.
+  rate?: Pick<RateLimit, 'max' | 'window'> | undefined
+  /** @deprecated The old form of `rate`, `perMinute: 120` standing for `rate: { max: 120, window: '1m' }`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
   perMinute?: number | undefined
 }
 
 export interface JobsConfig {
-  guard: Guard | Guard[]
+  // A guard, a list of them run in order, or `{ load }` returning one.
+  guard: GuardOption
   path?: string | undefined
 }
 
@@ -356,8 +362,10 @@ export interface FontsourceConfig {
   styles?: ('normal' | 'italic')[] | undefined
   // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
   subsets?: string[] | undefined
-  // The older spelling of `subsets`, which also takes one name.
+  /** @deprecated The old name of `subsets`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
   subset?: string | string[] | undefined
+  /** @deprecated The old name of `weights`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
+  weight?: number | number[] | undefined
   display?: FontConfig['display'] | undefined
   // Preloads every face the entry declares, as `preload` does a font's: give it to an entry of one subset and the faces the first paint shows.
   preload?: boolean | undefined
@@ -372,8 +380,8 @@ export interface FaviconConfig {
 export interface ManifestConfig {
   // The name under the icon on a home screen; defaults to `seo.name`.
   shortName?: string | undefined
-  // Also every page's `theme-color`, unless `seo.themeColor` sets one.
-  themeColor?: string | undefined
+  // Also every page's `theme-color`, unless `seo.themeColor` sets one: a colour, or a `{ light, dark }` pair for each colour scheme of the visitor, as `seo.themeColor` takes. A manifest holds one `theme_color`, so the installed app gets the `light` one.
+  themeColor?: string | { light: string, dark: string } | undefined
   backgroundColor?: string | undefined
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser' | undefined
   orientation?: 'any' | 'natural' | 'landscape' | 'landscape-primary' | 'landscape-secondary' | 'portrait' | 'portrait-primary' | 'portrait-secondary' | undefined
@@ -462,7 +470,7 @@ export interface ImagesConfig {
   // The file of an image `src` no import, stored file, `dirs` entry or remote host names, looked up the app's own way: `(src, ctx) => mediaPath(src.slice('/media/'.length))`. A path relative to the root, or undefined for a 404; `ctx` is a guard's, its `deny()` and `redirect()` included. `image(src, { width, height })` then resizes any `src` starting with `/`, and these answers are private to the browser.
   resolve?: ((src: string, ctx: GuardContext) => string | undefined | Promise<string | undefined>) | undefined
   // Run before `resolve`, as a page guard: `guard(ctx => { if (!ctx.locals.session.get('user')) ctx.deny(401) })` resizes those images for signed-in users alone.
-  guard?: Guard | undefined
+  guard?: GuardOption | undefined
 }
 
 export interface CardConfig {

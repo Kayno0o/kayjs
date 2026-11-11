@@ -244,7 +244,7 @@ interface FontsourceMetadata {
 
 // One face per weight and style, each the package's own file, or one per style spanning the weights of a variable package.
 function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
-  const { fontsource, weights, styles = ['normal'], display, preload } = font
+  const { fontsource, weight, styles = ['normal'], display, preload } = font
   let file: string
 
   try {
@@ -259,7 +259,11 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   if (font.subsets !== undefined && font.subset !== undefined)
     throw new KayError('font-invalid', `kay: the font ${fontsource} sets both subsets and its older spelling subset; keep subsets`)
 
+  if (font.weights !== undefined && weight !== undefined)
+    throw new KayError('font-invalid', `kay: the font ${fontsource} sets both weights and its older spelling weight; keep weights`)
+
   const named = font.subsets ?? font.subset
+  const weights = font.weights ?? (weight === undefined ? undefined : [weight].flat())
   const subsets = typeof named === 'string' ? [named] : named ?? [metadata.defSubset]
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
   const variable = fontsource.startsWith(VARIABLE_SCOPE) && metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined

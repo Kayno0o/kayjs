@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `analytics()` takes `url`, `site` and `privacy`
 
 `host` of an `analytics()` provider (the service address, which Matomo requires) is `url`, so it no longer shares a word with the `hosts` list of page hostnames. `domain` of Plausible and `hostname` of Simple Analytics are `site`; `websiteId`, `siteId`, `measurementId` and `token` stay, being each provider's own word. `policyUrl` is `privacy`, as in mail and kayjs-ui. The old names still work for three minors, and `kay upgrade` renames them (`deprecated-analytics-options`); an options object built outside the call is not found by the lint but is still read.
+### `serve.apiPath`, `live.perMinute`, `subset` and `weight` of a Fontsource font
+
+`serve.apiPath` is `serve.apiPrefix`, a prefix as every library's `prefix` is. `live: { perMinute: 120 }` is `live: { rate: { max: 120, window: '1m' } }`, the shape of every rate limit option. A Fontsource entry's `subset` is `subsets` and a `weight` it never took is `weights`. The old keys still work for three minors, and `kay upgrade` rewrites them (`deprecated-config-keys`).
 
 ### `tz` of `schedule()` is `timeZone`
 

@@ -576,6 +576,14 @@ describe('the screen', () => {
     expect(admitted.status).toBe(200)
   })
 
+  it('takes a list of guards run in order, and false to open the screen', async () => {
+    expect((await screen({ guard: [() => undefined, ctx => ctx.deny(403, 'not you')] })).status).toBe(403)
+    expect((await screen({ guard: [() => undefined, () => undefined] })).status).toBe(200)
+    expect((await screen({ guard: false })).status).toBe(200)
+    expect(() => vitals({ guard: [] })).toThrow('takes a guard')
+    expect(() => vitals({ guard: true as never })).toThrow('takes a guard')
+  })
+
   it('takes a guard built when the first request reaches it', async () => {
     let built = 0
     const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [vitals({ guard: { load: () => {

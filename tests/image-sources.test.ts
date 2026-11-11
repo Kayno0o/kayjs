@@ -275,6 +275,19 @@ describe('images.resolve and images.guard', () => {
     expect((await get('/media/10', 'w=320', signedIn)).status).toBe(404)
   })
 
+  it('runs a list of image guards in order', async () => {
+    const listed = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { resolve: () => HERO, guard: [(ctx) => {
+      ctx.headers.set('x-first', 'yes')
+    }, (ctx) => {
+      if (ctx.cookies.get('user') === null)
+        ctx.deny(401, 'Sign in')
+    }] } })
+    const ask = async (headers: Record<string, string> = {}) => listed.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`, { headers }))
+
+    expect((await ask()).status).toBe(401)
+    expect((await ask(signedIn)).status).toBe(200)
+  })
+
   it('answers the redirect resolve throws', async () => {
     const moved = await get('/media/moved', 'w=320', signedIn)
 

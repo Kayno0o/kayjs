@@ -11,7 +11,7 @@ import { SHIPPED_WORDS } from './analytics-words'
 export { consent } from '../runtime/consent'
 export type { Consent } from '../runtime/consent'
 export { vitals, vitalsReport } from './vitals'
-export type { LazyGuard, VitalsOptions } from './vitals'
+export type { GuardOption, LazyGuard, VitalsOptions } from './vitals'
 export type { RouteVitals, VitalsStore, VitalSummary } from './vitals'
 
 // Counts a named event from an action or an endpoint, with a few short props (strings, numbers, flags), through the provider `analytics()` configured: `await track(ctx, 'signup', { plan: 'pro' })`.

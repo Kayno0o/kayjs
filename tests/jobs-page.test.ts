@@ -88,6 +88,22 @@ describe('the production jobs page', () => {
     expect((await get(site, '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
   })
 
+  it('takes a guard built when the first request reaches it', async () => {
+    let built = 0
+    const lazy = { load: () => {
+      built++
+
+      return admin
+    } }
+    const site = await app({ jobs: { guard: lazy } })
+
+    expect(built).toBe(0)
+    expect((await get(site, '/_kay/jobs')).status).toBe(403)
+    expect((await get(await app({ jobs: { guard: lazy } }), '/_kay/jobs', { 'x-admin': 'yes' })).status).toBe(200)
+    expect(built).toBe(2)
+    await expect(app({ jobs: { guard: false } })).rejects.toThrow('guard')
+  })
+
   it('lists a failed job with its escaped error, uncached and not indexed', async () => {
     const site = await app({ jobs: { guard: allow } })
     const { name, id } = await failedJob('list')

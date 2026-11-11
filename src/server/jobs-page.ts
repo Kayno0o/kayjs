@@ -1,6 +1,5 @@
 import type { Elysia } from 'elysia'
 import type { JobsConfig } from '../config'
-import type { Guard } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
 import type { JobView, QueueView } from './job-admin'
@@ -10,6 +9,7 @@ import { escapeHtml } from '../runtime/escape'
 import { passGuards } from './actions'
 import { isCrossSite } from './cross-site'
 import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
+import { guardList, isGuardOption } from './lazy-guard'
 import { maintenanceOverview } from './maintenance'
 
 export const JOBS_PATH = '/_kay/jobs'
@@ -27,17 +27,16 @@ export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefine
     return undefined
 
   const given = typeof setting === 'object' && setting !== null ? setting.guard as unknown : undefined
-  const list = Array.isArray(given) ? given as unknown[] : [given]
 
-  if (list.length === 0 || !list.every(check => typeof check === 'function'))
-    throw new KayError('config-invalid', 'kay: `jobs` needs a `guard`, a guard function or a list of them, such as `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }`: the page lists the payloads of the queues and deletes their jobs, so it never mounts open')
+  if (!isGuardOption(given))
+    throw new KayError('config-invalid', 'kay: `jobs` needs a `guard`, a guard function, a list of them or `{ load }`, such as `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }`: the page lists the payloads of the queues and deletes their jobs, so it never mounts open')
 
   const path = setting.path ?? JOBS_PATH
 
   if (!path.startsWith('/') || (path.length > 1 && path.endsWith('/')))
     throw new KayError('config-invalid', `kay: \`jobs.path\` is an absolute path without a trailing slash, not ${JSON.stringify(path)}`)
 
-  return { path, guards: list.map(check => ({ file: 'kay.config.ts', special: {}, check: check as Guard })) }
+  return { path, guards: guardList(given).map(check => ({ file: 'kay.config.ts', special: {}, check })) }
 }
 
 // A due time past the range of a Date (a store may hold any number) is shown as it is.

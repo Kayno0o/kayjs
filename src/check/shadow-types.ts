@@ -33,6 +33,7 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { analyticsOptions } from './analytics-options'
+import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
@@ -40,6 +41,7 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
+
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
@@ -158,6 +160,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => scheduleTz(root, options),
   async ({ root, options }) => workflowStartId(root, options),
   async ({ root, options }) => analyticsOptions(root, options),
+  ({ root, options }) => deprecatedConfigKeys(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

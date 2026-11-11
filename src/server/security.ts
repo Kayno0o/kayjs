@@ -1,5 +1,6 @@
 import type { ClientConfig, KayConfig, SecurityConfig, ServeConfig } from '../config'
 import type { PageSecurity } from '../runtime'
+import { apiPrefixOf } from '../config-shape'
 import { pushListed, registersWorker } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
@@ -99,7 +100,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: options.serve?.apiPath, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: apiPrefixOf(options.serve), dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

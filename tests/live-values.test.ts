@@ -263,7 +263,7 @@ describe('live values on the server', () => {
 })
 
 describe('the connections of one client', () => {
-  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, perMinute?: number }): Promise<void> {
+  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, perMinute?: number, rate?: { max: number, window: '1m' | '1h' } }): Promise<void> {
     const site = await testSite({ root: ROOT, live })
 
     try {
@@ -295,6 +295,14 @@ describe('the connections of one client', () => {
       await first.body!.cancel()
       expect((await connect()).status).toBe(429)
     }, { perMinute: 1 })
+
+    await withSite(async (connect) => {
+      const first = await connect()
+
+      expect(first.status).toBe(200)
+      await first.body!.cancel()
+      expect((await connect()).status).toBe(429)
+    }, { rate: { max: 1, window: '1h' } })
   })
 
   it('are capped, a slot freeing as one closes', async () => {

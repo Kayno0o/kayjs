@@ -143,7 +143,7 @@ export default defineConfig({
 
 - The manifest is named after `seo.name`, `shortName` defaulting to it, and described by `seo.description`.
 - A `name` or `description` written per locale gives each locale reading a text of its own a manifest of its own, `/manifest.fr.webmanifest` beside the default locale's `/manifest.webmanifest`, which that locale's pages link; a locale reading the default locale's text links the default's, and a site writing them once serves one. A site serving its own `/manifest.webmanifest`, a public file or an endpoint, keeps it: kay then serves and links no manifest of a locale. An explicit `shortName` and every path in the manifest, `startUrl` and `scope` included, are the same in all of them, `short_name` otherwise following the locale's `name`.
-- `themeColor` is also every page's `theme-color`, `favicon: false` included, unless `seo.themeColor` sets one.
+- `themeColor` is also every page's `theme-color`, `favicon: false` included, unless `seo.themeColor` sets one. It takes a colour or a `{ light, dark }` pair, as `seo.themeColor` does: the pages get a meta for each colour scheme, and the manifest, which holds one `theme_color`, gets the `light` one.
 - `startUrl` is the page the installed app opens, `scope` by default, else `/`, and `scope` the paths it keeps in its window.
 - `startUrl`, `scope` and each shortcut's `url` (`name`, `shortName`, `description`) are paths of the site, put under `base`.
 - One not starting with a single `/`, or a start page or shortcut outside `scope`, which browsers would ignore, stops the server as it boots.
@@ -260,7 +260,7 @@ export default defineConfig({
 - `preload: true` on a Fontsource entry preloads each face it declares, as on a font: give it an entry of one subset.
 - Each style lists the same weights, so an italic of one weight alone, `italic` at 400 beside normal at 400, 600 and 700, is a second entry: `{ fontsource: '@fontsource/open-sans', weights: [400], styles: ['italic'] }`.
 - The family is the package's own name, `Figtree` for `@fontsource-variable/figtree`, not the `Figtree Variable` its stylesheet names.
-- `subsets` defaults to the package's own, `latin` for most; `subset`, which also takes one name, is the older spelling.
+- `subsets` defaults to the package's own, `latin` for most; `subset` was the spelling before 1.98 and `weight` the one of `weights`, which `deprecated-config-keys` rewrites, a lone name or number going in a list.
 - Several, `subsets: ['latin', 'latin-ext']`, declare each face once per subset with its `unicode-range`, read from the package, so a page loads only the files its text needs.
 - `styles` defaults to `['normal']`, and `display` applies to every face.
 - A weight, style or subset the package lacks stops the build, naming the ones it has.

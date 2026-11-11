@@ -79,7 +79,7 @@ In `serve`, how the server answers:
 
 | Option | Effect |
 | --- | --- |
-| `serve.apiPath` | Where the API modules, the OpenAPI document and its reference page are served, `/api` by default: `serve: { apiPath: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash. See [API routes](/guides/api-routes) |
+| `serve.apiPrefix` | Where the API modules, the OpenAPI document and its reference page are served, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash. It was `serve.apiPath` before 1.98. See [API routes](/guides/api-routes), and [Path and guard options](/reference/config#path-and-guard-options) for how every prefix, path and guard option reads |
 | `serve.compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `serve.compressionDictionary` | A server build with a prerendered page uses its 404 page as a dictionary and sends a page to a browser holding it as the difference from it. On by default; `false` builds none, so no page names one. See [Pages that send only their difference](/guides/deployment#pages-that-send-only-their-difference) |
 | `serve.shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
@@ -169,8 +169,23 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `cors` | The origins every API module accepts that sets no `cors` of its own, as `api({ cors })` takes them. `api({ cors: false })` opts a module out. An endpoint file sets its own in `page.cors`. See [Calls from other sites](/guides/api-routes#calls-from-other-sites) |
 | `mcp` | `true` serves an MCP endpoint at `/mcp`, or at `{ path }`, for AI agents, at most 120 requests a client a minute unless `{ rateLimit }` says otherwise, and only to a client sending `{ key }` as a bearer token when it is set, with a tool per API route or action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) |
 | `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. `path` and `referencePath` move them, `title` and `version` fill the document's `info`, and `dev: true` serves both under `kay dev` alone. See [API routes](/guides/api-routes#openapi) |
-| `live` | `{ connections, perMinute }`: how many live connections one client address holds at once (20) and opens a minute (120). See [Live values and realtime](/guides/live-and-realtime) |
+| `live` | `{ connections, rate }`: how many live connections one client address holds at once (20), and how many it opens in a `rate` of `{ max, window }` (120 a minute); `perMinute` is the older spelling. See [Live values and realtime](/guides/live-and-realtime) |
 | `metrics` | `true` serves `/metrics` in the Prometheus text format: requests by route and status, their durations, scheduled runs, cache reads and live connections. Answered only to a request straight from this machine or a private network, or carrying `KAY_METRICS_TOKEN` as a bearer token. `{ path }` moves it. Off by default |
-| `jobs` | `{ guard, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard or a list of them, run on every request, and without one the server does not start. Off by default |
+| `jobs` | `{ guard, path }` serves a page of the queues' jobs at `/_kay/jobs` with retry and delete buttons. The guard is a guard, a list of them or `{ load }`, run on every request, and without one the server does not start. Off by default |
+
+## Path and guard options
+
+A `path` is one route and a `prefix` a subtree. Every `guard` option takes a guard, a list of guards run in order, or `{ load }` returning one, which runs on the first request so `kay.config.ts` imports nothing of your auth. `false` opens what is closed without a guard.
+
+| Option | Reads as | Without a guard | `false` |
+| --- | --- | --- | --- |
+| `serve.apiPrefix` | Prefix of the API modules, the OpenAPI document and its reference | The API directory's `_guard.ts` decides | No guard option |
+| `openapi.path`, `openapi.referencePath`, `mcp.path` | One route | The API directory's `_guard.ts` decides | No guard option |
+| `health.path`, `metrics.path` | One route | Open, `metrics` takes a token | No guard option |
+| `jobs.path`, `jobs.guard` | One route | The server does not start: the page lists payloads | Refused |
+| `vitals({ prefix, guard })` | Prefix | Closed, 403 | Opens the screen |
+| `cms({ prefix, guard })` | Prefix | Closed, 403 | Admits everyone |
+| `images.guard` | Runs before `images.resolve` | Open | Not needed |
+| A page's `guards: false`, an API module's `api({ guards: false })` | One page or module | Under the guards above it | Skips them |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>

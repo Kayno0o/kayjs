@@ -6,13 +6,13 @@ import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
 const KEY = { 'x-key': 'open' }
-const moved = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', serve: { apiPath: '/v1' }, openapi: { reference: true }, mcp: true, base: '/shop' })
+const moved = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', serve: { apiPrefix: '/v1' }, openapi: { reference: true }, mcp: true, base: '/shop' })
 
 afterAll(async () => {
   await moved.close()
 })
 
-describe('apiPath', () => {
+describe('apiPrefix', () => {
   it('serves every module, the document and the reference page under it, and nothing under /api', async () => {
     expect((await moved.fetch('/v1/items/1', { headers: KEY })).status).toBe(200)
     expect((await moved.fetch('/api/items/1', { headers: KEY })).status).toBe(404)
@@ -24,6 +24,19 @@ describe('apiPath', () => {
     expect(document.paths['/v1/files']!.get!.tags).toEqual(['files'])
     expect((await moved.fetch('/v1/reference', { headers: KEY })).status).toBe(200)
     expect((await moved.fetch('/api/openapi.json', { headers: KEY })).status).toBe(404)
+  })
+
+  it('still reads the apiPath of before 1.98 as the prefix', async () => {
+    const legacy = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', serve: { apiPath: '/v1' }, base: '/shop' })
+
+    try {
+      expect((await legacy.fetch('/v1/items/1', { headers: KEY })).status).toBe(200)
+      expect((await legacy.fetch('/api/items/1', { headers: KEY })).status).toBe(404)
+      expect(await (await legacy.fetch('/')).text()).toContain('<meta name="kay-api" content="/v1">')
+    }
+    finally {
+      await legacy.close()
+    }
   })
 
   it('tells the browser where the API is, and keeps pages from being prefetched under it', async () => {
@@ -57,7 +70,7 @@ describe('apiPath', () => {
 
   it('refuses a path that is not plain segments or sits under /_kay', () => {
     for (const bad of ['v1', '/v1/', '/', '/a//b', '/a/../b', '/_kay', '/_kay/api', '/a:b', '/a*'])
-      expect(() => apiPathOf(bad)).toThrow('apiPath')
+      expect(() => apiPathOf(bad)).toThrow('apiPrefix')
 
     expect(apiPathOf('/v1/public')).toBe('/v1/public')
     expect(apiPathOf(undefined)).toBe('/api')
@@ -80,13 +93,13 @@ describe('apiPath', () => {
 })
 
 describe('apiUrl in a handler', () => {
-  it('names the route of the module the handler runs in from its request, under apiPath', async () => {
+  it('names the route of the module the handler runs in from its request, under apiPrefix', async () => {
     const root = await scratchDir('api-own-url-')
 
     try {
       await Bun.write(join(root, 'api/where.ts'), 'import { apiUrl } from \'kay\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', ({ request }) => ({ here: apiUrl(request, \'/\'), item: apiUrl(request, \'/items/:id\', { params: { id: 7 }, query: { q: \'a b\' } }) }))\n')
 
-      const site = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', dirs: { api: join(root, 'api') }, serve: { apiPath: '/v1' }, base: '/shop' })
+      const site = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', dirs: { api: join(root, 'api') }, serve: { apiPrefix: '/v1' }, base: '/shop' })
 
       try {
         expect(await (await site.fetch('/v1/where')).json()).toEqual({ here: '/v1/where', item: '/v1/where/items/7?q=a+b' })

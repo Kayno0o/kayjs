@@ -1,5 +1,5 @@
 import type { Duration, Guard, GuardContext } from 'kay'
-import type { BeforeHook, ByteSize, Hook, LazyGuard, Logo } from 'kay/library'
+import type { BeforeHook, ByteSize, GuardOption, Hook, Logo } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout, StoredEntry } from './kay/contract'
 import type { GivenRole, Role } from './roles'
@@ -130,8 +130,8 @@ export interface CanQuestion {
 export interface CmsOptions {
   // Where the collection screens live, `/admin` by default.
   prefix?: string | undefined
-  // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through.
-  guard?: Guard | LazyGuard | undefined
+  // Who may use the screens and the API, such as kayjs-auth's `auth.guard({ require: 'editor' })`, a list of guards run in order, or `{ load }` returning one, which runs on the first request rather than as kay.config.ts loads. With one, every save needs it, edit mode included; without one, only an edit-mode request gets through, and `false` admits everyone, which is for a site whose screens another layer already protects.
+  guard?: GuardOption | false | undefined
   // The kayjs-auth role an editor needs, `cms({ role: 'editor' })` standing for a guard of `requireUser({ require: 'editor' })`, the app's `authorize` deciding as in `auth.guard()`, with no route params. Not given with `guard`.
   role?: string | undefined
   // Where a folder entry's file goes: `forgejo(...)`, `github(...)` or `gitlab(...)` on a deployed site, the working tree by default, for `kay dev`. Left out, a production server builds `forgejo()` from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH`, or `github()` or `gitlab()` when `CMS_HOST` is `github` or `gitlab`.
@@ -229,6 +229,8 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
+const admitAll: Guard = () => undefined
+
 export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, beforeSave, beforeUpload, onUpload, collections, pageLink, roles, can, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
@@ -244,7 +246,7 @@ export function configure({ prefix = '/admin', guard: own, role, files = working
   if (can !== undefined && (typeof can !== 'function' || roles === undefined))
     throw configError('cms', 'can', '`cms({ can })` is a function asked after `cms({ roles })`, so it is given with it')
 
-  const guard = own ?? (role === undefined ? undefined : roleGuard(role))
+  const guard = own === false ? admitAll : own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
   current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, beforeSave, beforeUpload, onUpload, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), can, layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }

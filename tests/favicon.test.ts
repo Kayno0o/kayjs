@@ -300,6 +300,16 @@ describe('favicon', () => {
     }
   })
 
+  it('writes the light colour of a { light, dark } theme colour in the manifest, and both in the page', async () => {
+    const paired = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), seo: { name: 'Kay site' }, manifest: { themeColor: { light: '#ffffff', dark: '#111111' } } })
+    const manifest = await (await paired.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { theme_color: string }
+    const page = await (await paired.handle(new Request('http://localhost/about'))).text()
+
+    expect(manifest.theme_color).toBe('#ffffff')
+    expect(page).toContain('<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">')
+    expect(page).toContain('<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">')
+  })
+
   it('gives every page the theme colour with the favicon turned off, the site linking its own', async () => {
     const off = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: false, manifest: { themeColor: '#1e1e2e' } })
 

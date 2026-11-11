@@ -15,6 +15,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { extensionApps, PLUGINS_DIR, serverExtensions } from '../config-extensions'
 import { loadConfigWithin } from '../config-loader'
+import { apiPrefixOf } from '../config-shape'
 import { isRouteOf } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
@@ -207,7 +208,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const enabled = config.openapi === false ? undefined : config.openapi
   const openapi = enabled === true ? {} : enabled
   const mcpAt = mcpPath(config.mcp)
-  const documented = openApiPaths(openapi, apiPathOf(config.serve?.apiPath))
+  const documented = openApiPaths(openapi, apiPathOf(apiPrefixOf(config.serve)))
 
   return [
     ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],

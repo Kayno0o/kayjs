@@ -118,7 +118,7 @@ A page with a server fence, a layout and the special pages render once and are n
 
 A page reading a live value is rendered for each request. `kay build` does not keep it, and a static export of it fails.
 
-A client holds at most 20 live connections, a few tabs, and opens at most 120 a minute. The next one is refused until another closes. `live: { connections: 50, perMinute: 240 }` in kay.config.ts changes both. A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
+A client holds at most 20 live connections, a few tabs, and opens at most 120 a minute. The next one is refused until another closes. `live: { connections: 50, rate: { max: 240, window: '1m' } }` in kay.config.ts changes both (`perMinute: 240` is the older spelling of the rate, which `kay upgrade` rewrites). A client is its address, so behind a reverse proxy set `proxy` in kay.config.ts, or every visitor shares one address and one cap. See [Deployment](/guides/security#trust-a-proxy).
 
 While a tab is hidden it holds no connection for live values, and it opens one again, with every value as it is then, when the tab is shown. A tab following who else is here, below, keeps its connection.
 

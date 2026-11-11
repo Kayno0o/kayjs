@@ -15,9 +15,9 @@ const first = await testSite({ root: ROOT, extensions: [cms(options)] })
 // The app's own dev module sits where the cms's does, so the guard places a request by the next anchor (preview), under any apiPath and base.
 for (const { name, site: siteOptions, root } of [
   { name: 'under the default mount', site: DEFAULT_MOUNT, root: '' },
-  { name: 'under an apiPath', site: { serve: { apiPath: '/v1' } }, root: '' },
+  { name: 'under an apiPrefix', site: { serve: { apiPrefix: '/v1' } }, root: '' },
   { name: 'under a base', site: { base: '/site' }, root: '/site' },
-  { name: 'under a base and an apiPath', site: { base: '/site', serve: { apiPath: '/v1' } }, root: '/site' },
+  { name: 'under a base and an apiPrefix', site: { base: '/site', serve: { apiPrefix: '/v1' } }, root: '/site' },
 ]) {
   test(`with the dev module replaced, a role lacking an action is refused on its route and one holding it let through, ${name}`, async () => {
     const site = siteOptions === DEFAULT_MOUNT ? first : await testSite({ root: ROOT, extensions: [cms(options)], ...siteOptions })

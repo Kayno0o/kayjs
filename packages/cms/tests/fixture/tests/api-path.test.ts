@@ -7,7 +7,7 @@ const ROOT = join(import.meta.dir, '..')
 
 // The fixture's kay.config.ts calls cms() as it loads, after this one, so the settings are given again once it has.
 test('serves its routes under /_kay/cms whatever the apiPath', async () => {
-  const site = await testSite({ root: ROOT, extensions: [cms({})], serve: { apiPath: '/v1' } })
+  const site = await testSite({ root: ROOT, extensions: [cms({})], serve: { apiPrefix: '/v1' } })
 
   cms({})
 

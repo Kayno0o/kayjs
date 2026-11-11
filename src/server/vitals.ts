@@ -1,11 +1,11 @@
 import type { KayExtension } from '../config'
 import type { Guard } from '../runtime/core'
-import type { LazyGuard } from './lazy-guard'
+import type { GuardOption } from './lazy-guard'
 import { KayError } from '../compiler/errors'
 import { BASE_PATH } from './base'
-import { lazily } from './lazy-guard'
+import { isGuardOption, joinGuards } from './lazy-guard'
 
-export type { LazyGuard } from './lazy-guard'
+export type { GuardOption, LazyGuard } from './lazy-guard'
 
 export type { RouteVitals, VitalSummary } from './vitals-store'
 export { vitalsReport } from './vitals-store'
@@ -14,8 +14,8 @@ export type { VitalsStore } from './vitals-store'
 export interface VitalsOptions {
   // Where the numbers are shown, `/vitals` by default.
   prefix?: string | undefined
-  // Who may open the screen, such as kayjs-auth's `auth.guard({ require: 'admin' })`, or `{ load }` returning it, which runs on the first request rather than as kay.config.ts loads. Without one the screen stays closed, though the numbers are still collected.
-  guard?: Guard | LazyGuard | undefined
+  // Who may open the screen, such as kayjs-auth's `auth.guard({ require: 'admin' })`, a list of guards run in order, or `{ load }` returning one, which runs on the first request rather than as kay.config.ts loads. Without one the screen stays closed, though the numbers are still collected; `false` opens it to everyone.
+  guard?: GuardOption | false | undefined
   // `true` waits for the visitor's yes on the `kay_analytics` cookie before a view is reported and `false` never waits. Left out, the numbers follow `analytics({ consent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
   consent?: boolean | undefined
 }
@@ -24,6 +24,15 @@ export const VITALS_PATH = '/_kay/vitals'
 export const VITALS_SCRIPT_PATH = `${VITALS_PATH}.js`
 
 const DEFAULT_PREFIX = '/vitals'
+
+const open: Guard = () => undefined
+
+function guardOf(guard: GuardOption | false | undefined): Guard | undefined {
+  if (guard === undefined)
+    return undefined
+
+  return guard === false ? open : joinGuards(guard)
+}
 
 interface VitalsSettings {
   guard: Guard | undefined
@@ -51,10 +60,10 @@ export function vitals(options: VitalsOptions = {}): KayExtension {
   if (consent !== undefined && typeof consent !== 'boolean')
     refuse(`takes consent as true or false; got ${JSON.stringify(consent)}`)
 
-  if (guard !== undefined && typeof guard !== 'function' && typeof (guard as { load?: unknown }).load !== 'function')
-    refuse('takes a guard that is a function, or { load } returning one')
+  if (guard !== undefined && guard !== false && !isGuardOption(guard))
+    refuse('takes a guard that is a function, a list of them, or { load } returning one, or false')
 
-  current = { guard: guard === undefined ? undefined : lazily(guard) }
+  current = { guard: guardOf(guard) }
 
   return {
     name: 'kay/vitals',

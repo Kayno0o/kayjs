@@ -6,6 +6,22 @@
 
 ## Reference
 
+### Path and guard options
+
+A `path` is one route, a `prefix` a subtree, and every `guard` option takes a guard, a list of guards run in order, or `{ load }` returning one, which runs on the first request so `kay.config.ts` imports nothing of the app's auth. `false` opens what is closed without a guard; where nothing is guarded by default there is no `false`.
+
+| Option | Reads as | Guard | Without a guard | `false` |
+| --- | --- | --- | --- | --- |
+| `serve.apiPrefix` | prefix of the API modules, the OpenAPI document and its reference | the API directory's `_guard.ts` | open | no guard option |
+| `openapi.path`, `openapi.referencePath`, `mcp.path` | route | the API directory's `_guard.ts` | open | no guard option |
+| `health.path`, `metrics.path` | route | none: `metrics` takes a token, `health` is open | open | no guard option |
+| `jobs.path`, `jobs.guard` | route | guard, list or `{ load }` | the boot stops: the page lists payloads | refused |
+| `vitals({ prefix, guard })` | prefix | guard, list or `{ load }` | closed, 403 | opens the screen |
+| `cms({ prefix, guard })` | prefix | guard, list or `{ load }` | closed, 403 | admits everyone |
+| `images.guard` | before `images.resolve` | guard, list or `{ load }` | open | not needed |
+| `extension.routes`, `extension.api` `prefix` | prefix | the library's own guards | as the library says | no guard option |
+| `page = { guards: false }`, `api({ guards: false })` | one page, endpoint or API module | none | under the guards above it | skips them |
+
 ### Guards
 
 - A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first.

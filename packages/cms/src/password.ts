@@ -1,8 +1,8 @@
 import type { Duration, Guard, RateStore } from 'kay'
-import type { Kv, KvStore, LazyGuard, Limiter } from 'kay/library'
+import type { GuardOption, Kv, KvStore, LazyGuard, Limiter } from 'kay/library'
 import { createHmac, scryptSync } from 'node:crypto'
 import { guard } from 'kay'
-import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, limiter, sameText } from 'kay/library'
+import { appSecrets, appStore, configError, durationSeconds, joinGuards, keyedDigest, kv, limiter, sameText } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -282,11 +282,16 @@ function adopting(inner: Guard): Guard {
 }
 
 // Notes which passwords the app's guard holds, if it is a password guard, and hands the guard back.
-export function trackPasswords(given: Guard | LazyGuard | undefined): Guard | LazyGuard | undefined {
-  installed = typeof given === 'function' ? passwordsOf.get(given) : undefined
+export function trackPasswords(given: GuardOption | undefined): Guard | LazyGuard | undefined {
+  const known = Array.isArray(given) ? given.find(one => passwordsOf.has(one)) : given
+
+  installed = typeof known === 'function' ? passwordsOf.get(known) : undefined
 
   if (given === undefined)
     return given
+
+  if (Array.isArray(given))
+    return adopting(joinGuards(given))
 
   if (typeof given === 'function')
     return adopting(given)

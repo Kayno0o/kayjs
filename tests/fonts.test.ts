@@ -118,6 +118,7 @@ describe('fonts', () => {
       ...['latin', 'latin-ext', 'greek'].map(async subset => Bun.write(join(root, `node_modules/@fontsource-variable/grotesk/files/grotesk-${subset}-wght-normal.woff2`), display)),
     ])
 
+    const aliased = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weight: 400, subset: ['latin', 'latin-ext'] }], join(root, 'out-aliased'))
     const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], subsets: ['latin', 'latin-ext'] }, { fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'latin-ext'] }], join(root, 'out'))
     const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
 
@@ -128,6 +129,8 @@ describe('fonts', () => {
       '@font-face{font-family:"Grotesk";src:url() format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0100-02BA}',
     ])
 
+    expect(aliased.css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))).toEqual(faces.slice(0, 2))
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], weight: 400 }], scratch)).rejects.toThrow('both weights and its older spelling weight')
     await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'cyrillic'] }], scratch)).rejects.toThrow('has no subset cyrillic')
     await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'greek'] }], scratch)).rejects.toThrow('names no unicode-range for its greek subset')
 
