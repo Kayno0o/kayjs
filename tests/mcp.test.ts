@@ -763,6 +763,14 @@ describe('kay mcp tools that write', () => {
     expect((await call(writer, 'generate', { kind: 'page', name: 'x', apply: 'yes' })).isError).toBe(true)
   })
 
+  it('installs only with apply, as a boolean', async () => {
+    const preview = await call(writer, 'add', { features: ['tailwind'], install: true })
+
+    expect(preview.isError).toBe(true)
+    expect(preview.content[0]!.text).toContain('needs apply')
+    expect((await call(writer, 'add', { features: ['tailwind'], apply: true, install: 'yes' })).isError).toBe(true)
+  })
+
   it('previews a generated file by default, and writes it with apply, never over a file that exists', async () => {
     const preview = await call(writer, 'generate', { kind: 'page', name: 'contact' })
 

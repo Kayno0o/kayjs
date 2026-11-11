@@ -10,6 +10,7 @@ import { docFiles } from '../docs-search'
 import { KINDS } from '../generate'
 import { DEV_ERRORS_FILE } from '../server/dev-errors'
 import { optionalString, stringList, visitorData, writeGated } from './guards'
+import { addFlags } from './install'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
 const KAY_ROOT = join(import.meta.dir, '..', '..')
@@ -314,17 +315,16 @@ function tools(root: string, write: boolean): Tool[] {
     {
       name: 'add',
       title: 'Add features',
-      description: 'Lists what `kay add` would write to add features such as `tailwind`, `auth` or `mail` to the app, writing and installing nothing: `kay add --dry-run --format json`. With `apply: true`, writes the files and the dependencies into `package.json` but installs nothing, so run `bun install` after; that needs the server started as `kay mcp --write`.',
-      inputSchema: { type: 'object', properties: { features: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The features to add.' }, apply: APPLY }, required: ['features'], additionalProperties: false },
+      description: 'Lists what `kay add` would write to add features such as `tailwind`, `auth` or `mail` to the app, writing and installing nothing: `kay add --dry-run --format json`. With `apply: true`, writes the files and the dependencies into `package.json` but installs nothing, so run `bun install` after, unless `install: true` runs it: a library (`auth`, `mail`, `cms`, `ai`, `ui`) that the project does not hold has to be installed to say what it writes, so it needs `install`. That needs the server started as `kay mcp --write`.',
+      inputSchema: { type: 'object', properties: { features: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The features to add.' }, apply: APPLY, install: { type: 'boolean', description: 'With `apply`, install the libraries and the dependencies too (`bun add`, `bun install`), which needs the network.' } }, required: ['features'], additionalProperties: false },
       annotations: { ...WRITING, destructiveHint: true },
       run: async (args) => {
         const features = stringList(args.features, 'features')
-        const apply = applying(args)
 
         if (features.length === 0 || features.some(feature => feature.includes(',')))
           throw new Error('features takes a list of features, one each, none holding a comma')
 
-        return document(['add', ...apply ? [] : ['--dry-run'], '--no-install', '--format', 'json', '--', features.join(',')])
+        return document(['add', ...addFlags(args, applying(args)), '--format', 'json', '--', features.join(',')])
       },
     },
     {

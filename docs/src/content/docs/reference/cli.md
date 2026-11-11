@@ -756,7 +756,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `doctor` | `kay doctor --format json`. `port` is the port to check |
 | `fmt` | `kay fmt --check --format json`: the files not formatted, writing none. `paths` narrows it |
 | `generate` | `kay generate --dry-run --format json` on `kind` and `name`, with `fields` and `plural`: the files it would write. With `apply: true`, it writes them, never over a file that exists |
-| `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing. With `apply: true`, it writes the files and `package.json`, and you run `bun install` after |
+| `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing. With `apply: true`, it writes the files and `package.json`, and you run `bun install` after, unless `install: true` runs it, which a library the project lacks needs |
 | `fix` | `kay check --fix --dry-run --format json`: the problems with a safe fix. With `apply: true`, it rewrites the files |
 | `upgrade` | `kay upgrade --dry-run --format json`: the plan. With `apply: true`, it changes `package.json`, installs and rewrites the source |
 | `lint` | `kay lint` with the project's `keslint`, answered as `{ errors, warnings, problems }` capped at 200 problems, with `omitted` counting the rest. `paths` narrows it; `apply: true` adds `--fix` |
