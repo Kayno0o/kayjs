@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Commit, FileChange, FileMove, FileSaver, Identity } from './files'
 import { optionMs } from 'kay/library'
-import { checkBase, errorMessage, ForgeError, networkReason, requireSecure, SaveConflictError, TRAILING_SLASHES } from './files'
+import { boundedText, checkBase, errorMessage, ForgeError, networkReason, requireSecure, SaveConflictError, TRAILING_SLASHES } from './files'
 
 export interface GithubOptions {
   // `owner/name`.
@@ -64,7 +64,7 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
   }
 
   async function send<T>(path: string, signal: AbortSignal, method = 'GET', body?: object): Promise<T> {
-    return answer<T>(await request(`${api}${path}`, { method, headers, signal, body: body === undefined ? null : JSON.stringify(body) }))
+    return answer<T>(await request(`${api}${path}`, { method, headers, signal, redirect: 'error', body: body === undefined ? null : JSON.stringify(body) }))
   }
 
   async function branchName(signal: AbortSignal): Promise<string> {
@@ -73,7 +73,7 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
 
   // The blob sha of the file at a commit, which is the version an editor opened; undefined when it does not exist.
   async function versionAt(commit: string, repoPath: string, signal: AbortSignal): Promise<string | undefined> {
-    const response = await request(`${api}/contents/${encodePath(repoPath)}?ref=${commit}`, { headers, signal })
+    const response = await request(`${api}/contents/${encodePath(repoPath)}?ref=${commit}`, { headers, signal, redirect: 'error' })
 
     if (response.status === 404)
       return undefined
@@ -105,13 +105,13 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
       // Nothing is visible before the ref moves, so a failure until here leaves the repository as it was.
       posting(true)
 
-      const moved = await request(`${api}/git/refs/heads/${encodePath(name)}`, { method: 'PATCH', headers, signal, body: JSON.stringify({ sha: created.sha, force: false }) })
+      const moved = await request(`${api}/git/refs/heads/${encodePath(name)}`, { method: 'PATCH', headers, signal, redirect: 'error', body: JSON.stringify({ sha: created.sha, force: false }) })
 
       if (moved.ok)
         return { sha: created.sha, url: created.html_url }
 
       // Not a fast forward: another save moved the branch, so the versions are read again from its new head.
-      if ((moved.status === 422 || moved.status === 409) && NOT_FAST_FORWARD.test(await moved.clone().text())) {
+      if ((moved.status === 422 || moved.status === 409) && NOT_FAST_FORWARD.test(await boundedText(moved.clone()))) {
         if (attempt < ATTEMPTS)
           continue
 

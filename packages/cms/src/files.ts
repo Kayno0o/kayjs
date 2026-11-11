@@ -195,6 +195,8 @@ export class ForgeError extends KayError {
 
 // Forgejo's refusal of an update naming a sha the branch no longer holds.
 const SHA_MISMATCH = /sha/i
+// The most of a forge's answer read to word a refusal: a host that streams on, or a proxy page, is cut off there.
+const READ_LIMIT = 65_536
 // How much of a refusal the editor is shown; the log gets it whole.
 const SHOWN_REFUSAL = 200
 
@@ -236,7 +238,7 @@ export function forgejo({ baseUrl, repo, branch, token, timeout: wait = '15s', f
   // The blob sha of the file on the branch, which an update or a delete must name; undefined when it does not exist.
   async function currentSha(repoPath: string, signal: AbortSignal): Promise<string | undefined> {
     const query = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`
-    const response = await request(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, { headers, signal })
+    const response = await request(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, { headers, signal, redirect: 'error' })
 
     return response.status === 404 ? undefined : (await answer<{ sha: string }>(response)).sha
   }
@@ -245,10 +247,10 @@ export function forgejo({ baseUrl, repo, branch, token, timeout: wait = '15s', f
   async function post(files: object[], { message, author }: { message: string, author?: Identity | undefined }, conflictAt: string, creating: boolean, signal: AbortSignal, posting: () => void): Promise<Commit> {
     posting()
 
-    const response = await request(`${api}/contents`, { method: 'POST', headers, signal, body: JSON.stringify({ branch, message, author, files }) })
+    const response = await request(`${api}/contents`, { method: 'POST', headers, signal, redirect: 'error', body: JSON.stringify({ branch, message, author, files }) })
 
     // Another save landed between the read and the commit.
-    if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await response.clone().text())))
+    if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await boundedText(response.clone()))))
       // The read of the version the conflict reports has its own time, as the save's may be all but spent on the commit that was refused.
       throw new SaveConflictError(await conflictVersion(async () => currentSha(conflictAt, AbortSignal.timeout(timeout))), creating)
 
@@ -359,9 +361,37 @@ export function networkReason(error: unknown): string {
   return typeof code === 'string' ? code : error.message
 }
 
+// The start of a response's body, at most `READ_LIMIT` bytes, the rest of it never read.
+export async function boundedText(response: Response): Promise<string> {
+  const reader = response.body?.getReader()
+
+  if (reader === undefined)
+    return ''
+
+  const chunks: Uint8Array[] = []
+  let size = 0
+
+  try {
+    while (size < READ_LIMIT) {
+      const { done, value } = await reader.read()
+
+      if (done)
+        break
+
+      chunks.push(value)
+      size += value.byteLength
+    }
+  }
+  finally {
+    await reader.cancel()
+  }
+
+  return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, READ_LIMIT))
+}
+
 // Forgejo explains a refusal in a JSON `message` (GitLab in a `message` or an `error`, a text or an object); a proxy in front of it may answer anything, an HTML page say, which is cut short and logged whole.
 export async function errorMessage(response: Response, host = 'Forgejo'): Promise<string> {
-  const text = await response.text()
+  const text = await boundedText(response)
   let message: string
 
   try {

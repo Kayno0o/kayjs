@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Commit, FileChange, FileMove, FileSaver, Identity } from './files'
 import { optionMs } from 'kay/library'
-import { checkBase, errorMessage, ForgeError, networkReason, requireSecure, SaveConflictError, TRAILING_SLASHES } from './files'
+import { boundedText, checkBase, errorMessage, ForgeError, networkReason, requireSecure, SaveConflictError, TRAILING_SLASHES } from './files'
 
 export interface GitlabOptions {
   // `group/name`, or `group/subgroup/name`.
@@ -56,7 +56,7 @@ export function gitlab({ repo, branch, token, baseUrl = 'https://gitlab.com', ti
     if (branch !== undefined)
       return branch
 
-    const project = await answer<{ default_branch?: string | null }>(await request(api, { headers, signal }))
+    const project = await answer<{ default_branch?: string | null }>(await request(api, { headers, signal, redirect: 'error' }))
 
     if (project.default_branch === undefined || project.default_branch === null || project.default_branch === '')
       throw new ForgeError(422, 'GitLab: the repository has no default branch, so name one with `branch`')
@@ -66,7 +66,7 @@ export function gitlab({ repo, branch, token, baseUrl = 'https://gitlab.com', ti
 
   // The file at a commit: its blob sha, which is the version an editor opened, and the commit that last touched it; undefined when it does not exist.
   async function find(commit: string, repoPath: string, signal: AbortSignal): Promise<Found | undefined> {
-    const response = await request(`${api}/repository/files/${encodeURIComponent(repoPath)}?ref=${commit}`, { headers, signal })
+    const response = await request(`${api}/repository/files/${encodeURIComponent(repoPath)}?ref=${commit}`, { headers, signal, redirect: 'error' })
 
     if (response.status === 404)
       return undefined
@@ -82,7 +82,7 @@ export function gitlab({ repo, branch, token, baseUrl = 'https://gitlab.com', ti
 
     for (let attempt = 1; ; attempt++) {
       posting(false)
-      const head = (await answer<{ commit: { id: string } }>(await request(`${api}/repository/branches/${encodeURIComponent(name)}`, { headers, signal }))).commit.id
+      const head = (await answer<{ commit: { id: string } }>(await request(`${api}/repository/branches/${encodeURIComponent(name)}`, { headers, signal, redirect: 'error' }))).commit.id
       const actions = await plan(head, signal)
 
       if (actions === undefined)
@@ -91,7 +91,7 @@ export function gitlab({ repo, branch, token, baseUrl = 'https://gitlab.com', ti
       posting(true)
 
       const body = { branch: name, commit_message: message, actions, author_name: author?.name, author_email: author?.email }
-      const response = await request(`${api}/repository/commits`, { method: 'POST', headers, signal, body: JSON.stringify(body) })
+      const response = await request(`${api}/repository/commits`, { method: 'POST', headers, signal, redirect: 'error', body: JSON.stringify(body) })
 
       if (response.ok) {
         const created = await response.json() as { id: string, web_url?: string }
@@ -100,7 +100,7 @@ export function gitlab({ repo, branch, token, baseUrl = 'https://gitlab.com', ti
       }
 
       // A file the plan read has changed since, so the versions are read again from the branch.
-      if ((response.status === 400 || response.status === 409) && CHANGED.test(await response.clone().text())) {
+      if ((response.status === 400 || response.status === 409) && CHANGED.test(await boundedText(response.clone()))) {
         if (attempt < ATTEMPTS)
           continue
 

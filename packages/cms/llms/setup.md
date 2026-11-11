@@ -18,7 +18,7 @@ export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({
 
 ### Commit saves to Forgejo
 
-`forgejo({ baseUrl, repo, branch?, token, timeout?, fetch? })` commits each file through Forgejo's contents API.
+`forgejo({ baseUrl, repo, branch?, token, timeout?, fetch? })` commits each file through Forgejo's contents API. All three forge savers refuse a redirect (`redirect: 'error'`, so a renamed repository needs its new `repo` or `baseUrl`, and the token never follows one to another host) and read at most 64 KB of a refusal's body.
 
 ```ts
 cms({ guard, files: forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: env.FORGEJO_TOKEN }) })
