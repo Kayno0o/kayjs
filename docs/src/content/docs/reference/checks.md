@@ -163,6 +163,7 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `static-pin` | compile | A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, or a live value. The error stands at that thing. A function or a block with parameters it passes an island is `island-prop`. | [Islands](/essentials/islands) |
 | `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](/essentials/islands) |
 | `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
+| `allow-refused` | compile | A `// kay-allow` or `// kay-allow-file` comment that `lints.comments` refuses: no ` -- reason`, or any `kay-allow-file`. It allows nothing. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node or Bun built-in a browser build refuses, such as `async_hooks` or `bun:sqlite`; `kay check` reports it too. | [Browser-only components](/essentials/islands) |
 | `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, so the island dies as it loads; `kay check` reports it too. | [Browser globals on the server](/essentials/islands) |
 | `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](/guides/content) |
@@ -287,6 +288,8 @@ const label = signal('Save')
 ```
 
 `// kay-allow-file constant-signal` allows a lint in the whole file, for a file where it fits everywhere. It takes the same names and the same ` -- ` reason, and a name that is no lint is reported.
+
+A project that wants every allowance explained sets `lints: { comments: { reason: true } }` in `kay.config.ts`: a comment with no ` -- reason` then allows nothing and is reported as `allow-refused`. `comments: { file: true }` refuses `kay-allow-file` the same way, and `comments: { denied: true }` keeps a lint the config sets to `deny`, by its name or its group, out of a comment's reach.
 
 No comment silences an `seo` lint, `over-budget` or `unkept-page`, as no template reports them. Change their level in `lints` instead.
 

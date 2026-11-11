@@ -81,6 +81,11 @@ export const ERRORS = {
     summary: 'A `// kay-allow` or `// kay-allow-file` comment naming something that is no lint.',
     fix: { file: 'llms/lints.md', heading: 'Allow a lint on one line' },
   },
+  'allow-refused': {
+    group: 'compile',
+    summary: 'A `// kay-allow` or `// kay-allow-file` comment that `lints.comments` in kay.config.ts refuses: one with no ` -- reason`, or any `kay-allow-file`. It allows nothing.',
+    fix: { file: 'llms/lints.md', heading: 'Allow a lint on one line' },
+  },
   'browser-builtin-import': {
     group: 'build',
     summary: 'An island importing a module that reaches a Node built-in, which a browser does not have.',

@@ -141,7 +141,7 @@ describe('loaded collections', () => {
 
   it('refuses a loader slug the folder rules refuse as a content problem, one that would climb out of the export', async () => {
     const bad = ['a/../../x', '/a', 'a//b', 'a/', '.', 'a\\b', 'a?b', 'a#b', 'a\nb', ' ']
-    const notes = collection({ name: 'notes-slugs', load: () => [...bad.map(slug => ({ slug, data: { title: 'X' } })), { slug: 'fr/ok', data: { title: 'Ok' } }] as [] }, { schema })
+    const notes = collection({ name: 'notes-slugs', load: () => [...bad.map(slug => ({ slug, data: { title: 'X' } })), { slug: 'fr/ok', data: { title: 'Ok' } }] }, { schema })
 
     const refused = await rejection(notes.all())
 

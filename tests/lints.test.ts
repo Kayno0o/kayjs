@@ -77,6 +77,37 @@ describe('lint levels', () => {
     expect(diagnostics[0]!.help).toContain('`positional-key`')
   })
 
+  describe('lints.comments', () => {
+    const img = 'img(src="/a.png" width="1" height="1")'
+    const codes = (source: string, comments: NonNullable<CompileOptions['lints']>['comments'], more: CompileOptions['lints'] = {}) => lints(source, { lints: { ...more, comments } }).map(d => d.code)
+
+    it('refuses a comment with no reason, reporting it and keeping the lint', () => {
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { reason: true })).toEqual(['allow-refused', 'missing-alt'])
+      expect(codes(`// kay-allow missing-alt --\n${img}\n`, { reason: true })).toEqual(['allow-refused', 'missing-alt'])
+      expect(codes(`// kay-allow-file missing-alt\n${img}\n`, { reason: true })).toEqual(['allow-refused', 'missing-alt'])
+      expect(codes(`// kay-allow missing-alt -- #3120, decorative\n${img}\n`, { reason: true })).toEqual([])
+      expect(codes(`${img} // kay-allow missing-alt -- why\n`, { reason: true })).toEqual([])
+    })
+
+    it('refuses kay-allow-file with `file`, and leaves the line form alone', () => {
+      expect(codes(`// kay-allow-file missing-alt -- why\n${img}\n`, { file: true })).toEqual(['allow-refused', 'missing-alt'])
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { file: true })).toEqual([])
+    })
+
+    it('keeps a lint the config denies from a comment with `denied`, by its name or its group', () => {
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { denied: true }, { 'missing-alt': 'deny' })).toEqual(['missing-alt'])
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { denied: true }, { a11y: 'deny' })).toEqual(['missing-alt'])
+      expect(codes(`// kay-allow-file missing-alt\n${img}\n`, { denied: true }, { 'missing-alt': 'deny' })).toEqual(['missing-alt'])
+      // A lint that is only denied by default, or one the config warns about, can still be allowed.
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { denied: true })).toEqual([])
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, { denied: true }, { 'missing-alt': 'warn' })).toEqual([])
+    })
+
+    it('changes nothing without the setting', () => {
+      expect(codes(`// kay-allow missing-alt\n${img}\n`, undefined, { 'missing-alt': 'deny' })).toEqual([])
+    })
+  })
+
   describe('a reason after `--`', () => {
     const img = 'img(src="/a.png" width="1" height="1")'
     const code = (source: string) => lints(source).map(d => d.code)

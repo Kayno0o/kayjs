@@ -276,9 +276,9 @@ export async function checkContent(root: string, config: string | undefined, sit
   return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [], routes: read.marked(ROUTES_MARKER) ?? [] }
 }
 
-// The levels the app wrote, not the `satisfied` list kay adds from the extensions.
+// The levels the app wrote, not the `satisfied` list kay adds from the extensions nor the `comments` rules.
 function levelEntries(lints: LintLevels): [string, string][] {
-  return Object.entries(lints).filter(([name]) => name !== 'satisfied') as [string, string][]
+  return Object.entries(lints).filter(([name]) => name !== 'satisfied' && name !== 'comments') as [string, string][]
 }
 
 // A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed, reported at its entry in kay.config.ts.

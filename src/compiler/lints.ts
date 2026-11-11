@@ -1,6 +1,8 @@
+import type { AllowRules } from './allow-comments'
 import type { Diagnostic, ElementNode, ForNode, KayFile, Node, TextChunk } from './ast'
 import type { Scope } from './template-scopes'
 import { accessibilityLints } from './a11y'
+import { allowComments, honoured, refusedComments } from './allow-comments'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
 import { I18N_LINTS } from './i18n-lints'
@@ -701,15 +703,11 @@ export const LINTS = {
 export type LintName = keyof typeof LINTS
 
 // `satisfied` is set by kay from the extensions' `satisfies`, never written in `kay.config.ts`: the lints an extension answers for a place it fills in by itself.
-export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined }
+// `comments` is no lint's level: it sets what a `// kay-allow` comment must hold to count.
+export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined, comments?: AllowRules | undefined }
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
-// A lint's name starts with a letter, so the `--` of a reason is never read as one: `// kay-allow a, b -- why`.
-const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+(\w[\w-]*(?:[ \t]*,[ \t]*\w[\w-]*)*)/g
-// The file-wide form, which allows the lints it names wherever they are reported in the file.
-const ALLOW_FILE_COMMENT = /\/\/[ \t]*kay-allow-file[ \t]+(\w[\w-]*(?:[ \t]*,[ \t]*\w[\w-]*)*)/g
-const LINT_NAME = /[\w-]+/g
 const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // An opening, closing or self-closing tag, with what it holds after its name.
@@ -790,24 +788,23 @@ export function lintLevels(source: string, levels: LintLevels = {}): (name: Lint
   const allowed = new Map<number, Set<string>>()
   const everywhere = new Set<string>()
 
-  for (const comment of source.matchAll(ALLOW_FILE_COMMENT)) {
-    for (const name of comment[1]!.matchAll(LINT_NAME))
-      everywhere.add(name[0])
+  for (const comment of honoured(allowComments(source), levels.comments)) {
+    const names = comment.file ? everywhere : allowed.get(comment.line) ?? new Set()
+
+    for (const { name } of comment.names)
+      names.add(name)
+
+    if (!comment.file)
+      allowed.set(comment.line, names)
   }
 
-  for (const comment of source.matchAll(ALLOW_COMMENT)) {
-    const { line, column } = positionAt(source, comment.index)
-    // A comment alone on its line allows the next one; one ending a line of code allows that line.
-    const target = source.slice(comment.index - column + 1, comment.index).trim() === '' ? line + 1 : line
-    const names = allowed.get(target) ?? new Set()
+  return (name, offset) => {
+    const level = lintLevel(name, levels)
+    // With `denied`, a lint the config itself sets to `deny` is out of a comment's reach.
+    const held = levels.comments?.denied === true && (levels[name] ?? levels[LINTS[name].group]) === 'deny'
 
-    for (const name of comment[1]!.matchAll(LINT_NAME))
-      names.add(name[0])
-
-    allowed.set(target, names)
+    return !held && (everywhere.has(name) || allowed.get(positionAt(source, offset).line)?.has(name)) ? 'allow' : level
   }
-
-  return (name, offset) => everywhere.has(name) || allowed.get(positionAt(source, offset).line)?.has(name) ? 'allow' : lintLevel(name, levels)
 }
 
 // Sets each lint's severity from its level and drops the ones allowed; a `// kay-allow` naming no lint is reported.
@@ -825,21 +822,16 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
     return level === 'allow' ? [] : [{ ...diagnostic, severity: level === 'warn' ? 'warning' as const : 'error' as const }]
   })
 
-  return [...leveled, ...unknownLints(source)]
+  return [...leveled, ...unknownLints(source), ...refusedComments(allowComments(source), levels.comments)]
 }
 
 function unknownLints(source: string): Diagnostic[] {
   const unknown: Diagnostic[] = []
 
-  for (const comment of [...source.matchAll(ALLOW_COMMENT), ...source.matchAll(ALLOW_FILE_COMMENT)]) {
-    const listStart = comment.index + comment[0].length - comment[1]!.length
-
-    for (const name of comment[1]!.matchAll(LINT_NAME)) {
-      if (!isLint(name[0])) {
-        const start = listStart + name.index
-
-        unknown.push({ start, end: start + name[0].length, code: 'unknown-lint', message: `Unknown lint \`${name[0]}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
-      }
+  for (const comment of allowComments(source)) {
+    for (const { name, start } of comment.names) {
+      if (!isLint(name))
+        unknown.push({ start, end: start + name.length, code: 'unknown-lint', message: `Unknown lint \`${name}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
     }
   }
 
