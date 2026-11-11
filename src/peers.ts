@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { peerDependencies } from '../package.json'
 import { kayLog } from './runtime/log'
 
@@ -8,6 +9,9 @@ import { kayLog } from './runtime/log'
 export type Peer = keyof Pick<typeof peerDependencies, 'axe-core' | 'typescript7'>
 
 export const PEERS: Peer[] = ['typescript7', 'axe-core']
+
+// This file's folder: `import.meta.dir` is Bun's alone, and the ESLint processor runs under Node.
+const HERE = import.meta.dir ?? dirname(fileURLToPath(import.meta.url))
 
 // A peer as `bun add` takes it, at the range kay expects.
 export function peerSpec(name: Peer): string {
@@ -35,7 +39,7 @@ export class MissingPeerError extends Error {
 }
 
 // Where an optional peer's file is, resolved from `from` (the app that installed it, where kay is a dependency of it); a MissingPeerError naming the install command when it is missing.
-export function resolvePeer(name: Peer, specifier: string, from = import.meta.dir): string {
+export function resolvePeer(name: Peer, specifier: string, from = HERE): string {
   try {
     return resolveFrom(specifier, from)
   }
@@ -50,7 +54,7 @@ function resolveFrom(specifier: string, from: string): string {
 }
 
 // Whether the peer resolves from `from`, for a diagnosis that must not throw.
-export function peerInstalled(name: Peer, from = import.meta.dir): boolean {
+export function peerInstalled(name: Peer, from = HERE): boolean {
   try {
     resolveFrom(`${name}/package.json`, from)
 

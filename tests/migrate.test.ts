@@ -306,7 +306,7 @@ export const authors = collection('content/authors', {
     expect(await Bun.file(join(out, 'AGENTS.md')).text()).not.toContain('seo.name')
     expect(packageJson.scripts.dev).toBe('kay dev')
     expect(packageJson.dependencies).toEqual({ 'date-fns': '^4.1.0', 'elysia': expect.any(String), 'kay': '^1.0.0' })
-    expect(Object.keys(packageJson.devDependencies)).toEqual(['@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
+    expect(Object.keys(packageJson.devDependencies)).toEqual(['@types/bun', 'axe-core', 'bun-plugin-tailwind', 'tailwindcss', 'typescript7'])
     expect(report.notes).toEqual([])
   })
 
@@ -420,7 +420,7 @@ const host = import.meta.env.RCON_HOST
     expect(tree).toContain('import separation from \'../../public/svg/x.svg\' with { type: \'text\' }')
     expect(tree).toContain('// kay migrate: Astro.self')
     expect(Object.keys(packageJson.dependencies)).toEqual(['@fontsource/montserrat', '@kaynooo/utils', 'elysia', 'kay'])
-    expect(Object.keys(packageJson.devDependencies)).toEqual(['@iconify-json/mdi', '@kaynooo/eslint', '@types/bun'])
+    expect(Object.keys(packageJson.devDependencies)).toEqual(['@iconify-json/mdi', '@kaynooo/eslint', '@types/bun', 'axe-core', 'typescript7'])
     expect(await Bun.file(join(out, '.gitignore')).text()).toEndWith('\n# From the Astro project\nworld\ndata\npublic/generated/\n')
     expect(report.notes.map(note => `${note.file}:${note.line} ${lead(note.message)}`)).toEqual([
       'package.json:6 `@kaynooo/utils@^1.0.14` is carried over, and the Forgejo registry the .npmrc names may hold no version in that range',

@@ -28,6 +28,10 @@ export function browserGlobals(): ReadonlySet<string> {
 
   globals = new Set()
 
+  // Under the ESLint processor, which runs under Node, there is no Bun to list its globals: the hint is the server's, not the linter's.
+  if (typeof Bun === 'undefined')
+    return globals
+
   try {
     const lib = readFileSync(join(nativePlatformDir(), 'lib', 'lib.dom.d.ts'), 'utf8')
     const bun = bunGlobalNames()
