@@ -74,6 +74,7 @@ export async function contentChecks(root: string, options: CheckOptions, memory?
   // The lints the content check reports as problems, each at the level the app set and with the way out its message lacks.
   const held = new Map([
     ['trusted-folder', { level: lintLevel('trusted-folder', options.lints), help: 'remove `trusted`, or give the collection a loader' }],
+    ['held-back-reference', { level: lintLevel('held-back-reference', options.lints), help: 'publish the referenced entry, or point the reference at one that is shown' }],
     ['draft-entry', { level: lintLevel('draft-entry', options.lints), help: 'read it, then delete its `# draft` line, or save the entry from a CMS' }],
   ])
   const problems = content.problems.flatMap((problem) => {

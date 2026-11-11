@@ -154,6 +154,7 @@ kay check --only seo
 | `default-locale-path` | warn | i18n | With `i18n`, an `i18n.paths` entry translating a pattern for the default locale, whose path is the pattern itself: the entry is accepted but links to it never localize. Name the page the default locale's way and translate it for the other locales. |
 | `hidden-tool` | warn | code | With `mcp`, an API route whose `detail` sets `hide: true` and `tool`: a hidden route is no tool. |
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
+| `held-back-reference` | warn | code | An entry shown on the site whose `reference()` names an entry its collection holds back (a `draft`, or outside `publishAt` and `unpublishAt`): the page renders without it |
 | `old-bun-image` | deny | code | A root Dockerfile with `FROM oven/bun:<version>` older than the Bun kay needs (`engines.bun`), which fails the image build once `kay upgrade` moves kay up. `--fix` moves the tag to the Bun kay needs, not a digest pin; a tag that is no full version is left alone. Reported by `kay check`, and no `// kay-allow` comment reaches it. |
 | `unused-selector` | warn | code | A `--- style` rule whose last compound no element of the template can have; a spread, `class` expression, `part` or class string in the code counts as a match. |
 | `unreachable-selector` | deny | code | A `--- style` rule ending on `:root`, `html` or `body`, which carry no scope attribute; `:global(...)` is the fix, offered, never applied by `--fix`. |

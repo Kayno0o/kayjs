@@ -111,6 +111,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `default-locale-path` | warn | i18n | An `i18n.paths` entry translating a pattern for the default locale, whose links never localize |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
+| `held-back-reference` | warn | code | An entry whose `reference()` names an entry held back from production as a draft or by its dates |
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
 | `old-bun-image` | deny | code | A Dockerfile building from a Bun older than the one kay needs; `--fix` moves the tag, and leaves an image pinned by digest |
 | `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |

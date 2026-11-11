@@ -27,6 +27,7 @@ import { claimFeed } from './claims'
 import { modifiedMode } from './drafts'
 import { entries, registerCollections } from './edit'
 import { defaultFeedItem, FEED_TYPES, feedDocument, feedItem, feedPaths, renderedBody, resolvedFeed } from './feed'
+import { heldBack } from './held-back'
 import { isCollection } from './index'
 import { bodiesFile, contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
@@ -124,7 +125,7 @@ async function decodedIn<Result>(root: string, run: () => Result): Promise<Resul
 export async function writeContentManifests(root: string, clientBase: string, config?: string): Promise<number> {
   let count = 0
   const named = await namedCollections(root, config)
-  const slugs = new Map<string, Promise<Set<string> | undefined>>()
+  const slugs = new Map<string, Promise<Map<string, boolean> | undefined>>()
 
   for (const [, collection] of named) {
     if (collection.dir === undefined)
@@ -134,7 +135,7 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
     try {
       const decoded = await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
-      const dangling = await danglingReferences(collection, decoded, named, slugs)
+      const dangling = await danglingReferences(root, collection, decoded, named, slugs)
 
       if (dangling.length > 0)
         throw new ContentError(dangling)
@@ -167,7 +168,7 @@ export async function contentProblems(root: string, config?: string, site = true
   // What the collections were read from, beside the modules loaded: the config, the catalogs and each folder of entries.
   const read = [projectPaths(root, { contentConfig: config }).content, ...await catalogsOf(root)]
   const named = await namedCollections(root, config)
-  const slugs = new Map<string, Promise<Set<string> | undefined>>()
+  const slugs = new Map<string, Promise<Map<string, boolean> | undefined>>()
 
   for (const [name, collection] of named) {
     if (collection.options.feed)
@@ -198,7 +199,7 @@ export async function contentProblems(root: string, config?: string, site = true
 
       const decoded = await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
 
-      problems.push(...await danglingReferences(collection, decoded, named, slugs))
+      problems.push(...await danglingReferences(root, collection, decoded, named, slugs, problems))
 
       if (collection.options.feed)
         problems.push(...await feedProblems(collection, decoded))
@@ -222,8 +223,8 @@ export async function contentProblems(root: string, config?: string, site = true
 
 const KAY_PREFIX = /^kay: /
 
-// The slugs a folder collection holds, a localized one's without their locale; undefined for a loader's collection, whose entries are read when the server runs, and for a folder that does not read, which its own problems report.
-async function slugsOf(collection: Collection<unknown>): Promise<Set<string> | undefined> {
+// The slugs a folder collection holds, a localized one's without their locale, each with whether every entry of it is held back from production; undefined for a loader's collection, whose entries are read when the server runs, and for a folder that does not read, which its own problems report.
+async function slugsOf(root: string, collection: Collection<unknown>): Promise<Map<string, boolean> | undefined> {
   const { dir } = collection
 
   if (dir === undefined)
@@ -234,7 +235,18 @@ async function slugsOf(collection: Collection<unknown>): Promise<Set<string> | u
   try {
     const found = await loadEntries(dir, { ...markdownOf(collection.options), live: true, localized, modified: modifiedMode(collection.options) })
 
-    return new Set(found.map(entry => localized ? entry.slug.slice(entry.slug.indexOf('/') + 1) : entry.slug))
+    const { draft, publishAt, unpublishAt } = collection.options
+    // Decoding is only needed to read a draft or a publication date.
+    const data = draft === undefined && publishAt === undefined && unpublishAt === undefined ? undefined : new Map((await decodedIn(root, () => decodeEntries(found, collection.options.schema, collection.options.components ?? {}, localized))).map(({ entry, data }) => [entry, data]))
+    const held = new Map<string, boolean>()
+
+    for (const entry of found) {
+      const slug = localized ? entry.slug.slice(entry.slug.indexOf('/') + 1) : entry.slug
+
+      held.set(slug, (held.get(slug) ?? true) && data !== undefined && heldBack(collection.options, entry, data.get(entry)))
+    }
+
+    return held
   }
   catch (error) {
     if (error instanceof ContentError)
@@ -245,10 +257,13 @@ async function slugsOf(collection: Collection<unknown>): Promise<Set<string> | u
 }
 
 // The `reference()` fields of a folder collection's entries that name a slug the target has no entry for, or a collection the content config does not export, on the line of the field's key.
-async function danglingReferences(collection: Collection<unknown>, decoded: { entry: RawEntry, data: unknown }[], named: [string, Collection<unknown>][], slugs: Map<string, Promise<Set<string> | undefined>>): Promise<ContentProblem[]> {
+// `notes` takes, when given, the references of an entry shown to one held back from production, which the site then renders as no link or none.
+async function danglingReferences(root: string, collection: Collection<unknown>, decoded: { entry: RawEntry, data: unknown }[], named: [string, Collection<unknown>][], slugs: Map<string, Promise<Map<string, boolean> | undefined>>, notes?: ContentProblem[]): Promise<ContentProblem[]> {
   const found: ContentProblem[] = []
 
   for (const { entry, data } of decoded) {
+    const shown = notes !== undefined && !heldBack(collection.options, entry, data)
+
     for (const use of referencesIn(collection.options.schema, data)) {
       const target = named.find(([name]) => name === use.collection)?.[1]
       const line = entry.lines[use.field] ?? 1
@@ -260,12 +275,14 @@ async function danglingReferences(collection: Collection<unknown>, decoded: { en
       }
 
       if (!slugs.has(use.collection))
-        slugs.set(use.collection, slugsOf(target))
+        slugs.set(use.collection, slugsOf(root, target))
 
       const held = await slugs.get(use.collection)
 
       if (held !== undefined && !held.has(use.slug))
         found.push({ file: entry.file, line, message: `${use.path}: references ${use.slug}, which ${use.collection} has no entry for` })
+      else if (shown && held?.get(use.slug) === true)
+        notes?.push({ file: entry.file, line, message: `${use.path}: references ${use.slug}, which ${use.collection} holds back from production (a draft, or outside its publication dates)`, code: 'held-back-reference' })
     }
   }
 
