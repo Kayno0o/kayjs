@@ -10,7 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay new`'s test workflow runs on pull requests and on pushes to `main`, not twice for a pull request's commit, and the Forgejo Pages workflow's `SITE_URL` is `${{ vars.SITE_URL || github.server_url }}` in place of a `pages.example.com` placeholder ([project new and add](project-new-and-add.md)).
 - `markdownHtml` (a user's Markdown, on the server and in an island) writes `loading="lazy"` on its images ([content](content.md)).
 - kayjs-ai: an API root holding credentials in its URL (`https://user:pass@host`) is refused, naming the variable, as the key variables and options are where they go ([asking](../packages/ai/llms/asking.md)).
-- kayjs-mail: the dev outbox file `.kay/mail-outbox.json` is written readable by its owner alone (0600).
+- kayjs-mail: the dev outbox file `.kay/mail-outbox.json` is written readable by its owner alone (0600) ([mail](../packages/mail/llms/contact-form-and-testing.md)).
 - Links the libraries draw in a new tab by hand (kayjs-ui's subscribe form, app switcher and map attribution, kayjs-mail's, kayjs-auth's privacy link, kayjs-cms's) carry `rel="noopener noreferrer"`, as kayjs-ui's `OUTSIDE` does.
 - kayjs-ui: `MapView` loads Leaflet once the map is near the viewport, so one below the fold downloads none of it until it is scrolled to ([charts and MapView](../packages/ui/llms/charts.md)).
 - `/_kay/draft` answers 429 with `Retry-After` to an editor past 300 drafts a minute, and the browser error and CSP report routes answer 429 once all clients together pass 600 a minute, on top of each client's own limit ([edit mode](content-edit.md), [security](proxy-and-security.md)).
