@@ -1,0 +1,7 @@
+---
+import { describeField } from 'kay'
+
+describeField('', { invalid: true })
+---
+label
+  slot

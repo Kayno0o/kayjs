@@ -2022,6 +2022,20 @@ inBrowser('a FormField showing its own issue on a static page', () => {
     expect(await page.evaluate(() => document.querySelector('#clean-radio [data-kui-choice]')?.getAttribute('aria-invalid'))).toBeNull()
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('lets go of the mark the server drew for an issue once an island clears it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/field-issue-island')
+
+    const marks = () => page.evaluate(() => [...document.querySelectorAll('#single input, #grouped input')].map(input => input.getAttribute('aria-invalid')))
+
+    expect(await marks()).toEqual(['true', 'true', 'true'])
+    await page.click('#clear')
+    await page.waitUntil(() => document.querySelector('[data-part="issue"]') === null)
+    expect(await marks()).toEqual([null, null, null])
+    expect(page.errors).toEqual([])
+  }, 120_000)
 })
 
 inBrowser('a Form checking its fields against the action\'s schema', () => {

@@ -7,7 +7,7 @@ import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
-import { addFieldDescribed } from './field-described'
+import { addFieldDescribed, addInvalidAttribute } from './field-described'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addStyleArguments, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
@@ -517,7 +517,8 @@ export class HtmlTemplate extends TemplateWriter {
     const fieldAria = fieldAriaOf(name, type, plan.attributes)
     const describable = fieldAria !== undefined
     let ownDescribed: (() => void) | undefined
-    const fieldDescribed = (own: (() => void) | undefined, marked?: () => void) => addFieldDescribed(b, own, type, fieldAria, marked)
+    let refusing: (() => void) | undefined
+    const fieldDescribed = (own: (() => void) | undefined, refusing?: () => void) => addFieldDescribed(b, own, type, fieldAria, refusing)
 
     markup.text(`<${name}${element.fixed ?? ''}`)
 
@@ -730,23 +731,21 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (field.invalid) {
-        markup.dynamic(() => {
-          b.add(`${helperName('attribute')}("aria-invalid", KayFormInvalid`)
-          fieldArguments()
-          b.add('))')
-        })
+        refusing = fieldArguments
+
+        markup.dynamic(() => addInvalidAttribute(b, fieldArguments))
 
         // A refused field's description still takes the ids a component around it hands it, so a later field does not.
         if (described) {
-          const refused = (tail = describedValue(described)) => {
+          const refused = () => {
             b.add('KayFormInvalid')
             fieldArguments()
-            b.add(tail)
+            b.add(describedValue(described))
           }
 
           markup.dynamic(() => {
             if (describable)
-              return fieldDescribed(refused, () => refused(') || undefined'))
+              return fieldDescribed(refused, refusing)
 
             b.add(`${helperName('attribute')}("aria-describedby", `)
             refused()
@@ -768,7 +767,7 @@ export class HtmlTemplate extends TemplateWriter {
     }
 
     if (describable && !described)
-      markup.dynamic(() => fieldDescribed(ownDescribed))
+      markup.dynamic(() => fieldDescribed(ownDescribed, refusing))
 
     if (action) {
       if (action.method)

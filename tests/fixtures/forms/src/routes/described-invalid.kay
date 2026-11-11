@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const mark = action(t.Object({
+  first: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  second: t.Optional(t.String({ maxLength: 40 })),
+}), () => undefined)
+--- script
+import Marked from '../components/marked.kay'
+---
+form(action={mark})
+  Marked
+    input(name="first")
+    input(name="second")
+  button Mark

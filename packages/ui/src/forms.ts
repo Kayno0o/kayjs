@@ -20,6 +20,19 @@ const ITEM = /^(?:\.\d+|\[\d+\])$/
 // The fields whose `aria-required` or `required` was set here, not by the page.
 const requiredByUs = new WeakSet<HTMLElement>()
 const nativeByUs = new WeakSet<HTMLElement>()
+// The controls whose mark the server drew for a message was looked at.
+const looked = new WeakSet<HTMLElement>()
+
+// The mark the server drew for this FormField's message, found with the message's id in the `aria-describedby` of the control, or of the group around the field, is kay's and not the page's: it goes, for the FormField to hold its own, so it clears with the message.
+function releaseServerMark(control: HTMLElement, links: FieldLinks, described: Element = control): void {
+  if (looked.has(control))
+    return
+
+  looked.add(control)
+
+  if ((described.getAttribute('aria-describedby') ?? '').split(SPACES).includes(links.issues))
+    control.removeAttribute(control.getAttribute('role') === 'group' ? 'data-invalid' : 'aria-invalid')
+}
 
 export interface FieldLinks {
   // Marks the field's frame, for the link to find its control: a `ref` would make the component an island.
@@ -84,6 +97,8 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
     if (!control)
       return
 
+    releaseServerMark(control, links)
+
     const choice = control.matches(CHOICE)
 
     if (choice && !control.hasAttribute('aria-label') && !control.hasAttribute('aria-labelledby'))
@@ -146,6 +161,8 @@ function unrequireField(field: HTMLElement): void {
 // The fields the group marked, which it clears once its message does; `markInvalid` leaves one the page or a refused post still marks.
 function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>, required: boolean): void {
   for (const field of fieldsOf(links.frame)) {
+    releaseServerMark(field, links, document.querySelector(`[data-kui-field="${links.frame}"]`) ?? field)
+
     if (required)
       requireField(field, true)
     else

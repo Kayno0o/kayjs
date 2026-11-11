@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// An issue the server renders and the island later clears.
+const issue = signal<string | undefined>('Too short')
+---
+main
+  form
+    FormField#single(label="Name" issue={issue()})
+      input(name="name")
+    FormField#grouped(label="Access" group issue={issue()})
+      input(name="access" type="checkbox")
+      input(name="access" type="checkbox")
+  button#clear(type="button" onClick={() => issue = undefined}) Clear

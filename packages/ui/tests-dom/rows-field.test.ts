@@ -174,3 +174,14 @@ describe('RowsField words', () => {
     expect(said()).toBe('Row 1 removed')
   })
 })
+
+describe('RowsField given a ref', () => {
+  test('hands the app its group once drawn', async () => {
+    const held: Element[] = []
+
+    mounted = await mountComponent(RowsFields, { save: async () => undefined, held })
+
+    await settle()
+    expect(held.map(element => element.id)).toEqual(['posted'])
+  })
+})

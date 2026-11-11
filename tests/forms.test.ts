@@ -88,6 +88,15 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<input name="topic" value="abc">')
   })
 
+  it('writes aria-invalid once on a refused field a component around it marks, with no error element naming it', async () => {
+    const { mark } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/described-invalid.kay')) as { mark: Action<Record<string, string>, unknown> }
+    const before = await site.visit('/described-invalid')
+    const refused = await site.submit(mark, { first: 'ab', second: 'x' }, { from: '/described-invalid' })
+
+    expect(before.html).toContain('<label><input name="first" aria-invalid="true"><input name="second"></label>')
+    expect(refused.html).toContain('<label><input name="first" value="ab" aria-invalid="true"><input name="second" value="x"></label>')
+  })
+
   it('hands a component\'s describeField ids to a field the template describes when refused, before and after the post, and to no later field', async () => {
     const { pick } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/described.kay')) as { pick: Action<Record<string, string>, unknown> }
     const before = await site.visit('/described')
@@ -173,6 +182,12 @@ describe('the messages a refused form is described by', () => {
     expect(tsx).toContain('<p id=\\"add-tag-error\\">')
     expect(tsx).toContain('<p id=\\"add-title-error\\">')
     expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined)')
+  })
+
+  it('tells a field whose message no element names that its template marks it refused, so a component around it writes no second aria-invalid', () => {
+    const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n', 'page.kay', { output: 'html' })
+
+    expect(tsx).toContain('KayFieldDescribed(undefined, undefined, undefined, undefined, KayFormInvalid((add), "tag") || undefined)')
   })
 
   it('leaves a bound description, a row of a for and another action\'s message alone', () => {

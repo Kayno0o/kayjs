@@ -59,8 +59,7 @@ export function fieldRequired(): false | 'first' | 'all' {
   return 'all'
 }
 
-// The input types a lone control does not carry the mark of: a radio or a checkbox is one box of a group, which marks itself.
-const GROUPED_TYPES = new Set(['radio', 'checkbox'])
+// A lone radio is one box of a group, which marks itself.
 
 // Whether the field of this `type` rendering now is marked invalid by the nearest `describeField` above: the first field, or each with `'all'`.
 export function fieldInvalid(type: unknown): boolean {
@@ -72,7 +71,7 @@ export function fieldInvalid(type: unknown): boolean {
   if (found.invalid !== 'all') {
     found.invalidTaken = true
 
-    return !GROUPED_TYPES.has(String(type ?? '').toLowerCase())
+    return String(type ?? '').toLowerCase() !== 'radio'
   }
 
   return true
