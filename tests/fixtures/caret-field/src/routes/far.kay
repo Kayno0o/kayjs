@@ -1,0 +1,16 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const q = ctx.query.q ?? ''
+--- script
+import BoundField from '../components/bound-field.kay'
+import NavButtons from '../components/nav-buttons.kay'
+---
+head
+  title Caret far
+h1 Caret
+NavButtons
+div(style="height: 4000px")
+BoundField(value={q} hydrate="visible")

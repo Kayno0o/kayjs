@@ -1,0 +1,15 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()) }) }
+
+const q = ctx.query.q ?? ''
+const type = 'email'
+--- script
+import BoundField from '../components/bound-field.kay'
+---
+head
+  title Caret email
+h1 Caret
+p.searched {q}
+BoundField(value={q} type={type} hydrate="visible")

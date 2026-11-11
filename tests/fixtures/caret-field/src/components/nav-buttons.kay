@@ -1,0 +1,5 @@
+---
+import { navigate } from 'kay'
+---
+button.one(type="button" onClick={() => void navigate({ query: { q: 'one' } })}) one
+button.two(type="button" onClick={() => void navigate({ query: { q: 'two' } })}) two

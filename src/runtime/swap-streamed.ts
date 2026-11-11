@@ -1,5 +1,6 @@
 import type { LateParts } from './navigation'
 import { leave, navigation } from './navigation'
+import { settled, watchTyped } from './swap-focus'
 
 // What the page swap hands over, as importing it here would split the chunks the swap shares into one of their own (tests/build.test.ts).
 export interface Swapper {
@@ -152,7 +153,11 @@ function placeLate(part: string, { entry, runnable, scriptMarkup }: Swapper): bo
 
   end.remove()
   ;(start as ChildNode).replaceWith(template.content)
-  navigation.hooks!.hydrate(document.body)
+  const settle = watchTyped(true)
+  const hydrated = navigation.hooks!.hydrate(document.body)
+
+  if (settle)
+    void settled(hydrated, settle)
 
   return true
 }

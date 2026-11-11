@@ -244,4 +244,111 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
       await site.close()
     }
   }, 60_000)
+  // Keys typed in the swap's own turn, which hydration of a field in a `visible` or `idle` island writes its value over later.
+  const typeAtNavigate = async (page: TestPage, keys: string) => page.evaluate((added: string) => {
+    document.addEventListener('kay:navigate', () => {
+      const field = document.activeElement as HTMLInputElement
+
+      field.value += added
+      field.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    }, { once: true })
+  }, keys)
+
+  const lazy = { 'a visible island': '/lazy', 'an idle island': '/lazy?when=idle' }
+
+  for (const [kind, route] of Object.entries(lazy)) {
+    it(`keeps keys typed before ${kind} hydrates, and tells the island`, async () => {
+      const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+      try {
+        const page = await site.open(route)
+
+        await typeAtNavigate(page, 'sia')
+        await page.click('.field')
+        await page.type('ely')
+        await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'elysia')
+
+        expect(await page.evaluate(() => [document.activeElement === document.querySelector('.field'), document.querySelector<HTMLInputElement>('.field')!.value])).toEqual([true, 'elysia'])
+        expect(page.errors).toEqual([])
+      }
+      finally {
+        await site.close()
+      }
+    }, 60_000)
+  }
+
+  for (const kind of ['number', 'email'] as const) {
+    it(`keeps keys typed into a ${kind} field before it hydrates`, async () => {
+      const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+      try {
+        const page = await site.open(`/${kind}`)
+        const [first, more, whole] = kind === 'number' ? ['12', '34', '1234'] : ['a@b', '.fr', 'a@b.fr']
+
+        await typeAtNavigate(page, more)
+        await page.click('.field')
+        await page.type(first)
+        await page.waitUntil((all: string) => document.querySelector('p.searched')!.textContent === all, undefined, whole)
+
+        expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('.field')!.value)).toBe(whole)
+        expect(page.errors).toEqual([])
+      }
+      finally {
+        await site.close()
+      }
+    }, 60_000)
+  }
+
+  // The field far below stays unhydrated until scrolled to, so the first swap's watch is still waiting when the second arrives: it must not put its keys into the newer page's field.
+  it('restores nothing from a swap a newer one superseded', async () => {
+    const site = await testSite({ root: 'tests/fixtures/caret-field', browser: { path } })
+
+    try {
+      const page = await site.open('/far')
+
+      await page.evaluate(() => {
+        // The capture listeners on `input` the swaps leave registered.
+        const live = { count: 0 }
+        const add = document.addEventListener.bind(document)
+        const remove = document.removeEventListener.bind(document)
+
+        ;(window as unknown as { live: typeof live }).live = live
+        document.addEventListener = ((type: string, ...rest: [EventListenerOrEventListenerObject, (boolean | AddEventListenerOptions)?]) => {
+          if (type === 'input' && rest[1] === true)
+            live.count++
+
+          add(type, ...rest)
+        }) as typeof document.addEventListener
+        document.removeEventListener = ((type: string, ...rest: [EventListenerOrEventListenerObject, (boolean | EventListenerOptions)?]) => {
+          if (type === 'input' && rest[1] === true)
+            live.count--
+
+          remove(type, ...rest)
+        }) as typeof document.removeEventListener
+        document.querySelector<HTMLInputElement>('.field')!.focus({ preventScroll: true })
+        document.addEventListener('kay:navigate', () => {
+          const field = document.activeElement as HTMLInputElement
+
+          if (field.value === 'one') {
+            field.value += 'KEYS'
+            field.dispatchEvent(new InputEvent('input', { bubbles: true }))
+          }
+        })
+        document.querySelector<HTMLButtonElement>('button.one')!.click()
+      })
+      await page.waitUntil(() => document.querySelector<HTMLInputElement>('.field')!.defaultValue === 'one')
+      await page.evaluate(() => document.querySelector<HTMLButtonElement>('button.two')!.click())
+      await page.waitUntil(() => document.querySelector<HTMLInputElement>('.field')!.defaultValue === 'two')
+      await page.evaluate(() => document.querySelector('.field')!.scrollIntoView())
+      await page.waitUntil(() => (document.querySelector('slot[data-component]:has(.field)') as unknown as { _$k?: boolean })._$k === true)
+
+      expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('.field')!.value)).toBe('two')
+      // The first swap's watch ended when the second began, and the second's once its island hydrated.
+      expect(await page.evaluate(() => (window as unknown as { live: { count: number } }).live.count)).toBe(0)
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
 })

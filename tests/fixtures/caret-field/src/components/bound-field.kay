@@ -1,7 +1,7 @@
 ---
 import { debounced, effect, navigate, signal, watch } from 'kay'
 
-const { value } = props<{ value: string }>()
+const { value, type } = props<{ value: string, type?: string }>()
 const typed = signal(value)
 let box: HTMLInputElement | undefined
 
@@ -12,4 +12,4 @@ effect(() => {
     box.value = value
 })
 ---
-input.field(name="q" aria-label="Search" value={value} ref={(input: HTMLInputElement) => box = input} onInput={event => typed = event.currentTarget.value})
+input.field(name="q" type={type} aria-label="Search" value={value} ref={(input: HTMLInputElement) => box = input} onInput={event => typed = event.currentTarget.value})

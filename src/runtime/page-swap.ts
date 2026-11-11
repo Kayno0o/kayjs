@@ -7,7 +7,7 @@ import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
 import { abandon, HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, ENTRY_SCRIPT, inFlight, LATE, policyOf } from './swap-flight'
-import { moveFocus, watchTyped } from './swap-focus'
+import { moveFocus, settled, watchTyped } from './swap-focus'
 import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
 import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
@@ -404,6 +404,7 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
 
     void moveFocus(swap, policy, hash)
 
+    // Ends the watch of a swap this one superseded before it reads the focused field.
     const settle = watchTyped()
     const hydrated = navigation.hooks!.hydrate(document.body)
 
@@ -434,16 +435,6 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     await transitioned(commit)
   else
     commit()
-}
-
-// Once the hydration the swap started is done, whether it ended well or not.
-async function settled(hydrated: unknown, settle: () => void): Promise<void> {
-  try {
-    await hydrated
-  }
-  finally {
-    settle()
-  }
 }
 
 // The entry a swap adds or replaces, holding where the page it leaves was scrolled to.

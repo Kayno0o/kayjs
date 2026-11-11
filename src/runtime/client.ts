@@ -3,7 +3,7 @@ import { reviveActionsIn } from './action-revive'
 import { withBase } from './base'
 import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
-import { ISLAND } from './markers'
+import { HYDRATED, ISLAND } from './markers'
 import { flush, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { savesDataInBrowser } from './save-data'
 import { freshPrefix, withIds } from './uid'
@@ -299,6 +299,9 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
       console.error(error)
     }
   }
+
+  // Heard by a swap waiting to put keys back (swap-focus.ts).
+  element.dispatchEvent(new Event(HYDRATED))
 }
 
 // Its own chunk, which only a page holding a persistent island loads: the one kind of island the next page gives other props to.

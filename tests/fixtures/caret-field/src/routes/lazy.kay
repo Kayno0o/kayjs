@@ -1,0 +1,18 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()), when: s.Optional(s.String()) }) }
+
+const q = ctx.query.q ?? ''
+const when = ctx.query.when === 'idle' ? 'idle' : 'visible'
+--- script
+import BoundField from '../components/bound-field.kay'
+---
+head
+  title Caret lazy
+h1 Caret
+p.searched {q}
+if when === 'idle'
+  BoundField(value={q} hydrate="idle")
+else
+  BoundField(value={q} hydrate="visible")

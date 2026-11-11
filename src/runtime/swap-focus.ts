@@ -1,7 +1,7 @@
 import type { Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { announce } from './announce'
-import { ISLAND } from './markers'
+import { HYDRATED, ISLAND } from './markers'
 import { hashTarget } from './navigation'
 
 function byName(element: Element | null): Element | null {
@@ -100,37 +100,75 @@ async function showRefusal(form: HTMLFormElement | undefined, control: number): 
   return refusal.showRefusal(form, control, announce)
 }
 
-// Keys typed into the focused field after the swap and before its island hydrated land in the server's markup, which hydration then writes its own value over. They are noted as they come, and the function returned (called once the hydration is done) puts them back and fires `input` so the island hears them, the caret after them.
-export function watchTyped(): (() => void) | undefined {
+const WATCH_BOUND_MS = 30_000
+// What ends each field's watch, so a newer swap leaves the ones before it restoring nothing.
+const watching = new Set<() => void>()
+
+// Keys typed into the focused field after the swap and before its island hydrated land in the server's markup, which hydration then writes its own value over. They are noted as they come, and put back once the field's island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. The function returned is for when the swap's own hydration is done. A newer swap, or a bound of 30 s, ends the watch with nothing restored; a late block's watch (`late`) leaves the others.
+export function watchTyped(late = false): (() => void) | undefined {
+  if (!late) {
+    for (const end of watching)
+      end()
+  }
+
   const field = document.activeElement
 
   if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement))
     return undefined
 
   const id = field.id
-  let typed: { value: string, start: number, end: number, direction: 'forward' | 'backward' | 'none' } | undefined
+  const island = field.closest<HTMLElement & { _$k?: boolean }>(ISLAND)
+  // A number or email field has no selection, so no caret.
+  let typed: { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none' } | undefined
   const note = (event: Event) => {
     // Only the keys the island never saw: once it hydrated, what it did with them is what the field holds.
-    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null && !(field.closest(ISLAND) as { _$k?: boolean } | null)?._$k)
+    if (event.target === field && !island?._$k)
       typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' }
   }
-
-  document.addEventListener('input', note, true)
-
-  return () => {
+  const heard = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const end = () => {
+    clearTimeout(timer)
+    heard.abort()
     document.removeEventListener('input', note, true)
+    watching.delete(end)
+  }
+  const restore = () => {
+    end()
 
     const now = field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field)
 
-    if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.selectionStart === null)
-      return
-
     // Hydration kept what was typed, and the island heard it through the events queued for it.
-    if (now.value === typed.value)
+    if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.value === typed.value)
       return
 
     now.value = typed.value
     now.dispatchEvent(new InputEvent('input', { bubbles: true }))
-    now.setSelectionRange(typed.start, typed.end, typed.direction)
+
+    if (typed.start !== null && typed.end !== null && now.selectionStart !== null)
+      now.setSelectionRange(typed.start, typed.end, typed.direction)
+  }
+
+  document.addEventListener('input', note, true)
+  watching.add(end)
+  timer = setTimeout(end, WATCH_BOUND_MS)
+
+  if (island && !island._$k)
+    island.addEventListener(HYDRATED, restore, { once: true, signal: heard.signal })
+
+  // A field outside an island, or in one hydrated already, has nothing left to wait for once the swap's hydration is done.
+  return () => {
+    if (watching.has(end) && (!island || island._$k))
+      restore()
+  }
+}
+
+// Once the hydration a swap started is done, whether it ended well or not.
+export async function settled(hydrated: unknown, settle: () => void): Promise<void> {
+  try {
+    await hydrated
+  }
+  finally {
+    settle()
   }
 }
