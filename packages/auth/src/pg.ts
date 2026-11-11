@@ -501,7 +501,7 @@ export function pgAuth(db: Database): AuthStore {
         withoutMissingOAuthTables(async () => Promise.all([
           oauthCodes.write.deleteMany({ expires_at: { lte: now } }),
           oauthRefresh.write.deleteMany({ expires_at: { lte: now } }),
-          // A client that registered itself and that nobody approved within a month.
+          // A client that registered itself and that nobody approved within `UNUSED_CLIENT_MS`, a day.
           db.raw`DELETE FROM "kay_oauth_clients" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "kay_oauth_grants" WHERE "kay_oauth_grants"."client_id" = "kay_oauth_clients"."id")`,
         ])),
         tokens.write.deleteMany({ expires_at: { lte: now } }),
