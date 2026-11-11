@@ -234,7 +234,7 @@ test('an entry opens in a form of its collection\'s fields, nested slugs include
 })
 
 test('a new entry asks for its slug, and no locale in a plain collection', async () => {
-  expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).toEqual(['Slug*', 'Title*', 'Tags', 'Body'])
+  expect((await site.visit('/admin/new/posts')).find('.kui-label-text').map(label => label.text)).toEqual(['Slug* required', 'Title* required', 'Tags', 'Body'])
 })
 
 test('a collection\'s list shows the columns and the row actions its layout names', async () => {
@@ -337,7 +337,7 @@ test('a form is arranged by its layout: the named fields first, a row side by si
 
   expect(page.find('.kcms-field[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['price', 'stock', 'live', 'photo', 'name'])
   expect(page.find('.kcms-row').map(row => Array.from(row.html.matchAll(/data-kcms-path="(\w+)"/g), match => match[1]))).toEqual([['price'], ['stock', 'live'], ['photo'], ['name']])
-  expect(page.find('.kui-label-text').map(label => label.text)[0]).toBe('Slug*')
+  expect(page.find('.kui-label-text').map(label => label.text)[0]).toBe('Slug* required')
   expect((await site.visit('/admin/collections/shop/lamp')).find('[data-kcms-path]')).not.toHaveLength(0)
 })
 
