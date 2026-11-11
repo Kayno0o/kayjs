@@ -41,13 +41,13 @@ import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
 import { FLASH_COOKIE, flashForOther, flashName, flashPath, handedOverFlash, readFlash } from './flash'
-import { guardRuns, refusalOutcome } from './guard-runs'
+import { guardRuns } from './guard-runs'
 import { runGuards } from './guards'
 import { DEFAULT_LANG } from './i18n'
 import { inLiveReads, retryForViewer } from './live'
 import { errorPage } from './overlay'
 import { calmDeadline, pageErrorOf } from './page-error'
-import { pageLimits, pageOverLimit } from './page-limits'
+import { pageLimits, pageOverLimit, quietly } from './page-limits'
 import { chainSetting, pagePrerender } from './page-settings'
 import { pageToken } from './prerendered'
 import { withoutShareToken } from './preview'
@@ -197,8 +197,6 @@ export function sharedContext<T extends RequestContext>(request: Request, copy: 
   return (record.sharedContext ??= copy()) as T
 }
 
-export { refusalOutcome }
-
 export interface Rendering {
   ctx: PageContext<Record<string, unknown>>
   headers: Headers
@@ -303,7 +301,7 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
 async function chainOf(route: ServedRoute, options: RenderOptions): Promise<PageModule[]> {
   const { files } = routeChain(route)
 
-  return knownModules(files, options) ?? await importAll(files, options)
+  return knownModules(files, options) ?? await quietly(async () => importAll(files, options), [])
 }
 
 // Whether `kay build` writes this page ahead, from its `prerender` setting or a server island its template reaches; read off the source in development only, where the compiler is loaded anyway.
@@ -419,13 +417,13 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const modules = await importAll(files, options)
     const imports = performance.now() - importsStarted
 
-    readRouteQuery(files, modules, rendering, options)
-    retimePage(modules, rendering, options)
-
     const over = options.prerendering ? undefined : await pageOverLimit(route, modules, rendering)
 
     if (over)
       return await renderFailure(over, route.special, rendering, loaded, client, options)
+
+    readRouteQuery(files, modules, rendering, options)
+    retimePage(modules, rendering, options)
 
     const timings = timing ? Array.from<number>({ length: files.length }) : undefined
 
@@ -546,8 +544,8 @@ function storedEncodings(encoded: ServedPage['encoded']): { names: StoredEncodin
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
-  const modules = await chainOf(route, options)
-  const limited = pageLimits(route, modules).length > 0
+  const limited = page.limited === true
+  const modules = limited ? await chainOf(route, options) : []
   const rendering = limited || readsRequest(route, context.request, options) ? createRendering(context, params, options, route.contextKeys) : undefined
   const refusing = rendering && refused(route, rendering, client, withEditor(route, options))
   const refusal = refusing === undefined ? undefined : await refusing

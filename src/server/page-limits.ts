@@ -14,11 +14,31 @@ interface PageLimit {
 type Given = RateLimit | RateLimit[] | false | undefined
 
 const NONE: PageLimit[] = []
+// The limits of each chain of modules a route answers with, read once.
+const chains = new WeakMap<object[], PageLimit[]>()
+// What a request was told when it was counted, so a render run again for the viewer does not count it twice.
+const waits = new WeakMap<Request, number | undefined>()
 // The entries of each limit object by route, kept so a limit's counter is made once and the same one answers every request.
 const entries = new WeakMap<object, Map<string, PageLimit[]>>()
 
 // The limits a page counts a request against: its own `rateLimit`, else the innermost layout's, each counted under the route's pattern (the others under their place in the list), so a layout's limit applies to each page under it apart, as its other settings do. `false` lifts what a layout sets.
 export function pageLimits(route: { pattern: string }, modules: object[]): PageLimit[] {
+  let known = chains.get(modules)
+
+  if (!known)
+    chains.set(modules, known = limitsOf(route, modules))
+
+  return known
+}
+
+// Whether the page or a layout above it sets a limit, which `kay build` records on the page it writes so the server reads no module to tell.
+export function limitedPage(modules: object[]): true | undefined {
+  const given = chainSetting(modules, 'rateLimit') as Given
+
+  return given !== undefined && given !== false && [given].flat().length > 0 ? true : undefined
+}
+
+function limitsOf(route: { pattern: string }, modules: object[]): PageLimit[] {
   const given = chainSetting(modules, 'rateLimit') as Given
 
   if (given === undefined || given === false)
@@ -53,14 +73,18 @@ export async function pageOverLimit(route: { pattern: string }, modules: object[
 
   readPersonally(ctx.request)
 
-  const wait = await apiLimitWait(limits, ctx.request, undefined, () => ({
-    request: ctx.request,
-    locale: ctx.locale,
-    get cookies() {
-      return ctx.cookies
-    },
-    locals: ctx.locals,
-  }))
+  const wait = waits.has(ctx.request)
+    ? waits.get(ctx.request)
+    : await apiLimitWait(limits, ctx.request, undefined, () => ({
+      request: ctx.request,
+      locale: ctx.locale,
+      get cookies() {
+        return ctx.cookies
+      },
+      locals: ctx.locals,
+    }))
+
+  waits.set(ctx.request, wait)
 
   if (wait === undefined)
     return undefined
@@ -72,8 +96,7 @@ export async function pageOverLimit(route: { pattern: string }, modules: object[
 
 // Why `kay build` does not keep a page nothing marks: it sets `ttl`, which has a stale copy rendered again for every visitor with the request a page reads, which an unmarked page was never asked to, or `rateLimit`, which only the server counts. A marked page is written all the same, with a warning for `rateLimit`: a static host serves the file with no count.
 export function keptStop(file: string, revalidate: unknown, chain: object[], auto: boolean, skip: (why: string) => unknown): boolean {
-  const given = chainSetting(chain, 'rateLimit')
-  const limited = given !== undefined && given !== false
+  const limited = limitedPage(chain) === true
 
   if (limited && !auto)
     kayLog('warn', `${file} sets \`rateLimit\` and is prerendered: a static host serves the written page with no count, and only the kay server counts the requests it serves`)
@@ -84,4 +107,14 @@ export function keptStop(file: string, revalidate: unknown, chain: object[], aut
   skip(revalidate === undefined ? 'sets `rateLimit`, which counts the requests of every visitor' : 'sets `ttl`, which has a stale copy render again for every visitor')
 
   return true
+}
+
+// What `load` gives, or `fallback` when it fails: a refusal must not turn into a 500 because a page it guards cannot be imported.
+export async function quietly<Loaded>(load: () => Promise<Loaded>, fallback: Loaded): Promise<Loaded> {
+  try {
+    return await load()
+  }
+  catch {
+    return fallback
+  }
 }

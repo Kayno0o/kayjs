@@ -251,7 +251,7 @@
     "complexity": 93
   },
   "src/server/render.ts": {
-    "max-lines": 714
+    "max-lines": 713
   },
   "src/server/rooms.ts": {
     "max-lines-per-function": 196

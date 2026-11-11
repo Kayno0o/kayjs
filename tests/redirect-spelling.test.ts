@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { runInLocale } from '../src/runtime/locale-state'
-import { refusalOutcome } from '../src/server/render'
+import { refusalOutcome } from '../src/server/guard-runs'
 import { Redirect } from '../src/server/signals'
 import { pages } from './shared-pages'
 

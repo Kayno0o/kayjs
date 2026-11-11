@@ -74,6 +74,8 @@ export interface PageStyles {
 }
 
 export interface PrerenderedPage {
+  // Set when the page or a layout has a `rateLimit`, so the server counts each request it answers with the written copy.
+  limited?: true | undefined
   // The route the path belongs to.
   pattern: string
   // The locale it was rendered in.

@@ -91,7 +91,7 @@ export async function loadPrerendered(client: ClientBuild, dictionary: boolean):
     if (!paths)
       byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, cacheControl: page.cacheControl, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, kept: page.kept, pathname: page.pathname, reads: page.reads, token: page.token, ...loaded[index]! })
+    paths.set(path, { limited: page.limited, status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, cacheControl: page.cacheControl, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, kept: page.kept, pathname: page.pathname, reads: page.reads, token: page.token, ...loaded[index]! })
   }
 
   return byRoute

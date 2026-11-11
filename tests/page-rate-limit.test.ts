@@ -2,7 +2,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { keptStop, pageLimits } from '../src/server/page-limits'
+import { keptStop, limitedPage, pageLimits, pageOverLimit } from '../src/server/page-limits'
+import { Denied } from '../src/server/signals'
 import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -154,8 +155,20 @@ describe('the counter of a page', () => {
 
     expect(first.map(entry => entry.name)).toEqual(['/a', '/a#1'])
     expect(pageLimits({ pattern: '/a' }, modules)).toBe(first)
-    expect(pageLimits({ pattern: '/b' }, modules).map(entry => entry.name)).toEqual(['/b', '/b#1'])
+    expect(pageLimits({ pattern: '/b' }, [...modules]).map(entry => entry.name)).toEqual(['/b', '/b#1'])
+    expect(limitedPage([{ page: { rateLimit: [] } }])).toBeUndefined()
+    expect(limitedPage(modules)).toBe(true)
     expect(pageLimits({ pattern: '/a' }, [...modules, { page: { rateLimit: false } }])).toEqual([])
+  })
+
+  it('counts a request once when its render is run again for the viewer', async () => {
+    const modules = [{ page: { rateLimit: { max: 1, window: '1m' } } }]
+    const rendering = (request: Request) => ({ ctx: { request, locale: 'en', cookies: {}, locals: {} } as never, headers: new Headers() })
+    const request = new Request('http://localhost/again', { headers: { 'x-forwarded-for': '10.8.8.8' } })
+
+    expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(request))).toBeUndefined()
+    expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(request))).toBeUndefined()
+    expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(new Request('http://localhost/again', { headers: { 'x-forwarded-for': '10.8.8.8' } })))).toBeInstanceOf(Denied)
   })
 
   it('refuses a limit that cannot count', () => {
