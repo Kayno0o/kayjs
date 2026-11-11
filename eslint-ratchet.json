@@ -145,7 +145,7 @@
     "max-lines-per-function": 251
   },
   "src/mcp/tools.ts": {
-    "max-lines": 670,
+    "max-lines": 657,
     "max-lines-per-function": 382
   },
   "src/migrate/astro.ts": {

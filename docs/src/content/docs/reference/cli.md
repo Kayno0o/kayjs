@@ -749,7 +749,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `routes` | `kay routes --format json` |
 | `explain` | The lints and error codes, or with `name` one lint, error code or group |
 | `docs` | `kay docs --format json` on `query` |
-| `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies` |
+| `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies`. A body or a method other than GET, HEAD or OPTIONS runs the app's action against its database, so it needs `kay mcp --write` |
 | `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme`, `fullPage` and `cookies` (as `name=value`). Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
 | `doctor` | `kay doctor --format json`. `port` is the port to check |
 | `fmt` | `kay fmt --check --format json`: the files not formatted, writing none. `paths` narrows it |
@@ -760,12 +760,12 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `lint` | `kay lint` with the project's `keslint`, answered as `{ errors, warnings, problems }` capped at 200 problems, with `omitted` counting the rest. `paths` narrows it; `apply: true` adds `--fix` |
 | `build` | `kay build --format json`, with `denyWarnings`. A plain build writes `.kay`; `static: true` replaces `dist` and needs `kay mcp --write` |
 | `types` | `kay types --format json` |
-| `test` | `kay test`, with `files` and a `name` pattern: `{ code, failed }`, each failed test with its `file`, `name`, `message` and `at`, capped at 200 with `omitted` counting the rest, and `summary` holding the output when no failed test could be listed. An error when a test fails |
+| `test` | `kay test`, with `files` and a `name` pattern: `{ code, failed }`, each failed test with its `file`, `name`, `message` and `at`, capped at 200 with `omitted` counting the rest, and `summary` holding the output when no failed test could be listed. An error when a test fails. A test may write to the database it is given, so it needs `kay mcp --write` |
 | `env` | `kay env --format json` |
 | `i18n_missing` | `kay i18n missing --format json`, for one `locale` or all |
 | `a11y` | `kay a11y --dry-run --format json`, with `standard`. Needs Chrome |
 | `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser). `waitMs` first waits for the next change to settle, so an edit is answered by what it caused |
-| `not_found` | `kay not-found --format json`: `{ missing, total }`, the paths visitors found nothing at, most hit first, each with `hits`, `firstAt`, `lastAt`, `referrers` and the suggested `target`, from the same database the command reads. It writes nothing. `limit` lists fewer than the 200 it caps at |
+| `not_found` | `kay not-found --format json`: `{ missing, total }`, the paths visitors found nothing at, most hit first, each with `hits`, `firstAt`, `lastAt`, `referrers` and the suggested `target`, from the same database the command reads. It writes nothing. `limit` lists fewer than the 200 it caps at. A path, referrer or page is what a visitor typed or sent, so each comes quoted and cut at 120 characters, at most 5 referrers a path |
 
 The server offers tools and resources only. It has no prompts, which would repeat what `AGENTS.md` and the server's own instructions already tell an agent, and no resource subscriptions: the resources are the guides, which do not change while the server runs, and what does change (check problems, the dev server's errors) is read through `check` and `dev_errors`, whose `waitMs` waits for the next change.
 
@@ -773,7 +773,9 @@ The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<fi
 
 Each tool runs its command in a child process, so a call costs what the command does. Calls run one at a time, in the order they came.
 
-A tool that changes the project previews by default, and a long `waitMs` of `dev_errors` can outlast a client's request timeout. Its `apply: true` is refused unless the client starts the server as `kay mcp --write`, so an agent writes only where the person who registered it allowed it. Every path an argument names must be inside the project, arguments reach the command as a list and never through a shell, and a long answer is cut.
+A tool that changes the project previews by default, and a long `waitMs` of `dev_errors` can outlast a client's request timeout. The `test` tool and a `render` that POSTs run the app's code and are refused the same way. Its `apply: true` is refused unless the client starts the server as `kay mcp --write`, so an agent writes only where the person who registered it allowed it.
+
+Every path an argument names must be inside the project, arguments reach the command as a list and never through a shell, and a long answer is cut.
 
 ## Quiet and plain output
 

@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
+- `kay mcp` refuses a `render` that POSTs and the `test` tool unless it was started with `--write`, as both run the app's code against its database, and `not_found` hands the paths visitors typed as data, cut at 120 characters ([MCP commands](editor-and-agent-commands.md)).
 - `mount()` returns a handle, `{ update(props), dispose }` that is still callable as the disposer, and takes a function for its props, `() => ({ title: title() })`, whose signals the mount follows ([a page kay does not serve](navigation-from-code.md#a-page-kay-does-not-serve)).
 - kayjs-ui: `NavigationProgress` is a thin top bar following `navigation.pending()` with a delay before it shows, and the link a visit follows carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script ([page layout](../packages/ui/llms/page-layout-palette-and-trees.md), [navigating from code](navigation-from-code.md)).
 - kayjs-ui: `Meter` announces `value` out of `max` (3 of 10 is 3, not 30) and takes `formatValue`, `showValue` and a `@reading` block for its value as text, `thresholds` to colour the fill by value and `size`; `Progress` takes the same ([kayjs-ui basics](../packages/ui/llms/basics.md)).

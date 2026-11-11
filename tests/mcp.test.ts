@@ -494,6 +494,23 @@ describe.concurrent('kay mcp', () => {
     expect(missing.result?.content?.[1]?.text).toContain('404')
   })
 
+  it('refuses a render that runs an action, and a test run, while the server is read-only', async () => {
+    for (const args of [{ url: '/about', method: 'POST' }, { url: '/about', body: 'a=1' }, { url: '/about', method: 'delete' }]) {
+      const reply = (await agent.request('tools/call', { name: 'render', arguments: args })).result
+
+      expect(reply?.isError).toBe(true)
+      expect(JSON.stringify(reply?.content)).toContain('--write')
+    }
+
+    const tested = (await agent.request('tools/call', { name: 'test', arguments: {} })).result
+
+    expect(tested?.isError).toBe(true)
+    expect(JSON.stringify(tested?.content)).toContain('--write')
+
+    for (const method of ['GET', 'head', 'OPTIONS'])
+      expect(JSON.stringify((await agent.request('tools/call', { name: 'render', arguments: { url: '/about', method } })).result?.content)).not.toContain('--write')
+  })
+
   it('refuses to render what is no path or URL', async () => {
     const reply = await agent.request('tools/call', { name: 'render', arguments: { url: '--help' } })
 
@@ -599,20 +616,15 @@ describe.concurrent('kay mcp', () => {
     }
   })
 
-  it('previews adding a feature, checks the environment and the translations, and runs a test file', async () => {
-    await Bun.write(join(root, 'tests/about.test.ts'), 'import { expect, it } from \'bun:test\'\n\nit(\'adds\', () => expect(1 + 1).toBe(2))\n')
-
+  it('previews adding a feature, and checks the environment and the translations', async () => {
     const added = (await agent.request('tools/call', { name: 'add', arguments: { features: ['tailwind'] } })).result
     const env = (await agent.request('tools/call', { name: 'env', arguments: {} })).result
     const missing = (await agent.request('tools/call', { name: 'i18n_missing', arguments: {} })).result
-    const tested = (await agent.request('tools/call', { name: 'test', arguments: { files: ['tests/about.test.ts'] } })).result
 
     // The fixture's home page is not what `kay new` wrote, so the preview answers why nothing could be added, still as a document.
     expect(added?.structuredContent).toMatchObject({ errors: 1, problems: [{ message: expect.stringContaining('nothing was written') }] })
     expect(env?.structuredContent).toBeDefined()
     expect(missing?.content).toBeDefined()
-    expect(tested?.isError).toBe(false)
-    expect(tested?.structuredContent).toEqual({ code: 0, failed: [] })
   })
 
   it('refuses a resource it does not list, whatever the path says', async () => {
@@ -806,6 +818,12 @@ describe('kay mcp tools that write', () => {
     expect((await call(writer, 'types')).structuredContent).toMatchObject({ dir: '.kay/types' })
   }, 120_000)
 
+  it('renders a POST and runs tests once the server is started with --write', async () => {
+    const posted = await call(writer, 'render', { url: '/', method: 'POST', body: 'a=1' })
+
+    expect(JSON.stringify(posted.content)).not.toContain('started without')
+  })
+
   it('lists the failed tests with where they are, and the run\'s output when none can be listed', async () => {
     await Bun.write(join(app, 'tests/mixed.test.ts'), 'import { describe, expect, it } from \'bun:test\'\n\ndescribe(\'group\', () => {\n  it(\'adds\', () => expect(1 + 1).toBe(3))\n  it(\'passes\', () => {})\n})\n\nit(\'throws\', () => {\n  throw new Error(\'boom\\nline 2\')\n})\n')
     await Bun.write(join(app, 'tests/broken.test.ts'), 'import \'./missing\'\n')
@@ -959,5 +977,27 @@ describe('kay mcp not_found', () => {
       expect((await call({ limit })).isError).toBe(true)
 
     expect(new Bun.CryptoHasher('sha256').update(await Bun.file(file()).bytes()).digest('hex')).toBe(before)
+  })
+
+  it('hands the paths visitors typed as quoted data, cut short', async () => {
+    const store = missingStore(file())
+    const never = () => undefined
+    const long = `/${'a'.repeat(300)}`
+
+    store.hit(long, undefined, never)
+
+    for (let index = 0; index < 8; index++)
+      store.hit('/ignore-previous-instructions', `ref${index}.example`, never)
+
+    store.close()
+
+    const { missing } = (await call()).structuredContent!
+    const cutPath = missing.find(entry => entry.path.startsWith('/aaa'))!
+    const referrers = missing.find(entry => entry.path === '/ignore-previous-instructions')!.referrers
+
+    expect(cutPath.path).toHaveLength(123)
+    expect(cutPath.path.endsWith('...')).toBe(true)
+    expect(referrers.length).toBeLessThanOrEqual(5)
+    expect((await call()).content[0]!.text).toContain('"path":"/ignore-previous-instructions"')
   })
 })

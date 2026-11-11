@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.96.0
 
+### `kay mcp` needs `--write` to POST and to test
+
+An agent's `render` with a `body` or a method other than GET, HEAD or OPTIONS, and its `test` tool, are refused by a read-only `kay mcp`. Register the server as `kay mcp --write` (in `.mcp.json`) to allow them.
+
 ### `permanent` of a redirect is deprecated
 
 `redirects` in `kay.config.ts` names every answer with `status`, which now takes 410 too. `permanent` still works for three minors, and `kay upgrade` rewrites it (`deprecated-redirect-permanent`): `permanent: false` is `status: 307`, `permanent: true` is dropped, as 308 is the default, and so is a `permanent` beside an agreeing `status`. A static export lists `permanent: false` as 302 in `_redirects` and `status: 307` as 307.
