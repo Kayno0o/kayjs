@@ -143,7 +143,7 @@
   },
   "src/mcp/tools.ts": {
     "max-lines": 657,
-    "max-lines-per-function": 382
+    "max-lines-per-function": 381
   },
   "src/migrate/astro.ts": {
     "complexity": 43
