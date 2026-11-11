@@ -57,8 +57,8 @@ export interface SaveEvent {
   previous?: EntryState | undefined
 }
 
-// What the activity log keeps: what an `onSave` is told, and an upload.
-export type ActivityVerb = SaveEvent['verb'] | 'upload'
+// What the activity log keeps: what an `onSave` is told, an upload, and a share link made for an entry.
+export type ActivityVerb = SaveEvent['verb'] | 'upload' | 'share'
 
 // What `cms({ beforeSave })` is asked, before the entry is checked against its schema and written: the verbs that write it (`add`, `update`, `publish`, `unpublish`, `duplicate`, `restore`), a `delete`, and a `rename`, whose `slug` is the new one and `from` the old. A reorder is not asked.
 export interface BeforeSaveEvent {

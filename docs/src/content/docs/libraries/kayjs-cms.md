@@ -671,7 +671,7 @@ A deleted entry may hold a visitor's data, and the history holds the names of yo
 
 ### Seeing what editors did
 
-When a collection keeps a history, the content list has an Activity button, shown to a role that may delete when you list roles, as the page names every editor. It opens one page listing what editors did across the collections, newest first, a page at a time: who, when, and whether the entry was created, saved, published, unpublished, duplicated, deleted, restored or renamed.
+When a collection keeps a history, the content list has an Activity button, shown to a role that may delete when you list roles, as the page names every editor. It opens one page listing what editors did across the collections, newest first, a page at a time: who, when, and whether the entry was created, saved, published, unpublished, duplicated, deleted, restored, renamed or shared.
 
 Each line links to the entry, except a deleted one. The log keeps the last 500 events of each collection, and a collection left out with `history: false` adds nothing to it.
 
@@ -679,7 +679,7 @@ Each line links to the entry, except a deleted one. The log keeps the last 500 e
 
 A draft with a page has a Share preview button. It copies a link that shows that draft, and nothing else, to whoever you send it to. They need no account, and the rest of the site stays as published for them.
 
-The link works for a week and ends if you rename the entry. It needs `preview: { secret }` in `kay.config.ts`, and with `roles` it is a publisher's action. Save your edits first, as the link shows the saved draft.
+The link works for a week and ends if you rename the entry. It needs `preview: { secret }` in `kay.config.ts`, and with `roles` it is a publisher's action. Save your edits first, as the link shows the saved draft. Each link made is a line in the activity log, with who made it.
 
 ### Sending an entry to a mailing list
 

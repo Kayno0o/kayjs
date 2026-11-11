@@ -16,6 +16,7 @@ function action(row: ActivityRow): string {
     case 'duplicate': return wording('cms.activity.duplicate', 'Duplicated')
     case 'delete': return wording('cms.activity.delete', 'Deleted')
     case 'restore': return wording('cms.activity.restore', 'Restored')
+    case 'share': return wording('cms.activity.share', 'Shared a preview link')
     case 'upload': return wording('cms.activity.upload', 'Uploaded')
     case 'rename': return wording('cms.activity.rename', 'Renamed from {from}', { from: row.from ?? '' })
     default: return wording('cms.activity.update', 'Saved')

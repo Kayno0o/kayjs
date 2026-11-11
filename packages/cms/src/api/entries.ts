@@ -3,6 +3,7 @@ import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { memberOfRequest } from '../access'
+import { recordActivity } from '../activity'
 import { actors, authors, linkReaders, stamped } from '../authors'
 import { SINGLE_SLUG } from '../listing'
 import { withHold } from '../publishing'
@@ -53,7 +54,14 @@ export default api()
   .post('/:collection/:slug/submit', async ({ params, query, request }) => submitEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, actors.get(request) ?? nobody, authors.get(request)), { query: locale })
   .post('/:collection/:slug/approve', async ({ params, query, body, request }) => approveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, actors.get(request) ?? nobody, authors.get(request), body.version), { query: locale, body: s.Object({ version: s.Optional(s.String()) }) })
   .post('/:collection/:slug/send-back', async ({ params, query, body, request }) => sendBackEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.note, actors.get(request) ?? nobody, authors.get(request)), { query: locale, body: s.Object({ note: s.String() }) })
-  .post('/:collection/:slug/share', async ({ params, query }) => shareLink({ collection: params.collection, slug: params.slug, locale: query.locale }), { query: locale })
+  .post('/:collection/:slug/share', async ({ params, query, request }) => {
+    const shared = await shareLink({ collection: params.collection, slug: params.slug, locale: query.locale })
+
+    if (shared.ok)
+      await recordActivity({ collection: params.collection, slug: params.slug, locale: query.locale, verb: 'share', author: authors.get(request) })
+
+    return shared
+  }, { query: locale })
   .post('/:collection/:slug/duplicate', async ({ params, query, request }) => duplicateEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/rename', async ({ params, query, body, request }) => renameEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.slug, { author: authors.get(request), version: query.version, required: true }), { query: versioned, body: s.Object({ slug: s.String() }) })
   .post('/:collection/:slug/move', async ({ params, query, request }) => moveEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, query.direction, authors.get(request)), { query: s.Object({ locale: s.Optional(s.String()), direction: s.Union([s.Literal('up'), s.Literal('down')]) }) })
