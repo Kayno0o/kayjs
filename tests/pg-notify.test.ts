@@ -484,6 +484,58 @@ describe('a Postgres database that notifies', () => {
     await writer.close?.()
   })
 
+  // A replica holding a member, its poll asleep at the idle rate once notifications are known to arrive.
+  async function sleepingReader() {
+    const { sql } = await postgres()
+
+    await createDataTables(sql)
+
+    const clock = virtualClock()
+    const [readerSql, writerSql] = replicas(2)
+    const reader = pgRooms(pgHandle(readerSql!))
+    const writer = pgRooms(pgHandle(writerSql!))
+
+    reader.add('lobby', 'tab-1', 'ada')
+
+    for (let second = 0; second < 90; second++)
+      await clock.advance(1000, true)
+
+    return { clock, reader, writer, writerSql: writerSql! }
+  }
+
+  pgIt('hears a message published right after a replica holding a member subscribes, its poll asleep', async () => {
+    const { clock, reader, writer } = await sleepingReader()
+    const heard: string[] = []
+
+    reader.subscribe((room, text) => void heard.push(`${room}/${text}`))
+    // The subscription takes where the messages stand, then the writer publishes after it.
+    await Bun.sleep(300)
+    writer.publish('lobby', 'gap', {})
+    await eventually(async () => {
+      await clock.advance(150, true)
+      expect(heard).toContain('lobby/gap')
+    })
+
+    await reader.close?.()
+    await writer.close?.()
+  })
+
+  pgIt('delivers a message whose notification was lost at the fallback poll at the latest', async () => {
+    const { clock, reader, writer, writerSql } = await sleepingReader()
+    const heard: string[] = []
+
+    reader.subscribe((room, text) => void heard.push(`${room}/${text}`))
+    await Bun.sleep(300)
+    await writerSql.unsafe(`INSERT INTO kay_room_messages (room, text, process, at) VALUES ('lobby', 'lost', 'elsewhere', floor(extract(epoch FROM statement_timestamp()) * 1000)::bigint)`)
+    await eventually(async () => {
+      await clock.advance(31_000, true)
+      expect(heard).toContain('lobby/lost')
+    })
+
+    await reader.close?.()
+    await writer.close?.()
+  })
+
   pgIt('lets a cache invalidation published in one process reach another with its timers stopped', async () => {
     const { sql } = await postgres()
 

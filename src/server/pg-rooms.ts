@@ -54,6 +54,44 @@ const refused = (error: unknown): boolean => SQLSTATE.test(String((error as { er
 const LOCK_ATTEMPTS = 3
 const LOCK_NOT_AVAILABLE = '55P03'
 
+// Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included; a leaving member asks up to `LOCK_ATTEMPTS` times.
+async function lockRoom(tx: SQL, room: string): Promise<void> {
+  await query(tx, 'SET LOCAL lock_timeout = \'5s\'')
+  await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${escaped(room)}`])
+}
+
+// Under the room's lock, so an update storing a state for the member that just left finishes first; a lock not given in time is asked for again rather than left to the next prune.
+async function dropEmptyState(db: SQL, room: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await db.begin(async (tx) => {
+        await lockRoom(tx, room)
+        await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [escaped(room)])
+      })
+
+      return
+    }
+    catch (error) {
+      if (attempt >= LOCK_ATTEMPTS || (error as { errno?: string }).errno !== LOCK_NOT_AVAILABLE)
+        throw error
+    }
+  }
+}
+
+// The id of the last room message, or undefined when the database could not say.
+async function messageHead(pg: PgHandle): Promise<number | undefined> {
+  try {
+    const [latest] = await query<{ id: string }>(await pg.db(), 'SELECT coalesce(max(id), 0)::text AS id FROM kay_room_messages')
+
+    return Number(latest?.id ?? 0)
+  }
+  catch (error) {
+    kayLog('error', 'reading where the room messages stand failed; the first poll takes it', error)
+
+    return undefined
+  }
+}
+
 // The store's writes in the order they were made.
 function writeQueue(pg: PgHandle) {
   let tail: Promise<void> = Promise.resolve()
@@ -161,12 +199,6 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
         remote.delete(name)
       }
     }
-  }
-
-  // Waits for the room's lock for 5 seconds at most, so a stuck update elsewhere fails this one rather than holding the store's writes, the heartbeat's included; a leaving member asks up to `LOCK_ATTEMPTS` times.
-  const lockRoom = async (tx: SQL, room: string) => {
-    await query(tx, 'SET LOCAL lock_timeout = \'5s\'')
-    await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_room_state\n${escaped(room)}`])
   }
 
   // The states of rooms with no member left.
@@ -283,10 +315,27 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     }
   }
 
+  // The last message id as of a subscription, taken when it is made rather than by the first poll, which a poll asleep at its long idle rate would make late.
+  let baseline: Promise<void> | undefined
+  const takeBaseline = () => {
+    baseline ??= (async () => {
+      const head = await messageHead(pg)
+
+      if (head !== undefined && events.from() === undefined)
+        events.start([head])
+
+      baseline = undefined
+    })()
+  }
+
   // Whether a message not read before was found.
   const readMessages = async (db: SQL) => {
     if (listeners.size === 0)
       return false
+
+    // The baseline `subscribe` began is waited for, so a message published after the subscription is read even when the poll slept through it.
+    if (events.from() === undefined && baseline !== undefined)
+      await baseline
 
     const from = events.from()
 
@@ -405,21 +454,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
       enqueue('removing a member from the rooms store', async (db) => {
         await query(db, 'DELETE FROM kay_room_members WHERE room = $1 AND connection = $2', [escaped(room), connection])
         await wake(db)
-        // Under the room's lock, so an update storing a state for the member that just left finishes first; a lock not given in time is asked for again rather than left to the next prune.
-        for (let attempt = 1; ; attempt++) {
-          try {
-            await db.begin(async (tx) => {
-              await lockRoom(tx, room)
-              await query(tx, 'DELETE FROM kay_room_state WHERE room = $1 AND NOT EXISTS (SELECT 1 FROM kay_room_members WHERE room = $1)', [escaped(room)])
-            })
-
-            return
-          }
-          catch (error) {
-            if (attempt >= LOCK_ATTEMPTS || (error as { errno?: string }).errno !== LOCK_NOT_AVAILABLE)
-              throw error
-          }
-        }
+        await dropEmptyState(db, room)
       })
     },
     async state(room) {
@@ -476,7 +511,12 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomS
     },
     subscribe(listener) {
       listeners.add(listener)
+
+      if (events.from() === undefined && !closed)
+        takeBaseline()
+
       sync()
+      stopReadingTask?.wake()
 
       return () => {
         listeners.delete(listener)
