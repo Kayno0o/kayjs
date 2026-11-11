@@ -29,7 +29,7 @@ kay and its libraries tell an app what happened with DOM events, and keep what a
 | `kay:dev-types` | the type check ended | `{ problems }`, the reports as strings | `kay-dev-types` on the window, the JSON as a string |
 | `kai:chat-open` | sent to open a `ChatLauncher` | `{}` | `kai-chat-open` on the window |
 | `kai:chat-send`, `kai:chat-draft` | sent to a `ChatLauncher`, or to a `.kai-chat` element, to send a message or fill the field | `{ text }` | `kai-chat-send`, `kai-chat-draft` on the window, `detail` the text |
-| `kai:chat-new` | a `ChatLauncher` tells its chat to start over, on the `.kai-chat` element | `{}` | `kai-chat-new` was heard by the chat alone |
+| `kai:chat-new` | a `ChatLauncher` tells its chat to start over, on the `.kai-chat` element | `{}` | `kai-chat-new` on the `.kai-chat` element, still heard |
 | `kui:hold-defaults` | a `SaveForm` saved: the controls that keep their default in a signal push what they hold | `{ adopt }`, an array a control pushes a function to | `kui-hold-defaults` on the form, `detail` the array |
 
 ### Cookies

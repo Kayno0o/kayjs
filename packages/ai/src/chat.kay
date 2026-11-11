@@ -757,7 +757,7 @@ function listTakeFocus(element: HTMLElement, button: string) {
   queueMicrotask(() => element.focus())
 }
 ---
-section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-layout={(layout ?? variant) === 'plain' ? 'plain' : 'bubble'} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai:chat-new', reset); for (const name of ['kai:chat-send', 'kai-chat-send']) element.addEventListener(name, sendFrom); for (const name of ['kai:chat-draft', 'kai-chat-draft']) element.addEventListener(name, draftFrom) }})
+section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-layout={(layout ?? variant) === 'plain' ? 'plain' : 'bubble'} data-tone={tone} data-size={size} ref={element => { for (const name of ['kai:chat-new', 'kai-chat-new']) element.addEventListener(name, reset); for (const name of ['kai:chat-send', 'kai-chat-send']) element.addEventListener(name, sendFrom); for (const name of ['kai:chat-draft', 'kai-chat-draft']) element.addEventListener(name, draftFrom) }})
   // The visitor's conversations, each a link of the page, which the chat follows to show it, or a button for a chat named by the browser, which a page swap would leave.
   if conversations
     nav(part="conversations" aria-label={conversationsLabel})

@@ -243,7 +243,7 @@ test('asks every page when the tab keeps nothing, and a hint without a sign-in c
   Object.defineProperty(window, 'sessionStorage', kept)
   mock.restore()
   document.cookie = `${SIGNED_IN_COOKIE}=; path=/; max-age=0`
-  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+  sessionStorage.setItem('kay:editor-refused', 'one')
   document.cookie = `${HINT_COOKIE}=1; path=/`
 
   const hinted = answering(200)
@@ -254,7 +254,7 @@ test('asks every page when the tab keeps nothing, and a hint without a sign-in c
 
 test('a refusal kept for the tab does not hold once the hint is back, as the guard let the user in since', async () => {
   document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
-  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+  sessionStorage.setItem('kay:editor-refused', 'one')
   document.cookie = `${HINT_COOKIE}=1; path=/`
 
   const fetched = answering(200)
@@ -326,7 +326,7 @@ test('a cookie merely ending in the hint name is no hint', async () => {
   document.cookie = `${HINT_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   document.cookie = `${SIGNED_IN_COOKIE}=one; path=/`
   document.cookie = `x_${HINT_COOKIE}=1; path=/`
-  sessionStorage.setItem(`${HINT_COOKIE}-refused`, 'one')
+  sessionStorage.setItem('kay:editor-refused', 'one')
 
   const fetched = answering(200)
 

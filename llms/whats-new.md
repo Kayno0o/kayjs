@@ -2,9 +2,12 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.98.0
+## Unreleased
 
 - Every public DOM event is `<lib>:<verb>` on `document` with an object `detail`: `kay:renew`, `kay:install`, `kay:dev-built`, `kay:dev-types`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft` and `kui:hold-defaults`; the old names fire too until 1.103, and `deprecated-event-names` finds what `kay check` can read, with a fix where the handler changes nothing else. Cookies are `kay_<name>` and storage keys `<lib>:<name>`, in one [table of events and the two rules](events.md).
+
+## 1.98.0
+
 - `analytics()` takes `url` for the service address (`host` before), `site` for Plausible and Simple Analytics, and `privacy` for the policy link (`policyUrl` before); the old names keep working and `kay upgrade` renames them, and the site options are in one table ([analytics](analytics.md)).
 - Every `guard` option takes a guard, a list of guards run in order, or `{ load }`: `jobs`, `images`, `vitals()` and `cms()`, and `false` opens the screens of `vitals()` and `cms()`, closed without a guard ([guards](guards.md#path-and-guard-options)).
 - `serve.apiPrefix` names where the API is served, `apiPath` still read and renamed by `kay upgrade`; `live.rateLimit`, `images.rateLimit` and `mcp.rateLimit` are `{ max, window }` in place of `perMinute` and a bare number, as every rate limit option is; a Fontsource font takes `weight` beside `subset` as aliases of `weights` and `subsets`, and `manifest.themeColor` takes a `{ light, dark }` pair (`deprecated-config-keys`; [site config](sitemap-search-fonts.md)).
