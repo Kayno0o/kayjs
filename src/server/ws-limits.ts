@@ -5,7 +5,7 @@ import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
 import { optionMs } from '../runtime/duration'
 import { DEFAULT_BODY_LIMIT } from './body'
-import { clientAddress, rateKey } from './protection'
+import { knownAddress, rateKey } from './protection'
 
 // What a websocket route lets one socket send, in the route's `detail.messages`: the most one message may weigh, how many a socket may send in a window, and how many sockets one client may hold open on the route.
 export interface SocketLimits {
@@ -115,12 +115,17 @@ function capPayload(app: Elysia, bytes: number): void {
   app.config.websocket = { ...app.config.websocket, maxPayloadLength: cap }
 }
 
-function clientKey(request: Request, server: Upgradable | null | undefined): string {
-  return rateKey(clientAddress(request, server as Parameters<typeof clientAddress>[1]))
+// Undefined when no address is known, as on a unix socket or under `app.handle()`: clients that cannot be told apart are not counted as one.
+function clientKey(request: Request, server: Upgradable | null | undefined): string | undefined {
+  const address = knownAddress(request, server as Parameters<typeof knownAddress>[1])
+
+  return address === undefined ? undefined : rateKey(address)
 }
 
 function hasRoom({ connections }: Limits, request: Request | undefined, server: Upgradable | null | undefined): boolean {
-  return !connections || !request || (connections.open.get(clientKey(request, server)) ?? 0) < connections.most
+  const client = request === undefined ? undefined : clientKey(request, server)
+
+  return !connections || client === undefined || (connections.open.get(client) ?? 0) < connections.most
 }
 
 // Elysia hands the server's `upgrade` the socket's data, whose `message` Bun calls with the raw frame before Elysia parses it: wrapping it there is the one place a frame is measured before a 16 MB JSON is parsed.
@@ -142,11 +147,10 @@ function limitUpgrades(server: Upgradable): void {
     data.message &&= guarded(data.message, limits)
 
     const { connections } = limits
-
-    if (!connections)
-      return upgrade(request, options)
-
     const client = clientKey(request, server)
+
+    if (!connections || client === undefined)
+      return upgrade(request, options)
 
     if (!hasRoom(limits, request, server))
       return false

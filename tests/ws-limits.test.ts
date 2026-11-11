@@ -144,6 +144,19 @@ describe('the open sockets of one client', () => {
     await Promise.all([second!, third!, other!].map(closed))
   })
 
+  it('are not counted as one client when the address is unknown, as on a unix socket', () => {
+    const server = { upgrade: (_request: Request, _options?: { data?: unknown }) => true, requestIP: () => null }
+    const hook = socketLimits('/', { connections: 2 })
+
+    for (let opened = 0; opened < 5; opened++) {
+      const request = new Request('http://localhost/')
+      const context = { request, server }
+
+      expect(hook(context)).toBeUndefined()
+      expect(server.upgrade(request, { data: context })).toBe(true)
+    }
+  })
+
   it('are not limited with connections: false', async () => {
     const sockets = await Promise.all(Array.from({ length: 25 }, async () => opens('/many')))
 

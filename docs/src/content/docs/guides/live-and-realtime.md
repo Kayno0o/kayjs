@@ -413,7 +413,7 @@ A route takes 1 MB a message and 100 messages a second from one socket. A socket
 })
 ```
 
-The server also tells Bun the largest `maxSize` of your routes, so a bigger frame is dropped as it arrives instead of being buffered first. One client may keep 20 sockets open on a route; the next one gets a 429 until one closes. `connections` changes that number, and `connections: false` removes the limit.
+The server also tells Bun the largest `maxSize` of your routes, so a bigger frame is dropped as it arrives instead of being buffered first. One client may keep 20 sockets open on a route; the next one gets a 429 until one closes. `connections` changes that number, and `connections: false` removes the limit. A socket whose address is unknown, such as one on a unix socket, is not counted.
 
 Server code that opens a websocket to another service, with headers or a protocol, uses `WebSocket` from `kay/server`. It is the `WebSocket` Bun runs, typed with Bun's options, as the DOM types in a project give the global one no second argument:
 
