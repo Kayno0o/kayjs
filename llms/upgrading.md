@@ -10,6 +10,9 @@ An agent's `render` with a `body` or a method other than GET, HEAD or OPTIONS, a
 ### A `workflow()` run keeps 2 MB of results at most
 
 A run whose kept results (its input, results and inbox, as text) pass 2,000,000 characters fails on its next step, with no retry, naming the cap: a run already past it when you upgrade fails the same way. Return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs.
+### A template `innerHTML` is checked at runtime
+
+`innerHTML={expr}` on an element now drops a string nothing vouched for with `sanitizeHtml`, `trustHtml` or an icon import, as a spread already did, so a value cast to `SafeHtml` (`as`, `any`) no longer carries markup in; the element stays empty and development warns. A string written out and a project file imported as text are not checked. Wrap the value in `sanitizeHtml(...)` or `trustHtml(...)` where it is used.
 
 ### `permanent` of a redirect is deprecated
 

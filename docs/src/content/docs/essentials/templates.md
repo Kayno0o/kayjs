@@ -291,7 +291,7 @@ A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or a
 
 An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTML` is dropped.
 
-On an element, `innerHTML={waves}` takes a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }`, as it takes markup written out. A string from a package or a request still goes through `sanitizeHtml` or `trustHtml`.
+On an element, `innerHTML={waves}` takes a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }`, as it takes markup written out. A string from a package or a request still goes through `sanitizeHtml` or `trustHtml`, and a template drops one nothing vouched for when it renders, as a spread does, even if a cast told the type check to trust it.
 
 A string built from a vouched one, such as `markup + '<b>'`, is plain again.
 
