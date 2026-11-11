@@ -604,6 +604,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (signedIn?.impersonator && signedIn.until !== undefined && Date.now() >= signedIn.until) {
       await (await load.admin()).endImpersonation(this[STATE], signedIn, true)
       signedIn = await this.session.get('auth')
+      // The browser is tagged as who it is again, so a local() mirror filled as the user is emptied.
+      this.cookies.push(forgetLocalMirrors(this.request, signedIn?.user))
     }
 
     // The user and their session do not depend on each other, so they are read together.

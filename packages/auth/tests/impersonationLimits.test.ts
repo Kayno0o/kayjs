@@ -102,9 +102,14 @@ describe('an admin acting as a user', () => {
     const { root, ada, events } = await setup()
     const now = Date.now()
 
+    const own = root.browser.cookies.get('kay_local_clear')
+
     await root.browser.callOk('admin.impersonate', ada.id)
+    expect(root.browser.cookies.get('kay_local_clear')).not.toBe(own)
     setSystemTime(new Date(now + 31 * MINUTE))
     expect(await root.browser.json('/me')).toMatchObject({ email: 'root@example.com' })
+    // The browser is tagged as the admin again, so a local() mirror filled as the user is emptied.
+    expect(root.browser.cookies.get('kay_local_clear')).toBe(own)
 
     const ended = events.filter(info => info.event === 'impersonation-ended')
 
