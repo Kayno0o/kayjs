@@ -21,7 +21,7 @@ main
   Menu#menu(items={[{ label: 'One' }]} label="Actions" icon="chevron")
   Tooltip#rich(placement="bottom")
     @content
-      b Name
+      b#name Name
       | : detail
     | Hover me
   Tooltip#plain-tip(text="Just text") Text

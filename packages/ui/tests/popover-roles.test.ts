@@ -59,7 +59,7 @@ describe('a Popover names its panel, gives it a role and announces it on the tri
     expect(rich).toContain('data-tooltip-content=')
     expect(rich).not.toContain('data-tooltip=')
     expect(rich).toContain('tabindex="0"')
-    expect(html).toMatch(/<span[^>]*hidden[^>]*><b>Name<\/b>: detail<\/span>/)
+    expect(html).toMatch(/<span[^>]*hidden[^>]*><b id="name">Name<\/b>: detail<\/span>/)
     expect(tagOf(html, 'plain-tip')).toContain('data-tooltip="Just text"')
   })
 })
@@ -82,9 +82,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('TooltipHos
     expect(await page.text('#kui-tooltip')).toBe('Name: detail')
     expect(await page.evaluate(() => document.querySelector('#rich')!.getAttribute('aria-describedby'))).toBe('kui-tooltip')
 
+    // The copy carries no id of the block's own.
+    expect(await page.evaluate(() => document.querySelectorAll('#name').length)).toBe(1)
+    expect(await page.evaluate(() => document.querySelector('#kui-tooltip #name'))).toBeNull()
+
     await page.hover('#plain-tip')
     await page.waitUntil(() => document.querySelector('#kui-tooltip')?.textContent === 'Just text')
     expect(await page.evaluate(() => document.querySelector('#kui-tooltip b'))).toBeNull()
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('opens on keyboard focus and describes the element by it', async () => {
+    const page = await site.open('/popover-roles')
+
+    await page.evaluate(() => document.querySelector<HTMLElement>('#rich')!.focus())
+    await page.waitUntil(() => document.querySelector('#kui-tooltip')?.matches(':popover-open'))
+    expect(await page.text('#kui-tooltip')).toBe('Name: detail')
+    expect(await page.evaluate(() => document.querySelector('#rich')!.getAttribute('aria-describedby'))).toBe('kui-tooltip')
     expect(page.errors).toEqual([])
   }, 60_000)
 })

@@ -200,9 +200,21 @@ effect(() => {
 
   element.style.setProperty('position-area', target.element.dataset.tooltipPlacement ?? 'top')
 
-  // A content block is copied in as it stands, so a block's own markup shows, and the original stays hidden where it is.
-  if (target.content && holder)
-    holder.replaceChildren(...[...target.content.childNodes].map(node => node.cloneNode(true)))
+  // A content block is copied in with its ids stripped, so the copy never repeats one the page holds, and the original stays hidden where it is.
+  if (target.content && holder) {
+    const copy = [...target.content.childNodes].map(node => node.cloneNode(true))
+
+    for (const node of copy) {
+      if (node instanceof Element) {
+        node.removeAttribute('id')
+
+        for (const inner of node.querySelectorAll('[id]'))
+          inner.removeAttribute('id')
+      }
+    }
+
+    holder.replaceChildren(...copy)
+  }
 
   if (!element.matches(':popover-open'))
     element.showPopover()
