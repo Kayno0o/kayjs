@@ -133,44 +133,4 @@ A browser's mirror and unsent writes made before this version carry no person, s
 
 `deprecated-auth-error` and `deprecated-stream-open` go, their three minors over: run `kay upgrade` on 1.95 first and it rewrites what it can. A `result.error === 'limited'` left over is now TypeScript's own error, a string compared with an `ErrorShape`: read `result.error.code`. A `.onOpen(reconnected => ...)` left over still compiles and runs on every open: write `.onOpen(({ reconnected }) => ...)`.
 
-## 1.95.0
-
-### The names and the escape 1.91 deprecated are gone
-
-Their lints (`deprecated-library-names`, `deprecated-escape-option`) go with them: run `kay upgrade` on 1.94 first and it rewrites every one. On 1.95 the old names are type errors, and `plugin` is an unknown option of `auth()`.
-
-- kayjs-auth: `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth`, `pgStore` (of `/pg`) is `pgAuth`, and `auth({ plugin: false })` is `auth({ server: false })`.
-- kayjs-cms: `createDrafts` is `cmsDrafts`, `createEntryForm` is `cmsEntryForm`, and the `sql` key of `pgLoader()` is `source`.
-- kayjs-mail: `createMailSuppressionTable` is `createMailSuppressionTables` and `mailListTables` is `mailListTableNames`, both of `@kaynooo/kayjs-mail/pg`.
-- kay: `PgJobsSource` of `kay/server` is `PgSource`.
-
-### A component is an island by what it says, and every name is imported
-
-The three forms that 1.92 deprecated are gone, with their lints (`promoted-island`, `island-comment` and `implicit-import`). `kay upgrade` from 1.92 or later has already moved an app off them; one that stayed on them changes by hand.
-
-- A static component that passes an island a function, a class instance or a block with parameters is no longer made an island when it renders: `kay check` reports `island-prop`, and rendering throws an `IslandPropsError` naming the prop. Write `--- island` in place of `---` on the component (`--- island <T>` for a generic one), or pass the island data. A build lists a component as an island only for what its own code says, so `kay build --format json` has no `promoted` field and a `cause` is never a `prop`, a `spread` or a `block`.
-- `// kay-island` and `// kay-static` are comments: write `--- island` and `--- static`.
-- A `kay` value or `t` of `kay/i18n` used with no import is a type error, `Cannot find name 'signal'`, and the compiler adds no import: write `import { signal } from 'kay'` in the fence, or run `kay check --fix`, which writes the import of any name a `kay/*` entry exports. A library component reading `ctx` imports it from `kay`, and is still typed with the keys of its context module.
-- A template reading `ctx` needs `import { ctx } from 'kay'` in its script fence: `kay check --fix` adds it.
-- The `IslandProp` and `FunctionProp` types of `kay` take one type parameter less, as a lint name was their second.
-- `compileKay` no longer returns `promote`, its `cause` has no `target`, and `analyzeScript` takes no template reads.
-
-### The stream, hook, image route and callback forms 1.92 deprecated are gone
-
-Their lints (`deprecated-stream-types`, `deprecated-stream-on`, `deprecated-hook-dispatch`, `deprecated-hook-names`, `deprecated-icon-picker-search`) go with them: run `kay upgrade` on 1.94 first and it rewrites every one that has a safe fix.
-
-- The old stream types `EventReader` and `StreamRun` are `Connection` and `Stream`; `.on(fn)` of a stream or a socket is `.onData(({ value }) => ...)`.
-- `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`.
-- kayjs-auth's `onAuthEvent` is `onEvent` and its `onDelete` is `beforeDelete`, which can refuse; kayjs-ai's `onRequest` is `beforeRequest` and its `onFinish` is `onSuccess`.
-- Form, FormDialog and SaveForm `onSaved` is `onSave`, ContactForm and SubscribeForm `onSent` is `onSend`, AudioPlayer `onEnded` is `onEnd`, and the call that does a SaveForm's save is `save`, no longer `onSave`.
-- IconPicker's `search(query, limit, offset)` is `icons={({ q, limit, offset }) => ...}`.
-- The image resizer answers `/_kay/images` only: a link to `/_kay/image` is a 404, so rewrite one an app wrote by hand.
-### A route no guard covers is refused once the site has a guard
-
-With `requireGuards` unset, a site that declares a guard of its own (a `_guard.ts` or an `api()` guard, not a library's) now answers 403 on each page, endpoint and API module no guard covers, where it served them. A site with no guard at all starts as before, and `requireGuards: true` and `false` mean what they did. `kay check` already reports each such route as `unguarded-route`, now an error: add the guard, set `guards: false` on a route anyone may reach, or set `requireGuards: false` in kay.config.ts to keep every route open. A scaffolded `requireGuards: true` next to a root `_guard.ts` can go; no lint carries it, as `kay check` names each route. ([guards](guards.md))
-
-### A cookie an app sets is hardened by default
-
-A cookie set with `ctx.cookies.set` (a page, endpoint, guard or action) or by an `api()` route is now `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, where it was Bun's plain `Path=/` with neither `HttpOnly` nor `Secure`, unless the call gives the option itself. No lint can see it. A cookie a script reads from `document.cookie` needs `{ httpOnly: false }` on its `set`; to keep the old headers for every cookie, set `security: { cookies: false }` in kay.config.ts. A scaffolded `security: { cookies: {} }` is now the default and can go ([server](server.md#sessions)).
-
-Releases before 1.95 are in [Upgrading, older releases](upgrading-archive.md).
+Releases before 1.96 are in [Upgrading, older releases](upgrading-archive.md).
