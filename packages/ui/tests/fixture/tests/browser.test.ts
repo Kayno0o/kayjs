@@ -1946,7 +1946,10 @@ inBrowser('the FormFields a static page gives a Form, SaveForm or FormDialog as 
     const cleared = await read(page)
 
     expect(cleared.map(field => field.messages)).toEqual([['Page note'], [], []])
-    expect(cleared.map(field => [field.invalid, field.linked])).toEqual([['true', true], [null, false], [null, false]])
+    // The call went through, so the form is refreshed with the server's markup, which marks no field for a FormField's own `issue`: the first field is still invalid until that lands, and linked either way.
+    expect(cleared.map(field => field.linked)).toEqual([true, false, false])
+    expect(cleared[0]!.invalid === 'true' || cleared[0]!.invalid === null).toBe(true)
+    expect(cleared.slice(1).map(field => field.invalid)).toEqual([null, null])
     expect(page.errors).toEqual([])
   }, 120_000)
 

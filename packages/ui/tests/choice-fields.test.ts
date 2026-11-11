@@ -32,7 +32,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a choice g
         labelledby,
         label: root.getAttribute('aria-label'),
         described: (root.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean).map(described => document.getElementById(described)?.textContent),
-        invalid: root.getAttribute('aria-invalid'),
+        // A group says it refused with data-invalid, as aria-invalid is not allowed on it; a radiogroup keeps aria-invalid.
+        invalid: root.getAttribute('aria-invalid') ?? (root.hasAttribute('data-invalid') ? 'true' : null),
         required: root.getAttribute('aria-required'),
         name: labelledby === null ? undefined : document.getElementById(labelledby)?.textContent,
         firstInvalid: first.getAttribute('aria-invalid'),

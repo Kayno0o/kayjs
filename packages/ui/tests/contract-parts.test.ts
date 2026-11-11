@@ -42,6 +42,9 @@ const templates: Template[] = FOLDERS.flatMap(folder => readdirSync(join(SRC, fo
 
 const nameOf = (attribute: Attribute, source: string) => attribute.kind === 'spread' ? undefined : source.slice(attribute.name.start, attribute.name.end)
 
+// aria-invalid is not allowed on a role="group", so a group says it refused with `data-invalid`, which is no second source of truth there.
+const isGroup = (element: ElementNode, source: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && nameOf(attribute, source) === 'role' && 'value' in attribute && typeof attribute.value === 'object' && attribute.value !== null && 'start' in attribute.value && source.slice(attribute.value.start, attribute.value.end) === 'group')
+
 const attributesOf = (element: ElementNode, source: string) => new Set(element.attributes.map(attribute => nameOf(attribute, source)))
 
 const hasValue = (element: ElementNode, source: string, name: string, value: string) => element.attributes.some(attribute => attribute.kind === 'static' && nameOf(attribute, source) === name && attribute.text === value)
@@ -97,7 +100,7 @@ function badStates(template: Template): string[] {
         found.push(`${place(template, element)} ${name} is no named state`)
 
       for (const state of ARIA_STATES) {
-        if (name === `data-${state}`)
+        if (name === `data-${state}` && !(state === 'invalid' && isGroup(element, source)))
           found.push(`${place(template, element)} ${name} repeats ${state === 'disabled' ? 'aria-disabled or disabled' : `aria-${state}`}`)
       }
     }
