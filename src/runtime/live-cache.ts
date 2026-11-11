@@ -57,11 +57,13 @@ let waiting = false
 const waitingIslands = new Set<HTMLElement>()
 const fetchingIslands = new Map<HTMLElement, Map<string, number>>()
 
-// An app swapping no pages would reload the page for it, which a renewal is not worth.
-document.addEventListener(RENEW_EVENT, () => {
-  for (const slot of navigation.hooks === undefined ? [] : holding)
-    askIsland(slot)
-})
+// An app swapping no pages would reload the page for it, which a renewal is not worth. The server imports this module too, where there is no document.
+if (typeof document !== 'undefined') {
+  document.addEventListener(RENEW_EVENT, () => {
+    for (const slot of navigation.hooks === undefined ? [] : holding)
+      askIsland(slot)
+  })
+}
 
 function pagesOf(): LivePage[] {
   return [...document.querySelectorAll(SCRIPT)].map(script => decodeServerValue(script.textContent) as LivePage)
