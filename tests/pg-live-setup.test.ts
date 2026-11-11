@@ -297,7 +297,7 @@ pgDescribe('a pgData role that may not alter tables', () => {
 })
 
 pgDescribe('closing a pgData store', () => {
-  const others = async (sql: SQL) => Number((await sql.unsafe<{ count: string }[]>('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()'))[0]!.count)
+  const others = async (sql: SQL) => Number((await sql.unsafe<{ count: string }[]>('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = \'client backend\''))[0]!.count)
 
   // The server ends a closed connection a moment after the client sent its goodbye.
   async function settled(sql: SQL, expected: number) {
