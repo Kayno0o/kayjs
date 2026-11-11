@@ -873,6 +873,7 @@ class Board
   #measure: () => Measured
   #move: (move: BoardMove, kept?: number | undefined) => Promise<void>
   #moving: boolean
+  #nameOf: (id: Id) => string
   #onMove: (move: BoardMove) => unknown
   #start: (id: Id, origin: Point) => void
   #step: (id: Id, event: KeyboardEvent) => void
