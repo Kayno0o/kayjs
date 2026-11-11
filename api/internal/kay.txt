@@ -952,6 +952,9 @@ interface ErrorShape<Data = unknown>
 [./library] escapeHtml
 function escapeHtml(text: string): string
 
+[./library] eventStream
+function eventStream<T>(source: Source<T>, options?: EventStreamOptions<T>): EventStream<T>
+
 [./library] FallbackMemory
 interface FallbackMemory
   hit: (key: string, windowMs: number, weight?: number | undefined) => RateWindow

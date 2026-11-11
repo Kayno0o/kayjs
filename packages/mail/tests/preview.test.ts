@@ -2,11 +2,13 @@ import type { AuthView } from '../src/auth'
 import { createHash } from 'node:crypto'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { shutdown } from 'kay/server'
 import { testSite } from 'kay/test'
 import { authMailer } from '../src/auth'
 import { mailer, mail as mailExtensionOf } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { startSmtp } from './helpers/smtp'
+import { untilHolds } from './until'
 
 const saved = process.env.NODE_ENV
 
@@ -152,10 +154,52 @@ describe('the development outbox page', () => {
     const events = await get(mail, '/_kay/mail/events')
     const reader = events.body!.getReader()
 
-    expect(events.headers.get('content-type')).toBe('text/event-stream')
+    expect(events.headers.get('content-type')).toBe('text/event-stream; charset=utf-8')
+    const first = reader.read()
+
+    // The stream watches the outbox once it is read.
+    await new Promise(resolve => setTimeout(resolve, 0))
     await mail.send({ to: 'ada@example.com', subject: 'Live', text: 'Hi' })
-    expect(new TextDecoder().decode((await reader.read()).value)).toBe(`data: ${outbox.last()!.id}\n\n`)
+    expect(new TextDecoder().decode((await first).value)).toBe(`data: ["${outbox.last()!.id}"]\n\n`)
     await reader.cancel()
+  })
+
+  it('closes the mail stream when the server stops, and no longer watches the outbox', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const watch = outbox.watch
+    let watching = 0
+
+    outbox.watch = (listener) => {
+      const unwatch = watch(listener)
+
+      watching++
+
+      return () => {
+        watching--
+        unwatch()
+      }
+    }
+
+    mail.listen({ port: 0, hostname: '127.0.0.1' })
+
+    const response = await fetch(`http://127.0.0.1:${mail.server!.port}/_kay/mail/events`)
+    const reader = response.body!.getReader()
+
+    const decoder = new TextDecoder()
+    let text = ''
+
+    await untilHolds(() => watching === 1)
+    await mail.send({ to: 'ada@example.com', subject: 'Live', text: 'Hi' })
+
+    while (!text.includes('data:'))
+      text += decoder.decode((await reader.read()).value)
+
+    const stopping = shutdown(mail)
+
+    expect((await reader.read()).done).toBe(true)
+    await stopping
+    outbox.watch = watch
+    expect(watching).toBe(0)
   })
 
   it('clears the outbox once confirmed, from its own page only', async () => {

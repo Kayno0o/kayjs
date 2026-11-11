@@ -55,6 +55,7 @@ export { asConfigError, configError, durationSeconds, optionMs } from './config-
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'
 export type { LocalizedEntry } from './entry-drafts'
+export { eventStream } from './event-stream'
 export { fetchPublic } from './fetch-public'
 export type { FetchPublicOptions } from './fetch-public'
 export { decide, dispatch, hookContext } from './hooks'

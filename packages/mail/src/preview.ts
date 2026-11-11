@@ -4,7 +4,7 @@ import type { Address, Delivery, Mail, MailAttachment, MailMessage, ViewContent 
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { escapeHtml as escape, isEmail, RESTART_RELOAD, sourceHash } from 'kay/library'
+import { escapeHtml as escape, eventStream, isEmail, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
 import { attempt, deliveryAddress, devServer, messageOf, setDeliveryAddress } from './delivery'
@@ -48,8 +48,6 @@ const PAGE_POLICY = `default-src 'none'; style-src 'unsafe-inline'; script-src $
 
 // Gmail cuts a mail whose html passes this, behind a "View entire message" link.
 const GMAIL_CLIP_BYTES = 102 * 1024
-// Under Bun's idle timeout, so a quiet stream stays open.
-const KEEPALIVE_MS = 5000
 const PHONE_WIDTH = 375
 
 const STYLE = `
@@ -257,25 +255,37 @@ function jsonList(to: string | undefined): Response {
   return Response.json(mails.map(mail => ({ ...mail, attachments: mail.attachments.map(jsonAttachment) })), { headers: { 'cache-control': 'no-store' } })
 }
 
-// What the outbox page streams: the id of each mail sent, and a comment now and then to keep the stream open.
-function events(): Response {
-  const encoder = new TextEncoder()
-  let stop: (() => void) | undefined
-  const stream = new ReadableStream<Uint8Array>({
-    start: (controller) => {
-      const unwatch = outbox.watch(mail => controller.enqueue(encoder.encode(`data: ${mail.id}\n\n`)))
-      const keepalive = setInterval(() => controller.enqueue(encoder.encode(': keepalive\n\n')), KEEPALIVE_MS)
-
-      stop = () => {
-        unwatch()
-        clearInterval(keepalive)
-      }
-    },
-    cancel: () => stop?.(),
+// The id of each mail sent while the browser listens, until `signal` aborts.
+async function* sentIds(signal: AbortSignal): AsyncGenerator<string> {
+  const waiting: string[] = []
+  let wake: (() => void) | undefined
+  const unwatch = outbox.watch((mail) => {
+    waiting.push(mail.id)
+    wake?.()
   })
 
-  return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' } })
+  try {
+    while (!signal.aborted) {
+      const id = waiting.shift()
+
+      if (id === undefined) {
+        await new Promise<void>((resolve) => {
+          wake = resolve
+          signal.addEventListener('abort', () => resolve(), { once: true })
+        })
+      }
+      else {
+        yield id
+      }
+    }
+  }
+  finally {
+    unwatch()
+  }
 }
+
+// What the outbox page streams: the id of each mail sent, kept open and drained when the server stops like any event stream.
+const events = (): Response => eventStream(sentIds)
 
 async function eml(mail: SentMail): Promise<Response> {
   // Read on the first download, so the page itself never loads nodemailer.

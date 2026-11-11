@@ -56,7 +56,7 @@ export default api()
   )
 ```
 
-A source blocked on a quiet feed is freed by a signal: pass a function, `eventStream(signal => watch(signal))`, and its `signal` aborts when the visitor leaves, to hand to what the source waits on. An action's handler reads the same from `ctx.request.signal`.
+A library's own server streams through the same helper, `eventStream` from `kay/library`, so its stream beats and drains with the server's as an app's does. A source blocked on a quiet feed is freed by a signal: pass a function, `eventStream(signal => watch(signal))`, and its `signal` aborts when the visitor leaves, to hand to what the source waits on. An action's handler reads the same from `ctx.request.signal`.
 
 #### Resume after a drop
 
