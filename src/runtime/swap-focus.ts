@@ -1,6 +1,7 @@
 import type { Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { announce } from './announce'
+import { ISLAND } from './markers'
 import { hashTarget } from './navigation'
 
 function byName(element: Element | null): Element | null {
@@ -110,7 +111,7 @@ export function watchTyped(): (() => void) | undefined {
   let typed: { value: string, start: number, end: number, direction: 'forward' | 'backward' | 'none' } | undefined
   const note = (event: Event) => {
     // Only the keys the island never saw: once it hydrated, what it did with them is what the field holds.
-    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null && !(field.closest('slot[data-component]') as { _$k?: boolean } | null)?._$k)
+    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null && !(field.closest(ISLAND) as { _$k?: boolean } | null)?._$k)
       typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' }
   }
 
