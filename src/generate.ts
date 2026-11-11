@@ -1,8 +1,9 @@
 import type { Node, Program } from './compiler/estree'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { detectFeatures } from './add'
+import { replaceFile } from './build/files'
 import { parseProgram } from './compiler/estree'
 import { resourceFiles, withTable } from './generate-resource'
 
@@ -350,11 +351,11 @@ export async function generate(dir: string, kind: string, name: string, options:
 
   if (options.dryRun !== true) {
     for (const [path, text] of appended)
-      await writeFile(join(dir, path), text)
+      await replaceFile(join(dir, path), text)
 
     for (const [path, text] of Object.entries(files)) {
       await mkdir(dirname(join(dir, path)), { recursive: true })
-      await writeFile(join(dir, path), text, { flag: 'wx' })
+      await replaceFile(join(dir, path), text)
     }
   }
 

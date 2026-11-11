@@ -1,9 +1,10 @@
 import type { Feature } from './templates'
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
+import { replaceFile } from './build/files'
 import { FEATURE_NAMES, FEATURES } from './features'
 import { insertImport } from './imports'
 import { originHost, projectFiles } from './new'
@@ -445,7 +446,7 @@ export async function restore(dir: string, kept: Map<string, Buffer | undefined>
       if (content === undefined)
         await rm(join(dir, path), { force: true })
       else
-        await writeFile(join(dir, path), content)
+        await replaceFile(join(dir, path), content)
     }
     catch (error) {
       failed.push(`${path} (${messageOf(error)})`)
@@ -681,10 +682,9 @@ async function writePlan(dir: string, { writes }: Plan): Promise<string[]> {
 
   for (const path of written) {
     const target = join(dir, path)
-    const fresh = !existsSync(target)
 
     await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, writes.get(path)!, fresh && path === '.env' ? { mode: 0o600 } : {})
+    await replaceFile(target, writes.get(path)!, path === '.env' ? 0o600 : undefined)
   }
 
   return written

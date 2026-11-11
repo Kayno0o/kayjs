@@ -14,7 +14,7 @@ kay new my-app --template server --with auth
 
 ### Add a feature to a project
 
-`kay add` writes what a feature needs into a project that exists, and `kay add auth,ui` adds the libraries' features:
+`kay add` writes what a feature needs into a project that exists, and `kay add auth,ui` adds the libraries' features. Each file is written whole under a temporary name and moved into place, so a crash leaves it as it was:
 
 ```sh
 kay add postgres
