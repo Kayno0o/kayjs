@@ -38,7 +38,7 @@ function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 type FieldSize = 'sm' | 'md' | 'lg'
 
 [./field-look] GROUP_INVALID
-const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
+const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] data-[invalid]:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
 
 [./field-look] keepInvalid
 function keepInvalid(box: Element, invalid: () => boolean | undefined): void
@@ -1073,7 +1073,7 @@ function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 type FieldSize = 'sm' | 'md' | 'lg'
 
 [./lib/field-look] GROUP_INVALID
-const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
+const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] data-[invalid]:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
 
 [./lib/field-look] keepInvalid
 function keepInvalid(box: Element, invalid: () => boolean | undefined): void

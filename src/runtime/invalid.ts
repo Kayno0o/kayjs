@@ -7,11 +7,18 @@ interface Marks {
 
 const marks = new WeakMap<Element, Marks>()
 
-// Marks `element` `aria-invalid="true"` for `by` while `invalid`, and takes the mark off once no source holds it, unless the page had marked the field itself.
+// A `role="group"` takes no `aria-invalid` (ARIA 1.2 deprecated it there), so its mark is `data-invalid`, which its message's `aria-describedby` backs for assistive tech.
+function markOf(element: Element): { name: string, value: string } {
+  return element.getAttribute('role') === 'group' ? { name: 'data-invalid', value: '' } : { name: 'aria-invalid', value: 'true' }
+}
+
+// Marks `element` `aria-invalid="true"` (`data-invalid` on a `role="group"`) for `by` while `invalid`, and takes the mark off once no source holds it, unless the page had marked the field itself.
 // kay marks a refused field of an island through it, so a component marking the same control, such as a form field showing a message of its own, keeps it invalid.
 // kept: free
 export function markInvalid(element: Element, by: unknown, invalid: boolean): void {
-  holdInvalid(element, by, invalid, element.getAttribute('aria-invalid') === 'true')
+  const mark = markOf(element)
+
+  holdInvalid(element, by, invalid, element.getAttribute(mark.name) === mark.value)
 }
 
 // `own` tells whether a mark found before any source is the page's: kay's own mark of a refused field, rendered by the server, is not.
@@ -25,7 +32,9 @@ export function holdInvalid(element: Element, by: unknown, invalid: boolean, own
     }
 
     held.by.add(by)
-    element.setAttribute('aria-invalid', 'true')
+    const mark = markOf(element)
+
+    element.setAttribute(mark.name, mark.value)
 
     return
   }
@@ -36,5 +45,5 @@ export function holdInvalid(element: Element, by: unknown, invalid: boolean, own
   marks.delete(element)
 
   if (!held.own)
-    element.removeAttribute('aria-invalid')
+    element.removeAttribute(markOf(element).name)
 }

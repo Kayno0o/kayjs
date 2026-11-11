@@ -47,7 +47,7 @@ const { options, value = NONE, label, showLabel = false, name, invalid, required
   showLabel?: boolean | undefined
   // Disables every chip; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
-  // Marks the group as refused, its chips' keylines in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the boxes on its own.
+  // Marks the group as refused, its chips' keylines in the danger colour, with `data-invalid` on the group. A FormField showing a message marks the boxes on its own.
   invalid?: boolean | undefined
   // Requires at least one chip picked: `aria-required` on each box, and the first enabled box refuses the form's submit, with `requiredLabel`, while none is picked, as the browser cannot ask for one of several checkboxes itself.
   required?: boolean | undefined
@@ -155,7 +155,7 @@ effect(() => {
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 snippet chips()
-  div(part="root" {...rest} ref={ref} role="group" data-kui-choice="" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+  div(part="root" {...rest} ref={ref} role="group" data-kui-choice="" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} data-invalid={invalid ? '' : undefined} aria-busy={busy() || source.loading() ? 'true' : undefined})
     for option of list() key={option.value}
       label(part="chip")
         input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-required={required ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})

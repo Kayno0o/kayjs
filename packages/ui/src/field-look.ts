@@ -69,4 +69,4 @@ export function keepInvalid(box: Element, invalid: () => boolean | undefined): v
 export const RADIO_INVALID = 'aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger'
 
 // A refused Segmented, ChipGroup or FileDrop turns its keyline, which they read from `--_control-line`, to the danger colour, whether the group carries `aria-invalid` or a FormField marked a field in it.
-export const GROUP_INVALID = 'aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]'
+export const GROUP_INVALID = 'aria-invalid:[--_control-line:var(--color-danger)] data-[invalid]:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]'

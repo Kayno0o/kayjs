@@ -316,6 +316,23 @@ describe('the messages a refused form is described by', () => {
     markInvalid(page, {}, false)
     expect(page.getAttribute('aria-invalid')).toBe('false')
   })
+
+  it('marks a role="group" data-invalid, which takes no aria-invalid, and takes the mark off with its last source', () => {
+    const group = fakeElement()
+    const first = {}
+    const second = {}
+
+    group.setAttribute('role', 'group')
+    markInvalid(group, first, true)
+    markInvalid(group, second, true)
+    expect([group.getAttribute('data-invalid'), group.getAttribute('aria-invalid')]).toEqual(['', null])
+
+    markInvalid(group, first, false)
+    expect(group.getAttribute('data-invalid')).toBe('')
+
+    markInvalid(group, second, false)
+    expect(group.getAttribute('data-invalid')).toBeNull()
+  })
 })
 
 describe('a form naming its fields with field and showing their messages with error lines', () => {

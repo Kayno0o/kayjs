@@ -384,7 +384,8 @@ describe('FileDrop as a form control', () => {
     const root = await keeping({ issue: 'Too heavy' })
 
     expect(root.querySelector('[data-part=issues]')?.textContent).toBe('Too heavy')
-    expect(root.querySelector('#drop')?.getAttribute('aria-invalid')).toBe('true')
+    expect(root.querySelector('#drop')?.getAttribute('data-invalid')).toBe('')
+    expect(root.querySelector('#drop')?.hasAttribute('aria-invalid')).toBe(false)
   })
 
   test('shows a button opening the picker when it has no content', async () => {

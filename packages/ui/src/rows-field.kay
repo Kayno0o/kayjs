@@ -37,7 +37,7 @@ const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssue
   columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | 'number' | undefined, name?: string | undefined, cell?: boolean | undefined }[]
   // Names the field for screen readers.
   label: string
-  // Marks the field as refused: its text boxes in the danger colour, with `aria-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
+  // Marks the field as refused: its text boxes in the danger colour, with `data-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
   invalid?: boolean | undefined
   // The size of every text box, `md` by default; a cell drawn by `@cell` reads it as `column.size`.
   size?: FieldSize | undefined
@@ -234,7 +234,7 @@ onFormReset(() => root, () => {
   commit(start)
 })
 ---
-div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
+div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} data-invalid={invalid ? '' : undefined} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
   if current().length > 0
     div(part="head" aria-hidden="true")
       for column of columns key={column.key}

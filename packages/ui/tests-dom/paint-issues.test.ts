@@ -123,7 +123,7 @@ test('marks a FileDrop\'s zone, and a component of the app carrying no mark is l
   const [drop, own] = page(`<form id="a"><slot data-component="x/file-drop.kay"><div data-part="field" data-kui-control="drop"><div role="group"><input type="file" name="photo"></div><span data-part="issues" data-field="photo"></span></div></slot></form><form id="b"><slot data-component="app/checkbox.kay"><div data-part="field"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form>`)
 
   paintIssues(drop!, { photo: 'Too big' })
-  expect([drop!.querySelector('[data-form-issue]')!.textContent, drop!.querySelector('[role="group"]')!.getAttribute('aria-invalid')]).toEqual(['Too big', 'true'])
+  expect([drop!.querySelector('[data-form-issue]')!.textContent, drop!.querySelector('[role="group"]')!.getAttribute('data-invalid')]).toEqual(['Too big', ''])
 
   paintIssues(own!, { terms: 'Accept' })
   expect(own!.querySelector('[data-form-issue]')).toBeNull()

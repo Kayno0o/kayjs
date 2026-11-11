@@ -18,5 +18,9 @@ form
   TimeInput#required-time(aria-label="Wake" name="wake" value="07:00" required onChange={onTime})
   FormField(label="Held")
     DateInput#held(name="held" value="2026-10-21")
+  FormField#held-range(label="Held range")
+    DateRangeInput#held-stay(label="Held range" fromName="held-from" toName="held-to")
+  FormField#held-moment(label="Held moment")
+    DateTimeInput#held-time(name="held-moment")
   DateInput#locked(aria-label="Locked" value="2026-10-21" readonly)
   button#reset(type="reset") Reset

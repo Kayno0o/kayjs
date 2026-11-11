@@ -430,3 +430,21 @@ describe('DateTimeInput', () => {
     expect(posted(root).value).toBe('2026-10-21T09:30:00+02:00')
   })
 })
+
+describe('a FormField around the other date inputs', () => {
+  test('a DateRangeInput names each box by its own label, which its calendar buttons cannot join', async () => {
+    const root = await dates()
+    const [from, to] = [...root.querySelectorAll<HTMLInputElement>('#held-stay input[type=text], #held-stay input:not([type=hidden])')]
+
+    expect([from?.getAttribute('aria-label'), to?.getAttribute('aria-label')]).toEqual(['Held range from', 'Held range to'])
+    expect([from?.hasAttribute('aria-labelledby'), to?.hasAttribute('aria-labelledby')]).toEqual([false, false])
+  })
+
+  test('a DateTimeInput holds no button in its label, so the label text alone names it', async () => {
+    const root = await dates()
+    const label = root.querySelector('#held-moment label')!
+
+    expect(label.querySelectorAll('button').length).toBe(0)
+    expect(root.querySelector('#held-time')!.hasAttribute('aria-labelledby')).toBe(false)
+  })
+})

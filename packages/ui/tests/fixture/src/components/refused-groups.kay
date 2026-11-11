@@ -1,0 +1,19 @@
+---
+import { focusInvalid } from 'kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
+
+// Each role=group control of a FormField that shows a message, to read the mark it takes.
+const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
+---
+button#focus(type="button" onClick={() => focusInvalid()}) Focus
+FormField#chips(label="Chips" issue="Pick one")
+  ChipGroup#chip-group(name="chips" label="Chips" options={options})
+FormField#drop(label="Photo" issue="Add a photo")
+  FileDrop#file-drop(name="photo")
+FormField#range(label="Range" issue="Too wide")
+  RangeInput#range-input(label="Range")
+RowsField#rows-field(rows={[{ name: 'A', value: '1' }]} columns={[{ key: 'name', label: 'Header' }, { key: 'value', label: 'Value' }]} label="Headers" invalid)

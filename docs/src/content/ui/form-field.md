@@ -34,7 +34,9 @@ On a static page the server writes the link. Inside an island, as in a FormDialo
 
 A FileDrop zone is named, described and marked the same way, not its hidden file input.
 
-A choice made of several inputs (RadioGroup, Segmented, ChipGroup, Rating, RangeInput) is the described field, not its first input: the group is named by the field's label (one with its own `label` or `aria-label` keeps it), described by the hint and message, marked `aria-invalid` while one shows, and `aria-required` when it is a radio group. A static page's group links itself once the browser has it. With `group`, the fieldset names the choice instead, and each input inside takes the mark.
+A choice made of several inputs (RadioGroup, Segmented, ChipGroup, Rating, RangeInput) is the described field, not its first input: the group is named by the field's label (one with its own `label` or `aria-label` keeps it), described by the hint and message, and `aria-required` when it is a radio group.
+
+While a message shows, a radio group takes `aria-invalid`, and a plain group (ChipGroup, RangeInput, FileDrop) takes `data-invalid`, as ARIA does not allow `aria-invalid` there: style `[data-invalid]`, and the message still describes the group. A static page's group links itself once the browser has it. With `group`, the fieldset names the choice instead, and each input inside takes the mark.
 
 Inside an island, a `group` with a message marks every input, select and textarea inside it the same way. So kay's `focusInvalid` shows the tab holding the group and focuses its first field.
 

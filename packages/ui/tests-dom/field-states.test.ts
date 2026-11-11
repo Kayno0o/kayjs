@@ -64,13 +64,16 @@ test('invalid is held with a FormField message, which keeps the box invalid once
   expect(box.getAttribute('aria-invalid')).toBe('true')
 })
 
-test('every group and box control takes invalid as well, written as aria-invalid on the group or the box', async () => {
-  for (const id of ['radios', 'segmented', 'chips', 'rating'])
+test('every group and box control takes invalid as well, written as aria-invalid on the radiogroup or the box and data-invalid on a plain group', async () => {
+  for (const id of ['radios', 'segmented', 'rating'])
     expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
+
+  for (const id of ['chips', 'drop', 'rows'])
+    expect(await boxes(id, 'data-invalid'), id).toEqual([''])
 
   expect(new Set(await boxes('rows', 'aria-invalid'))).toEqual(new Set(['true']))
 
-  for (const id of ['color', 'drop', 'box', 'switch', 'markdown', 'icons'])
+  for (const id of ['color', 'box', 'switch', 'markdown', 'icons'])
     expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
 })
 

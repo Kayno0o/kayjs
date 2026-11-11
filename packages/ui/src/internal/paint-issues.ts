@@ -77,6 +77,7 @@ function paintField(form: HTMLFormElement, field: HTMLElement, controls: HTMLEle
         // A choice group linked itself to the message as the server drew it: from here this paints it.
         markInvalid(control, linkChoice, false)
         control.removeAttribute('aria-invalid')
+        control.removeAttribute('data-invalid')
         markInvalid(control, PAINTED, true)
       }
     }

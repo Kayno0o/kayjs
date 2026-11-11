@@ -36,7 +36,7 @@ const { accept, multiple = false, paste = false, disabled = false, invalid, name
   // Also takes files pasted anywhere on the page, unless the paste lands in a text field.
   paste?: boolean | undefined
   disabled?: boolean | undefined
-  // Marks the zone as refused, its keyline in the danger colour, with `aria-invalid`. A message shown for the zone marks it on its own.
+  // Marks the zone as refused, its keyline in the danger colour, with `data-invalid`. A message shown for the zone marks it on its own.
   invalid?: boolean | undefined
   // The field the files post as: the zone keeps what is picked, dropped or pasted on its input, so a form posts them as a plain file field would, to an `s.File()` or `s.Files()` of an action. Inside a FormDialog, the message its call was refused with for that field shows under the zone, as a FormField shows it.
   name?: string | undefined
@@ -229,7 +229,7 @@ onFormReset(() => input, () => {
 })
 ---
 snippet zoneView()
-  div(part="root" {...rest} ref={zoneRef} role="group" data-kui-choice="" data-compact={size === 'sm' || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} aria-invalid={marked() ? 'true' : rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+  div(part="root" {...rest} ref={zoneRef} role="group" data-kui-choice="" data-compact={size === 'sm' || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} data-invalid={marked() ? '' : undefined} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
     input(part="input" ref={element => input = element} type="file" name={name} tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
     if content
       | {content(zone)}
