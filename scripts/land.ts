@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { $, Glob } from 'bun'
+import { runBounded } from './bounded-run'
 import { dependenciesOnly } from './dependency-change'
 import { hostEnv } from './host-env'
 import { librariesToTest, libraryDependencies } from './library-dependents'
@@ -117,11 +118,11 @@ async function step(label: string, argv: string[], cwd = '.', lock?: string) {
 }
 
 // The files a test step's run lists and those that reported a result, the first from the same run with a test filter nothing matches, which loads each file and runs none of them.
-// The step has just failed, so the listing is given a few minutes and killed with its children past them.
+// The step has just failed, so the listing is given a few minutes and its process group killed past them.
 async function shardFiles(argv: string[], report: string) {
   const listing = `${report}.list`
 
-  await Bun.spawn(['sh', '-c', 'exec "$@" >/dev/null 2>&1', 'sh', ...nicedCommand([...argv, '--test-name-pattern=^$never', '--reporter=junit', `--reporter-outfile=${listing}`])], { stdin: 'ignore', timeout: LISTING_LIMIT_MS, killSignal: 'SIGKILL' }).exited
+  await runBounded(nicedCommand([...argv, '--test-name-pattern=^$never', '--reporter=junit', `--reporter-outfile=${listing}`]), LISTING_LIMIT_MS)
 
   const files = { listed: await reportedFiles(listing), reported: await reportedFiles(report) }
 
