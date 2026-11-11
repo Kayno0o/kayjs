@@ -285,7 +285,7 @@ test('a page with one entry has no Save all', async () => {
 const WITH_GROUP = { ...POSTS, schema: { type: 'object', properties: { ...POSTS.schema.properties, seo: { type: 'object', properties: { description: { type: 'string' }, image: { type: 'string' } } } } } }
 
 test('a click on a field the layout hides collapses nothing', async () => {
-  server(undefined, { ...POSTS, layout: { form: { hide: ['tags'] } } })
+  server(undefined, { ...POSTS, layout: { form: { exclude: ['tags'] } } })
 
   const { root, shown, button } = await open()
 

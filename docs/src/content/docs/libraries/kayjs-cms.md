@@ -855,12 +855,12 @@ The screens read each collection's schema. To change how one looks, name it in `
 
 ```ts
 cms({ collections: { shop: {
-  form: { fields: ['price', ['stock', 'live'], 'photo'], hide: ['sku'] },
+  form: { fields: ['price', ['stock', 'live'], 'photo'], exclude: ['sku'] },
   list: { columns: ['price', 'live'], actions: ['delete'] },
 } } })
 ```
 
-In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `hide` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
+In the form, `fields` come first, in that order. A list inside it is a row of columns, which stack where there is no room. The other fields follow in the schema's order, then the Markdown body, which you name `body`. `exclude` leaves a field out. A hidden field that a save refuses still shows its message above the form. A name can be a dotted path into a group, `address.street`: that field leaves its group and takes the place named, in a row too, and the group keeps the rest.
 
 The Markdown body is labelled Body, in the editor's language. `body: { label: 'Article', hint: 'Plain text, no HTML' }` in `form` words it for the collection. Setting `body` on a collection that has no Markdown body stops the server at boot and names the collection.
 

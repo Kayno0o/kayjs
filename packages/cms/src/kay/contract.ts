@@ -12,6 +12,8 @@ export type ToolbarAction = 'bold' | 'italic' | 'heading' | 'bulletList' | 'numb
 // How a collection's form is arranged: `fields` first, in that order, an inner array being one row of columns, then the others in the schema's order unless hidden; the Markdown body is `body`, or `#body` when a data field has that name.
 export interface FormLayout {
   fields?: (string | string[])[] | undefined
+  exclude?: string[] | undefined
+  /** @deprecated The old name of `exclude`, which wins when both are given. Removed in 1.103.0; `deprecated-filter-options` rewrites it. */
   hide?: string[] | undefined
   // The words over the Markdown body: its label (`Body` by default, translated) and a hint under it.
   body?: { label?: string | undefined, hint?: string | undefined } | undefined

@@ -2,6 +2,7 @@ ai [.] AskOptions.confirm	1.103.0	deprecated-ai-options	The old name of `approva
 ai [.] AskOptions.reasoning	1.103.0	deprecated-ai-options	The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it.
 ai [.] StructuredAskOptions.confirm	1.103.0	deprecated-ai-options	The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it.
 ai [.] StructuredAskOptions.reasoning	1.103.0	deprecated-ai-options	The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it.
+cms [.] FormLayout.hide	1.103.0	deprecated-filter-options	The old name of `exclude`, which wins when both are given. Removed in 1.103.0; `deprecated-filter-options` rewrites it.
 kay [./analytics] CloudflareOptions.consent	1.103.0	deprecated-await-consent	The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it.
 kay [./analytics] CloudflareOptions.policyUrl	1.102.0	deprecated-analytics-options	The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it.
 kay [./analytics] CustomOptions.consent	1.103.0	deprecated-await-consent	The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it.

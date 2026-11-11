@@ -100,6 +100,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const reply = ask(\'Hi\', { reasoning: \'low\', confirm: () => true })\n---',
     right: '---\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const reply = ask(\'Hi\', { effort: \'low\', approval: () => true })\n---',
   },
+  'deprecated-filter-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    site: true,
+    summary: '`hide` in the form layout of a kayjs-cms collection, `exclude` since 1.99: a list of what to leave out is `exclude` (and a list of what to keep `include`) in every library, as `analytics({ exclude })` is. The old name works until 1.103, `exclude` winning when both are given. Found in `cms({ collections: { <name>: { form: { hide } } } })`, in the TypeScript files and `.kay` files of the project. The fix renames the key, and writes `exclude: hide` for a shorthand; a form holding `exclude` already is reported with no fix.',
+    wrong: '// kay.config.ts\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default { extensions: [cms({ collections: { products: { form: { hide: [\'sku\'] } } } })] }',
+    right: '// kay.config.ts\nimport { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default { extensions: [cms({ collections: { products: { form: { exclude: [\'sku\'] } } } })] }',
+  },
   'deprecated-ai-props': {
     level: 'warn',
     group: 'deprecated',

@@ -19,7 +19,7 @@ it('lists the items of the form in the order it draws them, the body last', () =
 
 it('follows the layout: a placed field of a group is an item of its own, named by its path', () => {
   expect(anchorsOf(fields, false, { fields: [['title', 'seo.description']] }).map(anchor => anchor.key)).toEqual(['title', 'seo.description', 'seo', 'items'])
-  expect(anchorsOf(fields, false, { hide: ['items'] }).map(anchor => anchor.key)).toEqual(['title', 'seo'])
+  expect(anchorsOf(fields, false, { exclude: ['items'] }).map(anchor => anchor.key)).toEqual(['title', 'seo'])
 })
 
 it('names the item of a body label the layout gives', () => {
@@ -42,7 +42,7 @@ it('prefers the placed field over the group it was taken from', () => {
 })
 
 it('finds nothing for a name that only starts the same, or a field the layout hides', () => {
-  const keys = anchorsOf(fields, false, { hide: ['items'] })
+  const keys = anchorsOf(fields, false, { exclude: ['items'] })
 
   expect(ownerOf(keys, 'titles')).toBeUndefined()
   expect(ownerOf(keys, 'items.0')).toBeUndefined()

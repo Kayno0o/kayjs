@@ -54,8 +54,8 @@ function without(fields: Field[], cut: ReadonlySet<string>, parent = ''): Field[
 
 // The rows of a form, each the fields shown side by side: the layout's first, then the rest of the schema's in its order, then the body. A name the schema lacks is skipped. A dotted name reaches a field inside a group, which the group then leaves out and which carries its path as `at`.
 export function formRows(fields: Field[], hasBody: boolean, layout?: FormLayout): FormItem[][] {
-  const hidden = new Set((layout?.hide ?? []).map(name => bodyId(name, new Map(fields.map(field => [String(field.key), field])))))
-  const named = [...(layout?.fields ?? []).flat(), ...layout?.hide ?? []].filter(name => !fields.some(field => String(field.key) === name) && resolve(fields, name) !== undefined)
+  const hidden = new Set((layout?.exclude ?? []).map(name => bodyId(name, new Map(fields.map(field => [String(field.key), field])))))
+  const named = [...(layout?.fields ?? []).flat(), ...layout?.exclude ?? []].filter(name => !fields.some(field => String(field.key) === name) && resolve(fields, name) !== undefined)
   const cut = new Set(named)
   const kept = without(fields, cut)
   const byName = new Map(kept.map(field => [String(field.key), field]))
@@ -194,7 +194,7 @@ export function layoutProblems(listed: Pick<CollectionInfo, 'name' | 'schema'>[]
     }
 
     const fields = fieldsOf(found.schema)
-    const named = [...(layout.form?.fields ?? []).flat(), ...layout.form?.hide ?? []].filter(field => field !== 'body' && field !== BODY_ID)
+    const named = [...(layout.form?.fields ?? []).flat(), ...layout.form?.exclude ?? []].filter(field => field !== 'body' && field !== BODY_ID)
 
     const paired = pairedFields(fields)
 

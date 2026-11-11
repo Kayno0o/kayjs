@@ -149,7 +149,7 @@ test('a pick among many options has a search box narrowing them, the option held
 })
 
 test('a nested field the layout places is edited at its dotted path, the group keeping the others', async () => {
-  const { root, field, type, save } = await open({ address: { street: 'Rue 1', city: 'Lyon' } }, { ...SHOP, layout: { form: { fields: [['address.city', 'accent']], hide: ['icon', 'labels', 'opens', 'starts', 'size'] } } })
+  const { root, field, type, save } = await open({ address: { street: 'Rue 1', city: 'Lyon' } }, { ...SHOP, layout: { form: { fields: [['address.city', 'accent']], exclude: ['icon', 'labels', 'opens', 'starts', 'size'] } } })
   const rows = [...root.querySelectorAll('.kcms-row')].map(row => [...row.querySelectorAll('[data-kcms-path]')].map(found => found.getAttribute('data-kcms-path')).filter(path => path !== 'address.street' || row.querySelectorAll('[data-kcms-path]').length > 1))
 
   expect(rows[0]).toEqual(['address.city', 'accent'])

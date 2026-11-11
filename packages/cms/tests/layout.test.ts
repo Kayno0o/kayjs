@@ -39,7 +39,7 @@ describe('formRows', () => {
   })
 
   test('hides a field, the body included, and shows no name twice or unknown', () => {
-    const rows = keys(formRows(fields, true, { fields: ['price', ['price', 'nope', '__proto__', 'constructor']], hide: ['tags', 'body', 'stock'] })).flat()
+    const rows = keys(formRows(fields, true, { fields: ['price', ['price', 'nope', '__proto__', 'constructor']], exclude: ['tags', 'body', 'stock'] })).flat()
 
     expect(rows.filter(key => key === 'price')).toHaveLength(1)
     expect(rows).not.toContain('tags')
@@ -53,7 +53,7 @@ describe('formRows', () => {
     const own = fieldsOf({ properties: { body: { type: 'string' }, name: { type: 'string' } } })
 
     expect(keys(formRows(own, true, { fields: ['#body', 'body'] }))).toEqual([['#body'], ['body'], ['name']])
-    expect(keys(formRows(own, true, { hide: ['body'] }))).toEqual([['name'], ['#body']])
+    expect(keys(formRows(own, true, { exclude: ['body'] }))).toEqual([['name'], ['#body']])
   })
 })
 
@@ -80,9 +80,9 @@ describe('formRows with dotted names', () => {
   })
 
   test('hides a nested field, a group left empty, and everything under a hidden group', () => {
-    expect(inside(formRows(nested, false, { hide: ['address.street'] }))).toEqual(['city', 'geo'])
-    expect(placed(formRows(nested, false, { hide: ['address.street', 'address.city', 'address.geo'] }))).toEqual([['name']])
-    expect(placed(formRows(nested, false, { fields: ['address.street'], hide: ['address'] }))).toEqual([['name']])
+    expect(inside(formRows(nested, false, { exclude: ['address.street'] }))).toEqual(['city', 'geo'])
+    expect(placed(formRows(nested, false, { exclude: ['address.street', 'address.city', 'address.geo'] }))).toEqual([['name']])
+    expect(placed(formRows(nested, false, { fields: ['address.street'], exclude: ['address'] }))).toEqual([['name']])
   })
 
   test('reaches two levels down, and shows a path once', () => {
@@ -99,7 +99,7 @@ describe('formRows with dotted names', () => {
 
   test('reports a path the schema lacks like a top-level name', () => {
     const collection: CollectionInfo = { name: 'people', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { address: { type: 'object', properties: { city: { type: 'string' } } } } } }
-    const layouts = checkLayouts({ people: { form: { fields: ['address.city', 'address.zip'], hide: ['address.nope.x'] } } })
+    const layouts = checkLayouts({ people: { form: { fields: ['address.city', 'address.zip'], exclude: ['address.nope.x'] } } })
 
     expect(layoutProblems([collection], layouts)).toEqual(['people\'s form names address.zip, which its schema lacks', 'people\'s form names address.nope.x, which its schema lacks'])
   })
@@ -180,9 +180,14 @@ describe('checkLayouts', () => {
     expect(() => checkLayouts({ posts: { icon: {} } })).toThrow('icon')
   })
 
+  test('reads hide as the old name of exclude, exclude winning when both are given', () => {
+    expect(checkLayouts({ a: { form: { hide: ['x'] } } }).get('a')).toEqual({ form: { exclude: ['x'] } })
+    expect(checkLayouts({ b: { form: { hide: ['x'], exclude: ['y'] } } }).get('b')?.form?.exclude).toEqual(['y'])
+  })
+
   test('reads a layout as given, none as none', () => {
     expect(checkLayouts(undefined).size).toBe(0)
-    expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })
+    expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], exclude: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })
   })
 
   test('keeps a collection named __proto__ as a collection', () => {
@@ -198,12 +203,12 @@ describe('checkLayouts', () => {
     expect(refused({ a: { form: { fields: [['a', ['b']]] } } })).toThrow('list of field names')
     expect(refused({ a: { form: { fields: [1] } } })).toThrow('list of field names')
     expect(refused({ a: { form: { fields: ['a', ['a']] } } })).toThrow('twice')
-    expect(refused({ a: { form: { fields: ['a'], hide: ['a'] } } })).toThrow('both shows and hides')
+    expect(refused({ a: { form: { fields: ['a'], exclude: ['a'] } } })).toThrow('both shows and hides')
     expect(refused({ a: { form: { hide: [''] } } })).toThrow('list of field names')
     expect(refused({ a: { list: { columns: ['a', 'a'] } } })).toThrow('twice')
     expect(refused({ a: { list: { actions: ['remove'] } } })).toThrow('the row actions are')
     expect(refused({ a: { forms: {} } })).toThrow('has no option "forms"')
-    expect(refused({ a: { form: { hidden: ['x'] } } })).toThrow('it takes fields, hide')
+    expect(refused({ a: { form: { hidden: ['x'] } } })).toThrow('it takes fields, exclude, hide')
     expect(refused({ a: { list: { column: ['x'] } } })).toThrow('it takes columns, actions')
   })
 })
@@ -212,7 +217,7 @@ describe('layoutProblems', () => {
   const products: CollectionInfo = { name: 'products', kind: 'folder', localized: false, components: [], schema }
 
   test('names what the schemas lack and what a cell cannot show', () => {
-    const layouts = checkLayouts({ products: { form: { fields: ['name', 'nope'], hide: ['body', 'gone'] }, list: { columns: ['price', 'tags', 'absent'] } }, ghosts: {} })
+    const layouts = checkLayouts({ products: { form: { fields: ['name', 'nope'], exclude: ['body', 'gone'] }, list: { columns: ['price', 'tags', 'absent'] } }, ghosts: {} })
 
     expect(layoutProblems([products], layouts)).toEqual([
       'products\'s form names nope, which its schema lacks',
