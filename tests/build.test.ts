@@ -828,7 +828,13 @@ describe('kay build', () => {
 
       expect(Object.values(manifest.islands).filter(chunks => chunks[1] !== manifest.entry || chunks.length > 3)).toEqual([])
       expect(Object.entries(manifest.islands).filter(([, chunks]) => chunks.length === 2).map(([island]) => island).sort()).toEqual(['counter.kay', 'joined.kay', 'mounted.kay', 'picker.kay', 'rich.kay', 'typed.kay', 'vouched.kay'])
-      expect([...(await Bun.file(join(dirname(entryFile), swap)).text()).matchAll(/from\s*"\.\/([^"]+)"/g)].map(match => `/_kay/${match[1]}`)).toEqual([manifest.entry])
+      // Beside it, only the live-region announcer it shares with the pending blocks, which the page itself never loads.
+      const imported = [...(await Bun.file(join(dirname(entryFile), swap)).text()).matchAll(/from\s*"\.\/([^"]+)"/g)].map(match => match[1]!)
+      const others = imported.filter(file => `/_kay/${file}` !== manifest.entry)
+
+      expect(imported.length - others.length).toBe(1)
+      expect(await Promise.all(others.map(async file => (await Bun.file(join(dirname(entryFile), file)).text()).includes('data-kay-announce')))).toEqual(others.map(() => true))
+      expect(others.length).toBeLessThanOrEqual(1)
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
