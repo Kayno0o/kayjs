@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { noteMissingPeer } from '../peers'
 import { nativePlatformDir } from './native-typescript'
 
 const DECLARED_GLOBAL = /^declare (?:var|function) ([\w$]+)/gm
@@ -36,7 +37,9 @@ export function browserGlobals(): ReadonlySet<string> {
         globals.add(match[1]!)
     }
   }
-  catch {}
+  catch (error) {
+    noteMissingPeer(error, 'the hint for a browser-only global read on the server')
+  }
 
   return globals
 }

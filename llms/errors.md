@@ -30,6 +30,7 @@ kay explain template-syntax
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
 | `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](project.md#commands) |
+| `missing-peer` | command | A command that needs `typescript7` or `axe-core`, which the app did not install: the message names the `bun add -d` line to run. | [Peer packages](checks.md#peer-packages) |
 | `extension-command` | command | A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default. | [Extensions](component-libraries.md#extensions) |
 | `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](templates.md#template-lines) |
 | `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](templates-elements-slots-snippets.md#elements) |

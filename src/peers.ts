@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { peerDependencies } from '../package.json'
+import { kayLog } from './runtime/log'
 
 // The optional peers kay loads when a command needs them, never on import, so an app that never runs that command installs none of them. Nothing here imports kay's runtime: the ESLint processor, which runs under Node, reaches this file.
 export type Peer = keyof Pick<typeof peerDependencies, 'axe-core' | 'typescript7'>
@@ -56,4 +57,15 @@ export function peerInstalled(name: Peer, from = import.meta.dir): boolean {
 // The platform package of the native compiler is optional to its own package: missing, the install is broken rather than the peer absent.
 export function platformMissingMessage(): string {
   return `the native TypeScript compiler for ${process.platform}-${process.arch} is not installed: run \`bun install\`, or \`${peerInstallCommand('typescript7')}\` again`
+}
+
+const noted = new Set<string>()
+
+// Says once, in kay's log, that what kay does with a peer is off because it is missing, for the places that carry on without it; any other error is left to the caller.
+export function noteMissingPeer(error: unknown, off: string): void {
+  if (!(error instanceof MissingPeerError) || noted.has(off))
+    return
+
+  noted.add(off)
+  kayLog('warn', `${off} is off: ${error.message}`)
 }

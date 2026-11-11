@@ -12,6 +12,7 @@ import { inAnalysisScope } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { nativeExe } from '../compiler/native-typescript'
 import { pickConfig } from '../config'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
@@ -121,6 +122,9 @@ export async function check(root: string, options: CheckOptions = {}, probes?: P
 }
 
 async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
+  // A missing compiler fails here, before the probe reads anything.
+  nativeExe()
+
   const options = await withoutMissingCaptcha(root, given)
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.

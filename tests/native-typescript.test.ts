@@ -2,9 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { nativeExe, nativeManifest } from '../src/compiler/native-typescript'
-import { MissingPeerError, peerInstalled, resolvePeer } from '../src/peers'
+import { MissingPeerError, noteMissingPeer, peerInstalled, resolvePeer } from '../src/peers'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -104,3 +104,84 @@ describe('resolvePeer', () => {
     }
   })
 })
+
+it('says once that what rides on a missing peer is off, and passes any other error by', () => {
+  const log = spyOn(console, 'warn').mockImplementation(() => undefined)
+  const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  try {
+    const missing = new MissingPeerError('typescript7 is not installed')
+
+    noteMissingPeer(missing, 'the probe test hint')
+    noteMissingPeer(missing, 'the probe test hint')
+    noteMissingPeer(new Error('other'), 'another feature')
+    noteMissingPeer(missing, 'another feature')
+
+    const lines = [...log.mock.calls, ...error.mock.calls].map(call => call.join(' '))
+
+    expect(lines.filter(line => line.includes('the probe test hint is off'))).toHaveLength(1)
+    expect(lines.filter(line => line.includes('another feature is off'))).toHaveLength(1)
+  }
+  finally {
+    log.mockRestore()
+    error.mockRestore()
+  }
+})
+
+it('explains missing-peer from the command line', async () => {
+  const { stdout, code } = await run([CLI, 'explain', 'missing-peer'])
+
+  expect(code).toBe(0)
+  expect(stdout).toContain('bun add -d')
+})
+
+// `kay upgrade` runs the new kay's first check with KAY_UPGRADE_FROM set: the check adds the peers before it does anything else. The stub stands in for `bun add`.
+it('adds the peers at the start of `kay check` under KAY_UPGRADE_FROM, and stops when the add fails', async () => {
+  const { preload } = await withoutPeers()
+  const app = await mkdtemp(join(tmpdir(), 'peer-upgrade-'))
+  const record = join(app, 'adds.txt')
+  const stub = join(app, 'stub.ts')
+
+  try {
+    await Bun.write(join(app, 'package.json'), '{ "name": "app" }')
+    await Bun.write(stub, `import { appendFileSync } from 'node:fs'\nconst spawn = Bun.spawn\n// @ts-expect-error a stand-in\nBun.spawn = (command: string[], ...rest: unknown[]) => {\n  if (command[1] !== 'add')\n    return (spawn as Function)(command, ...rest)\n\n  appendFileSync(${JSON.stringify(record)}, command.slice(1).join(' ') + '\\n')\n\n  return { exited: Promise.resolve(Number(process.env.STUB_ADD_EXIT)) }\n}\n`)
+
+    const upgrading = async (exit: string) => {
+      const proc = Bun.spawn([process.execPath, '--preload', preload, '--preload', stub, CLI, 'check', app], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_UPGRADE_FROM: '1.96', STUB_ADD_EXIT: exit } })
+      const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited])
+
+      return { stderr, code }
+    }
+
+    const added = await upgrading('0')
+
+    expect(await Bun.file(record).text()).toBe('add --dev typescript7@npm:typescript@^7.0.2 axe-core@^4.14.0\n')
+    expect(added.stderr).not.toContain('could not add')
+
+    const failed = await upgrading('1')
+
+    expect(failed.code).toBe(1)
+    expect(failed.stderr).toContain('could not add typescript7 and axe-core to devDependencies')
+  }
+  finally {
+    await rm(app, { recursive: true, force: true })
+  }
+}, 60_000)
+
+// A server started with --quiet prints nothing of its own.
+it('warns at the start of `kay dev` that the type checks are off, unless --quiet', async () => {
+  const { preload, root } = await withoutPeers()
+  const start = async (flags: string[]) => {
+    const proc = Bun.spawn([process.execPath, '--preload', preload, CLI, 'dev', root, '--port', String(20_000 + Math.floor(Math.random() * 10_000)), ...flags], { stdout: 'pipe', stderr: 'pipe' })
+    const timer = setTimeout(() => proc.kill(), 6000)
+    const stderr = await new Response(proc.stderr).text()
+
+    clearTimeout(timer)
+    proc.kill()
+
+    return stderr
+  }
+
+  expect(await start([])).toContain('kay dev: type checks are off, typescript7 is not installed')
+  expect(await start(['--quiet'])).not.toContain('type checks are off')
+}, 60_000)

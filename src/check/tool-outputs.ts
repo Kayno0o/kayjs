@@ -8,6 +8,7 @@ import { KAY_DIR } from '../build/assets'
 import { nativeExe } from '../compiler/native-typescript'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { noteMissingPeer } from '../peers'
 import { projectPaths } from '../project'
 import { routeMounts, scanRoutes } from '../server/routes'
 import { TOOL_OUTPUTS_RECORD, toolOutputKey } from '../server/tool-outputs'
@@ -94,8 +95,9 @@ async function writeRecord(root: string, options: CheckOptions, output: string, 
       }
     }
   }
-  catch {
+  catch (error) {
     // The last record stays: a run that failed says nothing of the types, and a server listing the schemas should not lose them to one.
+    noteMissingPeer(error, 'the output schemas of the tool actions')
   }
 }
 

@@ -26,6 +26,11 @@ export const ERRORS = {
     summary: 'A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together.',
     fix: { file: 'llms/project.md', heading: 'Commands' },
   },
+  'missing-peer': {
+    group: 'command',
+    summary: 'A command that needs `typescript7` or `axe-core`, which the app did not install: the message names the `bun add -d` line to run.',
+    fix: { file: 'llms/checks.md', heading: 'Peer packages' },
+  },
   'extension-command': {
     group: 'command',
     summary: 'A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default.',

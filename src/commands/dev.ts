@@ -55,7 +55,7 @@ export const dev: Command = {
       warnOtherKay('dev', root)
 
       // The type checks run in the background of every save, each failing the same way without it: said once, here.
-      if (values['no-types'] !== true && !peerInstalled('typescript7'))
+      if (values['no-types'] !== true && values.quiet !== true && !peerInstalled('typescript7'))
         console.error(`kay dev: type checks are off, ${missingPeerMessage('typescript7')}`)
 
       const defaultEntry = inDir ? undefined : path

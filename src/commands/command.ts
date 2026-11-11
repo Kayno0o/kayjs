@@ -397,7 +397,7 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
 export function printFailure(command: string, failure: unknown, format: ProblemFormat, code?: string | null): void {
   // A package kay needs and the app did not install is one line naming the command to run, never an error object with its stack.
   if (failure instanceof MissingPeerError)
-    return printFailure(command, failure.message, format, code ?? 'missing-peer')
+    return printFailure(command, failure.message, format, code === undefined ? 'missing-peer' : code)
 
   console.error(typeof failure === 'string' ? `kay ${command}: ${failure}` : failure)
 
