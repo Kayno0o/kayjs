@@ -3,7 +3,7 @@ import type { Span, SpanOptions, Tracer } from '../src/server/trace'
 import type { TraceContext } from '../src/server/trace-context'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { encodeCall } from '../src/runtime/action'
 import { observed } from '../src/server/api'
 import { setTracer } from '../src/server/trace'
@@ -125,6 +125,23 @@ describe('Server-Timing on an API route', () => {
     })
   }
 
+  it('adds to a Server-Timing the handler set, and sends none for a handler that threw', async () => {
+    const made = await site({ observe: { serverTiming: true } })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await made.fetch('/api/own')).headers.get('server-timing')).toMatch(/^upstream;dur=1, handler;dur=\d+\.\d$/)
+
+      const failed = await made.fetch('/api/boom')
+
+      expect(failed.status).toBe(500)
+      expect(failed.headers.get('server-timing')).toBeNull()
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('is sent in development unless serverTiming is false, and never in production by default', async () => {
     expect((await (await site({ dev: true })).fetch('/api/probe')).headers.get('server-timing')).toMatch(HANDLER)
     expect((await (await site({ dev: true, observe: { serverTiming: false } })).fetch('/api/probe')).headers.get('server-timing')).toBeNull()
@@ -182,6 +199,17 @@ describe('Server-Timing on an endpoint', () => {
       expect((await made.fetch('/open.json')).headers.get('server-timing')).toMatch(HANDLER)
     })
   }
+
+  it('adds to a Server-Timing the endpoint returned, and copies a response whose headers are immutable', async () => {
+    const made = await site({ observe: { serverTiming: true } })
+
+    expect((await made.fetch('/own.json')).headers.get('server-timing')).toMatch(/^upstream;dur=1, handler;dur=\d+\.\d$/)
+
+    const moved = await made.fetch('/moved.txt', { redirect: 'manual' })
+
+    expect(moved.status).toBe(302)
+    expect(moved.headers.get('server-timing')).toMatch(HANDLER)
+  })
 
   it('gives a request the guards refuse their time alone, and sends nothing when serverTiming is off', async () => {
     const on = await site({ observe: { serverTiming: true } })

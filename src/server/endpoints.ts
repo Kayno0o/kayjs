@@ -185,11 +185,11 @@ function timed(response: Response, request: Request): Response {
     return response
 
   try {
-    response.headers.set('server-timing', timing)
+    response.headers.append('server-timing', timing)
   }
   catch {
     response = new Response(response.body, response)
-    response.headers.set('server-timing', timing)
+    response.headers.append('server-timing', timing)
   }
 
   return response

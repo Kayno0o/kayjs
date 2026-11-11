@@ -168,7 +168,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
 
       const guarded = group
-        // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
+        // A span from the guards to the response; the handler runs in Elysia's call, so `observed` runs it in a span under this one.
         .onBeforeHandle(({ request, route: mounted, set }) => {
           // The module a request matched, as the first hook of its group saw it.
           const record = requestRecord(request)
@@ -403,6 +403,7 @@ export function observed(fn: Handler, route: string, { serverTiming }: ActionOpt
       return run()
 
     const started = performance.now()
+    // Only an answer: a handler that threw carries no timing, as an action's and an endpoint's.
     const stamp = () => {
       requestRecord(request).handlerTook = performance.now() - started
 
@@ -410,7 +411,7 @@ export function observed(fn: Handler, route: string, { serverTiming }: ActionOpt
       const { set } = context as { request: Request, set?: { headers: Record<string, string> } }
 
       if (timing !== undefined && set)
-        set.headers['server-timing'] = timing
+        set.headers['server-timing'] = set.headers['server-timing'] === undefined ? timing : `${set.headers['server-timing']}, ${timing}`
     }
     const result = run()
 
@@ -421,12 +422,11 @@ export function observed(fn: Handler, route: string, { serverTiming }: ActionOpt
     }
 
     return (async (): Promise<unknown> => {
-      try {
-        return await result
-      }
-      finally {
-        stamp()
-      }
+      const answer = await result
+
+      stamp()
+
+      return answer
     })()
   }
 
