@@ -33,8 +33,8 @@ export interface Review {
   events: ReviewEvent[]
 }
 
-// What a screen is given of a review: the id of the person is left out. `own` is set when the signed-in person sent the draft and `cms({ fourEyes })` keeps them from approving it.
-export type ReviewView = Omit<Review, 'byId' | 'events'> & { events: ReviewEventView[], own?: true }
+// What a screen is given of a review: the id of the person is left out. `own` is set when the signed-in person sent the draft and `cms({ fourEyes })` keeps them from approving it, `unnamed` when it keeps them because the guard names no one.
+export type ReviewView = Omit<Review, 'byId' | 'events'> & { events: ReviewEventView[], own?: true, unnamed?: true }
 
 // A step of a review as a screen reads it, `at` in milliseconds becoming a `Date`.
 export type ReviewEventView = Omit<ReviewEvent, 'at'> & { doneAt: Date }
@@ -56,9 +56,20 @@ export function sentBy(review: Review, viewer: Viewer | undefined): boolean {
   return viewer.name !== '' && viewer.name !== wording('cms.review.someone', 'Someone') && review.by === viewer.name
 }
 
-// Whether `cms({ fourEyes })` keeps this person from approving the entry in review.
-export function mayNotApprove(review: Review, viewer: Viewer | undefined): boolean {
-  return settings().fourEyes && review.status === 'review' && sentBy(review, viewer)
+// Whether a person can be told from another: they have a kayjs-auth id, or a name that is not the placeholder.
+function identified(viewer: Viewer | undefined): boolean {
+  return viewer !== undefined && (viewer.id !== undefined || (viewer.name !== '' && viewer.name !== wording('cms.review.someone', 'Someone')))
+}
+
+// Why `cms({ fourEyes })` keeps this person from approving the entry in review: they sent it, or the guard names no one, so nothing says they did not.
+export function approvalBarred(review: Review, viewer: Viewer | undefined): 'own' | 'unnamed' | undefined {
+  if (!settings().fourEyes || review.status !== 'review')
+    return undefined
+
+  if (!identified(viewer))
+    return 'unnamed'
+
+  return sentBy(review, viewer) ? 'own' : undefined
 }
 
 // The events kept per entry, the oldest going first.
@@ -96,7 +107,7 @@ async function jsonOf(file: string): Promise<unknown> {
 }
 
 export function viewOf(review: Review, viewer?: Viewer): ReviewView {
-  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events.map(({ at, ...event }) => ({ ...event, doneAt: new Date(at) })), ...mayNotApprove(review, viewer) && { own: true as const } }
+  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events.map(({ at, ...event }) => ({ ...event, doneAt: new Date(at) })), ...approvalBarred(review, viewer) === 'own' && { own: true as const }, ...approvalBarred(review, viewer) === 'unnamed' && { unnamed: true as const } }
 }
 
 // A stored value as a review, undefined for anything else.

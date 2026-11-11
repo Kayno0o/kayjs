@@ -1,6 +1,7 @@
 import { defineMessages } from 'kay/i18n'
 import activityMessages from '../fr-activity-messages'
 import kayEntry from '../fr-entry-messages'
+import reviewMessages from '../fr-review-messages'
 
 // The French of every `cms.*` key the screens and the editor look up, which a site on a French page gets with no setup and overrides key by key in its own `src/messages/fr.ts`.
 export default defineMessages({
@@ -412,44 +413,7 @@ export default defineMessages({
       moved: '{item} déplacé en position {position} sur {count}',
       up: 'Monter {item}',
     },
-    review: {
-      already: '{slug} est déjà en relecture',
-      approve: 'Approuver',
-      approveFailure: 'Approbation impossible',
-      approved: '{name} a approuvé {title}',
-      approvedToast: 'Approuvé',
-      changed: '{slug} a changé après sa soumission à relecture : il faut le soumettre de nouveau',
-      changedSince: '{slug} a changé depuis que vous l\'avez ouvert : rechargez-le pour lire ce que vous approuvez',
-      failure: 'La relecture n\'a pas pu être enregistrée : le journal du serveur dit pourquoi',
-      inReview: 'En relecture',
-      log: 'Relecture',
-      logApprove: 'Approuvé',
-      logPublish: 'Publié pendant la relecture',
-      logSendBack: 'Renvoyé',
-      logSubmit: 'Soumis à relecture',
-      note: 'Ce qu\'il faut changer',
-      noteLong: 'La note dépasse {count} caractères',
-      noteNeeded: 'Dites ce qu\'il faut changer dans une note',
-      notApproved: 'Non approuvé',
-      notDraft: 'Seul un brouillon peut être soumis à relecture',
-      notInReview: '{slug} n\'est pas en relecture',
-      notSentBack: 'Non renvoyé',
-      notSubmitted: 'Non soumis à relecture',
-      ownApproval: 'Vous avez soumis cette entrée à relecture : une autre personne l\'approuve',
-      sendBack: 'Renvoyer',
-      sendBackFailure: 'Renvoi impossible',
-      sendBackTitle: 'Renvoyer à son auteur',
-      sentBack: '{name} a renvoyé {title} : {note}',
-      sentBackBadge: 'Renvoyé',
-      sentBackNote: 'Renvoyé par {name} : {note}',
-      sentBackToast: 'Renvoyé',
-      someone: 'Quelqu\'un',
-      submit: 'Soumettre à relecture',
-      submitFailure: 'Soumission impossible',
-      submitted: '{name} a soumis {title} à relecture',
-      submittedToast: 'Soumis à relecture',
-      unavailable: '{collection} ne peut pas soumettre d\'entrées à relecture : il lui faut un indicateur de brouillon et un loader qui garde une collection cachée',
-    },
+    review: reviewMessages,
     role: {
       delete: 'supprimer',
       publish: 'publier ou dépublier',

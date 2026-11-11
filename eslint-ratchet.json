@@ -48,9 +48,6 @@
   "packages/cms/src/form.ts": {
     "max-lines-per-function": 197
   },
-  "packages/cms/src/messages/fr.ts": {
-    "max-lines": 627
-  },
   "packages/cms/src/store.ts": {
     "max-lines": 710
   },

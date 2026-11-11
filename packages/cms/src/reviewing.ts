@@ -7,7 +7,7 @@ import { notify } from 'kay/server'
 import { wording } from 'kay/words'
 import { entryPath, entryTitle } from './listing'
 import { log } from './log'
-import { mayNotApprove, readReview, reviewable, settleReview, viewOf, writeReview } from './review'
+import { approvalBarred, readReview, reviewable, settleReview, viewOf, writeReview } from './review'
 import { settings } from './settings'
 import { answering, collectionNamed, entryOf, publishEntry, refused } from './store'
 
@@ -106,8 +106,13 @@ async function approveEntryAnswer(ref: EntryRef, actor: Actor, author: Identity 
   if (review?.status !== 'review' || !entry.draft)
     return refused(ref, wording('cms.review.notInReview', '{slug} is not in review', { slug: ref.slug }))
 
-  if (mayNotApprove(review, actor))
+  const barred = approvalBarred(review, actor)
+
+  if (barred === 'own')
     return refused(ref, wording('cms.review.ownApproval', 'You sent this entry for review: another person approves it'))
+
+  if (barred === 'unnamed')
+    return refused(ref, wording('cms.review.unnamedApproval', 'Approving needs a signed-in person the guard can name'))
 
   // An approval is of the version the reviewer was asked to look at, and the one they opened: an entry that has a version is approved by naming it.
   if (entry.version !== undefined && review.version !== entry.version)

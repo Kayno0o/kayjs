@@ -8,7 +8,7 @@ import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { sqliteLoader } from '../src/loaders/sqlite'
-import { readReview, reviewsOf, writeReview } from '../src/review'
+import { readReview, reviewsOf, viewOf, writeReview } from '../src/review'
 import { approveEntry, sendBackEntry, submitEntry } from '../src/reviewing'
 import { revisionsOf } from '../src/revisions'
 import { configure, settings } from '../src/settings'
@@ -172,7 +172,23 @@ describe('review with fourEyes', () => {
     const other = await draft('posts', 'second')
 
     await submitEntry(other, { name: 'Someone', reviewers: [] })
-    expect(await approveEntry(other, { name: 'Someone', reviewers: [] }, undefined, (await entryOf(other))?.version)).toMatchObject({ saved: true })
+    expect(await approveEntry(other, { name: 'Pia', reviewers: [] }, undefined, (await entryOf(other))?.version)).toMatchObject({ saved: true })
+  })
+
+  test('refuses an approval by a person the guard cannot name, and shows it', async () => {
+    configure({ fourEyes: true })
+
+    const ref = await draft('posts')
+    const version = (await entryOf(ref))?.version
+
+    await submitEntry(ref, writer)
+
+    for (const name of ['', 'Someone'])
+      expect(await approveEntry(ref, { name, reviewers: [] }, undefined, version)).toMatchObject({ ok: false, issues: [{ message: 'Approving needs a signed-in person the guard can name' }] })
+
+    expect(viewOf((await readReview(ref))!, undefined)).toMatchObject({ unnamed: true })
+    expect(viewOf((await readReview(ref))!, { name: 'Pia' })).not.toHaveProperty('unnamed')
+    expect((await entryOf(ref))?.draft).toBe(true)
   })
 
   test('is off by default, and a send-back stays open to the submitter', async () => {
