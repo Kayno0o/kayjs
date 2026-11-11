@@ -1,3 +1,4 @@
+import type { AuthEventInfo } from '../src/events'
 import type { AuthMailMessage as Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testApp } from './helpers/app'
@@ -9,13 +10,20 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup() {
+async function setup(options: { failing?: boolean } = {}) {
   const mails: Mail[] = []
+  const events: AuthEventInfo[] = []
   const app = testApp({
     site: 'https://site.test',
     name: 'Site',
     admin: 'admin',
+    onEvent: (info) => {
+      events.push(info)
+    },
     email: { mailer: { send: (mail) => {
+      if (options.failing)
+        throw new Error('relay down')
+
       mails.push(mail)
     } }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }, requireVerified: false },
     organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin', defaultRoles: ['member'], invitationPage: '/invitation' },
@@ -34,7 +42,7 @@ async function setup() {
   const { membership } = await ada.browser.callOk('organizations.create', { name: 'Acme' })
   const org = membership.organization.id
 
-  return { ...app, mails, person, root, ada, grace, org }
+  return { ...app, mails, events, person, root, ada, grace, org }
 }
 
 describe('an admin acting as a user', () => {
@@ -87,7 +95,53 @@ describe('an admin acting as a user', () => {
     setSystemTime(new Date(now + 20 * MINUTE))
     expect(await root.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
     setSystemTime(new Date(now + 31 * MINUTE))
-    expect(await root.browser.json('/me')).toBe('anonymous')
+    expect(await root.browser.json('/me')).toMatchObject({ email: 'root@example.com' })
+  })
+
+  test('an expired one puts the admin back as themselves and records that it expired', async () => {
+    const { root, ada, events } = await setup()
+    const now = Date.now()
+
+    await root.browser.callOk('admin.impersonate', ada.id)
+    setSystemTime(new Date(now + 31 * MINUTE))
+    expect(await root.browser.json('/me')).toMatchObject({ email: 'root@example.com' })
+
+    const ended = events.filter(info => info.event === 'impersonation-ended')
+
+    expect(ended).toHaveLength(1)
+    expect(ended[0]).toMatchObject({ user: { email: 'ada@example.com' }, context: { actor: { email: 'root@example.com' } }, expired: true })
+    // Once, however many requests follow.
+    await root.browser.json('/me')
+    expect(events.filter(info => info.event === 'impersonation-ended')).toHaveLength(1)
+  })
+
+  test('one ended by hand is not marked expired', async () => {
+    const { root, ada, events } = await setup()
+
+    await root.browser.callOk('admin.impersonate', ada.id)
+    await root.browser.call('admin.stopImpersonating')
+
+    const ended = events.find(info => info.event === 'impersonation-ended')
+
+    expect(ended).toBeDefined()
+    expect(ended).not.toHaveProperty('expired')
+  })
+
+  test('goes on when the mailer fails, and sends nothing to an address not verified', async () => {
+    const down = await setup({ failing: true })
+
+    await down.root.browser.callOk('admin.impersonate', down.ada.id)
+    await Bun.sleep(10)
+    expect(await down.root.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
+
+    const { root, ada, mails, store } = await setup()
+
+    await store.users.update(ada.id, { emailVerifiedAt: null })
+    mails.length = 0
+    await root.browser.callOk('admin.impersonate', ada.id)
+    await Bun.sleep(10)
+    expect(mails).toEqual([])
+    expect(await root.browser.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 
   test('tells the person by mail', async () => {

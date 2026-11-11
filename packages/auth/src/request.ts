@@ -598,7 +598,14 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   private async resolve(): Promise<UserRecord | null> {
-    const signedIn = await this.session.get('auth')
+    let signedIn = await this.session.get('auth')
+
+    // An impersonation past its half hour ends here, the admin back as themselves if their own sign-in still holds.
+    if (signedIn?.impersonator && signedIn.until !== undefined && Date.now() >= signedIn.until) {
+      await (await load.admin()).endImpersonation(this[STATE], signedIn, true)
+      signedIn = await this.session.get('auth')
+    }
+
     // The user and their session do not depend on each other, so they are read together.
     const [record, stored] = signedIn
       ? await Promise.all([this.core.store.users.get(signedIn.user), signedIn.session === undefined ? undefined : this.core.store.sessions.get(signedIn.session)])

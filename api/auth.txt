@@ -978,7 +978,7 @@ interface EventFields
   account-deleted: Record<never, never>
   banned: { reason?: string; }
   email-changed: { email: string; }
-  impersonation-ended: Record<never, never>
+  impersonation-ended: { expired?: boolean; }
   impersonation-started: Record<never, never>
   member-joined: { organizationId: string; roles: string[]; }
   member-left: { organizationId: string; }

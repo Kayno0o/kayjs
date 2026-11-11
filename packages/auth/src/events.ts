@@ -33,7 +33,8 @@ export interface EventFields {
   'banned': { reason?: string }
   'unbanned': Record<never, never>
   'impersonation-started': Record<never, never>
-  'impersonation-ended': Record<never, never>
+  // `expired` is set when the 30 minutes ran out rather than the admin ending it.
+  'impersonation-ended': { expired?: boolean }
   'organization-created': { organizationId: string }
   'organization-deleted': { organizationId: string }
   'member-joined': { organizationId: string, roles: string[] }
@@ -95,6 +96,10 @@ export interface AuditEntry {
   at: Date
 }
 
+function impersonationEnd(detail: string | undefined): EventFields['impersonation-ended'] {
+  return detail === 'expired' ? { expired: true } : {}
+}
+
 // The fields of an event, read off the detail it is kept with in the audit log.
 export function eventFields(event: AuthEvent, detail: string | undefined): EventFields[AuthEvent] {
   const text = detail === undefined || detail === '' ? undefined : detail
@@ -135,10 +140,11 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
       return text === undefined ? {} : { name: text }
     case 'signed-out-everywhere':
       return { keptThisOne: text === 'this-one-kept' }
+    case 'impersonation-ended':
+      return impersonationEnd(text)
     case 'signed-out':
     case 'unbanned':
     case 'impersonation-started':
-    case 'impersonation-ended':
     case 'new-sign-in':
     case 'sign-in-locked':
     case 'password-changed':

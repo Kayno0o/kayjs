@@ -1,4 +1,4 @@
-import type { BareUser } from './core'
+import type { BareUser, SignedIn } from './core'
 import type { AuditCursorInput, AuditEntry } from './events'
 import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
@@ -334,19 +334,28 @@ export async function stopImpersonating(state: RequestState): Promise<boolean> {
   if (!signedIn?.impersonator)
     return false
 
+  await endImpersonation(state, signedIn)
+  await state.reload()
+
+  return true
+}
+
+// Ends the impersonation `signedIn` holds and puts the admin's own sign-in back, recording the end; `expired` says it ran out rather than the admin ended it.
+export async function endImpersonation(state: RequestState, signedIn: SignedIn, expired = false): Promise<void> {
   const { impersonator } = signedIn
+
+  if (!impersonator)
+    return
+
   const record = await state.core.store.users.get(signedIn.user)
   const actor = await state.core.store.users.get(impersonator.user)
 
   if (record && actor)
-    await report(state, record, 'impersonation-ended', undefined, actor)
+    await report(state, record, 'impersonation-ended', expired ? 'expired' : undefined, actor)
 
   if (signedIn.session !== undefined)
     await state.core.store.sessions.delete(signedIn.user, signedIn.session)
 
   await state.session.regenerate()
   await state.session.set('auth', impersonator)
-  await state.reload()
-
-  return true
 }

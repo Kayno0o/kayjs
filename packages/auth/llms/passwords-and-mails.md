@@ -115,6 +115,6 @@ A change to what protects an account is mailed to its verified address, never an
 - `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
 - `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `keptThisOne` whether the session asking stayed signed in.
 - `organization-handed-over`, `organizationId`: mailed to the member an organization passes to when its only owner's account is deleted and no owner was named (an admin's `admin.deleteUser`, a stale guest or unverified account pruned), naming the organization, with no `actor`.
-- `impersonation-started`, with the admin as `actor`: mailed when an admin signs in as the user (see the admin section).
+- `impersonation-started`, with the admin as `actor`: mailed when an admin signs in as the user, to a verified address only and best effort: an unverified address gets none, and a failing mailer is logged while the impersonation goes on (see the admin section).
 - `email-changed`, mailed to the address left, `email` the new one.
 - `provider-linked` and `provider-unlinked`, `provider`; `passkey-added` and `passkey-removed`, `name`; `token-created`, `name` its label.
