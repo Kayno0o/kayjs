@@ -154,7 +154,7 @@ describe('the labels', () => {
     const dotted = t.Object({ 'a.b': t.String({ minLength: 1 }) })
 
     try {
-      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a.b': '' }, lines: { 'a.b': 5 }, body: '' } as never], dotted, {})
+      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a.b': '' }, lines: { 'a.b': 5 }, body: '' }], dotted, {})
       expect.unreachable()
     }
     catch (error) {
@@ -172,7 +172,7 @@ describe('the labels', () => {
     const lines = { 'a/b': 2, 'c~d': 3, 'a.b': 4, 'a': 5 }
 
     try {
-      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a/b': '', 'c~d': '', 'a.b': '', 'a': { b: '' } }, lines, body: '' } as never], odd, {})
+      decodeEntries([{ file: 'c/a.md', slug: 'a', data: { 'a/b': '', 'c~d': '', 'a.b': '', 'a': { b: '' } }, lines, body: '' }], odd, {})
       expect.unreachable()
     }
     catch (error) {
