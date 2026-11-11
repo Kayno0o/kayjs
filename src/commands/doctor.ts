@@ -178,7 +178,7 @@ function peersCheck(root: string): Check {
   const absent = PEERS.filter(name => installedVersion(root, name) === undefined)
 
   if (absent.includes('typescript7'))
-    return { name: 'peers', ok: false, message: 'typescript7 is not installed, so `kay check`, `kay dev` types and the editor server cannot run', fix: `run \`${peerInstallCommand('typescript7')}\`` }
+    return { name: 'peers', ok: false, message: 'typescript7 is not installed, so `kay check`, `kay dev` types and the editor server cannot run', fix: `run ${absent.map(name => `\`${peerInstallCommand(name)}\``).join(' and ')}` }
 
   if (absent.length > 0)
     return { name: 'peers', ok: true, warning: true, message: 'axe-core is not installed, so `kay a11y`, `page.a11y()` and the dev tool\'s a11y warnings are off', fix: `run \`${peerInstallCommand('axe-core')}\`` }

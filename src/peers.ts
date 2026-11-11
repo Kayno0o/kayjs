@@ -36,8 +36,8 @@ export function resolvePeer(name: Peer, specifier: string, from = import.meta.di
   try {
     return Bun.resolveSync(specifier, from)
   }
-  catch (error) {
-    throw new MissingPeerError(missingPeerMessage(name), { cause: error })
+  catch {
+    throw new MissingPeerError(missingPeerMessage(name))
   }
 }
 

@@ -184,7 +184,7 @@ describe('kay doctor', () => {
     const none = await doctor(root)
 
     expect(none.check('peers').ok).toBe(false)
-    expect(none.check('peers').fix).toBe('run `bun add -d typescript7@npm:typescript@^7.0.2`')
+    expect(none.check('peers').fix).toBe('run `bun add -d typescript7@npm:typescript@^7.0.2` and `bun add -d axe-core@^4.14.0`')
 
     await Promise.all(Object.entries(installed('typescript7', '7.0.2')).map(async ([path, content]) => Bun.write(join(root, path), content)))
 

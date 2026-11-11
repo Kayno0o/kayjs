@@ -57,6 +57,14 @@ it('stops `kay check` at once with the command that installs typescript7, in one
   expect(stderr).not.toContain('    at ')
 }, 60_000)
 
+it('stops `kay build` with the install command alone, no cause line under it', async () => {
+  const { preload, root } = await withoutPeers()
+  const { stderr, code } = await run(['--preload', preload, CLI, 'build', root])
+
+  expect(code).toBe(1)
+  expect(stderr.trim().split('\n')).toEqual([expect.stringContaining(TYPESCRIPT_COMMAND)])
+}, 60_000)
+
 it('answers a missing typescript7 as one problem under --format json', async () => {
   const { preload, root } = await withoutPeers()
   const { stdout, code } = await run(['--preload', preload, CLI, 'check', root, '--format', 'json'])

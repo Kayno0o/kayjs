@@ -86,7 +86,7 @@ describe('pointApp', () => {
     }, 'package.json', tarballs)
 
     expect(Object.keys(next).sort()).toEqual(['package.json', 'shell/package.json'])
-    expect(next['package.json']).toEqual({ workspaces: ['shell', 'relay'], overrides: { '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' } })
+    expect(next['package.json']).toEqual({ workspaces: ['shell', 'relay'], devDependencies: { 'axe-core': '^4.14.0', 'typescript7': 'npm:typescript@^7.0.2' }, overrides: { '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' } })
   })
 
   it('overrides at a root that depends on kay itself, and only for the install folder', () => {

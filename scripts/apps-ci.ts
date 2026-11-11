@@ -3,6 +3,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
+import { PEERS, peerSpec } from '../src/peers'
 
 // `bun scripts/apps-ci.ts pack` packs kay and each library into KAY_APPS_DIR, `bun scripts/apps-ci.ts <app>...` clones each app, installs it against those tarballs and runs its own check, lint and test scripts: what the Apps workflow runs before a release.
 export interface App {
@@ -101,6 +102,16 @@ export function overrideKay(manifest: Manifest, tarballs: Record<string, string>
   return { ...manifest, overrides: Object.fromEntries(Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : 1))) }
 }
 
+// The type check and the a11y checks load typescript7 and axe-core from the app, which an app written before kay 1.97 does not list.
+export function withPeers(manifest: Manifest): Manifest {
+  const devDependencies = { ...manifest.devDependencies as Record<string, string> | undefined }
+
+  for (const name of PEERS)
+    devDependencies[name] ??= peerSpec(name).slice(name.length + 1)
+
+  return { ...manifest, devDependencies: Object.fromEntries(Object.entries(devDependencies).sort(([a], [b]) => (a < b ? -1 : 1))) }
+}
+
 // The manifests of an app (by path from its repository root) that change to run on the tarballs: those naming kay or a library, and `installPath`, the install root's, with the overrides as soon as any of them changes, so a workspace root that only lists its children pins what their dependencies pull in too.
 export function pointApp(manifests: Record<string, Manifest>, installPath: string, tarballs: Record<string, string>): Record<string, Manifest> {
   const pointed: Record<string, Manifest> = {}
@@ -115,7 +126,7 @@ export function pointApp(manifests: Record<string, Manifest>, installPath: strin
   const rootManifest = pointed[installPath] ?? manifests[installPath]
 
   if (Object.keys(pointed).length > 0 && rootManifest !== undefined)
-    pointed[installPath] = overrideKay(rootManifest, tarballs)
+    pointed[installPath] = overrideKay(withPeers(rootManifest), tarballs)
 
   return pointed
 }

@@ -14,8 +14,8 @@ export function nativePlatformDir(from?: string): string {
   try {
     return dirname(Bun.resolveSync(`@typescript/typescript-${process.platform}-${process.arch}/package.json`, dirname(manifest)))
   }
-  catch (error) {
-    throw new MissingPeerError(platformMissingMessage(), { cause: error })
+  catch {
+    throw new MissingPeerError(platformMissingMessage())
   }
 }
 

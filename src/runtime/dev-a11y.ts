@@ -58,19 +58,31 @@ export function startA11y(doc: Document = document): () => void {
   // axe-core runs one check at a time, so a swap during one has the page checked again once it ends.
   let running = false
   let again = false
+  let unavailable = false
 
   // Imported, its browser build setting `window.axe`, rather than added as a script element, which the live reload would find in a head the server never sent.
   const load = async () => {
-    if (!win.axe)
-      await import(AXE_URL)
+    try {
+      if (!win.axe)
+        await import(AXE_URL)
 
-    if (!win.axe)
-      throw new Error('axe-core did not load')
+      if (!win.axe)
+        throw new Error('axe-core did not load')
+    }
+    catch (error) {
+      // The server has no axe-core to serve and said so in its own log: the page is not told again at every swap.
+      unavailable = true
+
+      throw error
+    }
 
     return win.axe
   }
 
   const check = async () => {
+    if (unavailable)
+      return
+
     again = running
 
     if (running)
