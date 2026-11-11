@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ObserveConfig } from '../config'
+import { overCeiling } from './ceiling'
 import { isCrossSite } from './cross-site'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
@@ -10,6 +11,8 @@ export const ERROR_REPORTS = '/_kay/error'
 const MAX_REPORT_BYTES = 16 * 1024
 const MAX_URL_LENGTH = 2048
 const REPORTS_PER_MINUTE = 20
+// What all clients together may send a minute, so a flood from many addresses cannot fill the log and `onError`.
+const ALL_REPORTS_PER_MINUTE = 600
 const MINUTE_MS = 60_000
 // What the rate limit counts reports under, apart from any action's.
 const REPORTS = 'kay:error-reports'
@@ -46,7 +49,7 @@ export function serveErrorReports(app: Elysia, onError: ObserveConfig['onError']
     if (Number(request.headers.get('content-length') ?? 0) > MAX_REPORT_BYTES)
       return new Response(null, { status: 413 })
 
-    if (await overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (await overLimit(REPORTS, clientAddress(request, server), REPORTS_PER_MINUTE, MINUTE_MS) !== undefined || await overCeiling(REPORTS, ALL_REPORTS_PER_MINUTE) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_REPORT_BYTES)

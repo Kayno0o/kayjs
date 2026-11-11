@@ -626,6 +626,9 @@ describe('an auth library that cannot name its origin', () => {
     const before = configuredSite()
 
     try {
+      // With a site set, the pointer is the site's, whatever Host the request names.
+      setSite('https://site.example', 'never')
+      expect((await rpc(unnamed, 'tools/call', { name: 'wipe', arguments: { confirm: true } }, { host: 'evil.example' })).response.headers.get('www-authenticate')).toBe('Bearer resource_metadata="https://site.example/.well-known/oauth-protected-resource"')
       setSite(undefined)
 
       const refused = await rpc(unnamed, 'tools/call', { name: 'wipe', arguments: { confirm: true } })

@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { ObserveConfig } from '../config'
 import { KayError } from '../compiler/errors'
+import { overCeiling } from './ceiling'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
@@ -16,6 +17,8 @@ const MAX_REPORTS_PER_BODY = 20
 const MAX_FIELD_LENGTH = 2048
 const REQUESTS_PER_MINUTE = 30
 const MINUTE_MS = 60_000
+// What all clients together may send a minute, so a flood from many addresses cannot fill the log and `onError`.
+const ALL_REPORTS_PER_MINUTE = 600
 // What the rate limit counts reports under, apart from any action's.
 const REPORTS = 'kay:csp-reports'
 // Past this many distinct violations, the oldest are forgotten and may be logged again.
@@ -57,7 +60,7 @@ export function serveViolationReports(app: Elysia, onError: ObserveConfig['onErr
     if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES)
       return new Response(null, { status: 413 })
 
-    if (await overLimit(REPORTS, clientAddress(request, server), REQUESTS_PER_MINUTE, MINUTE_MS) !== undefined)
+    if (await overLimit(REPORTS, clientAddress(request, server), REQUESTS_PER_MINUTE, MINUTE_MS) !== undefined || await overCeiling(REPORTS, ALL_REPORTS_PER_MINUTE) !== undefined)
       return new Response(null, { status: 429 })
 
     const text = await readCapped(request, MAX_BODY_BYTES)

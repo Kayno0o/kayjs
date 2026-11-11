@@ -178,7 +178,9 @@ describe('requireGuards', () => {
     // Routes alone: the actions of a layout or module no guard covers stay open, as kay check does not name them.
     expect(await post('_layout.kay', 'leave', {}, unset)).toBe(200)
     expect(await post('news/_layout.kay', 'subscribe', {}, unset)).toBe(200)
+    expect(await post('news/_actions.kay', 'unsubscribe', {}, unset)).toBe(200)
     expect(await post('staff/_layout.kay', 'promote', {}, unset)).toBe(403)
+    expect(await post('staff/_actions.kay', 'demote', {}, unset)).toBe(403)
   })
 
   it('says nothing, and serves every route, on a site no route of which has a guard', async () => {

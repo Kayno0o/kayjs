@@ -28,12 +28,12 @@ export function withoutEmptyFiles(body: unknown): unknown {
   if (typeof body !== 'object' || body === null)
     return body
 
-  const fields: Record<string, unknown> = {}
+  const fields: [string, unknown][] = []
 
   for (const [name, value] of Object.entries(body)) {
     if (!Array.isArray(value)) {
       if (!isEmptyFile(value))
-        fields[name] = value
+        fields.push([name, value])
 
       continue
     }
@@ -42,10 +42,11 @@ export function withoutEmptyFiles(body: unknown): unknown {
 
     // A multiple file input left empty posts only empty files, which is no files at all.
     if (files.length > 0 || value.length === 0)
-      fields[name] = files
+      fields.push([name, files])
   }
 
-  return fields
+  // Own properties all, a posted `__proto__` included, where assigning one would change the object's prototype.
+  return Object.fromEntries(fields)
 }
 
 // Bun parses such a part as a Blob with no name.

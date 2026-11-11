@@ -212,6 +212,9 @@ function blockIn(region: Region): Block
 [./dom] branches
 function branches(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: (value: () => unknown) => unknown][]): void
 
+[./dom] checkedMarkup
+function checkedMarkup(value: unknown): unknown
+
 [./dom] choose
 function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void
 
@@ -450,6 +453,9 @@ interface AwaitNote
 
 [./html] awaitNotes
 function awaitNotes(): AwaitNote[] | undefined
+
+[./html] checkedMarkup
+function checkedMarkup(value: unknown): unknown
 
 [./html] child
 function child(value: unknown): string

@@ -97,7 +97,7 @@ export default defineConfig({
 })
 ```
 
-`reports: true` has browsers send the reports to `/_kay/csp`, a route of kay's. Each violation is logged once per process and passed to `onError` as a `CspViolationError`. When `site` is set, a report about a page of neither the `site` nor the request's own origin is ignored. That keeps out noise; it is no proof a report came from a browser. `reports: 'https://...'` sends them to your own collector instead.
+`reports: true` has browsers send the reports to `/_kay/csp`, a route of kay's. Each violation is logged once per process and passed to `onError` as a `CspViolationError`. A client may send 30 requests a minute and all clients together 600; past that the route answers 429. When `site` is set, a report about a page of neither the `site` nor the request's own origin is ignored. That keeps out noise; it is no proof a report came from a browser. `reports: 'https://...'` sends them to your own collector instead.
 
 When the report looks clean, move the directives into `csp`.
 

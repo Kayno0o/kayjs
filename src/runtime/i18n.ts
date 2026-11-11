@@ -230,7 +230,7 @@ export function lookup(translations: Translations, key: string, params: Record<s
 }
 
 function fill(locale: string, text: string, params: Record<string, MessageValue>): string {
-  return text.replace(PLACEHOLDER, (placeholder, name: string) => name in params ? formatValue(locale, params[name]!) : placeholder)
+  return text.replace(PLACEHOLDER, (placeholder, name: string) => Object.hasOwn(params, name) ? formatValue(locale, params[name]!) : placeholder)
 }
 
 // A key no locale has, which `kay check` cannot see when the key is computed. Production shows it as itself rather than failing the page; development and tests fail the render on the server, and log it in the browser, where a test page fails on it.

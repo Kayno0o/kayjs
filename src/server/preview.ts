@@ -20,6 +20,7 @@ import { nodeCrypto } from './builtins'
 import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
 import { isCrossSite } from './cross-site'
+import { rateLimit } from './protection'
 import { overHttps, requestUrl } from './request-url'
 import { MIN_SECRET_LENGTH, sameText, warnLowEntropy } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
@@ -32,6 +33,9 @@ export const PREVIEW_COOKIE = 'kay_preview'
 // The cookie a guard sets beside an edit cookie it let in, signing that cookie's value: it is what tells a person the app signed in from the holder of an edit link, in any process and after a restart.
 const ADMITTED_COOKIE = 'kay_preview_admitted'
 const EDIT = 'edit'
+
+// The drafts one client may post a minute: typing in an editor posts one every few hundred milliseconds at most.
+const DRAFT_LIMIT = { max: 300, window: '1m' } as const
 
 // The query param of a share link, `until.entry.sig`.
 const SHARE_PARAM = 'kay_preview'
@@ -147,9 +151,17 @@ export function requestDrafts(request: Request): Map<string, EntryDraft[]> | und
 
 // `/_kay/draft` answers a visitor in edit mode with the page at `path` rendered with the entries they have not saved, or a 422 with where those fail their schema.
 export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): void {
+  // Each draft validates entries and renders a page, so an editor's session is held to a generous count a minute.
+  const drafting = rateLimit('kay:draft', DRAFT_LIMIT)
+
   app.post(DRAFT_ROUTE, async ({ request, server }) => {
     if (previewRequested(request) !== 'edit' || isCrossSite(request))
       return new Response('Drafts are shown in edit mode only', { status: 403, headers: TEXT })
+
+    const wait = await drafting.hit(request, server)
+
+    if (wait !== undefined)
+      return new Response('Too many drafts', { status: 429, headers: { ...TEXT, 'retry-after': String(wait) } })
 
     const posted = await postedDrafts(request)
 

@@ -561,6 +561,12 @@ describe('locale detection', () => {
     expect(requestLocale(settings, new Request('http://localhost/_kay/action/x'), 'http://localhost/en/about', '/app')).toBe('fr')
   })
 
+  it('fills a placeholder from the params given, never from what every object inherits', () => {
+    const translations = { locale: 'en', messages: new Map(), fallback: flattenMessages({ hi: 'Hi {constructor} {toString} {name}' }) }
+
+    expect(translate(translations, 'hi', { name: 'Ada' })).toBe('Hi {constructor} {toString} Ada')
+  })
+
   it('falls back to the default locale\'s message, then fails on a key no locale has, which production shows as itself', () => {
     const fallback = flattenMessages({ a: 'A', b: { c: 'C {n}' } })
     const translations = { locale: 'en', messages: new Map(), fallback }
