@@ -2360,7 +2360,7 @@ component default
   label: string;
   name: string | undefined;
   size: FieldSize;
-}, row: Row, index: number, set: (value: string) => void, issue: {
+}, row: Row, index: () => number, set: (value: string) => void, issue: {
   readonly invalid: boolean;
   readonly message: string | undefined;
   readonly id: string | undefined;

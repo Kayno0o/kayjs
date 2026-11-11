@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
 import { defaultKept, onFormReset, startRef } from './form-reset'
-import { effect, flush, formErrors, memo, postedValues, recipe, signal, uid, untrack } from 'kay'
+import { effect, flush, formErrors, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import type { FieldSize } from './field-look'
 import { FIELD_MESSAGE } from './field-look'
@@ -51,9 +51,9 @@ const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssue
   // Called with the row an Add button appended and its place, and with the row a Remove button took out and the place it had, besides `onChange`.
   onAdd?: ((row: Row, index: number) => unknown) | undefined
   onRemove?: ((row: Row, index: number) => unknown) | undefined
-  // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; name the control by `${column.label} ${index + 1}` for screen readers, and read its value off `row[column.key]`.
-  // The cell is drawn once per row and keeps its control while the row is edited: `issue` (`invalid`, `message` and the `id` of the message under the row, for `aria-describedby`) reads the same way, and `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is drawn again only when the row's place changes.
-  cell?: Snippet<[column: { key: string, label: string, name: string | undefined, size: FieldSize }, row: Row, index: number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
+  // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; `index` is a function of the row's place (from 0): name the control by `${column.label} ${index() + 1}` for screen readers, and the name follows the row when one above it is removed, and read its value off `row[column.key]`.
+  // The cell is drawn once per row and keeps its control while the row is edited: `issue` (`invalid`, `message` and the `id` of the message under the row, for `aria-describedby`) reads the same way, and `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is not drawn again for a row that stays, whatever happens to the rows around it.
+  cell?: Snippet<[column: { key: string, label: string, name: string | undefined, size: FieldSize }, row: Row, index: () => number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
   // The fewest rows: Remove stops there. The most: Add stops there.
   min?: number | undefined
   max?: number | undefined
@@ -157,15 +157,13 @@ function refusedCell(id: number, column: { key: string, name?: string | undefine
   return givenFor(at) !== undefined || refusal(postName(column)) !== undefined || refusalsOf(at).some(item => item.column === undefined || item.column === column.key)
 }
 
-// The cell block is called once per row and place, not on each edit: a call made from the template would track the row it is handed, so every keystroke drew its control again and lost the focus. The row it gets reads the current one where the block uses it.
+// The cell block is called once per row, not on each edit or move: a call made from the template would track the row it is handed, so every keystroke drew its control again and lost the focus. The row it gets reads the current one where the block uses it.
 function drawCell(id: number, column: { key: string, label: string, name?: string | undefined }) {
   const issue = {
     get invalid() { return refusedCell(id, column) },
     get message() { return issueOf(id) },
     get id() { return issueOf(id) === undefined ? undefined : `${issuesBase}_${id}` },
   }
-  const place = memo(() => placeOf(id))
-  const at = place()
   const view = new Proxy({} as Row, {
     get: (_, key) => (rowOf(id) as Record<PropertyKey, unknown> | undefined)?.[key],
     has: (_, key) => key in (rowOf(id) ?? {}),
@@ -177,7 +175,7 @@ function drawCell(id: number, column: { key: string, label: string, name?: strin
     },
   })
 
-  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, at, text => edit(placeOf(id), column.key, text), issue))
+  return untrack(() => cell!({ key: column.key, label: column.label, name: postName(column), size }, view, () => placeOf(id), text => edit(placeOf(id), column.key, text), issue))
 }
 const full = () => max !== undefined && current().length >= max
 const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)

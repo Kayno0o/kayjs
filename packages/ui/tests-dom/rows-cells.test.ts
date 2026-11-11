@@ -189,3 +189,23 @@ test('a reset brings the rows back, the cells keep working and the issues follow
   await settle()
   expect(out(root)).toEqual([{ name: 'Cable', qty: '2', unit: 'kg' }])
 })
+
+test('removing the first row keeps the held cell of the next one, named for its new place', async () => {
+  const { root } = await quote()
+
+  click(root.querySelector('#lines [data-part=add]'))
+  await settle()
+
+  const second = root.querySelectorAll('#lines [data-part=row]')[1]!
+  const select = second.querySelector('select')!
+
+  choose(select, 'kg')
+  await settle()
+  expect(select.getAttribute('aria-label')).toBe('Unit 2')
+  click(root.querySelector('#lines [data-part=remove]'))
+  await settle()
+  expect(select.isConnected).toBe(true)
+  expect(root.querySelector('#lines select')).toBe(select)
+  expect(select.value).toBe('kg')
+  expect(select.getAttribute('aria-label')).toBe('Unit 1')
+})

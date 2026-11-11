@@ -30,7 +30,9 @@ A FormField around MultiSelect or a Combobox picking several shows a refusal of 
 
 A column of `type: 'number'` is a number box; the row keeps the figure as text, `''` once emptied. For anything else, mark the column `cell: true` and draw it in the `@cell(column, row, index, set)` block: a Select of units, a checkbox, a Combobox. `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box.
 
-The `column` it gets carries the `name` the cell posts under (`<name>_<key>`), which the control takes as its own, and the cell is named for screen readers by `${column.label} ${index + 1}`. Add and Remove move focus to the first control of a row, whatever it is. The block is drawn once per row, so its control keeps its focus while the row is edited; read `row` where it is used, as in `value={row.unit}`.
+The `column` it gets carries the `name` the cell posts under (`<name>_<key>`), which the control takes as its own, and the cell is named for screen readers by `${column.label} ${index() + 1}`, where `index()` returns the row's place (from 0) and follows the row when one above it is removed, the cell staying the same element.
+
+Add and Remove move focus to the first control of a row, whatever it is. The block is drawn once per row, so its control keeps its focus while the row is edited or moved; read `row` where it is used, as in `value={row.unit}`.
 
 ```kay
 ---
@@ -42,7 +44,7 @@ const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity'
 ---
 RowsField(rows={[{ name: 'Cable', qty: '2', unit: 'm' }]} columns={columns} name="line" label="Quote")
   @cell(column, row, index, set)
-    Select(name={column.name} aria-label={`${column.label} ${index + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
+    Select(name={column.name} aria-label={`${column.label} ${index() + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
 ```
 
 `onAdd(row, index)` and `onRemove(row, index)` are called besides `onChange`, with the row added or removed and its place.
