@@ -5,3 +5,7 @@ kay's server carries its own AVIF encoder, src/server/codec/avif-enc.wasm, built
 It decodes AVIF through @jsquash/avif 2.1.1's wasm, which carries libavif 1.0.1, libaom 3.7.0 with the AOMedia Patent License 1.0, and the Emscripten 3.1.57 glue with the musl libc it links in, whose texts are in LICENSES/libavif.txt, LICENSES/libaom.txt, LICENSES/libaom-PATENTS.txt, LICENSES/emscripten.txt and LICENSES/musl.txt.
 
 Each of these texts is also in the third-party licences file of a build.
+
+src/server/public-suffixes.ts embeds a copy of the Public Suffix List (https://publicsuffix.org/list/), which is under the Mozilla Public License 2.0, whose text is in LICENSES/MPL-2.0.txt. The source of that list is the URL above, and scripts/public-suffixes.ts fetches it again.
+
+kay uses @resvg/resvg-js (https://github.com/yisibl/resvg-js) and axe-core (https://github.com/dequelabs/axe-core), both under the Mozilla Public License 2.0, whose text is in LICENSES/MPL-2.0.txt. kay ships neither modified: their source is at those addresses.
