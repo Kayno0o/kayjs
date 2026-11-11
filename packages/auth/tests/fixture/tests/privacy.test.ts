@@ -35,7 +35,7 @@ describe('the register page\'s purpose line and privacy link', () => {
     const found = await shown({ privacy: '/privacy' })
 
     expect(found.en.notice).toBe('We use your email address to create and secure your account. Privacy policy')
-    expect(found.en.links).toEqual([['Privacy policy', '/privacy', 'noopener']])
+    expect(found.en.links).toEqual([['Privacy policy', '/privacy', 'noopener noreferrer']])
     expect(found.fr.notice).toContain('Politique de confidentialité')
   }, 60_000)
 

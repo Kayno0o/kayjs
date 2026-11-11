@@ -84,7 +84,7 @@ export default function mailDevTool(tool: DevTool): void {
     toggle.setAttribute('aria-expanded', String(previewed.has(mail.id)))
     open.href = `${PAGE}/${encodeURIComponent(mail.id)}`
     open.target = '_blank'
-    open.rel = 'noopener'
+    open.rel = 'noopener noreferrer'
     open.style.marginLeft = '10px'
     preview.hidden = !previewed.has(mail.id)
 
@@ -342,7 +342,7 @@ export default function mailDevTool(tool: DevTool): void {
 
       open.href = `${TEMPLATE_PAGE}?mail=${encodeURIComponent(file)}`
       open.target = '_blank'
-      open.rel = 'noopener'
+      open.rel = 'noopener noreferrer'
       item.append(open)
 
       return item

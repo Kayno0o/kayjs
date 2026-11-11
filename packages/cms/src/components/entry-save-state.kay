@@ -16,10 +16,10 @@ p.kcms-save-state(role="status" aria-live="polite")
     if last.rebuilding
       {wording('cms.entry.savedRebuild', 'Saved at {time}. Not live yet: the site shows it once it has rebuilt.', { time: time(last.at) })}
       if url
-        a(href={url} target="_blank" rel="noopener") {wording('cms.entry.viewLive', 'View the page')}
+        a(href={url} target="_blank" rel="noopener noreferrer") {wording('cms.entry.viewLive', 'View the page')}
     else if last.live
       {wording('cms.entry.savedLive', 'Saved at {time}. Live now.', { time: time(last.at) })}
       if url
-        a(href={url} target="_blank" rel="noopener") {wording('cms.entry.viewLive', 'View the page')}
+        a(href={url} target="_blank" rel="noopener noreferrer") {wording('cms.entry.viewLive', 'View the page')}
     else
       {wording('cms.entry.savedAt', 'Saved at {time}', { time: time(last.at) })}

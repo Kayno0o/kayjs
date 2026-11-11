@@ -1140,7 +1140,7 @@ describe('SubscribeForm', () => {
     expect(html).toContain('aria-required="true"')
     expect(html).toMatch(/<input[^>]*name="email"[^>]* required/)
     expect(html).toContain('We use your address to send you the mails of this site')
-    expect(html).toContain('<a data-part="link" href="/privacy" target="_blank" rel="noopener">Privacy policy</a>')
+    expect(html).toContain('<a data-part="link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>')
     expect(html).toContain('name="wording" value="ui-v1"')
     expect(html).toContain('name="website"')
     expect(html).not.toContain('Almost done')

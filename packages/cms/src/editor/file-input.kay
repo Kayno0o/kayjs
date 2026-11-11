@@ -171,7 +171,7 @@ function pick(path: string, event: Event): void {
       // kay-allow unsized-image
       img.kcms-file-preview(src={value} alt={alt?.value ?? ''} hidden={unshown() === value} onError={() => unshown = value} onLoad={() => unshown = undefined})
     .kcms-file-name
-      a.kcms-file-link(href={value} target="_blank" rel="noopener" data-tooltip={wording('cms.file.open', 'Open {name} in a new tab', { name: fileName() })}) {fileName()}
+      a.kcms-file-link(href={value} target="_blank" rel="noopener noreferrer" data-tooltip={wording('cms.file.open', 'Open {name} in a new tab', { name: fileName() })}) {fileName()}
       IconButton(icon="close" label={wording('cms.file.clear', 'Clear')} variant="ghost" size="sm" disabled={sent() !== undefined} onClick={clear})
   if image && alt && value !== '' && !many
     label.kcms-file-alt

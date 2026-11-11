@@ -14,6 +14,6 @@ export interface SwitcherApp {
   description?: string | undefined
   // Opens this app in a new tab, keeps it in the same one when `false`, or opens it in a new tab when it leaves the site with `'auto'`, whatever the switcher does.
   newTab?: NewTab | undefined
-  // The tile's `rel` when it opens in a new tab, `noopener` by default.
+  // The tile's `rel` when it opens in a new tab, `noopener noreferrer` by default.
   rel?: string | undefined
 }

@@ -93,7 +93,7 @@ export default function cmsDevTool(tool: DevTool): void {
     toggle.type = 'button'
     screens.href = `${base()}${screenPath(state.prefix)}`
     screens.target = '_blank'
-    screens.rel = 'noopener'
+    screens.rel = 'noopener noreferrer'
 
     const press = async () => {
       if (!state.editing) {

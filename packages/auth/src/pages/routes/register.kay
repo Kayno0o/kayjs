@@ -78,6 +78,6 @@ Panel(landmark={landmark} title={wording('auth.register.title', 'Create an accou
         p.text-xs.text-muted
           | {purpose ?? wording('auth.register.purpose', 'We use your email address to create and secure your account.')}{' '}
           if privacy
-            a(href={privacy} target="_blank" rel="noopener" data-new-tab="") {wording('auth.register.privacy', 'Privacy policy')}
+            a(href={privacy} target="_blank" rel="noopener noreferrer" data-new-tab="") {wording('auth.register.privacy', 'Privacy policy')}
   p.text-center
     | {wording('auth.register.haveAccount', 'Already have an account?')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {wording('auth.register.signIn', 'Sign in')}]

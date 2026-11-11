@@ -12,7 +12,7 @@ description: A grid button opening tiles that link the sibling apps of a family.
 
 ## Same tab or a new one
 
-A tile is a real link. It opens in the same tab, even when it leads to another origin, as the apps are one place to the visitor. Set `newTab` on the switcher to open every tile in a new tab, or on one app to open only that one; `'auto'` opens only the tiles whose address leaves the site, as the other components with link entries do by default. A tile in a new tab carries `rel="noopener"`, which an app's `rel` replaces.
+A tile is a real link. It opens in the same tab, even when it leads to another origin, as the apps are one place to the visitor. Set `newTab` on the switcher to open every tile in a new tab, or on one app to open only that one; `'auto'` opens only the tiles whose address leaves the site, as the other components with link entries do by default. A tile in a new tab carries `rel="noopener noreferrer"`, which an app's `rel` replaces.
 
 ## Words and icon
 

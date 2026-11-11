@@ -41,7 +41,7 @@ Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key
       ConfirmDelete(message={wording('cms.uploads.deleteMany', keys.length === 1 ? 'Delete 1 upload and their variants? Check that no page or unsaved form uses them: this cannot be undone.' : 'Delete {count} uploads and their variants? Check that no page or unsaved form uses them: this cannot be undone.', { count: keys.length })} label={wording('cms.uploads.deleteSelected', 'Delete {count} selected', { count: keys.length })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { if (await remove(keys.map(String))) clear() }})
   @cell(row, column)
     if column.key === 'key'
-      a(href={row.url} target="_blank" rel="noopener") {row.key}
+      a(href={row.url} target="_blank" rel="noopener noreferrer") {row.key}
     else if column.key === 'variants'
       Tooltip(text={row.variants.join(', ')}) {row.variants.length === 0 ? wording('cms.uploads.noVariant', 'None') : wording('cms.uploads.variantCount', row.variants.length === 1 ? '1 variant' : '{count} variants', { count: row.variants.length })}
     else if denied.delete !== undefined

@@ -49,7 +49,7 @@ test('keeps tiles in the same tab, even to another origin, unless the switcher o
   const view = await switchers()
 
   expect(view.tiles('plain').map(tile => tile.getAttribute('target'))).toEqual(['_self', '_self', '_self', '_self', '_self'])
-  expect(view.tiles('named').map(tile => [tile.getAttribute('target'), tile.getAttribute('rel')])).toEqual(Array.from({ length: 5 }, () => ['_blank', 'noopener']))
+  expect(view.tiles('named').map(tile => [tile.getAttribute('target'), tile.getAttribute('rel')])).toEqual(Array.from({ length: 5 }, () => ['_blank', 'noopener noreferrer']))
 })
 
 test('replaces a tile\'s text with the tile snippet', async () => {

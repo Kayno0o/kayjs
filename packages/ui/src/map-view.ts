@@ -10,7 +10,7 @@ export interface MapMarker {
 }
 
 export const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-export const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+export const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
 
 // How far outside the viewport a map still counts as in view, so Leaflet is loaded a little before the visitor reaches it.
 const NEAR_MARGIN = 300

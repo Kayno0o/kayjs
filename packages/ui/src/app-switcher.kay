@@ -103,7 +103,7 @@ const opensNew = (app: SwitcherApp) => {
 }
 
 // `_self` is written out so kay's own new tab for a link to another origin does not apply; one in a new tab carries the mark the page's screen reader rule reads.
-const attributesOf = (app: SwitcherApp) => opensNew(app) ? { 'target': '_blank', 'rel': app.rel ?? 'noopener', 'data-new-tab': '' } : { target: '_self', rel: app.rel }
+const attributesOf = (app: SwitcherApp) => opensNew(app) ? { 'target': '_blank', 'rel': app.rel ?? 'noopener noreferrer', 'data-new-tab': '' } : { target: '_self', rel: app.rel }
 ---
 Popover(id={id} placement={placement} open={open} part="menu" onOpenChange={opened})
   @trigger(attributes)
