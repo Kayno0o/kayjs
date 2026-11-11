@@ -12,3 +12,15 @@ regexes = [
   '''rs384\.privateKey''',
   '''tests/fixtures/[\w-]+/src/[\w/-]+''',
 ]
+
+# Files made of test values the generic-api-key rule takes for secrets: the WebAuthn vectors, the RFC 8291 push vectors, and the sample keys of the mail, MCP key and testing-guide examples. Only that rule is skipped there.
+[[allowlists]]
+description = "test files holding sample keys"
+targetRules = ["generic-api-key"]
+paths = [
+  '''packages/auth/tests/helpers/webauthnVectors\.json''',
+  '''packages/mail/tests/events\.test\.ts''',
+  '''tests/push\.test\.ts''',
+  '''tests/mcp-key\.test\.ts''',
+  '''docs/src/content/docs/guides/testing\.md''',
+]
