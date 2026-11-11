@@ -1,0 +1,23 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const pick = action(t.Object({
+  size: t.Literal('b', { error: 'Pick Large' }),
+  note: t.Literal('yes', { error: 'Say yes' }),
+}), () => 'ok')
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+
+const sizes = [{ value: 'a', label: 'Small' }, { value: 'b', label: 'Large' }]
+---
+main
+  Form(action={pick} id="pick")
+    FormField(label="Size" name="size")
+      RadioGroup#size(options={sizes} name="size")
+    FormField(label="Note" name="note")
+      input#note(name="note" value="no")
+    button#pick-submit(formnovalidate) Pick

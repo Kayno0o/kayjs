@@ -1,0 +1,12 @@
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+const plans = [{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]
+---
+TextInput#bare(name="city")
+TextInput#aria(name="street" aria-label="Street")
+Select#plan(name="plan" options={plans})
+FormField(label="Zip")
+  TextInput#wrapped(name="zip")

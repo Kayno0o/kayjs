@@ -1,5 +1,5 @@
 import { markInvalid, uid } from 'kay'
-import { controlOf } from '../choice-link'
+import { controlOf, linkChoice } from '../choice-link'
 import { FIELD_MESSAGE, liveElements } from '../field-look'
 import { fieldsOf } from '../forms'
 
@@ -74,6 +74,8 @@ function paintField(form: HTMLFormElement, field: HTMLElement, controls: HTMLEle
 
     if (painted.length > 0) {
       for (const control of controls) {
+        // A choice group linked itself to the message as the server drew it: from here this paints it.
+        markInvalid(control, linkChoice, false)
         control.removeAttribute('aria-invalid')
         markInvalid(control, PAINTED, true)
       }

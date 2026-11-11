@@ -79,6 +79,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a choice g
     expect(seen.quiet!.invalid).toBeNull()
   })
 
+  it('a group marked for a message the server rendered is unmarked once a call clears it', async () => {
+    await using page = await site.open('/choice-refused')
+    const invalid = async () => page.evaluate(() => document.getElementById('size')!.getAttribute('aria-invalid'))
+
+    // A native post the action refuses comes back with the message in the markup.
+    await page.evaluate(() => {
+      (window as unknown as { old: boolean }).old = true
+      document.querySelector<HTMLFormElement>('#pick')!.submit()
+    })
+    await page.waitUntil(() => !(window as unknown as { old?: boolean }).old && document.querySelector('#pick') !== null)
+    await page.waitUntil(() => document.getElementById('size')?.getAttribute('aria-invalid') === 'true')
+    expect(await invalid()).toBe('true')
+    await Bun.sleep(1500)
+    await page.click('input[name=size][value=b]')
+    await page.click('#pick-submit')
+    // The call now refuses the note alone, so the group's message goes.
+    await page.waitUntil(() => document.querySelector('#pick [data-field=note] [data-form-issue]') !== null && document.querySelector('#pick [data-field=size] [data-form-issue]') === null)
+    expect(await invalid()).toBeNull()
+  }, 120_000)
+
   it('a FormField with group leaves its fieldset to name and describe the fields', () => {
     expect(seen.grouped!.labelledby).toBeNull()
     expect(seen.grouped!.label).toBe('Grouped')
