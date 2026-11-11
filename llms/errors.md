@@ -71,7 +71,7 @@ kay explain template-syntax
 | `loader-method` | content | An entry saved or removed through a loader that declares no `save` or `remove`. | [Loaded collections](content-cms.md#loaded-collections) |
 | `feed-needs-site` | content | A feed on a site with no `site` URL to build its links from. | [Feeds](content-markdown-to-caching.md#feeds) |
 | `pagination-misuse` | content | A page size that is not a whole number from 1, or `page()` called when no page renders. | [Pagination](content-markdown-to-caching.md#pagination) |
-| `content-api-misuse` | content | An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection's file from a loaded one, a folder outside the repository or missing. | [A CMS editing the collections](content-cms.md#a-cms-editing-the-collections) |
+| `content-api-misuse` | content | An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection's file from a loaded one, a folder outside the repository or missing. | [A CMS editing the collections](content-preview.md#a-cms-editing-the-collections) |
 | `export-unsupported-config` | export | A config a static export cannot serve: locales by domain, or an image route resolving images per request. | [Static export](prerendering.md#static-export) |
 | `export-output-dir` | export | A static export into a directory that is the project itself, or holds files it did not write, or a file whose path would land outside it. | [Static export](prerendering.md#static-export) |
 | `export-page-error` | export | A page, endpoint or module that threw as it was imported or rendered for the export. | [Static export](prerendering.md#static-export) |

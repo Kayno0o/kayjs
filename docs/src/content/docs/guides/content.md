@@ -567,6 +567,6 @@ A CMS that runs in your app's server reads the collections with `collections()` 
 
 These give drafts and files to whoever calls them, so serve them behind a guard or `editRequested(request)`.
 
-<ReadMore href="/llms/content-cms#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>
+<ReadMore href="/llms/content-preview#a-cms-editing-the-collections">Paged reads, counting without running a loader, `create: true`, `entryFile`, field markers such as `imageField()` and every failure shape are in the full content reference.</ReadMore>
 
 <ReadMore href="/llms/content">The Markdown renderer's edge cases, the collection options and the CMS helpers are in the full content reference.</ReadMore>

@@ -234,7 +234,7 @@ export const ERRORS = {
   'content-api-misuse': {
     group: 'content',
     summary: 'An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection\'s file from a loaded one, a folder outside the repository or missing.',
-    fix: { file: 'llms/content-cms.md', heading: 'A CMS editing the collections' },
+    fix: { file: 'llms/content-preview.md', heading: 'A CMS editing the collections' },
   },
   'export-unsupported-config': {
     group: 'export',

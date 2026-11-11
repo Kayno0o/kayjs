@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, as `count.set(c => c * 2)` does. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it, in both: `count = 0`, `count += step` and `count++` compile to `.set`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
 - An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
@@ -57,7 +57,8 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [CDN caching](llms/cdn-caching.md): `ttl`
 - [Content collections](llms/content.md): collections against a schema, entries as pages
 - [Content: Markdown to caching](llms/content-markdown-to-caching.md): Markdown, pagination, feeds, caching
-- [Loaded collections and preview mode](llms/content-cms.md): CMS or database loaders, preview mode
+- [Loaded collections](llms/content-cms.md): CMS or database loaders
+- [Preview mode](llms/content-preview.md): drafts, share links, editing
 - [Edit mode and the CMS editor](llms/content-edit.md): edit markers, the editor
 - [Locales](llms/locales.md): locale prefixes, typed messages, formatting
 - [Texts of kay](llms/locales-texts.md): the `kay.*` keys
