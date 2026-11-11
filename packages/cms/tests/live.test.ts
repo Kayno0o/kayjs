@@ -133,3 +133,118 @@ describe('savedHandler stop', () => {
     expect(page.reads.length).toBeLessThanOrEqual(1)
   })
 })
+
+// The server's stream as a test drives it: the ids it pushes, and the moment it refuses.
+function pushing() {
+  const heard: ((event: { value: string }) => void)[] = []
+  const refused: (() => void)[] = []
+  let started = 0
+
+  return {
+    get started() {
+      return started
+    },
+    instances: {
+      start: () => started++,
+      onData: (listener: (event: { value: string }) => void) => {
+        heard.push(listener)
+
+        return () => void heard.splice(heard.indexOf(listener), 1)
+      },
+      onError: (listener: () => void) => {
+        refused.push(listener)
+
+        return () => void refused.splice(refused.indexOf(listener), 1)
+      },
+    },
+    hear: (value: string) => {
+      for (const listener of heard.slice())
+        listener({ value })
+    },
+    refuse: () => {
+      for (const listener of refused.slice())
+        listener()
+    },
+    listeners: () => heard.length + refused.length,
+  }
+}
+
+describe('whenLive pushed', () => {
+  // A pause that never ends: reading on an interval would hang.
+  const never = async () => new Promise<void>(() => undefined)
+
+  test('is live as soon as the replaced server serves the saved page, with no interval to wait for', async () => {
+    const server = pushing()
+    const page = pageSaying('old', 'new', 'new')
+    const live = whenLive('/talk', { instances: server.instances, pause: never, read: page.read })
+
+    await until(() => server.started === 1)
+    server.hear('one')
+    await settle()
+    expect(page.reads).toEqual(['/talk'])
+    server.hear('two')
+    expect(await live).toBe(true)
+    expect(page.reads).toHaveLength(3)
+    expect(server.listeners()).toBe(0)
+  })
+
+  test('keeps waiting when the replacing server still shows the old page', async () => {
+    const server = pushing()
+    const page = pageSaying('old', 'old', 'new', 'new')
+    const live = whenLive('/talk', { instances: server.instances, pause: never, read: page.read })
+
+    await until(() => server.started === 1)
+    server.hear('one')
+    server.hear('two')
+    await until(() => page.reads.length === 2)
+    server.hear('three')
+    expect(await live).toBe(true)
+  })
+
+  test('is not live once the window passes with no replacement', async () => {
+    const server = pushing()
+
+    expect(await whenLive('/talk', { instances: server.instances, window: 20, pause: never, read: pageSaying('old').read })).toBe(false)
+    expect(server.listeners()).toBe(0)
+  })
+
+  test('ends with its signal, listening no more', async () => {
+    const server = pushing()
+    const controller = new AbortController()
+    const live = whenLive('/talk', { instances: server.instances, pause: never, read: pageSaying('old').read, signal: controller.signal })
+
+    await until(() => server.started === 1)
+    controller.abort()
+    expect(await live).toBe(false)
+    expect(server.listeners()).toBe(0)
+  })
+
+  test('reads on an interval when the server refuses the stream', async () => {
+    const server = pushing()
+    const page = pageSaying('old', 'old', 'new', 'new')
+    const live = whenLive('/talk', { instances: server.instances, ...quick, read: page.read })
+
+    await until(() => server.started === 1)
+    server.refuse()
+    expect(await live).toBe(true)
+  })
+})
+
+describe('savedHandler pushed', () => {
+  test('turns a save live when the server is replaced, a newer save listening alone', async () => {
+    const server = pushing()
+    const states: SavedState[] = []
+    let finished = 0
+    const page = pageSaying('old', 'old', 'new', 'new')
+    const saved = savedHandler(() => '/talk', state => states.push(state), () => finished++, { instances: server.instances, read: page.read })
+
+    saved({ rebuilding: true })
+    await until(() => server.listeners() === 2)
+    saved({ rebuilding: true })
+    await until(() => server.listeners() === 2 && page.reads.length === 2)
+    server.hear('one')
+    server.hear('two')
+    await until(() => finished === 1)
+    expect(states.at(-1)).toEqual(expect.objectContaining({ rebuilding: false, live: true }))
+  })
+})

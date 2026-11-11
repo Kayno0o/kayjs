@@ -11,6 +11,7 @@ import { effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { publishTime, unpublishTime, useGoesLive } from './datetime'
 import { cmsDrafts } from './drafts'
+import { serverInstances } from './editor/instances'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
@@ -253,7 +254,7 @@ export function cmsEntryForm({ prefix, collection, entry, locale, copy, source, 
   const canSave = () => denied?.edit === undefined && !saving() && stranded() === undefined && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
   const lastSave = signal<SavedState>()
-  const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished)
+  const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished, { instances: serverInstances() })
 
   onCleanup(onSaved.stop)
 

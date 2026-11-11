@@ -16,6 +16,7 @@ import { collectionPath, collectionTitle, entryTitle, SINGLE_SLUG } from '../lis
 import { entryKey } from '../markers'
 import { drafts } from './drafts'
 import { fieldAtPath, registerInline } from './inline'
+import { serverInstances } from './instances'
 import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
@@ -63,7 +64,7 @@ const removed = signal(false)
 const stranded = signal<string>()
 let created = false
 const lastSave = signal<SavedState>()
-const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave = saved, rebuildFinished)
+const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave = saved, rebuildFinished, { instances: serverInstances() })
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
 onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
