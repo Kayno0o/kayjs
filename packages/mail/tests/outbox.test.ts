@@ -1,5 +1,5 @@
 import type { Mail } from '../src/types'
-import { existsSync } from 'node:fs'
+import { chmodSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { scratchDir } from 'kay/test'
@@ -43,6 +43,16 @@ describe('the outbox kept in a file', () => {
     expect(second.mails).toHaveLength(500)
     expect(second.mails[0]!.subject).toBe('Mail 3')
     expect(second.last()!.subject).toBe('Mail 502')
+  })
+
+  it('writes the file for its owner alone, even over a leftover aside file with wider rights', async () => {
+    const path = await file()
+
+    await Bun.write(`${path}.tmp`, '[]')
+    chmodSync(`${path}.tmp`, 0o644)
+    await createOutbox(path).send(mail('Private'))
+
+    expect(statSync(path).mode & 0o777).toBe(0o600)
   })
 
   it('empties the file with the outbox, and leaves no half-written file beside it', async () => {

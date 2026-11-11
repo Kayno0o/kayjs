@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Address, Delivery, Mail, MailAttachment, Transport } from './types'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durationSeconds } from 'kay/library'
 import { devFile, devServer } from './delivery'
@@ -112,12 +112,13 @@ function readFile(file: string): SentMail[] {
   }
 }
 
-// A file written aside and renamed over the old one, so a crash in the middle of a write never leaves half a file.
+// A file written aside and renamed over the old one, so a crash in the middle of a write never leaves half a file. It holds the mails sent in development, tokens and links included, so it is the owner's alone (0600), a leftover aside file too.
 function writeFile(file: string, mails: readonly SentMail[]): void {
   const aside = `${file}.tmp`
 
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(aside, JSON.stringify(mails.map(stored)))
+  writeFileSync(aside, JSON.stringify(mails.map(stored)), { mode: 0o600 })
+  chmodSync(aside, 0o600)
   renameSync(aside, file)
 }
 
