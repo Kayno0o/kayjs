@@ -38,6 +38,6 @@ SidePanel, FormDialog and CommandPalette take the same `size` names (a palette's
 
 ## Heading level
 
-The title is an `h2`, as the dialog opens over the page's own `h1`. `level` sets another.
+The title is an `h2`, as the dialog opens over the page's own `h1`. `level` sets another. It is a string or a `@title` block that draws markup in its place, such as an icon or a badge, the dialog then being named by that heading; `label` names it for screen readers when that differs from the visible title. SidePanel, FormDialog and ConfirmDelete take the same.
 
 <ReadMore href="/ui/form-dialog">FormDialog wraps a Dialog around a form that calls a page's action.</ReadMore>

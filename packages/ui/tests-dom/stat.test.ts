@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import StatsOld from '../tests/fixture/src/components/stats-old.kay'
 import Stats from '../tests/fixture/src/components/stats.kay'
 
 let mounted: Mounted | undefined
@@ -15,11 +16,20 @@ async function stats() {
   return (id: string) => mounted!.root.querySelector(`#${id}`)!
 }
 
-test('a Stat is the inline pill unless variant is tile, which marks the root for the stylesheet', async () => {
+test('a Stat is the inline pill unless layout is tile, which marks the root for the stylesheet', async () => {
   const stat = await stats()
 
-  expect([stat('plain').getAttribute('data-variant'), stat('tile').getAttribute('data-variant')]).toEqual([null, 'tile'])
+  expect([stat('plain').getAttribute('data-layout'), stat('tile').getAttribute('data-layout')]).toEqual([null, 'tile'])
   expect(stat('tile').className).toContain('kui-stat-badge')
+})
+
+test('the deprecated variant of a Stat lays it out as layout does', async () => {
+  mounted = await mountComponent(StatsOld, {})
+
+  const tile = mounted.root.querySelector('#old-tile')!
+
+  expect(tile.getAttribute('data-layout')).toBe('tile')
+  expect(tile.className).toBe(mounted.root.querySelector('#new-tile')!.className)
 })
 
 test('a tile keeps the figure first and the label after it, as the pill does', async () => {
@@ -50,5 +60,5 @@ test('a link tile with a change draws the same parts as the span, in the order t
   const stat = await stats()
   const root = stat('linkedChange')
 
-  expect([root.tagName, root.getAttribute('data-variant'), [...root.children].map(child => child.getAttribute('data-part'))]).toEqual(['A', 'tile', ['value', 'label', 'delta']])
+  expect([root.tagName, root.getAttribute('data-layout'), [...root.children].map(child => child.getAttribute('data-part'))]).toEqual(['A', 'tile', ['value', 'label', 'delta']])
 })

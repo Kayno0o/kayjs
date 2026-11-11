@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, onCleanup, persisted, recipe, signal, untrack } from 'kay'
+import { effect, listen, onCleanup, persisted, recipe, signal, uid, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import type { OverlaySize } from './overlay'
 import { closeWatcher, followsHref, leave, renderedOpen, syncOpen } from './overlay'
@@ -23,12 +23,14 @@ const look = recipe({
   },
 })
 
-const { open, title, heading, level = 2, actions, header, close, dirty = false, autosave = false, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, label, heading, level = 2, actions, header, close, dirty = false, autosave = false, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
-  // Names the panel for screen readers, and is the heading unless a `@heading` block draws it.
-  title: string
-  // Markup in the heading in place of the title's text, such as an icon, a status badge or an emphasised name: the panel is still named by `title`.
+  // The heading, and the panel's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the panel is then named by that heading's text, or by `label`.
+  title: string | Snippet
+  // The panel's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
+  label?: string | undefined
+  // @deprecated Use a `@title` block, with `label` for the string that named the panel; `deprecated-ui-props` rewrites it. Removed in 2.0.0.
   heading?: Snippet
   // The title's heading level.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
@@ -79,6 +81,10 @@ const LAUNCHER_GAP = 16
 
 // Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
 const serverOpen = renderedOpen(open, modal, closeHref)
+// The name a screen reader announces: `label`, else a string title; a markup title names the panel through its heading.
+const name = () => label ?? (typeof title === 'string' ? title : undefined)
+const titleId = uid()
+
 // Set by any typing inside, and cleared however the panel closes or opens.
 const edited = signal(false)
 
@@ -322,7 +328,7 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
@@ -332,15 +338,15 @@ dialog(part="root" aria-label={title} {...rest} open={serverOpen} data-modal={mo
         | {header}
       else
         if level === 2
-          h2(part="title") {heading ?? title}
+          h2(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 3
-          h3(part="title") {heading ?? title}
+          h3(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 4
-          h4(part="title") {heading ?? title}
+          h4(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 5
-          h5(part="title") {heading ?? title}
+          h5(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else
-          h6(part="title") {heading ?? title}
+          h6(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         | {actions}
         if close
           | {close}

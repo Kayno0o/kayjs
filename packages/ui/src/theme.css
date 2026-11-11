@@ -1301,12 +1301,12 @@
   }
 
   /* A tile fills its grid cell: the figure large above its label. */
-  .kui-stat-badge:where([data-variant='tile']) {
+  .kui-stat-badge:where([data-layout='tile']) {
     @apply grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3;
   }
 
   /* The icon and the label take a row of their own above and below the figure, and the change, which follows the label in the document, sits beside the figure. */
-  .kui-stat-badge:where([data-variant='tile']) > :where([data-part='icon'], [data-part='label']) {
+  .kui-stat-badge:where([data-layout='tile']) > :where([data-part='icon'], [data-part='label']) {
     @apply col-span-full;
   }
 

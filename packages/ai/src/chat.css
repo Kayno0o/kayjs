@@ -594,7 +594,7 @@
     text-decoration: underline;
   }
 
-  /* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `variant="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
+  /* The chat's props: `tone="neutral"` draws the send button and the visitor's bubble in the text colour instead of the accent, `layout="plain"` draws the visitor's message as bare text, `size` scales the type of the turns and the suggestions. */
   .kai-chat[data-tone='neutral'] {
     --kai-chat-accent: var(--color-foreground);
   }
@@ -607,7 +607,7 @@
     background-color: color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
   }
 
-  .kai-chat[data-variant='plain'] .kai-chat-turn[data-role='user'] {
+  .kai-chat[data-layout='plain'] .kai-chat-turn[data-role='user'] {
     max-width: none;
     padding: 0;
     border-radius: 0;

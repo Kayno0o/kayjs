@@ -6,6 +6,7 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { kayCtxImport } from './script-shared'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
@@ -181,6 +182,8 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
+  // The names bound to a kayjs-ui or kayjs-ai component, by the library and the component's file, for `deprecatedUiProps`.
+  private libraryComponents = new Map<string, string>()
   // The name of the props the script left out of its destructuring: a plain object, whose members are values.
   private restName: string | undefined
 
@@ -190,8 +193,11 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
+    const imports = [...script.imports, ...(server?.imports ?? [])]
+
+    this.libraryComponents = libraryComponents(imports)
     this.restName = script.props?.rest && this.text(script.props.rest)
-    this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
+    this.sizedImports = new Set(imports.filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
 
     if (server && this.options.includeServer !== false) {
       for (const [binding, first] of sharedImports(script, server).conflicts)
@@ -438,6 +444,11 @@ class Validator {
   }
 
   private elementIn(element: ElementNode, foreign: boolean): void {
+    const library = this.options.check && element.component ? this.libraryComponents.get(element.name) : undefined
+
+    if (library !== undefined)
+      deprecatedUiProps(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ui-props', message, details))
+
     if (this.options.check && !element.component)
       this.accessibility(element)
 

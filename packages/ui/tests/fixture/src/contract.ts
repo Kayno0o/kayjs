@@ -291,7 +291,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'skeleton': { lines: 2, label: 'Loading' },
   'sparkline': { values: [1, 3, 2], label: 'Visits' },
   'status-strip': { cells: ['success', 'danger'], label: 'Up' },
-  'stat': { value: 12, label: 'moons', variant: 'tile', tone: 'danger' },
+  'stat': { value: 12, label: 'moons', layout: 'tile', tone: 'danger' },
   'steps': { steps: [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }], current: 'details', url: '/signup?step=details', done: ['account'], label: 'Signup' },
   'subscribe-form': { action, label: 'Email', submitLabel: 'Subscribe' },
   'tab-nav': { links: [{ href: '/', label: 'Home' }], current: '/', label: 'Sections' },

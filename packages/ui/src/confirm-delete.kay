@@ -49,8 +49,8 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
   ask?: 'dialog' | 'inline' | undefined
   // What the trigger says, for a delete the reader knows by another name: "Empty trash", "Revoke link". `Delete` by default, `Confirm` when neutral.
   label?: string | undefined
-  // The dialog's title: `Confirm Deletion` by default, the label when neutral.
-  title?: string | undefined
+  // The dialog's title, as a Dialog's, a string or a `@title` block: `Confirm Deletion` by default, the label when neutral.
+  title?: string | Snippet | undefined
   // The confirm button's text, and the one it shows while `onConfirm` is pending: `Delete` and `Deleting…` by default, the label when neutral.
   confirmLabel?: string | undefined
   pendingLabel?: string | undefined

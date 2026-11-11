@@ -76,12 +76,12 @@ describe('restyling the chat from src/ui.ts', () => {
   })
 
   test('the shared props reach the root as data attributes, with their defaults', () => {
-    expect(html).toMatch(/<section class="kai-chat rounded-xl"[^>]* data-variant="bubble" data-tone="accent" data-size="md"/)
-    expect(html).toMatch(/<section class="kai-chat rounded-xl opacity-90 rounded-lg"[^>]* data-variant="plain" data-tone="neutral" data-size="sm"/)
+    expect(html).toMatch(/<section class="kai-chat rounded-xl"[^>]* data-layout="bubble" data-tone="accent" data-size="md"/)
+    expect(html).toMatch(/<section class="kai-chat rounded-xl opacity-90 rounded-lg"[^>]* data-layout="plain" data-tone="neutral" data-size="sm"/)
   })
 
   test('the launcher hands the shared props to its chat and its class string to its wrapper', () => {
-    expect(html).toMatch(/<div class="kai-launcher mb-2"[\s\S]*?<section class="kai-chat[^"]*"[^>]* data-variant="plain" data-tone="neutral" data-size="lg"/)
+    expect(html).toMatch(/<div class="kai-launcher mb-2"[\s\S]*?<section class="kai-chat[^"]*"[^>]* data-layout="plain" data-tone="neutral" data-size="lg"/)
   })
 
   // Unlayered rules beat Tailwind's utilities layer whatever their specificity, which would leave the utilities above with no effect.

@@ -38,6 +38,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { tz: \'Europe/Paris\' })\n---',
     right: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { timeZone: \'Europe/Paris\' })\n---',
   },
+  'deprecated-ui-props': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.97',
+    summary: 'A kayjs-ui or kayjs-ai prop under its name before 1.97. `heading` on a Dialog, SidePanel or FormDialog is `title`, which takes a string or a `@title` block as a Card\'s does, and the string that named the dialog for screen readers is `label`. `variant` on a Stat, Chat or ChatLauncher is `layout`, `variant` naming only the frame of a control. The old names work until 2.0. The fix renames the prop or the block, and the `title` string beside a `heading` to `label`; it offers none where the new name is already written.',
+    wrong: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" variant="tile")',
+    right: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" layout="tile")',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

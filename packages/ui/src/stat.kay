@@ -22,6 +22,16 @@ const look = recipe({
   },
   variants: {
     // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
+    layout: {
+      inline: '',
+      tile: {
+        root: 'grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
+        icon: 'col-span-full',
+        value: 'text-2xl/none',
+        label: 'col-span-full [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+      },
+    },
+    // Deprecated since 1.97, removed in 2.0.0: the name `layout` took, `variant` naming a control's frame everywhere else; `deprecated-ui-props` rewrites it. It has the same classes, as a recipe reads no name the script declares.
     variant: {
       inline: '',
       tile: {
@@ -41,10 +51,10 @@ const look = recipe({
       info: { value: 'text-info' },
     },
   },
-  defaults: { variant: 'inline', tone: 'neutral' },
+  defaults: { layout: 'inline', variant: 'inline', tone: 'neutral' },
 })
 
-const { value, label, icon, href, delta, variant = 'inline', tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { value, label, icon, href, delta, layout, variant, tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   value: number | string
   label?: string | undefined
   icon?: IconSlot | IconProps | undefined
@@ -53,6 +63,8 @@ const { value, label, icon, href, delta, variant = 'inline', tone = 'neutral', .
   // How the figure moved since the period before, beside the figure with an arrow, so colour is not the only signal.
   delta?: StatDelta | undefined
 }>()
+
+const tile = layout === 'tile' || variant === 'tile'
 ---
 snippet body()
   if icon
@@ -69,8 +81,8 @@ snippet body()
 
 // A figure and what it counts, read together: "12 moons".
 if href !== undefined
-  a(part="root" {...rest} href={href} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
+  a(part="root" {...rest} href={href} data-layout={tile ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
     {body()}
 else
-  span(part="root" {...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
+  span(part="root" {...rest} data-layout={tile ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
     {body()}

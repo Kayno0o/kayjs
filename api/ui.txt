@@ -1266,7 +1266,7 @@ component default
   refused?: ((data: Data) => string | undefined) | undefined
   size?: Size | undefined
   success?: string | undefined
-  title?: string | undefined
+  title?: Element
   tone?: Tone | undefined
   triggerLook?: "button" | "icon" | "link" | "none" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
@@ -1446,14 +1446,14 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: string }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: string }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
 
 [./dnd] Bar
 interface Bar
@@ -1632,6 +1632,7 @@ component default
   header?: Element
   heading?: Element
   id?: string | undefined
+  label?: string | undefined
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   modal?: boolean | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
@@ -1642,7 +1643,7 @@ component default
   savingLabel?: string | undefined
   size?: OverlaySize | undefined
   submitLabel: string
-  title: string
+  title: Element
   validate?: FormValidation
 
 [./form-field.kay] default
@@ -2603,7 +2604,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2617,7 +2618,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2631,7 +2632,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
 
 [./site-favicon.kay] default
 component default
@@ -2768,6 +2769,7 @@ component default
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | undefined
+  layout?: "inline" | "tile" | undefined
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   value: number | string
   variant?: "inline" | "tile" | undefined

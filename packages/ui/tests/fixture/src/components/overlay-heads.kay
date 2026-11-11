@@ -8,21 +8,29 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 // A page's action as an island holds it: a call with a `pending()` and a `url`.
 const save = Object.assign(async () => 'saved', { pending: () => false, url: '/_kay/action/form/save' }) as unknown as Action<Record<string, never>, string>
 ---
-Dialog#dialog-heading(open={true} title="Rename planet" onOpenChange={() => undefined})
-  @heading
+Dialog#dialog-heading(open={true} label="Rename planet" onOpenChange={() => undefined})
+  @title
     em Mars
+  p Body
+Dialog#dialog-markup(open={true} onOpenChange={() => undefined})
+  @title
+    em Pluto
   p Body
 Dialog#dialog-plain(open={true} title="Plain" onOpenChange={() => undefined})
   p Body
-SidePanel#panel-heading(open={true} modal={false} closeHref="/list" title="Details of Venus")
-  @heading
+SidePanel#panel-heading(open={true} modal={false} closeHref="/list" label="Details of Venus")
+  @title
     em Venus
   p Body
 #form-heading
-  FormDialog(open={true} title="Edit moon" action={save} submitLabel="Save" failureLabel="Failed" onOpenChange={() => undefined})
-    @heading
+  FormDialog(open={true} label="Edit moon" action={save} submitLabel="Save" failureLabel="Failed" onOpenChange={() => undefined})
+    @title
       em Phobos
     p Body
+#confirm-title
+  ConfirmDelete(open={true} message="Delete the star?" failureLabel="Failed" onConfirm={() => undefined})
+    @title
+      em Sirius
 #confirm-details
   ConfirmDelete(open={true} message="Delete 2 moons?" failureLabel="Failed" onConfirm={() => undefined})
     @details

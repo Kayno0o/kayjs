@@ -684,7 +684,7 @@ describe('theme.css', () => {
   })
 
   test('a Stat tile keeps its grid placement without the recipe, and a control in a wrapping box keeps its words whole', () => {
-    expect(blockOf(theme, '.kui-stat-badge:where([data-variant=\'tile\']) > :where([data-part=\'icon\'], [data-part=\'label\'])')).toContain('@apply col-span-full;')
+    expect(blockOf(theme, '.kui-stat-badge:where([data-layout=\'tile\']) > :where([data-part=\'icon\'], [data-part=\'label\'])')).toContain('@apply col-span-full;')
 
     for (const [part, order] of [['value', 1], ['delta', 2], ['label', 3]])
       expect(blockOf(theme, `.kui-stat-badge > :where([data-part='${part}'])`)).toContain(`@apply order-${order};`)

@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, recipe, signal } from 'kay'
+import { effect, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import IconButton from './icon-button.kay'
 import { closeWatcher, followsHref, leave, renderedOpen, syncOpen } from './overlay'
@@ -27,12 +27,14 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open, title, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
-  // Names the dialog for screen readers, and is the heading unless a `@heading` block draws it.
-  title: string
-  // Markup in the heading in place of the title's text, such as an icon, a status badge or an emphasised name: the dialog is still named by `title`.
+  // The heading, and the dialog's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the dialog is then named by that heading's text, or by `label`.
+  title: string | Snippet
+  // The dialog's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
+  label?: string | undefined
+  // @deprecated Use a `@title` block, with `label` for the string that named the dialog; `deprecated-ui-props` rewrites it. Removed in 2.0.0.
   heading?: Snippet
   // The title's heading level: a modal opens over the page's own `h1`.
   level?: 2 | 3 | 4 | 5 | 6 | undefined
@@ -59,6 +61,10 @@ const { open, title, heading, level = 2, size = 'md', bare = false, dirty = fals
   | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown }
 )>()
 
+// The name a screen reader announces: `label`, else a string title; a markup title names the dialog through its heading.
+const name = () => label ?? (typeof title === 'string' ? title : undefined)
+const titleId = uid()
+
 // Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.
 const edited = signal(false)
 let dialog: HTMLDialogElement | undefined
@@ -79,22 +85,22 @@ function closed() {
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={title} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(aria-label={name()} aria-labelledby={name() === undefined ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     header(part="head")
       if header
         | {header}
       else
         if level === 2
-          h2(part="title") {heading ?? title}
+          h2(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 3
-          h3(part="title") {heading ?? title}
+          h3(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 4
-          h4(part="title") {heading ?? title}
+          h4(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else if level === 5
-          h5(part="title") {heading ?? title}
+          h5(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         else
-          h6(part="title") {heading ?? title}
+          h6(part="title" id={name() === undefined ? titleId : undefined}) {heading ?? title}
         | {actions}
         if close
           | {close}

@@ -12,7 +12,7 @@ description: A figure and what it counts, as a compact badge.
 
 ## Tiles
 
-`variant="tile"` draws a framed box with the figure above its label, for a grid of stats; the default `inline` is the pill.
+`layout="tile"` draws a framed box with the figure above its label, for a grid of stats; the default `inline` is the pill.
 
 <Demo name="stat/tile" />
 

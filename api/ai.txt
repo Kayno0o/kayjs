@@ -786,6 +786,7 @@ component default
   initial?: ChatTurn[] | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
+  layout?: "bubble" | "plain" | undefined
   loadFailedLabel?: string | undefined
   maxChars?: number | undefined
   maxFiles?: number | undefined
@@ -1000,6 +1001,7 @@ component default
   initial?: ChatTurn[] | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
+  layout?: "bubble" | "plain" | undefined
   links?: "apart" | "here" | undefined
   loadFailedLabel?: string | undefined
   maxChars?: number | undefined

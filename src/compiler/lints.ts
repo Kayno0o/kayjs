@@ -708,7 +708,6 @@ export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { sa
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
-const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // An opening, closing or self-closing tag, with what it holds after its name.
 const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
@@ -735,17 +734,7 @@ export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
 export { DEPRECATION_MINORS } from './deprecated-lints'
 
-// The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
-export function minorOf(version: string): [number, number] | undefined {
-  const found = MINOR.exec(version)
-
-  return found === null ? undefined : [Number(found[1]), Number(found[2])]
-}
-
-// Whether the minor `a` comes after `b`.
-export function minorAfter(a: [number, number], b: [number, number]): boolean {
-  return a[0] === b[0] ? a[1] > b[1] : a[0] > b[0]
-}
+export { minorAfter, minorOf } from './minor'
 
 export function isLintGroup(name: string | undefined): name is LintGroup {
   return name !== undefined && Object.hasOwn(LINT_GROUPS, name)

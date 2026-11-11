@@ -1,0 +1,23 @@
+---
+import type { Action } from 'kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// The `heading` block of 1.96, which still draws in the title element beside the `title` string that names the dialog.
+const save = Object.assign(async () => 'saved', { pending: () => false, url: '/_kay/action/form/save' }) as unknown as Action<Record<string, never>, string>
+---
+// kay-allow-file deprecated-ui-props
+Dialog#dialog-heading(open={true} title="Rename planet" onOpenChange={() => undefined})
+  @heading
+    em Mars
+  p Body
+SidePanel#panel-heading(open={true} modal={false} closeHref="/list" title="Details of Venus")
+  @heading
+    em Venus
+  p Body
+#form-heading
+  FormDialog(open={true} title="Edit moon" action={save} submitLabel="Save" failureLabel="Failed" onOpenChange={() => undefined})
+    @heading
+      em Phobos
+    p Body

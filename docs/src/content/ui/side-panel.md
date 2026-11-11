@@ -20,7 +20,7 @@ A panel kept in place while its content changes, such as one in a `persist` isla
 
 ## Title and close label
 
-`title` is required and heads the panel. `closeLabel` names the close button for screen readers, `Close` by default.
+`title` is required and heads the panel: a string, or a `@title` block that draws markup in its place, such as an icon or a badge. `label` names the panel for screen readers when that differs from the visible title. `closeLabel` names the close button for screen readers, `Close` by default.
 
 ## Beside the page
 
