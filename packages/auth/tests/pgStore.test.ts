@@ -50,6 +50,19 @@ if (reachable) {
     expect((await store.bearerTokens.findByDigest('legacy-bearer'))?.oauth).toEqual({ clientId: 'c1', family: 'f1', resource: null })
   })
 
+  // `confirmEmailChange` relies on it: of two accounts moving to one address, the loser's update throws and the address then has another holder.
+  test('pgAuth refuses an update moving a user to an address another holds', async () => {
+    await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
+
+    const users = store().users
+
+    await users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    await users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
+
+    await expect(users.update('u2', { email: 'ada@example.com' })).rejects.toThrow()
+    expect((await users.findByEmail('ada@example.com'))?.id).toBe('u1')
+  })
+
   // A table made before users kept app data gains the column on sync, its rows reading as empty.
   test('pgAuth adds the data column to an older users table and reads its rows as empty', async () => {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])

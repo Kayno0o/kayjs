@@ -132,6 +132,8 @@ async function signIn(site: Site, issuer: string, email: string, mount = { base:
 
   expect(consent.status).toBe(200)
   expect(consent.html).toContain('Claude Code')
+  // The client named itself when registering: the page says nothing checked the name.
+  expect(consent.html).toContain('nothing checked that name')
   // The app's label, as text: markup in it is escaped, and the raw code is not shown.
   expect(consent.html).toContain('Read &lt;b>your&lt;/b> notes')
   expect(consent.html).not.toContain('<b>your</b>')
