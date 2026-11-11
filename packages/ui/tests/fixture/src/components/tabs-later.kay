@@ -2,11 +2,13 @@
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import { signal } from 'kay'
 
-// The links arrive after the first render, as from an async source.
+// The links arrive after the first render, as from an async source: the test hands them over through deliverTabs.
 const links = signal<{ href: string, label: string }[]>([])
 
-setTimeout(() => {
-  links = ['profile', 'keys', 'billing', 'danger'].map(name => ({ href: `/settings/${name}`, label: name }))
-}, 50)
+Object.assign(globalThis, {
+  deliverTabs() {
+    links = ['profile', 'keys', 'billing', 'danger'].map(name => ({ href: `/settings/${name}`, label: name }))
+  },
+})
 ---
 TabNav#later(links={links()} current="/settings/billing" label="Later")

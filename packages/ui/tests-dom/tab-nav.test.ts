@@ -56,7 +56,7 @@ test('centres the current tab once links that arrive after the first render are 
 
   try {
     expect(mounted.root.querySelector('.kui-tab-nav')).toBeNull()
-    await new Promise(resolve => setTimeout(resolve, 100))
+    ;(globalThis as unknown as { deliverTabs: () => void }).deliverTabs()
     await settle()
     expect(mounted.root.querySelector('.kui-tab-nav')?.scrollLeft).toBe(225)
   }
