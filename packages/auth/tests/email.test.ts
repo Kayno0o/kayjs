@@ -509,6 +509,32 @@ describe('changing an email', () => {
 
     expect(await ada.call('email.confirmChange', tokenOf('change-email'))).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
+
+  test('an address taken in the instant of the click answers invalid, not a failure', async () => {
+    const { browser, store, tokenOf } = setup()
+    const ada = browser()
+
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
+    await store.users.create(userRecord({ id: 'u2', email: 'ada@new.test' }))
+
+    // The read before the write saw the address free, as the other request had not written yet.
+    const find = store.users.findByEmail
+    let stale = true
+
+    store.users.findByEmail = (email) => {
+      if (stale && email === 'ada@new.test') {
+        stale = false
+
+        return undefined
+      }
+
+      return find(email)
+    }
+
+    expect(await ada.call('email.confirmChange', tokenOf('change-email'))).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
+  })
 })
 
 test('an app without a mailer answers that mail is unavailable', async () => {

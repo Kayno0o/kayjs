@@ -276,7 +276,20 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   if (await store.users.findByEmail(spent.token.email))
     return failed('invalid')
 
-  const record = await endOtherSessions(state, spent.record, { email: spent.token.email, emailVerifiedAt: new Date() })
+  let record: UserRecord | undefined
+
+  try {
+    record = await endOtherSessions(state, spent.record, { email: spent.token.email, emailVerifiedAt: new Date() })
+  }
+  // Another request took the address between the read and the write; any other failure is the store's.
+  catch (error) {
+    const taker = await store.users.findByEmail(spent.token.email)
+
+    if (taker && taker.id !== spent.record.id)
+      return failed('invalid')
+
+    throw error
+  }
 
   if (!record)
     return failed('invalid')
