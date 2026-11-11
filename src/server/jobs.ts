@@ -17,6 +17,8 @@ import { reportBackgroundError } from './report'
 
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the config's `timeZone` by default, else the system's.
+  timeZone?: string | undefined
+  /** @deprecated The old name of `timeZone`. Removed in 1.101.0; `deprecated-schedule-tz` rewrites it. */
   tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
   // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.
@@ -44,7 +46,7 @@ type Jobs = Job | readonly Job[]
 type WhenOf<Key extends string> = Key extends Duration ? PositiveDuration<Key> : CronSchedule<Key>
 
 // What a schedule repeating every so long takes: it runs on the epoch's multiples of its length, the same instants in every time zone.
-export type ScheduleEveryOptions = Omit<ScheduleOptions, 'tz'>
+export type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone' | 'tz'>
 
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
@@ -111,7 +113,7 @@ export function scheduledOf(app: { event?: { start?: readonly unknown[] | undefi
 }
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
-// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
+// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `timeZone` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
 export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): Elysia
 export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): Elysia
@@ -133,7 +135,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
     const auto = options.lock === undefined && process.env.NODE_ENV === 'production' && process.env.KAY_LOCK_SCHEDULES !== 'false' ? autoLock(when, job) : undefined
 
     if (typeof when === 'number' || DURATION_TEXT.test(when))
-      return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own, auto)
+      return scheduleEvery(when as Duration, job, table ? { ...own, timeZone: undefined, tz: undefined } : own, auto)
 
     return scheduleCron(when, job, own, auto)
   })
@@ -143,7 +145,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
 
 function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const zoneNow = (): { tz?: string } => {
-    const tz = options.tz ?? timeZone()
+    const tz = options.timeZone ?? options.tz ?? timeZone()
 
     return tz === undefined ? {} : { tz }
   }
@@ -196,8 +198,10 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
 function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const ms = durationSeconds(every, `the schedule ${String(every)}`) * 1000
 
-  if (options.tz !== undefined)
-    throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no tz, it runs every ${String(every)} from the epoch`)
+  const zone = ['timeZone', 'tz'].find(key => options[key as 'tz' | 'timeZone'] !== undefined)
+
+  if (zone !== undefined)
+    throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no ${zone}, it runs every ${String(every)} from the epoch`)
 
   let timer: Timer | undefined
   let forgetDrain: (() => void) | undefined

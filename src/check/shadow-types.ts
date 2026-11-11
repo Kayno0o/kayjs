@@ -46,8 +46,9 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { redirectPermanent } from './redirect-permanent'
-
 import { removedUiTokens } from './removed-ui-tokens'
+
+import { scheduleTz } from './schedule-tz'
 
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
@@ -155,6 +156,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
   ({ root, options }) => redirectPermanent(root, options),
   async ({ root, options }) => uiHotkey(root, options),
+  async ({ root, options }) => scheduleTz(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

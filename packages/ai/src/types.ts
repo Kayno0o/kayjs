@@ -186,7 +186,7 @@ export type AudioFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'
 export interface TranscribeRequest {
   audio: Blob
   model: string
-  // An ISO 639-1 code such as `fr`, left out to let the model tell.
+  // An ISO 639-1 code such as `fr`, as the provider takes it, left out to let the model tell.
   language: string | undefined
   // How long the whole call may take.
   timeout: Duration

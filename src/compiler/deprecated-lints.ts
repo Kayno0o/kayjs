@@ -29,6 +29,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Toaster from \'@kaynooo/kayjs-ui/toaster.kay\'\n---\nToaster(hotkey="j")',
     right: '---\nimport Toaster from \'@kaynooo/kayjs-ui/toaster.kay\'\n---\nToaster(shortcut="alt+j")',
   },
+  'deprecated-schedule-tz': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.97',
+    site: true,
+    summary: '`tz` in the options of `schedule()`, `timeZone` since 1.97: the option has the name of the `timeZone` of `kay.config.ts`, which it falls back to. The old form still works. Found in the TypeScript files and `.kay` files of the project, on a call of `schedule` imported from `kay/server` or `kay`, in the options object written in the call. The fix renames the key, and writes `timeZone: tz` for a shorthand `{ tz }`; an object holding a `timeZone` already is reported with no fix.',
+    wrong: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { tz: \'Europe/Paris\' })\n---',
+    right: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { timeZone: \'Europe/Paris\' })\n---',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

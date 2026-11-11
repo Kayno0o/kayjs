@@ -3612,7 +3612,7 @@ function schedule<const Table extends Record<string, Jobs>>(table: Table & {
 }>
 
 [./server] ScheduleEveryOptions
-type ScheduleEveryOptions = Omit<ScheduleOptions, 'tz'>
+type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone' | 'tz'>
 
 [./server] ScheduleOptions
 interface ScheduleOptions
@@ -3623,8 +3623,9 @@ interface ScheduleOptions
   onStart?: Hook<{ schedule: string; boot: boolean; }> | undefined
   onSuccess?: Hook<{ schedule: string; boot: boolean; duration: number; }> | undefined
   store?: JobStore | undefined
+  timeZone?: string | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  tz?: string | undefined
+  /** @deprecated The old name of `timeZone`. Removed in 1.101.0; `deprecated-schedule-tz` rewrites it. */ tz?: string | undefined
 
 [./server] ScriptHashOptions
 interface ScriptHashOptions

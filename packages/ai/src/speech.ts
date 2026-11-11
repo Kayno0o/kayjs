@@ -13,7 +13,7 @@ const MIN_SPEED = 0.25
 const MAX_SPEED = 4
 
 export interface TranscribeOptions extends CallOptions {
-  // What is spoken, as an ISO 639-1 code such as `fr`: left out, the model tells, which a short recording may get wrong.
+  // What is spoken, as an ISO 639-1 code such as `fr`, the two letters speech providers take, not a BCP 47 tag like `fr-FR`: left out, the model tells, which a short recording may get wrong.
   language?: string | undefined
   // The most bytes the recording may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails with a `too-long` error before the provider is called. `Infinity` lifts it.
   maxSize?: number | string | undefined

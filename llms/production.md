@@ -81,7 +81,7 @@ import { Elysia } from 'elysia'
 import { pages, schedule } from 'kay/server'
 
 new Elysia()
-  .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(schedule('30 2 * * MON', sendWeeklyReport, { timeZone: 'Europe/Paris' }))
   .use(schedule('30s', collectMetrics))
   .use(await pages())
 ```
@@ -178,7 +178,7 @@ import { background, pages, schedule } from 'kay/server'
 
 new Elysia()
   .use(schedule('@hourly', async () => purgeExpiredCarts()))
-  .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(schedule('30 2 * * MON', sendWeeklyReport, { timeZone: 'Europe/Paris' }))
   .use(schedule('30s', collectMetrics))
   .use(background(async (signal) => {
     while (!signal.aborted)
@@ -187,11 +187,11 @@ new Elysia()
   .use(await pages())
 ```
 
-- `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the `timeZone` of kay.config.ts unless `tz` names one, the system's when neither is set.
+- `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the `timeZone` of kay.config.ts unless `timeZone` names one, the system's when neither is set.
 - A literal one with another number of fields, an unknown nickname or a day its month never has, `0 0 30 2 *`, is a type error; a computed one it cannot read, or that never comes, fails the boot.
 - Runs never overlap: the next is planned once the last settles.
 - A run that throws is logged and the next one comes as planned.
-- `schedule('30s', job)` runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `tz`; a run outlasting its length skips the runs it overlaps.
+- `schedule('30s', job)` runs every so long in place of a cron, at the multiples of that length since the epoch, `'1h'` on the hour and `'1d'` at UTC midnight, so it takes no `timeZone`; a run outlasting its length skips the runs it overlaps.
 - A length that is not positive is a type error, or fails the boot when computed.
 - `lock`, `store`, the overlap and the shutdown work as for a cron.
 - `background` starts `work` with the server, for a queue consumer or anything else that runs the whole time.
@@ -201,7 +201,7 @@ new Elysia()
 - `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
 - A production server (`NODE_ENV=production`) locks every schedule by default, named `auto:<schedule>:<hash of the job's source>` (a twin with the same schedule and source takes `#2` by start order, which every process of one app shares), so each run happens once across processes sharing the store; a dev or test server runs each schedule in every process. `lock: false` opts out. If the store cannot give that default lock, one warning is logged and the run goes on unlocked, once per process; a `lock` the app named skips the run instead.
 - A run still going after `timeout` (`'10m'` by default, `false` for none) is logged as failed and left, so it no longer blocks the next run; a stop aborts the signal and waits at most 3 s (less with a short `serve.shutdownTimeout`) for a run ignoring it, without reporting it. The job takes an `AbortSignal` that aborts at the timeout and as the server stops. Every job is called with the signal, so one with an optional first parameter gets it. The lock name hashes the job's source, so during a rolling deploy old and new builds with changed jobs both run.
-- `schedule(cron, [jobA, jobB])` gives each job of the list that schedule, and `schedule({ '* * * * *': [jobA, jobB], '@hourly': jobC, '30s': jobD }, options)` several schedules at once, each key checked as a literal schedule is and `tz` read by the crons alone, all in one plugin: with several jobs, `lock` names each `<lock>:<its schedule>:<its place in that schedule's list>`, `report:@hourly:0`.
+- `schedule(cron, [jobA, jobB])` gives each job of the list that schedule, and `schedule({ '* * * * *': [jobA, jobB], '@hourly': jobC, '30s': jobD }, options)` several schedules at once, each key checked as a literal schedule is and `timeZone` read by the crons alone, all in one plugin: with several jobs, `lock` names each `<lock>:<its schedule>:<its place in that schedule's list>`, `report:@hourly:0`.
 - `schedule(cron, job, { boot: true })` runs the jobs once as the server starts too, the first scheduled run waiting for it and a stop too, so a job needing a first run does not start itself by hand; processes starting within the same minute (the schedule's length if shorter) run it once, two either side of the boundary possibly twice (it takes the lock `<lock>:boot` for a slot of a minute at most, a skipped one is logged), while a restart minutes later runs it again, each restart of `kay dev`, `kay render` and `--verify` included.
 - `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store ([Queues](queues.md)), the first to reach it taking it; `store` names another store than the default one.
 - The upkeep kay and its libraries run on a timer (expired sessions and notifications on Postgres, kayjs-auth's prune, kayjs-mail's list sweep, kayjs-cms's history sweep) goes through the same lock, signal and stop handling as a schedule, so with several processes behind one database each pass runs once; it counts in `kay_job_runs_total` as `maintenance:<name>`, shows under Maintenance in the dev tool's Jobs tab, ends with the server, and a test's `runJobs()` waits for a pass going. `KAY_LOCK_SCHEDULES=false` turns its lock off as it does a schedule's. Upkeep of a file on one host (the sqlite session and notification stores) and the caches each process keeps (image variants, loader watchers) stay per process.

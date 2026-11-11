@@ -24,7 +24,7 @@ import { pages, schedule } from 'kay/server'
 
 new Elysia()
   .use(schedule('@hourly', purgeExpiredCarts))
-  .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(schedule('30 2 * * MON', sendWeeklyReport, { timeZone: 'Europe/Paris' }))
   .use(schedule('30s', collectMetrics))
   .use(await pages())
 ```
@@ -39,7 +39,7 @@ app.use(schedule({
 }, { boot: true }))
 ```
 
-A cron has five fields or a nickname such as `@daily`. A cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. `tz` applies to the crons and not to the lengths, and a cron without it is read in the `timeZone` of kay.config.ts.
+A cron has five fields or a nickname such as `@daily`. A cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. `timeZone` applies to the crons and not to the lengths, and a cron without it is read in the `timeZone` of kay.config.ts.
 
 Runs never overlap. A run that throws is logged without stopping the next.
 
