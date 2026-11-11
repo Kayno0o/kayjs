@@ -825,6 +825,8 @@ describe('kay new', () => {
       const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
 
       expect(compose).toContain('KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}')
+      // The `.env.example` lists it, so the container has to receive it.
+      expect(compose).toContain('AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-}')
       expect(compose).toContain('source: ./data-prod\n        target: /app/data\n        bind:\n          create_host_path: false')
       expect(compose).not.toContain('volumes:\n  data:')
       expect(compose).toContain('cap_drop: [ALL]')

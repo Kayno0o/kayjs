@@ -130,6 +130,8 @@ const SQLITE_COMPOSE = `services:
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       # The public origin of the site, which the mailed links and the OAuth callbacks start from. Its host is the one the server answers to, so the proxy in front passes the real Host header.
       SITE_URL: \${SITE_URL:?set SITE_URL}
+      # Where kayjs-auth keeps its users, a Postgres or SQLite url; empty, the file in the mounted folder below.
+      AUTH_DATABASE_URL: \${AUTH_DATABASE_URL:-}
     volumes:
       # In a folder of the checkout, out of git and the image, apart from the data/ of development; it must exist, owned by the image's user (nobody, uid 65534): mkdir -p data-prod && sudo chown 65534 data-prod. A missing folder refuses the start rather than being created as root's.
       - type: bind

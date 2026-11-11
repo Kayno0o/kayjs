@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
+- The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).
 - `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
 - `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).
 - The MCP `add` tool takes `install: true` with `apply: true`, which runs `bun add` and `bun install` so a library the project lacks (`auth`, `mail`, `cms`, `ai`, `ui`) can be added from an agent ([editor and agent commands](editor-and-agent-commands.md)).
