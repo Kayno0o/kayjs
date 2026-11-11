@@ -436,7 +436,6 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     commit()
 }
 
-// The entry a swap adds or replaces, holding where the page it leaves was scrolled to.
 // Once the hydration the swap started is done, whether it ended well or not.
 async function settled(hydrated: unknown, settle: () => void): Promise<void> {
   try {
@@ -447,6 +446,7 @@ async function settled(hydrated: unknown, settle: () => void): Promise<void> {
   }
 }
 
+// The entry a swap adds or replaces, holding where the page it leaves was scrolled to.
 function writeHistory({ history: change }: Policy, target: URL): void {
   if (change === 'push') {
     navigation.at++

@@ -107,10 +107,11 @@ export function watchTyped(): (() => void) | undefined {
     return undefined
 
   const id = field.id
-  let typed: { value: string, start: number, end: number } | undefined
+  let typed: { value: string, start: number, end: number, direction: 'forward' | 'backward' | 'none' } | undefined
   const note = (event: Event) => {
-    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null)
-      typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd }
+    // Only the keys the island never saw: once it hydrated, what it did with them is what the field holds.
+    if (event.target === field && field.selectionStart !== null && field.selectionEnd !== null && !(field.closest('slot[data-component]') as { _$k?: boolean } | null)?._$k)
+      typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' }
   }
 
   document.addEventListener('input', note, true)
@@ -123,10 +124,12 @@ export function watchTyped(): (() => void) | undefined {
     if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.selectionStart === null)
       return
 
-    if (now.value !== typed.value)
-      now.value = typed.value
+    // Hydration kept what was typed, and the island heard it through the events queued for it.
+    if (now.value === typed.value)
+      return
 
+    now.value = typed.value
     now.dispatchEvent(new InputEvent('input', { bubbles: true }))
-    now.setSelectionRange(typed.start, typed.end)
+    now.setSelectionRange(typed.start, typed.end, typed.direction)
   }
 }
