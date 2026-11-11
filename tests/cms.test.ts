@@ -139,15 +139,20 @@ describe('loaded collections', () => {
     expect((await notes.get('b'))?.data.title).toBe('Second')
   })
 
-  it('refuses a loader slug the folder rules refuse as a content problem, one that would climb out of the export', async () => {
-    const bad = ['a/../../x', '/a', 'a//b', 'a/', '.', 'a\\b', 'a?b', 'a#b', 'a\nb', ' ']
+  it('refuses a loader slug that would climb out of the site as a content problem, keeping an empty part, ? and #', async () => {
+    const bad = ['a/../../x', '../a', 'a/.', '.', 'a\\b', 'a\nb', ' ']
     const notes = collection({ name: 'notes-slugs', load: () => [...bad.map(slug => ({ slug, data: { title: 'X' } })), { slug: 'fr/ok', data: { title: 'Ok' } }] }, { schema })
 
     const refused = await rejection(notes.all())
 
     expect(refused).toBeInstanceOf(ContentError)
     expect((refused as ContentError).problems).toHaveLength(bad.length)
-    expect((refused as ContentError).problems.every(problem => problem.message.includes('a slug is a path of non-empty parts'))).toBe(true)
+    expect((refused as ContentError).problems.every(problem => problem.message.includes('a slug has no part . or ..'))).toBe(true)
+
+    const kept = ['/a', 'a//b', 'a?b', 'a#b']
+    const odd = collection({ name: 'notes-odd-slugs', load: () => kept.map(slug => ({ slug, data: { title: 'X' } })) }, { schema })
+
+    expect((await odd.all()).map(entry => entry.slug).sort()).toEqual([...kept].sort())
   })
 
   it('refuses entries the schema refuses, a missing or repeated slug, and anything but an array, loading again on the next read', async () => {

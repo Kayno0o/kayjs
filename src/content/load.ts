@@ -58,6 +58,8 @@ const MANIFEST_EXTENSION = /\.json$/
 const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)+/
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
+// eslint-disable-next-line no-control-regex -- control characters are what it finds
+const UNSAFE_PATH = /[\\\0-\x1F\x7F]/
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
 const CACHE_VERSION = 9
@@ -565,9 +567,14 @@ export function translationKey(entry: { slug: string, data: unknown }): string {
   return typeof given === 'string' && given !== '' ? given : entry.slug
 }
 
-// Whether a value is a slug: a path of non-empty parts, none `.` or `..`, with no backslash, control character, `?` or `#`.
-export function isSlug(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '' && !value.split('/').some(part => part === '' || part === '.' || part === '..') && !BAD_SLUG.test(value)
+// Whether a loader's slug stays inside the site: not blank, no part `.` or `..`, no backslash or control character. An empty part, `?` and `#` are kept: a route encodes them or leaves the entry out.
+export function isLoadedSlug(value: string): boolean {
+  return value.trim() !== '' && !value.split('/').some(part => part === '.' || part === '..') && !UNSAFE_PATH.test(value)
+}
+
+// Whether a value is a file's slug: a loader's rule, no empty part, and no `?` or `#`, which a file name would read as a query or a fragment.
+function isSlug(value: unknown): value is string {
+  return typeof value === 'string' && isLoadedSlug(value) && !value.split('/').includes('') && !BAD_SLUG.test(value)
 }
 
 // The slug of the entry a file holds: its `slug` field when it sets one, after its locale's folder in a localized collection, else the file's path.

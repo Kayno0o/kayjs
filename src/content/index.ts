@@ -23,7 +23,7 @@ import { entryPath } from './entry-route'
 import { excerptOf, keepMarkerHtml, restoreMarker } from './excerpt'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
-import { builtBody, contentMode, isSlug, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
+import { builtBody, contentMode, isLoadedSlug, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
 import { countWords, MarkdownError, problemMessage, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
@@ -562,8 +562,8 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 
     const file = `${loader.name}/${slug}`
 
-    if (!isSlug(slug)) {
-      problems.push({ file, line: 1, message: `has the slug ${JSON.stringify(slug)}: a slug is a path of non-empty parts, none . or .., with no backslash, control character, ? or #` })
+    if (!isLoadedSlug(slug)) {
+      problems.push({ file, line: 1, message: `has the slug ${JSON.stringify(slug)}: a slug has no part . or .., no backslash and no control character` })
 
       continue
     }
