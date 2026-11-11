@@ -153,7 +153,7 @@ describe('a proxy asking whether to let a request through', () => {
     expect(locationOf(await ask(browser())).pathname).toBe('/auth/sign-in')
   })
 
-  test('requireTwoFactor sends a user to the security page, a passkey holder too, as the session does not say how it signed in; the page is under of the pages\' prefix', async () => {
+  test('requireTwoFactor sends a user to the security page, a passkey holder signed in another way too; the page is under of the pages\' prefix', async () => {
     const app = testApp({ site: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
     const made = await app.auth.admin.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
 
