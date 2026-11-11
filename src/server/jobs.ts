@@ -18,7 +18,7 @@ import { reportBackgroundError } from './report'
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the config's `timeZone` by default, else the system's.
   timeZone?: string | undefined
-  /** @deprecated The old name of `timeZone`. Removed in 1.101.0; `deprecated-schedule-tz` rewrites it. */
+  /** @deprecated The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it. */
   tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
   // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.

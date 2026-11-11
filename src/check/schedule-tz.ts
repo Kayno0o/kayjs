@@ -9,7 +9,7 @@ const SCHEDULE = /\bschedule\b/
 const FROM_KAY = (source: string) => source === 'kay' || source === 'kay/server'
 const HELP = 'write `timeZone`'
 
-// `tz` in the options of `schedule()`, `timeZone` since 1.97, the name of the config's setting it falls back to.
+// `tz` in the options of `schedule()`, `timeZone` since 1.98, the name of the config's setting it falls back to.
 // Found on a call of `schedule` imported from `kay` or `kay/server`, in an options object written in the call; `{ tz }` becomes `timeZone: tz`, and an object that already holds a `timeZone` is reported with no fix.
 export async function scheduleTz(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-schedule-tz', options.lints) === 'allow')
@@ -43,7 +43,7 @@ export async function scheduleTz(root: string, options: CheckOptions): Promise<C
           const renamed = tz.shorthand ? { start: base + tz.start, end: base + tz.end, text: 'timeZone: tz' } : { start: base + tz.key.start, end: base + tz.key.end, text: 'timeZone' }
           const edits = taken || tz.computed ? null : [renamed]
 
-          report(base + tz.start, base + tz.end, '`tz` of `schedule()` is deprecated since 1.97: the option is `timeZone`, as in kay.config.ts, which it falls back to', HELP, edits)
+          report(base + tz.start, base + tz.end, '`tz` of `schedule()` is deprecated since 1.98: the option is `timeZone`, as in kay.config.ts, which it falls back to', HELP, edits)
         }
       })
     }

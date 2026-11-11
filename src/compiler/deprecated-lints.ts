@@ -32,17 +32,17 @@ export const DEPRECATED_LINTS = {
   'deprecated-schedule-tz': {
     level: 'warn',
     group: 'deprecated',
-    since: '1.97',
+    since: '1.98',
     site: true,
-    summary: '`tz` in the options of `schedule()`, `timeZone` since 1.97: the option has the name of the `timeZone` of `kay.config.ts`, which it falls back to. The old form still works. Found in the TypeScript files and `.kay` files of the project, on a call of `schedule` imported from `kay/server` or `kay`, in the options object written in the call. The fix renames the key, and writes `timeZone: tz` for a shorthand `{ tz }`; an object holding a `timeZone` already is reported with no fix.',
+    summary: '`tz` in the options of `schedule()`, `timeZone` since 1.98: the option has the name of the `timeZone` of `kay.config.ts`, which it falls back to. The old form still works. Found in the TypeScript files and `.kay` files of the project, on a call of `schedule` imported from `kay/server` or `kay`, in the options object written in the call. The fix renames the key, and writes `timeZone: tz` for a shorthand `{ tz }`; an object holding a `timeZone` already is reported with no fix.',
     wrong: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { tz: \'Europe/Paris\' })\n---',
     right: '---\nimport { schedule } from \'kay/server\'\n\nexport default schedule(\'30 2 * * MON\', () => undefined, { timeZone: \'Europe/Paris\' })\n---',
   },
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',
-    since: '1.97',
-    summary: 'A kayjs-ui or kayjs-ai prop under its name before 1.97. `heading` on a Dialog, SidePanel or FormDialog is `title`, which takes a string or a `@title` block as a Card\'s does, and the string that named the dialog for screen readers is `label`. `variant` on a Stat, Chat or ChatLauncher is `layout`, `variant` naming only the frame of a control. The old names work until 2.0. The fix renames the prop or the block, and the `title` string beside a `heading` to `label`; it offers none where the new name is already written.',
+    since: '1.98',
+    summary: 'A kayjs-ui or kayjs-ai prop under its name before 1.98. `heading` on a Dialog, SidePanel or FormDialog is `title`, which takes a string or a `@title` block as a Card\'s does, and the string that named the dialog for screen readers is `label`. `variant` on a Stat, Chat or ChatLauncher is `layout`, `variant` naming only the frame of a control. The old names work until 2.0. The fix renames the prop or the block, and the `title` string beside a `heading` to `label`; it offers none where the new name is already written.',
     wrong: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" variant="tile")',
     right: '---\nimport Stat from \'@kaynooo/kayjs-ui/stat.kay\'\n---\nStat(value={12} label="moons" layout="tile")',
   },
@@ -71,4 +71,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.92' },
   { since: '1.96' },
   { since: '1.97' },
+  { since: '1.98' },
 ]

@@ -3625,7 +3625,7 @@ interface ScheduleOptions
   store?: JobStore | undefined
   timeZone?: string | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  /** @deprecated The old name of `timeZone`. Removed in 1.101.0; `deprecated-schedule-tz` rewrites it. */ tz?: string | undefined
+  /** @deprecated The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it. */ tz?: string | undefined
 
 [./server] ScriptHashOptions
 interface ScriptHashOptions

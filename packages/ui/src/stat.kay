@@ -31,7 +31,7 @@ const look = recipe({
         label: 'col-span-full [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
       },
     },
-    // Deprecated since 1.97, removed in 2.0.0: the name `layout` took, `variant` naming a control's frame everywhere else; `deprecated-ui-props` rewrites it. It has the same classes, as a recipe reads no name the script declares.
+    // Deprecated since 1.98, removed in 2.0.0: the name `layout` took, `variant` naming a control's frame everywhere else; `deprecated-ui-props` rewrites it. It has the same classes, as a recipe reads no name the script declares.
     variant: {
       inline: '',
       tile: {
