@@ -16,10 +16,8 @@ export function compilerFingerprint(bunVersion = Bun.version): string {
     // What a compile depends on besides its source: kay's compiler with every module it imports, kay's own version, the packages it runs through, tsgo's among them for the browser globals it declares, and Bun's version, as a markdown block is lowered with `Bun.markdown`.
     const compilerDir = join(import.meta.dir, '../compiler')
     const sources = [
-      ...compilerModules(compilerDir),
+      ...compilerModules(compilerDir, [join(import.meta.dir, 'transform.ts'), join(import.meta.dir, 'probe.ts')]),
       import.meta.path,
-      join(import.meta.dir, 'transform.ts'),
-      join(import.meta.dir, 'probe.ts'),
       join(import.meta.dir, '../check/shadow.ts'),
       join(import.meta.dir, '../../package.json'),
       ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
@@ -37,10 +35,10 @@ export function compilerFingerprint(bunVersion = Bun.version): string {
   return fingerprint
 }
 
-// Every file of the compiler and the kay modules it imports, followed through their own relative imports, sorted.
-export function compilerModules(compilerDir: string): string[] {
+// Every file of the compiler, and the `roots` that shape its cached output, with the kay modules they import, followed through their own relative imports, sorted.
+export function compilerModules(compilerDir: string, roots: readonly string[] = []): string[] {
   const transpiler = new Bun.Transpiler({ loader: 'ts' })
-  const found = new Set(readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)))
+  const found = new Set([...readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)), ...roots])
 
   for (const file of found) {
     if (!SCRIPT_FILE.test(file))

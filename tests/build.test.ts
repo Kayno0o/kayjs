@@ -1476,6 +1476,16 @@ describe('compile cache', () => {
     expect(modules.filter(file => file.startsWith('server/'))).toEqual([])
   })
 
+  it('follows the imports of the transform and the probe too, whose modules shape the cached output', () => {
+    const src = join(import.meta.dir, '../src')
+    const roots = ['transform.ts', 'probe.ts'].map(file => join(src, 'build', file))
+    const alone = compilerModules(join(src, 'compiler')).map(file => relative(src, file))
+    const modules = compilerModules(join(src, 'compiler'), roots).map(file => relative(src, file))
+
+    expect(alone).not.toContain('build/signals.ts')
+    expect(modules).toEqual(expect.arrayContaining(['build/transform.ts', 'build/signals.ts', 'build/links.ts']))
+  })
+
   it('keys every entry on Bun\'s version, which a markdown block is lowered by', () => {
     expect(compilerFingerprint()).toBe(compilerFingerprint(Bun.version))
     expect(compilerFingerprint('1.4.3')).not.toBe(compilerFingerprint('1.4.4'))
