@@ -24,6 +24,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
+- `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
 - `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).
 - The MCP `add` tool takes `install: true` with `apply: true`, which runs `bun add` and `bun install` so a library the project lacks (`auth`, `mail`, `cms`, `ai`, `ui`) can be added from an agent ([editor and agent commands](editor-and-agent-commands.md)).
 - A hanging `onStop` hook is given up on after 5 seconds, so the hooks after it and the stores' closing still run ([production](production.md)); the 404 log and redirects of a `pgData` store give up on a database call after 8 seconds, logged ([routing](routing-endpoints-and-base.md)); `keepalive` calls share the browser's 64 KB cap between them, the one past it going as a plain post ([actions from islands](actions-from-islands.md)).

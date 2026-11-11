@@ -95,6 +95,45 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('warns when the working tree holds uncommitted changes, and goes on', async () => {
+    const root = await project()
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      deps.uncommitted = async () => true
+      expect(await upgradeProject(root, deps)).toBe(0)
+      expect(error.mock.calls.map(call => String(call[0])).join('\n')).toContain('uncommitted changes')
+    }
+    finally {
+      error.mockRestore()
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('sees a tracked file changed in a git repository, and an untracked one or no repository as clean', async () => {
+    const root = await scratchDir('upgrade-git-')
+    const { uncommitted } = registryDepsFor(process.execPath)
+    const git = async (...args: string[]) => Bun.spawn(['git', '-c', 'user.email=a@b.c', '-c', 'user.name=a', ...args], { cwd: root, stdout: 'ignore', stderr: 'ignore' }).exited
+
+    try {
+      expect(await uncommitted!(root)).toBe(false)
+      await git('init', '-q')
+      await Bun.write(join(root, 'package.json'), '{}\n')
+      await git('add', '.')
+      await git('commit', '-q', '-m', 'x')
+      await Bun.write(join(root, 'other.txt'), 'new\n')
+      expect(await uncommitted!(root)).toBe(false)
+      await Bun.write(join(root, 'package.json'), '{ }\n')
+      expect(await uncommitted!(root)).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('moves the ranges of kay and its libraries, each in its own section and form, and leaves the rest as it was', async () => {
     const root = await project()
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })

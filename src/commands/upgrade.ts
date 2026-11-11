@@ -15,6 +15,8 @@ export interface UpgradeDeps {
   install: (root: string, changes: DependencyChange[]) => Promise<boolean>
   // Runs the project's own kay, the one just installed, so the fixes of the minor moved to are the ones applied; answers its exit code and, when `capture`, its stdout.
   kay: (root: string, args: string[], capture: boolean, env?: Record<string, string>) => Promise<{ code: number, stdout: string }>
+  // Whether a git working tree holds uncommitted changes to files it tracks, which the rewrite would mix with its own; false outside a repository.
+  uncommitted?: (root: string) => Promise<boolean>
 }
 
 export interface DependencyChange {
@@ -68,6 +70,17 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
       return true
     },
     kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env, logTo),
+    uncommitted: async (root) => {
+      try {
+        const { code, stdout } = await run(['git', 'status', '--porcelain', '--untracked-files=no', '--', '.'], root, true)
+
+        return code === 0 && stdout.trim() !== ''
+      }
+      catch {
+        // No git on the machine.
+        return false
+      }
+    },
   }
 }
 
@@ -226,6 +239,9 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
     return finish(0)
   }
+
+  if (await deps.uncommitted?.(root) === true)
+    console.error('kay upgrade: the working tree has uncommitted changes, which the rewrite of old forms will mix with its own: commit or stash them first to review the upgrade alone')
 
   // What the project holds after the last phase that landed, so a failing one puts back that state and not an older one.
   let settled = { source: original, locks: await readLocks(root) }
