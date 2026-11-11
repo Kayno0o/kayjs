@@ -101,8 +101,10 @@ function paintMessage(form: HTMLFormElement, box: HTMLElement, name: string, mes
   const sample = shown[0]?.className ?? box.getAttribute('data-issue-class') ?? ''
 
   // A message the server rendered goes with its mark, taken over as the first message is written or cleared here.
-  if (shown.length > 0)
+  if (shown.length > 0) {
     control?.removeAttribute('aria-invalid')
+    control?.removeAttribute('data-invalid')
+  }
 
   for (const old of shown)
     old.remove()
