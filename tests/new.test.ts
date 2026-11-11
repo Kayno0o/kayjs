@@ -222,8 +222,8 @@ const DOCKER_COPY = /^COPY (?!--from)(.+) \S+$/gm
 const MIGRATIONS = /migrationsDir: '([^']+)'/g
 // The package each command a script runs comes from, Bun aside.
 const SCRIPT_BINS: Record<string, string | undefined> = { 'bun': undefined, 'kay': 'kay', 'keslint': '@kaynooo/eslint', 'pg-orm': '@kaynooo/pg-orm' }
-// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, pg-orm, which kayjs-auth's default SQLite store loads from the app, and Tailwind's plugin, which kay adds itself.
-const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm', 'bun-plugin-tailwind'])
+// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, pg-orm, which kayjs-auth's default SQLite store loads from the app, Tailwind's plugin, which kay adds itself, and the two kay loads for its type and accessibility checks.
+const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm', 'bun-plugin-tailwind', 'axe-core', 'typescript7'])
 
 // What a scaffold's files name that it lacks: a relative import, preload, extended tsconfig, copied file or migrations folder, a package it imports without depending on it, a script package.json does not hold; and a dependency nothing imports.
 function unresolved(files: Record<string, string>): { paths: string[], undeclared: string[], unused: string[], scripts: string[] } {
@@ -683,7 +683,12 @@ describe('kay new', () => {
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
-    expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
+    expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'axe-core', 'bun-plugin-tailwind', 'tailwindcss', 'typescript7'])
+    // At the ranges kay's package.json declares for its optional peers.
+    const peers = (await Bun.file(join(repo, 'package.json')).json() as { peerDependencies: Record<string, string> }).peerDependencies
+
+    expect(manifest.devDependencies['axe-core']).toBe(peers['axe-core'])
+    expect(manifest.devDependencies.typescript7).toBe(peers.typescript7)
     expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
     expect(manifest.dependencies.kay).toBe('^1.0.0')
     expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
@@ -996,7 +1001,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.mcp.json')).json()).toEqual({ mcpServers: { kay: { command: 'bunx', args: ['kay', 'mcp'] } } })
       // Published, so the docs AGENTS.md imports are in node_modules/kay.
       expect(((await Bun.file(join(repo, 'package.json')).json()) as { files: string[] }).files).toEqual(expect.arrayContaining(['llms', 'llms.txt']))
-      expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
+      expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun', 'axe-core', 'typescript7'])
       expect(Object.keys(manifest.dependencies)).toEqual(['elysia', 'kay'])
 
       await installKay(dir)

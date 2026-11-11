@@ -112,6 +112,12 @@ kay lint --cache
 - When no file that check read has changed since, packages' own included, and no `.kay` file compiles differently, the type check is skipped: a second `kay check` or `kay build` takes a fraction of the first, and `kay build` little more than `kay build --no-check`.
 - A file written within a second before a check counts as changed, so the next check runs the type check again.
 
+### Peer packages
+
+- `typescript7`, which `kay check` and the type checks of `kay dev`, `kay build` and the editor server run on, and `axe-core`, which `kay a11y`, `page.a11y()` and the dev tool's a11y warnings run on, are optional peers of kay: the app lists both in `devDependencies`, as `kay new` writes them, so a production install carries neither.
+- Without `typescript7` those commands stop at once with `bun add -d typescript7@npm:typescript@^7.0.2`, without `axe-core` the a11y ones with `bun add -d axe-core@^4.14.0`; `kay dev` says so once at start and goes on without type checks, and `kay build --no-check` needs neither. `kay doctor`'s `peers` fails for the first and warns for the second.
+- `kay upgrade` adds both to an app coming from a kay before 1.97, in the first `kay check` it runs (`bun add --dev`).
+
 ### Linting
 
 - ESLint lints the script and server fences, the template expressions and the template classes (Tailwind rules) of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.

@@ -12,6 +12,7 @@ import { bunProblem } from '../bun'
 import { loadConfigWithin } from '../config-loader'
 import { readDevAddress } from '../dev/address'
 import { loopbackTaken } from '../dev/loopback'
+import { peerInstallCommand, PEERS } from '../peers'
 import { sqlitePath } from '../server/app-database'
 import { readManifest } from '../server/client'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -91,6 +92,7 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
   return [
     bunCheck(root),
     versionsCheck(root),
+    peersCheck(root),
     tsconfigCheck(root),
     await configCheck(root),
     await envCheck(root, dotenv),
@@ -169,6 +171,19 @@ async function configCheck(root: string): Promise<Check> {
   catch (error) {
     return { name: 'config', ok: false, message: firstLine(error), fix: 'fix kay.config.ts, then `kay check` points at the line' }
   }
+}
+
+// The packages kay loads for its type checks and its accessibility checks are the app's to install, as dev dependencies: without the first `kay check` stops, without the second only `kay a11y` and the dev tool's a11y warnings are off, so it warns.
+function peersCheck(root: string): Check {
+  const absent = PEERS.filter(name => installedVersion(root, name) === undefined)
+
+  if (absent.includes('typescript7'))
+    return { name: 'peers', ok: false, message: 'typescript7 is not installed, so `kay check`, `kay dev` types and the editor server cannot run', fix: `run \`${peerInstallCommand('typescript7')}\`` }
+
+  if (absent.length > 0)
+    return { name: 'peers', ok: true, warning: true, message: 'axe-core is not installed, so `kay a11y`, `page.a11y()` and the dev tool\'s a11y warnings are off', fix: `run \`${peerInstallCommand('axe-core')}\`` }
+
+  return { name: 'peers', ok: true, message: PEERS.map(name => `${name} ${installedVersion(root, name)}`).join(', ') }
 }
 
 // The project's types are checked through its tsconfig.json, which a workspace may keep above the project.

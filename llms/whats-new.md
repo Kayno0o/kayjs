@@ -33,6 +33,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ui: a required FormField shows the word `required` after the `*` (`ui.field.required`, French included), and a DateInput inside a FormField is named by the label text, not by its calendar button ([forms](../packages/ui/llms/forms-and-steps.md)); every literal `target="_blank"` link in kayjs-ui, kayjs-mail and kayjs-cms carries `data-new-tab`, so a screen reader hears it opens in a new tab.
 
+- `typescript7` and `axe-core` are optional peers of kay, no longer installed in production: `kay new` adds both to `devDependencies`, a missing one stops `kay check`, `kay a11y` and the dev tool's checks with the `bun add -d` command to run, `kay doctor` has a `peers` check, and `kay upgrade` adds them to an existing app ([tools](check-and-tools.md), [upgrading](upgrading.md)).
 - `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
 - `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
 - The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).

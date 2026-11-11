@@ -1,8 +1,10 @@
 import type { DependencyChange, UpgradeDeps } from '../src/commands/upgrade'
-import { chmod, mkdir, rm, symlink } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
+import { addMissingPeers } from '../src/commands/add-peers'
 import { registryDepsFor, steppingStones, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
@@ -73,6 +75,53 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
 }
 
 describe('kay upgrade', () => {
+  it('adds typescript7 and axe-core as dev dependencies when the app lacks them, at kay\'s ranges, and installs nothing for an app that has them', async () => {
+    // Outside the checkout, whose own node_modules an app scratch folder would find above it.
+    const root = await mkdtemp(join(tmpdir(), 'upgrade-peers-'))
+    const commands: string[][] = []
+    const install = async (command: string[], cwd: string) => {
+      commands.push([...command.slice(1), cwd])
+
+      return 0
+    }
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await Bun.write(join(root, 'package.json'), '{ "name": "app" }')
+      expect(await addMissingPeers(root, install)).toBe(true)
+      expect(commands).toEqual([['add', '--dev', 'typescript7@npm:typescript@^7.0.2', 'axe-core@^4.14.0', root]])
+
+      // One of them installed: only the other is added.
+      await Bun.write(join(root, 'node_modules/axe-core/package.json'), '{ "name": "axe-core", "version": "4.14.0" }')
+      commands.length = 0
+      await addMissingPeers(root, install)
+      expect(commands).toEqual([['add', '--dev', 'typescript7@npm:typescript@^7.0.2', root]])
+
+      await Bun.write(join(root, 'node_modules/typescript7/package.json'), '{ "name": "typescript", "version": "7.0.2" }')
+      commands.length = 0
+      expect(await addMissingPeers(root, install)).toBe(true)
+      expect(commands).toEqual([])
+      expect(await addMissingPeers(root, async () => 1)).toBe(true)
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a failed add of the peers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'upgrade-peers-'))
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect(await addMissingPeers(root, async () => 1)).toBe(false)
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs each check knowing the version the app came from', async () => {
     const root = await project()
     const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }, ['1.45'])

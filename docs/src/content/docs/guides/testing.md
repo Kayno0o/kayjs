@@ -541,7 +541,7 @@ The view runs one DevTools command at a time, so use `page.cdp(method, params)` 
 
 ### Checking accessibility
 
-`page.a11y(selector?)` checks the page as it stands, or only the elements the selector matches, with axe-core, as `kay dev` does. It resolves with the rules the page breaks, and with none when it passes.
+`page.a11y(selector?)` checks the page as it stands, or only the elements the selector matches, with axe-core, as `kay dev` does. It resolves with the rules the page breaks, and with none when it passes. `axe-core` has to be in your `devDependencies`, as `kay new` writes it; without it the test fails with the `bun add -d` command that installs it.
 
 ```ts
 const broken = await page.a11y()

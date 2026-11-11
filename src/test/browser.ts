@@ -5,9 +5,9 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realp
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 import { within } from '@kaynooo/utils/promise'
 import { afterAll } from 'bun:test'
+import { resolvePeer } from '../peers'
 import { withUnreadable } from '../runtime/dev-a11y'
 import { optionMs } from '../runtime/duration'
 import { ISLAND } from '../runtime/markers'
@@ -1144,9 +1144,9 @@ interface Axe {
 
 let axe: string | undefined
 
-// axe-core's browser build, read once where the dependency installed.
+// axe-core's browser build, read once where the app installed it; a plain error naming the install command when it did not.
 async function axeSource(): Promise<string> {
-  axe ??= await Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))).text()
+  axe ??= await Bun.file(resolvePeer('axe-core', 'axe-core/axe.min.js')).text()
 
   return axe
 }

@@ -457,7 +457,7 @@ kay check --watch
 
 The first path is the project when it is a directory holding a `kay.config.ts`, a `package.json` or a `tsconfig.json`. The other paths narrow the report, and `--fix`, to those files and directories. The project is still type-checked as a whole.
 
-The type check is Bun's own (`bun check`), on every core, and runs even when your `package.json` has a `check` script. When nothing the last clean check read has changed, the next one skips it. A file written within a second before a check counts as changed.
+The type check is Bun's own (`bun check`), on every core, and runs even when your `package.json` has a `check` script. It needs `typescript7` among your dev dependencies, which `kay new` adds; without it `kay check` stops at once and prints the command that installs it, `bun add -d typescript7@npm:typescript@^7.0.2`. When nothing the last clean check read has changed, the next one skips it. A file written within a second before a check counts as changed.
 
 | Option | Effect |
 | --- | --- |
@@ -510,6 +510,8 @@ When the project is a git working tree with uncommitted changes to tracked files
 
 If the install leaves an npm `bun` package older than the Bun kay needs, as the peer of `bun-plugin-tailwind` can, it runs `bun update bun` so kay does not refuse to start.
 
+An app coming from kay 1.96 or older has no `typescript7` and `axe-core` of its own, which kay installed for it until 1.97: the first `kay check` of the upgrade adds both to `devDependencies`.
+
 A last `kay check --fix` applies any other quick fix, such as moving a Dockerfile's `FROM oven/bun:<version>` up to the Bun the new kay needs, and prints what is left for you to change by hand, warnings too: `kay upgrade` says nothing is left only when nothing was printed, and exits 1 otherwise. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
 `--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed. `--format json` prints `{ steps, changed }`: what each step said, and the packages moved.
@@ -543,6 +545,7 @@ kay doctor --port 4000
 | --- | --- |
 | `bun` | Bun is older than kay needs |
 | `versions` | `@kaynooo/kayjs` or a `@kaynooo/kayjs-*` library listed in `package.json` is not installed, or a library is not on kay's minor |
+| `peers` | `typescript7`, which `kay check` types the project with, is not installed. Warns when `axe-core`, which `kay a11y`, `page.a11y()` and the dev tool's accessibility warnings run, is not. Each says the `bun add -d` command that installs it |
 | `tsconfig` | No `tsconfig.json` in the project or above it, which `kay check` types the project through |
 | `config` | `kay.config.ts` does not load, or its `i18n` is refused (a default outside the locales, a bad tag, a domain for no locale) |
 | `env` | A variable the project declares as required is set neither in the shell nor in the project's `.env` files. `kay env` lists them |

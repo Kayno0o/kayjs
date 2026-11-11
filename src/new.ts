@@ -230,7 +230,7 @@ async function librariesDryRun(files: Record<string, string>, libraries: readonl
 export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host, runner?: string): Promise<Record<string, string>> {
   const has = (feature: Feature) => features.has(feature)
   const name = packageName(basename(dir))
-  const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+  const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string>, peerDependencies: Record<string, string> }
   // A kay minor may break, so the project takes its patches only.
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   const scripts = {
@@ -247,7 +247,10 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     (has('starter') || has('accents') || has('auth')) && '@iconify-json/tabler',
     has('eslint') && '@kaynooo/eslint',
     '@types/bun',
+    // The type checks and the accessibility checks load these from the app, at the ranges kay declares as its optional peers.
+    'axe-core',
     ...has('tailwind') ? ['bun-plugin-tailwind', 'tailwindcss'] : [],
+    'typescript7',
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
     ...templateFiles(features, settings, host, runner),
@@ -260,7 +263,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
       private: true,
       scripts,
       dependencies: { ...has('auth') && { '@kaynooo/kayjs-auth': `~${kay.version}`, '@kaynooo/kayjs-ui': `~${kay.version}`, '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency },
-      devDependencies: Object.fromEntries(devDependencies.map(dev => [dev, kay.devDependencies[dev]!])),
+      devDependencies: Object.fromEntries(devDependencies.map(dev => [dev, kay.peerDependencies[dev] ?? kay.devDependencies[dev]!])),
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }

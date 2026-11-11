@@ -91,14 +91,14 @@ describe('kay doctor', () => {
     const result = await doctor(root, [], { PORT: port })
 
     expect(result.code, result.stderr).toBe(0)
-    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database', 'complete'])
+    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'peers', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database', 'complete'])
     expect(result.checks.every(check => check.ok)).toBe(true)
 
     const text = Bun.spawnSync([process.execPath, cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH!, PORT: port } })
     const lines = text.stdout.toString().trimEnd().split('\n')
 
     expect(text.exitCode).toBe(0)
-    expect(lines).toHaveLength(10)
+    expect(lines).toHaveLength(11)
     expect(lines.every(line => line.startsWith('ok ') || line.startsWith('warn'))).toBe(true)
   })
 
@@ -158,7 +158,7 @@ describe('kay doctor', () => {
     expect(result.code).toBe(1)
     expect(result.check('config').ok).toBe(false)
     expect(result.check('config').message).toContain('boom in the config')
-    expect(result.checks).toHaveLength(10)
+    expect(result.checks).toHaveLength(11)
     expect(result.check('bun').ok).toBe(true)
   })
 
@@ -172,6 +172,32 @@ describe('kay doctor', () => {
     const both = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', prefixDefault: true, domains: { en: \'a.com\', fr: \'b.com\' } } }\n' }))
 
     expect(both.check('config').message).toContain('not both')
+  })
+
+  it('fails a project without typescript7, warns for one without axe-core, each naming the command that installs it', async () => {
+    // Outside the checkout, whose own node_modules a scratch project would find above it.
+    const root = await mkdtemp(join(tmpdir(), 'doctor-peers-'))
+
+    dirs.push(root)
+    await Promise.all(Object.entries({ 'package.json': '{ "name": "app" }', 'tsconfig.json': '{}' }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const none = await doctor(root)
+
+    expect(none.check('peers').ok).toBe(false)
+    expect(none.check('peers').fix).toBe('run `bun add -d typescript7@npm:typescript@^7.0.2`')
+
+    await Promise.all(Object.entries(installed('typescript7', '7.0.2')).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const noAxe = await doctor(root)
+
+    expect(noAxe.check('peers')).toMatchObject({ ok: true, warning: true, fix: 'run `bun add -d axe-core@^4.14.0`' })
+
+    await Promise.all(Object.entries(installed('axe-core', '4.14.0')).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const both = await doctor(root)
+
+    expect(both.check('peers')).toMatchObject({ ok: true, message: 'typescript7 7.0.2, axe-core 4.14.0' })
+    expect(both.check('peers').warning).toBeUndefined()
   })
 
   it('fails a project with no tsconfig.json', async () => {

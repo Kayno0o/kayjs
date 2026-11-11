@@ -10,6 +10,7 @@ interface Manifest {
   dependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>
   devDependencies?: Record<string, string>
   engines?: { bun?: string }
 }
@@ -368,9 +369,17 @@ describe('what\'s new', () => {
 
 describe('the TypeScript packages', () => {
   it('give kay the native compiler under its own alias, and typescript 6 only to its own lint, as an app gets the one typescript-eslint asks for', () => {
-    expect(root.dependencies?.typescript7).toStartWith('npm:typescript@')
+    expect(root.peerDependencies?.typescript7).toStartWith('npm:typescript@')
     expect(root.dependencies?.typescript).toBeUndefined()
     expect(root.devDependencies?.typescript).toStartWith('^6')
+  })
+
+  it('leave the compiler and axe-core to the app: optional peers that kay installs for itself, never dependencies an app installs in production', () => {
+    for (const name of ['typescript7', 'axe-core']) {
+      expect(root.dependencies?.[name]).toBeUndefined()
+      expect(root.peerDependenciesMeta?.[name]).toEqual({ optional: true })
+      expect(root.devDependencies?.[name]).toBe(root.peerDependencies?.[name])
+    }
   })
 
   it('give an app the tsgo command running the native compiler', async () => {

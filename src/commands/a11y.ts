@@ -7,6 +7,7 @@ import { A11yRefusedError, auditSite } from '../a11y/audit'
 import { declaration, failed, formatReport, NO_PAGE_AUDITED, reportOf, tally } from '../a11y/report'
 import { KAY_DIR } from '../build/assets'
 import { loadConfigWithin } from '../config-loader'
+import { resolvePeer } from '../peers'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
 
@@ -36,6 +37,9 @@ export const a11y: Command = {
     buildingWithoutEnv()
 
     try {
+      // Before Chrome opens a page: without axe-core no page can be audited.
+      resolvePeer('axe-core', 'axe-core/axe.min.js')
+
       const config = await loadConfigWithin(root)
       const standard = (values.standard as Standard | undefined) ?? (FRENCH.test(config.i18n?.defaultLocale ?? config.lang ?? '') ? 'rgaa' : 'wcag')
       const quiet = values.quiet === true || format === 'json'

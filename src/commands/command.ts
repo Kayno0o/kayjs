@@ -11,6 +11,7 @@ import { badUsage, findUp, parse, printError } from '@kaynooo/cli-kit'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { errorCodeOf } from '../compiler/errors'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { MissingPeerError } from '../peers'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // What a workflow command's message and properties escape.
@@ -394,6 +395,10 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
 // A command that could not run, on a missing path or a config that does not load: on stderr as always, and as one error in JSON or an Actions annotation, which a tool reading stdout would otherwise get nothing from.
 // A failure given as text is a usage problem, `command-usage`, unless `code` says otherwise: null for a child that died.
 export function printFailure(command: string, failure: unknown, format: ProblemFormat, code?: string | null): void {
+  // A package kay needs and the app did not install is one line naming the command to run, never an error object with its stack.
+  if (failure instanceof MissingPeerError)
+    return printFailure(command, failure.message, format, code ?? 'missing-peer')
+
   console.error(typeof failure === 'string' ? `kay ${command}: ${failure}` : failure)
 
   const hint = explainHint(failure)

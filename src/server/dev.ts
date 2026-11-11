@@ -15,10 +15,10 @@ import { readFileSync, statSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
 import { Elysia } from 'elysia'
 import { outputDir, underKayDev } from '../build/assets'
 import { siteFromEnv } from '../config-loader'
+import { resolvePeer } from '../peers'
 import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
@@ -264,9 +264,21 @@ export function devStyles(): Response {
   return devModule(STYLES_SOURCE, '\nstartStyleCheck()\n')
 }
 
-// Read where the dependency installed, never imported, so a compiled server leaves it out.
+let axeWarned = false
+
+// Read where the app installed it, never imported, so a compiled server leaves it out; without it the page's checks do not run, and the server says why once.
 export function devAxe(): Response {
-  return new Response(Bun.file(fileURLToPath(import.meta.resolve('axe-core/axe.min.js'))), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } })
+  try {
+    return new Response(Bun.file(resolvePeer('axe-core', 'axe-core/axe.min.js')), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } })
+  }
+  catch (error) {
+    if (!axeWarned) {
+      axeWarned = true
+      kayLog('warn', `a11y checks are off: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    return new Response(null, { status: 404 })
+  }
 }
 
 // How long the editor command gets to fail before it counts as opened: a launcher such as `code -g` or `tmux new-window` exits at once, an editor keeping its process runs on.

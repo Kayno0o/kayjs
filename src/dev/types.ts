@@ -9,6 +9,7 @@ import { KAY_DIR, testWorker } from '../build/assets'
 import { check, configCheckOptions, formatCheckDiagnostic, writeShadowTypes } from '../check'
 import { deriveToolOutputs } from '../check/tool-outputs'
 import { loadConfig } from '../config-loader'
+import { MissingPeerError } from '../peers'
 import { projectPaths } from '../project'
 import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE, TREE } from './refuse'
 
@@ -137,7 +138,9 @@ async function typecheck(): Promise<number> {
     return Number(problems.length > 0)
   }
   catch (error) {
-    console.error(error)
+    // `kay dev` said so at its start, once.
+    if (!(error instanceof MissingPeerError))
+      console.error(error)
 
     return CHECK_SKIPPED
   }

@@ -20,7 +20,9 @@
     "kay": "file:../.."
   },
   "devDependencies": {
+    "axe-core": "^4.14.0",
     "bun-plugin-tailwind": "*",
-    "tailwindcss": "*"
+    "tailwindcss": "*",
+    "typescript7": "npm:typescript@^7.0.2"
   }
 }

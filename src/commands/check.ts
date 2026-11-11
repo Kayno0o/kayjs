@@ -16,6 +16,7 @@ import { loadConfig, loadConfigWithin } from '../config-loader'
 import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
+import { addMissingPeers } from './add-peers'
 import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
 import { runProjectChecks } from './project-checks'
 
@@ -76,6 +77,13 @@ export const check: Command = {
 
     if (scope === undefined)
       return 1
+
+    // `kay upgrade` runs this check with the kay it just installed, for an app coming from one that held the compiler and axe-core as its own dependencies.
+    if (process.env[UPGRADE_FROM] !== undefined && !await addMissingPeers(root)) {
+      printFailure('check', 'could not add typescript7 and axe-core to devDependencies', format)
+
+      return 1
+    }
 
     if (values.watch === true) {
       const flags = [

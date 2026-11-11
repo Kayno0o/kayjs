@@ -5,6 +5,7 @@ import process from 'node:process'
 import { ConfigRefusedError, dev as startDev } from '../dev'
 import { InspectorAddressInUseError } from '../dev/inspector'
 import { isLoopback } from '../dev/loopback'
+import { missingPeerMessage, peerInstalled } from '../peers'
 import { isPort, warnOtherKay } from './command'
 
 const WS_SCHEME = /^ws:\/\//
@@ -52,6 +53,11 @@ export const dev: Command = {
 
     try {
       warnOtherKay('dev', root)
+
+      // The type checks run in the background of every save, each failing the same way without it: said once, here.
+      if (values['no-types'] !== true && !peerInstalled('typescript7'))
+        console.error(`kay dev: type checks are off, ${missingPeerMessage('typescript7')}`)
+
       const defaultEntry = inDir ? undefined : path
       const entry = typeof option === 'string' ? resolve(option) : defaultEntry
 
