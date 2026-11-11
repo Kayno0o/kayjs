@@ -1,4 +1,4 @@
-import { chmodSync, readdirSync, statSync } from 'node:fs'
+import { chmodSync, lstatSync, readdirSync, statSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import { replaceFile } from '../src/build/files'
@@ -28,4 +28,17 @@ it('gives a new file the mode asked for', async () => {
   await replaceFile(join(dir, '.env'), 'A=1\n', 0o600)
 
   expect(statSync(join(dir, '.env')).mode & 0o777).toBe(0o600)
+})
+
+it('writes through a symbolic link, which stays one', async () => {
+  const dir = await scratchDir('replace-file-')
+  const target = join(dir, 'real.env')
+  const link = join(dir, '.env')
+
+  await Bun.write(target, 'A=1\n')
+  symlinkSync('real.env', link)
+  await replaceFile(link, 'A=2\n')
+
+  expect(lstatSync(link).isSymbolicLink()).toBe(true)
+  expect(await Bun.file(target).text()).toBe('A=2\n')
 })

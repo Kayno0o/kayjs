@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { KAY_DIR } from './assets'
@@ -404,15 +404,18 @@ export async function writeAtomically(path: string, content: string | Uint8Array
 // Writes a file the user owns (`package.json`, `.env`, a route) atomically, so a crash or a full disk leaves it as it was, not cut short: the file it replaces keeps its mode, a new one takes `mode` (the process's default when none).
 export async function replaceFile(path: string, content: string | Uint8Array, mode?: number): Promise<void> {
   let kept = mode
+  let target = path
 
   try {
-    kept = (await stat(path)).mode & 0o777
+    // A symbolic link stays one: the file it names is the one replaced.
+    target = await realpath(path)
+    kept = (await stat(target)).mode & 0o777
   }
   catch {
     // A new file.
   }
 
-  await writeAtomically(path, async (draft) => {
+  await writeAtomically(target, async (draft) => {
     await writeFile(draft, content, kept === undefined ? {} : { mode: kept })
 
     // The mode given to a new file is cut by the process's umask, which a file that already had it did not ask for.

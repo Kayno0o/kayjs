@@ -4,6 +4,13 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
+- `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
+- The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).
+- `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
+- `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).
+- The MCP `add` tool takes `install: true` with `apply: true`, which runs `bun add` and `bun install` so a library the project lacks (`auth`, `mail`, `cms`, `ai`, `ui`) can be added from an agent ([editor and agent commands](editor-and-agent-commands.md)).
+- A hanging `onStop` hook is given up on after `serve.shutdownTimeout`, so the hooks after it and the stores' closing still run ([production](production.md)); the 404 log and redirects of a `pgData` store give up on a database call after 8 seconds, logged ([routing](routing-endpoints-and-base.md)); `keepalive` calls share the browser's 64 KB cap between them, the one past it going as a plain post ([actions from islands](actions-from-islands.md)).
 - `kay check --fix` applies only fixes that keep behaviour: `island-prop`'s `--- island`, `unreachable-selector`'s `:global(...)` and an `old-bun-image` pinned by digest are offered, not applied. The `brace-in-attribute` fix reads the scope of the name, the missing-import fix finds the imports of a module from its syntax, two fixes at one place apply in a fixed order, and `deprecated-local-state` leaves a template's prose and names it binds itself alone ([checks](lints.md)).
 - `kay mcp` refuses a `render` that POSTs and the `test` tool unless it was started with `--write`, as both run the app's code against its database, and `not_found` hands the paths visitors typed as data, cut at 120 characters ([MCP commands](editor-and-agent-commands.md)).
 - A queue keeps at most 2,000 characters of a failure's error, and a `workflow()` run fails with no retry once its kept results pass 2 MB, naming what to do ([queues](queues.md)).
@@ -31,13 +38,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.96.0
 
-- `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).
-- `kay check` notes an entry shown on the site whose `reference()` names an entry held back as a draft or by `publishAt` and `unpublishAt`, as the `held-back-reference` lint, a warning ([lints](lints.md)).
-- The SQLite `compose.prod.yaml` that `kay new` writes for an app on kayjs-auth passes `AUTH_DATABASE_URL` to the container, so the value `.env.example` lists reaches kayjs-auth ([scaffold](project-new-and-add.md)).
-- `kay upgrade` warns when the git working tree holds uncommitted changes to tracked files, before it rewrites any ([tools](check-and-tools.md)).
-- `kay add` and `kay generate` write each file atomically, keeping the mode of the one they replace, so a crash or a full disk leaves it as it was ([project and scaffolding](project-new-and-add.md)).
-- The MCP `add` tool takes `install: true` with `apply: true`, which runs `bun add` and `bun install` so a library the project lacks (`auth`, `mail`, `cms`, `ai`, `ui`) can be added from an agent ([editor and agent commands](editor-and-agent-commands.md)).
-- A hanging `onStop` hook is given up on after 5 seconds, so the hooks after it and the stores' closing still run ([production](production.md)); the 404 log and redirects of a `pgData` store give up on a database call after 8 seconds, logged ([routing](routing-endpoints-and-base.md)); `keepalive` calls share the browser's 64 KB cap between them, the one past it going as a plain post ([actions from islands](actions-from-islands.md)).
 - `mount()` returns a handle, `{ update(props), dispose }` that is still callable as the disposer, and takes a function for its props, `() => ({ title: title() })`, whose signals the mount follows ([a page kay does not serve](navigation-from-code.md#a-page-kay-does-not-serve)).
 - kayjs-ui: `NavigationProgress` is a thin top bar following `navigation.pending()` with a delay before it shows, and the link a visit follows carries `data-pending` until the swap ends, so `a[data-pending]` styles it with no script ([page layout](../packages/ui/llms/page-layout-palette-and-trees.md), [navigating from code](navigation-from-code.md)).
 - kayjs-ui: `Meter` announces `value` out of `max` (3 of 10 is 3, not 30) and takes `formatValue`, `showValue` and a `@reading` block for its value as text, `thresholds` to colour the fill by value and `size`; `Progress` takes the same ([kayjs-ui basics](../packages/ui/llms/basics.md)).

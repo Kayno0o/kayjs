@@ -1,6 +1,6 @@
 import type { Node, Program } from './compiler/estree'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { detectFeatures } from './add'
 import { replaceFile } from './build/files'
@@ -355,7 +355,8 @@ export async function generate(dir: string, kind: string, name: string, options:
 
     for (const [path, text] of Object.entries(files)) {
       await mkdir(dirname(join(dir, path)), { recursive: true })
-      await replaceFile(join(dir, path), text)
+      // A new file, written exclusively: never over one a concurrent run just made.
+      await writeFile(join(dir, path), text, { flag: 'wx' })
     }
   }
 

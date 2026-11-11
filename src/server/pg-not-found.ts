@@ -5,7 +5,7 @@ import type { PgSource } from './pg-jobs'
 import { kayLog } from '../runtime/log'
 import { FLUSH_MS, holdHit, HOUR_MS, MAX_AGE_MS, MAX_PATHS, MAX_PENDING, MAX_REFERRERS } from './missing-hits'
 import { connectionOf, privilegeRefused, relationsMissing } from './pg-jobs'
-import { limited, limitedStore, READY_TIMEOUT_MS } from './pg-limit'
+import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS, READY_TIMEOUT_MS, STORE_TIMEOUT_MS } from './pg-limit'
 import { pgRedirectSet } from './pg-redirects'
 import { escaped, query } from './pg-sql'
 import { onReload } from './reload'
@@ -222,7 +222,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
             await query(tx, 'INSERT INTO kay_missing_referrers (path, host, hits) VALUES ($1, $2, $3::bigint) ON CONFLICT (path, host) DO UPDATE SET hits = kay_missing_referrers.hits + $3::bigint', [path, host, more])
         }
       }
-    }))
+    }), now - purgedAt < HOUR_MS ? STORE_TIMEOUT_MS : MAINTENANCE_TIMEOUT_MS)
 
     if (purged)
       purgedAt = now

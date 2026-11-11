@@ -168,7 +168,7 @@ The check runs at most once every three seconds, however often the route is poll
 
 On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance. It then calls the `close` of each store, so a replica leaves no presence member and no connection behind.
 
-A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `serve.shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks, each given 5 seconds, and exits. Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed.
+A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `serve.shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks, each given `serve.shutdownTimeout` at most, and exits. Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed.
 
 ## Request timeouts
 

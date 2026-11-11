@@ -21,6 +21,7 @@ import { previewing, previewState, sharedDraft } from '../runtime/preview'
 import { checkPublishField, isDraft, modifiedMode, publishTime } from './drafts'
 import { entryPath } from './entry-route'
 import { excerptOf, keepMarkerHtml, restoreMarker } from './excerpt'
+import { heldBack } from './held-back'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
 import { builtBody, contentMode, isLoadedSlug, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
@@ -455,10 +456,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return down !== undefined && down <= Date.now()
   }
-  const scheduled = (entry: Entry<Data>) => notYet(entry) || over(entry)
   // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
   const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
-  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && ((draft !== undefined && isDraft(draft, entry)) || scheduled(entry)) && !sharedDraft(exportNameOf(name), entry.slug, entry.locale)
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && heldBack(options, entry, entry.data) && !sharedDraft(exportNameOf(name), entry.slug, entry.locale)
   const blockItem = (data: unknown, path: string[]) => isBlockItem(options.schema, data, path)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined

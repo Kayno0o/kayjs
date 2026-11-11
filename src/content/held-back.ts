@@ -1,11 +1,10 @@
-import type { Collection, Entry } from './index'
-import type { RawEntry } from './load'
+import type { Entry } from './index'
 import { isDraft, publishTime } from './drafts'
 
 // Whether a production server leaves an entry out of its pages: a draft, one not yet published, or one already taken down.
-export function heldBack(options: Collection<unknown>['options'], raw: RawEntry, data: unknown): boolean {
+export function heldBack<Data>(options: { draft?: ((entry: Entry<Data>) => boolean) | string | undefined, publishAt?: string | undefined, unpublishAt?: string | undefined }, raw: object, data: Data): boolean {
   const { draft, publishAt, unpublishAt } = options
-  const entry = { ...raw, data } as unknown as Entry<unknown>
+  const entry = { ...raw, data } as unknown as Entry<Data>
 
   if (draft !== undefined && isDraft(draft, entry))
     return true

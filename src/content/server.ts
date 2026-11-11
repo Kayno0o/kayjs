@@ -236,8 +236,17 @@ async function slugsOf(root: string, collection: Collection<unknown>): Promise<M
     const found = await loadEntries(dir, { ...markdownOf(collection.options), live: true, localized, modified: modifiedMode(collection.options) })
 
     const { draft, publishAt, unpublishAt } = collection.options
-    // Decoding is only needed to read a draft or a publication date.
-    const data = draft === undefined && publishAt === undefined && unpublishAt === undefined ? undefined : new Map((await decodedIn(root, () => decodeEntries(found, collection.options.schema, collection.options.components ?? {}, localized))).map(({ entry, data }) => [entry, data]))
+    // Decoding is only needed to read a draft or a publication date, and an entry that does not decode is not told held back.
+    let data: Map<RawEntry, unknown> | undefined
+
+    try {
+      data = draft === undefined && publishAt === undefined && unpublishAt === undefined ? undefined : new Map((await decodedIn(root, () => decodeEntries(found, collection.options.schema, collection.options.components ?? {}, localized))).map(({ entry, data }) => [entry, data]))
+    }
+    catch (error) {
+      if (!(error instanceof ContentError))
+        throw error
+    }
+
     const held = new Map<string, boolean>()
 
     for (const entry of found) {

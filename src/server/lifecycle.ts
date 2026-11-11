@@ -151,7 +151,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
       const endDrain = beginDrain(timeout * 1000)
 
       try {
-        await shutdown(root)
+        await shutdown(root, false, timeout * 1000)
       }
       finally {
         endDrain()
@@ -272,7 +272,7 @@ async function stopServer(server: NonNullable<AnyElysia['server']>, force: boole
 }
 
 // Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
-export async function shutdown(app: AnyElysia, force = false): Promise<void> {
+export async function shutdown(app: AnyElysia, force = false, hookTimeoutMs = STOP_HOOK_TIMEOUT_MS): Promise<void> {
   const server = app.server
 
   if (!server)
@@ -284,10 +284,10 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
 
   await stopServer(server, force)
   app.server = null
-  await runStopHooks(app)
+  await runStopHooks(app, hookTimeoutMs)
 }
 
-// Runs each `onStop` hook in turn, awaiting it for a few seconds at most, so one that hangs leaves the others and the stores their turn: for an app that never listened too, as a plugin may have started its timers when it was set up.
+// Runs each `onStop` hook in turn, awaiting it for `timeoutMs` at most (the shutdown timeout on a signal, so a queue finishing its jobs has all of it), so one that hangs leaves the others and the stores their turn: for an app that never listened too, as a plugin may have started its timers when it was set up.
 export async function runStopHooks(app: AnyElysia, timeoutMs = STOP_HOOK_TIMEOUT_MS): Promise<void> {
   for (const hook of app.event.stop ?? []) {
     try {

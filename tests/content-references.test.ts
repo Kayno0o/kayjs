@@ -128,6 +128,27 @@ describe('a dangling reference', () => {
     }
   }, 30_000)
 
+  it('still checks a collection with a date field when one of its entries does not decode', async () => {
+    const copy = await site({
+      'authors/ada.md': AUTHOR,
+      'authors/broken.md': '---\nname: 3\nat: 2999-01-01\n---\n',
+      'news/fr/lost.md': post('author: ghost\n'),
+    })
+
+    try {
+      const config = join(copy, 'src/content.config.ts')
+
+      await Bun.write(config, (await Bun.file(config).text()).replace('collection(\'content/authors\', { schema: t.Object({ name: t.String() }) })', 'collection(\'content/authors\', { schema: t.Object({ name: t.String(), at: t.Optional(t.Date()) }), publishAt: \'at\' })'))
+
+      const { problems } = await checkContent(copy, undefined, true)
+
+      expect(problems.map(problem => problem.message).some(message => message.includes('author: references ghost'))).toBe(true)
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('passes when every slug exists, and fails kay build when one does not', async () => {
     const good = await site({ 'authors/ada.md': AUTHOR, 'news/fr/ok.md': post('author: ada\n') })
     const bad = await site({ 'authors/ada.md': AUTHOR, 'news/fr/lost.md': post('author: ghost\n') })
