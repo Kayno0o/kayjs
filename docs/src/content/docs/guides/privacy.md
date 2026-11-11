@@ -150,9 +150,9 @@ Plausible, Umami on your own server (give it `websiteId` and `url`), Simple Anal
 
 The first four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 
-Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `consent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains.
+Fathom and Cloudflare Web Analytics are different. Like Google Analytics and `custom`, they wait for the visitor's yes unless you write `awaitConsent: false`. They take data only from their own scripts, so kay cannot send for them. `provider: 'fathom'` (`siteId`) and `provider: 'cloudflare'` (`token`) add their script to your pages and open the content security policy for their domains.
 
-Their data does not pass through your site. With `consent: false`, kay loads their script itself so it can honour an opt-out.
+Their data does not pass through your site. With `awaitConsent: false`, kay loads their script itself so it can honour an opt-out.
 
 For any other tracker that is a script posting to an endpoint, use `provider: 'custom'` with `script` and `endpoint`. kay serves a copy of the script from your site with the endpoint in it pointed at your site, and passes what the script posts on. The endpoint must appear in the script exactly as you write it.
 
@@ -163,7 +163,7 @@ The script counts the page when it loads and again after each page swap. It need
 `provider: 'ga4'` sends each page view to Google Analytics from your server, through its Measurement Protocol. It needs the `measurementId` of your web data stream (`G-` and letters) and an `apiSecret`, which you make in Google Analytics under the data stream's Measurement Protocol API secrets. The secret stays on your server. Use `url: 'https://region1.google-analytics.com'` to collect in the EU.
 
 ```ts
-analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: true })
+analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', awaitConsent: true })
 ```
 
 Google normally keeps a visitor's id in a cookie. kay sets none, but that does not remove the need to ask: the script still reads the visitor's screen and language, and Google Analytics is never exempt from consent.
@@ -185,19 +185,19 @@ Behind a CDN or proxy set `proxy`, or every visitor shares the proxy's address a
 
 ### Asking first
 
-Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without a `url`, or with `cloud.umami.is`) ask by default, as if you wrote `consent: true`, because it is a third party that gets the visitor's address; for Plausible, Simple Analytics, Matomo and an Umami with your own `host` you add it. `consent: false` counts Umami Cloud at once, and the transfer is yours to answer for.
+Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without a `url`, or with `cloud.umami.is`) ask by default, as if you wrote `awaitConsent: true`, because it is a third party that gets the visitor's address; for Plausible, Simple Analytics, Matomo and an Umami with your own `host` you add it. `awaitConsent: false` counts Umami Cloud at once, and the transfer is yours to answer for.
 
 Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
 
 The cookie is the only record of the answer, and it lives in the visitor's browser: kay keeps no list of who agreed or when. A site that must prove a visitor's consent (GDPR art. 7(1)) records it itself, for example by posting `consent()` to an action from the handler that assigns `consent`, with the date, the wording shown and no more of the visitor than the proof needs.
 
-`consent: { maxAge }` sets another time, a string such as `'180d'`, up to 13 months, the longest the CNIL accepts.
+`awaitConsent: { maxAge }` sets another time, a string such as `'180d'`, up to 13 months, the longest the CNIL accepts.
 
 ```ts
 analytics({
   provider: 'umami',
   websiteId: '0b2f4a52-0000-4000-8000-000000000000',
-  consent: {
+  awaitConsent: {
     text: { en: 'Can we count your visit?', fr: 'Pouvons-nous compter votre visite ?' },
     agree: { en: 'Yes', fr: 'Oui' },
     refuse: { en: 'No', fr: 'Non' },
@@ -267,7 +267,7 @@ Plausible, Simple Analytics, Matomo and Umami on your own `url` count at once, a
 
 The line reads in English, or in French on a page whose `lang` is `fr`; your own strings win over both.
 
-To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `consent: false`. You then answer for it yourself, but kay still shows the information line with an opt-out, for Google Analytics, Fathom, Cloudflare and a custom tracker alike.
+To count Google Analytics, Fathom, Cloudflare or a custom tracker without asking, write `awaitConsent: false`. You then answer for it yourself, but kay still shows the information line with an opt-out, for Google Analytics, Fathom, Cloudflare and a custom tracker alike.
 
 For Fathom, Cloudflare and `custom`, kay loads the tool's script itself, and not at all once the visitor has opted out. If they opt out after it ran, the page reloads without it. The page they opt out on was already counted by the tool's script.
 
@@ -275,7 +275,7 @@ Write `info: false` if your own page informs and lets visitors object, and the t
 
 Before 1.55 these counted every visit without asking, and `kay check` reports the ones that did not say which they want.
 
-A site built with `kay build --static` asks the same for Fathom and Cloudflare, and shows their information line and opt-out with `consent: false`: kay writes the notice's script beside the pages. Google Analytics and a custom tracker still need a server.
+A site built with `kay build --static` asks the same for Fathom and Cloudflare, and shows their information line and opt-out with `awaitConsent: false`: kay writes the notice's script beside the pages. Google Analytics and a custom tracker still need a server.
 
 ### The CNIL exemption, and what it asks
 
@@ -287,17 +287,17 @@ Not asking is lawful only where an exemption applies, and a cookieless id is not
 - Data is kept 25 months at most, and an identifier lives 13 months at most (`kay_analytics` lasts 180 days, and `maxAge` allows up to 13 months).
 - An address is truncated or dropped by the tool.
 
-This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Umami Cloud therefore asks first unless you write `consent: false`. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
+This is one regulator's position. Other countries may ask for consent anyway. Plausible, Umami and Matomo get the visitor's address to tell visitors apart, so the exemption holds only if the tool drops it: run it yourself, or check its terms. Umami Cloud therefore asks first unless you write `awaitConsent: false`. Google Analytics is never exempt. The information line and the opt-out are the notice and the objection the exemption asks for, not the whole of it.
 
 ### Processors, agreements and transfers
 
-Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change. The table is kay's cautious default: Fathom and Cloudflare call themselves cookieless, and writing `consent: false` is yours to answer for, with the line and the opt-out kay shows.
+Whichever tool you use, your privacy notice names it, what it is for and how long the data stays, and you sign its data processing agreement before counting a visit. Check each provider's current terms, as these change. The table is kay's cautious default: Fathom and Cloudflare call themselves cookieless, and writing `awaitConsent: false` is yours to answer for, with the line and the opt-out kay shows.
 
 | Provider | Your legal basis | Who it is | Agreement and transfer |
 | --- | --- | --- | --- |
 | Plausible, Umami or Matomo on your own server | The exemption above, or consent | You, with no third party | None to sign, and no transfer if your server is in the EU |
 | Plausible Cloud, Matomo Cloud, Simple Analytics | The same | A processor working for you | An agreement the provider offers, with an EU region available. Simple Analytics never gets a visitor's address from kay |
-| Umami Cloud | Consent by default, or `consent: false` to count at once | A processor | An agreement the provider offers. Check its hosting region for a transfer |
+| Umami Cloud | Consent by default, or `awaitConsent: false` to count at once | A processor | An agreement the provider offers. Check its hosting region for a transfer |
 | Google Analytics | Consent, always | Google, a processor (and for some uses a controller) | Google's data processing terms, accepted in your account, and a US transfer under the Data Privacy Framework or standard clauses |
 | Fathom | Consent | A processor (Fathom Analytics, Canada) | An agreement the provider offers. Check the transfer to Canada |
 | Cloudflare Web Analytics | Consent | Cloudflare, a processor | Cloudflare's agreement in its customer terms, and a US transfer under the Data Privacy Framework or standard clauses |
@@ -305,10 +305,10 @@ Whichever tool you use, your privacy notice names it, what it is for and how lon
 
 ### Asking in your own banner
 
-If your site already has a cookie banner or a settings page, ask there. Pass `consent: { notice: false }` so kay shows no notice of its own, and use `consent` from `kay/analytics` in an island. `consent()` is the visitor's answer, `'yes'`, `'no'` or `''` while they have not chosen. `consent = 'yes'`, `'no'` or `''` records a new one; an empty answer asks again.
+If your site already has a cookie banner or a settings page, ask there. Pass `awaitConsent: { notice: false }` so kay shows no notice of its own, and use `consent` from `kay/analytics` in an island. `consent()` is the visitor's answer, `'yes'`, `'no'` or `''` while they have not chosen. `consent = 'yes'`, `'no'` or `''` records a new one; an empty answer asks again.
 
 ```ts
-analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: { notice: false } })
+analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', awaitConsent: { notice: false } })
 ```
 
 ```kay
@@ -324,7 +324,7 @@ else
   button(onClick={() => consent = ''}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
 ```
 
-`consent` reads and writes the cookie on its own, so it works for `vitals({ consent: true })` too; kay's notice, though, comes only with the `consent` option on `analytics()`.
+`consent` reads and writes the cookie on its own, so it works for `vitals({ awaitConsent: true })` too; kay's notice, though, comes only with the `awaitConsent` option on `analytics()`.
 
 A page that calls `consent()` is rendered for each visitor, so read it in the island that needs it rather than in a layout every page shares, which a CDN could no longer cache.
 
@@ -352,7 +352,7 @@ That is all the app writes. kay adds a script of about 700 bytes to every page, 
 
 The numbers are on `/vitals`, or the `prefix` you pick, for whoever your `guard` lets in. Each route shows its three values against the good limits: 2.5 s, 0.1 and 200 ms. Without a `guard` the page answers 403, and the numbers are still collected.
 
-The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. With nothing else set, the numbers are counted at once, with no notice, as they hold nothing about the visitor. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own, then your own banner must set the `kay_analytics=yes` cookie with `consent = 'yes'`.
+The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. With nothing else set, the numbers are counted at once, with no notice, as they hold nothing about the visitor. When `analytics({ consent })` asks first, `vitals()` asks too. Set `awaitConsent: true` to ask on its own, then your own banner must set the `kay_analytics=yes` cookie with `consent = 'yes'`.
 
 Reports are checked like visits: a post from another site, a large or malformed body and more than 300 a minute from one address are refused. The screen needs a server, so a static export refuses `vitals()`.
 

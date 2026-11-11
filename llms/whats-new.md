@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.98.0
 
+- `analytics()` and `vitals()` take `awaitConsent` in place of `consent`, which now names only the visitor's answer; kayjs-ai's `ask()` takes `effort` and `approval` in place of `reasoning` and `confirm`, and `Chat` takes `showReasoning` and `waitingLabel` in place of `reasoning` and `thinkingLabel`. The old names keep working and `kay upgrade` renames them ([analytics](analytics.md), [upgrading](upgrading.md)).
 - `analytics()` takes `url` for the service address (`host` before), `site` for Plausible and Simple Analytics, and `privacy` for the policy link (`policyUrl` before); the old names keep working and `kay upgrade` renames them, and the site options are in one table ([analytics](analytics.md)).
 - Every `guard` option takes a guard, a list of guards run in order, or `{ load }`: `jobs`, `images`, `vitals()` and `cms()`, and `false` opens the screens of `vitals()` and `cms()`, closed without a guard ([guards](guards.md#path-and-guard-options)).
 - `serve.apiPrefix` names where the API is served, `apiPath` still read and renamed by `kay upgrade`; `live.rateLimit`, `images.rateLimit` and `mcp.rateLimit` are `{ max, window }` in place of `perMinute` and a bare number, as every rate limit option is; a Fontsource font takes `weight` beside `subset` as aliases of `weights` and `subsets`, and `manifest.themeColor` takes a `{ light, dark }` pair (`deprecated-config-keys`; [site config](sitemap-search-fonts.md)).

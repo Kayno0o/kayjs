@@ -89,13 +89,13 @@ function allowed(messages: ProviderMessage[]): Set<string> {
 
 let warnedHeld = false
 
-// Said once: an app without Chat has nothing that lets a held call run but a `confirm` of its own.
+// Said once: an app without Chat has nothing that lets a held call run but an `approval` of its own.
 function warnHeld(): void {
   if (warnedHeld)
     return
 
   warnedHeld = true
-  log.warn('a tool call was held for the visitor\'s approval; only Chat\'s Allow button or a `confirm` passed to ask() lets it run, and `tool: { readOnly: true }` marks an action that needs none')
+  log.warn('a tool call was held for the visitor\'s approval; only Chat\'s Allow button or an `approval` passed to ask() lets it run, and `tool: { readOnly: true }` marks an action that needs none')
 }
 
 async function run(tools: Map<string, Offered>, use: ToolUse, input: Record<string, unknown>, request: Request | undefined, confirm: Confirm | false | undefined, tickets: Set<string>, signal: AbortSignal): Promise<Ran> {

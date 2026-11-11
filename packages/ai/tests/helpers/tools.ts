@@ -23,5 +23,8 @@ export interface Tools {
   staying: Action<{ prompt: string, outlive: boolean }, Step[]>
   mixed: Action<{ prompt: string, twin?: boolean }, Step[]>
   unconfirmed: Action<{ prompt: string }, Step[]>
+  unconfirmedOld: Action<{ prompt: string }, Step[]>
+  approvedOverOld: Action<{ prompt: string }, Step[]>
+  unconfirmedOverOld: Action<{ prompt: string }, Step[]>
   approving: Action<{ messages: { role: 'user' | 'assistant', content: string }[] }, Step[]>
 }

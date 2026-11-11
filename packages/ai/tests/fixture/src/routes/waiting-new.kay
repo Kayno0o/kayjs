@@ -1,0 +1,7 @@
+--- server
+import { held } from './cases.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Waiting
+Chat(action={held} label="Held" waitingLabel="Hold on")

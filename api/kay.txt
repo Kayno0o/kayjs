@@ -1426,7 +1426,8 @@ type AnalyticsText = string | Record<string, string>
 
 [./analytics] CloudflareOptions
 interface CloudflareOptions extends Common
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: undefined
   exclude?: undefined
   hosts?: string[] | undefined
@@ -1446,7 +1447,8 @@ type Consent = 'yes' | 'no' | ''
 [./analytics] CustomOptions
 interface CustomOptions extends Common
   address?: boolean | undefined
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   endpoint: string
   events?: undefined
   exclude?: undefined
@@ -1461,7 +1463,8 @@ interface CustomOptions extends Common
 
 [./analytics] FathomOptions
 interface FathomOptions extends Common
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: undefined
   exclude?: undefined
   hosts?: string[] | undefined
@@ -1477,7 +1480,8 @@ interface FathomOptions extends Common
 interface Ga4Options extends Counted
   address?: boolean | undefined
   apiSecret: string
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
@@ -1503,7 +1507,8 @@ type MatomoOptions = MatomoBase & ({
 
 [./analytics] PlausibleOptions
 interface PlausibleOptions extends Counted
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ domain?: string | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
@@ -1526,7 +1531,8 @@ interface RouteVitals
 
 [./analytics] SimpleAnalyticsOptions
 interface SimpleAnalyticsOptions extends Counted
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
@@ -1545,7 +1551,8 @@ function track(ctx: { request: Request; }, name: string, props?: Record<string, 
 
 [./analytics] UmamiOptions
 interface UmamiOptions extends Counted
-  consent?: AnalyticsConsent | boolean | undefined
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
@@ -1566,7 +1573,8 @@ function vitals(options?: VitalsOptions): KayExtension<AnyElysia>
 
 [./analytics] VitalsOptions
 interface VitalsOptions
-  consent?: boolean | undefined
+  awaitConsent?: boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: boolean | undefined
   guard?: GuardOption | false | undefined
   prefix?: string | undefined
 

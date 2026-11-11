@@ -53,14 +53,14 @@ describe('function tools outside a request', () => {
     expect(fakeAi.asked[0]!.tools).toEqual([{ name: 'look_up', description: 'Looks an article up by its title', inputSchema: expect.objectContaining({ type: 'object', required: ['title'] }) }])
   })
 
-  it('runs a tool that writes unasked and never calls confirm, as no visitor is there to hold it', async () => {
+  it('runs a tool that writes unasked and never calls approval, as no visitor is there to hold it', async () => {
     found.length = 0
     fakeAi.reply({ calls: [{ name: 'look_up', input: { title: 'Sun' } }] })
     fakeAi.reply('done')
 
     const calls: unknown[] = []
 
-    await ask('go', { tools: [lookUp], confirm: (call) => {
+    await ask('go', { tools: [lookUp], approval: (call) => {
       calls.push(call)
 
       return false
@@ -173,7 +173,7 @@ describe('function tools in a request', () => {
     done.length = 0
   })
 
-  it('runs unasked beside an action that confirm holds', async () => {
+  it('runs unasked beside an action that approval holds', async () => {
     const { mixed } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }, { name: 'stamp' }] })

@@ -138,7 +138,7 @@ A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path
 
 Every text is looked up in the app's catalogs under an `ai.chat.<name>` key first (`ai.chat.send`, `ai.chat.greeting`, `ai.chat.open`, `ai.chat.running` and so on), and kayjs-ai ships the French of each, so a site on `lang: 'fr'` needs no setup; a key the app words in its own `src/messages/<locale>.ts` replaces it.
 
-Every label is also a prop, which replaces the message: `fieldLabel` (the name of the field, so it is not read like the message list, which `label` names), `startedLabel` (said to a screen reader when the conversation starts over), `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel`. The wording keys keep their names, such as `ai.chat.error`.
+Every label is also a prop, which replaces the message: `fieldLabel` (the name of the field, so it is not read like the message list, which `label` names), `startedLabel` (said to a screen reader when the conversation starts over), `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `waitingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel`. The wording keys keep their names, such as `ai.chat.error`.
 
 The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`. A call held for the visitor's yes has `approvalLabel`, `allowLabel`, `denyLabel`, `allowedLabel` and `deniedLabel`.
 
@@ -304,9 +304,9 @@ Under `bun test` the fake ignores the `retry` and `fallback` of `ai()`: it is re
 
 ### Thinking
 
-`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets adaptive thinking at that effort, with its text summarized so it streams. `'none'` asks for the lowest effort with thinking disabled, and a model that refuses `disabled` or the effort (Haiku 4.5 and Sonnet 4.5 take no effort) is asked again without that part.
+`effort: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets adaptive thinking at that effort, with its text summarized so it streams. `'none'` asks for the lowest effort with thinking disabled, and a model that refuses `disabled` or the effort (Haiku 4.5 and Sonnet 4.5 take no effort) is asked again without that part.
 
-A level such a model refuses fails with an error that names `reasoning` and `body: { thinking }`.
+A level such a model refuses fails with an error that names `effort` and `body: { thinking }`.
 
 Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves yours out then, and the newest models refuse it altogether with their own message. A model that still wants a thinking budget (Haiku 4.5 and older) takes `body: { thinking: { type: 'enabled', budget_tokens: 2000 } }`, which replaces all of this.
 
@@ -322,7 +322,7 @@ await ask(messages, { body: { top_p: 0.9, seed: 7, stop: ['END'] } })
 
 To set them once for every ask of a provider, give the provider a `body`: `openai({ baseUrl, body: { provider: { order: ['anthropic'] } } })`, or the same on `anthropic()`. The ask's own `body` wins, field by field.
 
-The fields kayjs-ai settles itself win over `body`: the model, the messages, `stream`, the tools, the token limit, the schema's output format, and `temperature`, `reasoning` and `cache` when you set them. A server that refuses a field fails the reply with its own message, so the name of the field is in the error.
+The fields kayjs-ai settles itself win over `body`: the model, the messages, `stream`, the tools, the token limit, the schema's output format, and `temperature`, `effort` and `cache` when you set them. A server that refuses a field fails the reply with its own message, so the name of the field is in the error.
 
 ### A reply that outlives the visitor
 
@@ -465,13 +465,13 @@ An action that changes something does not run on the model's word (a function to
 
 The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used (a store that fails or takes over five seconds to spend it runs no call), and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
 
-A tool names its calls for the chat with `tool: { label: 'Read the home' }`, which the model never sees. A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
+A tool names its calls for the chat with `tool: { label: 'Read the home' }`, which the model never sees. A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `approval: false` to run every tool without asking, for an app that asks elsewhere.
 
 The arguments travel in the message, so leave room for them in the `content` your schema allows.
 
-To decide what counts as a yes yourself, pass `confirm`: `ask(messages, { tools, confirm: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
+To decide what counts as a yes yourself, pass `approval`: `ask(messages, { tools, approval: ({ name, input, request }) => ... })`. It runs before each call, and only `true` lets the call run. Otherwise the model is told the visitor has not confirmed it, and can ask them first.
 
-You decide what counts as a yes, such as the last message of the visitor saying so, a token your page issued after a button, or a read tool answering `true` at once. A `confirm` of yours replaces the Allow button for that ask.
+You decide what counts as a yes, such as the last message of the visitor saying so, a token your page issued after a button, or a read tool answering `true` at once. An `approval` of yours replaces the Allow button for that ask.
 
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called. With [`outlive: true`](#a-reply-that-outlives-the-visitor) the loop runs to its end instead.
 
@@ -493,13 +493,13 @@ const findArticle = tool({
 await ask('Write this morning\'s episode', { tools: [findArticle], key: 'podcast' })
 ```
 
-A function tool runs with your app's own rights, never a visitor's, in a request or out of one. Because you wrote it and passed it, it is not held for an Allow and `confirm` is not asked about it, even in a visitor's chat, where the model picks its arguments from text a visitor or a fetched page wrote. Make it safe for any input, or check inside `run`. `maxSteps` and `signal` work as for actions, and with no visitor the `budget` and `rateLimit` count the `key` you pass, else only the total.
+A function tool runs with your app's own rights, never a visitor's, in a request or out of one. Because you wrote it and passed it, it is not held for an Allow and `approval` is not asked about it, even in a visitor's chat, where the model picks its arguments from text a visitor or a fetched page wrote. Make it safe for any input, or check inside `run`. `maxSteps` and `signal` work as for actions, and with no visitor the `budget` and `rateLimit` count the `key` you pass, else only the total.
 
 To show the calls in a chat, return `reply.progress()` from the chat's action instead of the reply: `ask(messages, { tools: [addNote] }).progress()`.
 
 The chat then lists each call before the text of its turn, with its status and, when opened, its arguments and result. Set `toolDetails={false}` on `Chat` to show names and statuses only.
 
-The same goes for the model's thinking: when the action returns `reply.progress()` and the provider streams it, the chat folds it above the text under `Reasoning`. Set `reasoning={false}` on `Chat` to hide it.
+The same goes for the model's thinking: when the action returns `reply.progress()` and the provider streams it, the chat folds it above the text under `Reasoning`. Set `showReasoning={false}` on `Chat` to hide it.
 
 Code in an answer is coloured the way the rest of your Markdown is. Once a code block is finished, the server highlights it with the `markdown.highlight` function from your `kay.config.ts`, the one your content pages use, and the chat swaps the plain block for the coloured one. The browser loads no highlighter. A block still being written stays plain, and so does code when your app has no highlighter. This works when the action returns `.progress()`.
 

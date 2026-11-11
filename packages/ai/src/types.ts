@@ -242,7 +242,7 @@ export interface FunctionTool {
   readonly run: (input: never, context: FunctionToolContext) => unknown
 }
 
-// A tool call waiting for `confirm`'s yes: the tool's name, the arguments the model gave and the request being answered.
+// A tool call waiting for `approval`'s yes: the tool's name, the arguments the model gave and the request being answered.
 export interface ToolRequest {
   name: string
   input: Record<string, unknown>
@@ -325,9 +325,11 @@ export interface AskOptions extends AskHooks, Resilience {
   model?: string | undefined
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
-  // Left out of an Anthropic request that thinks (`reasoning` of `'low'`, `'medium'` or `'high'`), which refuses one; models since 4.7 refuse any temperature, with their own message.
+  // Left out of an Anthropic request that thinks (`effort` of `'low'`, `'medium'` or `'high'`), which refuses one; models since 4.7 refuse any temperature, with their own message.
   temperature?: number | undefined
   // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets adaptive thinking at that effort, its text summarized so it streams (`'none'` asks the lowest effort with thinking disabled, which a model refusing it is asked again without), and `temperature` is then left out while it thinks; a `thinking` in `body` replaces all of it.
+  effort?: Reasoning | undefined
+  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */
   reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined
@@ -344,12 +346,14 @@ export interface AskOptions extends AskHooks, Resilience {
   // Who the limits and budget set in `ai()` count this ask for, and whose conversation a `Chat` with `keepOnServer` keeps, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
   key?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with an action called outside one throws.
-  // A `tool({ name, description, input, run })` is a plain function instead, run with the app's own rights and no visitor: it works outside a request, in a scheduled job or a queue worker, and is never held for approval nor asked of `confirm`.
+  // A `tool({ name, description, input, run })` is a plain function instead, run with the app's own rights and no visitor: it works outside a request, in a scheduled job or a queue worker, and is never held for approval nor asked of `approval`.
   tools?: readonly (ToolAction | FunctionTool)[] | undefined
   // The provider requests the tool loop may make, 5 by default; a reply still wanting tools after the last ends with `finish` `steps`.
   maxSteps?: number | undefined
   // Asked before each action call runs (a function tool is never asked), with its name, arguments and the request: only `true` lets it run, anything else tells the model the visitor has not confirmed it so it asks them first, and a throw fails the call like a tool that throws. A write the visitor must agree to, such as a booking, is checked here; a read answers `true`.
   // Left out, a tool not marked `tool: { readOnly: true }` is held until the visitor allows that very call (`Chat` draws an Allow button); `false` runs every action unasked.
+  approval?: Confirm | false | undefined
+  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */
   confirm?: Confirm | false | undefined
   // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
   maxInputChars?: number | undefined
@@ -379,7 +383,7 @@ export interface AiToolCall {
   approval?: string | undefined
   // What the model was told of the outcome, the action's answer or why the call failed; absent while running.
   result?: string | undefined
-  // How long the call took in milliseconds, from the model's request to its result (a `confirm` the app awaits counts); absent while running.
+  // How long the call took in milliseconds, from the model's request to its result (an `approval` the app awaits counts); absent while running.
   ms?: number | undefined
 }
 

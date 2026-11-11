@@ -109,10 +109,12 @@ type AskLimit = Omit<RateLimit, 'key'>
 
 [.] AskOptions
 interface AskOptions extends AskHooks, Resilience
+  approval?: Confirm | false | undefined
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
-  confirm?: Confirm | false | undefined
+  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ confirm?: Confirm | false | undefined
+  effort?: Reasoning | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
   maxInputChars?: number | undefined
@@ -126,7 +128,7 @@ interface AskOptions extends AskHooks, Resilience
   onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
-  reasoning?: Reasoning | undefined
+  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ reasoning?: Reasoning | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
   sources?: readonly Source[] | undefined
@@ -606,10 +608,12 @@ interface StoredTurn
 
 [.] StructuredAskOptions
 interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions
+  approval?: Confirm | false | undefined
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
-  confirm?: Confirm | false | undefined
+  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ confirm?: Confirm | false | undefined
+  effort?: Reasoning | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
   maxInputChars?: number | undefined
@@ -623,7 +627,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
-  reasoning?: Reasoning | undefined
+  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ reasoning?: Reasoning | undefined
   retry?: RetryOptions | false | undefined
   schema: Schema
   signal?: AbortSignal | undefined
@@ -818,6 +822,7 @@ component default
   runningLabel?: string | undefined
   saveLabel?: string | undefined
   sendLabel?: string | undefined
+  showReasoning?: boolean | undefined
   signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
@@ -838,6 +843,7 @@ component default
   unheardLabel?: string | undefined
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
+  waitingLabel?: string | undefined
 
 [./chat-launcher.kay] island
 const island: { readonly persist: true; readonly hydrate: "idle"; }
@@ -1031,6 +1037,7 @@ component default
   runningLabel?: string | undefined
   saveLabel?: string | undefined
   sendLabel?: string | undefined
+  showReasoning?: boolean | undefined
   signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
@@ -1051,6 +1058,7 @@ component default
   unheardLabel?: string | undefined
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
+  waitingLabel?: string | undefined
 
 [./pg] conversationTable
 const conversationTable: "kay_ai_conversations"

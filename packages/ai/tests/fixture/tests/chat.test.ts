@@ -211,7 +211,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
-  test('the model\'s thinking folds above the reply and opens to its text, and reasoning={false} hides it', async () => {
+  test('the model\'s thinking folds above the reply and opens to its text, and showReasoning={false} hides it', async () => {
     const page = await site.open('/helper')
 
     fakeAi.reply({ reasoning: 'First <b>think</b>. Then answer.', text: 'The answer' })
@@ -708,6 +708,34 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
     expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Go on')
+  })
+
+  test('waitingLabel words the wait, thinkingLabel is its old name, and waitingLabel wins when both are written', async () => {
+    for (const [path, words] of [['/waiting-new', 'Hold on'], ['/waiting-old', 'Hold on'], ['/waiting-both', 'Hold on']] as const) {
+      const page = await site.open(path)
+
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending] .kai-chat-thinking')
+
+      expect(await page.text('[data-pending] .kai-chat-thinking')).toBe(words)
+      await page.click('.kai-chat-form button')
+      await replied(page)
+    }
+  })
+
+  test('showReasoning hides the thinking, reasoning is its old name, and showReasoning wins when both are written', async () => {
+    for (const [path, shown] of [['/helper-private-old', 0], ['/helper-shown-both', 1]] as const) {
+      const page = await site.open(path)
+
+      fakeAi.reply({ reasoning: 'Private thoughts', text: 'Plain answer' })
+      await page.fill('textarea', 'Why')
+      await page.press('Enter')
+      await replied(page)
+      await page.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'Plain answer' })
+
+      expect(await page.count('.kai-chat-reasoning')).toBe(shown)
+    }
   })
 
   test('the chat has no accessibility violation, its log and field named', async () => {

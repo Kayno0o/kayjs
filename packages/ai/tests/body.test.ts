@@ -37,7 +37,7 @@ describe('fields kayjs-ai does not model', () => {
     const server = serve(() => stream(openaiEvents('ok')).response)
     const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm', body: { stream: false, model: 'other' } })
 
-    await ask('Hi', { provider: provided, temperature: 0.1, reasoning: 'low', body: { messages: [], temperature: 2, reasoning_effort: 'high', max_tokens: 1, stream_options: null } })
+    await ask('Hi', { provider: provided, temperature: 0.1, effort: 'low', body: { messages: [], temperature: 2, reasoning_effort: 'high', max_tokens: 1, stream_options: null } })
     expect(server.seen[0]!.body).toMatchObject({ model: 'm', stream: true, temperature: 0.1, reasoning_effort: 'low', max_tokens: 4096, stream_options: { include_usage: true } })
     expect(server.seen[0]!.body.messages).toEqual([{ role: 'user', content: 'Hi' }])
   })

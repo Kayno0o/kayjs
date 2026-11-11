@@ -54,14 +54,14 @@ function save(value: Consent): void {
   }
 
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
-  // The tracker's own script carries the app's `consent.maxAge`.
+  // The tracker's own script carries the app's `awaitConsent.maxAge`.
   const maxAge = Number(document.querySelector<HTMLElement>('script[data-max-age]')?.dataset.maxAge) || CONSENT_MAX_AGE
 
   document.cookie = `${COOKIE}=${value}; max-age=${value === '' ? 0 : maxAge}; path=${path}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
   document.dispatchEvent(new CustomEvent('kay:consent', { detail: { consent: value } }))
 }
 
-// The visitor's answer to `analytics({ consent })`, for an app's own cookie banner or settings page: read `consent()`, answer with `consent = 'yes'`, `'no'`, or `''` to ask again.
+// The visitor's answer to `analytics({ awaitConsent })`, for an app's own cookie banner or settings page: read `consent()`, answer with `consent = 'yes'`, `'no'`, or `''` to ask again.
 // A page renders with the answer in the request's `kay_analytics` cookie, the one kay's own notice writes, so the two never disagree; setting it is for the browser, since the server has no response to write to there.
 const reader = Object.assign(
   (): Consent => {

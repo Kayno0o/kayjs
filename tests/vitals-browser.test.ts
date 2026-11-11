@@ -283,8 +283,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
     page.close()
   }, 30_000)
 
-  it('waits for the visitor\'s yes with consent: true, and only sends once the cookie says it', async () => {
-    const site = await started({ consent: true })
+  it('waits for the visitor\'s yes with awaitConsent: true, and only sends once the cookie says it', async () => {
+    const site = await started({ awaitConsent: true })
     const page = await site.open('/')
 
     await page.waitFor('h1', { text: 'Home' })

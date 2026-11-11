@@ -564,7 +564,7 @@ describe('a conversation held on the server', () => {
 
     try {
       await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: 'About Moon', steps, thinking, thinkingBy: ['anthropic/m'] }], title: '' })
-      await visit(said('so?'), { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'high', ...model !== undefined && { model } }, { header: `send:${ID}:1` })
+      await visit(said('so?'), { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), effort: 'high', ...model !== undefined && { model } }, { header: `send:${ID}:1` })
 
       const sent = server.seen[0]!.body.messages as { role: string, content: unknown }[]
 

@@ -32,7 +32,9 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
+import { aiOptions } from './ai-options'
 import { analyticsOptions } from './analytics-options'
+import { awaitConsent } from './await-consent'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
@@ -161,6 +163,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => scheduleTz(root, options),
   async ({ root, options }) => workflowStartId(root, options),
   async ({ root, options }) => analyticsOptions(root, options),
+  async ({ root, options }) => awaitConsent(root, options),
+  async ({ root, options }) => aiOptions(root, options),
   ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => eventNames(root, options),
 ]

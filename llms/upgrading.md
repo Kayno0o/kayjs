@@ -11,6 +11,13 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### Storage keys are `<lib>:<name>`
 
 `kay-reloaded`, `kay-push-posted`, `kay-push-refused`, `kay_editor-refused`, `kay-dev`, `kay-dev-layout`, `kai-chat-conversation:<url>` and `kcms-editor` are `kay:reloaded`, `kay:push-posted`, `kay:push-refused`, `kay:editor-refused`, `kay:dev`, `kay:dev-layout`, `kai:chat-conversation:<url>` and `kcms:editor`. The push record, the chat's shown conversation and the editor's layout move from the old key the first time they are read; the others start again. An app reading one of these keys by name reads the new one.
+### `consent` of `analytics()` and `vitals()` is `awaitConsent`
+
+The option that waits for the visitor's yes is `awaitConsent`, so `consent` means one thing everywhere: the visitor's answer (the `consent` signal of `kay/analytics`, the checkbox of kayjs-mail's contact form and kayjs-ui's SubscribeForm). `analytics({ consent: true })`, `consent: { notice: false }` and `vitals({ consent: false })` become `awaitConsent`. The old name still works for three minors, `awaitConsent` winning when both are given, and `kay upgrade` renames it (`deprecated-await-consent`); an options object built outside the call is not found by the lint but is still read.
+
+### kayjs-ai: `effort`, `approval`, `showReasoning` and `waitingLabel`
+
+`ask(messages, { reasoning })` is `effort`: `reasoning` meant how much a model thinks there and whether Chat shows what it thought there. `ask(messages, { confirm })` is `approval`, the word Chat's `approvalLabel` and the call's `approval` already use. Chat and ChatLauncher take `showReasoning` in place of `reasoning`, and `waitingLabel` in place of `thinkingLabel`, what the chat says while it waits for the first words, so it no longer reads as `reasoningLabel`, which names the folded thinking. The old names still work for three minors, the new ones winning when both are given, and `kay upgrade` renames them (`deprecated-ai-options` for `ask()`, `deprecated-ai-props` for the two components). A custom provider still reads `request.reasoning`, the effort `ask` settled, and the stream piece `{ reasoning }` keeps its name.
 
 ## 1.98.0
 

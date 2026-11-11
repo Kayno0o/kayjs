@@ -82,6 +82,32 @@ export const DEPRECATED_LINTS = {
     wrong: 'import { gate } from \'./gate\'\n\nwindow.dispatchEvent(new CustomEvent(\'kai-chat-send\', { detail: gate() }))\naddEventListener(\'kay-renew\', () => gate())',
     right: 'import { gate } from \'./gate\'\n\ndocument.dispatchEvent(new CustomEvent(\'kai:chat-send\', { detail: { text: gate() } }))\ndocument.addEventListener(\'kay:renew\', () => gate())',
   },
+  'deprecated-await-consent': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    site: true,
+    summary: '`consent` in the options of `analytics()` and `vitals()`, `awaitConsent` since 1.99: the app\'s choice to wait for the visitor\'s yes, which no longer shares a word with `consent`, the visitor\'s answer (the signal of `kay/analytics`, the checkbox of kayjs-mail\'s contact form and kayjs-ui\'s SubscribeForm). The old name works until 1.103, `awaitConsent` winning when both are given. Found in the options object written in a call of either imported from `kay/analytics`, in the TypeScript files and `.kay` files of the project. The fix renames the key, and writes `awaitConsent: consent` for a shorthand; an object holding `awaitConsent` already is reported with no fix.',
+    wrong: '// kay.config.ts\nimport { analytics } from \'kay/analytics\'\n\nexport default { extensions: [analytics({ provider: \'ga4\', measurementId: \'G-ABC123XYZ\', apiSecret: \'secret\', consent: false })] }',
+    right: '// kay.config.ts\nimport { analytics } from \'kay/analytics\'\n\nexport default { extensions: [analytics({ provider: \'ga4\', measurementId: \'G-ABC123XYZ\', apiSecret: \'secret\', awaitConsent: false })] }',
+  },
+  'deprecated-ai-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    site: true,
+    summary: '`reasoning` and `confirm` in the options of kayjs-ai\'s `ask()`, `effort` and `approval` since 1.99: `reasoning` meant how much a model thinks here and whether Chat shows what it thought there, and `confirm` is the approval Chat asks of the visitor for a call, so each has one word. The old names work until 1.103, the new ones winning when both are given. Found in the options object written as the second argument of a call of `ask` imported from `@kaynooo/kayjs-ai`, in the TypeScript files and `.kay` files of the project. The fix renames the key, and writes `effort: reasoning` for a shorthand; an object holding the new name already is reported with no fix.',
+    wrong: '---\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const reply = ask(\'Hi\', { reasoning: \'low\', confirm: () => true })\n---',
+    right: '---\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const reply = ask(\'Hi\', { effort: \'low\', approval: () => true })\n---',
+  },
+  'deprecated-ai-props': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.99',
+    summary: 'A kayjs-ai Chat or ChatLauncher prop under its name before 1.99. `reasoning` is `showReasoning`, as `effort` of `ask()` is how much a model thinks, and `thinkingLabel` is `waitingLabel`, what the chat says while it waits for the first words, as `reasoningLabel` names the thinking it folds. The old names work until 1.103, the new ones winning when both are given. Found on a `Chat` or `ChatLauncher` element of a `.kay` file bound to kayjs-ai\'s file. The fix renames the prop, and writes a shorthand out as `showReasoning={reasoning}`; a prop whose new name is written too is reported with no fix.',
+    wrong: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { reply } from \'./reply\'\n---\nChat(action={reply} reasoning={false} thinkingLabel="One moment")',
+    right: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { reply } from \'./reply\'\n---\nChat(action={reply} showReasoning={false} waitingLabel="One moment")',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

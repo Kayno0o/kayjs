@@ -277,10 +277,10 @@ describe('kay build --static', () => {
 
   it.each([
     ['fathom', '{ provider: \'fathom\', siteId: \'ABCDEFGH\' }', true],
-    ['cloudflare', '{ provider: \'cloudflare\', token: \'tok-123\', consent: true }', true],
-    ['fathom with consent false', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false }', false],
-    ['fathom with consent false and no line', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', consent: false, info: false }', false],
-    ['cloudflare with consent false', '{ provider: \'cloudflare\', token: \'tok-123\', consent: false }', false],
+    ['cloudflare', '{ provider: \'cloudflare\', token: \'tok-123\', awaitConsent: true }', true],
+    ['fathom with consent false', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', awaitConsent: false }', false],
+    ['fathom with consent false and no line', '{ provider: \'fathom\', siteId: \'ABCDEFGH\', awaitConsent: false, info: false }', false],
+    ['cloudflare with consent false', '{ provider: \'cloudflare\', token: \'tok-123\', awaitConsent: false }', false],
   ])('writes kay\'s notice script beside the pages of a static site for %s when it asks or shows the line', async (_name, options, asks) => {
     const fixture = await fixtureCopy('static')
     const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
@@ -297,7 +297,7 @@ describe('kay build --static', () => {
       const home = await Bun.file(join(elsewhere, 'index.html')).text()
 
       // The line counts too: it loads the provider's script after kay's, and opts out through the same files.
-      const lined = !options.includes('info: false') && options.includes('consent: false')
+      const lined = !options.includes('info: false') && options.includes('awaitConsent: false')
 
       expect(home.includes('data-consent')).toBe(asks)
       expect(home.includes('data-info')).toBe(lined)

@@ -1,0 +1,8 @@
+--- server
+import { held } from './cases.kay'
+--- script
+// kay-allow-file deprecated-ai-props -- reads the old names on purpose
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Waiting
+Chat(action={held} label="Held" waitingLabel="Hold on" thinkingLabel="Not me")

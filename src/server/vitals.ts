@@ -16,7 +16,9 @@ export interface VitalsOptions {
   prefix?: string | undefined
   // Who may open the screen, such as kayjs-auth's `auth.guard({ require: 'admin' })`, a list of guards run in order, or `{ load }` returning one, which runs on the first request rather than as kay.config.ts loads. Without one the screen stays closed, though the numbers are still collected; `false` opens it to everyone.
   guard?: GuardOption | false | undefined
-  // `true` waits for the visitor's yes on the `kay_analytics` cookie before a view is reported and `false` never waits. Left out, the numbers follow `analytics({ consent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
+  // `true` waits for the visitor's yes on the `kay_analytics` cookie before a view is reported and `false` never waits. Left out, the numbers follow `analytics({ awaitConsent })` when the site has it, and are reported at once otherwise, as they hold no identifier.
+  awaitConsent?: boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */
   consent?: boolean | undefined
 }
 
@@ -49,7 +51,8 @@ export function vitalsSettings(): VitalsSettings {
 // It sets no cookie and keeps neither an address nor a title: a view is counted in a bucket of its route.
 // Only a production server (`NODE_ENV=production`) keeps a report: `kay dev` and a test answer the same and keep nothing.
 export function vitals(options: VitalsOptions = {}): KayExtension {
-  const { prefix = DEFAULT_PREFIX, guard, consent } = options
+  const { prefix = DEFAULT_PREFIX, guard } = options
+  const awaitConsent = options.awaitConsent ?? options.consent
   const refuse = (reason: string): never => {
     throw new KayError('config-invalid', `kay: vitals ${reason}`)
   }
@@ -57,8 +60,8 @@ export function vitals(options: VitalsOptions = {}): KayExtension {
   if (typeof prefix !== 'string' || !BASE_PATH.test(prefix) || prefix === '/_kay' || prefix.startsWith('/_kay/'))
     refuse(`takes a prefix such as '/vitals', a path with no trailing slash outside /_kay; got ${JSON.stringify(prefix)}`)
 
-  if (consent !== undefined && typeof consent !== 'boolean')
-    refuse(`takes consent as true or false; got ${JSON.stringify(consent)}`)
+  if (awaitConsent !== undefined && typeof awaitConsent !== 'boolean')
+    refuse(`takes awaitConsent as true or false; got ${JSON.stringify(awaitConsent)}`)
 
   if (guard !== undefined && guard !== false && !isGuardOption(guard))
     refuse('takes a guard that is a function, a list of them, or { load } returning one, or false')

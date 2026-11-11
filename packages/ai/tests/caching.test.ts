@@ -118,7 +118,7 @@ describe('OpenAI-compatible prompt caching', () => {
     const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })
 
     await ask('Hi', { provider: provided })
-    await ask('Hi', { provider: provided, reasoning: 'none' })
+    await ask('Hi', { provider: provided, effort: 'none' })
     expect('reasoning_effort' in server.seen[0]!.body).toBe(false)
     expect(server.seen[1]!.body.reasoning_effort).toBe('none')
   })
@@ -127,8 +127,8 @@ describe('OpenAI-compatible prompt caching', () => {
     const server = strict(['reasoning_effort'], openaiEvents('ok'))
     const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })
 
-    expect(await ask('Hi', { provider: provided, reasoning: 'low' })).toBe('ok')
-    expect(await ask('Again', { provider: provided, reasoning: 'low' })).toBe('ok')
+    expect(await ask('Hi', { provider: provided, effort: 'low' })).toBe('ok')
+    expect(await ask('Again', { provider: provided, effort: 'low' })).toBe('ok')
     expect(server.seen).toHaveLength(3)
     expect('reasoning_effort' in server.seen[1]!.body).toBe(false)
     expect('reasoning_effort' in server.seen[2]!.body).toBe(false)

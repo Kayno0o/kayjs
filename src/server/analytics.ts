@@ -49,8 +49,10 @@ export interface AnalyticsInfo {
 
 interface Common {
   // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English.
-  // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `host`) ask like `true`, as they are not self-hostable cookieless counters; `consent: false` counts them without asking, which shows `info` and its opt-out.
-  // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `consent: false`, whose own script kay then loads until the visitor opts out.
+  // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `host`) ask like `true`, as they are not self-hostable cookieless counters; `awaitConsent: false` counts them without asking, which shows `info` and its opt-out.
+  // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `awaitConsent: false`, whose own script kay then loads until the visitor opts out.
+  awaitConsent?: boolean | AnalyticsConsent | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */
   consent?: boolean | AnalyticsConsent | undefined
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
   info?: false | AnalyticsInfo | undefined
@@ -90,7 +92,7 @@ export interface UmamiOptions extends Counted {
   provider: 'umami'
   // The website's id in Umami.
   websiteId: string
-  // A self-hosted Umami; Umami Cloud, `https://cloud.umami.is`, by default, which asks for consent unless `consent: false`.
+  // A self-hosted Umami; Umami Cloud, `https://cloud.umami.is`, by default, which asks for consent unless `awaitConsent: false`.
   url?: string | undefined
   /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
   host?: string | undefined
@@ -135,7 +137,7 @@ export interface Ga4Options extends Counted {
   address?: boolean | undefined
 }
 
-// Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `consent` is set, else until they opt out on the information line.
+// Fathom has no API to send a visit to, so its own script is loaded: from Fathom's domain, which the CSP then allows, and after the visitor's yes when `awaitConsent` is set, else until they opt out on the information line.
 export interface FathomOptions extends Common {
   exclude?: undefined
   titles?: undefined
@@ -147,7 +149,7 @@ export interface FathomOptions extends Common {
   spa?: 'auto' | 'history' | 'hash' | undefined
 }
 
-// Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `consent` is set, else until they opt out on the information line.
+// Cloudflare takes its data only from its own beacon, so that script is loaded: from Cloudflare's domain, which the CSP then allows, and after the visitor's yes when `awaitConsent` is set, else until they opt out on the information line.
 export interface CloudflareOptions extends Common {
   exclude?: undefined
   titles?: undefined
@@ -198,14 +200,14 @@ const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 const PROVIDER_NAMES: Record<string, string> = { plausible: 'Plausible', umami: 'Umami', simpleanalytics: 'Simple Analytics', matomo: 'Matomo', ga4: 'Google Analytics', fathom: 'Fathom', cloudflare: 'Cloudflare Web Analytics' }
 const LOCAL_PATH = /^\/(?![/\\])/
 const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
-// The providers that wait for a yes unless the app wrote `consent: false`; Umami joins them while it has no `host`.
+// The providers that wait for a yes unless the app wrote `awaitConsent: false`; Umami joins them while it has no `host`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
-// The options with the names before 1.98 (`host`, `domain` and `hostname`, `policyUrl`) under the current ones, which win when both are written.
-// `deprecated-analytics-options` rewrites the old names in an app's files; an options object built elsewhere is out of its sight, so the old names are read here until they go.
+// The options with the names before 1.98 (`host`, `domain` and `hostname`, `policyUrl`) and 1.99 (`consent`) under the current ones, which win when both are written.
+// `deprecated-analytics-options` and `deprecated-await-consent` rewrite the old names in an app's files; an options object built elsewhere is out of its sight, so the old names are read here until they go.
 function current(options: AnalyticsOptions): AnalyticsOptions {
   const copy: Record<string, unknown> = { ...options }
-  const renamed = [['host', 'url'], ['policyUrl', 'privacy'], ...options.provider === 'plausible' ? [['domain', 'site']] : [], ...options.provider === 'simpleanalytics' ? [['hostname', 'site']] : []]
+  const renamed = [['host', 'url'], ['policyUrl', 'privacy'], ['consent', 'awaitConsent'], ...options.provider === 'plausible' ? [['domain', 'site']] : [], ...options.provider === 'simpleanalytics' ? [['hostname', 'site']] : []]
 
   for (const [old, name] of renamed) {
     if (copy[old!] === undefined)
@@ -221,17 +223,17 @@ function current(options: AnalyticsOptions): AnalyticsOptions {
 // The seconds a consent lasts, NaN for what is no positive duration.
 function consentSeconds(age: unknown): number {
   try {
-    return wholeSeconds(age, 'consent.maxAge')
+    return wholeSeconds(age, 'awaitConsent.maxAge')
   }
   catch {
     return Number.NaN
   }
 }
 
-// Whether a visit waits for the visitor's yes: the app's `consent`, else the provider's default. Umami on its cloud host is a third party that gets the visitor's address, so it asks unless the app names another `host`.
+// Whether a visit waits for the visitor's yes: the app's `awaitConsent`, else the provider's default. Umami on its cloud host is a third party that gets the visitor's address, so it asks unless the app names another `host`.
 export function isGated(options: AnalyticsOptions): boolean {
-  if (options.consent !== undefined)
-    return options.consent !== false
+  if (options.awaitConsent !== undefined)
+    return options.awaitConsent !== false
 
   return ASKS_BY_DEFAULT.has(options.provider) || (options.provider === 'umami' && onUmamiCloud(options.url ?? options.host))
 }
@@ -250,7 +252,7 @@ export function analytics(written: AnalyticsOptions): KayExtension {
 
   const asking = isGated(options)
   const informs = !asking && options.info !== false
-  const asked = typeof options.consent === 'object' ? options.consent : {}
+  const asked = typeof options.awaitConsent === 'object' ? options.awaitConsent : {}
   const info = typeof options.info === 'object' ? options.info : {}
   const name = options.provider === 'custom' ? URL.parse(options.endpoint)?.hostname ?? 'a statistics tool' : PROVIDER_NAMES[options.provider]!
   const words = asking
@@ -263,7 +265,7 @@ export function analytics(written: AnalyticsOptions): KayExtension {
     ...asking ? { 'data-consent': '', ...asked.notice === false && { 'data-silent': '' } } : { 'data-info': '' },
     'data-texts': JSON.stringify(named),
     'data-provider': name,
-    'data-max-age': String(asked.maxAge === undefined ? CONSENT_MAX_AGE : wholeSeconds(asked.maxAge, 'consent.maxAge')),
+    'data-max-age': String(asked.maxAge === undefined ? CONSENT_MAX_AGE : wholeSeconds(asked.maxAge, 'awaitConsent.maxAge')),
     ...options.privacy !== undefined && { 'data-policy': options.privacy },
   }
   const counting = options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'
@@ -374,10 +376,10 @@ function checked(options: AnalyticsOptions): void {
   if (policy !== undefined && !(typeof policy === 'string' && (LOCAL_PATH.test(policy) || ['https:', 'http:'].includes(URL.parse(policy)?.protocol ?? ''))))
     refuse(`privacy is a path starting with / or an http or https address; got ${JSON.stringify(policy)}`)
 
-  const age = typeof options.consent === 'object' ? options.consent.maxAge : undefined
+  const age = typeof options.awaitConsent === 'object' ? options.awaitConsent.maxAge : undefined
 
   if (age !== undefined && !(consentSeconds(age) <= MAX_CONSENT_AGE))
-    refuse(`consent.maxAge is a duration up to 13 months, such as '180d'; got ${JSON.stringify(age)}`)
+    refuse(`awaitConsent.maxAge is a duration up to 13 months, such as '180d'; got ${JSON.stringify(age)}`)
 
   if (options.exclude !== undefined && (!Array.isArray(options.exclude) || options.exclude.some(path => typeof path !== 'string' || !path.startsWith('/') || path === '/')))
     refuse(`exclude is a list of paths starting with /, such as ['/account']; got ${JSON.stringify(options.exclude)}`)
@@ -399,7 +401,7 @@ function checked(options: AnalyticsOptions): void {
     refuse(`takes exclude, titles and events for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
 
   if (typeof options.info === 'object' && isGated(options))
-    refuse('takes info for a counter that asks no one; with consent on, the notice is worded by consent, and consent: false shows the line')
+    refuse('takes info for a counter that asks no one; with awaitConsent on, the notice is worded by awaitConsent, and awaitConsent: false shows the line')
 
   if ('url' in options && options.url !== undefined)
     address('url', options.url, true)

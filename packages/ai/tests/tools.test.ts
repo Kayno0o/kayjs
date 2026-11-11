@@ -17,7 +17,7 @@ import { untilHolds } from './until'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, staying, watch, unconfirmed, approving, refusedTools, upload, looks } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, staying, watch, unconfirmed, unconfirmedOld, approvedOverOld, unconfirmedOverOld, approving, refusedTools, upload, looks } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
@@ -496,7 +496,7 @@ describe('a visitor leaving mid-loop', () => {
   })
 })
 
-describe('confirm', () => {
+describe('approval', () => {
   const request = new Request('http://localhost/')
   const base = { messages: [{ role: 'user' as const, content: 'go' }], system: undefined, model: 'fake', maxTokens: 10, temperature: undefined, timeouts: { connect: '5s' as const, idle: '5s' as const } }
 
@@ -555,6 +555,20 @@ describe('confirm', () => {
 
     expect(done).toEqual([])
     expect(steps.at(-1)!.calls).toMatchObject([{ name: 'add_note', status: 'failed' }])
+  })
+
+  it('still reads confirm, the old name of approval, and lets approval win when both are given', async () => {
+    for (const [action, status] of [[unconfirmedOld, 'failed'], [unconfirmedOverOld, 'failed'], [approvedOverOld, 'done']] as const) {
+      done.length = 0
+      fakeAi.clear()
+      fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+      fakeAi.reply('ok')
+
+      const steps = await site.call(action, { prompt: 'go' })
+
+      expect(steps.at(-1)!.calls).toMatchObject([{ name: 'add_note', status }])
+      expect(done).toEqual(status === 'done' ? ['addNote:Milk'] : [])
+    }
   })
 
   it('runs nothing when confirm throws', async () => {

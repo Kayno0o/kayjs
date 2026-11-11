@@ -1,4 +1,5 @@
 --- server
+// kay-allow-file deprecated-ai-options -- the fixture reads the old names on purpose
 import { ask, tool } from '@kaynooo/kayjs-ai'
 import { action, s } from 'kay'
 import { done, heard, hooks, testing } from '../testing'
@@ -38,19 +39,19 @@ export const homeState = action(s.Object({}), () => 'lit', { tool: { description
 const tools = [addNote, refuses, sendsAway, breaks, slow, limited, wipe, homeState]
 
 export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), maxSteps: s.Optional(s.Integer({ minimum: 1, maximum: 10 })), offer: s.Optional(s.Array(s.String({ maxLength: 40 }), { maxItems: 10 })) }), async ({ prompt, maxSteps, offer }) => {
-  const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, confirm: false, provider: testing.provider })
+  const reply = ask(prompt, { tools: offer === undefined ? tools : tools.filter(tool => offer.includes(tool.url.slice(tool.url.lastIndexOf('/') + 1))), maxSteps, approval: false, provider: testing.provider })
 
   return { text: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
 })
 
 // A posted file shown to a model that calls tools, as an app's scan reader would.
-export const looks = action(s.Object({ photo: s.File({ type: 'image/png' }) }), async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], confirm: false, provider: testing.provider }), { maxSize: '1mb' })
+export const looks = action(s.Object({ photo: s.File({ type: 'image/png' }) }), async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], approval: false, provider: testing.provider }), { maxSize: '1mb' })
 
-export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], confirm: false, provider: testing.provider }).progress())
+export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], approval: false, provider: testing.provider }).progress())
 
 // A tool loop an app reads itself, as it would to speak the reply aloud, which `outlive` lets go on once the visitor left.
 export const staying = action(s.Object({ prompt: s.String({ maxLength: 200 }), outlive: s.Boolean() }), ({ prompt, outlive }) => {
-  const reply = ask(prompt, { tools: [addNote, slow], confirm: false, outlive, provider: testing.provider })
+  const reply = ask(prompt, { tools: [addNote, slow], approval: false, outlive, provider: testing.provider })
 
   void (async () => {
     let text = ''
@@ -71,11 +72,16 @@ const stamp = tool({ name: 'stamp', description: 'Stamps something', input: s.Ob
 } })
 const addNoteTwin = tool({ name: 'add_note', description: 'A function tool named as an action', input: s.Object({}), run: () => 'twin' })
 
-// An action and a function tool in one ask, whose confirm refuses every action.
-export const mixed = action(s.Object({ prompt: s.String({ maxLength: 200 }), twin: s.Optional(s.Boolean()) }), ({ prompt, twin }) => ask(prompt, { tools: twin === true ? [addNoteTwin, addNote] : [addNote, stamp], confirm: () => false, provider: testing.provider }).progress())
+// An action and a function tool in one ask, whose approval refuses every action.
+export const mixed = action(s.Object({ prompt: s.String({ maxLength: 200 }), twin: s.Optional(s.Boolean()) }), ({ prompt, twin }) => ask(prompt, { tools: twin === true ? [addNoteTwin, addNote] : [addNote, stamp], approval: () => false, provider: testing.provider }).progress())
 
 // A tool loop whose every call the visitor has not confirmed.
-export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())
+export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, provider: testing.provider }).progress())
+
+// The old name of `approval`, alone, and beside a different `approval`, which wins.
+export const unconfirmedOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())
+export const approvedOverOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: false, confirm: () => false, provider: testing.provider }).progress())
+export const unconfirmedOverOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, confirm: false, provider: testing.provider }).progress())
 
 export const lookup = action(s.Object({}), () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
 
@@ -83,7 +89,7 @@ export const lookup = action(s.Object({}), () => 'found', { tool: { description:
 export const approving = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, lookup], provider: testing.provider }).progress())
 
 // The chat's action when the model has tools: the stream carries the calls too.
-export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], confirm: false, provider: testing.provider }).progress())
+export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], approval: false, provider: testing.provider }).progress())
 
 export const labelled = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [homeState], provider: testing.provider }).progress())
 

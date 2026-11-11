@@ -25,10 +25,10 @@ export function libraryComponents(imports: readonly ImportBinding[]): Map<string
 
 type Report = (span: Span, message: string, details: Details) => void
 
-type Named = Exclude<Attribute, { kind: 'spread' }>
+export type Named = Exclude<Attribute, { kind: 'spread' }>
 
 // The edit renaming an attribute, which a bare `{heading}` writes out as `title={heading}`.
-function rename(attribute: Named, from: string, to: string): Span & { text: string } {
+export function rename(attribute: Named, from: string, to: string): Span & { text: string } {
   return attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${to}={${from}}` } : { start: attribute.name.start, end: attribute.name.end, text: to }
 }
 

@@ -125,7 +125,7 @@ describe('the script and the page', () => {
   })
 
   it('marks the script as waiting for consent, with the notice in each language', async () => {
-    const home = await (await (await site(plausible({ consent: { text: { en: 'Count?', fr: 'Compter ?' }, agree: 'Yes' } }))).handle(new Request('http://localhost/'))).text()
+    const home = await (await (await site(plausible({ awaitConsent: { text: { en: 'Count?', fr: 'Compter ?' }, agree: 'Yes' } }))).handle(new Request('http://localhost/'))).text()
 
     expect(home).toContain('data-consent')
     expect(home).toContain('Compter ?')
@@ -133,18 +133,27 @@ describe('the script and the page', () => {
   })
 
   it('reads a language key written in uppercase for the page whose lang is lowercase', async () => {
-    const home = await (await (await site(plausible({ consent: { text: { EN: 'Count?', FR: 'Compter ?' }, agree: { Fr: 'Oui' } } }))).handle(new Request('http://localhost/'))).text()
+    const home = await (await (await site(plausible({ awaitConsent: { text: { EN: 'Count?', FR: 'Compter ?' }, agree: { Fr: 'Oui' } } }))).handle(new Request('http://localhost/'))).text()
 
     expect(home).toContain('&quot;fr&quot;:{&quot;text&quot;:&quot;Compter ?&quot;,&quot;agree&quot;:&quot;Oui&quot;')
     expect(home).not.toContain('&quot;FR&quot;')
   })
 
+  it('still reads consent, the old name of awaitConsent, and lets awaitConsent win when both are given', async () => {
+    const page = async (options: Record<string, unknown>) => (await (await site(plausible(options))).handle(new Request('http://localhost/'))).text()
+
+    expect(await page({ consent: true })).toContain('data-consent')
+    expect(await page({ consent: { text: 'Count?' } })).toContain('Count?')
+    expect(await page({ consent: true, awaitConsent: false })).not.toContain('data-consent')
+    expect(await page({ consent: false, awaitConsent: true })).toContain('data-consent')
+  })
+
   it('marks the notice as silent when the app asks in its own UI, the gate staying', async () => {
-    const home = await (await (await site(plausible({ consent: { notice: false } }))).handle(new Request('http://localhost/'))).text()
+    const home = await (await (await site(plausible({ awaitConsent: { notice: false } }))).handle(new Request('http://localhost/'))).text()
 
     expect(home).toContain('data-silent')
     expect(home).toContain('data-consent')
-    const asking = await (await site(plausible({ consent: true }))).handle(new Request('http://localhost/'))
+    const asking = await (await site(plausible({ awaitConsent: true }))).handle(new Request('http://localhost/'))
 
     expect(await asking.text()).not.toContain('data-silent')
   })
@@ -172,11 +181,11 @@ describe('the notice, its lifetime and what a visit carries', () => {
 
   it('names the provider in the information line of a counter that asks nothing, and in the notice once consent is on', async () => {
     expect(await page(plausible())).toContain('with Plausible, without cookies that follow you. You can opt out.')
-    expect(await page(plausible({ consent: true }))).toContain('with Plausible, without cookies that follow you. Do you agree?')
+    expect(await page(plausible({ awaitConsent: true }))).toContain('with Plausible, without cookies that follow you. Do you agree?')
   })
 
   it('puts the provider into wording the app wrote, where it writes {provider}', async () => {
-    const html = await page(plausible({ consent: { text: { en: 'Count with {provider}?', fr: 'Compter avec {provider} ?' } } }))
+    const html = await page(plausible({ awaitConsent: { text: { en: 'Count with {provider}?', fr: 'Compter avec {provider} ?' } } }))
 
     expect(html).toContain('Count with Plausible?')
     expect(html).toContain('Compter avec Plausible ?')
@@ -201,14 +210,14 @@ describe('the notice, its lifetime and what a visit carries', () => {
   })
 
   it('keeps the first language the app wrote ahead of the shipped English, for a page language nothing names', async () => {
-    const texts = textsOf(await page(plausible({ consent: { text: { fr: 'Compter ?' } } })))
+    const texts = textsOf(await page(plausible({ awaitConsent: { text: { fr: 'Compter ?' } } })))
 
     expect(Object.keys(texts)[0]).toBe('fr')
     expect(texts.fr!.text).toBe('Compter ?')
   })
 
   it('lets a plain string of the app win for every language, French included', async () => {
-    const texts = textsOf(await page(plausible({ consent: { agree: 'Yes' } })))
+    const texts = textsOf(await page(plausible({ awaitConsent: { agree: 'Yes' } })))
 
     expect(texts.fr).toMatchObject({ agree: 'Yes', refuse: 'Refuser' })
     expect(texts.en).toMatchObject({ agree: 'Yes', refuse: 'Refuse' })
@@ -216,7 +225,7 @@ describe('the notice, its lifetime and what a visit carries', () => {
 
   it('links the policy the app names, in the notice and in the information line', async () => {
     expect(await page(plausible({ privacy: '/privacy' }))).toContain('data-policy="/privacy"')
-    expect(await page(plausible({ consent: true, privacy: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
+    expect(await page(plausible({ awaitConsent: true, privacy: 'https://example.com/privacy' }))).toContain('data-policy="https://example.com/privacy"')
     expect(await page(plausible())).not.toContain('data-policy')
     expect(await page(plausible({ privacy: '/privacy', info: { policy: { en: 'Policy', fr: 'Politique' } } }))).toContain('Politique')
   })
@@ -227,12 +236,12 @@ describe('the notice, its lifetime and what a visit carries', () => {
 
   it('remembers an answer 180 days by default, for the information line and the notice alike, and takes up to 13 months', async () => {
     expect(await page(plausible())).toContain('data-max-age="15552000"')
-    expect(await page(plausible({ consent: true }))).toContain('data-max-age="15552000"')
-    expect(await page(plausible({ consent: { maxAge: '3600s' } }))).toContain('data-max-age="3600"')
+    expect(await page(plausible({ awaitConsent: true }))).toContain('data-max-age="15552000"')
+    expect(await page(plausible({ awaitConsent: { maxAge: '3600s' } }))).toContain('data-max-age="3600"')
     expect(await page({ provider: 'fathom', siteId: 'ABCDEFGH' })).toContain('data-max-age="15552000"')
-    expect(() => analytics(plausible({ consent: { maxAge: '396d' } }))).toThrow('maxAge')
-    expect(() => analytics(plausible({ consent: { maxAge: '0s' } }))).toThrow('maxAge')
-    expect(() => analytics(plausible({ consent: { maxAge: '395d' } }))).not.toThrow()
+    expect(() => analytics(plausible({ awaitConsent: { maxAge: '396d' } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ awaitConsent: { maxAge: '0s' } }))).toThrow('maxAge')
+    expect(() => analytics(plausible({ awaitConsent: { maxAge: '395d' } }))).not.toThrow()
   })
 
   it('carries the excluded paths and the titles opt-in to the tracker', async () => {
@@ -285,17 +294,17 @@ describe('the notice, its lifetime and what a visit carries', () => {
     expect(wrong).toHaveLength(3)
   })
 
-  it.each(['fathom', 'cloudflare', 'custom'] as const)('takes an info object for %s once consent is false, and refuses it while consent asks', (name) => {
+  it.each(['fathom', 'cloudflare', 'custom'] as const)('takes an info object for %s once consent is false, and refuses it while awaitConsent asks', (name) => {
     const options = NAMED.find(([provider]) => provider === name)![1] as AnalyticsOptions
 
-    expect(() => analytics({ ...options, consent: false, info: { text: 'Counting' } })).not.toThrow()
+    expect(() => analytics({ ...options, awaitConsent: false, info: { text: 'Counting' } })).not.toThrow()
     expect(() => analytics({ ...options, info: { text: 'Counting' } })).toThrow('info')
-    expect(() => analytics({ ...options, consent: false, info: false })).not.toThrow()
+    expect(() => analytics({ ...options, awaitConsent: false, info: false })).not.toThrow()
   })
 
   it('refuses an info object when consent asks, which shows the notice instead', () => {
-    expect(() => analytics(plausible({ consent: true, info: { text: 'Counting' } }))).toThrow('consent')
-    expect(() => analytics(plausible({ consent: true, info: false }))).not.toThrow()
+    expect(() => analytics(plausible({ awaitConsent: true, info: { text: 'Counting' } }))).toThrow('awaitConsent')
+    expect(() => analytics(plausible({ awaitConsent: true, info: false }))).not.toThrow()
     expect(() => analytics(plausible({ info: { text: 'Counting' } }))).not.toThrow()
   })
 })
@@ -360,7 +369,7 @@ describe('when a visit is not forwarded', () => {
   })
 
   it('waits for the visitor\'s yes when the site asked for it, however the request arrives', async () => {
-    const app = await site(plausible({ consent: true }))
+    const app = await site(plausible({ awaitConsent: true }))
 
     expect((await send(app, visit())).status).toBe(204)
     expect((await send(app, visit(), { cookie: 'kay_analytics=no' })).status).toBe(204)
@@ -390,7 +399,7 @@ describe('consent by provider', () => {
 
   it.each(ASKING)('%s asks before anything loads when consent is left out, as with consent true', async (_name, options) => {
     const unset = await page(options)
-    const asked = await page({ ...options, consent: true })
+    const asked = await page({ ...options, awaitConsent: true })
 
     expect(unset).toContain('data-consent')
     expect(unset).not.toContain('data-info')
@@ -400,14 +409,14 @@ describe('consent by provider', () => {
   })
 
   it.each(ASKING)('%s counts without asking once the app wrote consent false, kay\'s script showing the opt-out', async (_name, options) => {
-    const html = await page({ ...options, consent: false })
+    const html = await page({ ...options, awaitConsent: false })
 
     expect(html).not.toContain('data-consent')
     expect(html).toContain('data-info')
   })
 
   it.each(ASKING)('%s with consent false and info false shows no line', async (_name, options) => {
-    expect(await page({ ...options, consent: false, info: false })).not.toContain('data-info')
+    expect(await page({ ...options, awaitConsent: false, info: false })).not.toContain('data-info')
   })
 
   it('sends a ga4 visit only after a yes when consent is left out, and with consent false whatever the cookie but an opt-out', async () => {
@@ -420,7 +429,7 @@ describe('consent by provider', () => {
     expect(received).toHaveLength(1)
     received = []
 
-    const open = await site(ga4({ consent: false }))
+    const open = await site(ga4({ awaitConsent: false }))
 
     await send(open, visit())
     expect(received).toHaveLength(1)
@@ -459,8 +468,8 @@ describe('consent by provider', () => {
     await asks({ provider: 'umami', websiteId: 'w' })
     await asks({ provider: 'umami', websiteId: 'w', url: 'https://cloud.umami.is' })
     await asks({ provider: 'umami', websiteId: 'w', url: 'https://u.example' }, 'data-info')
-    await asks({ provider: 'umami', websiteId: 'w', consent: false }, 'data-info')
-    await asks({ provider: 'umami', websiteId: 'w', url: 'https://u.example', consent: true })
+    await asks({ provider: 'umami', websiteId: 'w', awaitConsent: false }, 'data-info')
+    await asks({ provider: 'umami', websiteId: 'w', url: 'https://u.example', awaitConsent: true })
   })
 
   it('forwards nothing to Umami Cloud before the yes, and one visit after it', async () => {
@@ -502,7 +511,7 @@ describe('consent by provider', () => {
     process.env.NODE_ENV = 'development'
 
     try {
-      expect((await send(await site(ga4({ consent: false })), visit(), { cookie: 'kay_analytics=yes' })).status).toBe(204)
+      expect((await send(await site(ga4({ awaitConsent: false })), visit(), { cookie: 'kay_analytics=yes' })).status).toBe(204)
     }
     finally {
       process.env.NODE_ENV = 'production'
@@ -694,7 +703,7 @@ describe('pages left out', () => {
 
 describe('under a base and a trailing slash', () => {
   it('serves the tracker, the page tag and the post under the base', async () => {
-    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ consent: true }))], proxy: { hops: 1 } })
+    const mounted = await testSite({ requireGuards: false, root: dir, dirs: { routes: join(dir, 'routes') }, islands: false, base: '/shop', trailingSlash: 'always', extensions: [analytics(plausible({ awaitConsent: true }))], proxy: { hops: 1 } })
 
     try {
       const home = await (await mounted.fetch('/')).text()
@@ -777,7 +786,7 @@ describe('Matomo', () => {
 })
 
 describe('Google Analytics 4', () => {
-  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false, titles: true, ...more })
+  const ga4 = (more: object = {}): AnalyticsOptions => ({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, awaitConsent: false, titles: true, ...more })
 
   it('is sent a page_view through the Measurement Protocol, the secret in the query and no cookie asked of the browser', async () => {
     const response = await send(await site(ga4({ address: true })), visit(), { 'x-forwarded-for': '198.51.100.9' })
@@ -833,7 +842,7 @@ describe('Google Analytics 4', () => {
   })
 
   it('makes no id for a visitor who has not agreed', async () => {
-    const app = await site(ga4({ consent: true }))
+    const app = await site(ga4({ awaitConsent: true }))
 
     await send(app, visit())
     await send(app, visit(), { cookie: 'kay_analytics=no' })
@@ -865,7 +874,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   }
 
   it('puts Fathom\'s script in the head, the CSP opened for its domain', async () => {
-    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, info: false })
+    const { html, policy } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: false, info: false })
 
     expect(html).toContain('src="https://cdn.usefathom.com/script.js"')
     expect(html).toContain('data-site="ABCDEFGH"')
@@ -876,7 +885,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it('puts the Cloudflare beacon in the head, the CSP opened as Cloudflare documents', async () => {
-    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123', consent: false, info: false })
+    const { html, policy } = await home({ provider: 'cloudflare', token: 'tok-123', awaitConsent: false, info: false })
 
     expect(html).toContain('src="https://static.cloudflareinsights.com/beacon.min.js"')
     expect(html).toContain('data-cf-beacon="{&quot;token&quot;:&quot;tok-123&quot;}"')
@@ -885,8 +894,8 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it.each([
-    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', consent: false }, 'https://cdn.usefathom.com/script.js'],
-    ['cloudflare', { provider: 'cloudflare', token: 'tok-123', consent: false }, 'https://static.cloudflareinsights.com/beacon.min.js'],
+    ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: false }, 'https://cdn.usefathom.com/script.js'],
+    ['cloudflare', { provider: 'cloudflare', token: 'tok-123', awaitConsent: false }, 'https://static.cloudflareinsights.com/beacon.min.js'],
   ] as const)('%s with consent false loads through kay\'s script, which shows the opt-out line, the CSP still open for its domain', async (_name, options, src) => {
     const { html, policy } = await home(options)
     const app = await site(options)
@@ -904,8 +913,8 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it('words the line of a script provider with info, and names it in the default one', async () => {
-    const worded = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, info: { text: 'Counted with {provider}', optOut: 'Stop' } })
-    const plain = await home({ provider: 'cloudflare', token: 'tok-123', consent: false })
+    const worded = await home({ provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: false, info: { text: 'Counted with {provider}', optOut: 'Stop' } })
+    const plain = await home({ provider: 'cloudflare', token: 'tok-123', awaitConsent: false })
 
     expect(worded.html).toContain('Counted with Fathom')
     expect(worded.html).toContain('Stop')
@@ -914,18 +923,18 @@ describe('Fathom and Cloudflare Web Analytics', () => {
   })
 
   it('leaves the provider\'s script out of the page until the visitor agrees, kay\'s script loading it', async () => {
-    const { html } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })
+    const { html } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: true })
 
     expect(html).not.toContain('src="https://cdn.usefathom.com/script.js"')
     expect(html).toContain('src="/_kay/analytics.js?v=')
     expect(html).toContain('data-load=')
     expect(html).toContain('data-consent')
-    expect((await (await site({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })).handle(new Request('http://localhost/_kay/analytics.js'))).status).toBe(200)
+    expect((await (await site({ provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: true })).handle(new Request('http://localhost/_kay/analytics.js'))).status).toBe(200)
   })
 })
 
 describe('a custom provider', () => {
-  const custom = (more: object = {}): AnalyticsOptions => ({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, consent: false, ...more })
+  const custom = (more: object = {}): AnalyticsOptions => ({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, awaitConsent: false, ...more })
   const collect = async (app: Awaited<ReturnType<typeof pages>>, body: BodyInit, headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/analytics/collect', { method: 'POST', body, headers: { 'content-type': 'application/json', 'user-agent': CHROME, 'x-forwarded-for': `203.0.113.${++counter % 250}`, ...headers } }))
 
   it('serves the script from the app with the endpoint pointed at the app', async () => {
@@ -1055,7 +1064,7 @@ describe('a custom provider', () => {
   })
 
   it('waits for the visitor\'s yes when asked to, and loads the script only then', async () => {
-    const app = await site(custom({ consent: true }))
+    const app = await site(custom({ awaitConsent: true }))
 
     expect((await collect(app, '{}')).status).toBe(204)
     expect(received).toEqual([])
@@ -1276,7 +1285,7 @@ describe('custom events', () => {
   })
 
   it('sends GA4 the event under a name and parameters it accepts, the page ones kept', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('File Download: pdf', { 'file-type': 'pdf', 'page_location': 'https://evil.example/' }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, awaitConsent: false }), event('File Download: pdf', { 'file-type': 'pdf', 'page_location': 'https://evil.example/' }))
 
     const [sent] = (lastBody() as { events: { name: string, params: Record<string, unknown> }[] }).events
 
@@ -1291,7 +1300,7 @@ describe('custom events', () => {
   })
 
   it('waits for the yes, honours an opt-out, leaves out excluded pages and production-only like a visit', async () => {
-    const asking = await site(plausible({ consent: true }))
+    const asking = await site(plausible({ awaitConsent: true }))
 
     expect((await send(asking, event('signup'))).status).toBe(204)
     expect((await send(asking, event('signup'), { cookie: 'kay_analytics=no' })).status).toBe(204)
@@ -1377,7 +1386,7 @@ describe('custom events', () => {
   })
 
   it('counts a server-side event only with the yes where consent is asked, and not in development', async () => {
-    await site(plausible({ consent: true, hosts: ['track-b.example'] }))
+    await site(plausible({ awaitConsent: true, hosts: ['track-b.example'] }))
 
     const request = (cookie: string) => new Request('http://localhost/signup', { headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.9', cookie } })
 
@@ -1411,7 +1420,7 @@ describe('custom events', () => {
   })
 
   it('does nothing for a provider that counts with its own script', async () => {
-    await site({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, hosts: ['track-d.example'] })
+    await site({ provider: 'fathom', siteId: 'ABCDEFGH', awaitConsent: false, hosts: ['track-d.example'] })
     await track({ request: new Request('http://localhost/x', { headers: { 'user-agent': CHROME } }) }, 'signup')
     await forwardsSettled()
 
@@ -1449,7 +1458,7 @@ describe('custom events', () => {
   })
 
   it('keeps a GA4 parameter value within Google\'s 100 characters and the parameters within its 25', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('x', { long: 'y'.repeat(300), ...Object.fromEntries(Array.from({ length: 9 }, (_, at) => [`k${at}`, at])) }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, awaitConsent: false }), event('x', { long: 'y'.repeat(300), ...Object.fromEntries(Array.from({ length: 9 }, (_, at) => [`k${at}`, at])) }))
 
     const params = (lastBody() as { events: { params: Record<string, unknown> }[] }).events[0]!.params
 
@@ -1524,7 +1533,7 @@ describe('custom events, guarded and hardened', () => {
   })
 
   it('keeps the first of two props that GA4 names alike', async () => {
-    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, consent: false }), event('x', { 'a-b': 'first', 'a_b': 'second' }))
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', url: `http://localhost:${provider.port}/`, awaitConsent: false }), event('x', { 'a-b': 'first', 'a_b': 'second' }))
 
     const [sent] = (lastBody() as { events: { params: Record<string, unknown> }[] }).events
 

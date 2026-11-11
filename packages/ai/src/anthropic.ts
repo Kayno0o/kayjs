@@ -217,7 +217,7 @@ export function anthropicAt({ apiKey, baseUrl = ANTHROPIC_URL, insecure, model, 
             throw error
 
           if (request.reasoning !== 'none' || refused.has(part))
-            throw new AiError('invalid', `${error.message.replace('kayjs-ai: ', '')}; this model may not take the thinking settings \`reasoning\` sends, so leave \`reasoning\` out and set \`body: { thinking }\` yourself`, { status: error.status, cause: error })
+            throw new AiError('invalid', `${error.message.replace('kayjs-ai: ', '')}; this model may not take the thinking settings \`effort\` sends, so leave \`effort\` out and set \`body: { thinking }\` yourself`, { status: error.status, cause: error })
 
           refused = new Set([...refused, part])
           events = open(refused)
