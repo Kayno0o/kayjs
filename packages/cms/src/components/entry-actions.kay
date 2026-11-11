@@ -4,7 +4,7 @@ import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
-import { shareDraft } from '../editor/save'
+import { revokeSharedLinks, shareDraft } from '../editor/save'
 import { collectionPath, historyPath, onPagePath } from '../listing'
 import EntryNewsletter from './entry-newsletter.kay'
 import EntryReview from './entry-review.kay'
@@ -52,6 +52,11 @@ else if form.ends() as at
         Refused(label={wording('cms.share.label', 'Share preview')} reason={denied.publish ?? unsaved()})
       else
         Button(label={wording('cms.share.label', 'Share preview')} disabled={form.saving()} onClick={async () => { await shareDraft({ collection: form.collection.name, slug: entry.slug, locale: entry.locale }) }})
+    if entry.url
+      if denied.publish !== undefined
+        Refused(label={wording('cms.share.revoke', 'Revoke shared links')} reason={denied.publish})
+      else
+        Button(label={wording('cms.share.revoke', 'Revoke shared links')} variant="ghost" disabled={form.saving()} onClick={async () => { await revokeSharedLinks({ collection: form.collection.name, slug: entry.slug, locale: entry.locale }) }})
     if form.collection.history
       Button(href={historyPath(form.prefix, { collection: form.collection.name, slug: entry.slug, locale: entry.locale })} label={wording('cms.history.open', 'History')})
     if form.collection.newsletter

@@ -65,6 +65,18 @@ async function type(root: ParentNode, text: string): Promise<void> {
   await settle()
 }
 
+test('Revoke shared links posts to the entry\'s revoke route, for a published entry too', async () => {
+  const { fetched } = server({ ok: true })
+  const root = await open()
+
+  button(root, 'Revoke shared links')!.click()
+  await until(() => fetched.mock.calls.some(call => String(call[0]).includes('/posts/hello/revoke-shares')))
+
+  const call = fetched.mock.calls.find(each => String(each[0]).includes('/revoke-shares'))!
+
+  expect((call[1] as RequestInit).method).toBe('POST')
+})
+
 // A deliberate wait for nothing to happen: the request or the notice a test expects not to come would have by now.
 async function quiet(): Promise<void> {
   for (let wait = 0; wait < 10; wait++) {

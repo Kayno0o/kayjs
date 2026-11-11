@@ -12,6 +12,7 @@ export default {
   share: 'Lien d\'aperçu partagé',
   title: 'Activité',
   unpublish: 'Dépubliée',
+  unshare: 'Liens d\'aperçu révoqués',
   update: 'Enregistrée',
   upload: 'Téléversé',
 }

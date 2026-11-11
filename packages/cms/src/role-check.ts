@@ -32,11 +32,12 @@ const MEDIA_RENAME = /^\/files\/media\/rename$/
 const UNUSED_UPLOADS = /^\/files\/unused\/delete$/
 const FORGET_EDITOR = /^\/history\/forget-editor$/
 
-// What an entry route does by the last segment of its path, with the action of `cms({ roles })` it asks. Sharing a draft shows what is not published, and mailing a list sends what an editor wrote, so both are a publisher's.
+// What an entry route does by the last segment of its path, with the action of `cms({ roles })` it asks. Sharing a draft shows what is not published (and revoking the links is as much a publisher's), and mailing a list sends what an editor wrote, so both are a publisher's.
 const SUFFIXES: Record<string, { action?: CmsAction, edit?: boolean, move?: boolean }> = {
   'publish': { action: 'publish' },
   'unpublish': { action: 'publish' },
   'share': { action: 'publish' },
+  'revoke-shares': { action: 'publish' },
   'preview': { action: 'publish' },
   'test': { action: 'publish' },
   'send': { action: 'publish' },

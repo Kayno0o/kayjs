@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The 404 log forgets a path past 90 days on an hourly timer, and kayjs-cms sweeps expired drafts from the browser at load and hourly, not only when one is written ([privacy](privacy.md)).
+- kayjs-cms adds a Revoke shared links button on an entry, which refuses every preview link already shared for it and is noted in the activity ([CMS history](../packages/cms/llms/history.md)).
 - `preview.sharedNotBefore` in kay.config.ts (and `setSharedNotBefore` from `kay/server`) revokes an entry's share links: it answers the time before which no link of that entry is accepted, and an older link is refused as expired ([content and the CMS](content-cms.md)).
 - kayjs-cms names more of its controls for assistive technology: the tables carry a hidden caption, a locked field's group a name, the Compare and Hide links the locale, the colour swatch its own name, "Add redirect" keeps its words first, and an alt-text or sign-in error is linked to its input; the new texts are the `cms.table.entries`, `cms.media.table`, `cms.uploads.table`, `cms.redirects.configured`, `cms.locales.compareAria`, `cms.locales.stopCompareAria` and `cms.field.colorPicker` wordings, and `cms.missing.addAria` now opens with "Add redirect".
 - `kay build`, `routes`, `env`, `lint`, `types`, `doctor`, `i18n`, `not-found`, `a11y`, `screenshot` and `extensions` give up on a `kay.config.ts` that awaits something forever after 30 seconds, as `kay check` does, instead of hanging ([tools](check-and-tools.md)).

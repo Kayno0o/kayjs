@@ -9,6 +9,7 @@ import { SINGLE_SLUG } from '../listing'
 import { withHold } from '../publishing'
 import { readReview, viewOf } from '../review'
 import { approveEntry, sendBackEntry, submitEntry } from '../reviewing'
+import { revokeShares } from '../share-revoke'
 import { deleteEntry, duplicateEntry, entryScreen, moveEntry, publishEntry, referenceChoices, renameEntry, saveEntry, shareLink, UnknownCollectionError, unpublishEntry } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
@@ -61,6 +62,20 @@ export default api()
       await recordActivity({ collection: params.collection, slug: params.slug, locale: query.locale, verb: 'share', author: authors.get(request) })
 
     return shared
+  }, { query: locale })
+  .post('/:collection/:slug/revoke-shares', async ({ params, query, request, status }) => {
+    const ref = { collection: params.collection, slug: params.slug, locale: query.locale }
+
+    try {
+      await revokeShares(ref, authors.get(request))
+    }
+    catch (error) {
+      return status(500, error instanceof Error ? error.message : String(error))
+    }
+
+    await recordActivity({ ...ref, verb: 'unshare', author: authors.get(request) })
+
+    return { ok: true as const }
   }, { query: locale })
   .post('/:collection/:slug/duplicate', async ({ params, query, request }) => duplicateEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
   .post('/:collection/:slug/rename', async ({ params, query, body, request }) => renameEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, body.slug, { author: authors.get(request), version: query.version, required: true }), { query: versioned, body: s.Object({ slug: s.String() }) })

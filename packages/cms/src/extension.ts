@@ -3,7 +3,7 @@ import type { FileSaver } from './files'
 import type { CmsOptions } from './settings'
 import { s } from 'kay'
 import { checkOptionKeys, configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/library'
-import { api, defineEnv } from 'kay/server'
+import { api, defineEnv, setSharedNotBefore } from 'kay/server'
 import { viewMembers } from './editor-names'
 import { forgejo } from './files'
 import { github } from './github'
@@ -17,6 +17,7 @@ import { migrateUploads } from './migrate-uploads'
 import { pageLinkLoader } from './page-link'
 import { startSweeping } from './retention'
 import { configure, settings } from './settings'
+import { sharesRevokedAt } from './share-revoke'
 
 // Where the editor and the screens call the API, outside `apiPath` like kay's own files.
 export const API_PREFIX = '/_kay/cms'
@@ -114,6 +115,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
     server: () => {
       // Editor names reach the guard's editors alone, however a page names the room it joins.
       viewPresenceWith(viewMembers)
+      // The share links of an entry made before an editor revoked them are refused.
+      setSharedNotBefore(sharesRevokedAt)
 
       if (options.files === undefined && process.env.NODE_ENV === 'production')
         settings().files = savedFromEnv()

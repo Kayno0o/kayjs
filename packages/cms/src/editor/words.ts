@@ -191,6 +191,8 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.share.copied',
   'cms.share.failure',
   'cms.share.refused',
+  'cms.share.revokeFailure',
+  'cms.share.revoked',
   'cms.share.shown',
   'cms.slug.creates',
   'cms.slug.empty',

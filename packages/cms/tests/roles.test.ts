@@ -76,6 +76,7 @@ const RESTRICTED = [
   ['POST', '/entries/posts/hello/publish', 'publish'],
   ['POST', '/entries/posts/hello/unpublish', 'publish'],
   ['POST', '/entries/posts/hello/share', 'publish'],
+  ['POST', '/entries/posts/hello/revoke-shares', 'publish'],
   ['POST', '/entries/posts/hello/approve', 'review'],
   ['POST', '/entries/posts/hello/send-back', 'review'],
   ['POST', '/newsletter/posts/hello/preview', 'publish'],

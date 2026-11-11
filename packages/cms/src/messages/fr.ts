@@ -475,7 +475,9 @@ export default defineMessages({
       label: 'Partager l\'aperçu',
       noPage: 'Cette entrée n\'a pas de page à partager',
       refused: 'Pas de lien',
-
+      revoke: 'Révoquer les liens partagés',
+      revokeFailure: 'Impossible de révoquer les liens',
+      revoked: 'Liens révoqués : ceux déjà envoyés ne montrent plus ce brouillon',
       shown: 'Lien valable une semaine : {link}',
     },
     slug: {

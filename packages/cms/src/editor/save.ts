@@ -412,6 +412,18 @@ export async function shareDraft(ref: EntryRef): Promise<boolean> {
   return true
 }
 
+// Refuses every share link made for the entry so far and says so; true once revoked.
+export async function revokeSharedLinks(ref: EntryRef): Promise<boolean> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/revoke-shares', { method: 'post', params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) }), wording('cms.share.revokeFailure', 'Could not revoke the links'))
+
+  if (!outcome)
+    return false
+
+  toast.success(wording('cms.share.revoked', 'Links revoked: the ones already sent no longer show this draft'))
+
+  return true
+}
+
 // Moves an entry one place up or down in its collection's order and says how it went; true once moved.
 export async function moveSaved(ref: EntryRef, direction: 'up' | 'down'): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/move', {
