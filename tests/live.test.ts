@@ -867,6 +867,18 @@ describe('call()', () => {
     expect(sentSince()).toEqual([true, undefined, undefined])
   })
 
+  it('shares the 64 KB between the keepalive calls in flight', async () => {
+    const before = served.mock.calls.length
+    const title = 'x'.repeat(40 * 1024)
+
+    await Promise.allSettled([
+      call(notes, '/', { method: 'post', body: { title }, keepalive: true }),
+      call(notes, '/', { method: 'post', body: { title }, keepalive: true }),
+    ])
+
+    expect(served.mock.calls.slice(before).map(([, init]) => init?.keepalive)).toEqual([true, undefined])
+  })
+
   it('calls any method of a route, sending its body as JSON and reading its answer typed', async () => {
     const added = await call(notes, '/', { method: 'post', body: { title: 'Milk' } })
 
