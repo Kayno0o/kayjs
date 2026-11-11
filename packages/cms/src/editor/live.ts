@@ -70,7 +70,8 @@ async function whenReplaced(url: string, instances: Instances, watch: Watch): Pr
     signal?.addEventListener('abort', () => end(false), { once: true })
 
     stops.push(instances.onError(() => {
-      // Reads on an interval from here on, from how the page stood when the save went through.
+      // Reads on an interval from here on, from how the page stood when the save went through, for a window of its own.
+      clearTimeout(timer)
       for (const stop of stops)
         stop()
 
