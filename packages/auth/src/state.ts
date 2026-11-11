@@ -25,9 +25,9 @@ export interface RequestState {
   establish: (record: UserRecord, method: string) => Promise<void>
   // Signs this session out, telling `onEvent`.
   signOut: () => Promise<void>
-  // Takes `record` as the user this request is, as when an admin starts acting as them.
+  // Takes `record` as the user this request is, as when an admin starts acting as them, and tags the browser's `local()` mirrors with them.
   adopt: (record: UserRecord) => void
-  // Reads who the session is again, and signs it out when nobody is.
+  // Reads who the session is again, tagging the mirrors with them, and signs it out when nobody is.
   reload: () => Promise<void>
   // Keeps this session signed in as `record` after its session version was raised, when it is that user's.
   renew: (record: UserRecord) => Promise<void>

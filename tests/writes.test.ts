@@ -103,4 +103,34 @@ describe('forgetLocalMirrors', () => {
     expect(forgetLocalMirrors(request, 'user-bob')).not.toBe(ada)
     expect(ada).not.toContain('ada')
   })
+
+  // Each value is made by a process of its own, as a restart or another replica would make it.
+  async function valueIn(secret: string | undefined, person: string): Promise<string> {
+    const code = `import { useStampSecret } from './src/server/stamp'
+import { forgetLocalMirrors } from './src/server/writes'
+${secret === undefined ? '' : `useStampSecret('${secret}', 'config')`}
+console.log(forgetLocalMirrors(new Request('https://x.example/'), '${person}'))`
+    const run = Bun.spawn([process.execPath, '-e', code], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_SECRET: '', NODE_ENV: 'production' } })
+
+    const line = (await new Response(run.stdout).text()).trim()
+
+    return line.slice(0, line.indexOf(';'))
+  }
+
+  it('keeps one value per person across restarts and replicas that share a secret, or none', async () => {
+    const secret = 'a-shared-secret-of-more-than-32-characters'
+
+    expect(await valueIn(secret, 'user-ada')).toBe(await valueIn(secret, 'user-ada'))
+    expect(await valueIn(secret, 'user-ada')).not.toBe(await valueIn(secret, 'user-bob'))
+    // With no secret the digest is plain: stable, so a restart empties no mirror.
+    expect(await valueIn(undefined, 'user-ada')).toBe(await valueIn(undefined, 'user-ada'))
+    expect(await valueIn(undefined, 'user-ada')).not.toBe(await valueIn(undefined, 'user-bob'))
+  })
+
+  it('changes every value when the secret is rotated, which empties the mirrors once', async () => {
+    const first = await valueIn('a-shared-secret-of-more-than-32-characters', 'user-ada')
+
+    expect(await valueIn('another-secret-of-more-than-32-characters', 'user-ada')).not.toBe(first)
+    expect(await valueIn(undefined, 'user-ada')).not.toBe(first)
+  })
 })

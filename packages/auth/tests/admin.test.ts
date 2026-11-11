@@ -348,6 +348,19 @@ describe('admin', () => {
     expect(told()).toEqual([['impersonation-started', 'ada@example.com', {}, 'root@example.com'], ['impersonation-ended', 'ada@example.com', {}, 'root@example.com']])
   })
 
+  test('impersonating and stopping tag the browser with the person it now is, so a local() mirror is never read as the other', async () => {
+    const { admin, ada } = await setup()
+    const tag = (who: typeof admin) => who.browser.cookies.get('kay_local_clear')
+    const own = tag(admin)
+
+    expect(own).toBeTruthy()
+    expect(tag(ada)).not.toBe(own)
+    await admin.browser.call('admin.impersonate', ada.id)
+    expect(tag(admin)).toBe(tag(ada))
+    await admin.browser.call('admin.stopImpersonating')
+    expect(tag(admin)).toBe(own)
+  })
+
   test('another admin, themselves or a banned user cannot be impersonated', async () => {
     const { admin, ada, member } = await setup()
     const other = await member('second@example.com', ['admin'])

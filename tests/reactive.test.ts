@@ -1,6 +1,6 @@
 import type { Action, Failure, NoInputAction } from '../src/runtime'
 import type { NavigationHooks } from '../src/runtime/navigation'
-import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
 import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/action'
@@ -2131,6 +2131,10 @@ describe('effect and onMount types', () => {
   })
 
   describe('an effect that never settles', () => {
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
     it('is named and stopped, what reads its writes ends on the last value, and the other effects of the page go on', () => {
       const error = spyOn(console, 'error').mockImplementation(() => undefined)
       const count = signal(0)
@@ -2185,7 +2189,7 @@ describe('effect and onMount types', () => {
       error.mockRestore()
     })
 
-    it('is stopped inside an effect another one runs, and a disposed effect stays disposed', () => {
+    it('stays disposed when it is disposed in the round the cap is met', () => {
       const error = spyOn(console, 'error').mockImplementation(() => undefined)
       const count = signal(0)
       let runs = 0
@@ -2198,18 +2202,132 @@ describe('effect and onMount types', () => {
           count.set(count() + 1)
         })
       })
+      // Runs after the runaway one in the round the cap is met, and disposes its root.
+      root(() => effect(() => {
+        if (count() > 1000)
+          stop()
+      }))
       flush()
       expect(error).toHaveBeenCalledTimes(1)
-      stop()
-      count.set(0)
-      flush()
 
       const after = runs
 
-      count.set(1)
+      count.set(0)
       flush()
       expect(runs).toBe(after)
-      error.mockRestore()
+    })
+
+    it('runs an effect that only the last round before the cap queued', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      const late = signal(0)
+      const seen: number[] = []
+
+      root(() => {
+        effect(() => count.set(count() + 1))
+        // The last write before the cap: what reads it is queued behind the runaway effect.
+        effect(() => {
+          if (count() >= 999)
+            late.set(1)
+        })
+        effect(() => void seen.push(late()))
+      })
+      flush()
+      expect(error).toHaveBeenCalledTimes(1)
+      expect(seen.at(-1)).toBe(1)
+    })
+
+    it('ends a render effect and a user effect reading the runaway one on its last value', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      const seen: string[] = []
+
+      root(() => {
+        effect(() => count.set(count() + 1))
+        renderEffect(() => void seen.push(`render ${count()}`))
+        effect(() => void seen.push(`user ${count()}`))
+      })
+      flush()
+      expect(seen.findLast(line => line.startsWith('render'))).toBe(`render ${count()}`)
+      expect(seen.findLast(line => line.startsWith('user'))).toBe(`user ${count()}`)
+      expect(error).toHaveBeenCalledTimes(1)
+    })
+
+    it('runs a stopped effect again when what it read directly changes', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      const trigger = signal(0)
+      let runs = 0
+
+      root(() => effect(() => {
+        runs++
+        trigger()
+        count.set(count() + 1)
+      }))
+      flush()
+
+      const stopped = runs
+
+      trigger.set(1)
+      flush()
+      expect(runs).toBeGreaterThan(stopped)
+      expect(error.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('runs a stopped effect again when a memo it read changes, however the memo was brought up to date', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const base = signal(0)
+      const trigger = signal(0)
+      const doubled = memo(() => base() * 2)
+      const gate = signal(false)
+      let runs = 0
+
+      root(() => {
+        effect(() => {
+          runs++
+          trigger()
+          base.set(doubled() + 1)
+        })
+        // Reads the memo the stopped effect read only once the gate opens, which brings it up to date after the stop.
+        effect(() => void (gate() && doubled()))
+      })
+      flush()
+
+      const stopped = runs
+
+      gate.set(true)
+      flush()
+      trigger.set(1)
+      flush()
+      expect(runs).toBeGreaterThan(stopped)
+      expect(error).toHaveBeenCalled()
+    })
+
+    it('stops a self-loop and a loop through several effects that run together', () => {
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const count = signal(0)
+      const left = signal(0)
+      const right = signal(0)
+      let runs = 0
+
+      root(() => {
+        effect(() => {
+          runs++
+          count.set(count() + 1)
+        })
+        effect(() => right.set(left() + 1))
+        effect(() => left.set(right() + 1))
+      })
+      flush()
+      // Each is reported by the cap it meets, and nothing runs on afterwards.
+      expect(error.mock.calls.length).toBeLessThanOrEqual(2)
+
+      const after = runs
+      const total = left() + right() + count()
+
+      flush()
+      expect(runs).toBe(after)
+      expect(left() + right() + count()).toBe(total)
     })
   })
 })

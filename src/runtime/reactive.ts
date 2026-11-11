@@ -622,8 +622,12 @@ export function flush(): void {
 
   // An effect writing what it reads, on every run, would never settle.
   for (let rounds = 1; renderQueue.length > 0 || userQueue.length > 0; rounds++) {
-    const ran = renderQueue.concat(userQueue)
+    const ran = renderQueue
     let stuck: Computation[] = []
+
+    // The render effects first, then the user ones.
+    for (const node of userQueue)
+      ran.push(node)
 
     renderQueue = []
     userQueue = []
@@ -724,7 +728,8 @@ function mark(source: Source, state: typeof CHECK | typeof DIRTY, direct = false
     if (observer.cursor >= 0 && !readBy(observer, source))
       continue
 
-    if (direct)
+    // A clean one, an effect stopped at the round cap, is queued as any other that goes stale.
+    if (direct && observer.state !== CLEAN)
       observer.state = DIRTY
     else
       stale(observer, state)
@@ -752,11 +757,7 @@ function stale(node: Computation, state: typeof CHECK | typeof DIRTY): void {
 }
 
 function enqueue(node: Computation): void {
-  if (node.effect === 'render')
-    renderQueue.push(node)
-  else
-    userQueue.push(node)
-
+  (node.effect === 'render' ? renderQueue : userQueue).push(node)
   schedule()
 }
 

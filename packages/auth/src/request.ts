@@ -150,12 +150,17 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       signOut: async () => this.signOut(),
       adopt: (record) => {
         this.resolving = Promise.resolve(record)
+        this.cookies.push(forgetLocalMirrors(this.request, record.id))
       },
       reload: async () => {
         this.source = null
         this.resolving = undefined
 
-        if (!(await this.record()))
+        const record = await this.record()
+
+        if (record)
+          this.cookies.push(forgetLocalMirrors(this.request, record.id))
+        else
           await this.leave()
       },
       renew: async (record) => {

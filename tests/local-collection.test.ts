@@ -350,9 +350,50 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
       dispatchEvent(new Event('online'))
     })
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note') === null)
+    // Back online, nothing is left to send as the other person.
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
 
     expect((await stored(page)).outbox).toEqual([])
     expect((await server()).saves).toBe(0)
+  }, 60_000)
+
+  it('lets a write in flight finish when another tab signs someone else in, and queues nothing of the first person after', async () => {
+    const page = await opened()
+    let release = (): void => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    await page.route('/_kay/action/*', async () => gate)
+    await write(page, 'button.add', 'in flight')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '1')
+    await page.evaluate(() => {
+      document.cookie = 'kay_local_clear=person-b; path=/'
+      dispatchEvent(new Event('online'))
+    })
+    release()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('.status')?.textContent === 'synced')
+
+    expect((await stored(page)).outbox).toEqual([])
+    // The write left under the first person's session, so the server took it once.
+    expect((await server()).saves).toBe(1)
+  }, 60_000)
+
+  it('drops what an anonymous visitor queued once someone signs in', async () => {
+    const page = await opened()
+
+    await page.route('/_kay/action/*', async request => request.abort())
+    await write(page, 'button.add', 'before signing in')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+    await page.evaluate(() => {
+      document.cookie = 'kay_local_clear=person-a; path=/'
+    })
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent !== 'loading')
+
+    expect((await stored(page)).outbox).toEqual([])
+    expect(await page.count('li.note')).toBe(0)
   }, 60_000)
 
   // Full Chrome's offline emulation cuts the page off and leaves its service worker online; chrome-headless-shell's cuts the worker off too, so the worker cannot send the write. The CI job on full Chrome runs it.
