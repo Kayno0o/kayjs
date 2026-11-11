@@ -342,6 +342,29 @@ inBrowser('HoverCard and ZoomPane', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('stays open while the pointer is on the card, and closes once it leaves it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/hover-card')
+
+    await page.hover('#node-1')
+    await page.waitUntil(() => document.querySelector('#card')?.matches(':popover-open'))
+    expect(await page.evaluate(() => {
+      const card = document.querySelector('#card')!
+      const box = card.getBoundingClientRect()
+
+      return card.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))
+    })).toBe(true)
+    await page.hover('#card')
+    await Bun.sleep(400)
+
+    expect((await boxes(page, '#node-1')).open).toBe(true)
+
+    await page.hover('#plain')
+    await page.waitUntil(() => !document.querySelector('#card')!.matches(':popover-open'))
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('closes without an error when its anchor leaves the page', async () => {
     const site = await shared()
 

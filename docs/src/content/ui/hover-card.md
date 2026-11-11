@@ -6,7 +6,7 @@ description: A card anchored to whichever element the page picks at run time, sh
 
 `anchor` is the element the card sits beside, or `undefined` for none: the card shows while there is one. The page sets it from `onPointerEnter` and `onFocus` and clears it on `onPointerLeave` and `onBlur`, so one card serves many elements. An element inside an SVG works too, the card following it as the plate pans or zooms.
 
-The card never takes the pointer, so it cannot cancel the hover that shows it. For content to click, use [Popover](/ui/popover). The card is a plain `div`: while it shows, its `id` is added to the anchor's `aria-describedby` so a screen reader hears it, and Escape closes it.
+The pointer can move onto the card: when your code clears the anchor, the card waits a moment and stays while the pointer is on it, so its text can be read at length (WCAG 1.4.13). For content to click, use [Popover](/ui/popover). The card is a plain `div`: while it shows, its `id` is added to the anchor's `aria-describedby` so a screen reader hears it, and Escape closes it.
 
 ## Hearing it close
 

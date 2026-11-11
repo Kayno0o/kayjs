@@ -4,12 +4,12 @@ import type { HoverCardPlacement } from './hover-card'
 import { effect, onCleanup, recipe, uid, untrack } from 'kay'
 
 // 'kui-hover-card' stays as the component's name for an app's CSS and the always-hidden guard.
-// It never takes the pointer, so it cannot flicker the hover that shows it.
+// The pointer can move onto it without it closing (WCAG 1.4.13), so its text can be read at length and selected.
 const look = recipe({
   parts: {
-    root: 'kui-hover-card pointer-events-none inset-auto m-1 [position-try-fallbacks:flip-block,flip-inline] rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-0 text-foreground data-[placement=top]:[position-area:block-start] data-[placement=bottom]:[position-area:block-end] data-[placement=left]:[position-area:inline-start] data-[placement=right]:[position-area:inline-end] data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]',
-    // Stands in for an SVG shape the card is anchored to, which the browser cannot anchor to itself: a box laid over the shape, never seen or hit.
-    stand: 'pointer-events-none invisible fixed inset-auto m-0 size-0 overflow-visible border-0 p-0',
+    root: 'kui-hover-card inset-auto m-1 [position-try-fallbacks:flip-block,flip-inline] rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-0 text-foreground data-[placement=top]:[position-area:block-start] data-[placement=bottom]:[position-area:block-end] data-[placement=left]:[position-area:inline-start] data-[placement=right]:[position-area:inline-end] data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]',
+    // Stands in for an SVG shape the card is anchored to, which the browser cannot anchor to itself: a box laid over the shape that paints nothing and is never hit; it is not `visibility: hidden`, as a hidden anchor hides the card anchored to it.
+    stand: 'pointer-events-none fixed inset-auto m-0 size-0 overflow-visible border-0 p-0',
   },
 })
 
@@ -33,6 +33,9 @@ let stand: HTMLSpanElement | undefined
 let frame = 0
 // The anchor the card describes while it is open.
 let described: Element | undefined
+// Whether the pointer is on the card, and the wait that lets it cross the gap from the anchor to the card before the card is let go.
+let hovered = false
+let leaving: ReturnType<typeof setTimeout> | undefined
 // Where the stand-in was last put, so a frame with nothing moved writes nothing.
 let placed = ''
 
@@ -76,6 +79,20 @@ function undescribe() {
   described = undefined
 }
 
+function onPanel(element: HTMLDivElement) {
+  panel = element
+  element.addEventListener('pointerenter', () => {
+    hovered = true
+    clearTimeout(leaving)
+  })
+  element.addEventListener('pointerleave', () => {
+    hovered = false
+
+    if (!anchor)
+      closeSoon()
+  })
+}
+
 // Escape dismisses the card without a pointer or focus move, and leaves the key to whatever else listens for it.
 function dismiss(event: KeyboardEvent) {
   if (event.key === 'Escape')
@@ -90,7 +107,22 @@ function unmark() {
   stand?.style.removeProperty('anchor-name')
 }
 
+// How long a card whose anchor was cleared stays for the pointer to arrive on it.
+const GRACE = 150
+
+// An anchor cleared while the card shows: the card stays a moment, and while the pointer is on it, so a visitor can move onto it.
+function closeSoon() {
+  clearTimeout(leaving)
+
+  if (hovered)
+    return
+
+  leaving = setTimeout(close, GRACE)
+}
+
 function close() {
+  clearTimeout(leaving)
+  hovered = false
   unmark()
 
   if (panel?.isConnected && panel.matches(':popover-open'))
@@ -125,6 +157,14 @@ function follow(target: Element) {
 effect(() => {
   const target = anchor ?? undefined
 
+  clearTimeout(leaving)
+
+  if (!target && panel?.isConnected && panel.matches(':popover-open')) {
+    closeSoon()
+
+    return
+  }
+
   unmark()
 
   if (!panel?.isConnected || !stand?.isConnected)
@@ -156,8 +196,11 @@ effect(() => {
   report(true)
 })
 
-onCleanup(unmark)
+onCleanup(() => {
+  clearTimeout(leaving)
+  unmark()
+})
 ---
-div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="manual" data-placement={placement} style={[`position-anchor: ${name}`, style].filter(Boolean).join('; ')})
+div(part="root" {...rest} ref={onPanel} id={panelId} popover="manual" data-placement={placement} style={[`position-anchor: ${name}`, style].filter(Boolean).join('; ')})
   slot
 span(part="stand" ref={element => stand = element} popover="manual" aria-hidden="true")
