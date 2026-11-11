@@ -5,6 +5,7 @@ import type { Aspect, ImageVariant } from '../runtime/image'
 import type { ActionOptions, GuardedRequest } from './actions'
 import type { ImageLimits } from './config-limits'
 import type { LoadedGuard } from './guards'
+import type { EncodeRefusal } from './image-limits'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
@@ -25,8 +26,9 @@ import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
 import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 
+import { encodeGate, waitFor } from './image-limits'
 import { limiter } from './limit'
-import { clientAddress, overLimit } from './protection'
+import { clientAddress } from './protection'
 import { revalidated } from './public'
 import { cacheKey, remoteAllowed, remotePatterns, remoteVariants } from './remote'
 import { requestUrl } from './request-url'
@@ -76,10 +78,6 @@ const WEBP_EXTENSION = /\.webp$/
 const MOST_ANSWERED = 1024
 // A longer URL is answered without being kept, so junk query strings cannot pin megabytes.
 const LONGEST_ANSWERED = 2048
-
-const ENCODE_RATE = 'image-encodes'
-const MINUTE_MS = 60_000
-const QUEUE_RETRY_SECONDS = 5
 
 export const DEFAULT_QUALITY = 80
 // Images a build decodes at once, each held whole while its variants are written from it.
@@ -235,7 +233,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
 
 // `/_kay/images?src=...&w=640` answers a WebP, or an AVIF to a browser that reads it when `avif` is set, of an imported image, or of one in a directory of runtime images or on a host `images.remote` lists, at a width of the ladder, a multiple of 16 below it or its own; `&crop=16x9` cuts it to an aspect ratio `images.aspects` allows, and `?src=...&card` answers its 1200x630 JPEG share card.
 export function serveImages(app: Elysia, options: ImageRouteOptions): void {
-  const pending = new Map<string, Promise<void>>()
+  const pending = new Map<string, Promise<EncodeRefusal | undefined>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
   // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
   const importedSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
@@ -243,13 +241,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
-  const gate = encodeGate(options.limits ?? imageLimits(undefined))
   // The variants, by file version, whose drawing failed, so a request for one, a conditional one included, does not run the failing decode again.
   const undecodable = new Map<string, true>()
   // The color of a runtime image, by the version of its file.
   const colors = new Map<string, Promise<string | undefined>>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
+  const gate = encodeGate(options.limits ?? imageLimits(undefined), options.cacheDir, [answered, importedVariants])
   const text = headerCopies(TEXT, options.security)
   const lightens = options.saveData !== false
   // By what the answer varies on: whether the format is negotiated, and whether the width is for a visitor saving data.
@@ -416,12 +414,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
     // Requests for a variant being written wait for that one write.
     if (file === cached && (writing || !await touched(cached))) {
+      // A request that started the write while this one looked at the file.
+      writing ??= pending.get(cached)
+
       if (!writing) {
-        const refusal = await gate(request, server, path, name)
-
-        if (refusal)
-          return waitFor(fail(refusal.body, refusal.status), refusal.wait)
-
         // Counted before it waits its turn, so the variants a burst asks for share the decode.
         const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
 
@@ -432,11 +428,11 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
         writing = (async () => {
           try {
-            await drawing(async () => {
+            return await gate.run(request, server, { name, suffix: inFormat(variantSuffix(variant), format) }, async () => drawing(async () => {
               const decoded = decoding ? await (decoding.png ??= decodable(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)) : path
 
               await writeVariant(decoded, variant, cached, variantLevel(variant, format, options.quality ?? DEFAULT_QUALITY, options.avif ?? DEFAULT_AVIF_QUALITY), format)
-            })
+            }))
           }
           finally {
             pending.delete(cached)
@@ -449,7 +445,10 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       }
 
       try {
-        await writing
+        const refusal = await writing
+
+        if (refusal)
+          return waitFor(fail(refusal.body, refusal.status), refusal.wait)
       }
       catch (error) {
         // A full or unwritable cache directory is the server's failure, which its error log reports, not the image's.
@@ -520,38 +519,6 @@ function failureKey(version: string, format: VariantFormat, variant: ImageVarian
     return `${version}\n${format}\ncard`
 
   return `${version}\n${format}\n${variant.aspect ? 'crop' : 'resize'}`
-}
-
-function waitFor(response: Response, seconds: number | undefined): Response {
-  if (seconds !== undefined)
-    response.headers.set('retry-after', String(seconds))
-
-  return response
-}
-
-// What the route checks before it encodes a variant, answering why not or undefined: the draw queue is full, the source has all the variants it may, or the client has asked for too many new ones this minute. A refused variant counts for none of the limits.
-function encodeGate(limits: ImageLimits): (request: Request, server: Context['server'], path: string, name: string) => Promise<{ body: string, status: number, wait?: number } | undefined> {
-  // The variants encoded of each source, for `images.maxVariants`; a source forgotten is counted again from none.
-  const encoded = new Map<string, Set<string>>()
-
-  return async (request, server, path, name) => {
-    if (limits.queue !== undefined && drawing.waiting >= limits.queue)
-      return { body: 'Too many images are being drawn; try again shortly', status: 503, wait: QUEUE_RETRY_SECONDS }
-
-    const names = encoded.get(path) ?? new Set<string>()
-
-    if (limits.maxVariants !== undefined && !names.has(name) && names.size >= limits.maxVariants)
-      return { body: 'Too many variants of this image', status: 429 }
-
-    const wait = limits.perMinute === undefined ? undefined : await overLimit(ENCODE_RATE, clientAddress(request, server), limits.perMinute, MINUTE_MS)
-
-    if (wait !== undefined)
-      return { body: 'Too many new image variants; try again later', status: 429, wait }
-
-    keep(encoded, path, names.add(name))
-
-    return undefined
-  }
 }
 
 // The headers of an answer that varies on `Accept`, or on `Save-Data`, or on both, by which of them it does.

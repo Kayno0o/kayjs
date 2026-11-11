@@ -30,7 +30,7 @@ The call used to stay pending for good once the browser went to the redirect's t
 No lint can see these: they depend on the traffic an app gets, not on its code.
 
 - A `.ws()` route refuses a client's 21st open socket with 429. An app whose clients share one address (an office behind one NAT, a proxy kay is not told to trust) or open many sockets on one route sets `detail.messages.connections` to its number, or `false` ([API routes](api-routes.md)).
-- The image route answers 429 past 120 new variants a minute for one client or 256 variants of one source, and 503 past 128 waiting draws; variants already made never count. An app that draws more raises `images.perMinute`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
+- The image route answers 429 past 120 new variants a minute for one client and 503 past 128 waiting draws, and keeps at most 256 cached variants of one source, removing the oldest to make room; variants already made never count against the rate. An app that draws more raises `images.perMinute`, `images.maxVariants` or `images.queue`, or sets `false` ([limits on encoding](images-runtime-and-remote.md#limits-on-encoding)).
 
 ## 1.95.0
 

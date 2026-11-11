@@ -61,13 +61,31 @@ describe('the image route limits', () => {
       expect((await app.handle(variant(quality))).status).toBe(200)
   })
 
-  it('caps the distinct variants kept of one source', async () => {
-    const app = await site({ perMinute: false, maxVariants: 2 })
+  it('keeps the variants of one source to the cap by removing the oldest, so no client locks another out', async () => {
+    const app = await site({ perMinute: false, maxVariants: 2 }, { proxy: 1 })
+    const cached = (quality: number) => [...new Bun.Glob(`**/*-320-q${quality}.webp`).scanSync(join(root, '.kay'))].length
+    const from = (address: string) => ({ 'x-forwarded-for': address })
 
-    expect((await app.handle(variant(85))).status).toBe(200)
-    expect((await app.handle(variant(90))).status).toBe(200)
-    expect((await app.handle(variant(95))).status).toBe(429)
-    expect((await app.handle(variant(85))).status).toBe(200)
+    // Client A fills the cap and goes past it.
+    for (const quality of [85, 90, 95])
+      expect((await app.handle(variant(quality, from('203.0.113.20')))).status).toBe(200)
+
+    expect(cached(85)).toBe(0)
+    expect(cached(90)).toBe(1)
+    expect(cached(95)).toBe(1)
+    // Client B asks a new legitimate variant and gets it, and the one A evicted is drawn again on request.
+    expect((await app.handle(variant(100, from('203.0.113.21')))).status).toBe(200)
+    expect((await app.handle(variant(85, from('203.0.113.21')))).status).toBe(200)
+    expect(cached(90) + cached(95)).toBe(0)
+  })
+
+  it('counts the concurrent first requests for one variant once', async () => {
+    const app = await site({ perMinute: 1, maxVariants: false }, { proxy: 1 })
+    const from = { 'x-forwarded-for': '203.0.113.30' }
+    const answers = await Promise.all([5, 5, 5].map(async quality => app.handle(variant(quality, from))))
+
+    expect(answers.map(answer => answer.status)).toEqual([200, 200, 200])
+    expect((await app.handle(variant(25, from))).status).toBe(429)
   })
 
   it('answers 503 with Retry-After once the queue of waiting draws is full', async () => {

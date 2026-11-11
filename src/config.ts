@@ -436,7 +436,7 @@ export interface ImagesConfig {
   remoteTimeout?: Duration | undefined
   // The most variants one client may have the image route encode in a minute, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. 120 by default, `false` for no limit.
   perMinute?: number | false | undefined
-  // The most distinct variants of one source image the route encodes, so a client varying width, quality, crop and format cannot fill the cache; a variant already made is still served. Past it the route answers 429. 256 by default, `false` for no limit.
+  // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `perMinute`. Counted from the files on disk. 256 by default, `false` for no limit.
   maxVariants?: number | false | undefined
   // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
   queue?: number | false | undefined
