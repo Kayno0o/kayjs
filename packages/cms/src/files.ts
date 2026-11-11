@@ -361,6 +361,16 @@ export function networkReason(error: unknown): string {
   return typeof code === 'string' ? code : error.message
 }
 
+// Only a courtesy to the host: a stream that fails to cancel must not hide what the read found.
+async function cancelled(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel()
+  }
+  catch {
+    // nothing to do for a stream that is gone
+  }
+}
+
 // The start of a response's body, at most `READ_LIMIT` bytes, the rest of it never read.
 export async function boundedText(response: Response): Promise<string> {
   const reader = response.body?.getReader()
@@ -383,8 +393,7 @@ export async function boundedText(response: Response): Promise<string> {
     }
   }
   finally {
-    // Only a courtesy to the host: a stream that fails to cancel must not hide what the read found.
-    await reader.cancel().catch(() => undefined)
+    await cancelled(reader)
   }
 
   return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, READ_LIMIT))
