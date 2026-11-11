@@ -57,9 +57,6 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
 
   const { selectionStart, selectionEnd, selectionDirection, value } = from
 
-  if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
-    return
-
   // Keys typed while the page was fetched are kept, and the island is told so it asks for them next.
   const typed = held !== undefined && value !== held && value !== to.value
 
@@ -67,6 +64,10 @@ function carryCaret(from: Element | null, to: HTMLElement, held: string | undefi
     to.value = value
     to.dispatchEvent(new InputEvent('input', { bubbles: true }))
   }
+
+  // A number or email field has no selection, so no caret.
+  if (selectionStart === null || selectionEnd === null || to.selectionStart === null)
+    return
 
   const length = to.value.length
   const place = (offset: number) => {
@@ -101,29 +102,44 @@ async function showRefusal(form: HTMLFormElement | undefined, control: number): 
 }
 
 const WATCH_BOUND_MS = 30_000
-// What ends each field's watch, so a newer swap leaves the ones before it restoring nothing.
+// What ends each watch, so a newer swap leaves the ones before it restoring nothing.
 const watching = new Set<() => void>()
 
-// Keys typed into the focused field after the swap and before its island hydrated land in the server's markup, which hydration then writes its own value over. They are noted as they come, and put back once the field's island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. The function returned is for when the swap's own hydration is done. A newer swap, or a bound of 30 s, ends the watch with nothing restored; a late block's watch (`late`) leaves the others.
-export function watchTyped(late = false): (() => void) | undefined {
-  if (!late) {
-    for (const end of watching)
-      end()
-  }
+type Island = HTMLElement & { _$k?: boolean }
+type Field = HTMLInputElement | HTMLTextAreaElement
+interface Typed { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none' }
+
+const noteOf = (field: Field): Typed => ({ value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' })
+
+// Hydration kept what was typed when the field already holds it, and the island heard it through the events queued for it. A number or email field has no selection, so no caret.
+function putBack(now: Element | null, typed: Typed | undefined): void {
+  if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.value === typed.value)
+    return
+
+  now.value = typed.value
+  now.dispatchEvent(new InputEvent('input', { bubbles: true }))
+
+  if (typed.start !== null && typed.end !== null && now.selectionStart !== null)
+    now.setSelectionRange(typed.start, typed.end, typed.direction)
+}
+
+// Keys typed into an island's field after the swap and before the island hydrated land in the server's markup, which hydration then writes its own value over. Called as the swap hands the body to hydration, it notes them as they come into the focused field and puts them back once its island has hydrated, however late a `visible` or `idle` one is, with `input` fired so the island hears them, the caret after them. A newer swap, or a bound of 30 s (an island that never hydrates), ends the watch with nothing restored.
+export function watchTyped(): void {
+  for (const end of watching)
+    end()
 
   const field = document.activeElement
+  const island = field?.closest<Island>(ISLAND)
 
-  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement))
-    return undefined
+  // A field outside an island, or in one hydrated already, nothing overwrites.
+  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) || !island || island._$k)
+    return
 
   const id = field.id
-  const island = field.closest<HTMLElement & { _$k?: boolean }>(ISLAND)
-  // A number or email field has no selection, so no caret.
-  let typed: { value: string, start: number | null, end: number | null, direction: 'forward' | 'backward' | 'none' } | undefined
+  let typed: Typed | undefined
   const note = (event: Event) => {
-    // Only the keys the island never saw: once it hydrated, what it did with them is what the field holds.
-    if (event.target === field && !island?._$k)
-      typed = { value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection ?? 'none' }
+    if (event.target === field)
+      typed = noteOf(field)
   }
   const heard = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -133,42 +149,35 @@ export function watchTyped(late = false): (() => void) | undefined {
     document.removeEventListener('input', note, true)
     watching.delete(end)
   }
-  const restore = () => {
-    end()
-
-    const now = field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field)
-
-    // Hydration kept what was typed, and the island heard it through the events queued for it.
-    if (!typed || !(now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement) || now.value === typed.value)
-      return
-
-    now.value = typed.value
-    now.dispatchEvent(new InputEvent('input', { bubbles: true }))
-
-    if (typed.start !== null && typed.end !== null && now.selectionStart !== null)
-      now.setSelectionRange(typed.start, typed.end, typed.direction)
-  }
 
   document.addEventListener('input', note, true)
   watching.add(end)
   timer = setTimeout(end, WATCH_BOUND_MS)
-
-  if (island && !island._$k)
-    island.addEventListener(HYDRATED, restore, { once: true, signal: heard.signal })
-
-  // A field outside an island, or in one hydrated already, has nothing left to wait for once the swap's hydration is done.
-  return () => {
-    if (watching.has(end) && (!island || island._$k))
-      restore()
-  }
+  island.addEventListener(HYDRATED, () => {
+    end()
+    putBack(field.isConnected ? field : (id === '' ? null : document.getElementById(id)) ?? byName(field), typed)
+  }, { once: true, signal: heard.signal })
 }
 
-// Once the hydration a swap started is done, whether it ended well or not.
-export async function settled(hydrated: unknown, settle: () => void): Promise<void> {
-  try {
-    await hydrated
-  }
-  finally {
-    settle()
+// The same for the islands of a streamed block placed after the swap, whose field the visitor may focus at any time: each is watched from its own first `input` until it hydrates or the bound passes.
+export function keepTyped(part: ParentNode): void {
+  for (const island of part.querySelectorAll<Island>(ISLAND)) {
+    let field: Field | undefined
+    let typed: Typed | undefined
+    const heard = new AbortController()
+    const timer = setTimeout(() => heard.abort(), WATCH_BOUND_MS)
+    const options = { signal: heard.signal }
+
+    island.addEventListener('input', (event) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        field = event.target
+        typed = noteOf(field)
+      }
+    }, { ...options, capture: true })
+    island.addEventListener(HYDRATED, () => {
+      clearTimeout(timer)
+      heard.abort()
+      putBack(field?.isConnected ? field : null, typed)
+    }, { ...options, once: true })
   }
 }

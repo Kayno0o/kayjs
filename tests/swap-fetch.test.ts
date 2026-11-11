@@ -223,7 +223,7 @@ describe('placing the parts of a streamed page', () => {
   const swapper = async () => {
     const { runnable, scriptMarkup } = await import('../src/runtime/swap-head')
 
-    return { inFlight: {}, entry: 'script[type="module"][src]', runnable, scriptMarkup }
+    return { inFlight: {}, entry: 'script[type="module"][src]', runnable, scriptMarkup, keepTyped: () => undefined }
   }
 
   it('drops a part answering a block the page does not hold, and replaces the one it does', async () => {

@@ -7,7 +7,7 @@ import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
 import { abandon, HTML, ownOrigin, pageFor, pageTimeout } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, ENTRY_SCRIPT, inFlight, LATE, policyOf } from './swap-flight'
-import { moveFocus, settled, watchTyped } from './swap-focus'
+import { keepTyped, moveFocus, watchTyped } from './swap-focus'
 import { mergeHead, runnable, scriptMarkup, swapRoot } from './swap-head'
 import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
@@ -405,12 +405,8 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     void moveFocus(swap, policy, hash)
 
     // Ends the watch of a swap this one superseded before it reads the focused field.
-    const settle = watchTyped()
-    const hydrated = navigation.hooks!.hydrate(document.body)
-
-    if (settle)
-      void settled(hydrated, settle)
-
+    watchTyped()
+    navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)
     navigation.phase?.('idle')
     // For plain scripts, which no island tells of the swap.
@@ -420,7 +416,7 @@ async function showPage(page: FetchedPage, hash: string, swap: Swap, isCurrent: 
     if (page.late) {
       let at = scrollY
 
-      void streamed!.followLate(page.late, { inFlight, entry: ENTRY_SCRIPT, runnable, scriptMarkup, placed: policy.scroll === 'saved' || hash !== ''
+      void streamed!.followLate(page.late, { inFlight, entry: ENTRY_SCRIPT, runnable, scriptMarkup, keepTyped, placed: policy.scroll === 'saved' || hash !== ''
         ? () => {
           if (scrollY === at) {
             restoreScroll(swap.saved, hash)

@@ -1,6 +1,5 @@
 import type { LateParts } from './navigation'
 import { leave, navigation } from './navigation'
-import { settled, watchTyped } from './swap-focus'
 
 // What the page swap hands over, as importing it here would split the chunks the swap shares into one of their own (tests/build.test.ts).
 export interface Swapper {
@@ -8,6 +7,8 @@ export interface Swapper {
   entry: string
   runnable: (script: HTMLScriptElement, markup: string) => HTMLScriptElement
   scriptMarkup: (script: HTMLScriptElement) => string
+  // Keeps the keys typed into the islands of a part before they hydrate (swap-focus.ts).
+  keepTyped: (part: ParentNode) => void
   // Called after each part is placed.
   placed?: (() => void) | undefined
 }
@@ -89,7 +90,7 @@ export async function followLate(late: LateParts, swapper: Swapper): Promise<voi
 }
 
 // Whether the part could be placed here; a part answering a block the page does not hold is dropped.
-function placeLate(part: string, { entry, runnable, scriptMarkup }: Swapper): boolean {
+function placeLate(part: string, { entry, runnable, scriptMarkup, keepTyped }: Swapper): boolean {
   const parsed = new DOMParser().parseFromString(`<body>${part}`, 'text/html')
   const template = parsed.querySelector<HTMLTemplateElement>('template[data-kay-await]')
   const id = template?.dataset.kayAwait
@@ -152,12 +153,9 @@ function placeLate(part: string, { entry, runnable, scriptMarkup }: Swapper): bo
   }
 
   end.remove()
+  keepTyped(template.content)
   ;(start as ChildNode).replaceWith(template.content)
-  const settle = watchTyped(true)
-  const hydrated = navigation.hooks!.hydrate(document.body)
-
-  if (settle)
-    void settled(hydrated, settle)
+  navigation.hooks!.hydrate(document.body)
 
   return true
 }
