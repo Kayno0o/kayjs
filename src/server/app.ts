@@ -26,6 +26,7 @@ import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { dropExitListenerOnStop } from './lifecycle'
 import { mcpKeySetting, resolveMcpKey } from './mcp-key'
+import { checkPageLimits } from './page-limits'
 import { checkProxy } from './protection'
 import { claimPublic } from './public'
 import { claimRedirects, readRedirects } from './redirects'
@@ -49,7 +50,11 @@ export type ServedOptions = PagesOptions & InternalConfig
 
 // The routes with their guards loaded.
 async function servedRoutes(routes: Route[], pages: ServedRoute[], required: GuardRequirement): Promise<ServedRoute[]> {
-  return Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
+  const served = await Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
+
+  await checkPageLimits(served)
+
+  return served
 }
 
 // What the server's options refuse by themselves, before the project is read.

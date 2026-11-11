@@ -1,6 +1,7 @@
 import type { PageContext } from '../runtime'
 import type { RateLimit } from '../runtime/action-shared'
 import { kayLog } from '../runtime/log'
+import { importModule } from './bundle'
 import { chainSetting } from './page-settings'
 import { apiLimitWait, checkApiLimit } from './protection'
 import { readPersonally } from './scope'
@@ -116,5 +117,15 @@ export async function quietly<Loaded>(load: () => Promise<Loaded>, fallback: Loa
   }
   catch {
     return fallback
+  }
+}
+
+// Fails the boot for a limit that cannot count, as an endpoint's or an API route's does, instead of the first visit to the page. Only a page or layout whose source names `rateLimit` is imported, so the others stay unloaded until a request reaches them.
+export async function checkPageLimits(routes: readonly { pattern: string, file: string, layouts: string[] }[]): Promise<void> {
+  for (const route of routes) {
+    const files = [...route.layouts, route.file]
+
+    if ((await Promise.all(files.map(async file => Bun.file(file).text()))).some(text => text.includes('rateLimit')))
+      pageLimits(route, await Promise.all(files.map(async file => importModule<object>(file))))
   }
 }

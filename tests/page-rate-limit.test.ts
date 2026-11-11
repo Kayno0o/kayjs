@@ -13,21 +13,31 @@ type App = Awaited<ReturnType<typeof pages>>
 const FENCE = (settings: string, body = 'h1 Page') => `--- server\nexport const page = ${settings}\n---\n${body}\n`
 const LIMIT = (max: number, extra = '') => `{ rateLimit: { max: ${max}, window: '1m'${extra} } }`
 const html = { accept: 'text/html' }
+const VARIANTS = ['plain', 'mounted', 'dev'] as const
+
+// Each app has routes of its own, as the apps share this process's counters, which count under the route's pattern.
+function filesOf(variant: string): Record<string, string> {
+  return {
+    [`routes/${variant}/index.kay`]: 'h1 Home\n',
+    [`routes/${variant}/search.kay`]: FENCE(LIMIT(2), 'h1 Search'),
+    [`routes/${variant}/keyed.kay`]: FENCE(LIMIT(1, ', key: ({ request }) => request.headers.get(\'x-user\') ?? undefined'), 'h1 Keyed'),
+    [`routes/${variant}/listed.kay`]: FENCE(`{ rateLimit: [{ max: 5, window: '1m' }, { max: 1, window: '1m' }] }`, 'h1 Listed'),
+    [`routes/${variant}/section/_layout.kay`]: FENCE(LIMIT(1), 'slot'),
+    [`routes/${variant}/section/one.kay`]: 'h1 One\n',
+    [`routes/${variant}/section/two.kay`]: 'h1 Two\n',
+    [`routes/${variant}/section/roomy.kay`]: FENCE(LIMIT(3), 'h1 Roomy'),
+    [`routes/${variant}/section/open.kay`]: FENCE('{ rateLimit: false }', 'h1 Open'),
+    [`routes/${variant}/gated/_guard.ts`]: 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'authorization\'))\n    deny(401, \'Sign in first\')\n})\n',
+    [`routes/${variant}/gated/index.kay`]: FENCE(LIMIT(2), 'h1 Gated'),
+    [`routes/${variant}/gated/open.kay`]: FENCE(LIMIT(5), 'h1 Signed in'),
+    [`routes/${variant}/shared.txt.ts`]: 'export const page = { rateLimit: { max: 1, window: \'1m\' } }\n\nexport const GET = () => \'ok\'\n',
+  }
+}
+
 const FILES: Record<string, string> = {
   'routes/index.kay': 'h1 Home\n',
   'routes/_error.kay': '--- server\nconst { status, message } = ctx.error\n---\nh1 Error {status}\np {message}\n',
-  'routes/search.kay': FENCE(LIMIT(2), 'h1 Search'),
-  'routes/keyed.kay': FENCE(LIMIT(1, ', key: ({ request }) => request.headers.get(\'x-user\') ?? undefined'), 'h1 Keyed'),
-  'routes/listed.kay': FENCE(`{ rateLimit: [{ max: 5, window: '1m' }, { max: 1, window: '1m' }] }`, 'h1 Listed'),
-  'routes/section/_layout.kay': FENCE(LIMIT(1), 'slot'),
-  'routes/section/one.kay': 'h1 One\n',
-  'routes/section/two.kay': 'h1 Two\n',
-  'routes/section/roomy.kay': FENCE(LIMIT(3), 'h1 Roomy'),
-  'routes/section/open.kay': FENCE('{ rateLimit: false }', 'h1 Open'),
-  'routes/gated/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'authorization\'))\n    deny(401, \'Sign in first\')\n})\n',
-  'routes/gated/index.kay': FENCE(LIMIT(2), 'h1 Gated'),
-  'routes/shared.txt.ts': 'export const page = { rateLimit: { max: 1, window: \'1m\' } }\n\nexport const GET = () => \'ok\'\n',
-  'routes/section/feed.txt.ts': 'export const GET = () => \'feed\'\n',
+  ...Object.assign({}, ...VARIANTS.map(filesOf)) as Record<string, string>,
 }
 
 let dir = ''
@@ -57,7 +67,7 @@ async function get(app: App, path: string, headers: Record<string, string> = {})
   return { status: response.status, body: await response.text(), headers: response.headers }
 }
 
-const paths = { plain: (path: string) => path, mounted: (path: string) => `/blog${path === '/' ? '' : path}/`, dev: (path: string) => path }
+const paths = { plain: (path: string) => `/plain${path}`, mounted: (path: string) => `/mounted${path}/`, dev: (path: string) => `/dev${path}` }
 
 for (const name of ['plain', 'mounted', 'dev'] as const) {
   const at = paths[name]
@@ -118,37 +128,23 @@ for (const name of ['plain', 'mounted', 'dev'] as const) {
 
     it('counts after the guards for a request they let through', async () => {
       const app = apps[name]!
-      const headers = { 'authorization': 'Bearer y', 'x-forwarded-for': `10.1.0.${name.length}` }
+      const headers = { authorization: 'Bearer y' }
 
-      expect((await get(app, at('/gated'), headers)).status).toBe(200)
+      expect((await get(app, at('/gated/open'), headers)).status).toBe(200)
+      expect((await get(app, at('/gated/open'))).status).toBe(401)
     })
 
     it('shares its counter with an endpoint of the same name only, leaving the other limits alone', async () => {
       const app = apps[name]!
 
-      expect((await get(app, '/shared.txt')).status).toBe(200)
-      expect((await get(app, '/shared.txt')).status).toBe(429)
-      expect((await get(app, at('/'))).status).toBe(200)
+      expect((await get(app, `/${name}/shared.txt`)).status).toBe(200)
+      expect((await get(app, `/${name}/shared.txt`)).status).toBe(429)
+      expect((await get(app, at(''))).status).toBe(200)
     })
   })
 }
 
 describe('the counter of a page', () => {
-  it('is kept in the app\'s store.rates, under the route\'s pattern', async () => {
-    const keys: string[] = []
-    const rates = {
-      hit: async (key: string, windowMs: number, weight = 1) => {
-        keys.push(key)
-
-        return { count: weight, resetAt: Date.now() + windowMs }
-      },
-    }
-    const app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false }, store: { rates } })
-
-    expect((await get(app, '/search')).status).toBe(200)
-    expect(keys.some(key => key.startsWith('/search\n'))).toBe(true)
-  })
-
   it('is made once for a limit and a route, named by the route\'s pattern', () => {
     const modules = [{ page: { rateLimit: [{ max: 2, window: '1m' }, { max: 9, window: '1m' }] } }]
     const first = pageLimits({ pattern: '/a' }, modules)
@@ -162,13 +158,44 @@ describe('the counter of a page', () => {
   })
 
   it('counts a request once when its render is run again for the viewer', async () => {
-    const modules = [{ page: { rateLimit: { max: 1, window: '1m' } } }]
+    const counts = new Map<string, number>()
+    const store = {
+      hit: (key: string, windowMs: number, weight = 1) => {
+        counts.set(key, (counts.get(key) ?? 0) + weight)
+
+        return { count: counts.get(key)!, resetAt: Date.now() + windowMs }
+      },
+    }
+    const modules = [{ page: { rateLimit: { max: 1, window: '1m', store } } }]
     const rendering = (request: Request) => ({ ctx: { request, locale: 'en', cookies: {}, locals: {} } as never, headers: new Headers() })
     const request = new Request('http://localhost/again', { headers: { 'x-forwarded-for': '10.8.8.8' } })
 
     expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(request))).toBeUndefined()
     expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(request))).toBeUndefined()
     expect(await pageOverLimit({ pattern: '/again' }, modules, rendering(new Request('http://localhost/again', { headers: { 'x-forwarded-for': '10.8.8.8' } })))).toBeInstanceOf(Denied)
+  })
+
+  it('fails the boot of an app with a page or a layout whose limit cannot count', async () => {
+    const root = await scratchDir('page-rate-bad-')
+
+    await Bun.write(join(root, 'routes/index.kay'), 'h1 Home\n')
+    await Bun.write(join(root, 'routes/bad/_layout.kay'), FENCE(LIMIT(0), 'slot'))
+    await Bun.write(join(root, 'routes/bad/page.kay'), 'h1 Page\n')
+    await expect(pages({ root, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false } })).rejects.toThrow('max')
+    await rm(root, { recursive: true, force: true })
+  })
+
+  it('shows the 429 as the guard\'s outcome in the dev tool when the limit replaced it', async () => {
+    const app = apps.dev!
+    const asked = async () => (await app.handle(new Request('http://localhost/dev/gated', { headers: { ...html, 'x-forwarded-for': '10.55.0.1' } }))).text()
+
+    await asked()
+    await asked()
+    const page = await asked()
+
+    const request = JSON.parse((/id="kay-dev-request">([^<]*)</).exec(page)![1]!.replaceAll('\\u003c', '<')) as { guards: { outcome: string }[] }
+
+    expect(request.guards.map(guard => guard.outcome)).toEqual([expect.stringContaining('denied with 429')])
   })
 
   it('refuses a limit that cannot count', () => {
@@ -222,5 +249,23 @@ describe('a prerendered page with a rateLimit', () => {
     expect(reasons.pop()).toContain('ttl')
     expect(stops(undefined, limited, false)).toBe(false)
     expect(reasons).toEqual([])
+  })
+})
+
+// Last, as the app it boots sets the process's store.rates for the files after it.
+describe('the store of a page\'s limit', () => {
+  it('is the app\'s store.rates, the count under the route\'s pattern', async () => {
+    const keys: string[] = []
+    const rates = {
+      hit: async (key: string, windowMs: number, weight = 1) => {
+        keys.push(key)
+
+        return { count: weight, resetAt: Date.now() + windowMs }
+      },
+    }
+    const app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, requireGuards: false, observe: { log: false }, store: { rates } })
+
+    expect((await get(app, '/plain/search')).status).toBe(200)
+    expect(keys.some(key => key.startsWith('/plain/search\n'))).toBe(true)
   })
 })

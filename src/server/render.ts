@@ -284,17 +284,17 @@ async function refusedByGuards(route: ServedRoute, rendering: Rendering, client:
   // The page keeps the URL as sent; its guards read it spelled one way.
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
-  if (options.dev) {
-    rendering.guards = guardRuns(route.guards, refusal, options.redirectSpelling)
+  // A request a guard refuses counts against the page's limits too, and over them it gets the 429 in place of the refusal, which the dev tool shows as the guard's outcome.
+  const answer = refusal && { ...refusal, error: await pageOverLimit(route, await chainOf(route, options), rendering) ?? refusal.error }
 
-    if (refusal?.error instanceof Redirect)
-      noteRedirect(options.dev, rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
+  if (options.dev) {
+    rendering.guards = guardRuns(route.guards, answer, options.redirectSpelling)
+
+    if (answer?.error instanceof Redirect)
+      noteRedirect(options.dev, rendering.ctx.request, `the guard ${projectPath(answer.guard.file)}`)
   }
 
-  // A request a guard refuses counts against the page's limits too, and over them it gets the 429 in place of the refusal.
-  const over = refusal && await pageOverLimit(route, await chainOf(route, options), rendering)
-
-  return refusal && renderFailure(over ?? refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+  return answer && renderFailure(answer.error, answer.guard.special, rendering, new Map(), client, options)
 }
 
 // The route's modules, layouts first, imported once and known after that.
