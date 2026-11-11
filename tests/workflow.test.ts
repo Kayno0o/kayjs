@@ -459,6 +459,27 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(large / small).toBeGreaterThan(1.7)
   }, 60_000)
 
+  it('runs on a store without step rows, keeping the results in the payload', async () => {
+    const base = await open()
+    const store: JobStore = { ...base, update: async (id, change, guard) => base.update!(id, { ...change, steps: undefined }, guard) }
+
+    delete (store as { steps?: unknown }).steps
+
+    const seen: string[] = []
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      seen.push(await step.run('a', () => 'one'))
+      await step.sleep('1h')
+      seen.push(await step.run('b', () => 'two'))
+    }, { store })
+    const id = await flow.start()
+
+    await flow.drain()
+    expect(await flow.status(id)).toMatchObject({ status: 'sleeping' })
+    later(2 * MINUTE * 60)
+    await flow.drain()
+    expect(seen).toEqual(['one', 'one', 'two'])
+  })
+
   it('keeps a run\'s results as rows of the store, the payload staying small, and drops them with the run', async () => {
     const store = await open()
     const name = named()

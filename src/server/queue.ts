@@ -357,7 +357,7 @@ export function sqliteJobs(path: string): JobStore {
           statements.dropSteps.run(stepsQueue(id))
 
         return statements.purge.run(queue, before).changes
-      })()
+      }).immediate()
     },
     failed(queue, limit) {
       return open(false)?.failed.all(queue, limit ?? -1).map(toJob) ?? []
