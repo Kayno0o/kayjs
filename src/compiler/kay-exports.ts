@@ -8,6 +8,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   ActionRedirectError: 'shared',
   ApiError: 'shared',
   action: 'browser',
+  announce: 'browser',
   apiUrl: 'shared',
   batch: 'browser',
   byteCount: 'shared',

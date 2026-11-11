@@ -8,6 +8,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   ActionRedirectError: 'free',
   ApiError: 'free',
   action: 'free',
+  announce: 'free',
   apiUrl: 'request',
   batch: 'free',
   byteCount: 'free',

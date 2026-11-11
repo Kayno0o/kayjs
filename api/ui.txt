@@ -654,7 +654,7 @@ component default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
 
 [./announce] announce
-function announce(message: string, from?: Element | null): void
+function announce(text: string, within?: Element | null): void
 
 [./app-header.kay] default
 component default

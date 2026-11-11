@@ -1,26 +1,2 @@
-// Says `message` to a screen reader through a polite live region, made on first use and kept off screen.
-// It lives in the open modal dialog holding `from` (the focused element by default), since a modal makes the rest of the page inert, and in the page otherwise.
-export function announce(message: string, from: Element | null = document.activeElement): void {
-  const host = from?.closest('dialog') ?? document.body
-  let region = host.querySelector<HTMLElement>(':scope > [data-kui-announce]')
-
-  if (!region) {
-    region = host.appendChild(document.createElement('div'))
-    region.setAttribute('data-kui-announce', '')
-    // A page swap leaves the body's where it is, so words said just before one are still read; a dialog goes with the swap anyway.
-    region.setAttribute('data-kay-keep', '')
-    region.setAttribute('aria-live', 'polite')
-    region.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)'
-
-    // A region put in the page and filled at once is often not read, so the first words wait for it to have been there.
-    const fresh = region
-
-    // A call meanwhile has already written its newer words.
-    setTimeout(() => fresh.textContent ||= message, 100)
-
-    return
-  }
-
-  // The same words twice in a row are not read again unless the text changed.
-  region.textContent = region.textContent === message ? `${message}\u00A0` : message
-}
+// Kept as an entry of kayjs-ui for the apps and libraries importing it from here.
+export { announce } from 'kay'

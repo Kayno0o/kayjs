@@ -1956,7 +1956,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
   it('keeps through every swap the element a script put in <body> marked data-kay-keep, the same one, and drops the rest it added', async () => {
     const state = async () => page.evaluate(() => ({
-      kept: [...document.querySelectorAll('body > [data-kay-keep]')].map(element => [element.textContent, element === (window as { kept?: Element }).kept]),
+      // Not kay's own announcer region, which a swap announcing the title makes and keeps too.
+      kept: [...document.querySelectorAll('body > [data-kay-keep]:not([data-kay-announce])')].map(element => [element.textContent, element === (window as { kept?: Element }).kept]),
       // Taken out and put back, with or without `moveBefore`, a live region may go unread.
       moved: (window as { moved?: number }).moved,
       unmarked: document.querySelectorAll('.script-added').length,

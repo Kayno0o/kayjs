@@ -139,6 +139,9 @@ type ActionStream<T> = Connection<T>
 interface ActionSuccessDetail
   action: string
 
+[.] announce
+function announce(text: string, within?: Element | null): void
+
 [.] Answer
 type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
 

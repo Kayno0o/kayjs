@@ -65,7 +65,7 @@ const default: { description: string; extension: { import: string; expression: s
 const addedIcons: Record<AddedSlot, IconProps>
 
 [./lib/announce] announce
-function announce(message: string, from?: Element | null): void
+function announce(text: string, within?: Element | null): void
 
 [./lib/app-switcher] SwitcherApp
 interface SwitcherApp

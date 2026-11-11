@@ -345,7 +345,7 @@ export function createChatSession(options: ChatSessionOptions) {
   }
 
   // Says the calls whose status changed since the last snapshot.
-  function announce(next: AiToolCall[]) {
+  function sayChangedCalls(next: AiToolCall[]) {
     const said: { id: number, text: string }[] = []
 
     for (const call of next) {
@@ -374,7 +374,7 @@ export function createChatSession(options: ChatSessionOptions) {
     partial.set(value.text)
     thought.set(value.reasoning ?? '')
     calls.set(value.calls)
-    announce(value.calls)
+    sayChangedCalls(value.calls)
 
     if (value.sources) {
       const next = usableSources(value.sources)
