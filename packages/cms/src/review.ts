@@ -53,7 +53,7 @@ export function sentBy(review: Review, viewer: Viewer | undefined): boolean {
   if (review.byId !== undefined || viewer.id !== undefined)
     return review.byId === viewer.id
 
-  return viewer.name !== '' && viewer.name !== wording('cms.review.someone', 'Someone') && review.by === viewer.name
+  return identified(viewer) && review.by === viewer.name
 }
 
 // Whether a person can be told from another: they have a kayjs-auth id, or a name that is not the placeholder.

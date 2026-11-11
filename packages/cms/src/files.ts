@@ -383,7 +383,8 @@ export async function boundedText(response: Response): Promise<string> {
     }
   }
   finally {
-    await reader.cancel()
+    // Only a courtesy to the host: a stream that fails to cancel must not hide what the read found.
+    await reader.cancel().catch(() => undefined)
   }
 
   return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, READ_LIMIT))
