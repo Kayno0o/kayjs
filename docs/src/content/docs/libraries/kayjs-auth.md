@@ -611,7 +611,7 @@ if (made.ok)
 ```
 
 - `organizations.list()` lists the user's memberships and `organizations.get(ref)` gives one, by id or slug.
-- `organizations.members(ref)`, `organizations.setMemberRoles(ref, userId, roles)`, `organizations.removeMember(ref, userId)` and `organizations.leave(ref)` manage who is in it.
+- `organizations.members(ref)`, `organizations.setMemberRoles(ref, userId, roles)`, `organizations.removeMember(ref, userId)` and `organizations.leave(ref)` manage who is in it. `members` gives the others' emails only to a member holding the `manage` role; for anyone else their `email` is `null`, and their own stays.
 - `organizations.update(ref, { name, slug })` renames it and `organizations.delete(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 

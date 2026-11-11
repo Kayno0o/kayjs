@@ -187,6 +187,19 @@ describe('organizations', () => {
     expect(heard.at(-1)).toEqual(['member-joined', 'grace@example.com', { organizationId: org, roles: ['admin'] }, undefined])
   })
 
+  test('only a member who manages members is given the others\' emails', async () => {
+    const { ada, org, person } = await setup()
+    const grace = await person('grace@example.com')
+    const { invitation } = await ada.browser.callOk('organizations.invite', org, 'grace@example.com', ['member'])
+
+    await grace.browser.call('organizations.acceptInvitation', invitation.id)
+
+    expect((await ada.browser.callOk('organizations.members', org)).members).toMatchObject([{ user: { email: 'ada@example.com' } }, { user: { email: 'grace@example.com' } }])
+
+    // Her own address stays, as she knows it.
+    expect((await grace.browser.callOk('organizations.members', org)).members.map(member => member.user.email)).toEqual([null, 'grace@example.com'])
+  })
+
   test('invitations.maxAge takes a duration string, and a bad one fails naming the option', async () => {
     for (const maxAge of ['2d' as const]) {
       const { ada, org } = await setup({ invitations: { maxAge } })

@@ -235,15 +235,16 @@ export async function deleteOrganization(state: RequestState, ref: string): Prom
   return { ok: true }
 }
 
-// Any member may list the others.
+// Any member may list the others; only one who manages members is given their emails, the others' `email` is null (their own stays).
 export async function listMembers(state: RequestState, ref: string): Promise<ListMembersResult> {
-  const { store } = organizationsOf(state.core)
+  const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref)
 
   if (!found.ok)
     return found
 
   const members: AuthMember[] = []
+  const managing = config.isGranted(config.manage, found.member.roles)
 
   const held = await store.members.listByOrganization(found.organization.id)
   const users = await usersById(state.core.store, held.map(member => member.userId))
@@ -252,7 +253,7 @@ export async function listMembers(state: RequestState, ref: string): Promise<Lis
     const user = users.get(member.userId)
 
     if (user)
-      members.push({ user: { id: user.id, email: user.email, username: user.username }, roles: [...member.roles], joinedAt: member.createdAt })
+      members.push({ user: { id: user.id, email: managing || user.id === found.record.id ? user.email : null, username: user.username }, roles: [...member.roles], joinedAt: member.createdAt })
   }
 
   return { ok: true, members }
