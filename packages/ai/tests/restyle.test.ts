@@ -80,6 +80,10 @@ describe('restyling the chat from src/ui.ts', () => {
     expect(html).toMatch(/<section class="kai-chat rounded-xl opacity-90 rounded-lg"[^>]* data-layout="plain" data-tone="neutral" data-size="sm"/)
   })
 
+  test('layout wins over the deprecated variant when both are given, and variant alone still works', () => {
+    expect(html).toMatch(/<section class="[^"]*both-names[^"]*"[^>]* data-layout="bubble"/)
+  })
+
   test('the launcher hands the shared props to its chat and its class string to its wrapper', () => {
     expect(html).toMatch(/<div class="kai-launcher mb-2"[\s\S]*?<section class="kai-chat[^"]*"[^>]* data-layout="plain" data-tone="neutral" data-size="lg"/)
   })

@@ -64,7 +64,7 @@ const { value, label, icon, href, delta, layout, variant, tone = 'neutral', ...r
   delta?: StatDelta | undefined
 }>()
 
-const tile = layout === 'tile' || variant === 'tile'
+const tile = (layout ?? variant) === 'tile'
 ---
 snippet body()
   if icon

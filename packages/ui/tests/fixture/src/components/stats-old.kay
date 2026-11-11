@@ -6,3 +6,4 @@ import Stat from '@kaynooo/kayjs-ui/stat.kay'
 // kay-allow-file deprecated-ui-props
 Stat#old-tile(value={12} label="moons" variant="tile")
 Stat#new-tile(value={12} label="moons" layout="tile")
+Stat#both(value={12} label="moons" layout="inline" variant="tile")

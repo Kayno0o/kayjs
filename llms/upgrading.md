@@ -13,6 +13,9 @@ kay no longer installs the native compiler (`typescript7`) or `axe-core` with it
 ### `tz` of `schedule()` is `timeZone`
 
 `schedule(cron, job, { tz })` takes `timeZone`, the name of the `timeZone` in `kay.config.ts` it falls back to. `tz` still works for three minors, and `kay upgrade` renames it (`deprecated-schedule-tz`).
+### Stat and Chat write `data-layout`, not `data-variant`
+
+`Stat` and `Chat` (and the `ChatLauncher` chat) take `layout` in place of `variant` and mark their root `data-layout`: CSS on `[data-variant=tile]` (Stat) or `[data-variant=plain]` (Chat) reads `[data-layout=tile]` and `[data-layout=plain]` now. The `variant` prop still works, rewritten by `deprecated-ui-props`.
 
 ### `kay mcp` needs `--write` to POST and to test
 

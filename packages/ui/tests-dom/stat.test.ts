@@ -30,6 +30,7 @@ test('the deprecated variant of a Stat lays it out as layout does', async () => 
 
   expect(tile.getAttribute('data-layout')).toBe('tile')
   expect(tile.className).toBe(mounted.root.querySelector('#new-tile')!.className)
+  expect(mounted.root.querySelector('#both')!.hasAttribute('data-layout')).toBe(false)
 })
 
 test('a tile keeps the figure first and the label after it, as the pill does', async () => {

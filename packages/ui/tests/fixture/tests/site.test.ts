@@ -1595,3 +1595,14 @@ describe('required fields with JavaScript off', () => {
     expect(await attributes('/required', '#chips input', ['required', 'aria-required'])).toEqual([{ 'required': null, 'aria-required': 'true' }, { 'required': null, 'aria-required': 'true' }])
   })
 })
+
+describe('a SidePanel with a title block and no label', () => {
+  test('the server render names it through its heading, the id matching the aria-labelledby', async () => {
+    const [panel] = await attributes('/title-block', '#named', ['aria-label', 'aria-labelledby'])
+    const [heading] = await attributes('/title-block', '#named [data-part=title]', ['id'])
+
+    expect(panel!['aria-label']).toBeNull()
+    expect(heading!.id).toBeTruthy()
+    expect(panel!['aria-labelledby']).toBe(heading!.id)
+  })
+})
