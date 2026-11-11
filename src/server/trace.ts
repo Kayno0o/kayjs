@@ -2,7 +2,7 @@ import type { SpanIds, TraceContext } from './trace-context'
 import { logMessage } from './log'
 import { requestRecord } from './request-record'
 import { Denied, NotFound, Redirect } from './signals'
-import { parseTraceparent, remoteContext, traceresponse, validIds } from './trace-context'
+import { contextOf, parseTraceparent, remoteContext, traceresponse, validIds } from './trace-context'
 
 // The part of OpenTelemetry's `Tracer` kay calls: an app hands `trace.getTracer('my-site')` from its own @opentelemetry/api, its SDK exporting the spans, and kay depends on neither.
 export interface Tracer {
@@ -119,9 +119,15 @@ export function answered(span: Span, status: number): void {
 // Runs `fn` in a span the work it starts nests under, which ends as `fn` settles, recording what it throws; without a tracer it runs `fn` alone, a name given as a function never built.
 // A `request` makes the span a server span under the trace its headers carry.
 export function traced<T>(name: string | (() => string), options: SpanOptions | (() => SpanOptions), fn: (span?: Span) => T, request?: Request): T {
-  if (!tracer)
-    return fn()
+  return tracer ? inSpan(tracer, name, options, request && parentOf(request), fn, request) : fn()
+}
 
+// Runs `fn` in a span under `parent`, a span that outlives one call such as an API route's, which a handler running in Elysia's call is not otherwise nested under.
+export function tracedUnder<T>(parent: Span, name: string | (() => string), fn: (span?: Span) => T): T {
+  return tracer ? inSpan(tracer, name, {}, contextOf(parent), fn, undefined) : fn()
+}
+
+function inSpan<T>(own: Tracer, name: string | (() => string), options: SpanOptions | (() => SpanOptions), parent: TraceContext | undefined, fn: (span?: Span) => T, request: Request | undefined): T {
   const run = (span: Span) => {
     let result: T
 
@@ -161,17 +167,16 @@ export function traced<T>(name: string | (() => string), options: SpanOptions | 
     return settled() as T
   }
   const given = typeof options === 'function' ? options() : options
-  const parent = request && parentOf(request)
   const title = typeof name === 'string' ? name : name()
 
   if (!parent)
-    return tracer.startActiveSpan(title, given, run)
+    return own.startActiveSpan(title, given, run)
 
   // A wrapper written with rest parameters declares none, and forwards all four to a real tracer.
-  if (tracer.startActiveSpan.length >= 4 || tracer.startActiveSpan.length === 0)
-    return (tracer.startActiveSpan as unknown as ActiveWithParent)(title, given, parent, run)
+  if (own.startActiveSpan.length >= 4 || own.startActiveSpan.length === 0)
+    return (own.startActiveSpan as unknown as ActiveWithParent)(title, given, parent, run)
 
-  return run(tracer.startSpan(title, given, parent))
+  return run(own.startSpan(title, given, parent))
 }
 
 // A span that outlives one call, such as an API route's from its first hook to its response.

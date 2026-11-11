@@ -261,13 +261,13 @@ export default defineConfig({
 })
 ```
 
-Each page request becomes a span named after its route, with one span per load and one for the render inside it. Each action and API request becomes a span too.
+Each page request becomes a span named after its route, with one span per load and one for the render inside it. Each action and API request becomes a span too, and the spans an API handler starts nest under its request's.
 
 A request that carries a `traceparent` header joins the caller's trace, so a call from another service shows as one trace. Kay reads the header itself. The response sends `traceresponse` with the trace id, and the JSON log lines of the request carry it as `trace`, so a log line leads to its trace.
 
 To read another format, set `observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces, which a public edge should do, as anyone can send a `traceparent` that asks for sampling.
 
-`observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
+`observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one. Actions, endpoints and API routes send it too, with the time of their guards and their handler.
 
 <ReadMore href="/llms/production#request-logs">The log fields and the sink for your own entries are in the full production reference, the span attributes in the tracing reference.</ReadMore>
 

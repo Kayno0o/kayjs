@@ -22,6 +22,7 @@ import { corsAdmits, corsRule, grantedByKay, preflight, withCors } from './cors'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from './cross-site'
 import { allowedVerbs, ENDPOINT_VERBS, isEndpointVerb } from './endpoint-verbs'
 import { loadGuard, requiredGuards } from './guards'
+import { handlerTiming } from './handler-timing'
 import { answeringRequest } from './log'
 import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
@@ -29,6 +30,7 @@ import { apiLimitWait, checkApiLimit, tooManyRequests } from './protection'
 import { readQuery } from './query'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { requestRecord } from './request-record'
 import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { endpointPath, routerKey } from './routes'
@@ -172,7 +174,25 @@ function corsOf(file: string, own: EndpointSettings['cors']): CorsRule | undefin
 async function answer(endpoint: ServedEndpoint, context: EndpointRequest, params: Record<string, string>, options: ActionOptions): Promise<Response> {
   const response = await respond(endpoint, context, params, options)
 
-  return grantedByKay.has(response) ? response : granted(endpoint.cors, context.request, response)
+  return grantedByKay.has(response) ? response : granted(endpoint.cors, context.request, options.serverTiming === true ? timed(response, context.request) : response)
+}
+
+// The response with the `Server-Timing` of its guards and handler, on a copy when its headers are immutable.
+function timed(response: Response, request: Request): Response {
+  const timing = handlerTiming(request)
+
+  if (timing === undefined)
+    return response
+
+  try {
+    response.headers.set('server-timing', timing)
+  }
+  catch {
+    response = new Response(response.body, response)
+    response.headers.set('server-timing', timing)
+  }
+
+  return response
 }
 
 // The response with the headers the rule grants the caller, on a copy when its headers are immutable.
@@ -262,7 +282,13 @@ async function respond(endpoint: ServedEndpoint, context: EndpointRequest, param
     if (endpoint.query !== undefined)
       void ctx.query
 
-    response = responseOf(endpoint, verb, await handler(ctx))
+    const started = options.serverTiming === true ? performance.now() : undefined
+    const returned = await handler(ctx)
+
+    if (started !== undefined)
+      requestRecord(request).handlerTook = performance.now() - started
+
+    response = responseOf(endpoint, verb, returned)
   }
   catch (error) {
     if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)

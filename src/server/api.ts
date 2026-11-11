@@ -31,6 +31,7 @@ import { admitCrossSite, crossSiteRefused, crossSiteResponse } from './cross-sit
 import { streamReporters } from './event-stream'
 import { refusedFields, validated } from './field-errors'
 import { loadGuard, requiredGuards } from './guards'
+import { handlerTiming } from './handler-timing'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
 import { apiLimitWait, checkApiLimit, requestId, tooManyRequests } from './protection'
@@ -43,7 +44,7 @@ import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
-import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracing } from './trace'
+import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracedUnder, tracing } from './trace'
 import { kayWord } from './words'
 import { socketLimits } from './ws-limits'
 
@@ -133,7 +134,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         const routeTimeout = own === undefined ? moduleTimeout : timeoutMs(own, `the timeout of ${route.method} ${route.path}`) ?? false
         const located = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
 
-        route.handler = route.method === 'WS' ? located : timedHandler(located, routeTimeout, options)
+        route.handler = route.method === 'WS' ? located : timedHandler(observed(located, `${route.method} ${withoutSlash(apiRoutePath(module.mount, route.path))}`, options), routeTimeout, options)
       }
 
       const hooks = withDecodedParams(route) as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
@@ -380,6 +381,56 @@ export function inRequestLocale(fn: Handler, options: ActionOptions, following =
 
   // Elysia tells a generator or an async handler by its `constructor`, and a handler's `name` shows in traces and errors.
   Object.defineProperties(wrapped, { toString: { value: () => original.toString() }, constructor: { value: original.constructor }, name: { value: original.name }, [WRAPPED]: { value: original } })
+
+  return wrapped
+}
+
+// A handler that runs in a span nested under its request's, which Elysia's call would leave it outside of, and whose time goes in the `Server-Timing` header when `serverTiming` asks.
+// A generator's stream, which outlives the call, is not timed, and a span covers what it takes to start it.
+export function observed(fn: Handler, route: string, { serverTiming }: ActionOptions): Handler {
+  // The tracer is set before the routes are, so an app with neither keeps its handler as written.
+  if (serverTiming !== true && !tracing())
+    return fn
+
+  const original = (fn as { [WRAPPED]?: Handler })[WRAPPED] ?? fn
+
+  const wrapped: Handler = function (this: unknown, context, ...rest) {
+    const { request } = context
+    const parent = tracing() ? recordOf(request)?.apiSpan : undefined
+    const run = () => parent ? tracedUnder(parent, () => `kay.handler ${route}`, () => fn.call(this, context, ...rest)) : fn.call(this, context, ...rest)
+
+    if (serverTiming !== true)
+      return run()
+
+    const started = performance.now()
+    const stamp = () => {
+      requestRecord(request).handlerTook = performance.now() - started
+
+      const timing = handlerTiming(request)
+      const { set } = context as { request: Request, set?: { headers: Record<string, string> } }
+
+      if (timing !== undefined && set)
+        set.headers['server-timing'] = timing
+    }
+    const result = run()
+
+    if (!(result instanceof Promise)) {
+      stamp()
+
+      return result
+    }
+
+    return (async (): Promise<unknown> => {
+      try {
+        return await result
+      }
+      finally {
+        stamp()
+      }
+    })()
+  }
+
+  Object.defineProperties(wrapped, { toString: { value: () => fn.toString() }, constructor: { value: fn.constructor }, name: { value: fn.name }, [WRAPPED]: { value: original } })
 
   return wrapped
 }

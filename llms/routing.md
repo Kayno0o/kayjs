@@ -278,7 +278,7 @@ The fence's `ctx`:
 
 - Layout and page loads run in parallel; when several fail, the outermost one decides the response.
 - A layout cannot read its page's data, so a value they both need is returned by a guard (`ctx.guard`) or shared with `ctx.once(key, load)`, which runs the load once for the request ([Guards](guards.md)).
-- In development each response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel.
+- In development each page response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel; an action, an endpoint and an API route carry the time of their guards and handler.
 - `observe: { serverTiming: true }` in kay.config.ts sends it in production too (see [Tracing and timing](tracing.md#tracing-and-timing)).
 
 #### Special pages

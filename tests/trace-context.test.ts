@@ -238,7 +238,7 @@ describe('an incoming traceparent', () => {
       const api = await pages({ root: 'tests/fixtures/production', prebuilt: false, observe: { tracer: recording } })
       const echoed = await api.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'traceparent': INCOMING, 'content-type': 'text/plain' }, body: 'hello' }))
 
-      expect(started.at(-1)).toMatchObject({ name: 'POST /api/echo', parent: { traceId: TRACE } })
+      expect(started.find(span => span.name === 'POST /api/echo')).toMatchObject({ parent: { traceId: TRACE } })
       expect(echoed.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-\\d{16}-01$`))
 
       const bare = await pages({ requireGuards: false, dirs: { routes: 'tests/fixtures/bare/src/routes' }, observe: { tracer: recording }, prebuilt: true })

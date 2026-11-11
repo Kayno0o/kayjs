@@ -175,7 +175,7 @@ export interface ServeConfig {
 export interface ObserveConfig {
   // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
   log?: Logger | undefined
-  // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
+  // A `Server-Timing` header on each action, endpoint and API route, timing its guards and handler, and on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
   serverTiming?: boolean | undefined
   // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.
   requestIdHeader?: string | undefined

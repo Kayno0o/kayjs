@@ -42,6 +42,7 @@ import { fieldMessage, refusedFields, validated } from './field-errors'
 import { fileBodyLimit } from './file-limit'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
+import { handlerTiming } from './handler-timing'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
@@ -102,6 +103,8 @@ export interface ActionOptions {
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: GuardRequirement | undefined
+  // `observe.serverTiming`: an action, an endpoint and an API route answer with a `Server-Timing` header of their guards and handler.
+  serverTiming?: boolean | undefined
   // `serve.timeout` in milliseconds.
   timeout?: number | undefined
   // How a redirect is spelled, with the trailing slash its page has.
@@ -192,6 +195,13 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           answered(span, response.status)
 
         replyTrace(context.request, context.set)
+
+        if (options.serverTiming === true) {
+          const timing = handlerTiming(context.request)
+
+          if (timing !== undefined)
+            context.set.headers['server-timing'] = timing
+        }
 
         return carryContext(context.set, response)
       }, context.request), {
@@ -514,7 +524,11 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
     headers: state.headers,
     ...stoppers(request),
   }
+  const guardsStart = options.serverTiming === true && guards.length > 0 ? performance.now() : undefined
   const refusal = await runGuards(guards, ctx)
+
+  if (guardsStart !== undefined)
+    requestRecord(request).guardsTook = performance.now() - guardsStart
 
   if (refusal?.error instanceof Denied && refusal.error.status === 401)
     markChallenge(request)
@@ -601,8 +615,12 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     }
 
     // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
+    const handlerStart = options.serverTiming === true ? performance.now() : undefined
     const returned = action.handler(context.body, ctx)
     const result = isAsyncIterable(returned) ? returned : await returned
+
+    if (handlerStart !== undefined)
+      requestRecord(request).handlerTook = performance.now() - handlerStart
 
     // What `ctx.once` loaded before the handler changed things is stale for the page rendered again after a failure.
     forgetOnces(request)

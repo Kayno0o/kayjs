@@ -66,6 +66,9 @@ export class RequestRecord {
   apiSpan: Span | undefined = undefined
   // The trace its server span belongs to, which its log lines and `traceresponse` carry.
   trace: SpanIds | undefined = undefined
+  // The milliseconds its guards and its handler took, noted only when `serverTiming` is on, for the `Server-Timing` header.
+  guardsTook: number | undefined = undefined
+  handlerTook: number | undefined = undefined
   apiOwner: object | undefined = undefined
   apiLocale: LocaleState | undefined = undefined
   // A post's guards' answer, its page's params and URL, whether it is cross-site and where it was posted from (null for nowhere on this site).

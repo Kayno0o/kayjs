@@ -39,8 +39,8 @@ export default defineConfig({
 
 ### Tracing and timing
 
-- `observe: { serverTiming: true }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
-- Anyone loading the page reads it, page file names included.
+- `observe: { serverTiming: true }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too, and on every action, endpoint and API route, which carry `guards;dur=0.4, handler;dur=3.2` (the guards only when it has any; only the guards for an endpoint they refuse). A page carries: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
+- Anyone loading the page reads it, page file names included; an action's, endpoint's and API route's holds none.
 - A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
 - `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.
 - Without one, kay starts no span and the requests cost nothing more.
@@ -49,6 +49,6 @@ export default defineConfig({
 - Spans the loads start nest under theirs.
 - An action call is one too, `POST /_kay/action/...`, holding the handler's spans and the page it renders back.
 - A span whose work threw records the error and an error status, as does a request answered with a 5xx.
-- An API request is a server span from its guards to its response, `POST /api/upload`; spans its handler starts do not nest under it, since Elysia runs the handler outside any call kay makes.
+- An API request is a server span from its guards to its response, `POST /api/upload`, and its handler runs in a `kay.handler POST /api/upload` span inside it, so the spans the handler starts nest under the request's (with a tracer declaring the four parameters of OpenTelemetry's `startActiveSpan`; a hand-written one of three keeps them apart).
 - Spans nest across `await` through the context manager the SDK registers, which Bun's `AsyncLocalStorage` backs.
 

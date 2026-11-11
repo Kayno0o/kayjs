@@ -2076,7 +2076,9 @@ describe('tracing and timing in production', () => {
 
         expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
         // Elysia runs the hook ending it once the response is out.
-        await eventually(() => expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }]))
+        await eventually(() => expect(ended.filter(span => span.name === 'POST /api/echo')).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }]))
+        // This tracer declares three parameters, so the handler's span is made but none is active under it.
+        expect(ended.map(span => span.name)).toContain('kay.handler POST /api/echo')
       }
     }
     finally {

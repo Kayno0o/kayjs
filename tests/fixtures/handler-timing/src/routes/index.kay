@@ -1,0 +1,6 @@
+--- server
+import { action } from 'kay'
+
+export const save = action(() => 'saved')
+---
+h1 Timing

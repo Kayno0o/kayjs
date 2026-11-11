@@ -57,6 +57,11 @@ export function remoteContext({ traceId, spanId, traceFlags, traceState }: SpanI
   return new RemoteContext(new Map([[SPAN_KEY, { spanContext: () => ({ traceId, spanId, traceFlags, isRemote: true, ...traceState !== undefined && { traceState: state(traceState) } }) }]]))
 }
 
+// A context whose span is `span` itself, which a tracer makes the parent of a span started under it, as `trace.setSpan` does.
+export function contextOf(span: object): TraceContext {
+  return new RemoteContext(new Map([[SPAN_KEY, span]]))
+}
+
 // OpenTelemetry's `TraceState`, read-only: what a tracer needs to pass the caller's entries on.
 function state(header: string) {
   const entries = new Map(header.split(',').flatMap((pair) => {
