@@ -42,9 +42,15 @@ async function bodyOf(request: Request, server: Parameters<typeof clientAddress>
   }
 }
 
-// Deletes the subscriptions no push reached within the configured `keep`, answering how many went.
+// Deletes the subscriptions no push reached within the configured `keep`, answering how many went; a store with `prune` but no `touch` is left alone.
 export async function prunePushSubscriptions(): Promise<number> {
-  return await pushStore().prune?.(Date.now() - (pushSettings()?.keep ?? DEFAULT_KEEP_MS)) ?? 0
+  const store = pushStore()
+
+  // A store that cannot be told a device was reached would purge the ones in use.
+  if (store.touch === undefined)
+    return 0
+
+  return await store.prune?.(Date.now() - (pushSettings()?.keep ?? DEFAULT_KEEP_MS)) ?? 0
 }
 
 // The sweep is the server's, as a subscription is only sent to from here; one timer per process, shared by a reloaded config.

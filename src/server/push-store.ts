@@ -24,15 +24,17 @@ export interface PushStore extends StoreBase {
   delete: (endpoint: string, user?: string) => MaybePromise<boolean>
   // Deletes every subscription of a person, answering how many went.
   erase: (user: string) => MaybePromise<number>
-  // Marks the subscription at an endpoint as reached at a time (ms), which `createdAt` then answers. Without it, a subscription is purged by the age it was stored at.
+  // Marks the subscription at an endpoint as reached at a time (ms), which `createdAt` then answers. Kay purges by age only a store that has both `touch` and `prune`, as one without `touch` would lose subscriptions still in use.
   touch?: (endpoint: string, at: number) => MaybePromise<void>
-  // Deletes every subscription stored or reached before a time (ms), answering how many went. Without it, none is purged by age.
+  // Deletes every subscription stored or reached before a time (ms), answering how many went. A store counts a subscription's idleness from the later of its date and the first call of `prune`, so none is purged for having been stored before the purge existed.
   prune?: (before: number) => MaybePromise<number>
 }
 
 // Subscriptions kept in this process's memory, gone when it stops.
 export function memoryPush(): PushStore {
   const rows = new Map<string, PushSubscriptionRecord & { user: string }>()
+  // When purging began.
+  let since: number | undefined
 
   return inMemory({
     add(user, subscription, most) {
@@ -78,6 +80,11 @@ export function memoryPush(): PushStore {
     },
     prune(before) {
       let count = 0
+
+      since ??= Date.now()
+
+      if (since >= before)
+        return 0
 
       for (const row of rows.values()) {
         if (row.createdAt < before) {
@@ -142,6 +149,12 @@ function openPush(path: string): PushStore {
   const touch = db.query('UPDATE kay_push_subscriptions SET at = ?2 WHERE endpoint = ?1')
   const prune = db.query('DELETE FROM kay_push_subscriptions WHERE at < ?1')
 
+  // The first call of `prune` records when purging began, which no later call's cutoff may precede.
+  db.run('CREATE TABLE IF NOT EXISTS kay_push_purge (since INTEGER NOT NULL)')
+
+  const began = db.query('INSERT INTO kay_push_purge (since) SELECT ?1 WHERE NOT EXISTS (SELECT 1 FROM kay_push_purge)')
+  const beganAt = db.query<{ since: number }, []>('SELECT since FROM kay_push_purge')
+
   return {
     add(user, subscription, most) {
       insert.run(subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.createdAt)
@@ -151,7 +164,11 @@ function openPush(path: string): PushStore {
     delete: (endpoint, user) => (user === undefined ? drop.run(endpoint) : dropOwn.run(endpoint, user)).changes > 0,
     erase: user => erase.run(user).changes,
     touch: (endpoint, at) => void touch.run(endpoint, at),
-    prune: before => prune.run(before).changes,
+    prune(before) {
+      began.run(Date.now())
+
+      return beganAt.get()!.since >= before ? 0 : prune.run(before).changes
+    },
     close: () => db.close(),
   }
 }

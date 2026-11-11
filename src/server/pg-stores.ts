@@ -342,8 +342,15 @@ export function pgPush(pg: PgHandle): PushStore {
     async touch(endpoint, at) {
       await counted('UPDATE kay_push_subscriptions SET at = $2::bigint WHERE endpoint = $1', [endpoint, at])
     },
+    // Idleness counts from the later of a row's date and the first call, kept in `kay_meta`, so rows stored before the purge existed are not taken for idle.
     async prune(before) {
-      return counted('DELETE FROM kay_push_subscriptions WHERE at < $1::bigint', [before])
+      const db = await pg.db()
+
+      await query(db, 'INSERT INTO kay_meta (name, value) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING', ['push_purge_since', String(Date.now())])
+
+      const [row] = await query<{ value: string }>(db, 'SELECT value FROM kay_meta WHERE name = $1', ['push_purge_since'])
+
+      return Number(row?.value) >= before ? 0 : counted('DELETE FROM kay_push_subscriptions WHERE at < $1::bigint', [before])
     },
   }, 'the push subscriptions store', { ready: pg.db })
 }

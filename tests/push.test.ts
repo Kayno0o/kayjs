@@ -216,15 +216,32 @@ describe('sendPush', () => {
 
     expect(times.get('/push/fresh')).toBeLessThan(Date.now() - 500)
     expect(Date.now() - times.get('/push/stale')!).toBeLessThan(5000)
-    expect(await prunePushSubscriptions()).toBe(1)
-    expect((await store.list('ada')).map(each => new URL(each.endpoint).pathname).toSorted()).toEqual(['/push/fresh', '/push/stale'])
+    expect(times.get('/push/idle')).toBeLessThan(Date.now() - 299 * day)
   })
 
-  it('keeps `push({ keep })` as the idle age', async () => {
+  it('purges with a cutoff of `keep` ago, 180 days by default, and only a store that has `touch` and `prune`', async () => {
+    const cutoffs: number[] = []
+    const prune = (before: number) => {
+      cutoffs.push(before)
+
+      return 0
+    }
+
+    setupStore({ push: { ...memoryPush(), prune } })
+    await prunePushSubscriptions()
     setPushSettings({ subject: undefined, keep: 1000 })
-    await store.add('ada', { endpoint: 'https://a/1', p256dh: 'p', auth: 'a', createdAt: Date.now() - 5000 }, 10)
-    expect(await prunePushSubscriptions()).toBe(1)
+    await prunePushSubscriptions()
+    expect(Date.now() - cutoffs[0]!).toBeGreaterThan(180 * 86_400_000 - 5000)
+    expect(Date.now() - cutoffs[0]!).toBeLessThan(180 * 86_400_000 + 5000)
+    expect(Date.now() - cutoffs[1]!).toBeLessThan(6000)
     expect(() => push({ keep: '0d' })).toThrow('keep')
+
+    const untouched = memoryPush()
+
+    delete untouched.touch
+    setupStore({ push: { ...untouched, prune } })
+    await prunePushSubscriptions()
+    expect(cutoffs).toHaveLength(2)
   })
 
   it('refuses a title, body, tag, topic or urgency out of bounds, and drops a hostile link', async () => {
@@ -876,16 +893,40 @@ function storeCases(name: string, make: () => Promise<PushStore>): void {
 
     it('prunes what was kept or reached before a time, and a touch counts as reached', async () => {
       const made = await make()
+      const now = Date.now()
 
-      await made.add('ada', record('https://a/old', 1), 10)
-      await made.add('ada', record('https://a/reached', 2), 10)
-      await made.add('grace', record('https://g/new', 100), 10)
-      await made.touch!('https://a/reached', 50)
+      await made.add('ada', record('https://a/old', now + 1000), 10)
+      await made.add('ada', record('https://a/reached', now + 1000), 10)
+      await made.add('grace', record('https://g/new', now + 9000), 10)
+      await made.touch!('https://a/reached', now + 5000)
 
-      expect(await made.prune!(50)).toBe(1)
+      // A cutoff before the first call is not a time anything idled through: the first call records when purging began.
+      expect(await made.prune!(now + 3000)).toBe(1)
       expect((await made.list('ada')).map(each => each.endpoint)).toEqual(['https://a/reached'])
-      expect(await made.prune!(50)).toBe(0)
+      expect(await made.prune!(now + 3000)).toBe(0)
       expect(await made.list('grace')).toHaveLength(1)
+    })
+
+    it('purges nothing for having been stored before purging began', async () => {
+      const made = await make()
+      const now = Date.now()
+
+      await made.add('ada', record('https://a/long-ago', now - 300 * 86_400_000), 10)
+      expect(await made.prune!(now - 180 * 86_400_000)).toBe(0)
+      // Still at that date, still covered once the cutoff passes the day purging began, since idleness counts from it.
+      expect(await made.prune!(now - 100)).toBe(0)
+      expect(await made.list('ada')).toHaveLength(1)
+      expect(await made.prune!(Date.now() + 60_000)).toBe(1)
+    })
+
+    it('keeps a touched device when a person goes over the most', async () => {
+      const made = await make()
+
+      await made.add('ada', record('https://a/1', 1), 2)
+      await made.add('ada', record('https://a/2', 2), 2)
+      await made.touch!('https://a/1', 10)
+      await made.add('ada', record('https://a/3', 11), 2)
+      expect((await made.list('ada')).map(each => each.endpoint)).toEqual(['https://a/3', 'https://a/1'])
     })
 
     it('removes by endpoint, a person\'s own when named, and erases a person', async () => {
@@ -921,6 +962,7 @@ pgDescribe('Postgres', () => {
 
     await sql.unsafe('DROP TABLE IF EXISTS kay_push_subscriptions')
     await createDataTables(sql)
+    await sql.unsafe('DELETE FROM kay_meta WHERE name = \'push_purge_since\'')
 
     return pgPush(pgHandle(sql))
   })
