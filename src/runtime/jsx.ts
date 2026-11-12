@@ -1,4 +1,5 @@
 import type { INPUT_TYPES } from '../input-types'
+import type { CROSS_ORIGINS, FORM_ENCODINGS, FORM_METHODS, REFERRER_POLICIES } from '../keyword-attributes'
 import type { SVG_ATTRIBUTE_NAMES } from '../svg-attributes'
 import type { Range } from './dom'
 import type { Html } from './html'
@@ -179,15 +180,14 @@ interface SpelledAttributes {
 
 type BrowsingContext = OpenKeyword<'_self' | '_blank' | '_parent' | '_top'>
 
-type ReferrerPolicy = Keyword<'' | 'no-referrer' | 'no-referrer-when-downgrade' | 'origin' | 'origin-when-cross-origin' | 'same-origin' | 'strict-origin' | 'strict-origin-when-cross-origin' | 'unsafe-url'>
+type ReferrerPolicy = Keyword<typeof REFERRER_POLICIES[number]>
 
 // A bare `crossorigin` is `true`, which renders as an empty value: anonymous.
-type CrossOrigin = Keyword<'' | 'anonymous' | 'use-credentials'> | true
+type CrossOrigin = Keyword<typeof CROSS_ORIGINS[number]> | true
 
-// HTML reads the method case-insensitively and templates habitually write it in capitals, so both spellings go.
-type FormMethod = Keyword<'get' | 'post' | 'dialog' | 'GET' | 'POST' | 'DIALOG'>
+type FormMethod = Keyword<typeof FORM_METHODS[number]>
 
-type FormEncoding = Keyword<'application/x-www-form-urlencoded' | 'multipart/form-data' | 'text/plain'>
+type FormEncoding = Keyword<typeof FORM_ENCODINGS[number]>
 
 // The attributes HTML limits to keywords, by tag, spelled as the attribute and as the property.
 interface EnumeratedAttributes {

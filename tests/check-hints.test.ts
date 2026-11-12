@@ -91,6 +91,17 @@ describe('hints for the first template mistakes', () => {
     ])
   })
 
+  it('names the words of a list several tags share, which TypeScript names by its alias', async () => {
+    const found = await report('---\n---\nimg(src="https://x.test/a.png" alt="" width="1" height="1" referrerpolicy="nope" crossorigin="nope")\nform(enctype="json")\nbutton(formmethod="put") go\n')
+
+    expect(errors(found).map(error => [error[0], error[3]])).toEqual([
+      [3, '`referrerpolicy` takes `""`, `"no-referrer"`, `"no-referrer-when-downgrade"`, `"origin"`, `"origin-when-cross-origin"`, `"same-origin"`, `"strict-origin"`, `"strict-origin-when-cross-origin"` or `"unsafe-url"`, not `"nope"`'],
+      [3, '`crossorigin` takes `""`, `"anonymous"` or `"use-credentials"`, not `"nope"`'],
+      [4, '`enctype` takes `"application/x-www-form-urlencoded"`, `"multipart/form-data"` or `"text/plain"`, not `"json"`'],
+      [5, '`formmethod` takes `"dialog"`, `"get"` or `"post"`, not `"put"`'],
+    ])
+  })
+
   it('takes every value HTML allows on the enumerated attributes, and an open one where HTML is open', async () => {
     const found = await report('---\nconst kind = "text" as const\nconst wide = "a-frame"\n---\ninput(type={kind} inputmode="numeric" enterkeyhint="done")\nbutton(type="reset" aria-pressed="mixed" aria-expanded={true} aria-current="page" aria-live="polite") go\na(href="/" target="_blank" rel="noopener x-custom" referrerpolicy="origin") go\na(href="/" target={wide}) go\nscript(type="module")\nscript(type="importmap")\ndiv(dir="rtl" aria-label="x" aria-hidden="true" aria-busy={false})\nmy-element(anything="x" other={1})\nform(method="POST")\n')
 

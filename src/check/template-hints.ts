@@ -4,6 +4,7 @@ import type { Span } from '../compiler/ast'
 import type { TsgoDiagnostic } from './diagnose'
 import { HTML_ELEMENTS } from '../compiler/lints'
 import { INPUT_TYPES } from '../input-types'
+import { NAMED_KEYWORDS } from '../keyword-attributes'
 import { nearest } from '../nearest'
 import { SVG_ATTRIBUTE_NAMES } from '../svg-attributes'
 
@@ -329,7 +330,7 @@ const enumeratedValue: Row = (diagnostic, source, span) => {
   if (name === undefined || given === undefined || allowed === undefined)
     return undefined
 
-  const listed = allowed.replace(KEYWORD_ALIAS, '$1')
+  const listed = (NAMED_KEYWORDS[allowed]?.toSorted().map(word => `"${word}"`).join(' | ') ?? allowed).replace(KEYWORD_ALIAS, '$1')
   const words = listed.includes('...') ? INPUT_TYPES.map(word => `"${word}"`) : listed.split(' | ').filter(word => word.startsWith('"') && !UPPERCASE_METHODS.has(word))
 
   if (words.length === 0)
