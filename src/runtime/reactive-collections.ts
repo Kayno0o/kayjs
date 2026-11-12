@@ -177,17 +177,23 @@ class ReactiveSet<T> extends Set<T> {
   }
 }
 
-// The native set algebra reads the set's own slots, so each one subscribes to the whole set first.
-for (const name of ['union', 'intersection', 'difference', 'symmetricDifference', 'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'] as const) {
-  // eslint-disable-next-line ts/unbound-method -- called back with the set as `this`
-  const native = Set.prototype[name] as ((this: Set<unknown>, other: ReadonlySetLike<unknown>) => unknown) | undefined
+let algebra = false
 
-  if (native) {
-    ReactiveSet.prototype[name] = function (this: ReactiveSet<unknown>, other: ReadonlySetLike<unknown>) {
-      trackKey(this, ALL)
+// The native set algebra reads the set's own slots, so each one subscribes to the whole set first: set up by the first `reactiveSet()`, so the module runs nothing as it loads.
+function trackAlgebra() {
+  algebra = true
 
-      return native.call(this, other)
-    } as never
+  for (const name of ['union', 'intersection', 'difference', 'symmetricDifference', 'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'] as const) {
+    // eslint-disable-next-line ts/unbound-method -- called back with the set as `this`
+    const native = Set.prototype[name] as ((this: Set<unknown>, other: ReadonlySetLike<unknown>) => unknown) | undefined
+
+    if (native) {
+      ReactiveSet.prototype[name] = function (this: ReactiveSet<unknown>, other: ReadonlySetLike<unknown>) {
+        trackKey(this, ALL)
+
+        return native.call(this, other)
+      } as never
+    }
   }
 }
 
@@ -201,5 +207,8 @@ export function reactiveMap<K, V>(entries?: Iterable<readonly [K, V]> | null): M
 // A Set whose reads are tracked: `has(v)` re-runs only when `v` comes or goes, `size` as values come and go, and iteration and `forEach` on any change.
 // kept: free
 export function reactiveSet<T>(values?: Iterable<T> | null): Set<T> {
+  if (!algebra)
+    trackAlgebra()
+
   return new ReactiveSet<T>(values)
 }
