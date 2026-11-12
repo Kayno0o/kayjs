@@ -2,10 +2,13 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-mail: components take per-use styling: `style` (appended last), the element's own attributes and `align` where it makes sense, `Button` takes `tone` (`accent`, `neutral`, `danger`), `block` and `target`, `Heading` and `Paragraph` take `tone`, `Image` takes `href`; the settings gain optional `danger` and `onDanger` colours, with dark equivalents derived or set through `dark`, and the Outlook fixes and the dark-mode classes still apply ([kayjs-mail](../packages/mail/llms/writing-and-sending.md)).
+
 ## 1.100.0
 
 - kayjs-ui: a Dialog and a SidePanel take no `open` or `onOpenChange`: left out, each keeps its own state and a `@trigger(attributes)` block draws what opens it, like FormDialog; `open` still drives it and `closeHref` still works ([Dialog](../packages/ui/llms/basics.md)).
-- kayjs-mail: components take per-use styling: `style` (appended last), the element's own attributes and `align` where it makes sense, `Button` takes `tone` (`accent`, `neutral`, `danger`), `block` and `target`, `Heading` and `Paragraph` take `tone`, `Image` takes `href`; the settings gain optional `danger` and `onDanger` colours, with dark equivalents derived or set through `dark`, and the Outlook fixes and the dark-mode classes still apply ([kayjs-mail](../packages/mail/llms/writing-and-sending.md)).
 - kayjs-ui: a FormDialog takes no `open` or `onOpenChange`: left out, it keeps its own state and a `@trigger(attributes)` block draws what opens it, like ConfirmDelete; `open` still drives it ([FormDialog](../packages/ui/llms/forms-and-steps.md)).
 - kayjs-ui: Combobox and MultiSelect take numbers as values like Select does: `onChange` hands back the option's own type, so a numeric id from a remote `options` stays a number, while the form posts its string; MultiSelect's `valueLabels` is keyed by that string ([pickers](../packages/ui/llms/pickers.md)).
 - A rate limit answers its own 429: `await limit.enforce(ctx)` in a guard sets `Retry-After` and denies, the object `rateLimit()` returns goes to `protect: { rateLimit }`, `api({ rateLimit })` or `page.rateLimit` and counts with the guard, and `onLimit` on any limit is told of each request it refused ([Rate limits](rate-limits.md)).
