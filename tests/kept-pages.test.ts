@@ -958,6 +958,12 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
       'src/routes/typed.kay': '---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep<boolean>(\'open\', false, { storage: \'local\' })\n---\np {open()}\n',
       'src/routes/in-module.kay': '---\nimport { theme } from \'../theme\'\n---\np {theme()}\n',
+      'src/routes/entry-local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.local(\'theme\', \'light\')\nconst step = persisted.session(\'step\', \'one\', { values: [\'one\', \'two\'] })\n---\np {theme()}{step()}\n',
+      'src/routes/entry-aliased.kay': '---\nimport { persisted as keep } from \'kay\'\n\nconst open = keep.local<boolean>(\'open\', false)\n---\np {open()}\n',
+      'src/routes/entry-cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted.cookie(\'theme\', \'light\')\n---\np {theme()}\n',
+      'src/routes/entry-query.kay': '---\nimport { persisted } from \'kay\'\n\nconst page = persisted.query(\'page\', \'1\')\n---\np {page()}\n',
+      'src/routes/entry-mixed.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted.local(\'a\', \'1\')\nconst b = persisted.query(\'b\', \'1\')\n---\np {a()}{b()}\n',
+      'src/routes/entry-passed.kay': '---\nimport { persisted } from \'kay\'\n\nconst make = persisted.local\nconst a = make(\'a\', \'1\')\n---\np {a()}\n',
       'src/routes/cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
       'src/routes/query.kay': '---\nimport { persisted } from \'kay\'\n\nconst page = persisted(\'page\', \'1\', { storage: \'query\' })\n---\np {page()}\n',
       'src/routes/mixed.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\' })\nconst b = persisted(\'b\', \'1\')\n---\np {a()}{b()}\n',
@@ -979,10 +985,10 @@ describe('what kay exports to a page that is kept', () => {
 
     const at = async (file: string) => keptStop({ file: join(root, file), layouts: [] })
 
-    for (const page of ['local', 'typed', 'in-module'])
+    for (const page of ['local', 'typed', 'in-module', 'entry-local', 'entry-aliased'])
       expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
 
-    for (const page of ['cookie', 'query', 'mixed', 'passed', 'spread', 'spread-args', 'in-value', 'commented', 'parens', 'computed', 'quoted'])
+    for (const page of ['entry-cookie', 'entry-query', 'entry-mixed', 'entry-passed', 'cookie', 'query', 'mixed', 'passed', 'spread', 'spread-args', 'in-value', 'commented', 'parens', 'computed', 'quoted'])
       expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `persisted(?: as keep)?` from `kay`, which a request or the clock can change$/) })
 
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })

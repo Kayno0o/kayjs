@@ -211,13 +211,13 @@ const tableId = uid()
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
-const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
+const keptKey = sortParam === undefined ? undefined : persisted.query(sortParam, '')
 const directionParam = sortParam === undefined ? undefined : sortParam === 'sort' ? 'direction' : `${sortParam}Direction`
-const keptDirection = directionParam === undefined ? undefined : persisted(directionParam, '', { storage: 'query' })
+const keptDirection = directionParam === undefined ? undefined : persisted.query(directionParam, '')
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
-const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
+const typed = filterParam === undefined ? signal('') : persisted.query(filterParam, '')
 // kay-allow once-read-prop: the extra fields are read when the table is created
 const extra = fields ?? []
 // The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
@@ -228,7 +228,7 @@ for (const field of extra) {
     throw new Error(`kayjs-ui: a Table field cannot be keyed ${field.key}, a name the table's sort, search or export address already writes in the query`)
 }
 
-const fieldValues = extra.map(field => persisted(field.key, '', { storage: 'query' }))
+const fieldValues = extra.map(field => persisted.query(field.key, ''))
 const fieldsNow = () => Object.fromEntries(extra.flatMap((field, index) => fieldValues[index]!() === '' ? [] : [[field.key, fieldValues[index]!()]]))
 const asked = () => ({ text: typed(), fields: fieldsNow() })
 // A table over a list searches on the server, so a `filterParam` alone shows the box.
@@ -379,8 +379,8 @@ const endpoint = memo(() => {
 
 // The page and the size live in the address like the sort does, read from the request on the server, unless the app holds the page itself.
 // kay-allow once-read-prop: whether the table pages is decided when it is made
-const keptPage = pageSize === undefined ? undefined : persisted(pageParam, '', { storage: 'query', history: 'push' })
-const keptSize = pageSize === undefined ? undefined : persisted(limitParam, '', { storage: 'query' })
+const keptPage = pageSize === undefined ? undefined : persisted.query(pageParam, '', { history: 'push' })
+const keptSize = pageSize === undefined ? undefined : persisted.query(limitParam, '')
 const pageNow = () => page ?? (Number(keptPage?.()) || 1)
 
 const sizeNow = () => {

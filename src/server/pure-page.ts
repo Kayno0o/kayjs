@@ -10,7 +10,7 @@ import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { CONTENT_EXPORTS, I18N_EXPORTS, IMAGE_EXPORTS, KAY_EXPORTS } from './kept-exports'
-import { readKeptSource } from './kept-source'
+import { memberCalls, readKeptSource } from './kept-source'
 import { literalOf, neverWritten } from './literal-writes'
 import { exposedBy, firstExportAt, laterExportAt, stateAt, statementState } from './module-state'
 import { routeChain } from './routes'
@@ -72,8 +72,11 @@ function moduleStateAt(file: string, source: string, read: KeptSource, unchanged
   return later === undefined ? undefined : real(later)
 }
 
-// Whether the arguments of a `persisted` call give the options as a literal with no spread and every `storage` in it `'local'`: anything else may be a cookie or the query.
-function savesLocally(args: Node[]): boolean {
+// Whether a `persisted` call keeps its value in the browser's own storage: `persisted.local()` or `persisted.session()`, or the deprecated call whose options are a literal with no spread and every `storage` in it `'local'`; anything else may be a cookie or the query.
+function savesLocally(args: Node[], member: string | undefined): boolean {
+  if (member !== undefined)
+    return member === 'local' || member === 'session'
+
   const options = args[2]
 
   // A spread before the options moves them to a place the scan cannot tell.
@@ -100,17 +103,20 @@ function savesLocally(args: Node[]): boolean {
 }
 
 // Whether the arguments of a `collection` call start with a folder as a plain string, not a loader.
-function startsWithFolder(args: Node[]): boolean {
+function startsWithFolder(args: Node[], member: string | undefined): boolean {
   const first = args[0]
+
+  if (member !== undefined)
+    return false
 
   return (first?.type === 'Literal' && typeof first.value === 'string') || (first?.type === 'TemplateLiteral' && first.expressions.length === 0)
 }
 
 // Whether every use of `name` is a call whose arguments `accepts`, and there is one.
-function onlyCalls(read: KeptSource, name: string, accepts: (args: Node[]) => boolean): boolean {
+function onlyCalls(read: KeptSource, name: string, accepts: (args: Node[], member: string | undefined) => boolean): boolean {
   const uses = read.uses.get(name) ?? []
 
-  return uses.length > 0 && uses.every(args => args !== undefined && accepts(args))
+  return uses.length > 0 && uses.every(args => args !== undefined && accepts(args, memberCalls.get(args)))
 }
 
 // What stops a page from being kept: the file and line that decided it, and what is there; line 0 when a render decided it, not a line of source.

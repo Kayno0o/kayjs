@@ -85,6 +85,54 @@ describe('persisted signals of one name in a page', () => {
     expect(draft()).toBe('none')
   })
 
+  it('keeps a signal of each entry apart from the others of the same name', () => {
+    const local = persisted.local('entries', 'a')
+    const session = persisted.session('entries', 'a')
+    const cookie = persisted.cookie('entries', 'a')
+
+    expect(new Set([local, session, cookie]).size).toBe(3)
+    expect(persisted.local('entries', 'b')).toBe(local)
+    expect(persisted.session('entries', 'b')).toBe(session)
+    expect(persisted.cookie('entries', 'b')).toBe(cookie)
+    expect(persisted('entries', 'b')).toBe(cookie)
+    expect(persisted('entries', 'b', { storage: 'local' })).toBe(local)
+  })
+
+  it('keeps and reads a value in sessionStorage, localStorage staying empty', () => {
+    const step = persisted.session('wizard', 'one', { values: ['one', 'two'] })
+
+    step.set('two')
+    expect(sessionStorage.getItem('wizard')).toBe(encodeValue('two'))
+    expect(localStorage.getItem('wizard')).toBeNull()
+  })
+
+  it('follows the storage event of its own area for local and session, and no other', () => {
+    const local = persisted.local('both', 'none')
+    const session = persisted.session('both', 'none')
+
+    window.dispatchEvent(new StorageEvent('storage', { storageArea: sessionStorage, key: 'both', newValue: encodeValue('tab') }))
+    expect(session()).toBe('tab')
+    expect(local()).toBe('none')
+
+    storageEvent({ key: 'both', newValue: encodeValue('everywhere') })
+    expect(local()).toBe('everywhere')
+    expect(session()).toBe('tab')
+
+    window.dispatchEvent(new StorageEvent('storage', { storageArea: sessionStorage, key: 'both', newValue: null }))
+    expect(session()).toBe('none')
+    expect(local()).toBe('everywhere')
+  })
+
+  it('leaves a session signal alone with sync: false', () => {
+    const shared = persisted.session('quiet-session', 'a')
+    const alone = persisted.session('quiet-session', 'a', { sync: false })
+
+    expect(alone).not.toBe(shared)
+    window.dispatchEvent(new StorageEvent('storage', { storageArea: sessionStorage, key: 'quiet-session', newValue: encodeValue('b') }))
+    expect(shared()).toBe('b')
+    expect(alone()).toBe('a')
+  })
+
   it('ignores the storage event of another storage area', () => {
     const area = persisted('area', 'a', { storage: 'local' })
 

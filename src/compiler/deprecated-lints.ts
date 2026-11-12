@@ -144,6 +144,15 @@ export const DEPRECATED_LINTS = {
     wrong: '// tests/admin.test.ts\nimport { cmsSignInAs } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\nawait cmsSignInAs(site, \'admin\')',
     right: '// tests/admin.test.ts\nimport { cmsTest } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\nawait cmsTest(site).signInAs(\'admin\')',
   },
+  'deprecated-persisted-storage': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.101',
+    site: true,
+    summary: '`storage` in the options of `persisted()`, an entry of its own per storage since 1.101: `persisted.local()` keeps the value in localStorage, `persisted.session()` in sessionStorage (new), `persisted.query()` in the URL and `persisted.cookie()` or `persisted()` in a cookie, each with the options that storage takes, so `maxAge` and `sync` no longer sit beside a `storage` that refuses them. The old form works until 1.104. Found on a call of `persisted` imported from `kay`, in the options object written in the call, in the TypeScript files and `.kay` files of the project. The fix moves the call to the entry and drops `storage`; a `storage` that is not a literal, an object that spreads another, or a key the entry refuses (`maxAge` or `sync` of a query, `maxAge` of a web storage) is reported with no fix.',
+    wrong: '---\nimport { persisted } from \'kay\'\n\nconst draft = persisted(\'draft\', \'\', { storage: \'local\' })\n---\ninput(bind:value={draft})',
+    right: '---\nimport { persisted } from \'kay\'\n\nconst draft = persisted.local(\'draft\', \'\')\n---\ninput(bind:value={draft})',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
@@ -172,4 +181,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.98' },
   { since: '1.99' },
   { since: '1.100' },
+  { since: '1.101' },
 ]

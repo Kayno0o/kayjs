@@ -39,7 +39,7 @@ export async function settle(): Promise<void> {
   await sleep(0)
 }
 
-// Keeps a value in localStorage as `persisted(key, initial, { storage: 'local' })` does, encoded as island props are rather than as JSON, for a component mounted after to read.
+// Keeps a value in localStorage as `persisted.local(key, initial)` does, encoded as island props are rather than as JSON, for a component mounted after to read.
 export function writePersisted(key: string, value: unknown): void {
   localStorage.setItem(key, sendValue(value))
 }
@@ -52,7 +52,7 @@ export function persistedCookie(name: string, value: unknown): string {
   return `${name}=${encodeURIComponent(sendValue(value))}`
 }
 
-// The value a `persisted(key, initial, { storage: 'local' })` signal kept in localStorage, decoded, or undefined when it kept none.
+// The value a `persisted.local(key, initial)` signal kept in localStorage, decoded, or undefined when it kept none.
 export function readPersisted(key: string): unknown {
   const text = localStorage.getItem(key)
 

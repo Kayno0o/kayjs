@@ -52,6 +52,7 @@ import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
+import { persistedStorage } from './persisted-storage'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
 import { scheduleTz } from './schedule-tz'
@@ -165,6 +166,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => uiItems(root, options),
   async ({ root, options }) => uiItemKeys(root, options),
   async ({ root, options }) => scheduleTz(root, options),
+  async ({ root, options }) => persistedStorage(root, options),
   async ({ root, options }) => workflowStartId(root, options),
   async ({ root, options }) => analyticsOptions(root, options),
   async ({ root, options }) => awaitConsent(root, options),

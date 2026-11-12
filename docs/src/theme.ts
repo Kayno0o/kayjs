@@ -21,8 +21,8 @@ export const THEMES: { value: string, label: string }[] = [
 export const SCHEMES: { value: Scheme, label: string }[] = [{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]
 
 // Kept in localStorage: the server and the islands as they hydrate render the defaults, and kay applies the visitor's after.
-export const scheme = persisted<Scheme>('kay-docs-scheme', 'system', { storage: 'local' })
-export const palette = persisted<string>('kay-docs-palette', THEMES[0]!.value, { storage: 'local' })
+export const scheme = persisted.local<Scheme>('kay-docs-scheme', 'system')
+export const palette = persisted.local<string>('kay-docs-palette', THEMES[0]!.value)
 
 // Shows the theme at once, the scheme as kayjs-ui's `data-theme` and the palette as `data-palette` on `html`, which kay keeps for the next pages and visits.
 export function pickTheme(change: Partial<Theme>) {

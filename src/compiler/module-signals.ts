@@ -10,6 +10,9 @@ export type ImportedSignals = Record<string, Record<string, SignalKind>>
 export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo', live: 'live' }
 const NAMES_KAY = /["']kay["']/
 
+// The entries `persisted` carries, one per storage.
+export const PERSISTED_ENTRIES = new Set(['cookie', 'local', 'session', 'query'])
+
 // The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam`, `memo`, `debounced`, `throttled` or `live`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
 export function moduleSignals(source: string, jsx = false): Record<string, SignalKind> {
   const ast = NAMES_KAY.test(source) ? parseModule(source, jsx) : undefined
@@ -45,8 +48,21 @@ function allTypes(specifiers: Node[]): boolean {
   return specifiers.length > 0 && specifiers.every(specifier => (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type') || (specifier.type === 'ExportSpecifier' && specifier.exportKind === 'type'))
 }
 
+// The local name a call's callee makes a signal by: `signal` of `signal(...)`, and `persisted` of `persisted.local(...)`, `.session`, `.cookie` and `.query`, which make one as `persisted(...)` does.
+function madeBy(callee: Node, persisted: Set<string>): string | undefined {
+  if (callee.type === 'Identifier')
+    return callee.name
+
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier' || callee.property.type !== 'Identifier')
+    return undefined
+
+  return PERSISTED_ENTRIES.has(callee.property.name) && persisted.has(callee.object.name) ? callee.object.name : undefined
+}
+
 function signalsIn(ast: Program): Record<string, SignalKind> {
   const made = new Map<string, SignalKind>()
+  // The local names `persisted` is imported as.
+  const persisted = new Set<string>()
   const found: Record<string, SignalKind> = {}
 
   for (const statement of ast.body) {
@@ -59,6 +75,9 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
 
       if (kind)
         made.set(specifier.local.name, kind)
+
+      if (imported && (imported.type === 'Identifier' ? imported.name : imported.value) === 'persisted')
+        persisted.add(specifier.local.name)
     }
   }
 
@@ -69,7 +88,8 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
       continue
 
     for (const { id, init } of declaration.declarations) {
-      const kind = id.type === 'Identifier' && init?.type === 'CallExpression' && init.callee.type === 'Identifier' ? made.get(init.callee.name) : undefined
+      const name = init?.type === 'CallExpression' ? madeBy(init.callee, persisted) : undefined
+      const kind = id.type === 'Identifier' && name !== undefined ? made.get(name) : undefined
 
       if (id.type === 'Identifier' && kind)
         found[id.name] = kind

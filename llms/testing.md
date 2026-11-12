@@ -250,7 +250,7 @@ Requests, jobs, sockets and sessions are in [Testing requests, jobs, sockets and
 - A test may register the DOM itself instead, such as `GlobalRegistrator.register({ url: 'http://localhost/' })` for a document whose cookies the page reads.
 - A DOM left registered for the rest of the run does not reach `testSite`, whose app runs on Bun's own `Request`, `Response` and the rest, so a file mounting components and one visiting pages share one `bun test` run, as long as `kay/test/preload` comes before any preload registering a DOM.
 - A function the test stubbed, such as `fetch`, stays its stub there, and a streamed page under a DOM is read through `visit`, `site.fetch` handing back a body read later.
-- A `persisted(key, initial, { storage: 'local' })` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept.
+- A `persisted.local(key, initial)` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept.
 - After an interaction, `await settle()` lets effects land before the DOM is read.
 
 ### Helpers for a test of its own

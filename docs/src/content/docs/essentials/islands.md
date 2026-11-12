@@ -177,13 +177,15 @@ export const theme = persisted('theme', 'light')
 
 A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
 
-A param kept in the URL takes `values` too: `persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, so it needs one.
+A param kept in the URL takes `values` too: `persisted.query('tab', 'site', { values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, so it needs one.
 
-Pass `{ storage: 'query' }` to keep a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link.
+Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, which `persisted()` is, `persisted.local()`, `persisted.session()` and `persisted.query()`.
 
-Pass `{ storage: 'local' }` to use localStorage. The server never sees it, so every island reading it renders the default first, then shows the kept value.
+`persisted.query('q', '')` keeps a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link.
 
-Islands that persist the same name share one signal, so a change in one shows in the others at once, and in other tabs of the browser too: through the `storage` event for `local`, a broadcast channel for a cookie. `{ sync: false }` keeps a call's signal on its own.
+`persisted.local('draft', '')` uses localStorage. The server never sees it, so every island reading it renders the default first, then shows the kept value. `persisted.session()` does the same in sessionStorage, which lasts as long as the tab and is not shared with another one.
+
+Islands that persist the same name share one signal, so a change in one shows in the others at once, and in other tabs of the browser too: through the `storage` event for `local`, a broadcast channel for a cookie. A sessionStorage belongs to one tab, so its `storage` event reaches only the windows of that session, such as the page's frames. `{ sync: false }` keeps a call's signal on its own.
 
 Derive from a persisted value inside the island. A memo made outside one gives a late-hydrating island the kept value, which its server markup does not hold.
 

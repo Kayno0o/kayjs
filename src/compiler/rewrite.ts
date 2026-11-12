@@ -7,6 +7,7 @@ import type { Read } from './rewrite-reads'
 import type { ConstantSignal, FoundRewrites, RewriteInput, Rewrites } from './rewrite-types'
 import type { Binding, Path, Scope } from './scope'
 import { parseProgram } from './estree'
+import { PERSISTED_ENTRIES } from './module-signals'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
 import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
 import { Scanner } from './rewrite-scan'
@@ -585,7 +586,9 @@ class RewriteFinder {
 
   private madeSignal(path: Path<VariableDeclarator>, id: Identifier, init: CallExpression) {
     // `relativeTime` from `kay/i18n` makes a memo too.
-    const made = importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)
+    // `persisted.local(...)` and the other entries make a signal as `persisted(...)` does.
+    const entry = init.callee.type === 'MemberExpression' && !init.callee.computed && init.callee.property.type === 'Identifier' && PERSISTED_ENTRIES.has(init.callee.property.name) && importedFromKay(path.scope, init.callee.object) === 'persisted' ? 'persisted' : undefined
+    const made = entry ?? importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)
     const binding = path.scope.getBinding(id.name)
     const start = this.input.map.isExact(id.start) ? this.input.map.toSource(id.start) : undefined
 

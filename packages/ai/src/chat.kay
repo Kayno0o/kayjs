@@ -224,7 +224,7 @@ const following = followLog(() => log, { threshold: PINNED_PX })
 // The conversation held on the server that the page shows, named by its address, or by this browser for a chat on every page.
 // kay-allow once-read-prop: chosen when the chat is created
 const inBrowser = conversationIn === 'browser'
-const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted<string | undefined>(conversationKey(action.url), undefined, { storage: 'local' }) : queryParam<string | undefined>('conversation')
+const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted.local<string | undefined>(conversationKey(action.url), undefined) : queryParam<string | undefined>('conversation')
 // The old names of `waitingLabel` and `showReasoning` are read until they go, the new ones winning.
 const waiting = () => waitingLabel ?? thinkingLabel ?? wording('ai.chat.thinking', 'Thinking…')
 const reasoned = () => showReasoning ?? reasoning ?? true

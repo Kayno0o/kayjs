@@ -10,7 +10,10 @@ import { decodeValue } from './wire'
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
 
-export type PersistStorage = 'cookie' | 'local' | 'query'
+export type PersistStorage = 'cookie' | 'local' | 'session' | 'query'
+
+// The two web storages, which the browser holds and the server never sees.
+export type WebStorage = 'local' | 'session'
 
 export interface Persisted<T> {
   read: () => T
@@ -37,9 +40,9 @@ const MAX_COOKIE_BYTES = 3800
 
 export const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 
-// What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
+// What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage or sessionStorage, read once the page has hydrated.
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.
-// In a browser, unless `sync` is false, a value another tab writes reaches `write`: through the `storage` event for `local`, a BroadcastChannel for a cookie.
+// In a browser, unless `sync` is false, a value another tab writes reaches `write`: through the `storage` event for a web storage, a BroadcastChannel for a cookie. A sessionStorage belongs to one tab, so its event reaches only the windows sharing that session, such as the page's frames.
 export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration, values?: readonly unknown[], sync?: boolean, fallback?: T): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ .`)
@@ -47,7 +50,7 @@ export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'quer
   const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'
     ? { request: scope => decoded(scope.cookie(key), values), stored: () => decoded(cookie(key), values), save: value => saveCookie(key, value, seconds, sync !== false) }
-    : { stored: () => decoded(readLocal(key), values), save: value => saveLocal(key, value), afterHydration: true }
+    : { stored: () => decoded(readWeb(key, storage), values), save: value => saveWeb(key, storage, value), afterHydration: true }
 
   if (sync !== false && typeof document !== 'undefined')
     listen(key, storage, write, values, fallback as T)
@@ -83,10 +86,10 @@ function listen<T>(key: string, storage: Exclude<PersistStorage, 'query'>, write
       write(stored.value)
   }
 
-  if (storage === 'local') {
+  if (storage !== 'cookie') {
     // `clear()` fires one event with no key.
     addEventListener('storage', (event: StorageEvent) => {
-      if ((event.key === key || event.key === null) && sameArea(event.storageArea))
+      if ((event.key === key || event.key === null) && sameArea(event.storageArea, storage))
         hear(event.newValue)
     })
 
@@ -240,7 +243,7 @@ function saveCookie(name: string, value: unknown, seconds: number, tell: boolean
   const text = encodeURIComponent(sent)
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
-    kayLog('warn', `the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with { storage: 'local' }`)
+    kayLog('warn', `the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with persisted.local()`)
 
     return
   }
@@ -254,29 +257,34 @@ function saveCookie(name: string, value: unknown, seconds: number, tell: boolean
     channel?.postMessage([name, sent])
 }
 
-function sameArea(area: Storage | null): boolean {
+// The browser's storage of one kind; reading it throws where a browser blocks the site's data.
+function area(storage: WebStorage): Storage {
+  return storage === 'local' ? localStorage : sessionStorage
+}
+
+function sameArea(other: Storage | null, storage: WebStorage): boolean {
   try {
-    return area === localStorage
+    return other === area(storage)
   }
   catch {
     return false
   }
 }
 
-function readLocal(key: string): string | null {
+function readWeb(key: string, storage: WebStorage): string | null {
   try {
-    return localStorage.getItem(key)
+    return area(storage).getItem(key)
   }
   catch {
     return null
   }
 }
 
-function saveLocal(key: string, value: unknown): void {
+function saveWeb(key: string, storage: WebStorage, value: unknown): void {
   try {
-    localStorage.setItem(key, sendValue(value))
+    area(storage).setItem(key, sendValue(value))
   }
   catch (error) {
-    kayLog('warn', `the persisted signal ${key} could not be kept in localStorage: ${error instanceof Error ? error.message : String(error)}`)
+    kayLog('warn', `the persisted signal ${key} could not be kept in ${storage}Storage: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

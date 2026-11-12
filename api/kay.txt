@@ -840,16 +840,35 @@ function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<Persis
   storage?: "cookie" | undefined;
 }) | undefined): Signal<T>
 
+[.] PersistedCookieOptions
+interface PersistedCookieOptions<T> extends KeptOptions<T>
+  equals?: Equals<T> | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  sync?: boolean | undefined
+  values?: readonly T[] | undefined
+
 [.] PersistedOptions
 interface PersistedOptions<T> extends SignalOptions<T>
   equals?: Equals<T> | undefined
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  storage?: PersistStorage | undefined
+  /** @deprecated Call `persisted.local()` or `persisted.query()`; the cookie, the default, is `persisted()`. Removed in 1.104.0; `deprecated-persisted-storage` rewrites it. */ storage?: PersistStorage | undefined
+  sync?: boolean | undefined
+  values?: readonly T[] | undefined
+
+[.] PersistedQueryOptions
+interface PersistedQueryOptions<T> extends KeptOptions<T>
+  equals?: Equals<T> | undefined
+  history?: "push" | "replace" | undefined
+  values?: readonly T[] | undefined
+
+[.] PersistedStorageOptions
+interface PersistedStorageOptions<T> extends KeptOptions<T>
+  equals?: Equals<T> | undefined
   sync?: boolean | undefined
   values?: readonly T[] | undefined
 
 [.] PersistStorage
-type PersistStorage = 'cookie' | 'local' | 'query'
+type PersistStorage = 'cookie' | 'local' | 'session' | 'query'
 
 [.] postedChecked
 function postedChecked(name: unknown, value?: number | string | undefined, fallback?: boolean): boolean | undefined

@@ -1288,6 +1288,18 @@ describe('signal writes', () => {
     expect(checked.tsx).toContain('KayWritable(open).set(!open())')
   })
 
+  it('read and write the signals an entry of persisted makes like the ones persisted() makes', () => {
+    const source = '---\nimport { persisted } from \'kay\'\nconst size = persisted.local(\'size\', 1)\nconst step = persisted.session(\'step\', \'a\')\nconst tab = persisted.query(\'tab\', \'x\')\nconst tone = persisted.cookie(\'tone\', \'y\')\nfunction f() {\n  size = 2\n  step = \'b\'\n  tab = \'z\'\n  tone = \'w\'\n}\n---\np {size} {step} {tab} {tone}\n'
+    const runs = compileKay(source, 'test.kay', { output: 'dom' })
+
+    expect(runs.diagnostics.map(d => d.message)).toEqual([])
+    expect(runs.tsx).toContain('size.set(2)')
+    expect(runs.tsx).toContain('step.set(\'b\')')
+    expect(runs.tsx).toContain('tab.set(\'z\')')
+    expect(runs.tsx).toContain('tone.set(\'w\')')
+    expect(runs.tsx).toContain('size()')
+  })
+
   it('keep a parenthesized right side whole, in a plain, compound or logical assignment, on the server, in an island and when type checking', () => {
     const source = '---\nimport { accent } from \'./theme\'\nimport { signal } from \'kay\'\nconst open = signal(false)\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
     const runs = compileKay(source, 'test.kay', { output: 'dom' })
@@ -1315,6 +1327,10 @@ describe('module signals', () => {
     expect(moduleSignals('import { debounced, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const settled = debounced(typed, \'300ms\')\n')).toEqual({ typed: 'signal', settled: 'memo' })
     expect(moduleSignals('import { throttled, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const slow = throttled(typed, \'300ms\')\n')).toEqual({ typed: 'signal', slow: 'memo' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
+  })
+
+  it('finds the signals made by an entry of persisted, under the name persisted is imported as', () => {
+    expect(moduleSignals('import { persisted as keep, signal } from \'kay\'\n\nexport const a = keep.local(\'a\', 0), b = keep.session(\'b\', 0), c = keep.cookie(\'c\', 0), d = keep.query(\'d\', \'\')\nexport const e = signal.local(\'e\')\nexport const f = other.local(\'f\')\nexport const g = keep.other(\'g\')\n')).toEqual({ a: 'signal', b: 'signal', c: 'signal', d: 'signal' })
   })
 })
 

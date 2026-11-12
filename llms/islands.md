@@ -53,13 +53,13 @@ button(onClick={() => theme = theme() === 'light' ? 'dark' : 'light'}) Theme: {t
 
 ### Keep a filter in the URL
 
-`{ storage: 'query' }` keeps it as a query param, so a reload or a shared link keeps it:
+`persisted.query()` keeps it as a query param, so a reload or a shared link keeps it (`persisted.local()` and `persisted.session()` keep it in the browser's storage):
 
 ```kay
 ---
 import { persisted } from 'kay'
 
-const q = persisted('q', '', { storage: 'query' })
+const q = persisted.query('q', '')
 ---
 input(type="search" bind:value={q} aria-label="Search")
 ```

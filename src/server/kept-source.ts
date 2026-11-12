@@ -53,6 +53,9 @@ const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFu
 // What a `var` under it binds in.
 const VAR_SCOPES = new Set([...FUNCTIONS, 'Program', 'StaticBlock', 'TSModuleBlock'])
 
+// The member a call's arguments were reached through, in `name.member(...)`: those of a plain call have none.
+export const memberCalls = new WeakMap<Node[], string>()
+
 export const MEMBERS = new Set(['MemberExpression'])
 export const CALLS = new Set(['CallExpression'])
 // The parents whose `key` is a name rather than a reference unless computed.
@@ -432,7 +435,16 @@ class Reader {
     const parent = frame.parent!.node
     const uses = this.found.uses.get(node.name) ?? []
 
-    uses.push(CALLS.has(parent.type) && frame.key === 'callee' ? (parent as { arguments: Node[] }).arguments : undefined)
+    const call = frame.parent!.parent
+    const called = CALLS.has(parent.type) && frame.key === 'callee' ? (parent as { arguments: Node[] }).arguments : undefined
+    // `name.member(...)`, as `persisted.local(...)`: the arguments, tagged with the member.
+    const member = frame.key === 'object' && MEMBERS.has(parent.type) && call && CALLS.has(call.node.type) && frame.parent!.key === 'callee' ? memberName(parent) : undefined
+    const args = member === undefined ? called : (call!.node as { arguments: Node[] }).arguments
+
+    if (args !== undefined && member !== undefined)
+      memberCalls.set(args, member)
+
+    uses.push(args)
     this.found.uses.set(node.name, uses)
 
     if (node.name !== 'ctx' && this.bound(frame, node.name))

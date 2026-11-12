@@ -80,7 +80,7 @@ function fromText(rule: ParamRule, text: string): unknown {
 const followed = new Set<() => void>()
 
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
-// A param left out reads as the signal's own value, `fallback` for `persisted(name, fallback, { storage: 'query' })`, which writing it leaves out too.
+// A param left out reads as the signal's own value, `fallback` for `persisted.query(name, fallback)`, which writing it leaves out too.
 // A value outside `values` reads as the param left out.
 // `history: 'push'` adds an entry for each write instead, which Back and Forward step through, the signal following.
 export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T, values?: readonly unknown[], history?: 'push' | 'replace'): Persisted<T> {

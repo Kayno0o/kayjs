@@ -44,7 +44,8 @@ Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__
 | `localStorage` `kcms-marks` | kayjs-cms, whether the editor's page outlines its marked fields | until the editor clears it |
 | `localStorage` `kay:push-posted` | `push()`, the endpoint of the push subscription the server last accepted | until the visitor unsubscribes |
 | `sessionStorage` `kay:push-refused` | `push()`, the endpoint a signed-out visitor was refused with | the tab's life |
-| `localStorage` under a name | a `persisted()` signal with `storage: 'local'` | until the app clears it |
+| `localStorage` under a name | a `persisted.local()` signal | until the app clears it |
+| `sessionStorage` under a name | a `persisted.session()` signal | the tab's life |
 | `localStorage` `kcms:editor` | kayjs-cms, the editor's panel position and size | until the editor clears it |
 | `localStorage` `kcms:rebuilding` | kayjs-cms, a save the site is still rebuilding for | until the rebuild ends |
 | `sessionStorage` under `remember` | kayjs-ai `Chat`, only when you name a key | the tab's life; the conversation's text, up to 200,000 characters |

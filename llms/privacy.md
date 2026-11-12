@@ -112,7 +112,7 @@ export async function archive(scan: File) {
 - `theme` (kayjs-ui `ThemeToggle`, `themeMode`, `scheme`, or the name given to their `cookie`): `system`, `light` or `dark`, readable by scripts so the server renders the scheme the visitor picked; a preference, so necessary, a year.
 - `kay_push_device` (`push()`): a hash naming the push subscription this browser made, `httpOnly`, set when it subscribes, so sign-out drops that device alone; necessary, a year.
 - `kay_local_clear` (`local()`): a random value at sign-out, or at sign-in a hash of the person's id (kayjs-auth, or `forgetLocalMirrors(request, person)`), readable by scripts, derived from the app's secret; the next page using a collection empties the browser's mirror and queue when it changed, which another person's sign-in does and a sign-in again by the same person does not, so after a session expires the mirror stays readable on that browser until the next sign-in; necessary, a year, names no one.
-- Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
+- Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` (`persisted.local()`) or `sessionStorage` (`persisted.session()`, dropped when the tab closes); what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
 ### Browser storage
 
@@ -123,7 +123,7 @@ export async function archive(scan: File) {
 - `localStorage` `kcms-marks` (kayjs-cms): `on` or `off`, whether the editor's page outlines its marked fields; a preference, until the editor clears it.
 - `localStorage` `kay:push-posted` (`push()`): the push endpoint the server last accepted from this browser, a URL naming its subscription, so a load can tell one the browser rotated; necessary for the notifications the visitor asked for, until they unsubscribe.
 - `sessionStorage` `kay:push-refused` (`push()`): the endpoint a signed-out visitor was refused with, so a load does not post it again; necessary, the tab's life.
-- `localStorage` under the name of a `persisted(name, ..., { storage: 'local' })` signal, as the cookies above.
+- `localStorage` under the name of a `persisted.local(name, ...)` signal, and `sessionStorage` under that of a `persisted.session(name, ...)` one, as the cookies above.
 - `localStorage` `kcms:editor` (kayjs-cms): where the editor's panel sits and how big it is; a preference, until the editor clears it.
 - `localStorage` `kcms:rebuilding` (kayjs-cms): the time of a save the site is still rebuilding for, so the notice shows in every tab; necessary, dropped when the rebuild ends.
 - `sessionStorage` under the `remember` key of kayjs-ai's `Chat` and `ChatLauncher` (none unless named): the conversation's text, up to 200,000 characters, what the visitor wrote included; the tab's life, nothing without `remember`.

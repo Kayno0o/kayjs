@@ -108,7 +108,7 @@ ul
 ```ts
 import { persisted } from 'kay'
 
-export const saved = persisted<string[]>('saved', [], { storage: 'local' })
+export const saved = persisted.local<string[]>('saved', [])
 ```
 
 ### Post a form
@@ -273,7 +273,7 @@ ul
     li: a(href={`/posts/${post.slug}`}) {post.title}
 ```
 
-- State several islands share, or one kept across visits, is a signal in a `.ts` module: `export const saved = persisted<string[]>('saved', [], { storage: 'local' })` from `kay` keeps it in localStorage.
+- State several islands share, or one kept across visits, is a signal in a `.ts` module: `export const saved = persisted.local<string[]>('saved', [])` from `kay` keeps it in localStorage.
 - An island importing it calls it, `saved()`, in the template too.
 - See [Islands and navigation](islands.md).
 

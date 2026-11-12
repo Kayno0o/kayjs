@@ -82,7 +82,7 @@ const tabs = source.options
 const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const shown = signal<string>(value ?? '')
-const kept = param === undefined ? undefined : persisted(param, paramDefault ?? '', { storage: 'query' })
+const kept = param === undefined ? undefined : persisted.query(param, paramDefault ?? '')
 const opened = signal<readonly string[]>([])
 let list: HTMLElement | undefined
 
