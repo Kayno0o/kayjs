@@ -140,10 +140,18 @@ const tarballDir = join(workDir, 'tarballs')
 // The clones live outside the kay checkout, as an app's resolution climbs into kay's own node_modules from inside it and finds a second copy of every package kay has, and in a directory of this run alone, so two runs on one runner never meet; KAY_APPS_CLONES names one instead, which is kept.
 let clonesDir: string | undefined
 
-async function clones() {
+export async function clones() {
   clonesDir ??= process.env.KAY_APPS_CLONES === undefined ? await mkdtemp(join(tmpdir(), 'kay-apps-ci-')) : resolve(process.env.KAY_APPS_CLONES)
 
   return clonesDir
+}
+
+// Removes the per-run clones directory; one named by KAY_APPS_CLONES is kept.
+export async function cleanClones() {
+  if (process.env.KAY_APPS_CLONES === undefined && clonesDir !== undefined)
+    await rm(clonesDir, { recursive: true, force: true })
+
+  clonesDir = undefined
 }
 
 async function packageDirs() {
@@ -338,18 +346,27 @@ if (import.meta.main) {
 
   let failed = false
 
-  for (const name of names) {
-    try {
-      await run(APPS.find(app => app.name === name)!)
-    }
-    catch (error) {
-      failed = true
-      console.error((error as Error).message)
-    }
+  // A cancelled run ends on a signal, which would leave the clones behind.
+  for (const [signal, code] of [['SIGTERM', 143], ['SIGINT', 130]] as const) {
+    process.on(signal, () => {
+      void cleanClones().finally(() => process.exit(code))
+    })
   }
 
-  if (process.env.KAY_APPS_CLONES === undefined && clonesDir !== undefined)
-    await rm(clonesDir, { recursive: true, force: true })
+  try {
+    for (const name of names) {
+      try {
+        await run(APPS.find(app => app.name === name)!)
+      }
+      catch (error) {
+        failed = true
+        console.error((error as Error).message)
+      }
+    }
+  }
+  finally {
+    await cleanClones()
+  }
 
   process.exit(failed ? 1 : 0)
 }

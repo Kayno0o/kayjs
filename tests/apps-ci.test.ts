@@ -1,6 +1,6 @@
 import { chmod } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
-import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs, writeStubs } from '../scripts/apps-ci'
+import { APPS, cleanClones, clones, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs, writeStubs } from '../scripts/apps-ci'
 import { BLOCKING, dispatchRun, exitCode, NO_FT, SECRET_UNSET } from '../scripts/release-apps'
 import { scratchDir } from './scratch'
 
@@ -123,6 +123,38 @@ describe('writeStubs', () => {
 
     expect(await Bun.file(`${dir}/kept.env`).text()).toBe('SECRET=1')
     expect(await Bun.file(`${dir}/deep/new.env`).text()).toBe('')
+  })
+})
+
+describe('the clones directory', () => {
+  it('is removed by cleanClones, and left alone when KAY_APPS_CLONES names it', async () => {
+    const tmp = await scratchDir('clones-tmp')
+    const previous = process.env.TMPDIR
+
+    process.env.TMPDIR = tmp
+
+    try {
+      const dir = await clones()
+
+      expect(dir.startsWith(`${tmp}/kay-apps-ci-`)).toBe(true)
+      expect(await clones()).toBe(dir)
+      await cleanClones()
+      expect(new Bun.Glob('kay-apps-ci-*').scanSync({ cwd: tmp, onlyFiles: false }).next().done).toBe(true)
+    }
+    finally {
+      if (previous === undefined)
+        delete process.env.TMPDIR
+      else
+        process.env.TMPDIR = previous
+    }
+  })
+
+  it('leaves nothing in the temp dir after a run that ends on an error', async () => {
+    const tmp = await scratchDir('clones-run')
+    const run = Bun.spawn(['bun', 'scripts/apps-ci.ts', 'no-such-app'], { env: { ...process.env, TMPDIR: tmp }, stdout: 'ignore', stderr: 'ignore' })
+
+    expect(await run.exited).not.toBe(0)
+    expect(Array.from(new Bun.Glob('kay-apps-ci-*').scanSync({ cwd: tmp, onlyFiles: false }))).toEqual([])
   })
 })
 
