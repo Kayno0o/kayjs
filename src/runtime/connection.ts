@@ -4,7 +4,7 @@ import { listenerSet } from './listener-set'
 import { ownSignal, untrack } from './reactive'
 import { retryLater } from './retry-later'
 
-// The one place a connection is retried and its state kept: the reconnect, the backoff, the listeners and the status of `socket()`, `stream()`, the cached values a page follows and the live values.
+// The one place a connection's state is kept (its retry is `retryLater` of retry-later.ts): the backoff, the listeners and the status of `socket()`, `stream()`, the cached values a page follows and the live values.
 // A leaf: only modules that open a connection import it, never the call result or the action call, which every page loads.
 
 // `on`, handing each value as `{ value }`, the shape every hook takes.

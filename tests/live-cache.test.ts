@@ -460,6 +460,35 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('waits while the browser is offline, and reconnects once it is online again', async () => {
+    change(22)
+    drop = true
+    connections.length = 0
+
+    await using page = await site.open('/?offline')
+
+    await waitFor(() => connections.length >= 2)
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false })
+    })
+    // An attempt already on its timer may still be the last one before the wait.
+    await Bun.sleep(1500)
+
+    const offlineAt = connections.length
+
+    await Bun.sleep(1500)
+    expect(connections.length).toBe(offlineAt)
+    drop = false
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true })
+      globalThis.dispatchEvent(new Event('online'))
+    })
+    await waitFor(() => connections.length > offlineAt)
+    change(23)
+    await page.waitUntil(...shows(23))
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('asks for a new proof again on a refusal after a good connection, as the refusal limit starts over', async () => {
     change(12)
     refuse = true
