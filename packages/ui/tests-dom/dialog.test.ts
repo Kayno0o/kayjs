@@ -42,7 +42,7 @@ describe('Dialog', () => {
     expect(closes).toBe(1)
   })
 
-  test('holds against a click outside or Escape once something was typed, until it closes', async () => {
+  test('asks before a click outside or Escape drops what was typed, until it closes', async () => {
     const root = await dialogs()
     const dialog = root.querySelector<HTMLDialogElement>('#dialog')!
 
@@ -54,7 +54,7 @@ describe('Dialog', () => {
     dialog.querySelector('#name')!.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
 
-    expect(dialog.getAttribute('closedby')).toBe('none')
+    expect(dialog.getAttribute('closedby')).toBe('closerequest')
 
     click(root.querySelector('#cancel'))
     await settle()

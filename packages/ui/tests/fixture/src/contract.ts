@@ -21,6 +21,7 @@ import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import ConfirmHost from '@kaynooo/kayjs-ui/confirm-host.kay'
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
@@ -138,6 +139,7 @@ export const COMPONENTS = {
   'combobox': Combobox,
   'command-palette': CommandPalette,
   'confirm-delete': ConfirmDelete,
+  'confirm-host': ConfirmHost,
   'contact-form': ContactForm,
   'contribution-graph': ContributionGraph,
   'copy-button': CopyButton,
@@ -238,6 +240,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'combobox': { options: [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }], label: 'Planet', value: 'mars', name: 'planet' },
   'command-palette': { open: false, entries: [{ label: 'Home', group: 'Go', href: '/' }, { label: 'Do', group: 'Act', onSelect: noop }] },
   'confirm-delete': { message: 'Delete this?', failure: 'Could not delete', onConfirm: noop },
+  'confirm-host': {},
   'contact-form': { action, nameLabel: 'Name', emailLabel: 'Email', messageLabel: 'Message', submitLabel: 'Send' },
   'contribution-graph': { days, color: 'green', today: '2026-09-05' },
   'copy-button': { text: 'x', label: 'Copy link' },

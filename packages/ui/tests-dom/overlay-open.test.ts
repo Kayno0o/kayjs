@@ -118,10 +118,10 @@ test('a Dialog the server rendered open is opened again as a modal, with no clos
   }
 })
 
-test('typing inside a Dialog or a SidePanel locks a click outside: Escape alone with no footer, nothing with one, and it clears on reopen', async () => {
+test('typing inside a Dialog or a SidePanel hands Escape and a click outside to the component, which asks before dropping it, and it clears on reopen', async () => {
   const { dialog, open } = await page()
 
-  for (const [id, locked] of [['dtype', 'closerequest'], ['dfooter', 'none'], ['ptype', 'closerequest'], ['pfooter', 'none']] as const) {
+  for (const [id, locked] of [['dtype', 'closerequest'], ['dfooter', 'closerequest'], ['ptype', 'closerequest'], ['pfooter', 'closerequest']] as const) {
     await open(id)
     expect(dialog(id).getAttribute('closedby')).toBe('any')
     dialog(id).querySelector('input')!.dispatchEvent(new Event('input', { bubbles: true }))
