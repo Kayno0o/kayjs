@@ -1,5 +1,5 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { expect, it } from 'bun:test'
+import { expect, it, vi } from 'bun:test'
 import { readActionResponse } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 
@@ -15,7 +15,7 @@ it('does not put the base on a redirect again when the swap has taken the app ov
     meta.name = 'kay-base'
     meta.content = '/app'
     document.head.append(meta)
-    navigation.hooks = { hydrate() {}, dispose() {} } as unknown as typeof navigation.hooks
+    navigation.hooks = { hydrate: vi.fn(), dispose: vi.fn() }
 
     const seen: string[] = []
 
@@ -34,7 +34,7 @@ it('does not put the base on a redirect again when the swap has taken the app ov
   }
   finally {
     globalThis.fetch = original
-    navigation.hooks = undefined
+    delete navigation.hooks
     await GlobalRegistrator.unregister()
   }
 })

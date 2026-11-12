@@ -48,7 +48,8 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
   navigation.flush?.()
 
   // A query change keeps the path and the other params, and leaves the hash out.
-  const url = new URL(typeof to === 'string' ? hooked ? withBase(to) : to : location.pathname + location.search, location.href)
+  const path = hooked && typeof to === 'string' ? withBase(to) : to
+  const url = new URL(typeof path === 'string' ? path : location.pathname + location.search, location.href)
 
   // A `javascript:` URL, as one read from a query param could be, would run in the page; a `data:` one browsers refuse to load, and `vbscript:` is gone.
   if (url.protocol === 'javascript:')
