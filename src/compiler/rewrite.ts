@@ -9,8 +9,9 @@ import type { Binding, Path, Scope } from './scope'
 import { parseProgram } from './estree'
 import { PERSISTED_ENTRIES } from './module-signals'
 import { CURRENT, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
-import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
+import { assignedIdentifier, compilerCall, handedToComponent, holdsNoSignal, holdsNoSignalRoot, holdsNoSignalType, importedFromKay, isCall, isPlainRead, keyRead, lastNonSpace, loopKey, memberTypes, namesType, nestsEffects, nestsWrites, nextNonSpace, onlyRead, plainMemberAwait, propRead, propType, rowReadOnly, signatureNames, sourceSpan, syntaxError, tagPosition, typeQueryOf, uncalledSignal, valueReferences, valueUnused, withShorthand } from './rewrite-reads'
 import { Scanner } from './rewrite-scan'
+import { markTagValue } from './rewrite-tags'
 import { analyze } from './scope'
 
 type ArrowFunctionExpression = NodeOfType<'ArrowFunctionExpression'>
@@ -132,6 +133,9 @@ class RewriteFinder {
     }
     else if (path.is('TSTypeQuery')) {
       this.typeQuery(path)
+    }
+    else if (path.is('JSXIdentifier')) {
+      markTagValue(path, this.input, this.rewrites)
     }
   }
 
@@ -286,17 +290,6 @@ class RewriteFinder {
   // The rewrite asking the types whether the parameter a signal is handed to takes one.
   private handedRead(access: Rewrite = {}): Rewrite {
     return { ...access, before: `${HANDED}${access.before ?? ''}`, after: `${access.after ?? ''})` }
-  }
-
-  // Reports a signal read uncalled, its fix calling it, when type checking.
-  private reportUncalled(reference: Path, source: number, name: string, kind: SignalKind) {
-    if (!this.input.values)
-      return
-
-    const shorthand = reference.parent.type === 'Property' && reference.parent.shorthand
-    const end = source + name.length
-
-    this.diagnostics.push({ start: source, end, code: 'uncalled-signal', checkOnly: true, message: `\`${name}\` is ${kind === 'live' ? 'a live value' : `a ${kind}`}, read by calling it`, help: `\`${name}()\``, fixes: [{ title: `Call \`${name}\``, edits: [{ start: end, end, text: shorthand ? `: ${name}()` : '()' }], safe: true }] })
   }
 
   // Reports `count.set(value)` standing as a statement or an arrow's body when checking a project, its fix assigning `count = value`, which compiles to the same call.
@@ -474,8 +467,8 @@ class RewriteFinder {
       const values = this.input.values && !this.deferred(reference)
       const uncalled = this.uncalled(reference, kind === 'live')
 
-      if (uncalled !== undefined)
-        this.reportUncalled(reference, uncalled, name, kind)
+      if (uncalled !== undefined && this.input.values)
+        this.diagnostics.push(uncalledSignal(reference, uncalled, name, kind))
 
       if (kind === 'signal')
         this.reportSetCall(reference, name)

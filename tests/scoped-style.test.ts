@@ -40,6 +40,14 @@ describe('scopeCss', () => {
     expect(scopeCss('p::before { content: "," } a:hover { x: y }', ATTR)).toBe(`p[${ATTR}]::before { content: "," } a:hover[${ATTR}] { x: y }`)
   })
 
+  it('scopes each selector of a :global list', () => {
+    expect(scopeCss(':global(.a, .b) .c { x: y }', ATTR)).toBe(`.a .c[${ATTR}], .b .c[${ATTR}] { x: y }`)
+    expect(scopeCss('.c :global(.a, .b) { x: y }', ATTR)).toBe(`.c[${ATTR}] .a, .c[${ATTR}] .b { x: y }`)
+    expect(scopeCss(':global(.a, .b):hover { x: y }', ATTR)).toBe('.a:hover, .b:hover { x: y }')
+    expect(scopeCss(':global(.a, .b) .c, .d { x: y }', ATTR)).toBe(`.a .c[${ATTR}], .b .c[${ATTR}], .d[${ATTR}] { x: y }`)
+    expect(scopeCss(':global(.a, .b) :global(.c, .d) { x: y }', ATTR)).toBe('.a .c, .a .d, .b .c, .b .d { x: y }')
+    expect(scopeCss('.x :global(a:is(.p, .q), [title="a,b"]) { x: y }', ATTR)).toBe(`.x[${ATTR}] a:is(.p, .q), .x[${ATTR}] [title="a,b"] { x: y }`)
+  })
 
   it('unwraps :global and scopes the last compound that is not global', () => {
     expect(scopeCss(':global(body) .a, .b :global(.c), :global(.d) { x: y }', ATTR)).toBe(`body .a[${ATTR}], .b[${ATTR}] .c, .d { x: y }`)

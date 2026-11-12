@@ -266,7 +266,7 @@ export interface ScopeAnalysis {
 }
 
 // The node types the rewrites visit, whose paths `analyze` hands back.
-const EVENT_TYPES = new Set(['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery'])
+const EVENT_TYPES = new Set(['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery', 'JSXIdentifier'])
 
 // Kept per file, as `@babel/traverse` keeps the scopes of a tree it has crawled, so the passes over one fence share it.
 const analyses = new WeakMap<Program, ScopeAnalysis>()

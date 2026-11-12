@@ -2,6 +2,7 @@ import type { Node, TSTupleElement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { NodeOfType } from './estree'
 import type { Rewrite, SourceMap } from './mapping'
+import type { SignalKind } from './module-signals'
 import type { Binding, Path } from './scope'
 import type { PropsBinding } from './script'
 import { DEFAULTED, defaultName, PROPS } from './names'
@@ -447,4 +448,12 @@ export function namesType(path: Path): boolean {
 // The references to a binding that read its value, leaving out a name written in a type, such as a function type's parameter, which the scope analysis resolves to the binding of the same name.
 export function valueReferences(binding: Binding): Path[] {
   return binding.referencePaths.filter(reference => !namesType(reference))
+}
+
+// A signal read uncalled when type checking, its fix calling it.
+export function uncalledSignal(reference: Path, source: number, name: string, kind: SignalKind): Diagnostic {
+  const shorthand = reference.parent.type === 'Property' && reference.parent.shorthand
+  const end = source + name.length
+
+  return { start: source, end, code: 'uncalled-signal', checkOnly: true, message: `\`${name}\` is ${kind === 'live' ? 'a live value' : `a ${kind}`}, read by calling it`, help: `\`${name}()\``, fixes: [{ title: `Call \`${name}\``, edits: [{ start: end, end, text: shorthand ? `: ${name}()` : '()' }], safe: true }] }
 }

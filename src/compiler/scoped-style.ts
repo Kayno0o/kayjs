@@ -227,11 +227,33 @@ function scopeSelector(selector: string, attribute: string): string {
   }).join('')
 }
 
+// `selector` as one selector per entry of its first `:global(a, b)` list, and again for each list after it, so every entry is global on its own: `:global(.a, .b) .c` is `:global(.a) .c, :global(.b) .c`.
+function globalLists(selector: string): string[] {
+  for (let i = selector.indexOf(GLOBAL); i !== -1; i = selector.indexOf(GLOBAL, i + 1)) {
+    const end = closing(selector, i + GLOBAL.length - 1, '(', ')')
+    const entries = pieces(selector.slice(i + GLOBAL.length, end), ',').filter(entry => entry !== ',')
+
+    if (entries.length > 1)
+      return entries.flatMap(entry => globalLists(`${selector.slice(0, i)}${GLOBAL}${entry.trim()}${selector.slice(end)}`))
+  }
+
+  return [selector]
+}
+
 function scopeRule(prelude: string, attribute: string): string {
   const lead = LEADING.exec(prelude)![0]
-  const selectors = pieces(withoutComments(prelude.slice(lead.length)), ',')
+  const selectors = pieces(withoutComments(prelude.slice(lead.length)), ',').map((selector) => {
+    if (selector === ',')
+      return selector
 
-  return lead + selectors.map(selector => selector === ',' ? selector : scopeSelector(selector, attribute)).join('')
+    const [first = '', ...rest] = globalLists(selector).map(entry => scopeSelector(entry, attribute))
+    const space = selector.slice(selector.trimEnd().length)
+
+    // A list's entries after the first sit where the written one's trailing space was, and the last keeps it.
+    return rest.length === 0 ? first : `${first.trimEnd()}, ${rest.map(entry => entry.trimEnd()).join(', ')}${space}`
+  })
+
+  return lead + selectors.join('')
 }
 
 // The `@keyframes` names `css` defines, `:global(...)` ones left out, in the rules and the bodies of the at-rules that hold rules.

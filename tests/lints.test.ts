@@ -288,6 +288,22 @@ describe('async-reply', () => {
     expect(found('export const a = async (m: never, x: boolean) => { if (x) return ask(m); return ask(m) }')).toBe(1)
   })
 
+  it('offers no fix where removing async would break the body', () => {
+    const fixes = (body: string) => lints(server(body)).filter(d => d.code === 'async-reply').length
+    const offered = (body: string) => compileKay(server(body), 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'async-reply').flatMap(d => d.fixes ?? []).length
+
+    for (const body of [
+      'export const a = async (it: never) => { for await (const x of it) {} return ask(\'x\') }',
+      'export const a = async (c: never) => { await using r = c; return ask(\'x\') }',
+      'export const a = async (c: never) => { if (!c) throw new Error(\'x\'); return ask(\'x\') }',
+    ]) {
+      expect(fixes(body), body).toBe(1)
+      expect(offered(body), body).toBe(0)
+    }
+
+    expect(offered('export const a = async (c: never) => { const f = () => { throw new Error(\'x\') }; return ask(f) }')).toBe(1)
+  })
+
   it('fixes async(m) with no space, and gives no fix to a function with a return type', () => {
     expect(fixed(server('export const a = async(m: never) => ask(m)'))).toEqual([server('export const a = (m: never) => ask(m)')])
     expect(fixed(server('export const a = async (m: never): Promise<string> => ask(m)'))).toEqual([])

@@ -370,6 +370,8 @@ function candidates(node: Node): Node[] {
 interface Body {
   returned: Node[]
   awaits: boolean
+  // Whether it throws on its own, which an `async` function turns into a rejected promise.
+  throws: boolean
   // The names the function declares itself, parameters included, and the `const` locals with their initializer.
   declared: Set<string>
   consts: Map<string, Node>
@@ -386,6 +388,7 @@ function returnsAndAwaits(fn: FunctionNode): Body {
   const declared = new Set<string>()
   const consts = new Map<string, Node>()
   let awaits = false
+  let throws = false
 
   for (const param of fn.params)
     declare(declared, param)
@@ -401,8 +404,11 @@ function returnsAndAwaits(fn: FunctionNode): Body {
     if (node.type === 'ReturnStatement' && node.argument) {
       returned.push(node.argument)
     }
-    else if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await)) {
+    else if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await) || (node.type === 'VariableDeclaration' && node.kind === 'await using')) {
       awaits = true
+    }
+    else if (node.type === 'ThrowStatement') {
+      throws = true
     }
     else if (node.type === 'VariableDeclarator') {
       declare(declared, node.id)
@@ -423,7 +429,7 @@ function returnsAndAwaits(fn: FunctionNode): Body {
     return true
   })
 
-  return { returned: returned.flatMap(candidates), awaits, declared, consts }
+  return { returned: returned.flatMap(candidates), awaits, throws, declared, consts }
 }
 
 // Whether the call's callee, or the namespace it is read from, is declared by the function itself, so the call is not the import's.
@@ -466,7 +472,7 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
     if (!isFunction(node) || !node.async || ('generator' in node && node.generator))
       return
 
-    const { returned, awaits, declared, consts } = returnsAndAwaits(node)
+    const { returned, awaits, throws, declared, consts } = returnsAndAwaits(node)
     // A method starts at its key or its `static` and `async`, where its function value starts at the parameters.
     const start = (parent?.type === 'Property' && (parent.method || parent.kind !== 'init') && parent.value === node) || (parent?.type === 'MethodDefinition' && parent.value === node) ? parent.start : node.start
     const keyword = ASYNC_KEYWORD.exec(fence.code.slice(start))
@@ -482,7 +488,7 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
         message: 'This `ask()` is returned from an `async` function, which awaits it: the answer arrives as its whole text, with no streaming',
         note: 'the reply is a thenable async iterable, and an action or an `await` block streams it only when it is returned as it is',
         help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is; `return await ask(...)` says the whole text is meant' : 'remove `async`, or write `return await ask(...)` when the whole text is meant',
-        fixes: !awaits && keyword && !node.returnType && values.every(isAsk) ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + start + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + start + keyword[0].length, text: '' }], safe: true }] : [],
+        fixes: !awaits && !throws && keyword && !node.returnType && values.every(isAsk) ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + start + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + start + keyword[0].length, text: '' }], safe: true }] : [],
       })
     }
   })
