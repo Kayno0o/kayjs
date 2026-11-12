@@ -56,3 +56,18 @@ it('follows a swap: no translated slug on a page without an entry, the new one o
   document.head.innerHTML = '<meta name="kay-base" content="/app">'
   expect(alternate('fr')).toBe('/app/fr/about')
 })
+
+it('finds the entry of a page whose path holds a non-ASCII character, written encoded on both sides', async () => {
+  const { entryPath } = await import('../src/content/entry-route')
+  const slug = entryPath('/blog/:slug', 'café')
+
+  expect(slug).toBe('/blog/caf%C3%A9')
+
+  const urls = new Map([[slug!, { en: slug!, fr: '/blog/caf%C3%A9-fr' }]])
+  const script = runInLocale({ locale: 'en', messages: new Map(), settings, path: '/blog/caf%C3%A9', entryUrls: urls }, () => messagesScript(new Set(), true))
+  const { alternate } = await import('../src/runtime/i18n.client')
+
+  history.pushState({}, '', '/app/blog/caf%C3%A9')
+  document.head.innerHTML = `<meta name="kay-base" content="/app">${script}`
+  expect(alternate('fr')).toBe('/app/fr/blog/caf%C3%A9-fr')
+})
