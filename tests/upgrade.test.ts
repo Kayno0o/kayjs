@@ -299,8 +299,8 @@ describe('kay upgrade', () => {
     const versions = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
     const manifest = MANIFEST.replace(kayDependencies.elysia, '^1.4.0')
     const top = await project(MANIFEST, { 'apps/a/package.json': manifest })
-    // Outside the checkout, whose own node_modules an app scratch folder would find above it.
-    const bare = await mkdtemp(join(tmpdir(), 'upgrade-bare-'))
+    // A kay above the app's own project, which its lockfile marks the edge of, is not the app's.
+    const outer = await project('{}', { 'app/package.json': manifest, 'app/bun.lock': '' })
     const error = spyOn(console, 'error').mockImplementation(() => undefined)
     const log = spyOn(console, 'log').mockImplementation(() => undefined)
 
@@ -308,15 +308,31 @@ describe('kay upgrade', () => {
       expect(await upgradeProject(join(top, 'apps/a'), fakes(versions).deps)).toBe(0)
       expect(await Bun.file(join(top, 'apps/a/package.json')).text()).toContain(`"elysia": "^${floor}"`)
 
-      await Bun.write(join(bare, 'package.json'), manifest)
-      expect(await upgradeProject(bare, fakes(versions).deps)).toBe(0)
+      expect(await upgradeProject(join(outer, 'app'), fakes(versions).deps)).toBe(0)
       expect(error.mock.calls.map(call => String(call[0])).join('\n')).toContain('no installed kay')
+      expect(await Bun.file(join(outer, 'app/package.json')).text()).toBe(manifest)
     }
     finally {
       error.mockRestore()
       log.mockRestore()
       await rm(top, { recursive: true, force: true })
-      await rm(bare, { recursive: true, force: true })
+      await rm(outer, { recursive: true, force: true })
+    }
+  })
+
+  it('pairs kay and a shared package from the app\'s own folder first', async () => {
+    const versions = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    const current = (/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]
+    // The folder above holds kay and a stale elysia; the app holds its own, current one.
+    const top = await project(MANIFEST, { 'node_modules/elysia/package.json': '{ "name": "elysia", "version": "1.4.0" }', 'apps/a/package.json': MANIFEST, 'apps/a/node_modules/elysia/package.json': `{ "name": "elysia", "version": "${current}" }` })
+    const { deps, calls } = fakes(versions)
+
+    try {
+      expect(await quietly(async () => upgradeProject(join(top, 'apps/a'), deps))).toBe(0)
+      expect(calls.installs).toEqual([])
+    }
+    finally {
+      await rm(top, { recursive: true, force: true })
     }
   })
 

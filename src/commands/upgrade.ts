@@ -407,7 +407,7 @@ function describeRaise({ change, held, wanted, rewritten }: Raise, kay: string):
   return rewritten ? `${change.name} to ${change.spec}, which ${kay} depends on (the app held ${held})` : `installed ${change.name} ${wanted}, which ${kay} asks for (the app had ${held})`
 }
 
-// The manifest of a package as `node_modules` holds it from the app's folder up, as a hoisted install or a workspace puts it; undefined when none is found.
+// The manifest of a package as `node_modules` holds it from the app's folder up, as a hoisted install or a workspace puts it, never above the project: the first folder with `workspaces`, a lockfile or `.git`. Undefined when none is found.
 async function findInstalled(root: string, name: string): Promise<{ version?: string, dependencies?: Record<string, string> } | undefined> {
   for (let dir = root; ; dir = dirname(dir)) {
     try {
@@ -417,8 +417,20 @@ async function findInstalled(root: string, name: string): Promise<{ version?: st
       // Not here, or unreadable: look in the folder above.
     }
 
-    if (dirname(dir) === dir)
+    if (dirname(dir) === dir || await endsProject(dir))
       return undefined
+  }
+}
+
+async function endsProject(dir: string): Promise<boolean> {
+  if (LOCKFILES.some(name => existsSync(join(dir, name))) || existsSync(join(dir, '.git')))
+    return true
+
+  try {
+    return 'workspaces' in ((await Bun.file(join(dir, 'package.json')).json()) as object)
+  }
+  catch {
+    return false
   }
 }
 
