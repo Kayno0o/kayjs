@@ -5,8 +5,9 @@ import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { listRoutes } from '../src/commands/routes'
-import { DEV_REQUEST, DEV_ROUTES } from '../src/server/dev'
+import { DEV_REQUEST, DEV_ROUTES, recordResponses } from '../src/server/dev'
 import { redirectedBy } from '../src/server/dev-notes'
+import { requestId } from '../src/server/protection'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -477,6 +478,41 @@ describe('kay routes for a collection\'s page', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the dev tool\'s Request tab', () => {
+  it('masks every cookie a response sets, one entry each', async () => {
+    let id = ''
+    const app = new Elysia()
+
+    recordResponses(app)
+    app.get('/', ({ set, request }) => {
+      id = requestId(request)
+      set.headers['set-cookie'] = ['sid=SECRET1; Path=/; HttpOnly', 'csrf=SECRET2; Path=/']
+
+      return new Response('<p>x</p>', { headers: { 'content-type': 'text/html' } })
+    })
+    app.get('/direct', ({ request }) => {
+      id = requestId(request)
+
+      const headers = new Headers({ 'content-type': 'text/html' })
+
+      headers.append('set-cookie', 'a=SECRET3; Path=/')
+      headers.append('set-cookie', 'b=SECRET4; Path=/')
+
+      return new Response('<p>x</p>', { headers })
+    })
+
+    for (const path of ['/', '/direct']) {
+      await app.handle(new Request(`http://localhost${path}`))
+
+      const found = await (await app.handle(new Request(`http://localhost${DEV_REQUEST}?id=${id}`, { headers: { 'x-kay-dev': '1' } }))).json() as DevResponse
+
+      expect(JSON.stringify(found)).not.toContain('SECRET')
+      expect(found.headers.filter(([name]) => name === 'set-cookie')).toHaveLength(2)
+      expect(found.headers.filter(([name]) => name === 'set-cookie').every(([, value]) => (/^\w+=\.\.\.; Path=\//).test(value))).toBe(true)
     }
   })
 })

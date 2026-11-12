@@ -730,8 +730,9 @@ export function recordResponses(app: Elysia, base = ''): void {
     const headers = new Headers(response?.headers)
 
     for (const [name, value] of Object.entries(set.headers)) {
-      if (!headers.has(name) && value !== undefined)
-        headers.set(name, String(value))
+      // A header Elysia holds as a list, as `set-cookie` is, is one field line each.
+      for (const line of headers.has(name) || value === undefined ? [] : [value].flat())
+        headers.append(name, String(line))
     }
 
     const status = response?.status ?? (typeof set.status === 'number' ? set.status : 200)
