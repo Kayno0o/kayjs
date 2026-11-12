@@ -1,4 +1,3 @@
-import { homedir } from 'node:os'
 import process from 'node:process'
 import { $ } from 'bun'
 
@@ -15,90 +14,36 @@ export const SECRET_UNSET = 'KAY_APPS_TOKEN is not set'
 // The exit code for a finished run: 0 for a pass, and for a red run only once the apps are meant to block a release.
 export const exitCode = (status: string, blocking: boolean) => status === 'success' || !blocking ? 0 : 1
 
-const URL_ORIGIN = /^[a-z+]+:\/\//i
-const SSH_HOST = /@([^:/]+)[:/]/
-const unquote = (value: string) => value.replace(/^['"]|['"]$/g, '')
+export const NO_FT = 'ft is not on PATH'
 
-export const NO_CLIENT = 'neither tea nor gt is on PATH'
+// Under --json ft reports a failure as {error, hint?} on stderr; anything else is its own words.
+function refusal(stderr: string): string {
+  const text = stderr.trim()
 
-// The login of tea's config on `host`, read line by line: a login starts at a `- ` entry and its keys are indented under it.
-export function teaToken(config: string, host: string): { url: string, token: string } | undefined {
-  const logins: Record<string, string>[] = []
-  let current: Record<string, string> | undefined
+  try {
+    const { error, hint } = JSON.parse(text) as { error?: string, hint?: string }
 
-  for (const line of config.split('\n')) {
-    const starts = line.trimStart().startsWith('- ')
-    const entry = starts ? line.trimStart().slice(2) : line
-    const colon = entry.indexOf(':')
-
-    if (colon < 1)
-      continue
-
-    if (starts) {
-      current = {}
-      logins.push(current)
-    }
-
-    if (current !== undefined)
-      current[entry.slice(0, colon).trim()] = unquote(entry.slice(colon + 1).trim())
+    if (typeof error === 'string')
+      return hint === undefined ? error : `${error} (${hint})`
   }
+  catch {}
 
-  for (const login of logins) {
-    const { url = '', token = '' } = login
-
-    if (token !== '' && URL.canParse(url) && new URL(url).hostname.toLowerCase() === host.toLowerCase())
-      return { url, token }
-  }
-
-  return undefined
+  return text
 }
 
-// Dispatches the workflow on main through `tea`, or through `gt` (gitea-cli, which replaces tea on Arch) with the token of tea's config for origin's host, as ft does; the token never reaches an output.
-export async function dispatchWorkflow(workflow: string, options: { path?: string, config?: string, origin?: string } = {}): Promise<{ ok: boolean, error: string }> {
-  const path = options.path ?? process.env.PATH ?? ''
-  const endpoint = `repos/{owner}/{repo}/actions/workflows/${workflow}/dispatches`
-  const body = JSON.stringify({ ref: 'main' })
-  const env: Record<string, string | undefined> = { ...process.env, PATH: path }
-  let command: string[]
-  let token: string | undefined
-  let note = ''
+// Dispatches the workflow on `sha` through `ft dispatch`, answering the id of the run it started or why it could not.
+export async function dispatchRun(workflow: string, sha: string, options: { path?: string } = {}): Promise<{ id: number } | { error: string }> {
+  const env = options.path === undefined ? process.env : { ...process.env, PATH: options.path }
 
-  const tea = Bun.which('tea', { PATH: path })
-  const gt = Bun.which('gt', { PATH: path })
+  if (Bun.which('ft', { PATH: env.PATH ?? '' }) === null)
+    return { error: NO_FT }
 
-  if (tea !== null) {
-    command = [tea, 'api', '-X', 'POST', endpoint, '-d', body]
-  }
-  else if (gt !== null) {
-    command = [gt, 'api', '-X', 'POST', endpoint, '--input', '-']
-    token = env.GITEA_TOKEN
+  const started = await $`ft dispatch ${workflow} --ref ${sha} --json`.env(env).quiet().nothrow()
 
-    if (token === undefined || token === '') {
-      const origin = options.origin ?? (await $`git remote get-url origin`.quiet().nothrow().text()).trim()
-      const host = URL_ORIGIN.test(origin) ? new URL(origin).hostname : SSH_HOST.exec(origin)?.[1]
-      const file = Bun.file(options.config ?? `${homedir()}/.config/tea/config.yml`)
-      const login = host !== undefined && await file.exists() ? teaToken(await file.text(), host) : undefined
+  if (started.exitCode !== 0)
+    return { error: refusal(started.stderr.toString()) || `exit ${started.exitCode}` }
 
-      // With no login of tea's to borrow, gt picks the instance with its own stored login.
-      if (login === undefined) {
-        note = ` (no tea login for origin host ${host ?? `of "${origin}"`}, so gt used its own login)`
-      }
-      else {
-        token = login.token
-        env.GITEA_TOKEN = login.token
-        env.GITEA_CLI_HOST = login.url
-      }
-    }
-  }
-  else {
-    return { ok: false, error: NO_CLIENT }
-  }
-
-  const proc = Bun.spawn(command, { env, stdin: new Blob([body]), stdout: 'pipe', stderr: 'pipe' })
-  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
-  const scrub = (text: string) => token === undefined || token === '' ? text : text.replaceAll(token, '***')
-
-  return { ok: code === 0, error: scrub(stderr.trim() || stdout.trim() || `exit ${code}`) + (code === 0 ? '' : note) }
+  return { id: (JSON.parse(started.stdout.toString()) as { id: number }).id }
 }
 
 interface Run {
@@ -120,7 +65,7 @@ async function main() {
 
   const sha = (await $`git rev-parse HEAD`.text()).trim()
 
-  // The dispatch runs main's tip, so a HEAD that is not it would never get a run of its own.
+  // A release is of the pushed main, the only commit of it Forgejo can run.
   await $`git fetch -q origin main`
 
   if ((await $`git rev-parse origin/main`.text()).trim() !== sha) {
@@ -134,26 +79,26 @@ async function main() {
 
   const TERMINAL = new Set(['success', 'failure', 'cancelled', 'skipped'])
   const finished = (candidate: Run) => TERMINAL.has(candidate.status)
-  // Runs from before the dispatch are ignored once it is made, so an earlier failure is not taken for its result.
-  let ignored = new Set<number>()
   let run = (await runs()).find(candidate => candidate.status !== 'failure' && candidate.status !== 'cancelled')
+  let id = run?.id
 
   // A run still going or passed is waited on; a failed one is run again, as the apps may have been fixed since.
-  if (run === undefined) {
-    ignored = new Set((await runs()).map(candidate => candidate.id))
+  if (id === undefined) {
     console.log(`dispatching ${WORKFLOW} on ${sha.slice(0, 7)}`)
-    const dispatched = await dispatchWorkflow(WORKFLOW)
+    const dispatched = await dispatchRun(WORKFLOW, sha)
 
-    if (!dispatched.ok) {
+    if ('error' in dispatched) {
       console.error(`dispatching ${WORKFLOW} failed: ${dispatched.error}`)
       process.exit(exitCode('failure', BLOCKING))
     }
+
+    id = dispatched.id
   }
 
   const deadline = Date.now() + LIMIT_MS
 
   while (Date.now() < deadline) {
-    run = (await runs()).find(candidate => !ignored.has(candidate.id))
+    run = (await runs()).find(candidate => candidate.id === id)
 
     if (run !== undefined && finished(run))
       break
