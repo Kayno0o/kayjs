@@ -249,6 +249,28 @@ describe('template errors', () => {
     expect(fixed('div.a(class) x')).toBe('div.a() x')
     expect(fixed('div(part={\'head\'}) x')).toBe('div(part="head") x')
     expect(fixed('div(style:color="red") x')).toBe('div(style:color={"red"}) x')
+    expect(fixed('div(part={ \'head\' }) x')).toBe('div(part="head") x')
+    expect(fixed('form(action={save})\n  input(field={\'title\'})\n')).toContain('input(field="title")')
+    expect(fixed('Card(part="a a")')).toBe('Card(part="a")')
+  })
+
+  it('leave no stray comma where a fix removes an attribute from a comma-separated list', () => {
+    expect(fixed('div(class="a", class="b") x')).toBe('div(class="a b") x')
+    expect(fixed('div.a(class, id="x") x')).toBe('div.a(id="x") x')
+    expect(fixed('div(class="a", class="b", id="x") x')).toBe('div(class="a b", id="x") x')
+  })
+
+  it('raise attribute-ineffective for an html tag setting dir', () => {
+    expect(codes('head\n  html(dir="rtl")\n')).toContain('attribute-ineffective')
+  })
+
+  it('give each code flagged with a quick fix a case that produces one', () => {
+    const cases: Record<string, string> = { 'event-name': 'button(onclick={go}) Go', 'duplicate-attribute': 'div(class="a" class="b")', 'attribute-invalid': 'div.a(class)', 'part-invalid': 'div(part={\'x\'})', 'form-misuse': 'form(action={save})\n  input(field={\'t\'})\n' }
+
+    for (const [code, source] of Object.entries(cases))
+      expect(found(source).find(diagnostic => diagnostic.code === code)?.fixes?.some(fix => fix.safe)).toBe(true)
+
+    expect(Object.keys(cases).toSorted()).toEqual(Object.entries(ERRORS).filter(([, error]) => 'quickFix' in error).map(([name]) => name).toSorted())
   })
 
   it('leave an error without one right answer alone', () => {

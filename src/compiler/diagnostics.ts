@@ -13,8 +13,8 @@ export interface DiagnosticInfo {
   summary: string
   // The level a lint has by default; an error has none, and no `// kay-allow` comment reaches it.
   level: LintLevel | undefined
-  // Whether `kay check --fix` can apply a fix for it: an error says so, a lint that replaces an old form always has one, and any other lint may, in the cases it can.
-  quickFix: boolean | undefined
+  // Whether the registry knows a fix `kay check --fix` applies: an error says so, and a lint that replaces an old form always has one; any other lint may still offer one in the cases it can.
+  quickFix: boolean
 }
 
 // The code of a lint or an error, which share one namespace: a test keeps them apart.
@@ -28,7 +28,7 @@ export function diagnosticInfo(code: string | undefined): DiagnosticInfo | undef
   if (isLint(code)) {
     const lint: Lint = LINTS[code]
 
-    return { code, kind: 'lint', group: lint.group, summary: lint.summary, level: lint.level, quickFix: lint.since === undefined ? undefined : true }
+    return { code, kind: 'lint', group: lint.group, summary: lint.summary, level: lint.level, quickFix: lint.since !== undefined }
   }
 
   if (isErrorCode(code)) {

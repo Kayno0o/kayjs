@@ -61,13 +61,13 @@ export const ERRORS = {
   },
   'attribute-invalid': {
     group: 'compile',
-    summary: 'An attribute kay refuses: `class` with no value, `hydrate="media(...)"` with no query, a bad `transition`, `style:` or event modifier. A `style:` written as text has a quick fix.',
+    summary: 'An attribute kay refuses: `class` with no value, `hydrate="media(...)"` with no query, a bad `transition`, `style:` or event modifier. A valueless `class` or a `style:` written as text has a quick fix.',
     fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
     quickFix: true,
   },
   'attribute-ineffective': {
     group: 'compile',
-    summary: 'An attribute that does nothing there: `lang` on `<html>`, or an island option inside an island.',
+    summary: 'An attribute that does nothing there: `dir` on `<html>`, which kay sets from the locale, or an island option inside an island.',
     fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
   },
   'element-invalid': {
@@ -77,7 +77,7 @@ export const ERRORS = {
   },
   'part-invalid': {
     group: 'compile',
-    summary: 'A `part` that is no static name, several names off a component call, a repeated name or `root` not first. A string expression or a repeated name has a quick fix.',
+    summary: 'A `part` that is no static name, several names off a component call, a repeated name or `root` not first, or the `class` and recipe of a component with parts. A string expression or a repeated name has a quick fix.',
     fix: { file: 'llms/templates.md', heading: 'Let a parent fill a part of a component' },
     quickFix: true,
   },
@@ -115,7 +115,7 @@ export const ERRORS = {
   },
   'fence-invalid': {
     group: 'compile',
-    summary: 'A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings, a `guards` or `layouts` in it that is no literal `true` or `false`.',
+    summary: 'A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings, a `guards` or `layouts` in it that is no literal `true` or `false`, a name imported twice in the two fences, type parameters, a recipe or props on a page, `ctx` read in an island.',
     fix: { file: 'llms/components.md', heading: 'File layout' },
   },
   'fence-syntax': {
@@ -125,7 +125,7 @@ export const ERRORS = {
   },
   'page-settings-invalid': {
     group: 'compile',
-    summary: 'A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`.',
+    summary: 'A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`, or a `query` declared outside a page or a layout.',
     fix: { file: 'llms/routing.md', heading: 'Page settings' },
   },
   'signal-misuse': {

@@ -1,8 +1,12 @@
 import type { Details, Fix, NamedAttribute } from './ast'
 
-export const PART_NAME_LIST = /^[A-Z][\w-]*(?: [A-Z][\w-]*)*$/i
+const PART = '[A-Z][\\w-]*'
+
+export const PART_NAME = new RegExp(`^${PART}$`, 'i')
+export const PART_NAME_LIST = new RegExp(`^${PART}(?: ${PART})*$`, 'i')
 export const FIELD_NAME = /^[\w.[\]-]+$/
 const WHITESPACE_CHAR = /\s/
+const COMMA_AFTER = /^\s*,\s*/
 // The text of a static attribute that a fix moves as it is: no quote, escape, entity or line break.
 const PLAIN_TEXT = /^[^"'`\\&\n{}<>]*$/
 // A string expression with nothing to interpolate or escape.
@@ -13,18 +17,23 @@ export class AttributeFixes {
   constructor(private readonly src: string) {}
 
   // The attribute whole, from its name to its closing quote or brace, and the blank before it, so deleting it leaves the others as they were.
-  removal(title: string, attribute: NamedAttribute): Fix {
-    let end = attribute.name.end
-
-    if (attribute.kind === 'static')
-      end = attribute.value.end + 1
-    else if (attribute.kind === 'expression')
-      end = attribute.expression.end + 1
-
+  removal(title: string, attribute: Extract<NamedAttribute, { kind: 'static' | 'boolean' }>): Fix {
+    let end = attribute.kind === 'static' ? attribute.value.end + 1 : attribute.name.end
     let start = attribute.name.start
 
     while (start > 0 && WHITESPACE_CHAR.test(this.src[start - 1]!))
       start--
+
+    // In a comma-separated list the comma goes with it: the one before, else the one after.
+    if (this.src[start - 1] === ',') {
+      start--
+    }
+    else {
+      const after = COMMA_AFTER.exec(this.src.slice(end))
+
+      if (after)
+        end += after[0].length
+    }
 
     return { title, safe: true, edits: [{ start, end, text: '' }] }
   }

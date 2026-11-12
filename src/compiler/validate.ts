@@ -11,7 +11,7 @@ import { deprecatedAiProps } from './deprecated-ai-props'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
-import { AttributeFixes, FIELD_NAME, PART_NAME_LIST } from './validate-fixes'
+import { AttributeFixes, FIELD_NAME, PART_NAME, PART_NAME_LIST } from './validate-fixes'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -27,7 +27,6 @@ const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'l
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
 // A part's name, which becomes a key of the component's `class` type.
-const PART_NAME = /^[A-Z][\w-]*$/i
 // A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
 const CLASS_MEMBER = /^(?:class|'class'|"class")\??\s*:/
 const MEMBER_START = /[\s{;,]/
@@ -215,7 +214,7 @@ class Validator {
     const query = server?.page?.settings.get(QUERY)?.key
 
     if (query && this.options.special)
-      this.error('fence-invalid', query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
+      this.error('page-settings-invalid', query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
     if ((this.options.island !== undefined || this.options.insideIsland === true) && kayCtxImport(script.imports) !== undefined)
       this.ctxInIsland()
@@ -235,10 +234,10 @@ class Validator {
       const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && declaresClass(this.text(type)) ? type : undefined)
 
       if (taken)
-        this.error('fence-invalid', taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+        this.error('part-invalid', taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
 
       if (parts.root === 'none' && script.recipeRoot === true && script.recipeSpan)
-        this.error('fence-invalid', script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })
+        this.error('part-invalid', script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })
     }
 
     if (server && script.props)

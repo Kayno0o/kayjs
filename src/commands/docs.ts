@@ -3,8 +3,7 @@ import type { DocFile, DocMatch, DocSection } from '../docs-search'
 import type { Command, ProblemFormat } from './command'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { explainError, isErrorCode } from '../compiler/errors'
-import { explainLint, isLint } from '../compiler/lints'
+import { explainDiagnostic, isDiagnosticCode } from '../compiler/diagnostics'
 import { componentPlace, componentProps } from '../docs-props'
 import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
@@ -68,8 +67,8 @@ export const docs: Command = {
     const matches = searchDocs(files, query)
 
     // A lint or an error code is explained as `kay explain` does, the sections naming it listed after.
-    if (positionals.length === 1 && (isLint(first) || isErrorCode(first))) {
-      printShown({ label: `kay explain ${first}`, heading: first, text: isLint(first) ? explainLint(first) : explainError(first, fixPath) }, matches.slice(0, OTHERS), format, root)
+    if (positionals.length === 1 && isDiagnosticCode(first)) {
+      printShown({ label: `kay explain ${first}`, heading: first, text: explainDiagnostic(first, fixPath) }, matches.slice(0, OTHERS), format, root)
 
       return 0
     }

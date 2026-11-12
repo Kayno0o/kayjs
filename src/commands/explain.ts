@@ -1,8 +1,9 @@
+import type { DiagnosticCode } from '../compiler/diagnostics'
 import type { ErrorCode, ErrorGroup, ErrorName } from '../compiler/errors'
 import type { Lint, LintGroup, LintName } from '../compiler/lints'
 import type { Command } from './command'
 import process from 'node:process'
-import { diagnosticInfo, explainDiagnostic, isDiagnosticCode } from '../compiler/diagnostics'
+import { diagnosticInfo, explainDiagnostic } from '../compiler/diagnostics'
 import { ERROR_GROUPS, errorList, ERRORS, isErrorGroup } from '../compiler/errors'
 import { isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { docFiles, searchDocs } from '../docs-search'
@@ -43,16 +44,16 @@ export const explain: Command = {
 
     const info = diagnosticInfo(name)
 
-    if (info === undefined || !isDiagnosticCode(name)) {
+    if (info === undefined) {
       printFailure('explain', `\`${name}\` is no lint, error or group; \`kay explain\` lists them${docsHint(name)}`, format)
 
       return 1
     }
 
     if (format === 'json')
-      printDocument({ name, ...(info.kind === 'error' ? ERRORS[name as ErrorName] : LINTS[name as LintName]) })
+      printDocument({ name, ...(info.kind === 'error' ? ERRORS[info.code as ErrorName] : LINTS[info.code as LintName]) })
     else
-      console.log(explainDiagnostic(name, fixPath))
+      console.log(explainDiagnostic(info.code as DiagnosticCode, fixPath))
 
     return 0
   },
