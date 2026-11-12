@@ -119,7 +119,7 @@ describe('the headers of every kind of answer', () => {
 
     expect(Number(length)).toBeGreaterThan(0)
     expect(policy).toBe(page)
-    expect(seen).toEqual({ ...SECURITY, 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, Save-Data' })
+    expect(seen).toEqual({ ...SECURITY, 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, Save-Data, accept-encoding' })
   })
 
   it('an API route carries them beside its own headers, whether it answers a value or a Response', async () => {
