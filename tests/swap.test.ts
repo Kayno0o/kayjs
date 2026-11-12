@@ -169,7 +169,7 @@ describe('page swap, on the server', () => {
 
   it('renders a persisted query param as queryParam does, by the page\'s schema, its value standing for the param left out', () => {
     const report = () => undefined
-    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted('q', 'all', { storage: 'query' })(), persisted('page', '1', { storage: 'query' })()], undefined, { page: { type: 'integer', default: 1 } })
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted.query('q', 'all')(), persisted.query('page', '1')()], undefined, { page: { type: 'integer', default: 1 } })
 
     expect(read('http://localhost/?q=kay&page=3')).toEqual(['kay', 3])
     expect(read('http://localhost/?page=x')).toEqual(['all', 1])
@@ -177,7 +177,7 @@ describe('page swap, on the server', () => {
 
   it('reads a persisted query param outside its values as the default, on the server', () => {
     const report = () => undefined
-    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })(), persisted('n', 1, { storage: 'query', values: [1, 2] })()], undefined, { n: { type: 'integer' } })
+    const read = (url: string) => inServerScope(new Request(url), report, (): unknown[] => [persisted.query('tab', 'site', { values: ['site', 'logs'] })(), persisted.query('n', 1, { values: [1, 2] })()], undefined, { n: { type: 'integer' } })
 
     expect(read('http://localhost/?tab=logs&n=2')).toEqual(['logs', 2])
     expect(read('http://localhost/?tab=nope&n=3')).toEqual(['site', 1])
@@ -341,7 +341,7 @@ describe('page swap, checking a form in the browser', () => {
   it('refuses persist and storage on a plain signal, which persisted() took over', () => {
     // @ts-expect-error -- persisted('a', 'x') keeps a value
     expect(signal('x', { persist: 'a' })()).toBe('x')
-    // @ts-expect-error -- persisted('a', 'x', { storage: 'local' }) does
+    // @ts-expect-error -- persisted.local('a', 'x') does
     expect(signal('x', { storage: 'local' })()).toBe('x')
   })
 
@@ -390,8 +390,8 @@ describe('page swap, checking a form in the browser', () => {
       document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
       setURL('http://localhost/list?q=kay&page=3')
 
-      const query = persisted('q', 'all', { storage: 'query' })
-      const page = persisted<number>('page', 2, { storage: 'query' })
+      const query = persisted.query('q', 'all')
+      const page = persisted.query<number>('page', 2)
 
       expect<unknown[]>([query(), page()]).toEqual(['kay', 3])
 
@@ -417,8 +417,8 @@ describe('page swap, checking a form in the browser', () => {
 
       // Left out, the param reads as the schema's default, as the page's loads read it, before the value given.
       setURL('http://localhost/list')
-      expect(persisted<number>('page', 2, { storage: 'query' })()).toBe(1)
-      expect(persisted('q', 'all', { storage: 'query' })()).toBe('all')
+      expect(persisted.query<number>('page', 2)()).toBe(1)
+      expect(persisted.query('q', 'all')()).toBe('all')
     }
     finally {
       document.head.innerHTML = ''
@@ -428,10 +428,10 @@ describe('page swap, checking a form in the browser', () => {
 
   it('reads a persisted query param outside its values as the default, in the browser', () => {
     setURL('http://localhost/list?tab=nope')
-    expect(persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })()).toBe('site')
+    expect(persisted.query('tab', 'site', { values: ['site', 'logs'] })()).toBe('site')
 
     setURL('http://localhost/list?tab=logs')
-    expect(persisted('tab', 'site', { storage: 'query', values: ['site', 'logs'] })()).toBe('logs')
+    expect(persisted.query('tab', 'site', { values: ['site', 'logs'] })()).toBe('logs')
   })
 
   it('writes fast-changing query params with one replaceState per 200 ms for all of them, the latest values in the address, the signals always current', () => {
@@ -442,7 +442,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/slider')
       tick(1000)
 
-      const params = ['a', 'b', 'c'].map(name => persisted<number>(name, 0, { storage: 'query' }))
+      const params = ['a', 'b', 'c'].map(name => persisted.query<number>(name, 0))
 
       for (let value = 1; value <= 40; value++) {
         for (const param of params) {
@@ -478,8 +478,8 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/one')
       tick(1000)
 
-      const first = persisted('first', '', { storage: 'query' })
-      const second = persisted('second', '', { storage: 'query' })
+      const first = persisted.query('first', '')
+      const second = persisted.query('second', '')
 
       first.set('a')
       second.set('b')
@@ -506,7 +506,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/back?x=1')
       tick(1000)
 
-      const level = persisted('level', '', { storage: 'query' })
+      const level = persisted.query('level', '')
 
       level.set('1')
       level.set('2')
@@ -552,7 +552,7 @@ describe('page swap, checking a form in the browser', () => {
       tick(1000)
 
       const tab = queryParam('tab', { history: 'push' })
-      const page = persisted<number>('page', 1, { storage: 'query', history: 'push' })
+      const page = persisted.query<number>('page', 1, { history: 'push' })
       const plain = queryParam('plain')
 
       expect<unknown[]>([tab(), page()]).toEqual(['a', 1])
@@ -630,7 +630,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/replaced')
       tick(1000)
       queryParam('r').set('1')
-      persisted('r2', '', { storage: 'query', history: 'replace' }).set('2')
+      persisted.query('r2', '', { history: 'replace' }).set('2')
       expect(push).not.toHaveBeenCalled()
     }
     finally {
@@ -646,8 +646,8 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/leave')
       tick(1000)
 
-      const level = persisted('level', '', { storage: 'query' })
-      const other = persisted('other', '', { storage: 'query' })
+      const level = persisted.query('level', '')
+      const other = persisted.query('other', '')
 
       level.set('1')
       level.set('2')
@@ -685,7 +685,7 @@ describe('page swap, checking a form in the browser', () => {
       setURL('http://localhost/refused')
       tick(1000)
 
-      const refused = persisted('refused', 'a', { storage: 'query' })
+      const refused = persisted.query('refused', 'a')
 
       expect(() => refused.set('b')).not.toThrow()
       expect(refused()).toBe('b')
@@ -703,8 +703,8 @@ describe('page swap, checking a form in the browser', () => {
 
   it('keeps a string in the query unless the signal is typed otherwise, as the URL holds text', () => {
     // @ts-expect-error -- a query param is a string unless typed otherwise
-    expect(persisted('page', 1, { storage: 'query' })()).toBe(1)
-    expect(persisted<number>('page', 1, { storage: 'query' })()).toBe(1)
+    expect(persisted.query('page', 1)()).toBe(1)
+    expect(persisted.query<number>('page', 1)()).toBe(1)
   })
 
   it('parses each page data script once, a script a swap brings afresh, and skips one that does not parse after reporting it once, until its text changes', () => {

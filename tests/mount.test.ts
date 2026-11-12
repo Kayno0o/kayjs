@@ -225,6 +225,32 @@ describe('mount', () => {
     }
   })
 
+  it('writes and reads a persisted.session signal in sessionStorage, which a local one does not see', async () => {
+    try {
+      writePersisted('step', 'two', 'session')
+
+      const first = await mountComponent(await imported('tests/fixtures/mount/stepper.kay'))
+
+      expect(first.root.querySelector('.step')!.textContent).toBe('two')
+      expect(readPersisted('step')).toBeUndefined()
+      first.unmount()
+
+      writePersisted('step', 'one', 'session')
+
+      const second = await mountComponent(await imported('tests/fixtures/mount/stepper.kay'))
+
+      second.root.querySelector('button')!.click()
+      await settle()
+
+      expect(readPersisted('step', 'session')).toBe('two')
+      expect(localStorage.getItem('step')).toBeNull()
+      second.unmount()
+    }
+    finally {
+      sessionStorage.clear()
+    }
+  })
+
   it('reads a kept value the signal does not offer as its default', async () => {
     try {
       writePersisted('accent', 'purple')

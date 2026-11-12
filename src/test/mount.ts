@@ -1,3 +1,4 @@
+import type { WebStorage } from '../runtime/persist'
 import type { Interactions } from './interact'
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -39,9 +40,9 @@ export async function settle(): Promise<void> {
   await sleep(0)
 }
 
-// Keeps a value in localStorage as `persisted.local(key, initial)` does, encoded as island props are rather than as JSON, for a component mounted after to read.
-export function writePersisted(key: string, value: unknown): void {
-  localStorage.setItem(key, sendValue(value))
+// Keeps a value in localStorage as `persisted.local(key, initial)` does, or in sessionStorage as `persisted.session(key, initial)` does with `'session'`, encoded as island props are rather than as JSON, for a component mounted after to read.
+export function writePersisted(key: string, value: unknown, storage: WebStorage = 'local'): void {
+  area(storage).setItem(key, sendValue(value))
 }
 
 // A `Cookie` header value setting the cookie a `persisted(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
@@ -52,11 +53,15 @@ export function persistedCookie(name: string, value: unknown): string {
   return `${name}=${encodeURIComponent(sendValue(value))}`
 }
 
-// The value a `persisted.local(key, initial)` signal kept in localStorage, decoded, or undefined when it kept none.
-export function readPersisted(key: string): unknown {
-  const text = localStorage.getItem(key)
+// The value a `persisted.local(key, initial)` signal kept in localStorage, or a `persisted.session(key, initial)` one in sessionStorage with `'session'`, decoded, or undefined when it kept none.
+export function readPersisted(key: string, storage: WebStorage = 'local'): unknown {
+  const text = area(storage).getItem(key)
 
   return text === null ? undefined : decodeValue(text)
+}
+
+function area(storage: WebStorage): Storage {
+  return storage === 'local' ? localStorage : sessionStorage
 }
 
 // Registers happy-dom's DOM on the first mount of a file, so a file that mounts nothing never loads it; a project that preloaded `kay/test/dom` already has one.

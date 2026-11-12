@@ -839,14 +839,6 @@ function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<Persis
 }) | (Omit<PersistedOptions<T>, "values"> & {
   storage?: "cookie" | undefined;
 }) | undefined): Signal<T>
-function persisted.cookie<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedCookieOptions<T> & { values: readonly T[]; }): Signal<T>
-function persisted.cookie<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedCookieOptions<T>, "values"> | undefined): Signal<T>
-function persisted.local<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedStorageOptions<T> & { values: readonly T[]; }): Signal<T>
-function persisted.local<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedStorageOptions<T>, "values"> | undefined): Signal<T>
-function persisted.session<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedStorageOptions<T> & { values: readonly T[]; }): Signal<T>
-function persisted.session<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedStorageOptions<T>, "values"> | undefined): Signal<T>
-function persisted.query<T = string>(name: string, value: NoInfer<PlainValue<T>>, options?: Omit<PersistedQueryOptions<NoInfer<T>>, "values"> | undefined): Signal<T>
-function persisted.query<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: PersistedQueryOptions<T> & { values: readonly T[]; }): Signal<T>
 
 [.] PersistedCookieOptions
 interface PersistedCookieOptions<T> extends KeptOptions<T>
@@ -4206,7 +4198,7 @@ interface PointerOptions extends WaitOptions
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./test] readPersisted
-function readPersisted(key: string): unknown
+function readPersisted(key: string, storage?: WebStorage): unknown
 
 [./test] resetEachTest
 function resetEachTest(clear: () => void): void
@@ -4529,7 +4521,7 @@ interface WaitUntilOptions
   what?: string | undefined
 
 [./test] writePersisted
-function writePersisted(key: string, value: unknown): void
+function writePersisted(key: string, value: unknown, storage?: WebStorage): void
 
 [./words] formatDate
 function formatDate(value: Date | number, options?: DateFormatOptions | undefined): string

@@ -98,6 +98,11 @@ describe('persisted signals of one name in a page', () => {
     expect(persisted('entries', 'b', { storage: 'local' })).toBe(local)
   })
 
+  it('keeps the deprecated storage option on the entry it names', () => {
+    expect(persisted('entries', 'a', { storage: 'query' })).not.toBe(persisted.cookie('entries', 'a'))
+    expect(persisted('entries', 'a', { storage: 'local' })).toBe(persisted.local('entries', 'a'))
+  })
+
   it('keeps and reads a value in sessionStorage, localStorage staying empty', () => {
     const step = persisted.session('wizard', 'one', { values: ['one', 'two'] })
 

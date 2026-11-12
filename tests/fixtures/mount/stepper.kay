@@ -1,0 +1,7 @@
+---
+import { persisted } from 'kay'
+
+const step = persisted.session<string>('step', 'one')
+---
+p.step {step()}
+button(onClick={() => step = 'two'}) Next
