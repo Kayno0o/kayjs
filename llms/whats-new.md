@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `kay upgrade` raises a dependency the app shares with kay, `elysia` first, to the version kay's range starts at when the app's range or installed copy is below it, so the app and kay install one copy (an app already on the latest kay too, `--dry-run` listing it) and `kay check` no longer fails on Elysia's types ([kay upgrade](check-and-tools.md)).
 - `kay upgrade` no longer stops on a stepping stone the registry has pruned: it installs the closest older minor that still holds the lints the stone is there for and says which, and when none installs it names the forms left unfixed and the `llms/upgrading.md` sections to read, then goes on ([kay upgrade](check-and-tools.md)).
+- kayjs-ui: the blocks and callbacks of TreeView (`@actions`, `onSelectedChange`, `onOpenChange`), AppSwitcher (`@tile`), AudioPlayer (`@actions`) and BellInbox (`@item`) hand a node, app, chapter or note whose `key` (or `label`) is always set, filled from `id` (`title`) for an item still under the old name, so no `!` or `nodeKey()` is needed.
 
 ## 1.102.0
 

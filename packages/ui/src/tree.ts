@@ -30,6 +30,13 @@ export function nodeKey<Id extends TreeId>(node: { key?: Id | undefined, id?: Id
   return (node.key ?? node.id)!
 }
 
+// A node as the app's blocks and callbacks read it: `key` always there, filled from `id` for a node written with the older name.
+export type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
+
+export function keyedNode<Id extends TreeId>(node: TreeNode<Id>): KeyedTreeNode<Id> {
+  return node.key === undefined ? { ...node, key: nodeKey(node) } : node as KeyedTreeNode<Id>
+}
+
 export type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)
 
 // The nodes below a node when they are known: its list, else none yet.

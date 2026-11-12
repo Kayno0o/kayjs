@@ -3,8 +3,8 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { Snippet } from 'kay'
 import type { MenuTriggerProps } from './menu'
-import type { SwitcherApp } from './app-switcher'
-import { appKey } from './app-switcher'
+import type { KeyedSwitcherApp, SwitcherApp } from './app-switcher'
+import { appKey, keyedApp } from './app-switcher'
 import type { IconSlot } from './defaults'
 import { isExternal } from './outside'
 import type { NewTab } from './outside'
@@ -60,7 +60,7 @@ const { id, apps, current, label = wording('ui.appSwitcher.label', 'Apps'), icon
   // Opens the tiles in a new tab, or only those leaving the site with `'auto'`. They stay in the same tab by default, unlike the other components with link entries, as the apps are one place to the visitor. An app's own `newTab` wins.
   newTab?: NewTab | undefined
   // Replaces the text under a tile's icon: `@tile(app)`.
-  tile?: Snippet<[app: SwitcherApp]> | undefined
+  tile?: Snippet<[app: KeyedSwitcherApp]> | undefined
   // Replaces the icon button that opens the panel, as a Menu's does: `@trigger(attributes)`, then `button({...attributes})`; `icon` then has nothing to draw.
   trigger?: Snippet<[attributes: MenuTriggerProps]> | undefined
 }>()
@@ -121,6 +121,6 @@ Popover(id={id} placement={placement} role="none" open={open} part="menu" onOpen
           span(part="initial" aria-hidden="true") {app.label.slice(0, 1)}
         span(part="name")
           if tile
-            | {tile(app)}
+            | {tile(keyedApp(app))}
           else
             | {app.label}

@@ -44,7 +44,7 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Draws each row in place of its dot and title: `@item(note)`.
-  item?: Snippet<[note: Item]> | undefined
+  item?: Snippet<[note: Item & ReturnType<typeof bellItem>]> | undefined
   // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is a function returning the count (a function, so the app's element is updated in place and keeps focus), to draw a badge of your own (the one over the default button is not drawn).
   trigger?: Snippet<[attributes: BellTriggerProps, unread: () => number]> | undefined
 }>()

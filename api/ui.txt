@@ -197,6 +197,9 @@ type InfinitePage<Row> = Row[] | undefined
 [.] isExternal
 function isExternal(href: string): boolean
 
+[.] KeyedTreeNode
+type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
+
 [.] ListFilter
 interface ListFilter
   fields: Record<string, string>
@@ -747,12 +750,12 @@ component default
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
   style?: string | undefined
-  tile?: ((app: SwitcherApp) => Element) | undefined
+  tile?: ((app: SwitcherAppBase & { key: string; id?: string | undefined; } & { key: string; }) => Element) | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
 
 [./audio-player.kay] default
 component default
-  actions?: ((chapter: AudioChapter, index: number) => Element) | undefined
+  actions?: ((chapter: AudioChapterBase & { label: string; title?: string | undefined; } & { label: string; }, index: number) => Element) | undefined
   artist?: string | undefined
   artwork?: string | undefined
   chapters?: readonly AudioChapter[] | undefined
@@ -953,7 +956,20 @@ component default
   announce?: string | undefined;
   count?: string | undefined;
 }
-  item?: ((note: Item) => Element) | undefined
+  item?: ((note: Item & BellItemBase & {
+  key: string;
+  id?: string | undefined;
+} & {
+  label: string;
+  title?: string | undefined;
+} & {
+  href?: string | undefined;
+  url?: string | undefined;
+} & {
+  key: string;
+  label: string;
+  href?: string | undefined;
+}) => Element) | undefined
   items?: BellItems<Item> | undefined
   label?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -3229,7 +3245,7 @@ component default
 
 [./tree-view.kay] default
 component default
-  actions?: ((args_0: TreeNode<Id>) => Element) | undefined
+  actions?: ((args_0: KeyedTreeNode<Id>) => Element) | undefined
   class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;
@@ -3252,8 +3268,8 @@ component default
   failureLabel?: string | undefined
   label: string
   nodes: readonly TreeNode<Id>[]
-  onOpenChange?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
-  onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  onOpenChange?: ((id: Id, open: boolean, node: KeyedTreeNode<Id>) => unknown) | undefined
+  onSelectedChange?: ((id: Id, node: KeyedTreeNode<Id>) => unknown) | undefined
   retryLabel?: string | undefined
   selected?: Id | undefined
 

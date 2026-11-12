@@ -2,12 +2,12 @@
 import type { JSX, Snippet } from 'kay'
 import type { MenuEntry } from './menu'
 import { tabOf } from './outside'
-import type { TreeId, TreeNode, TreeRow } from './tree'
+import type { KeyedTreeNode, TreeId, TreeNode, TreeRow } from './tree'
 import { effect, memo, recipe, signal, untrack, withQuery } from 'kay'
 import Icon from './icon.kay'
 import Menu from './menu.kay'
 import { ORIGIN } from './tab-nav'
-import { nodeKey, treeHasMenu, treeHere, treeKey, treePath, treeRows } from './tree'
+import { keyedNode, nodeKey, treeHasMenu, treeHere, treeKey, treePath, treeRows } from './tree'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
@@ -21,14 +21,14 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, a
   // The branches open; a tree whose parent passes another list follows it, and the reader opens and closes branches from then on.
   expanded?: readonly Id[] | undefined
   // Called with the branch's id, whether it is now open and the node, whenever the reader opens or closes a branch, by a click or a key.
-  onOpenChange?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
+  onOpenChange?: ((id: Id, open: boolean, node: KeyedTreeNode<Id>) => unknown) | undefined
   // What a branch whose children failed to load says, beside a button that tries again.
   failureLabel?: string | undefined
   retryLabel?: string | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
-  onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  onSelectedChange?: ((id: Id, node: KeyedTreeNode<Id>) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@actions(node)`.
-  actions?: Snippet<[TreeNode<Id>]> | undefined
+  actions?: Snippet<[KeyedTreeNode<Id>]> | undefined
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
@@ -159,13 +159,13 @@ function toggle(id: TreeId) {
     failed.set(shown => without(shown, id))
 
   if (node)
-    onOpenChange?.(id as Id, opening, node)
+    onOpenChange?.(id as Id, opening, keyedNode(node))
 }
 
 function pick(row: TreeRow<Id>) {
   current = nodeKey(row.node)
   focused = nodeKey(row.node)
-  onSelectedChange?.(nodeKey(row.node), row.node)
+  onSelectedChange?.(nodeKey(row.node), keyedNode(row.node))
 }
 
 // A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.
@@ -308,6 +308,6 @@ else
           button(part="retry" type="button") {retryLabel}
         if actions
           span(part="trailing")
-            | {actions(row.node)}
+            | {actions(keyedNode(row.node))}
   if hasMenu()
     Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={shown => { if (!shown) menu = undefined }})

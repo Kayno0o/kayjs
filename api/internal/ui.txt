@@ -79,6 +79,12 @@ function announce(text: string, within?: Element | null): void
 [./lib/app-switcher] appKey
 function appKey(app: SwitcherApp): string
 
+[./lib/app-switcher] keyedApp
+function keyedApp(app: SwitcherApp): SwitcherAppBase & { key: string; id?: string | undefined; } & { key: string; }
+
+[./lib/app-switcher] KeyedSwitcherApp
+type KeyedSwitcherApp = SwitcherApp & { key: string }
+
 [./lib/app-switcher] SwitcherApp
 type SwitcherApp = SwitcherAppBase & ({
   key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id?: string | undefined
@@ -116,6 +122,12 @@ function cueAt(cues: readonly AudioCue[], seconds: number): number
 
 [./lib/audio] cuesByChapter
 function cuesByChapter(chapters: readonly AudioChapter[], cues: readonly AudioCue[]): { chapter: number; first: number; cues: AudioCue[]; }[]
+
+[./lib/audio] labelledChapter
+function labelledChapter(chapter: AudioChapter): AudioChapterBase & { label: string; title?: string | undefined; } & { label: string; }
+
+[./lib/audio] LabelledChapter
+type LabelledChapter = AudioChapter & { label: string }
 
 [./lib/audio] lockScreen
 const lockScreen: { owner: object | undefined; }
@@ -1466,6 +1478,9 @@ type InfinitePage<Row> = Row[] | undefined
 
 [./lib/index] isExternal
 function isExternal(href: string): boolean
+
+[./lib/index] KeyedTreeNode
+type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
 
 [./lib/index] ListFilter
 interface ListFilter
@@ -3066,6 +3081,12 @@ type ToastTone = Tone
 
 [./lib/tone] Tone
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[./lib/tree] keyedNode
+function keyedNode<Id extends TreeId>(node: TreeNode<Id>): KeyedTreeNode<Id>
+
+[./lib/tree] KeyedTreeNode
+type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
 
 [./lib/tree] nodeKey
 function nodeKey<Id extends TreeId>(node: { key?: Id | undefined; id?: Id | undefined; }): Id

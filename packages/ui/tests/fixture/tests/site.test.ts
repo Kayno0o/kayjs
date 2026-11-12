@@ -1620,3 +1620,11 @@ describe('a FormField showing its own issue marks its control in the server rend
     expect(((await visit('/field-issue')).html.match(/<input[^>]*name="title"[^>]*>/)?.[0].match(/aria-invalid/g) ?? [])).toHaveLength(1)
   })
 })
+
+describe('blocks of lists under the names before 1.100 and 1.103', () => {
+  test('hand the app the new name, filled from the old one', async () => {
+    const text = async (selector: string) => (await find('/keyed-blocks', selector)).map(found => found.text)
+
+    expect([await text('.node'), await text('.app'), await text('.chapter')]).toEqual([['root'], ['atlas'], ['Intro']])
+  })
+})

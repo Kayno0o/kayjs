@@ -1,0 +1,24 @@
+--- island
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+// Lists under the names before 1.100 and 1.103: their blocks still read `key` and `label`, typed as set. A cast keeps the upgrade lints from rewriting them.
+function old<T>(items: unknown): T {
+  return items as T
+}
+const nodes = old<{ id: string, label: string }[]>([{ id: 'root', label: 'Root' }])
+const apps = old<{ id: string, href: string, label: string }[]>([{ id: 'atlas', href: '/atlas', label: 'Atlas' }])
+const chapters = old<{ title: string, start: number }[]>([{ title: 'Intro', start: 0 }])
+const keyOf = (key: string) => key
+---
+main
+  TreeView#tree(nodes={nodes} label="Files")
+    @actions(node)
+      span.node {keyOf(node.key)}
+  AppSwitcher#apps(apps={apps} open={true})
+    @tile(app)
+      span.app {keyOf(app.key)}
+  AudioPlayer#audio(src="/a.mp3" chapters={chapters})
+    @actions(chapter)
+      span.chapter {keyOf(chapter.label)}

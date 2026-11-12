@@ -14,6 +14,13 @@ interface AudioChapterBase {
 // A chapter: `label` names it, `title` being the name it had before 1.99.
 export type AudioChapter = AudioChapterBase & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string })
 
+// A chapter as an `@actions(chapter)` block reads it: `label` always there.
+export type LabelledChapter = AudioChapter & { label: string }
+
+export function labelledChapter(chapter: AudioChapter): LabelledChapter {
+  return chapter.label === undefined ? { ...chapter, label: chapter.title } : chapter
+}
+
 export function chapterLabel(chapter: AudioChapter): string {
   return chapter.label ?? chapter.title
 }
