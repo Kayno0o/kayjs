@@ -1,6 +1,6 @@
 import { chmod } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
-import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs } from '../scripts/apps-ci'
+import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs, writeStubs } from '../scripts/apps-ci'
 import { BLOCKING, dispatchRun, exitCode, NO_FT, SECRET_UNSET } from '../scripts/release-apps'
 import { scratchDir } from './scratch'
 
@@ -98,8 +98,31 @@ describe('workspaceDirs', () => {
     expect(await workspaceDirs(await workspace(undefined, {}))).toEqual([])
   })
 
+  it('drops a ./ prefix and leaves out what a !pattern matches', async () => {
+    const dir = await workspace(['./a', 'libs/*', '!libs/b', '!./c'], {
+      'a': { test: 'bun test' },
+      'libs/b': { test: 'bun test' },
+      'libs/d': { test: 'bun test' },
+      'c': { test: 'bun test' },
+    })
+
+    expect(await workspaceDirs(dir)).toEqual(['a', 'libs/d'])
+  })
+
   it('is how orbit runs every workspace, not a list kept beside it', () => {
     expect(APPS.find(app => app.name === 'orbit')?.dirs).toBe('workspaces')
+  })
+})
+
+describe('writeStubs', () => {
+  it('writes the files the clone lacks and never blanks one it holds', async () => {
+    const dir = await scratchDir('stubs')
+
+    await Bun.write(`${dir}/kept.env`, 'SECRET=1')
+    await writeStubs(dir, ['kept.env', 'deep/new.env'])
+
+    expect(await Bun.file(`${dir}/kept.env`).text()).toBe('SECRET=1')
+    expect(await Bun.file(`${dir}/deep/new.env`).text()).toBe('')
   })
 })
 

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -49,6 +49,7 @@ export const APPS: App[] = [
 
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
 const SCOPE_PREFIX = /^@/
+const DOT_SLASH = /^\.\//
 const KAY_ALIAS = 'npm:@kaynooo/kayjs@'
 
 export interface Manifest {
@@ -136,8 +137,14 @@ export function pointApp(manifests: Record<string, Manifest>, installPath: strin
 const root = resolve(import.meta.dir, '..')
 const workDir = resolve(process.env.KAY_APPS_DIR ?? join(root, '.kay/apps-ci'))
 const tarballDir = join(workDir, 'tarballs')
-// The clones live outside the kay checkout: from inside it, an app's resolution climbs into kay's own node_modules and finds a second copy of every package kay has.
-const clonesDir = resolve(process.env.KAY_APPS_CLONES ?? join(tmpdir(), 'kay-apps-ci'))
+// The clones live outside the kay checkout, as an app's resolution climbs into kay's own node_modules from inside it and finds a second copy of every package kay has, and in a directory of this run alone, so two runs on one runner never meet; KAY_APPS_CLONES names one instead, which is kept.
+let clonesDir: string | undefined
+
+async function clones() {
+  clonesDir ??= process.env.KAY_APPS_CLONES === undefined ? await mkdtemp(join(tmpdir(), 'kay-apps-ci-')) : resolve(process.env.KAY_APPS_CLONES)
+
+  return clonesDir
+}
 
 async function packageDirs() {
   return ['.', ...(await Array.fromAsync(new Glob('packages/*').scan({ cwd: root, onlyFiles: false })))]
@@ -202,16 +209,30 @@ async function manifestPaths(directory: string) {
   return files.filter(file => file !== '' && !file.includes('node_modules'))
 }
 
-// The folders of a package.json's `workspaces` (a `dir/*` pattern expanded) that have a check, lint or test script, relative to `installDir`.
+// Empty files at `stubs`, from `directory`, for those the clone does not hold: a tracked file is left as it is.
+export async function writeStubs(directory: string, stubs: string[]) {
+  for (const stub of stubs) {
+    const path = join(directory, stub)
+
+    if (!existsSync(path))
+      await Bun.write(path, '')
+  }
+}
+
+// The folders of a package.json's `workspaces` (a `dir/*` pattern expanded, a `./` prefix dropped, a `!pattern` excluding what it matches, as Bun reads them) that have a check, lint or test script, relative to `installDir`.
 export async function workspaceDirs(installDir: string): Promise<string[]> {
   const manifest = await Bun.file(join(installDir, 'package.json')).json() as { workspaces?: string[] | { packages?: string[] } }
   const patterns = Array.isArray(manifest.workspaces) ? manifest.workspaces : manifest.workspaces?.packages ?? []
   const dirs: string[] = []
+  const excluded = patterns.filter(pattern => pattern.startsWith('!')).map(pattern => new Glob(pattern.slice(1).replace(DOT_SLASH, '')))
 
-  for (const pattern of patterns) {
+  for (const pattern of patterns.filter(pattern => !pattern.startsWith('!')).map(pattern => pattern.replace(DOT_SLASH, ''))) {
     const matches = pattern.includes('*') ? await Array.fromAsync(new Glob(pattern).scan({ cwd: installDir, onlyFiles: false })) : [pattern]
 
     for (const dir of matches.sort()) {
+      if (dirs.includes(dir) || excluded.some(glob => glob.match(dir)))
+        continue
+
       const file = Bun.file(join(installDir, dir, 'package.json'))
 
       if (!(await file.exists()))
@@ -228,6 +249,7 @@ export async function workspaceDirs(installDir: string): Promise<string[]> {
 }
 
 async function run(app: App) {
+  const clonesDir = await clones()
   const directory = join(clonesDir, app.name)
   const tarballs = await Bun.file(join(tarballDir, 'tarballs.json')).json() as Record<string, string>
   const installDir = join(directory, app.install ?? '.')
@@ -236,8 +258,7 @@ async function run(app: App) {
   await mkdir(clonesDir, { recursive: true })
   await clone(app, directory)
 
-  for (const stub of app.stubs ?? [])
-    await Bun.write(join(directory, stub), '')
+  await writeStubs(directory, app.stubs ?? [])
 
   const dirs = app.dirs === 'workspaces' ? await workspaceDirs(installDir) : app.dirs ?? ['.']
 
@@ -326,6 +347,9 @@ if (import.meta.main) {
       console.error((error as Error).message)
     }
   }
+
+  if (process.env.KAY_APPS_CLONES === undefined && clonesDir !== undefined)
+    await rm(clonesDir, { recursive: true, force: true })
 
   process.exit(failed ? 1 : 0)
 }
