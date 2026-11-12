@@ -149,12 +149,26 @@ describe('the clones directory', () => {
     }
   })
 
-  it('leaves nothing in the temp dir after a run that ends on an error', async () => {
+  it('is gone when a cancelled run ends on SIGTERM, exiting 143', async () => {
     const tmp = await scratchDir('clones-run')
-    const run = Bun.spawn(['bun', 'scripts/apps-ci.ts', 'no-such-app'], { env: { ...process.env, TMPDIR: tmp }, stdout: 'ignore', stderr: 'ignore' })
+    const work = await scratchDir('clones-work')
 
-    expect(await run.exited).not.toBe(0)
-    expect(Array.from(new Bun.Glob('kay-apps-ci-*').scanSync({ cwd: tmp, onlyFiles: false }))).toEqual([])
+    // A git that never answers holds the run in its clone, after the clones directory exists.
+    await Bun.write(`${tmp}/bin/git`, `#!/bin/sh\necho $$ > ${tmp}/git.pid\nexec sleep 60\n`)
+    await chmod(`${tmp}/bin/git`, 0o755)
+    await Bun.write(`${work}/tarballs/tarballs.json`, '{}')
+
+    const run = Bun.spawn([process.execPath, 'scripts/apps-ci.ts', 'mc-stats'], { env: { ...process.env, TMPDIR: tmp, KAY_APPS_DIR: work, KAY_APPS_TOKEN: 'x', PATH: `${tmp}/bin:${process.env.PATH}` }, stdout: 'ignore', stderr: 'ignore' })
+    const created = () => Array.from(new Bun.Glob('kay-apps-ci-*').scanSync({ cwd: tmp, onlyFiles: false }))
+
+    for (let waited = 0; created().length === 0 && waited < 100; waited++)
+      await Bun.sleep(50)
+
+    expect(created()).toHaveLength(1)
+    run.kill('SIGTERM')
+    expect(await run.exited).toBe(143)
+    process.kill(Number(await Bun.file(`${tmp}/git.pid`).text()), 'SIGKILL')
+    expect(created()).toEqual([])
   })
 })
 
