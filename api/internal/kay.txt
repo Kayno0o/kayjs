@@ -297,6 +297,9 @@ function listen(element: Element, name: string, handler: (event: Event) => void)
 [./dom] listenSubmit
 function listenSubmit(element: Element, name: string, handler: (event: Event) => void): void
 
+[./dom] listenSubmitWith
+function listenSubmitWith(element: Element, name: string, handler: (event: Event) => void, options: AddEventListenerOptions): void
+
 [./dom] listenWith
 function listenWith(element: Element, name: string, handler: (event: Event) => void, options: AddEventListenerOptions): void
 

@@ -162,7 +162,7 @@ describe('style:prop and event modifiers', () => {
 })
 
 describe('event modifiers that filter or pass listener options', () => {
-  const mountListeners = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst log = signal(\'\')\nconst add = (letter: string) => log.set(log() + letter)\n---\ndiv#outer(onClick|capture={() => add(\'c\')})\n  button#once(onClick|once={() => add(\'1\')}) o\n  div#self(onClick|self={() => add(\'s\')})\n    span#child x\n  button#plain(onClick={() => add(\'p\')}) p\ninput#key(onKeyDown|enter|escape={e => add(e.key)})\ndiv#pass(onTouchStart|passive={e => add(String(e.defaultPrevented))})\np#out {log()}\n' })
+  const mountListeners = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst log = signal(\'\')\nconst add = (letter: string) => log.set(log() + letter)\n---\ndiv#outer(onClick|capture={() => add(\'c\')})\n  button#once(onClick|once={() => add(\'1\')}) o\n  div#self(onClick|self={() => add(\'s\')})\n    span#child x\n  button#plain(onClick={() => add(\'p\')}) p\ninput#key(onKeyDown|enter|escape={e => add(e.key)})\ninput#oncekey(onKeyDown|once|space={() => add(\'_\')})\ndiv#pass(onTouchStart|passive={e => add(String(e.defaultPrevented))})\np#out {log()}\n' })
 
   it('runs a once handler a single time, a self handler for its own element and a capture handler first', async () => {
     const { root, dispose } = await mountListeners()
@@ -201,6 +201,17 @@ describe('event modifiers that filter or pass listener options', () => {
       root.querySelector('#pass')!.dispatchEvent(new Event('touchstart', { bubbles: true, cancelable: true }))
       await settle()
       expect(out.textContent).toBe('EnterEscapefalse')
+
+      // A key written while composing (IME) is skipped, and a filter written after `once` does not spend it on another key.
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }))
+
+      const first = root.querySelector('#oncekey')!
+
+      for (const key of ['a', ' ', 'Enter'])
+        first.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+      await settle()
+      expect(out.textContent).toBe('EnterEscapefalse_')
     }
     finally {
       await dispose()

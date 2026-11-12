@@ -265,9 +265,11 @@ A modifier after an event name calls an event method before the handler: `form(o
 
 More modifiers follow the same way and run in the order written. `|once` runs the handler for one event only, and `|self` only when the event's target is the element itself.
 
-`|capture` and `|passive` are the options `addEventListener` takes, so `div(onTouchStart|passive={track})` never blocks scrolling. They do not work on an element that spreads props, and a passive listener cannot call `preventDefault`.
+`|capture` and `|passive` are the options `addEventListener` takes, so `div(onTouchStart|passive={track})` never blocks scrolling. They attach a native listener on the element itself, so the page's shared click listener is not used and a disabled button still runs the handler. They do not work on an element that spreads props, a passive listener cannot call `preventDefault`, and `onSubmit` takes `|capture` only.
 
-On `onKeyDown`, `onKeyUp` and `onKeyPress`, a key name runs the handler for that key only: `input(onKeyDown|enter={send})`. The names are `enter`, `escape`, `space`, `tab`, `backspace`, `delete`, `up`, `down`, `left` and `right`, and several of them run the handler for any of those keys.
+On `onKeyDown`, `onKeyUp` and `onKeyPress`, a key name runs the handler for that key only, and not while an input method is composing text: `input(onKeyDown|enter={send})`. The names are `enter`, `escape`, `space`, `tab`, `backspace`, `delete`, `home`, `end`, `pageup`, `pagedown`, `up`, `down`, `left` and `right`, and several of them run the handler for any of those keys. For any other key, check `event.key` in the handler.
+
+`|once` is spent by the first event that passes the filters written with it. On an element that spreads props, it starts over each time the spread is evaluated again.
 
 A `ref` function may return a cleanup, which runs when the element goes away: `ref={element => { const stop = watch(element); return stop }}`.
 

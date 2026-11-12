@@ -1,11 +1,14 @@
 import { listen, submits } from './dom'
 import { controlsOf } from './form-controls'
+import { listenWith } from './listen-with'
+
+export { listenWith }
 
 // Kept out of the entry: only an island listening to `submit` loads it. While it answers a promise the form and its submit buttons are `aria-busy`, which kayjs-ui styles as a spinner, and a second submit is dropped.
 const holds = new WeakSet<Element>()
 const marked = new WeakSet<Element>()
 
-function holding(handler: (event: Event) => void): (event: Event) => void {
+export function holding(handler: (event: Event) => void): (event: Event) => void {
   return function (this: unknown, event) {
     const form = event.currentTarget
 
@@ -70,6 +73,12 @@ async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promis
 export function listenSubmit(element: Element, name: string, handler: (event: Event) => void): void {
   holdSubmits()
   listen(element, name, name.toLowerCase() === 'onsubmit' ? holding(handler) : handler)
+}
+
+// `onSubmit|capture`: held while it answers a promise, as `listenSubmit` holds it.
+export function listenSubmitWith(element: Element, name: string, handler: (event: Event) => void, options: AddEventListenerOptions): void {
+  holdSubmits()
+  listenWith(element, name, holding(handler), options)
 }
 
 // Makes a `submit` handler a spread gives hold too, which a form spreading its props asks for at compile time.

@@ -14,7 +14,7 @@ import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from '
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenSubmitWith', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 // The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
 const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
 
@@ -672,10 +672,10 @@ export class DomTemplate extends TemplateWriter {
         return (variable) => {
           const modifiers = modifiersOf(attribute, this.src)
           const options = listenerOptions(modifiers)
-          // A `submit` handler is held while it answers a promise, which only an island listening to one loads; one with listener options is not.
-          const submit = name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen'
+          // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
+          const helpers = name.toLowerCase() === 'onsubmit' ? ['listenSubmit', 'listenSubmitWith'] as const : ['listen', 'listenWith'] as const
 
-          b.add(`${helperName(options === undefined ? submit : 'listenWith')}(${variable(node)}, ${JSON.stringify(name)}, `)
+          b.add(`${helperName(helpers[options === undefined ? 0 : 1])}(${variable(node)}, ${JSON.stringify(name)}, `)
           addHandler(b, attribute.expression, modifiers, isFunctionAt(this.src, attribute.expression, this.facts.functions))
           b.add(`${options === undefined ? '' : `, ${options}`});`)
         }

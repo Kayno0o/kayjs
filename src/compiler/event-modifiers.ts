@@ -8,7 +8,7 @@ const EVENT_METHODS = ['preventDefault', 'stopPropagation']
 const LISTENER_OPTIONS = new Set(['capture', 'passive'])
 
 // `onKeyDown|enter` runs the handler for that `event.key` only; several keys run it for any of them.
-const KEYS = new Map([['enter', 'Enter'], ['escape', 'Escape'], ['space', ' '], ['tab', 'Tab'], ['backspace', 'Backspace'], ['delete', 'Delete'], ['up', 'ArrowUp'], ['down', 'ArrowDown'], ['left', 'ArrowLeft'], ['right', 'ArrowRight']])
+const KEYS = new Map([['enter', 'Enter'], ['escape', 'Escape'], ['space', ' '], ['tab', 'Tab'], ['backspace', 'Backspace'], ['delete', 'Delete'], ['home', 'Home'], ['end', 'End'], ['pageup', 'PageUp'], ['pagedown', 'PageDown'], ['up', 'ArrowUp'], ['down', 'ArrowDown'], ['left', 'ArrowLeft'], ['right', 'ArrowRight']])
 
 const KEY_EVENT = /^onKey(?:Down|Up|Press)$/
 
@@ -33,6 +33,8 @@ export function modifierProblems(modifiers: string[], name: string, spreads: boo
       problems.push({ message: `\`|${modifier}\` filters a key event, and \`${name}\` is not one`, help: '`input(onKeyDown|enter={send})`' })
     else if (LISTENER_OPTIONS.has(modifier) && spreads)
       problems.push({ message: `\`|${modifier}\` cannot reach the listener of an element that spreads props`, help: 'add the listener in a `ref`, or spread the props on another element' })
+    else if (modifier === 'passive' && name.toLowerCase() === 'onsubmit')
+      problems.push({ message: '`|passive` cannot go on `onSubmit`, which a form holds while it answers', help: 'use `|capture`, or drop it' })
     else if (modifier === 'passive' && modifiers.includes('preventDefault'))
       problems.push({ message: '`|passive` listeners cannot call `preventDefault`', help: 'drop one of them' })
   }
@@ -59,23 +61,20 @@ export function addHandler(b: CodeBuilder, expression: Span, modifiers: string[]
 
 // A handler running its modifiers in the order written, each as the code it stands for: an event method, the checks that return early, and the flag `once` flips.
 function addModifiedHandler(b: CodeBuilder, expression: Span, modifiers: string[]): void {
-  const steps = modifiers.filter(modifier => !LISTENER_OPTIONS.has(modifier))
-  const once = steps.includes('once')
+  const steps = modifiers.filter(modifier => !LISTENER_OPTIONS.has(modifier) && modifier !== 'once')
+  const once = modifiers.includes('once')
   const keys = steps.flatMap(modifier => KEYS.get(modifier) ?? [])
   const body = once ? ['if (kayDone) return;'] : []
   let keyed = false
 
   for (const modifier of steps) {
-    if (modifier === 'once') {
-      body.push('kayDone = true;')
-    }
-    else if (modifier === 'self') {
+    if (modifier === 'self') {
       body.push('if (kayEvent.target !== kayEvent.currentTarget) return;')
     }
     else if (KEYS.has(modifier)) {
       // The keys are checked together, where the first of them is written.
       if (!keyed)
-        body.push(`if (!${JSON.stringify(keys)}.includes(kayEvent.key)) return;`)
+        body.push(`if (kayEvent.isComposing || !${JSON.stringify(keys)}.includes(kayEvent.key)) return;`)
 
       keyed = true
     }
@@ -83,6 +82,10 @@ function addModifiedHandler(b: CodeBuilder, expression: Span, modifiers: string[
       body.push(`kayEvent.${modifier}();`)
     }
   }
+
+  // Spent once every filter let the event through, so one they stopped leaves it for the next.
+  if (once)
+    body.push('kayDone = true;')
 
   b.add(`${once ? '(() => { let kayDone = false; return ' : ''}(kayEvent) => { ${body.map(step => `${step} `).join('')}return (`).addSource(expression).add(`)?.(kayEvent) }${once ? ' })()' : ''}`)
 }

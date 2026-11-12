@@ -427,10 +427,13 @@ describe('elements', () => {
     const dom = (attributes: string, tag = 'button') => compileKay(`${ISLAND}${tag}(${attributes}) x\n`, 'test.kay', { output: 'dom' }).tsx
 
     expect(dom('onClick|self={f}')).toContain('(kayEvent) => { if (kayEvent.target !== kayEvent.currentTarget) return; return (f)?.(kayEvent) }')
-    expect(dom('onKeyDown|enter={f}', 'input')).toContain('(kayEvent) => { if (!["Enter"].includes(kayEvent.key)) return; return (f)?.(kayEvent) }')
-    expect(dom('onKeyDown|enter|space|preventDefault={f}', 'input')).toContain('if (!["Enter"," "].includes(kayEvent.key)) return; kayEvent.preventDefault();')
-    expect(dom('onKeyUp|up={f}', 'input')).toContain('"ArrowUp"')
+    expect(dom('onKeyDown|enter={f}', 'input')).toContain('(kayEvent) => { if (kayEvent.isComposing || !["Enter"].includes(kayEvent.key)) return; return (f)?.(kayEvent) }')
+    expect(dom('onKeyDown|enter|space|preventDefault={f}', 'input')).toContain('if (kayEvent.isComposing || !["Enter"," "].includes(kayEvent.key)) return; kayEvent.preventDefault();')
+    expect(dom('onKeyUp|up|pagedown={f}', 'input')).toContain('["ArrowUp","PageDown"]')
     expect(dom('onClick|once={f}')).toContain('(() => { let kayDone = false; return (kayEvent) => { if (kayDone) return; kayDone = true; return (f)?.(kayEvent) } })()')
+    expect(dom('onClick|once|self={f}')).toContain('if (kayDone) return; if (kayEvent.target !== kayEvent.currentTarget) return; kayDone = true; return')
+    expect(dom('onSubmit|capture={f}', 'form')).toContain('KayListenSubmitWith(')
+    expect(errors('form(onSubmit|passive={f}) x')).toEqual([expect.stringContaining('cannot go on `onSubmit`')])
     expect(dom('onClick|capture|passive={f}')).toContain('KayListenWith(KayN0_0, "onClick", (kayEvent) => { return (f)?.(kayEvent) }, { capture: true, passive: true });')
     expect(dom('onClick={f}')).not.toContain('capture')
     expect(compileKay('button(onClick|once|capture={f}) x\n', 'test.kay', { output: 'html' }).tsx).not.toContain('kayDone')
