@@ -5,12 +5,12 @@ import { Elysia } from 'elysia'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const VARIANTS = [
+const VARIANTS: [string, NonNullable<Parameters<typeof pages>[0]>][] = [
   ['at the root', {}],
   ['under a base', { base: '/app' }],
-  ['under a base with a trailing slash', { base: '/app', trailingSlash: 'always' as const }],
+  ['under a base with a trailing slash', { base: '/app', trailingSlash: 'always' }],
   ['with a locale prefix', { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }],
-] as const
+]
 
 // The same site answers through the listener, where Bun routes the request, and through `app.handle`, where Elysia does.
 describe.each(VARIANTS)('a site served %s', (_name, options) => {
@@ -18,8 +18,8 @@ describe.each(VARIANTS)('a site served %s', (_name, options) => {
   let app: Elysia
   let served: Elysia
   // A proxy takes the base off before the request reaches the app.
-  const slash = 'trailingSlash' in options ? '/' : ''
-  const locale = 'i18n' in options ? '/fr' : ''
+  const slash = options.trailingSlash === 'always' ? '/' : ''
+  const locale = options.i18n === undefined ? '' : '/fr'
 
   beforeAll(async () => {
     const dir = await scratchDir('server-listener-')
@@ -28,7 +28,7 @@ describe.each(VARIANTS)('a site served %s', (_name, options) => {
     await Bun.write(`${dir}/src/routes/blog/[slug].kay`, '--- server\nconst { slug } = ctx.params\n---\nh1 post {slug}\n')
     await Bun.write(`${dir}/src/routes/big.kay`, `--- server\nconst x = 1\n---\nh1 big\n${Array.from({ length: 200 }, (_, index) => `p lorem ipsum dolor sit amet ${index}`).join('\n')}\n`)
 
-    const config = { requireGuards: false, root, prebuilt: false, security: false, site: 'https://x.example', serve: { compress: true }, ...options }
+    const config = { requireGuards: false, root, prebuilt: false, security: false as const, site: 'https://x.example', serve: { compress: true }, ...options }
 
     app = new Elysia().use(await pages(config)).listen({ port: 0, hostname: '127.0.0.1' })
     served = new Elysia().use(await pages(config))

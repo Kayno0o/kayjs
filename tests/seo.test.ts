@@ -1,4 +1,6 @@
 import type { HeadTag } from '../src/runtime/head'
+import type { LocaleSettings } from '../src/runtime/i18n'
+import type { LocaleState } from '../src/runtime/locale-state'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
@@ -368,13 +370,13 @@ describe('the social tags a render fills', () => {
 })
 
 describe('the canonical and alternate links of a site with a host per locale', () => {
-  const settings: any = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'exemple.fr' } }
+  const settings: LocaleSettings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'exemple.fr' } }
 
   function linksOf(base: string, path: string, trailingSlash?: 'always'): string[] {
-    const state: any = { locale: 'en', settings, path, host: 'example.com', messages: new Map(), fallback: undefined }
+    const state: LocaleState = { locale: 'en', settings, path, host: 'example.com', messages: new Map() }
     const out = runInLocale(state, () => seoHead('https://example.com', {}, [], trailingSlash, base)!(new URL(`https://example.com${base}${path}`), 200))
 
-    return out.defaults.filter(tag => tag.tag === 'link').map(tag => `${tag.props.rel} ${tag.props.hreflang ?? ''} ${tag.props.href}`.replace('  ', ' '))
+    return (out.defaults ?? []).filter(tag => tag.tag === 'link').map(tag => `${String(tag.props?.rel)} ${String(tag.props?.hreflang ?? '')} ${String(tag.props?.href)}`.replace('  ', ' '))
   }
 
   it('puts the base after each host, as the sitemap does', () => {

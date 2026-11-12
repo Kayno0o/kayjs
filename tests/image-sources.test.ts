@@ -1,3 +1,4 @@
+import type { ImageRouteOptions } from '../src/server/image'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
@@ -326,7 +327,7 @@ describe('images.resolve and images.guard', () => {
 })
 
 describe('the file a src names', () => {
-  const options: any = { clientDir: '/client', cacheDir: '/x', dirs: { '/uploads/': '/tmp/up' } }
+  const options: ImageRouteOptions = { clientDir: '/client', cacheDir: '/x', dirs: { '/uploads/': '/tmp/up' } }
 
   it('ends at a ?, so a query is never part of the path and never hides another file', () => {
     expect(sourceFile('/uploads/a.png', options)).toEqual({ path: '/tmp/up/a.png', immutable: false })
