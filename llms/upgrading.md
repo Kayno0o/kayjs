@@ -129,4 +129,12 @@ The third argument of `@cell(column, row, index, set, issue)` is `index()`, the 
 
 `Stat` and `Chat` (and the `ChatLauncher` chat) take `layout` in place of `variant` and mark their root `data-layout`: CSS on `[data-variant=tile]` (Stat) or `[data-variant=plain]` (Chat) reads `[data-layout=tile]` and `[data-layout=plain]` now. The `variant` prop still works, rewritten by `deprecated-ui-props`.
 
+### kayjs-ui popover panels carry a role
+
+A Popover panel, which had no role unless given one, is `role="dialog"` by default (its new `role` prop), and so is MultiSelect's panel, `role="group"` before; Menu, AppSwitcher and Bell panels are `role="none"` around their own list. A test or CSS selecting a panel by `[role="group"]` selects `[role="dialog"]` now.
+
+### A disabled IconButton stays focusable
+
+An IconButton with a `label` shows it as a tooltip, so a disabled one is `aria-disabled="true"` with no `disabled` attribute, to stay reachable for its tooltip (since 1.80): a test reading `button.disabled` reads `aria-disabled` instead.
+
 Releases before 1.98 are in [Upgrading, older releases](upgrading-archive.md).
