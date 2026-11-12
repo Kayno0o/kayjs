@@ -1,0 +1,17 @@
+---
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// A Dialog and a SidePanel that leave `open` out: each keeps its own state, opened by its trigger; `onOpenChange` is optional.
+const { onOpenChange } = props<{ onOpenChange?: ((name: string, open: boolean) => unknown) | undefined }>()
+
+const heard = (name: string) => (open: boolean) => onOpenChange?.(name, open)
+---
+Dialog#dialog(title="Own" onOpenChange={heard('dialog')})
+  @trigger(attributes)
+    button#open-dialog({...attributes}) Open dialog
+  input#field(name="field")
+SidePanel#panel(title="Panel" onOpenChange={heard('panel')})
+  @trigger(attributes)
+    button#open-panel({...attributes}) Open panel
+  p Panel body

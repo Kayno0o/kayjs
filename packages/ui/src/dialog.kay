@@ -28,9 +28,11 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, discard, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
-  // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
-  open: boolean
+const { open, trigger, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, discard, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+  // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`. Left out, the dialog keeps its own state, opened by `trigger`.
+  open?: boolean | undefined
+  // Renders what opens the dialog when `open` is left to the component: `@trigger(attributes)`, then `button({...attributes})`.
+  trigger?: Snippet<[attributes: { 'onClick': () => void, 'aria-haspopup': 'dialog' }]> | undefined
   // The heading, and the dialog's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the dialog is then named by that heading's text, or by `label`.
   title: string | Snippet
   // The dialog's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
@@ -60,9 +62,26 @@ const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty
 } & (
   // Makes the close control a link to this URL, for a dialog open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the dialog with no island of its own.
   | { closeHref: string, onOpenChange?: undefined }
-  // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
-  | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown }
+  // Called with `true` when `trigger` opens it and with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
+  | { closeHref?: string | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined }
 )>()
+
+// The state of a dialog the app leaves to the component: `open` wins when given. Every close, the guarded ones too, ends in `closed()`, which comes here.
+const inner = signal(false)
+const isOpen = () => open ?? inner()
+
+function change(next: boolean) {
+  if (open === undefined) {
+    if (inner() === next)
+      return
+
+    inner = next
+  }
+
+  onOpenChange?.(next)
+}
+
+const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as const
 
 // The name a screen reader announces: `label`, else a string title; a markup title names the dialog through its heading, which a `header` block replaces: that one needs a `label`.
 const name = () => label ?? (typeof title === 'string' ? title : undefined)
@@ -73,10 +92,10 @@ const edited = signal(false)
 let dialog: HTMLDialogElement | undefined
 
 // Read once: the open attribute is what the server renders, and the client opens and closes the dialog by its methods.
-const serverOpen = renderedOpen(open, modal, closeHref)
+const serverOpen = renderedOpen(isOpen(), modal, closeHref)
 
 effect(() => {
-  const shown = open
+  const shown = isOpen()
 
   if (dialog)
     syncOpen(dialog, shown, modal)
@@ -87,7 +106,10 @@ const guarded = () => edited() && modal && !autosave && !dirty && discard !== fa
 
 function closed() {
   edited = false
-  leave(closeHref, onOpenChange)
+  if (followsHref(closeHref, onOpenChange))
+    leave(closeHref, onOpenChange)
+  else
+    change(false)
 }
 
 // Escape, which the dialog hears itself while typed text is at stake.
@@ -122,9 +144,11 @@ function leaving() {
     dialog?.close()
 }
 ---
+if trigger
+  | {trigger(opener)}
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
-  if open
+dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
+  if isOpen()
     header(part="head")
       if header
         | {header}

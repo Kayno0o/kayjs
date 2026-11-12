@@ -8,6 +8,15 @@ description: A modal dialog driven by an open flag, with a title, a close button
 
 `open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onOpenChange`. `onOpenChange(false)` runs however the dialog closed, Escape and a click outside included. Every disclosure takes `open` and `onOpenChange`.
 
+Leave `open` out and the dialog keeps its own state, opened by a `@trigger` block that spreads the attributes it is handed. `onOpenChange` is then optional, and still called with `true` on opening and `false` on every close.
+
+```kay
+Dialog(title="Rename")
+  @trigger(attributes)
+    button({...attributes}) Rename
+  p Pick a new name.
+```
+
 The `@footer` block holds the buttons. The content renders only while the dialog is open.
 
 ## Typed work is kept

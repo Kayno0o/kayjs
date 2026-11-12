@@ -8,6 +8,17 @@ description: A panel along the edge of the screen, with a head, a body and an op
 
 `open` shows the panel and `onOpenChange(false)` is called however it closes: its close button, a click outside or Escape. Set `open` back to `false` there.
 
+## Keeping its own state
+
+Leave `open` out and the panel keeps its own state, opened by a `@trigger` block that spreads the attributes it is handed (or by its `launcher`). `onOpenChange` is optional, called with `true` and `false`.
+
+```kay
+SidePanel(title="Details")
+  @trigger(attributes)
+    button({...attributes}) Details
+  p The panel's content.
+```
+
 ## Scroll position
 
 A panel kept in place while its content changes, such as one in a `persist` island that shows the next item of a list, keeps the scroll of its body. Give `scrollKey` a value that names the content, an id for instance, and the body goes back to the top whenever it changes.

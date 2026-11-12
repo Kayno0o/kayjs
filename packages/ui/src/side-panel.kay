@@ -24,9 +24,11 @@ const look = recipe({
   },
 })
 
-const { open, title, label, heading, level = 2, actions, header, close, dirty = false, autosave = false, discard, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
-  // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
-  open: boolean
+const { open, trigger, title, label, heading, level = 2, actions, header, close, dirty = false, autosave = false, discard, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
+  // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`. Left out, the panel keeps its own state, opened by `trigger` or its `launcher`.
+  open?: boolean | undefined
+  // Renders what opens the panel when `open` is left to the component: `@trigger(attributes)`, then `button({...attributes})`.
+  trigger?: Snippet<[attributes: { 'onClick': () => void, 'aria-haspopup': 'dialog' }]> | undefined
   // The heading, and the panel's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the panel is then named by that heading's text, or by `label`.
   title: string | Snippet
   // The panel's name for screen readers when it differs from the visible title, such as a short name beside a `@title` full of markup.
@@ -73,7 +75,7 @@ const { open, title, label, heading, level = 2, actions, header, close, dirty = 
   | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
   | { closeHref: string, onOpenChange?: undefined, launcher: string, launcherHref: string }
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link too: the link navigates and `onOpenChange(true)` is called as well.
-  | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown, launcherHref?: string | undefined }
+  | { closeHref?: string | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined, launcherHref?: string | undefined }
 )>()
 
 // A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
@@ -82,8 +84,25 @@ const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom:
 // The launcher's distance from the window's right edge, which what keeps off it counts too.
 const LAUNCHER_GAP = 16
 
+// The state of a panel the app leaves to the component: `open` wins when given. Every close, the guarded ones too, ends in `closed()`, which comes here.
+const inner = signal(false)
+const isOpen = () => open ?? inner()
+
+function change(next: boolean) {
+  if (open === undefined) {
+    if (inner() === next)
+      return
+
+    inner = next
+  }
+
+  onOpenChange?.(next)
+}
+
+const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as const
+
 // Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
-const serverOpen = renderedOpen(open, modal, closeHref)
+const serverOpen = renderedOpen(isOpen(), modal, closeHref)
 // The name a screen reader announces: `label`, else a string title; a markup title names the panel through its heading, which a `header` block replaces: that one needs a `label`.
 const name = () => label ?? (typeof title === 'string' ? title : undefined)
 const titleId = uid()
@@ -96,7 +115,10 @@ const guarded = () => edited() && modal && !autosave && !dirty && discard !== fa
 
 function closed() {
   edited = false
-  leave(closeHref, onOpenChange)
+  if (followsHref(closeHref, onOpenChange))
+    leave(closeHref, onOpenChange)
+  else
+    change(false)
 }
 
 // Escape, which the panel hears itself while typed text is at stake.
@@ -269,7 +291,7 @@ function panelStyle() {
 
 // A shown docked panel makes room on the page and publishes what it holds, for the dev tool's bar and floating drawer to keep out of.
 effect(() => {
-  if (!docked() || dock === undefined || !open)
+  if (!docked() || dock === undefined || !isOpen())
     return
 
   const root = document.documentElement
@@ -313,7 +335,7 @@ effect(() => {
 effect(() => {
   const button = launching()
 
-  if (!button || open)
+  if (!button || isOpen())
     return
 
   const root = document.documentElement
@@ -345,7 +367,7 @@ effect(() => {
 listen(() => window, 'resize', measureSoon)
 
 effect(() => {
-  const shown = open
+  const shown = isOpen()
 
   if (!panel)
     return
@@ -358,16 +380,18 @@ effect(() => {
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(document, 'keydown', event => {
-  if (event.key !== 'Escape' || modal || !open || event.defaultPrevented || event.isComposing || docked() || 'closedBy' in HTMLDialogElement.prototype)
+  if (event.key !== 'Escape' || modal || !isOpen() || event.defaultPrevented || event.isComposing || docked() || 'closedBy' in HTMLDialogElement.prototype)
     return
 
   if (!document.querySelector(':modal, :popover-open'))
     panel?.close()
 })
 ---
+if trigger
+  | {trigger(opener)}
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
 dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
-  if open
+  if isOpen()
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
         span(part="line" data-dock={edge})
@@ -395,5 +419,5 @@ dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && 
     if footer
       div(part="footer")
         | {footer}
-if docked() && !open && launcher
-  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching = element} href={launcherHref} onClick={() => onOpenChange?.(true)})
+if docked() && !isOpen() && launcher
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching = element} href={launcherHref} onClick={() => change(true)})
