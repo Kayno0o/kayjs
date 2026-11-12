@@ -180,10 +180,8 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
   for (let index = start; index < newEnd; index++) {
     const row = byKey.get(keys[index])
 
-    if (row)
-      byKey.delete(keys[index])
-
     if (row) {
+      byKey.delete(keys[index])
       update(row, index)
       middle.push(row)
     }

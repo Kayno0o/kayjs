@@ -34,7 +34,8 @@ export function positionalKeyFix(source: string, span: Span | undefined): Fix[] 
     if (node.kind !== 'for' || node.each.start !== span.start || node.key)
       return
 
-    const unused = source.slice(node.item.start, node.item.end) === 'i' ? 'index' : 'i'
+    const written = source.slice(node.start, node.end)
+    const unused = ['i', 'index', 'at'].find(name => !new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(written)) ?? 'rowIndex'
     const index = node.index ? source.slice(node.index.start, node.index.end) : unused
     const edits = [...node.index ? [] : [{ start: node.item.end, end: node.item.end, text: `, ${index}` }], { start: node.each.end, end: node.each.end, text: ` key={${index}}` }]
 
