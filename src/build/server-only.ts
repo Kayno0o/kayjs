@@ -7,7 +7,7 @@ import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { parseProgram } from '../compiler/estree'
-import { TS_EXPRESSIONS } from '../compiler/estree-shapes'
+import { TS_EXPRESSIONS, viaGlobalThis } from '../compiler/estree-shapes'
 import { parseKay } from '../compiler/parser'
 import { eachDescendant, walkScope } from '../compiler/walk'
 import { readCacheEntry, writeCacheEntry } from './cache'
@@ -118,8 +118,11 @@ export function loadTimeReads(source: string, path: string, names: ReadonlySet<s
         if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => (parent.node.type.startsWith('TS') && !TS_EXPRESSIONS.has(parent.node.type)) || (parent.node.type === 'PropertyDefinition' && !parent.node.static)) !== null)
           return
 
-        if (names.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, guardedBy(names, name)))
-          found.push({ name, start: start + path.node.start })
+        const through = names === SERVER_ONLY ? undefined : viaGlobalThis(path)
+        const read = through ?? { name, at: path.node.start }
+
+        if (names.has(read.name) && (through !== undefined || !path.scope.hasBinding(name, true)) && !defined(path) && !guarded(path, guardedBy(names, read.name)))
+          found.push({ name: read.name, start: start + read.at })
       },
     })
   }
@@ -307,7 +310,13 @@ function references(node: Node): Set<string> {
 function asksTypeof(node: Node, name: Asked): boolean {
   let asked = false
   const ask = (found: Node) => {
-    if (found.type === 'UnaryExpression' && found.operator === 'typeof' && found.argument.type === 'Identifier' && name(found.argument.name))
+    if (found.type !== 'UnaryExpression' || found.operator !== 'typeof')
+      return
+
+    const { argument } = found
+    const through = argument.type === 'MemberExpression' && argument.object.type === 'Identifier' && argument.object.name === 'globalThis' && !argument.computed && argument.property.type === 'Identifier'
+
+    if ((argument.type === 'Identifier' && name(argument.name)) || (through && name(argument.property.name)))
       asked = true
   }
 

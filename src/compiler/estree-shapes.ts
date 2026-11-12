@@ -1,3 +1,6 @@
+import type { NodeOfType } from './estree'
+import type { Path } from './scope'
+
 // The node-type groups kay's scope pass reads, named as the oxc AST (ESTree with TypeScript nodes) names the types.
 // They follow the groups of the scope rules of `@babel/traverse`, which the scope pass reproduces.
 
@@ -26,3 +29,16 @@ export const LOOP_TYPES = group('DoWhileStatement', 'ForInStatement', 'ForStatem
 // TypeScript nodes wrapping a value rather than spelling a type.
 export const TS_EXPRESSIONS: ReadonlySet<string> = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 export const BUILTIN_GLOBALS: ReadonlySet<string> = new Set(['decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape', 'eval', 'globalThis', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape', 'AggregateError', 'Array', 'ArrayBuffer', 'Atomics', 'BigInt', 'BigInt64Array', 'BigUint64Array', 'Boolean', 'DataView', 'Date', 'Error', 'EvalError', 'FinalizationRegistry', 'Float16Array', 'Float32Array', 'Float64Array', 'Function', 'Infinity', 'Int16Array', 'Int32Array', 'Int8Array', 'Intl', 'Iterator', 'JSON', 'Map', 'Math', 'NaN', 'Number', 'Object', 'Promise', 'Proxy', 'RangeError', 'ReferenceError', 'Reflect', 'RegExp', 'Set', 'SharedArrayBuffer', 'String', 'Symbol', 'SyntaxError', 'TypeError', 'Uint16Array', 'Uint32Array', 'Uint8Array', 'Uint8ClampedArray', 'URIError', 'WeakMap', 'WeakRef', 'WeakSet', 'arguments'])
+
+// `globalThis.window.innerWidth`: a name read through `globalThis`, which throws once something is read from it, not as it is looked up.
+export function viaGlobalThis(path: Path<NodeOfType<'Identifier'>>): { name: string, at: number } | undefined {
+  const member = path.parentPath?.node
+  const outer = path.parentPath?.parentPath?.node
+
+  if (path.node.name !== 'globalThis' || path.scope.hasBinding('globalThis', true) || member?.type !== 'MemberExpression' || member.object !== path.node || member.computed || member.property.type !== 'Identifier')
+    return undefined
+
+  const used = (outer?.type === 'MemberExpression' && outer.object === member && !outer.optional) || (outer?.type === 'CallExpression' && outer.callee === member && !outer.optional)
+
+  return used ? { name: member.property.name, at: member.property.start } : undefined
+}

@@ -179,7 +179,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
     }),
     ...onceRead.flatMap(file => report(file, componentTexts.get(file)!, onceReadChecks(componentTexts.get(file)!))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
-    ...(await browserGlobalAtLoad(root, componentTexts, routes)).flatMap(({ file, source, diagnostic }) => report(file, source, [diagnostic])),
+    ...(await browserGlobalAtLoad(root, componentTexts, routes, projectPaths(root, options).cache)).flatMap(({ file, source, diagnostic }) => report(file, source, [diagnostic])),
     ...await builtinImportsInIsland(root, browser?.seeds ?? islands, browser?.edges ?? islandEdges(islands, componentTexts, api), api),
   ]
 

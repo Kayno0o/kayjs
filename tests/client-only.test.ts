@@ -345,6 +345,8 @@ describe('browser-only globals read while rendering', () => {
     const source = '---\nimport { effect, onMount } from \'kay\'\n\nconst location = \'here\'\nconst later = () => alert(\'later\')\neffect(() => console.log(localStorage.length))\nonMount(() => document.body.focus())\nsetTimeout(() => window.scrollTo(0, 0))\nconst at: Window | undefined = undefined\nconst socket = typeof WebSocket\n---\nbutton(onClick={later} ref={() => window.focus()}) {location} {fetch.name} {URL.name} {crypto.randomUUID()} {String(at)} {socket}\n'
 
     expect(reads(source)).toEqual([])
+    expect(reads('---\nconst a = globalThis.window?.name\nconst b = typeof globalThis.document !== \'undefined\' ? globalThis.document.title : \'\'\n---\np {a} {b}\n')).toEqual([])
+    expect(reads('---\nconst title = globalThis.document.title\n---\np {title}\n').map(read => read.text)).toEqual(['document'])
     expect(reads('--- server\nconst status = \'ok\'\n---\np {status}\nfor event of [status] key={event}\n  span {event}\n')).toEqual([])
   })
 

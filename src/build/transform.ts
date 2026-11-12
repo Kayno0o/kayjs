@@ -288,7 +288,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
 
 // An island importing a package that throws as it loads without a DOM renders in the browser only, with no flag to write.
 // The packages its script imports are read off the source once and kept with the other cache entries, so a file already compiled is not parsed again to ask.
-async function clientOnlyIsland(source: string, filename: string, cacheDir: string | undefined): Promise<boolean> {
+export async function clientOnlyIsland(source: string, filename: string, cacheDir: string | undefined): Promise<boolean> {
   if (filename !== withoutTwin(filename) || !mayImportPackage(source))
     return false
 

@@ -3,7 +3,7 @@ import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
 import { visitNodes } from './ast'
 import { isPlainProperty, parseProgram } from './estree'
-import { TS_EXPRESSIONS } from './estree-shapes'
+import { TS_EXPRESSIONS, viaGlobalThis } from './estree-shapes'
 import { browserGlobals } from './host'
 import { importEdits } from './import-edits'
 import { parameterNames } from './items'
@@ -40,7 +40,7 @@ const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex'
 const FENCE_OPENING = '---'
 const SCRIPT_LABEL = /[ \t]+script\b/y
 const AWAIT = /\bawait\b/
-const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
+const TYPEOF_GLOBAL = /\btypeof\s+(?:globalThis\.)?([a-z_$][\w$]*)/gi
 // What may render differently on the server and in the browser, worth a scope analysis in an island.
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
 const LOCALE_METHODS = new Set(['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'])
@@ -127,9 +127,10 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       noteVarying(path)
     },
     Identifier(path) {
-      const { name } = path.node
+      const through = path.node.name === 'globalThis' ? viaGlobalThis(path) : undefined
+      const { name } = through ?? path.node
 
-      if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path) || listenTarget(path))
+      if (!names.has(name) || !path.isReferencedIdentifier() || (through === undefined && path.scope.hasBinding(name, true)) || inType(path) || listenTarget(path))
         return
 
       const holder = path.parentPath!.node
@@ -141,7 +142,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       const chain = functionChain(path)
       const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.node.type === 'Program')?.node : undefined
 
-      reads.push({ name, at: path.node.start, chain, typeOf, statement })
+      reads.push({ name, at: through?.at ?? path.node.start, chain, typeOf, statement })
     },
   })
 

@@ -26,7 +26,7 @@ describe('a module a server render reaches that reads a browser global as it loa
     const root = await project(files)
     const components = new Map(await Promise.all(Object.keys(files).filter(file => file.endsWith('.kay')).map(async file => [join(root, file), files[file]!] as const)))
 
-    const reads = await browserGlobalAtLoad(root, components, join(root, 'src/routes'))
+    const reads = await browserGlobalAtLoad(root, components, join(root, 'src/routes'), join(root, '.kay/cache'))
 
     return reads.map(({ file, source, diagnostic }) => `${file.slice(root.length + 1)}:${source.slice(0, diagnostic.start).split('\n').length} ${diagnostic.message.slice(0, diagnostic.message.indexOf(','))}`)
   }
@@ -74,6 +74,32 @@ describe('a module a server render reaches that reads a browser global as it loa
     expect(await found({ 'src/routes/index.kay': '--- client\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual([])
     expect(await found({ 'src/routes/index.kay': 'p hi\n', ...marker })).toEqual([])
     expect(await found({ 'src/routes/index.kay': '---\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
+  })
+
+  it('leaves what the server never renders: a component used only with `hydrate="client"`, and an island the build demotes for a package that throws on load', async () => {
+    const marker = { 'src/components/marker.kay': '---\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' }
+    const use = (tag: string) => ({ 'src/routes/index.kay': `---\nimport Marker from '../components/marker.kay'\n---\n${tag}\n`, ...marker })
+
+    expect(await found(use('Marker(hydrate="client")'))).toEqual([])
+    expect(await found(use('Marker(hydrate="client")\n  Marker'))).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
+    expect(await found(use('Marker(hydrate="visible")'))).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
+
+    const island = '---\nimport { signal } from \'kay\'\nimport { draw } from \'needs-dom\'\nimport { width } from \'../lib/width\'\n\nconst count = signal(width)\n---\nbutton(onClick={() => draw(count++)}) {count()}\n'
+    const pkg = { 'node_modules/needs-dom/package.json': '{"name":"needs-dom","version":"1.0.0","main":"index.js","type":"module"}', 'node_modules/needs-dom/index.js': 'export const draw = window.document.title.length\n' }
+    const page = '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n'
+
+    expect(await found({ 'src/routes/index.kay': page, 'src/components/counter.kay': island, 'src/lib/width.ts': marker['src/lib/width.ts'], ...pkg })).toEqual([])
+    expect(await found({ 'src/routes/index.kay': page, 'src/components/counter.kay': island.replace('import { draw } from \'needs-dom\'\n', '').replace('draw(count++)', 'count++'), 'src/lib/width.ts': marker['src/lib/width.ts'] })).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
+  })
+
+  it('reads a name through globalThis once something is read from it, and passes a guard, an optional read and the bare lookup', async () => {
+    const through = async (body: string) => found({ ...page, 'src/lib/width.ts': `export const width = 1\n${body}\n` })
+
+    expect(await through('export const a = globalThis.window.innerWidth')).toEqual(['src/lib/width.ts:2 `window` exists only in the browser'])
+    expect(await through('globalThis.document.title = \'x\'')).toEqual(['src/lib/width.ts:2 `document` exists only in the browser'])
+    expect(await through('export const a = globalThis.window?.innerWidth\nexport const b = globalThis.window\nexport const c = globalThis.fetch.name')).toEqual([])
+    expect(await through('export const a = typeof globalThis.window !== \'undefined\' ? globalThis.window.innerWidth : 0')).toEqual([])
+    expect(await through('const globalThis = { window: { innerWidth: 1 } }\nexport const a = globalThis.window.innerWidth')).toEqual([])
   })
 
   it('leaves a module no page imports, and one only a `--- client` component imports', async () => {
