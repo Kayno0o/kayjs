@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
@@ -14,8 +15,10 @@ export interface App {
   branch?: string
   // The folder holding the lockfile the app installs from, relative to the repository root; the root by default.
   install?: string
-  // The packages whose scripts run, relative to the install folder; it alone by default.
-  dirs?: string[]
+  // The packages whose scripts run, relative to the install folder; it alone by default, or 'workspaces' for each workspace of its package.json that has a check, lint or test script.
+  dirs?: string[] | 'workspaces'
+  // Files the repository keeps out of git and its checks read (a compose file's env_file), written empty at these paths from the repository root.
+  stubs?: string[]
   // A script that cannot run in CI, with the reason it prints instead.
   skip?: Partial<Record<Script, string>>
 }
@@ -25,7 +28,6 @@ export type Script = typeof SCRIPTS[number]
 export const SCRIPTS = ['check', 'lint', 'test'] as const
 
 const COMPOSE = 'needs the compose stack of its own test database'
-const ORBIT_DIRS = ['atlas', 'aurora', 'hubble', 'pallas', 'pulsar', 'relay', 'selene', 'shell', 'shell/tests/fixture', 'voyager', 'vulcan']
 const ORBIT_DATABASE = 'needs a database and services only its compose files start'
 
 // The apps of the `kay-sites` memory that have a remote (kay-mail-test has none), with enshrouded's dashboard and mc-stats, which pin kay too; relay/auth is not an orbit workspace, so it installs on its own.
@@ -39,7 +41,7 @@ export const APPS: App[] = [
   { name: 'kayjs-playground', repo: 'kaynooo/kayjs-playground' },
   { name: 'assemblee', repo: 'kaynooo/assemblee' },
   { name: 'azael-kaynooo', repo: 'kaynooo/azael-kaynooo', branch: 'kay-port', skip: { test: COMPOSE } },
-  { name: 'orbit', repo: 'kaynooo/orbit', dirs: ORBIT_DIRS, skip: { test: ORBIT_DATABASE } },
+  { name: 'orbit', repo: 'kaynooo/orbit', dirs: 'workspaces', stubs: ['relay/secrets.env', 'relay/auth/secrets.env'], skip: { test: ORBIT_DATABASE } },
   { name: 'orbit-relay-auth', repo: 'kaynooo/orbit', install: 'relay/auth' },
   { name: 'enshrouded-dashboard', repo: 'kaynooo/enshrouded', install: 'dashboard' },
   { name: 'mc-stats', repo: 'kaynooo/mc-stats' },
@@ -134,6 +136,8 @@ export function pointApp(manifests: Record<string, Manifest>, installPath: strin
 const root = resolve(import.meta.dir, '..')
 const workDir = resolve(process.env.KAY_APPS_DIR ?? join(root, '.kay/apps-ci'))
 const tarballDir = join(workDir, 'tarballs')
+// The clones live outside the kay checkout: from inside it, an app's resolution climbs into kay's own node_modules and finds a second copy of every package kay has.
+const clonesDir = resolve(process.env.KAY_APPS_CLONES ?? join(tmpdir(), 'kay-apps-ci'))
 
 async function packageDirs() {
   return ['.', ...(await Array.fromAsync(new Glob('packages/*').scan({ cwd: root, onlyFiles: false })))]
@@ -198,15 +202,44 @@ async function manifestPaths(directory: string) {
   return files.filter(file => file !== '' && !file.includes('node_modules'))
 }
 
+// The folders of a package.json's `workspaces` (a `dir/*` pattern expanded) that have a check, lint or test script, relative to `installDir`.
+export async function workspaceDirs(installDir: string): Promise<string[]> {
+  const manifest = await Bun.file(join(installDir, 'package.json')).json() as { workspaces?: string[] | { packages?: string[] } }
+  const patterns = Array.isArray(manifest.workspaces) ? manifest.workspaces : manifest.workspaces?.packages ?? []
+  const dirs: string[] = []
+
+  for (const pattern of patterns) {
+    const matches = pattern.includes('*') ? await Array.fromAsync(new Glob(pattern).scan({ cwd: installDir, onlyFiles: false })) : [pattern]
+
+    for (const dir of matches.sort()) {
+      const file = Bun.file(join(installDir, dir, 'package.json'))
+
+      if (!(await file.exists()))
+        continue
+
+      const scripts = ((await file.json()) as Manifest).scripts ?? {}
+
+      if (SCRIPTS.some(script => scripts[script] !== undefined))
+        dirs.push(dir)
+    }
+  }
+
+  return dirs
+}
+
 async function run(app: App) {
-  const directory = join(workDir, 'apps', app.name)
+  const directory = join(clonesDir, app.name)
   const tarballs = await Bun.file(join(tarballDir, 'tarballs.json')).json() as Record<string, string>
-  const dirs = app.dirs ?? ['.']
   const installDir = join(directory, app.install ?? '.')
 
   await rm(directory, { recursive: true, force: true })
-  await mkdir(join(workDir, 'apps'), { recursive: true })
+  await mkdir(clonesDir, { recursive: true })
   await clone(app, directory)
+
+  for (const stub of app.stubs ?? [])
+    await Bun.write(join(directory, stub), '')
+
+  const dirs = app.dirs === 'workspaces' ? await workspaceDirs(installDir) : app.dirs ?? ['.']
 
   const prefix = app.install === undefined ? '' : `${app.install}/`
   const manifests: Record<string, Manifest> = {}
@@ -226,7 +259,8 @@ async function run(app: App) {
 
   // The apps' scripts and their dependencies' install scripts have no use for the token.
   delete env.KAY_APPS_TOKEN
-  const filters = dirs.length > 1 || dirs[0] !== '.' ? dirs.flatMap(dir => ['--filter', dir]) : []
+  // Every workspace installs whole; a listed few install through `--filter ./dir`, which names the folder (a bare `dir` names a package, and matched nothing).
+  const filters = Array.isArray(app.dirs) && (dirs.length > 1 || dirs[0] !== '.') ? dirs.flatMap(dir => ['--filter', `./${dir}`]) : []
 
   console.log(`== ${app.name}: install`)
   await $`bun install ${filters}`.cwd(installDir).env(env)

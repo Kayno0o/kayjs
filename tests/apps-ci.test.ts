@@ -1,6 +1,6 @@
 import { chmod } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
-import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
+import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs } from '../scripts/apps-ci'
 import { BLOCKING, dispatchRun, exitCode, NO_FT, SECRET_UNSET } from '../scripts/release-apps'
 import { scratchDir } from './scratch'
 
@@ -66,6 +66,40 @@ describe('APPS', () => {
       for (const script of Object.keys(app.skip ?? {}))
         expect(SCRIPTS as readonly string[]).toContain(script)
     }
+  })
+})
+
+describe('workspaceDirs', () => {
+  async function workspace(workspaces: unknown, packages: Record<string, Record<string, string> | undefined>) {
+    const dir = await scratchDir('workspaces')
+
+    await Bun.write(`${dir}/package.json`, JSON.stringify({ workspaces }))
+
+    for (const [path, scripts] of Object.entries(packages))
+      await Bun.write(`${dir}/${path}/package.json`, JSON.stringify(scripts === undefined ? {} : { scripts }))
+
+    return dir
+  }
+
+  it('lists each workspace with a check, lint or test script, nested ones and patterns included, in order', async () => {
+    const dir = await workspace(['shell', 'shell/tests/fixture', 'libs/*', 'docs', 'missing'], {
+      'shell': { check: 'kay check' },
+      'shell/tests/fixture': { lint: 'keslint' },
+      'libs/a': { test: 'bun test' },
+      'libs/b': { build: 'kay build' },
+      'docs': undefined,
+    })
+
+    expect(await workspaceDirs(dir)).toEqual(['shell', 'shell/tests/fixture', 'libs/a'])
+  })
+
+  it('reads the packages of the object form, and none from a manifest without workspaces', async () => {
+    expect(await workspaceDirs(await workspace({ packages: ['a'] }, { a: { test: 'bun test' } }))).toEqual(['a'])
+    expect(await workspaceDirs(await workspace(undefined, {}))).toEqual([])
+  })
+
+  it('is how orbit runs every workspace, not a list kept beside it', () => {
+    expect(APPS.find(app => app.name === 'orbit')?.dirs).toBe('workspaces')
   })
 })
 
