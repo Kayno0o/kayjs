@@ -164,4 +164,16 @@ describe('emailed codes', () => {
     expect(await bob.call('email.verifyCode', first.code)).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await bob.call('email.verifyCode', second.code)).toEqual({ ok: true, redirect: '/' })
   })
+
+  test('a verification link refused for another browser leaves its code valid, as it leaves the link', async () => {
+    const { browser, nextCodeMail } = await setup('both')
+    const ada = browser()
+
+    await ada.call('password.register', { email: 'bob@example.com', password: PASSWORD })
+    const mail = await nextCodeMail('verify-email')
+    const link = new URL(mail.url!).searchParams.get('token')!
+
+    expect(await browser().call('email.verify', link)).toMatchObject({ ok: false, error: { code: 'confirm' } })
+    expect(await ada.call('email.verifyCode', mail.code)).toEqual({ ok: true, redirect: '/' })
+  })
 })

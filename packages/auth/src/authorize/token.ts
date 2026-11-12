@@ -6,7 +6,7 @@ import { banned, sameText } from '../core'
 import { digest, randomToken } from '../keys'
 import { spend } from '../limits'
 import { refused } from './reply'
-import { covers, sameResource, sameSite } from './request'
+import { covers, IMPLIED_SCOPES, sameResource, sameSite } from './request'
 
 // Seconds an access token works for, a refresh token unused, and a whole family of them from its first token.
 export const ACCESS_LIFETIME = 60 * 60
@@ -141,7 +141,7 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
 // What a refresh asks for: the scopes and the resource the new tokens get, or the reply refusing a scope the token lacks or a resource it is not bound to.
 function refreshAsk(form: URLSearchParams, root: string, held: OAuthRefreshRecord): { scopes: string[] | null, resource: string | null } | TokenReply {
   const asked = form.get('scope')
-  const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(Boolean)
+  const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(each => each !== '' && !IMPLIED_SCOPES.has(each))
 
   if (asked !== null && !covers(held.scopes, scopes))
     return refused('invalid_scope', 'A refresh cannot add scopes')

@@ -1,6 +1,7 @@
 import type { CodeMode } from '../src/email'
 import type { AuthMailMessage as Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
+import { memoryAuth } from '../src/memoryStore'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
@@ -543,4 +544,29 @@ test('an app without a mailer answers that mail is unavailable', async () => {
   await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
 
   expect(await browser().call('password.requestReset', 'ada@example.com')).toMatchObject({ ok: false, error: { code: 'unavailable' } })
+})
+
+describe('the resend count of an address held by another account', () => {
+  test('is kept under a digest of the address, not the address', async () => {
+    const store = memoryAuth()
+    const keys: string[] = []
+    const hit = store.rates!.hit.bind(store.rates)
+
+    store.rates!.hit = async (key, ...rest) => {
+      keys.push(key)
+
+      return hit(key, ...rest)
+    }
+
+    const { browser } = testApp({ site: 'https://site.test', store, email: { mailer: { send: () => undefined }, links: LINKS } })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+
+    const eve = browser()
+
+    await eve.call('password.register', { email: 'Ada@Example.com', password: PASSWORD })
+    expect(await eve.call('email.sendVerification')).toEqual({ ok: true })
+    expect(keys.filter(key => key.includes('held'))).toHaveLength(1)
+    expect(keys.filter(key => key.includes('ada@example.com'))).toEqual([])
+  })
 })

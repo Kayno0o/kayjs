@@ -515,4 +515,55 @@ describe('the OAuth server being off', () => {
       expect(await app.browser().call('oauthServer.authorize', params('x'))).toEqual({ kind: 'error', error: 'client' })
     }
   })
+
+  test('the consent fields authorize answers are what decide takes back, an empty one meaning absent', async () => {
+    const app = server()
+    const { client_id } = await register(app)
+    const ada = await signedIn(app)
+
+    const cases: Record<string, string | undefined>[] = [{ scope: undefined, state: undefined }, { scope: '', state: '' }, { state: undefined }, { state: '' }]
+
+    for (const extra of cases) {
+      const out = await ada.call('oauthServer.authorize', { ...params(client_id), ...extra, prompt: 'consent' }) as { kind: string, fields: Record<string, string> }
+
+      expect(out.kind).toBe('consent')
+      expect(out.fields.resource).toBe('')
+
+      const answer = await ada.call('oauthServer.decide', { ...out.fields, response_type: 'code', code_challenge_method: 'S256' }, true) as { ok: true, redirect: string }
+      const back = new URL(answer.redirect)
+
+      expect(back.searchParams.get('error')).toBeNull()
+      expect(back.searchParams.get('code')).not.toBeNull()
+      expect(back.searchParams.has('state')).toBe(false)
+    }
+
+    // A resource really asked for still has to be this server's.
+    const foreign = await ada.call('oauthServer.decide', { ...params(client_id), resource: 'https://other.example/' }, true) as { redirect: string }
+
+    expect(new URL(foreign.redirect).searchParams.get('error')).toBe('invalid_target')
+  })
+
+  test('a refresh may ask for the scopes the grant was made with, offline_access included, and no more', async () => {
+    const app = server()
+    const { client_id } = await register(app)
+    const ada = await signedIn(app)
+    const code = await approved(ada, client_id, { scope: 'posts:read offline_access' })
+    const first = await exchange(app, client_id, code)
+    const refresh = async (scope: string, refresh_token: string) => token(app, { grant_type: 'refresh_token', refresh_token, client_id, scope })
+
+    expect(first.body.scope).toBe('posts:read')
+
+    const equal = await refresh('posts:read offline_access', String(first.body.refresh_token))
+
+    expect(equal.status).toBe(200)
+    expect(equal.body.scope).toBe('posts:read')
+
+    const narrower = await refresh('offline_access', String(equal.body.refresh_token))
+
+    expect(narrower.status).toBe(200)
+
+    const wider = await refresh('posts:read posts:write offline_access', String(narrower.body.refresh_token))
+
+    expect(wider).toMatchObject({ status: 400, body: { error: 'invalid_scope' } })
+  })
 })

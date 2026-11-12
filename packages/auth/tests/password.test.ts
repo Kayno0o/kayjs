@@ -145,4 +145,13 @@ describe('signInWithPassword', () => {
 
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'x'.repeat(10_000) })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
+
+  test('signs in with the identifier spelled as it was registered, a fullwidth at sign included', async () => {
+    const { browser } = setup()
+
+    await browser().call('password.register', { email: 'ada＠example.com', password: PASSWORD })
+
+    for (const identifier of ['ada＠example.com', 'ada@example.com', 'ＡＤＡ＠Example.com'])
+      expect(await browser().call('password.signIn', { identifier, password: PASSWORD })).toMatchObject({ ok: true })
+  })
 })

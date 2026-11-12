@@ -266,7 +266,8 @@ async function keepBack(state: RequestState, redirect: string | undefined): Prom
 
 export async function signInWithPassword(state: RequestState, input: PasswordSignInInput, options: Pick<SignInOptions, 'redirect' | 'captcha'>): Promise<PasswordSignInResult> {
   const { store } = state.core
-  const byEmail = input.identifier.includes('@')
+  // Registration reads the address NFKC-normalised, so a fullwidth at sign names an email here too.
+  const byEmail = input.identifier.normalize('NFKC').includes('@')
   const identifier = byEmail ? normalizeEmail(input.identifier) : normalizeUsername(input.identifier)
 
   const refused = await admit(state, 'sign-in', options.captcha)

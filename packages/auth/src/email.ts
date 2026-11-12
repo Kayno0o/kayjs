@@ -101,7 +101,7 @@ export async function sendVerification(state: RequestState): Promise<SendVerific
   if (!state.core.email)
     return failed('unavailable')
 
-  const refused = await spendResend(state, record?.id ?? `held:${email}`, 'resend')
+  const refused = await spendResend(state, record?.id ?? typedKey(state.core, 'held', email), 'resend')
 
   if (refused)
     return refused
@@ -140,6 +140,7 @@ export async function verifyEmail(state: RequestState, token: string, password?:
     }
   }
 
+  await dropCode(state, record, 'verify-email')
   await state.core.store.users.update(record.id, { emailVerifiedAt: new Date() })
 
   return { ok: true, redirect: afterVerifying(state, current?.id === record.id, spent.token.redirect) }
@@ -229,6 +230,8 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
 
   if (!spent.ok)
     return spent
+
+  await dropCode(state, spent.record, 'magic-link')
 
   const record = spent.record.emailVerifiedAt === null
     ? await state.core.store.users.update(spent.record.id, { ...await claim(state.core, spent.record), emailVerifiedAt: new Date() }) ?? spent.record
@@ -521,6 +524,11 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
   await mail.mailer.send({ to: email, kind: type, name: core.name, locale, ...content, maxAge, ...templates[type]({ name: core.name, email, locale, ...content, maxAge }) })
 }
 
+// The code the same mail carried is spent with its link, once the link is used: a link refused leaves both.
+async function dropCode(state: RequestState, record: UserRecord, type: CodedLink): Promise<void> {
+  await state.core.store.tokens.erase(record.id, CODE_OF[type])
+}
+
 // The token's user, once the token is spent; a link for an address the account no longer has is spent for nothing.
 async function spendLink(state: RequestState, token: string, type: LinkType, counted = false) {
   const { store, limits } = state.core
@@ -533,10 +541,6 @@ async function spendLink(state: RequestState, token: string, type: LinkType, cou
 
   if (!spent || !record || (type !== 'change-email' && record.email !== spent.email))
     return failed('invalid')
-
-  // The code the same mail carried is spent with it.
-  if (type in CODE_OF)
-    await store.tokens.erase(record.id, CODE_OF[type as CodedLink])
 
   return { ok: true, token: spent, record, remember: type === 'magic-link' ? rememberOf(token) : undefined } as const
 }

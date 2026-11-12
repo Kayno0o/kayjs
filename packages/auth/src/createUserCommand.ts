@@ -139,7 +139,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       if (login === undefined || login === '')
         return refuse('auth create-user needs the email or the username to sign in with')
 
-      const isEmail = login.includes('@')
+      const isEmail = login.normalize('NFKC').includes('@')
 
       if (isEmail && values.email !== undefined)
         return refuse('auth create-user was given two emails: the one to sign in with, and --email')

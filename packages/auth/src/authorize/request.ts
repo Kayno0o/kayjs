@@ -16,8 +16,9 @@ export const CODE_LIFETIME = 60
 const PARAM_MAX_LENGTH = 2048
 const CHALLENGE = /^[\w-]{43}$/
 const WHITESPACE = /\s+/
+
 // Asked by clients that want a refresh token, which every client is given.
-const IMPLIED_SCOPES = new Set(['offline_access'])
+export const IMPLIED_SCOPES = new Set(['offline_access'])
 
 // What the authorization endpoint reads off the request, as the client sent it.
 export type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'prompt', string | undefined>> & {
@@ -53,8 +54,9 @@ interface Checked {
   params: AuthorizeParams
 }
 
+// A parameter as a string, an empty one counting as absent: the consent form posts the ones the client left out back empty.
 function oneOf(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length <= PARAM_MAX_LENGTH ? value : undefined
+  return typeof value === 'string' && value !== '' && value.length <= PARAM_MAX_LENGTH ? value : undefined
 }
 
 // Whether `held` covers `wanted`: null is every scope.
