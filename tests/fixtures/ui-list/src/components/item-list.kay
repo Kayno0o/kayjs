@@ -1,0 +1,50 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import { toast } from '@kaynooo/kayjs-ui'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { signal } from 'kay'
+
+interface Item { id: number, name: string, state: string, seen: number }
+
+const { items } = props<{ items: Item[] }>()
+const rows = signal(items)
+const editing = signal<Item | undefined>(undefined)
+
+const COLUMNS: Column<Item>[] = [
+  { key: 'name', header: 'Name', sortValue: row => row.name, cell: true },
+  { key: 'state', header: 'State', sortValue: row => row.state, cell: true },
+  { key: 'actions', header: '', cell: true },
+]
+
+async function remove(item: Item): Promise<void> {
+  rows.set(list => list.filter(row => row.id !== item.id))
+  toast(`${item.name} removed`)
+}
+---
+Table(columns={COLUMNS} rows={rows()} rowKey="id" pageSize={20} filter={row => [row.name]} filterPlaceholder="Filter items")
+  @cell(row, column)
+    if column.key === 'name'
+      span.font-medium {row.name}
+    else if column.key === 'state'
+      Badge(label={row.state} tone={row.state === 'down' ? 'danger' : 'success'})
+    else
+      .flex.gap-2
+        Button(label="Edit" variant="ghost" onClick={() => editing = row})
+        ConfirmDelete(message={`Delete ${row.name}?`} failureLabel="Could not delete" onConfirm={async () => remove(row)})
+  @empty
+    EmptyState(title="No item yet")
+Dialog(open={editing() !== undefined} title="Edit item" onOpenChange={(open: boolean) => { if (!open) editing = undefined }})
+  FormField(label="Name" name="name")
+    TextInput(name="name" value={editing()?.name ?? ''})
+  FormField(label="State" name="state")
+    Select(name="state" options={['up', 'down']} value={editing()?.state ?? 'up'})
+  @footer
+    Button(label="Save" tone="accent" onClick={() => editing = undefined})

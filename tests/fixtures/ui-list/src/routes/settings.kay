@@ -1,0 +1,7 @@
+---
+import SettingsForm from '../components/settings-form.kay'
+import StatusCard from '../components/status-card.kay'
+---
+h1 Settings
+StatusCard(up={27} down={13})
+SettingsForm

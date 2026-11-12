@@ -1,4 +1,5 @@
-export interface Size { gzip: number, files: number }
+// `packages` holds the minified bytes each package adds to the page, which only say where a change came from: the gzip and the file count are what a page is held to.
+export interface Size { gzip: number, files: number, packages?: Record<string, number> | undefined }
 
 export interface Row { page: string, was: number, now: number, delta: number, wasFiles: number, nowFiles: number, grew: boolean, shrank: boolean }
 
@@ -50,4 +51,17 @@ export function growth(rows: Row[]): string | undefined {
     return undefined
 
   return `Eager JS grew past ${TOLERANCE} B or gained a file: ${grown.map(row => `${row.page} ${growthOf(row).join(', ')}`).join('; ')}. If the growth is intended, run \`bun scripts/sizes.ts --update\` and commit bench/sizes.json with the change.`
+}
+
+// For each page that grew or shrank, the packages whose minified bytes changed, the largest change first: `ui-list: kayjs-ui +1204, kay -32`.
+export function origins(baseline: Record<string, Size>, sizes: Record<string, Size>, rows: Row[]): string | undefined {
+  const lines = rows.filter(row => row.grew || row.shrank).flatMap(({ page }) => {
+    const was = baseline[page]?.packages ?? {}
+    const now = sizes[page]?.packages ?? {}
+    const changes = [...new Set([...Object.keys(was), ...Object.keys(now)])].map(name => [name, (now[name] ?? 0) - (was[name] ?? 0)] as const).filter(([, delta]) => delta !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+
+    return changes.length === 0 ? [] : [`${page}: ${changes.map(([name, delta]) => `${name} ${delta > 0 ? '+' : ''}${delta}`).join(', ')}`]
+  })
+
+  return lines.length === 0 ? undefined : `Minified bytes by package against the baseline:\n${lines.map(line => `  ${line}`).join('\n')}`
 }

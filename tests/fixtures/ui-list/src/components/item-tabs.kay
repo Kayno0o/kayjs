@@ -1,0 +1,12 @@
+--- island
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Popover from '@kaynooo/kayjs-ui/popover.kay'
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+---
+Tabs(tabs={[{ value: 'recent', label: 'Recent' }, { value: 'flagged', label: 'Flagged' }]} value="recent" label="Items")
+  @panel(value)
+    if value === 'recent'
+      Badge(label="3 new")
+    else
+      Popover(label="Why flagged")
+        p Items flagged by a check.

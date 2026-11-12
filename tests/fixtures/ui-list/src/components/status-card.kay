@@ -1,0 +1,15 @@
+---
+import { toast } from '@kaynooo/kayjs-ui'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import { signal } from 'kay'
+
+const { up, down } = props<{ up: number, down: number }>()
+const checks = signal(0)
+---
+Card(title="Status")
+  .flex.items-center.gap-2
+    Badge(label={`${up} up`} tone="success")
+    Badge(label={`${down} down`} tone="danger")
+    Button(label={`Check again (${checks()})`} onClick={() => { checks.set(count => count + 1); toast('Checked') }})

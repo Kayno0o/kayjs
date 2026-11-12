@@ -3,7 +3,8 @@ import { cp, mkdir, rm } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { eagerJs, scriptUrls } from './eager-js'
-import { compare, growth, table } from './size-table'
+import { packageBytes } from './size-modules'
+import { compare, growth, origins, table } from './size-table'
 
 // The gzipped JS each tracked page loads up front, against the baseline in bench/sizes.json: `bun scripts/sizes.ts` fails when a page grew past the tolerance of scripts/size-table.ts, `--update` records the sizes measured now, `--report` prints the table and never fails (CI).
 // Each page is measured in a process of its own, one after the other, as a process serves one project and a build is the heavy part.
@@ -14,15 +15,16 @@ const SCRATCH = join(ROOT, '.kay/scratch')
 const BASE = '/repo'
 const CLIENT_PREFIX = /^\/_kay\//
 
-const PAGES = ['static', 'i18n-links', 'live-values', 'bench-products', 'bench-table', 'form-only'] as const
+const PAGES = ['static', 'i18n-links', 'live-values', 'bench-products', 'bench-table', 'form-only', 'ui-list'] as const
 
 type Page = typeof PAGES[number]
 
 // The bench app's pages and the island each hydrates.
 const BENCH: Record<string, string> = { 'bench-products': 'components/counter.kay', 'bench-table': 'components/table.kay' }
 
-function total(loaded: Map<string, { size: number }>): Size {
-  return { gzip: loaded.values().reduce((sum, { size }) => sum + size, 0), files: loaded.size }
+// What a page loads up front, with the minified bytes each package adds to it as the builds of this process recorded them.
+async function total(loaded: Map<string, { size: number }>): Promise<Size> {
+  return { gzip: loaded.values().reduce((sum, { size }) => sum + size, 0), files: loaded.size, packages: await packageBytes(process.env.KAY_SIZE_MODULES!, loaded.keys()) }
 }
 
 // A copy at a path of its own, the same every run, as Bun hashes chunk names from it.
@@ -59,7 +61,7 @@ async function staticHome(): Promise<Size> {
     await rm(out, { recursive: true, force: true })
     await build([relative(ROOT, fixture), '--static', '--outdir', out], { NODE_ENV: 'development', KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remote.port}` })
 
-    return total(await eagerJs(scriptUrls(await Bun.file(join(out, 'index.html')).text()), async url => Bun.file(join(out, url.slice(BASE.length))).text()))
+    return await total(await eagerJs(scriptUrls(await Bun.file(join(out, 'index.html')).text()), async url => Bun.file(join(out, url.slice(BASE.length))).text()))
   }
   finally {
     await remote.stop(true)
@@ -77,7 +79,7 @@ async function i18nLinks(): Promise<Size> {
   const site = await testSite({ root: copy, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }, client: { typography: false }, browser: { path: browserPath() } })
 
   try {
-    return total(await eagerJs(scriptUrls(await (await site.fetch('/en')).text()), async url => (await site.fetch(url)).text()))
+    return await total(await eagerJs(scriptUrls(await (await site.fetch('/en')).text()), async url => (await site.fetch(url)).text()))
   }
   finally {
     await site.close()
@@ -98,6 +100,16 @@ async function servedPage(fixture: string, path: string): Promise<Size> {
   const get = async (url: string) => (await app.handle(new Request(`http://localhost${url}`))).text()
 
   return total(await eagerJs(scriptUrls(await get(path)), get))
+}
+
+// A page a production build of a fixture prerendered, under the fixture's own config, read as the build wrote it.
+async function prerenderedPage(fixture: string, file: string): Promise<Size> {
+  const root = await copyOf(fixture, join(ROOT, 'tests/fixtures', fixture))
+  const client = join(root, '.kay/client')
+
+  await build([root], { NODE_ENV: 'production' })
+
+  return total(await eagerJs(scriptUrls(await Bun.file(join(client, 'pages', file)).text()), async url => Bun.file(join(client, 'dist', url.replace(CLIENT_PREFIX, ''))).text()))
 }
 
 async function benchPage(page: string): Promise<Size> {
@@ -127,6 +139,8 @@ async function measureHere(page: Page): Promise<Size> {
     case 'live-values': return servedPage('live-values', '/')
     // A page posting a form to an action and holding no island, in an app whose other pages hold some.
     case 'form-only': return servedPage('forms', '/described')
+    // A list page of an app on kayjs-ui and Tailwind: a Table with its pager, dialogs and fields, and two other islands sharing components with it.
+    case 'ui-list': return prerenderedPage('ui-list', 'index.html')
     case 'bench-products':
     case 'bench-table': return benchPage(page)
   }
@@ -137,7 +151,14 @@ async function measureAll(): Promise<Record<Page, Size>> {
   const sizes = {} as Record<Page, Size>
 
   for (const page of PAGES) {
-    const child = Bun.spawn([process.execPath, import.meta.path, '--measure', page], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+    const modules = join(SCRATCH, `sizes-${page}-modules.jsonl`)
+
+    await mkdir(SCRATCH, { recursive: true })
+    await rm(modules, { force: true })
+
+    // Every build of the page is recorded, the measuring process's own and those of the Bun processes it starts, a `kay build` or a test site's builder, which take the environment the process started with.
+    const env = { ...process.env, KAY_SIZE_MODULES: modules, BUN_OPTIONS: `${process.env.BUN_OPTIONS ?? ''} --preload ${join(import.meta.dir, 'size-modules.ts')}`.trim() }
+    const child = Bun.spawn([process.execPath, import.meta.path, '--measure', page], { cwd: ROOT, env, stdout: 'pipe', stderr: 'pipe' })
     const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
     if (code !== 0)
@@ -169,6 +190,11 @@ const rows = compare(baseline, sizes)
 const failure = growth(rows)
 
 console.log(table(rows))
+
+const moved = origins(baseline, sizes, rows)
+
+if (moved !== undefined)
+  console.log(`\n${moved}`)
 
 if (flag !== '--report' && failure !== undefined) {
   console.error(`\n${failure}`)

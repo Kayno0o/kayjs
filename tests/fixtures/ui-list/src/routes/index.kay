@@ -1,0 +1,14 @@
+--- server
+// Rendered by the build, so the size script reads the page as written, with no server to start.
+export const page = { prerender: true }
+
+const items = Array.from({ length: 40 }, (_, index) => ({ id: index + 1, name: `Item ${index + 1}`, state: index % 3 === 0 ? 'down' : 'up', seen: 1_790_000_000_000 + index * 60_000 }))
+--- script
+import ItemList from '../components/item-list.kay'
+import ItemTabs from '../components/item-tabs.kay'
+import StatusCard from '../components/status-card.kay'
+---
+h1 Items
+StatusCard(up={27} down={13})
+ItemTabs
+ItemList(items={items})
