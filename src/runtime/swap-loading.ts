@@ -7,11 +7,11 @@ import { swapBody } from './swap-kept'
 // The head, history, scroll, focus and `kay:navigate` are the page's to change once it arrives, so this only morphs the body, as a refresh does; a page already there, or a navigation that moved on, leaves it be.
 export async function showLoading(url: URL, signal: AbortSignal, waiting: () => boolean): Promise<void> {
   // Neither read from nor written to the browser's cache, which could hand the page this answer.
-  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', [LOADING_HEADER]: '1' }, cache: 'no-store', redirect: 'manual', signal })
+  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', [LOADING_HEADER]: '1' }, cache: 'no-store', signal })
 
-  // A route with no loading page answers 204, a guard's refusal or a redirect something else: none is shown.
-  // A page loaded in full has no use for one shown first.
-  if (response.status !== 200 || !response.headers.has(LOADING_HEADER) || response.headers.has(RELOAD_HEADER))
+  // A route with no loading page answers 204 and a guard's refusal something else: none is shown.
+  // A page loaded in full has no use for one shown first, nor has one a redirect led elsewhere than the same page with its trailing slash added or taken off.
+  if (response.status !== 200 || !response.headers.has(LOADING_HEADER) || response.headers.has(RELOAD_HEADER) || (response.redirected && !samePage(new URL(response.url), url)))
     return
 
   const html = await response.text()
@@ -41,4 +41,10 @@ export async function showLoading(url: URL, signal: AbortSignal, waiting: () => 
 
 function entryOf(page: Document): string | null | undefined {
   return page.querySelector(ENTRY_SCRIPT)?.getAttribute('src')
+}
+
+const TRAILING_SLASH = /\/$/
+
+function samePage(found: URL, asked: URL): boolean {
+  return found.search === asked.search && found.pathname.replace(TRAILING_SLASH, '') === asked.pathname.replace(TRAILING_SLASH, '')
 }

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
-import { browserPath, testSite } from '../src/test'
+import { browse, browserPath, testSite } from '../src/test'
 
 const ROOT = 'tests/fixtures/route-loading'
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
@@ -18,8 +18,8 @@ afterAll(async () => {
 
 beforeEach(reset)
 
-async function open(path = '/'): Promise<TestPage> {
-  const made = await testSite({ root: ROOT, browser: { path: chrome }, client: { loadingDelay: '300ms' } })
+async function open(path = '/', options: Record<string, unknown> = {}): Promise<TestPage> {
+  const made = await testSite({ root: ROOT, browser: { path: chrome }, client: { loadingDelay: '300ms' }, ...options })
 
   sites.push(made)
 
@@ -36,7 +36,7 @@ async function watch(page: TestPage): Promise<void> {
     new MutationObserver((records) => {
       for (const record of records) {
         for (const node of record.addedNodes) {
-          if (node instanceof Element && node.matches('p.loading, p.admin-loading'))
+          if (node instanceof Element && node.matches('p.loading, p.admin-loading, p.late-loading'))
             seen.loading++
         }
       }
@@ -143,6 +143,97 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a page f
     await page.waitFor('h1.error')
 
     expect(await page.count('p.loading')).toBe(0)
+  }, 60_000)
+
+  it('shows it under a trailing slash', async () => {
+    await using page = await open('/', { trailingSlash: 'always' })
+
+    await page.click('a.slow')
+    await page.waitFor('p.loading')
+    release('slow', 'X')
+    await page.waitFor('h1', { text: 'Slow X' })
+
+    expect(await page.path()).toBe('/slow/')
+    expect(await page.count('p.loading')).toBe(0)
+    expect(hits.slow).toBe(1)
+  }, 60_000)
+
+  it('shows it under a base, the front of a real deploy taking it off', async () => {
+    const base = '/repo'
+    const site = await testSite({ root: ROOT, browser: { path: chrome }, base, client: { loadingDelay: '300ms' } })
+
+    sites.push(site)
+
+    const front = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url)
+
+        return site.handle(new Request(new URL(`${url.pathname.slice(base.length) || '/'}${url.search}`, 'http://localhost'), { method: request.method, headers: request.headers, body: request.body, redirect: 'manual' }))
+      },
+    })
+    const page = await browse(`${front.url.origin}${base}/`, { path: chrome })
+
+    try {
+      await page.click('a.slow')
+      await page.waitFor('p.loading')
+      release('slow', 'X')
+      await page.waitFor('h1', { text: 'Slow X' })
+
+      expect(await page.path()).toBe(`${base}/slow`)
+      expect(await page.count('p.loading')).toBe(0)
+      expect(hits.slow).toBe(1)
+    }
+    finally {
+      page.close()
+      await front.stop(true)
+    }
+  }, 60_000)
+
+  it('shows it at once with a delay of 0s', async () => {
+    await using page = await open('/', { client: { loadingDelay: '0s' } })
+
+    await page.click('a.slow')
+    await page.waitFor('p.loading')
+    release('slow', 'X')
+    await page.waitFor('h1', { text: 'Slow X' })
+  }, 60_000)
+
+  it('drops a loading page that comes after the page', async () => {
+    await using page = await open()
+
+    await watch(page)
+    await page.click('a.late')
+
+    // The loading request is under way, held by its gate, when the page arrives.
+    const deadline = Date.now() + 10_000
+
+    while ((hits.lateLoading ?? 0) < 1 && Date.now() < deadline)
+      await Bun.sleep(20)
+
+    release('latePage', 'P')
+    await page.waitFor('h1', { text: 'Late P' })
+    release('lateLoading', 'L')
+    await Bun.sleep(500)
+
+    expect(await page.count('p.late-loading')).toBe(0)
+    expect(await page.text('h1')).toBe('Late P')
+    expect((await seen(page)).loading).toBe(0)
+  }, 60_000)
+
+  it('keeps the page as it is when it holds a persist island the loading page lacks', async () => {
+    await using page = await open('/pers')
+
+    await page.click('button.kept')
+    await page.waitFor('button.kept', { text: 'Kept 1' })
+    await page.click('a.slow')
+    await Bun.sleep(900)
+
+    // No loading page took the island away while the page was awaited.
+    expect(await page.count('p.loading')).toBe(0)
+    expect(await page.text('button.kept')).toBe('Kept 1')
+    release('slow', 'X')
+    await page.waitFor('h1', { text: 'Slow X' })
   }, 60_000)
 
   it('shows none for a change of the query of the page it is on', async () => {

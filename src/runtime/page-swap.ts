@@ -258,17 +258,30 @@ async function showLoadingLater(url: URL, flight: NonNullable<typeof inFlight.fe
     return
 
   const waiting = () => isCurrent() && inFlight.fetch === flight
+  const arrived = new AbortController()
+
+  // A loading page still being fetched when the page comes is of no use: it stops, and the server with it.
+  void abortOnArrival(flight.page, arrived)
 
   try {
     // The code loads while the delay runs.
     const [{ showLoading }] = await Promise.all([import('./swap-loading'), new Promise(resolve => setTimeout(resolve, delay))])
 
     if (waiting())
-      await showLoading(url, flight.controller.signal, waiting)
+      await showLoading(url, AbortSignal.any([flight.controller.signal, arrived.signal]), waiting)
   }
   catch {
     // A loading page is a nicety: the page's own swap goes on without it.
   }
+}
+
+async function abortOnArrival(page: Promise<FetchedPage>, arrived: AbortController): Promise<void> {
+  try {
+    await page
+  }
+  catch {}
+
+  arrived.abort()
 }
 
 // Tells the app a swap to another page began: the `loading` state and `kay:navigate-start` on `document`, and the link followed marked pending.

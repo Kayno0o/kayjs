@@ -1,0 +1,6 @@
+--- server
+import { gate } from '../../gates'
+
+const value = await gate('latePage')
+---
+h1 Late {value}

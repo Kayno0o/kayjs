@@ -7,6 +7,8 @@ nav
   a.fast(href="/fast") Fast
   a.stats(href="/admin/stats") Stats
   a.boom(href="/boom") Boom
+  a.pers(href="/pers") Pers
+  a.late(href="/late") Late
   Counter(label="Count")
 main
   slot

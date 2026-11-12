@@ -1,0 +1,6 @@
+--- server
+import { gate } from '../../gates'
+
+await gate('lateLoading')
+---
+p.late-loading Late loading
