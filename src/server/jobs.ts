@@ -1,6 +1,7 @@
 import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
 import type { Hook } from './hooks'
+import type { KayPlugin } from './plugin'
 import type { JobStore } from './queue'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -12,6 +13,7 @@ import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
+import { kayPlugin } from './plugin'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -113,9 +115,9 @@ export function scheduledOf(app: { event?: { start?: readonly unknown[] | undefi
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
 // A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `timeZone` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
-export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): Elysia
-export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): Elysia
-export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key> }, options?: ScheduleOptions): Elysia
+export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): KayPlugin
+export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): KayPlugin
+export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key> }, options?: ScheduleOptions): KayPlugin
 export function schedule(first: Duration | string | Record<string, Jobs>, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
   const table = typeof first === 'object'
   const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
@@ -125,7 +127,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
     throw new KayError('config-invalid', 'kay: schedule takes timeZone, not tz, which 1.102 dropped')
 
   if (options.enabled === false)
-    return new Elysia()
+    return kayPlugin(new Elysia())
 
   const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map((job, place) => [when, job, place] as const))
   const plugins = jobs.map(([when, job, place]) => {
@@ -141,7 +143,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
     return scheduleCron(when, job, own, auto)
   })
 
-  return plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia())
+  return kayPlugin(plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia()))
 }
 
 function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
@@ -367,14 +369,14 @@ export interface BackgroundOptions {
 
 // Starts `work` with the server, for a queue consumer or anything else that runs the whole time; on stop, its signal aborts and the server waits for it to return.
 // Work that throws is logged; it is not started again.
-export function background(work: (signal: AbortSignal) => unknown, options: BackgroundOptions = {}) {
+export function background(work: (signal: AbortSignal) => unknown, options: BackgroundOptions = {}): KayPlugin {
   if (options.enabled === false)
-    return new Elysia()
+    return kayPlugin(new Elysia())
 
   let controller: AbortController | undefined
   let running: Promise<void> | undefined
 
-  return new Elysia()
+  return kayPlugin(new Elysia()
     .onStart(() => {
       if (controller)
         return
@@ -397,5 +399,5 @@ export function background(work: (signal: AbortSignal) => unknown, options: Back
       controller?.abort()
       await running
       controller = undefined
-    })
+    }))
 }

@@ -1,9 +1,9 @@
-import type { AnyElysia } from 'elysia'
 import type { Action, ActionError, FailuresOf, NoInputAction, ResultOf, STAMP_FIELD, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { LogEntry } from '../server/log'
+import type { PluginInput } from '../server/plugin'
 import type { TestContent } from './content'
 import type { PageReading } from './page'
 import type { BrowserOptions, TestPage } from './page-types'
@@ -12,7 +12,7 @@ export interface TestOptions extends PagesOptions {
   // Headers every request of the site sends unless the call gives one of the same name, such as an `authorization` bearer token; `site.as()` adds to them.
   headers?: Record<string, string> | undefined
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
-  use?: AnyElysia[] | undefined
+  use?: PluginInput[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
   // The key the site's MCP endpoint asks for as a bearer token, which `mcp: { key }` in the config otherwise reads from the environment: `site.mcp` sends it unless a call or the site's headers give an `authorization`. A site whose config sets `mcp.key` and gets none here is given a generated one, so its tests need nothing.

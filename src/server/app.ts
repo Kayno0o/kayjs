@@ -3,6 +3,7 @@ import type { Project } from '../project'
 import type { ClientBuild } from './client'
 import type { GuardRequirement } from './guard-requirement'
 import type { ServedRoute } from './guards'
+import type { KayPlugin } from './plugin'
 import type { ClaimedFile } from './public'
 import type { Redirect } from './redirects'
 import type { RouteTable } from './route-table'
@@ -27,6 +28,7 @@ import { refuseLocaleClashes } from './i18n'
 import { dropExitListenerOnStop } from './lifecycle'
 import { mcpKeySetting, resolveMcpKey } from './mcp-key'
 import { checkPageLimits } from './page-limits'
+import { kayPlugin } from './plugin'
 import { checkProxy } from './protection'
 import { claimPublic } from './public'
 import { claimRedirects, readRedirects } from './redirects'
@@ -121,8 +123,8 @@ function refuseScanned({ root, config }: Project<ServedOptions>, { routes, files
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
-export async function servePages(project: Project<ServedOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false) {
-  return (await pagesApp(project, loadClient, false, skipBroken)).app
+export async function servePages(project: Project<ServedOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false): Promise<KayPlugin> {
+  return kayPlugin((await pagesApp(project, loadClient, false, skipBroken)).app)
 }
 
 // The modules declaring an `s.Public` field run before any build starts, so a name meant for the server alone is refused first and the values are there before a page or the browser reads them. Returns their paths.

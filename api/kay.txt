@@ -2585,34 +2585,7 @@ function siteOrigin(): string
 function siteUrl(path?: string): string
 
 [./server] api
-function api<Guarded extends object = object>(options?: ApiOptions): Elysia<"", {
-  decorator: Empty;
-  store: Empty;
-  derive: Empty;
-  resolve: ApiRequest<Guarded>;
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>
+function api<Guarded extends object = object>(options?: ApiOptions): KayPlugin<ApiRequest<Guarded>>
 
 [./server] ApiModule
 interface ApiModule
@@ -2649,34 +2622,7 @@ interface AppStore extends StoreBase
   vitals?: VitalsStore | undefined
 
 [./server] background
-function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>
+function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): KayPlugin
 
 [./server] BackgroundOptions
 interface BackgroundOptions
@@ -3003,7 +2949,7 @@ interface KayConfig extends AppHooks
   trailingSlash?: TrailingSlash | undefined
 
 [./server] KayExtension
-interface KayExtension<Server extends AnyElysia = AnyElysia>
+interface KayExtension<Server extends PluginInput = AnyElysia>
   api?: undefined | { dir: string; prefix?: string | undefined; former?: string | undefined; }
   appFiles?: Record<string, string> | undefined
   asksConsent?: boolean | undefined
@@ -3027,6 +2973,18 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   staticFiles?: Record<string, string> | undefined
   transformPage?: PageHook | undefined
   transformServedPage?: PageHook | undefined
+
+[./server] KayPlugin
+type KayPlugin<Locals extends SingletonBase['resolve'] = Empty, Scope extends 'global' | 'scoped' = 'global'> = Elysia< '', {
+  decorator: Empty, store: Empty, derive: Empty, resolve: Scope extends 'scoped' ? Empty : Locals
+}, {
+  typebox: Empty, error: Empty
+}, {
+  schema: Empty, standaloneSchema: Empty, macro: Empty, macroFn: Empty, parser: Empty, response: Empty
+}, Empty, {
+  derive: Scope extends 'scoped' ? Locals : Empty, resolve: Empty, schema: Empty, standaloneSchema: Empty, response: Empty
+} > & {
+  // The Elysia instance behind the plugin, for code that must call Elysia itself. Not part of kay's stable API: its type follows the Elysia kay is built on. readonly elysia: AnyElysia }
 
 [./server] kv
 function kv(namespace: string, store?: KvStore | undefined): Kv
@@ -3186,34 +3144,7 @@ interface NotifyOptions
 type PageHook = (page: RenderedPage) => string | Promise<string>
 
 [./server] pages
-function pages(options?: PagesOptions): Promise<Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>>
+function pages(options?: PagesOptions): Promise<KayPlugin>
 
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
@@ -3315,6 +3246,9 @@ function pgJobs(source: PgSource): JobStore
 [./server] PgSource
 type PgSource = SQL | { sql: SQL } | string
 
+[./server] PluginInput
+type PluginInput = AnyElysia | KayPlugin
+
 [./server] Prefetch
 type Prefetch = 'conservative' | 'moderate' | 'eager' | false
 
@@ -3411,7 +3345,7 @@ interface PutOptions
 function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress>
 
 [./server] Queue
-type Queue<Payload, Progress = unknown> = Elysia & {
+type Queue<Payload, Progress = unknown> = KayPlugin & {
   // Keeps the job for a worker to run, surviving a restart;
   resolves with its id once stored. enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string> // The waiting or running job with that key, else the last one with it that failed, or the job of that id;
   undefined for one that completed or never was. Needs a store with `state()`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have. job: (job: string | {
@@ -3618,92 +3552,11 @@ function s3Files(options?: S3Options & { publicUrl?: string | undefined; } & Fil
 function safePath(root: string, name: string): string | undefined
 
 [./server] schedule
-function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>
-function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>
+function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): KayPlugin
+function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): KayPlugin
 function schedule<const Table extends Record<string, Jobs>>(table: Table & {
   readonly [Key in keyof Table & string]: WhenOf<Key>;
-}, options?: ScheduleOptions | undefined): Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}, {
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
-}>
+}, options?: ScheduleOptions | undefined): KayPlugin
 
 [./server] ScheduleEveryOptions
 type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone'>
@@ -3735,28 +3588,28 @@ function sendPush(user: string, message: PushMessage, options?: PushSendOptions)
 
 [./server] session
 function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {};
-  resolve: {};
+  decorator: Empty;
+  store: Empty;
+  derive: Empty;
+  resolve: Empty;
 }, {
-  typebox: {};
-  error: {};
+  typebox: Empty;
+  error: Empty;
 }, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {};
-}, {}, {
+  schema: Empty;
+  standaloneSchema: Empty;
+  macro: Empty;
+  macroFn: Empty;
+  parser: Empty;
+  response: Empty;
+}, Empty, {
   derive: {
     readonly session: RequestSession<Data>;
   };
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {};
+  resolve: Empty;
+  schema: Empty;
+  standaloneSchema: Empty;
+  response: Empty;
 }, {
   derive: {};
   resolve: {};
@@ -3764,6 +3617,8 @@ function session<Data extends object = SessionData>(options?: SessionOptions): E
   standaloneSchema: {};
   response: {};
 }> & {
+  readonly elysia: AnyElysia;
+} & {
   deriveSecret: (purpose: string) => string[];
   endsSessionsElsewhere: () => void;
   sharesUnder: (domains: string[]) => void;
@@ -3821,7 +3676,7 @@ interface SessionStore extends StoreBase
 function setSharedNotBefore(read: ((entry: PreviewScope) => Date | Promise<Date | number | undefined> | number | undefined) | undefined): void
 
 [./server] shutdown
-function shutdown(app: AnyElysia, force?: boolean, hookTimeoutMs?: number): Promise<void>
+function shutdown(app: PluginInput, force?: boolean, hookTimeoutMs?: number): Promise<void>
 
 [./server] signed
 const signed: { sign(use: string, value: string, options?: SignOptions): string; verify(use: string, value: string, token: unknown): boolean; }
@@ -3965,7 +3820,7 @@ interface WorkChallengeOptions
 function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
 
 [./server] Workflow
-type Workflow<Input, Known extends Events> = Elysia & {
+type Workflow<Input, Known extends Events> = KayPlugin & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string> // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped. send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean> // Where the run stands; undefined once it completed, was cancelled or never started. status: (id: string) => Promise<WorkflowStatus | undefined> // Ends a run: one not running goes at once, one running stops at its next step. Resolves with whether there was one. cancel: (id: string) => Promise<boolean> // Runs every run whose time has come, here and now, as `drain` of a queue does. drain: () => Promise<number> }
 
 [./server] WorkflowOptions
@@ -4320,7 +4175,7 @@ interface TestOptions extends PagesOptions
   styles?: boolean | undefined
   timeZone?: string | undefined
   trailingSlash?: TrailingSlash | undefined
-  use?: AnyElysia[] | undefined
+  use?: PluginInput[] | undefined
 
 [./test] TestPage
 interface TestPage

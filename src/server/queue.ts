@@ -3,6 +3,7 @@ import type { KayErrorOptions } from '../compiler/errors'
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
+import type { KayPlugin } from './plugin'
 import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
 import { existsSync } from 'node:fs'
@@ -21,8 +22,10 @@ import { dispatch } from './hooks'
 import { statusOf } from './job-status'
 import { stepsQueue } from './job-steps'
 import { memoryJobs } from './memory-jobs'
+import { kayPlugin } from './plugin'
 import { forgetShownJobs, showJobs } from './queue-live'
 import { forgetDrain, inFlightWork, LISTENED_IDLE_POLL, POLL_MS, Scheduler } from './queue-scheduler'
+import { tellingStore } from './queue-telling'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -165,7 +168,7 @@ export interface FailedJob<Payload> {
   error: string
 }
 
-export type Queue<Payload, Progress = unknown> = Elysia & {
+export type Queue<Payload, Progress = unknown> = KayPlugin & {
   // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored.
   enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string>
   // The waiting or running job with that key, else the last one with it that failed, or the job of that id; undefined for one that completed or never was. Needs a store with `state()`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have.
@@ -848,7 +851,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     })
     .onStop(async () => scheduler.stop())
 
-  const queued = Object.assign(plugin, {
+  const queued = Object.assign(kayPlugin(plugin), {
     activate: () => scheduler.activate(),
     enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => inFlightWork(async () => {
       const id = crypto.randomUUID()
@@ -949,56 +952,4 @@ export function forgetQueue(queued: { drain: () => Promise<number> }): void {
       forgetShownJobs(name)
     }
   }
-}
-
-// The changes to the store that move a job in or out of the waiting and running ones, or change what they show.
-const CHANGES = new Set<PropertyKey>(['add', 'claim', 'complete', 'retry', 'release', 'progress', 'update', 'fail', 'revive'])
-
-// The store of a queue with `live`, telling it of each change once the store made it: every path that writes a job, the workers, drains, `remove` and the jobs page alike, goes through it.
-function tellingStore(own: () => JobStore, changed: () => void): () => JobStore {
-  const told = new WeakMap<JobStore, JobStore>()
-
-  return () => {
-    const store = own()
-    let telling = told.get(store)
-
-    if (telling === undefined) {
-      telling = new Proxy(store, {
-        get(target, property, receiver) {
-          const value: unknown = Reflect.get(target, property, receiver)
-
-          if (typeof value !== 'function' || !CHANGES.has(property))
-            return value
-
-          // A claim that found no job changed nothing: an idle queue claims at every look.
-          const tell = (result: unknown) => {
-            if (property !== 'claim' || result !== undefined)
-              changed()
-          }
-
-          return (...args: unknown[]) => {
-            const result: unknown = Reflect.apply(value, target, args)
-
-            if (result instanceof Promise)
-              return toldOnce(result, tell)
-
-            tell(result)
-
-            return result
-          }
-        },
-      })
-      told.set(store, telling)
-    }
-
-    return telling
-  }
-}
-
-async function toldOnce(result: Promise<unknown>, tell: (result: unknown) => void): Promise<unknown> {
-  const value: unknown = await result
-
-  tell(value)
-
-  return value
 }

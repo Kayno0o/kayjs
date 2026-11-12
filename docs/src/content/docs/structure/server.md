@@ -22,6 +22,8 @@ Exporting `app` lets `kay check` check links against your own routes and type `c
 
 A project with nothing custom on its server needs no entry. `kay dev`, `kay start` and `kay build --compile` serve the pages with a server of kay's own on `PORT` and `HOST`. Write a `src/server.ts` for your own routes or an `onStop` hook.
 
+`pages()`, `session()`, `schedule()`, `background()` and `api()` return a `KayPlugin`, which is an Elysia instance in this release: `new Elysia().use(session())` works as before, and a function that takes a plugin accepts any Elysia instance too. When your code has to call Elysia itself, `plugin.elysia` is the instance behind it. Its type follows the Elysia version kay is built on, so it can change between releases, unlike the rest of kay's API.
+
 A plugin, a session or a job needs no entry: each `src/plugins/<name>.ts` default-exports an Elysia plugin (or a function building one), and kay uses them before the pages in the order of their file names, so `ctx.locals` is typed from them. A file starting with `_`, a test and a declaration are not plugins.
 
 ```ts

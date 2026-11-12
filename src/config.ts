@@ -17,11 +17,12 @@ import type { AppHooks } from './server/app-hooks'
 import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
-
 import type { GuardOption } from './server/lazy-guard'
+
 import type { Logger } from './server/log'
 import type { OpenApiConfig } from './server/openapi'
 import type { PageHook } from './server/page-hook'
+import type { PluginInput } from './server/plugin'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
@@ -523,7 +524,7 @@ export interface ExtensionApp {
 }
 
 // What a library hands the app to list in `extensions`: pages it serves, the texts they show, the config it needs and the server plugin they run on, as if they were the app's own.
-export interface KayExtension<Server extends AnyElysia = AnyElysia> {
+export interface KayExtension<Server extends PluginInput = AnyElysia> {
   name: string
   // Set when the extension does nothing without a running server, as a tracker posting to a route of its own: `kay build --static` warns of it, as that export runs no extension's server.
   needsServer?: boolean | undefined

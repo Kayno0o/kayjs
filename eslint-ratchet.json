@@ -241,7 +241,7 @@
     "complexity": 54
   },
   "src/server/queue.ts": {
-    "max-lines": 692,
+    "max-lines": 660,
     "max-lines-per-function": 321
   },
   "src/server/render-document.ts": {

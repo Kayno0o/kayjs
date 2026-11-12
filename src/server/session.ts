@@ -1,6 +1,7 @@
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
+import type { KayPlugin } from './plugin'
 import { statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
@@ -18,6 +19,7 @@ import { dispatch } from './hooks'
 import { maintenance } from './maintenance'
 import { inMemory } from './memory-mark'
 import { WORKER_INDEX } from './parent'
+import { kayPlugin } from './plugin'
 import { onReload } from './reload'
 import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
@@ -192,7 +194,7 @@ const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => 
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
-export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
+export function session<Data extends object = SessionData>(options: SessionOptions = {}): KayPlugin<{ readonly session: RequestSession<Data> }, 'scoped'> & { deriveSecret: (purpose: string) => string[], endsSessionsElsewhere: () => void, sharesUnder: (domains: string[]) => void } {
   // A secret of its own, or the config's once it is read, is settled now; a `session()` made as a module loads comes before the config, so the app's secret is read on first use, or as the server starts.
   let sealing: SessionSecrets | undefined
   const secrets = (): SessionSecrets => sealing ??= sessionSecrets(options)
@@ -255,7 +257,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     config.shared = domains
   }
 
-  return Object.assign(plugin, { deriveSecret, endsSessionsElsewhere, sharesUnder })
+  return Object.assign(kayPlugin(plugin), { deriveSecret, endsSessionsElsewhere, sharesUnder })
 }
 
 // The listed domain a host is, or is a subdomain of, the longest when several are.

@@ -1,5 +1,5 @@
 import type { BeforeHook, Hook } from 'kay/library'
-import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, QueueOptions } from 'kay/server'
+import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, KayPlugin, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
@@ -15,7 +15,7 @@ import { splitList } from '@kaynooo/utils/text'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { checkOptionKeys, configError, decide, dispatch, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, refuse, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, decide, dispatch, escapeHtml as escape, inFlightWork, KayError, kayPlugin, normalizeAddress, refuse, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -110,7 +110,7 @@ export class MailNotConfiguredError extends KayError {
   }
 }
 
-export type Mailer = Elysia & {
+export type Mailer = KayPlugin & {
   // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
   configured: boolean
   // Renders the message and sends it now, throwing when the server refuses it or cannot be reached.
@@ -827,7 +827,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   if (realDelivery !== undefined)
     mountPreview(plugin, render, realDelivery)
 
-  const sending = Object.assign(plugin, {
+  const sending = Object.assign(kayPlugin(plugin), {
     send: async <P extends object>(message: MailMessage<P>) => inFlightWork(async () => {
       ready(message)
 

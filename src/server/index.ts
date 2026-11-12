@@ -1,5 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { PagesOptions } from './app'
+import type { KayPlugin } from './plugin'
 import process from 'node:process'
 import { bunProblem } from '../bun'
 import { KayError } from '../compiler/errors'
@@ -10,6 +11,7 @@ import { listenWhenIdle } from './auto-listen'
 import { bootFailure } from './dev'
 import { recordBootFailure, trackDevErrors } from './dev-errors'
 import { START_PARENT } from './parent'
+import { kayPlugin } from './plugin'
 import { projectSource } from './source'
 import { shareThePort } from './workers'
 
@@ -57,6 +59,7 @@ export { personalData } from './personal-data'
 export { createDataTables, dataTableNames, pgData } from './pg-data'
 export type { PgSource } from './pg-jobs'
 export { createJobTables, jobTableNames, pgJobs } from './pg-jobs'
+export type { KayPlugin, PluginInput } from './plugin'
 export { editedEntry, editRequested, editSessionOf, enterPreview, exitPreview, previewUrl, setSharedNotBefore } from './preview'
 export type { Limiter, LimiterOptions } from './protection'
 export { clientAddress, limiter, memoryRates, rateKey, requestId, sqliteRates } from './protection'
@@ -93,7 +96,7 @@ export { forgetLocalMirrors } from './writes'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
-export async function pages(options: PagesOptions = {}) {
+export async function pages(options: PagesOptions = {}): Promise<KayPlugin> {
   shareThePort()
 
   const problem = bunProblem()
@@ -112,11 +115,11 @@ export async function pages(options: PagesOptions = {}) {
   const loadClient = async () => source.client(project)
 
   // An entry that runs under a kay command, as the executable, or as `bun src/server.ts` itself, and never listens, is listened for; a test or a script importing it is not.
-  const listened = <T extends AnyElysia>(app: T): T => {
+  const listened = (app: AnyElysia): KayPlugin => {
     if (mode.underKayDev || source.embedded || process.env[START_PARENT] !== undefined || Bun.main === project.paths.entry)
       listenWhenIdle(app)
 
-    return app
+    return kayPlugin(app) as unknown as KayPlugin
   }
 
   if (!mode.dev)

@@ -12,6 +12,7 @@ import type { BodyLimit, RouteBodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
+import type { KayPlugin } from './plugin'
 import type { SocketLimits } from './ws-limits'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
 import { underKayDev } from '../build/assets'
@@ -34,6 +35,7 @@ import { loadGuard, requiredGuards } from './guards'
 import { handlerTiming } from './handler-timing'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
+import { kayPlugin } from './plugin'
 import { apiLimitWait, requestId, tooManyRequests } from './protection'
 import { checkApiLimit } from './rate-refusal'
 import { sharedContext } from './render'
@@ -790,7 +792,6 @@ declare module 'elysia' {
 
 // Mapped, so the locals read as the record Elysia's context takes, nothing registered included.
 type ApiLocals = { [Key in keyof Locals]: Locals[Key] }
-type Empty = Record<never, never>
 
 export interface ApiOptions {
   // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a function is read once the server mounts the module, after the config's extensions ran.
@@ -810,7 +811,7 @@ type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: On
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is, and `ctx.guard` and `ctx.once` as a page does.
 // `Guarded` names what the guards above the module return, `api<{ org: Org }>()`; it is an assertion kay does not check, as a library guard's locals are.
-export function api<Guarded extends object = object>(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }> {
+export function api<Guarded extends object = object>(options: ApiOptions = {}): KayPlugin<ApiRequest<Guarded>> {
   const instance = new Elysia()
 
   // `guard` is empty until the module's guards run, which set it, so a `derive` or `resolve` of the module's own reads none; only `request` is read, so Elysia parses nothing more for it.
@@ -835,7 +836,7 @@ export function api<Guarded extends object = object>(options: ApiOptions = {}): 
   // `.ws()` returns the instance, so the chain goes on as it was written.
   instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
 
-  return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }>
+  return kayPlugin(instance) as unknown as KayPlugin<ApiRequest<Guarded>>
 }
 
 // The first thing a schema finds wrong with a value, as text.

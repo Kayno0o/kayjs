@@ -1,7 +1,7 @@
-import type { Elysia } from 'elysia'
 import type { ErrorShape } from '../runtime/api-error'
 import type { Duration } from '../runtime/duration'
 import type { Hook } from './hooks'
+import type { KayPlugin } from './plugin'
 import type { JobContext, JobStore, QueueOptions, RunHold } from './queue'
 import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
@@ -81,7 +81,7 @@ export interface WorkflowStatus {
   error?: string
 }
 
-export type Workflow<Input, Known extends Events> = Elysia & {
+export type Workflow<Input, Known extends Events> = KayPlugin & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored.
   start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string>
   // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped.
@@ -488,7 +488,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
   admin.workflow = { send: async (id, event, data) => flowSend(id, event, data, true), cancel: async jobId => storeOf().complete(jobId) }
 
-  return Object.assign(queued as Elysia, {
+  return Object.assign(queued as unknown as KayPlugin, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {
       const id = runKey(name, startOptions)
 

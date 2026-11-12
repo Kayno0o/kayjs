@@ -1076,6 +1076,9 @@ interface KayErrorOptions extends ErrorOptions
   kind?: string | undefined
   status?: number | undefined
 
+[./library] kayPlugin
+function kayPlugin<Instance extends AnyElysia>(instance: Instance): Instance & { readonly elysia: AnyElysia; }
+
 [./library] keepCookiesPrivate
 function keepCookiesPrivate(set: { headers: Record<string, unknown>; }, response?: unknown): void
 

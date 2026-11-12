@@ -2,6 +2,7 @@ import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
+import type { PluginInput } from './plugin'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { kayLog } from '../runtime/log'
@@ -272,7 +273,7 @@ async function stopServer(server: NonNullable<AnyElysia['server']>, force: boole
 }
 
 // Ends the open event streams, which never finish by themselves, stops the server once its other open requests finished, or at once when `force` is set, then runs each `onStop` hook in turn, awaiting it, which Elysia's own `stop()` does not.
-export async function shutdown(app: AnyElysia, force = false, hookTimeoutMs = STOP_HOOK_TIMEOUT_MS): Promise<void> {
+export async function shutdown(app: PluginInput, force = false, hookTimeoutMs = STOP_HOOK_TIMEOUT_MS): Promise<void> {
   const server = app.server
 
   if (!server)
