@@ -710,7 +710,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
 
-  if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
+  if (BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
   const encoding = advertised && dictionaryAsked(request, dictionary.ref) ? dictionary : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)

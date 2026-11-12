@@ -37,7 +37,7 @@ import { reportServerError } from './report'
 import { withPageTimeout } from './request-timeout'
 import { overHttps, requestUrl } from './request-url'
 import { revalidateStale } from './revalidate'
-import { canonicalPath, withoutSlash } from './routes'
+import { canonicalPath, decodePath, withoutSlash } from './routes'
 import { carryContext, restoreStartedHeaders } from './security'
 import { serveServerIslands } from './server-islands'
 import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
@@ -245,7 +245,8 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     for (const { route, shape } of candidates) {
       const text = positionalParams(shape, route, context.params as Record<string, string | null>)
 
-      if (text === 'malformed')
+      // The listener's router decodes a malformed encoding to U+FFFD where `app.handle`'s gives null, so the path itself is read: either answers 400.
+      if (text === 'malformed' || (shape.positions.length > 0 && url.pathname.split('/').some(segment => decodePath(segment) === undefined)))
         return new Response('Bad request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 
       const params = matchedParams(route, text, matchers)
