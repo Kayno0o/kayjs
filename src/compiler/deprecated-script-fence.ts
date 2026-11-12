@@ -20,7 +20,7 @@ export function spelledOutScriptFence(file: KayFile): Diagnostic[] {
     code: 'deprecated-script-fence',
     checkOnly: true,
     message: '`--- script` is `---` spelled out, deprecated since 1.102',
-    help: 'write `---`: the word is only needed for a script that follows a `--- server` or `--- module` fence',
+    help: 'write `---`: the word is only needed for a script that follows a `--- server`, `--- module` or `--- style` fence',
     fixes: [{ title: 'Write `---`', safe: true, edits: [{ start: line.start + 3, end: line.start + spelled[0].length, text: '' }] }],
   }]
 }

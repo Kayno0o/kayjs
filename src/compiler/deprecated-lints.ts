@@ -148,7 +148,7 @@ export const DEPRECATED_LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.102',
-    summary: '`--- script` as the first fence of a file, `---` since 1.102: the bare line opens the component script wherever no named fence comes before it, so one fence had two spellings. `--- script` stays for a script that follows a `--- server` or `--- module` fence, where a bare `---` would close that fence instead, and `--- client` still replaces `---` rather than modifying it. The old form still works. The fix drops the word, keeping the type parameters of `--- script <T>` as `--- <T>`.',
+    summary: '`--- script` as the first fence of a file, `---` since 1.102: the bare line opens the component script wherever no named fence comes before it, so one fence had two spellings. `--- script` stays for a script that follows a `--- server`, `--- module` or `--- style` fence, where a bare `---` would close that fence instead, and `--- client` still replaces `---` rather than modifying it. The old form still works. The fix drops the word, keeping the type parameters of `--- script <T>` as `--- <T>`.',
     wrong: '--- script\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
     right: '---\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
   },

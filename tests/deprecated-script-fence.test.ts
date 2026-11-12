@@ -42,4 +42,11 @@ describe('deprecated-script-fence', () => {
     expect(found('---\nconst n = 1\n---\npre\n  | --- script\n')).toEqual([])
     expect(found('---\nconst n = 1\n--- script\n---\np {n}\n')).toEqual([])
   })
+
+  it('fixes a CRLF file and follows the configured level', () => {
+    const source = '--- script\r\nconst n = 1\r\n---\r\np {n}\r\n'
+
+    expect(found(source)[0]?.fixed).toBe('---\r\nconst n = 1\r\n---\r\np {n}\r\n')
+    expect(compileKay(source, 'thing.kay', { check: true, lints: { 'deprecated-script-fence': 'allow' } }).diagnostics.filter(d => d.code === 'deprecated-script-fence')).toEqual([])
+  })
 })
