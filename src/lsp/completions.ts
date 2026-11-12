@@ -138,11 +138,8 @@ export async function templateData(host: LspHost, document: Document, wanted: Wa
     data.components = await importedComponents(host, document, project, wanted.kind === 'attribute' ? wanted.tag : undefined)
 
     if (wanted.kind === 'attribute' && !CAPITALIZED.test(wanted.tag)) {
-      data.intrinsic = (await typedProps(host, document, project, wanted.tag, ''))?.map(prop => prop.name)
-
       // A plain element always has attributes, so an empty answer means tsgo was not ready: ask again next time.
-      if (data.intrinsic?.length === 0)
-        project.lookups.typedProps.delete(`${document.file}\0${wanted.tag}\0`)
+      data.intrinsic = (await typedProps(host, document, project, wanted.tag, '', true))?.map(prop => prop.name)
     }
   }
 
@@ -191,7 +188,7 @@ export async function localInterface(host: LspHost, document: Document, project:
 }
 
 // The props TypeScript gives a tag, asked of a copy of the file's shadow with the tag written once more at its end, since the cursor of a completion is not in the shadow itself.
-export async function typedProps(host: LspHost, document: Document, project: Project, tag: string, from: string): Promise<ComponentInterface['props'] | undefined> {
+export async function typedProps(host: LspHost, document: Document, project: Project, tag: string, from: string, emptyFails = false): Promise<ComponentInterface['props'] | undefined> {
   const key = `${document.file}\0${tag}\0${from}`
   const cached = project.lookups.typedProps.get(key)
 
@@ -206,7 +203,7 @@ export async function typedProps(host: LspHost, document: Document, project: Pro
   const props = await asked
 
   // A failed probe is asked again, unless a newer one took its key.
-  if (props === undefined && typedProps.get(key) === asked)
+  if ((props === undefined || (emptyFails && props.length === 0)) && typedProps.get(key) === asked)
     typedProps.delete(key)
 
   return props
