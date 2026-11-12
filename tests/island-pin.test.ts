@@ -181,6 +181,34 @@ describe('island-marker', () => {
   })
 })
 
+describe('a page of the routes directory', () => {
+  const route = 'src/routes/p.kay'
+  const codes = (source: string, filename: string, page: boolean | undefined) => compileKay(source, filename, { check: true, page }).diagnostics.map(diagnostic => diagnostic.code).filter(code => code === 'client-route-fence' || code === 'island-marker')
+  const server = '--- server\nconst b = 1\n'
+
+  it('is refused `--- client` and `--- island` with a server fence or without', () => {
+    for (const fence of ['client', 'island']) {
+      const code = fence === 'client' ? 'client-route-fence' : 'island-marker'
+
+      expect(codes(`--- ${fence}\nconst a = 1\n---\np {a}\n`, route, true)).toEqual([code])
+      expect(codes(`${server}--- ${fence}\nconst a = 1\n---\np {a}\n`, route, true)).toEqual([code])
+      expect(codes(`${server}--- ${fence}\nconst a = 1\n---\np {a}\n`, route, undefined)).toEqual([code])
+    }
+  })
+
+  it('is refused the same in a layout and a special page', () => {
+    expect(codes('--- client\nconst a = 1\n---\np {a}\n', 'src/routes/_layout.kay', true)).toEqual(['client-route-fence'])
+    expect(codes('--- island\nconst a = 1\n---\np {a}\n', 'src/routes/_404.kay', true)).toEqual(['island-marker'])
+  })
+
+  it('leaves a component and a page with no such fence alone', () => {
+    expect(codes('--- client\nconst a = 1\n---\np {a}\n', 'src/components/c.kay', false)).toEqual([])
+    expect(codes('--- island\nconst a = 1\n---\np {a}\n', 'src/components/c.kay', undefined)).toEqual([])
+    expect(codes('--- static\nconst a = 1\n---\np {a}\n', route, true)).toEqual([])
+    expect(codes('---\nconst a = 1\n---\np {a}\n', route, true)).toEqual([])
+  })
+})
+
 describe('beside the pin', () => {
   it('writes the browser-only fix over the pin label, not beside it', () => {
     for (const word of ['island', 'static']) {

@@ -134,8 +134,8 @@ ul
 | `---` | The component script, run wherever the component renders | Every `.kay` file; written `--- <T>` for a generic component |
 | `--- script` | The same fence, for a script that follows a `--- server`, `--- module` or `--- style` fence, where a bare `---` would close that one; as a file's first fence it is the `deprecated-script-fence` lint | After another fence |
 | `--- server` | Code run on the server for each request, never sent to the browser | Pages, layouts and the other `_` route files; `fence-invalid` on a component |
-| `--- client` | Replaces `---`: the component renders in the browser only, `--- client <T>` when generic | Components; `client-route-fence` on a layout, a special page or a page with a `--- server` fence, `fence-invalid` beside `--- module` |
-| `--- island`, `--- static` | Replace `---`: pin the component as an island, or hold it to not being one | Components; `island-marker` for `--- island` on a layout, a special page or a page with a `--- server` fence |
+| `--- client` | Replaces `---`: the component renders in the browser only, `--- client <T>` when generic | Components; `client-route-fence` on a page, a layout or a special page, `fence-invalid` beside `--- module` |
+| `--- island`, `--- static` | Replace `---`: pin the component as an island, or hold it to not being one | Components; `island-marker` for `--- island` on a page, a layout or a special page |
 | `--- module` | Module-level code, run once per bundle, whose exports other files import | Every file; no props, and not on a `--- client` component |
 | `--- style` | CSS scoped to the component | Every file |
 
