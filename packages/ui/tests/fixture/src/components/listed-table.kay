@@ -13,7 +13,7 @@ const { onLoad, onSort, sort, sortParam, filterParam, fields, searchable = false
   searchable?: boolean
 }>()
 
-const feed = infiniteList([{ id: 1, name: 'Io', moons: 0 }, { id: 2, name: 'Europa', moons: 1 }], { pageSize: 2, key: row => row.id, load: onLoad })
+const feed = infiniteList([{ id: 1, name: 'Io', moons: 0 }, { id: 2, name: 'Europa', moons: 1 }], { limit: 2, key: row => row.id, load: onLoad })
 ---
 Table(columns={[{ key: 'name', header: 'Name', sortValue: true, defaultDirection: 'asc' }, { key: 'moons', header: 'Moons', numeric: true }]} list={feed} rowKey="id" onSort={onSort} sort={sort} sortParam={sortParam} filter={searchable ? ['name'] : undefined} filterParam={filterParam} fields={fields})
   @noMatch

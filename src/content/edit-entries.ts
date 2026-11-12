@@ -76,7 +76,7 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
     ...order !== undefined && { orderField: order },
     ...collection.options.single && { single: true as const },
     ...collection.options.single && collection.options.seed !== undefined && { seed: collection.options.seed as Record<string, DataValue> },
-    ...count !== undefined && { count },
+    ...count !== undefined && { total: count, count },
     ...problem !== undefined && { problem },
   }
 }

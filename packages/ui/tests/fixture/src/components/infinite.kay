@@ -13,7 +13,7 @@ const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, f
   expose?: (list: ReturnType<typeof infiniteList<{ id: number }>>) => void
 }>()
 
-const feed = infiniteList(first, { pageSize: size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+const feed = infiniteList(first, { limit: size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
 
 expose?.(feed)
 ---

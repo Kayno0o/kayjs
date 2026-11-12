@@ -25,6 +25,7 @@ kay [./analytics] UmamiOptions.host	1.102.0	deprecated-analytics-options	The old
 kay [./analytics] UmamiOptions.policyUrl	1.102.0	deprecated-analytics-options	The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it.
 kay [./analytics] VitalsOptions.consent	1.103.0	deprecated-await-consent	The old name of `awaitConsent`, which wins when both are given. Removed in 1.103.0; `deprecated-await-consent` rewrites it.
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
+kay [./content] CollectionInfo.count	1.103	-	Named `total` since 1.100, as every count of a list is. Removed in 1.103. No lint: a field an app reads cannot be found by `kay check`.
 kay [./server] ScheduleOptions.tz	1.102.0	deprecated-schedule-tz	The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it.
 kay [./server] StartOptions.id	1.102.0	deprecated-workflow-start-id	The old name of `key`, which wins when both are given. Removed in 1.102.0; `deprecated-workflow-start-id` rewrites it.
 kay [.] Local.pending	2.0.0	deprecated-local-state	The count of writes the server has not taken, which `unsynced()` reads; `pending()` is a boolean at 2.0, as on every source. Removed in 2.0.0; `deprecated-local-state` rewrites it.

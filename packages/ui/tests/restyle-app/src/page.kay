@@ -82,7 +82,7 @@ const planets = [{ id: 1, name: 'Mars' }]
 // An action as the server renders it: a call with its `url`, every reading of it empty.
 const fakeAction = new Proxy(Object.assign(async () => undefined, { url: '/_kay/action/form/fake' }), { get: (target, key) => key in target ? Reflect.get(target, key) : () => undefined }) as unknown as Action<never, unknown>
 
-const feed = infiniteList([{ id: 1 }], { pageSize: 1, key: row => row.id, load: async () => undefined })
+const feed = infiniteList([{ id: 1 }], { limit: 1, key: row => row.id, load: async () => undefined })
 ---
 //- Renders components `src/ui.ts` restyles, for the library's restyle test.
 Card#card(title="Hi" class={{ body: 'p-9' }}) Body

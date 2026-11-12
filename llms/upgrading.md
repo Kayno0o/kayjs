@@ -7,6 +7,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui TreeView and Bell items: `key`, `label`, `href`
 
 A TreeNode's `id` is `key`, and a Bell or BellInbox item's `id`, `title` and `url` are `key`, `label` and `href`, as in every other list (`onRead` and `onSelectedChange` still carry the key). The old names work until 1.103, the new ones winning when both are given. `kay upgrade` rewrites a literal array, nested `children` included, or one bound to a `const` of the page's script (`deprecated-ui-item-keys`); an item built elsewhere, such as the result of a `map`, is renamed by hand. What `notifications.inbox()` answers and `notify()` takes is unchanged, `{ id, title, url }`: the Bell maps it, so an `@item(note)` block reads `note.key`, `note.label` and `note.href` with the old three still there.
+### kayjs-ui: `infiniteList({ limit })`, and a count is `total`
+
+`infiniteList(rows, { pageSize: 20, ... })` is `limit: 20`: the rows a full page holds are the `limit` of the window each page asks for, as `pageFields()` and `PageInput` name it, while `pageSize` stays for a list paged by number (`paginate()`, `Pagination`, a Table). `pageSize` works until 1.103, `limit` winning when both are given, and `deprecated-infinite-list-options` (`kay upgrade`) rewrites it.
+
+`CollectionInfo`, what `collectionInfo()` and `collections()` of `kay/content` answer, reports the number of entries as `total` in place of `count`, the word every list result uses (`pageOf`, kayjs-auth's `ListUsersResult`, kayjs-cms's `ListScreen`). A field an app reads cannot be found by `kay check`, so there is no lint: `count` is still set beside `total` until 1.103, and an app reading `info.count` writes `info.total`.
 
 ## 1.99.0
 

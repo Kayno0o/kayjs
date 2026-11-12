@@ -25,9 +25,10 @@ export interface PageAt<Row> {
   filter: ListFilter
 }
 
+// The rows a full page holds: a page of fewer ends the list. It is the `limit` of the window each page asks for, as `PageInput` and `pageFields` name it; `pageSize` is its name before 1.100, which `deprecated-infinite-list-options` rewrites, and `limit` wins when both are given.
+type PageLimit = { limit: number, pageSize?: number | undefined } | { limit?: number | undefined, /** @deprecated Named `limit` since 1.100: it is the window each page asks for. Removed in 1.103; `deprecated-infinite-list-options` rewrites it. */ pageSize: number }
+
 interface InfiniteListBase<Row> {
-  // The rows a full page holds: a page of fewer ends the list.
-  pageSize: number
   // Tells a row from another, so one already shown is dropped when the list shifts between two pages, and `patch` finds the row to change.
   key?: ((row: Row) => unknown) | undefined
   // The sort the first page is already in, which the first `load` receives.
@@ -60,7 +61,7 @@ export type ActionSource<Row, Target extends Action<never, unknown>> = {
   load?: undefined
 } & RowsOf<Row, Target>
 
-export type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+export type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
 
 export interface InfiniteList<Row> extends Source<LoadStatus> {
   // The rows loaded so far, the first page first.
@@ -149,10 +150,10 @@ function loadFromAction<Row, Target extends Action<never, unknown>>(source: Acti
   }
 }
 
-// The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `pageSize` ends the list, one call runs at a time and a failed page loads no other until `retry`.
+// The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `limit` ends the list, one call runs at a time and a failed page loads no other until `retry`.
 // In an island marked `persist`, the list starts over when the next page changes what it was made from: the first rows when they are given as a function (`() => rows`, which reads the props), and what an action source's `input` function reads, which starts it over from the first page that input asks for.
 export function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
-  const { key, pageSize: size } = options
+  const { key, limit: size = options.pageSize! } = options
   const first = typeof given === 'function' ? untrack(given) : given
   const unloaded = typeof (options as { failure?: unknown }).failure === 'string' ? (options as { failure: string }).failure : ((options as { failure?: AttemptOptions }).failure?.failure ?? 'The page could not be loaded.')
   const load = options.load === undefined ? loadFromAction(options, size) : options.load

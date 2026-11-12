@@ -229,7 +229,7 @@ describe('VirtualList items from a source', () => {
 describe('Table over a list', () => {
   test('draw skeletons while the list loads its first page with no rows, and the rows after', async () => {
     const wait = deferred<Planet[]>()
-    const feed = infiniteList<Planet>([], { pageSize: 2, load: async () => wait.promise })
+    const feed = infiniteList<Planet>([], { limit: 2, load: async () => wait.promise })
 
     mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], list: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
     await settle()
@@ -245,7 +245,7 @@ describe('Table over a list', () => {
 
   test('a failed first page shows LoadMore\'s alert alone, without the empty block, and one loading status', async () => {
     const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
-    const feed = infiniteList<Planet>([], { pageSize: 2, load: async () => {
+    const feed = infiniteList<Planet>([], { limit: 2, load: async () => {
       throw new Error('down')
     } })
 
@@ -306,7 +306,7 @@ describe('Table source callbacks', () => {
 describe('VirtualList over a list', () => {
   test('keeps its loading status for LoadMore while the list is pending', async () => {
     const wait = deferred<string[]>()
-    const feed = infiniteList<string>([], { pageSize: 2, load: async () => wait.promise })
+    const feed = infiniteList<string>([], { limit: 2, load: async () => wait.promise })
 
     mounted = await mountComponent(VirtualList, { list: feed, label: 'Planets', item: (name: string) => name })
     void feed.restart({})
@@ -458,7 +458,7 @@ describe('the empty text of a Table', () => {
 
   test('is drawn for a paged list whose first page is empty, absent while it restarts, and an empty emptyLabel draws nothing', async () => {
     const wait = deferred<Planet[]>()
-    const feed = infiniteList<Planet>([], { pageSize: 2, load: async () => wait.promise })
+    const feed = infiniteList<Planet>([], { limit: 2, load: async () => wait.promise })
 
     mounted = await mountComponent(Table, { columns: COLUMNS, list: feed, rowKey: 'id' })
 

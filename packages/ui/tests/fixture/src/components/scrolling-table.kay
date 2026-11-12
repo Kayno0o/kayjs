@@ -9,7 +9,7 @@ const rowsOf = (from: number, count: number) => Array.from({ length: Math.max(0,
 
 // Pages come back after a tick, counted on the window so a test reads how many were asked for.
 const feed = infiniteList(rowsOf(0, first), {
-  pageSize: size,
+  limit: size,
   key: row => row.id,
   load: async ({ offset }) => {
     const target = window as unknown as { loads: number }

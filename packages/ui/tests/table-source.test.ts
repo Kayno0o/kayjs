@@ -24,7 +24,7 @@ test('a Table takes rows or a list, and fails kay check with neither or both', a
     await Bun.write(join(dir, `src/components/source-${item.name}.kay`), `${item.feed ? '--- island' : '---'}
 ${item.feed ? 'import { infiniteList } from \'@kaynooo/kayjs-ui\'\n' : ''}import Table from '@kaynooo/kayjs-ui/table.kay'
 
-${item.feed ? 'const feed = infiniteList([{ id: 1 }], { pageSize: 1, load: () => [] })' : ''}
+${item.feed ? 'const feed = infiniteList([{ id: 1 }], { limit: 1, load: () => [] })' : ''}
 ---
 Table(columns={[{ key: 'id', header: 'Id' }]} rowKey="id" ${item.props})
 `)

@@ -72,23 +72,23 @@ describe('pageRows', () => {
 
   it('reads the entries of the page asked for alone, the count giving the pages', async () => {
     const { asked, read } = reader()
-    const listed = await pageRows({ ...posts, count: 120 }, '', 9, read, none)
+    const listed = await pageRows({ ...posts, total: 120 }, '', 9, read, none)
 
     expect([listed.page, listed.pages, listed.rows.map(row => row.slug), asked]).toEqual([3, 3, stock.slice(100).map(entry => entry.slug), [{ offset: 100, limit: PAGE_SIZE }]])
   })
 
   it('reads and pages by the size it is given', async () => {
     const { asked, read } = reader()
-    const listed = await pageRows({ ...posts, count: 120 }, '', 2, read, none, 25)
+    const listed = await pageRows({ ...posts, total: 120 }, '', 2, read, none, 25)
 
     expect([listed.page, listed.pages, listed.rows.map(row => row.slug).slice(0, 2), asked]).toEqual([2, 5, ['post-25', 'post-26'], [{ offset: 25, limit: 25 }]])
-    expect((await pageRows({ ...posts, count: 120 }, 'post', 3, read, none, 40)).pages).toBe(3)
+    expect((await pageRows({ ...posts, total: 120 }, 'post', 3, read, none, 40)).pages).toBe(3)
   })
 
   it('reads every entry to search their titles, and none of a collection that cannot be read', async () => {
     const { asked, read } = reader()
 
-    expect((await pageRows({ ...posts, count: 120 }, 'post 11', 1, read, none)).rows.map(row => row.slug)).toEqual(['post-11', 'post-110', 'post-111', 'post-112', 'post-113', 'post-114', 'post-115', 'post-116', 'post-117', 'post-118', 'post-119'])
+    expect((await pageRows({ ...posts, total: 120 }, 'post 11', 1, read, none)).rows.map(row => row.slug)).toEqual(['post-11', 'post-110', 'post-111', 'post-112', 'post-113', 'post-114', 'post-115', 'post-116', 'post-117', 'post-118', 'post-119'])
     expect(await pageRows({ ...posts, problem: 'gone' }, '', 1, read, none)).toEqual({ rows: [], page: 1, pages: 1, total: 0 })
     expect(asked).toEqual([{}])
   })
@@ -96,7 +96,7 @@ describe('pageRows', () => {
 
 describe('pageRows of a localized collection', () => {
   const locales = ['fr', 'en', 'de']
-  const pages: CollectionInfo = { ...posts, kind: 'loaded', localized: true, locales, defaultLocale: 'fr', count: 120 }
+  const pages: CollectionInfo = { ...posts, kind: 'loaded', localized: true, locales, defaultLocale: 'fr', total: 120 }
   const stock: SourceEntry[] = Array.from({ length: 120 }, (_, i) => ({ slug: `page-${i}`, locale: 'fr', data: { title: `Page ${i}`, ...i === 0 && { translationKey: 'home' } }, draft: false }))
   // `home` is also written as `accueil` in en, a translation that carries another slug.
   const index = new Map([['home', new Map([['fr', 'page-0'], ['en', 'accueil']])], ...stock.slice(1).map(entry => [entry.slug, new Map([['fr', entry.slug], ['de', entry.slug]])] as const)])
@@ -134,8 +134,8 @@ describe('pageRows versions', () => {
       return `v-${ref.slug}`
     }
 
-    expect((await pageRows({ ...posts, count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual(['v-a', 'v-b'])
-    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([contentVersion(stock[0]!, posts.schema), contentVersion(stock[1]!, posts.schema)])
+    expect((await pageRows({ ...posts, total: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual(['v-a', 'v-b'])
+    expect((await pageRows({ ...posts, kind: 'loaded', total: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([contentVersion(stock[0]!, posts.schema), contentVersion(stock[1]!, posts.schema)])
     expect(asked).toEqual(['a', 'b'])
   })
 })
@@ -163,14 +163,14 @@ describe('pageRows of an ordered collection', () => {
   const read = async () => stock
 
   it('lists the entries by their order, each saying which way it can move, a broken one none', async () => {
-    const listed = await pageRows({ ...shelf, count: 5 }, '', 1, read, none)
+    const listed = await pageRows({ ...shelf, total: 5 }, '', 1, read, none)
 
     expect(listed.rows.map(row => [row.slug, row.move])).toEqual([['a', { up: false, down: true }], ['b', { up: true, down: true }], ['c', { up: true, down: true }], ['z', { up: true, down: false }], ['bad', undefined]])
   })
 
   it('pages the ordered rows and offers no move while a search narrows them', async () => {
-    expect((await pageRows({ ...shelf, count: 5 }, '', 2, read, none, 2)).rows.map(row => row.slug)).toEqual(['c', 'z'])
-    expect((await pageRows({ ...shelf, count: 5 }, 'b', 1, read, none)).rows.map(row => [row.slug, row.move])).toEqual([['b', undefined], ['bad', undefined]])
+    expect((await pageRows({ ...shelf, total: 5 }, '', 2, read, none, 2)).rows.map(row => row.slug)).toEqual(['c', 'z'])
+    expect((await pageRows({ ...shelf, total: 5 }, 'b', 1, read, none)).rows.map(row => [row.slug, row.move])).toEqual([['b', undefined], ['bad', undefined]])
   })
 
   it('orders each locale apart', async () => {
@@ -208,7 +208,7 @@ describe('search', () => {
 
   it('counts every entry the search keeps across the pages', async () => {
     const many: SourceEntry[] = Array.from({ length: 120 }, (_, i) => ({ slug: `p-${i}`, data: { title: `Post ${i}` }, draft: false }))
-    const listed = await pageRows({ ...posts, count: 120 }, 'post 1', 2, async () => many, none, 10)
+    const listed = await pageRows({ ...posts, total: 120 }, 'post 1', 2, async () => many, none, 10)
 
     expect([listed.total, listed.pages, listed.rows.length]).toEqual([39, 4, 10])
   })

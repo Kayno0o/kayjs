@@ -175,7 +175,7 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   status: () => LoadStatus
 
 [.] InfiniteListOptions
-type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
 
 [.] InfinitePage
 type InfinitePage<Row> = Row[] | undefined

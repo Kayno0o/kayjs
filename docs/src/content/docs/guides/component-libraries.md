@@ -179,7 +179,9 @@ kay and its libraries name the same idea the same way. A new option, export or f
 - `maxAge` is how long something stays valid. `timeout` is how long to wait. `expires` is a date.
 - `maxSize` is one size limit and takes bytes or a string such as `'2mb'`; a map of limits by path is `maxSizeByPath`, as the extension's and the config's `limits.byPath` are.
 - `rateLimit` sets a rate limit with `max` and `window`, or a list of them. `key` says who is counted, `store` where. A library with several limits nests them under `rateLimit`.
-- A list by page uses `page` and `pageSize`. A window onto a list uses `limit` and `offset`.
+- A list by page uses `page` and `pageSize`, and reports `page`, `pages` and `total`. A window onto a list uses `limit` and `offset`. A list is paged one way or the other, and a count of its rows is always `total`, never `count`.
+- A cursor is for an API that truly pages by one, such as the audit log of kayjs-auth, and is named `cursor` or `before`.
+- An app wiring `infiniteList`, `Pagination` and `paginate` writes the same words in each: `limit` and `offset` for the window of an infinite list, `page`, `pages` and `pageSize` for numbered pages.
 - Look goes in the library's settings module. Behaviour goes in the call.
 
 ### Hooks and switches

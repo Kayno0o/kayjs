@@ -4,7 +4,7 @@ description: The end of an infinite-scroll list that loads its pages by offset o
 
 <Demo name="load-more/basic" />
 
-`infiniteList(firstRows, { pageSize, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.rows()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(list={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
+`infiniteList(firstRows, { limit, key, load })` owns the rows: pass it the first page the server rendered, and draw `list.rows()` however you like, in a `Table`, a `Masonry` or a plain `for`. `LoadMore(list={list})` goes after them: it draws the sentinel while there are more rows, a "Loading more…" status while a page is on its way, and nothing once the list has ended.
 
 `load({ offset, last })` resolves to the next page. A source paging by offset skips `offset` rows, which counts every row fetched so far, duplicates included; one paging by cursor continues after `last`, the last row fetched. A page of fewer than `size` rows ends the list, and a list whose last page was exactly `size` ends on the one empty page after it. One page loads at a time, however often the sentinel fires.
 
@@ -36,7 +36,7 @@ A list follows what it reads, which the props a `persist` island gets from the n
 
 Pass the first rows as a function, `infiniteList(() => rows, ...)`, to start over from new rows when the `rows` prop changes. A plain array and an `input` that reads nothing keep the rows: give the island another `persist` value for each input.
 
-An action loading the pages replaces `load`: `infiniteList(first, { pageSize, key, action: listPeople, input: { team }, failure: 'Could not load people.' })`. Each page calls it with `{ refresh: false }` through `attempt`, so a failed call toasts `failure` and fails the page. `input` holds the call's other fields; `offset` and `limit` are added from the page.
+An action loading the pages replaces `load`: `infiniteList(first, { limit, key, action: listPeople, input: { team }, failure: 'Could not load people.' })`. Each page calls it with `{ refresh: false }` through `attempt`, so a failed call toasts `failure` and fails the page. `input` holds the call's other fields; `offset` and `limit` are added from the page.
 
 For a cursor or a sort, `input` can be a function of where the page starts, such as `at => at.last && { before: at.last.id }` or `at => ({ q: at.filter.text })`. It answers the call with `offset` and `limit` added under what it names, and `undefined` loads an empty page, which is what a list with no row to continue after should do. When the answer is not an array of rows, `rows: answer => answer.items` reads them out.
 

@@ -135,6 +135,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { reply } from \'./reply\'\n---\nChat(action={reply} reasoning={false} thinkingLabel="One moment")',
     right: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { reply } from \'./reply\'\n---\nChat(action={reply} showReasoning={false} waitingLabel="One moment")',
   },
+  'deprecated-infinite-list-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.100',
+    site: true,
+    summary: '`pageSize` in the options of kayjs-ui\'s `infiniteList()`, `limit` since 1.100: the rows a full page holds are the `limit` of the window each page asks for, as `PageInput` and `pageFields` name it, `pageSize` being for a list paged by number (`paginate()`, `Pagination`, a Table). The old name works until 1.103, `limit` winning when both are given. Found in the options object written as the second argument of a call of `infiniteList` imported from `@kaynooo/kayjs-ui`, in the TypeScript files and `.kay` files of the project. The fix renames the key, and writes `limit: pageSize` for a shorthand; an object holding `limit` already is reported with no fix.',
+    wrong: '---\nimport { infiniteList } from \'@kaynooo/kayjs-ui\'\n\nconst people = infiniteList([], { pageSize: 20, load: ({ offset }) => [] })\n---',
+    right: '---\nimport { infiniteList } from \'@kaynooo/kayjs-ui\'\n\nconst people = infiniteList([], { limit: 20, load: ({ offset }) => [] })\n---',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

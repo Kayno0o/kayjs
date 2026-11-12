@@ -318,7 +318,7 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     return versioned(pageOf(kept, page, size), kept.length)
   }
 
-  const total = collection.count ?? 0
+  const total = collection.total ?? 0
   const at = pageAt(total, page, size)
 
   return versioned({ rows: rowsOf(collection, await list({ offset: at.offset, limit: size })), page: at.page, pages: at.pages }, total)

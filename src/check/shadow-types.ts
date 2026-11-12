@@ -44,6 +44,7 @@ import { filterOptions } from './filter-options'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
 import { unguardedRoutes, unguardedTools } from './guards'
+import { infiniteListOptions } from './infinite-list-options'
 import { islandOnlyComponents } from './island-only'
 
 import { largePublicImages } from './large-images'
@@ -170,6 +171,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => awaitConsent(root, options),
   async ({ root, options }) => aiOptions(root, options),
   async ({ root, options }) => filterOptions(root, options),
+  async ({ root, options }) => infiniteListOptions(root, options),
   ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => eventNames(root, options),
 ]

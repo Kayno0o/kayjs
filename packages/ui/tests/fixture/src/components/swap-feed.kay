@@ -4,7 +4,7 @@ import { infiniteList } from '@kaynooo/kayjs-ui'
 const { rows } = props<{ rows: { id: number }[] }>()
 
 // Pages of three rows continuing the ids, with no server.
-const feed = infiniteList(() => rows, { pageSize: 3, key: row => row.id, load: ({ last }) => Array.from({ length: 3 }, (_, index) => ({ id: (last?.id ?? 0) + index + 1 })) })
+const feed = infiniteList(() => rows, { limit: 3, key: row => row.id, load: ({ last }) => Array.from({ length: 3 }, (_, index) => ({ id: (last?.id ?? 0) + index + 1 })) })
 ---
 button#more(type="button" onClick={() => feed.more()}) More
 p#ids {feed.rows().map(row => row.id).join(',')}

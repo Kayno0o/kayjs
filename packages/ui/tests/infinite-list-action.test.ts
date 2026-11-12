@@ -54,7 +54,7 @@ describe('pageFields and pageOf', () => {
 describe('infiniteList over an action', () => {
   test('calls the action with the fixed fields, the offset and the page size, without refreshing the page', async () => {
     const { calls, action: source } = fake(bans(4, 3))
-    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, action: source, input: { host: 'a' }, failure: 'Could not load.' })
+    const list = infiniteList(bans(1, 3), { limit: 3, key: ban => ban.id, action: source, input: { host: 'a' }, failure: 'Could not load.' })
 
     await list.more()
 
@@ -64,19 +64,19 @@ describe('infiniteList over an action', () => {
 
   test('a function input is the whole call, and undefined loads an empty page', async () => {
     const { calls, action: source } = fake(bans(4, 1), bans(7, 1))
-    const list = infiniteList(bans(1, 3), { pageSize: 3, action: source, input: (at: PageAt<Ban>) => at.last && { before: at.last.id }, failure: 'Could not load.' })
+    const list = infiniteList(bans(1, 3), { limit: 3, action: source, input: (at: PageAt<Ban>) => at.last && { before: at.last.id }, failure: 'Could not load.' })
 
     await list.more()
 
     expect(calls.map(call => call.input)).toEqual([{ offset: 3, limit: 3, before: 3 }])
 
-    const own = infiniteList(bans(1, 3), { pageSize: 3, action: source, input: () => ({ limit: 2 }), failure: 'Could not load.' })
+    const own = infiniteList(bans(1, 3), { limit: 3, action: source, input: () => ({ limit: 2 }), failure: 'Could not load.' })
 
     await own.more()
 
     expect(calls.at(-1)?.input).toEqual({ offset: 3, limit: 2 })
 
-    const empty = infiniteList<Ban, typeof source>([], { pageSize: 3, action: source, input: () => undefined, failure: 'Could not load.' })
+    const empty = infiniteList<Ban, typeof source>([], { limit: 3, action: source, input: () => undefined, failure: 'Could not load.' })
 
     await empty.sortBy({ key: 'id', direction: 'asc' })
 
@@ -87,7 +87,7 @@ describe('infiniteList over an action', () => {
 
   test('rows reads them out of the answer, and a call that throws fails the page until a retry', async () => {
     const paged = fake(new Error('down'), { rows: bans(4, 3), total: 9 })
-    const list = infiniteList(bans(1, 3), { pageSize: 3, action: paged.action as unknown as typeof listBans, rows: answer => answer.rows, failure: 'Could not load.' })
+    const list = infiniteList(bans(1, 3), { limit: 3, action: paged.action as unknown as typeof listBans, rows: answer => answer.rows, failure: 'Could not load.' })
 
     await list.more()
 
@@ -103,6 +103,6 @@ describe('infiniteList over an action', () => {
     const paged = fake()
 
     // @ts-expect-error listBans answers `{ rows, total }`, so its list needs `rows`
-    expect(() => infiniteList(bans(1, 3), { pageSize: 3, action: paged.action as unknown as typeof listBans, failure: 'Could not load.' })).not.toThrow()
+    expect(() => infiniteList(bans(1, 3), { limit: 3, action: paged.action as unknown as typeof listBans, failure: 'Could not load.' })).not.toThrow()
   })
 })
