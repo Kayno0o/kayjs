@@ -1,6 +1,46 @@
 # Upgrading, older releases
 
-What each minor release before 1.97 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.98 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.97.0
+
+### Deploy workflow replicas together
+
+A workflow run now keeps each step's result in its own row of the job store. A replica still on an older kay cannot read a run kept this way and leaves its rows behind when it completes it, so move every process sharing a store to this version at once, and do not roll back while runs are in flight.
+
+### `typescript7` and `axe-core` are the app's dev dependencies
+
+kay no longer installs the native compiler (`typescript7`) or `axe-core` with itself: both are optional peers, so a production install carries neither. No `deprecated` lint can carry this: `kay check` needs `typescript7` to run at all, so a lint inside it could not report its absence. The first `kay check` after the upgrade (`kay upgrade` runs it) adds both to `devDependencies`; an app upgraded by hand runs `bun add -d typescript7@npm:typescript@^7.0.2 axe-core@^4.14.0`. Without `typescript7`, `kay check`, `kay build` (which checks) and the editor server stop at once naming that command, and without `axe-core` so do `kay a11y` and `page.a11y()`; `kay doctor` lists both under `peers`. A Docker build that installs with `--production` and runs `kay build` passes `--no-check`, or keeps them installed.
+
+### `kay mcp` needs `--write` to POST and to test
+
+An agent's `render` with a `body` or a method other than GET, HEAD or OPTIONS, and its `test` tool, are refused by a read-only `kay mcp`. Register the server as `kay mcp --write` (in `.mcp.json`) to allow them.
+
+### A `workflow()` run keeps 2 MB at most
+
+A run whose input, events no wait named and kept results (their text) pass 2,000,000 characters fails on its next step, with no retry, naming the cap: a run already past it when you upgrade fails the same way. Return an id from a step that makes a large result and keep the result elsewhere, or split a long loop into runs.
+
+### kayjs-ai: no credentials in an API root
+
+`AI_BASE_URL`, `AI_AUDIO_URL`, `AI_EMBED_URL` and `baseUrl` throw at their first use for an address like `https://user:pass@host/v1`; move the secret to `OPENAI_API_KEY`, `AI_AUDIO_KEY`, `AI_EMBED_KEY` or `apiKey`.
+
+### A template `innerHTML` is checked at runtime
+
+`innerHTML={expr}` on an element now drops a string nothing vouched for with `sanitizeHtml`, `trustHtml` or an icon import, as a spread already did, so a value cast to `SafeHtml` (`as`, `any`) no longer carries markup in; the element stays empty and development warns. A string written out and a project file imported as text are not checked. Wrap the value in `sanitizeHtml(...)` or `trustHtml(...)` where it is used. No `kay check` lint recognises it: a cast leaves no trace once the types are erased.
+
+### kayjs-cms: a forge redirect fails, and `fourEyes` needs a named approver
+
+`forgejo()`, `github()` and `gitlab()` refuse a redirect from the forge, where they followed it with the token: a repository renamed or moved needs its new `repo` in the config. With `cms({ fourEyes: true })`, an approval by a person the guard cannot name (no id, no name) is refused, as it cannot be told from the sender: an app with its own guard passes `cms({ member })` so each person is named.
+
+### kayjs-auth: member emails, a new notice, the forward route's second factor
+
+- `organizations.members(ref)` gives `user.email` as `null` for every other member when the caller does not hold the `manage` role of the organizations options: a page listing members by email shows their username, or whatever the app keeps, instead.
+- `email-change-requested` is a new notice kind (`SecurityEvent`) mailed to the address an account is leaving when `email.change` sends its link, and a new event for `onEvent`: an app with its own `templates`, or a mailer switching on `mail.kind` exhaustively, handles it or falls back to the built-in.
+- `forwardAuth`'s `/forward` route now applies `twoFactor.require`: a user it names without two-factor is sent to the security page (a 403 without the prebuilt pages), where only `requireTwoFactor` did so before. Passing `requireTwoFactor` with a passkey sign-in no longer sends the user to set up an authenticator.
+
+### A `role="group"` is marked `data-invalid`, not `aria-invalid`
+
+ChipGroup, FileDrop, RowsField and the group a FormField marks, and `markInvalid` on any `role="group"`, set `data-invalid` where they set `aria-invalid="true"`, as ARIA 1.2 allows `aria-invalid` on a radio group but not on a plain group. `focusInvalid` finds both, and a `data-invalid` group with no focusable self focuses its first control. An app's CSS or test reading `[aria-invalid]` on one of those groups reads `[data-invalid]` now; a field and a radiogroup (RadioGroup, Segmented, Rating) keep `aria-invalid`. The message still reaches a screen reader through the group's `aria-describedby`.
 
 ## 1.96.0
 

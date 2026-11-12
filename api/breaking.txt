@@ -1,2 +1,0 @@
-ui [./command-palette.kay] default
-ui [./toaster.kay] default
