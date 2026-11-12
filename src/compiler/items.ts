@@ -236,3 +236,8 @@ export function addRowItem(b: CodeBuilder, node: ForNode): void {
   else
     b.add(node.row)
 }
+
+// The attributes the compiler fixes on an element, each with no value.
+export function fixedAttributes(element: ElementNode): [string, string][] {
+  return (element.fixed ?? '').split(' ').filter(name => name !== '').map(name => [name, ''])
+}

@@ -939,7 +939,7 @@ export class HtmlTemplate extends TemplateWriter {
 
     b.add(`${helperName('element')}(${JSON.stringify(element.name)}, `)
     this.spreadOver(element, () => {
-      this.leadingImageDefaults(element)
+      this.leadingImageDefaults(element, true)
       this.sources(element, false)
       this.formDefaults(element)
     })

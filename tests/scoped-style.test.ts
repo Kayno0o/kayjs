@@ -40,6 +40,7 @@ describe('scopeCss', () => {
     expect(scopeCss('p::before { content: "," } a:hover { x: y }', ATTR)).toBe(`p[${ATTR}]::before { content: "," } a:hover[${ATTR}] { x: y }`)
   })
 
+
   it('unwraps :global and scopes the last compound that is not global', () => {
     expect(scopeCss(':global(body) .a, .b :global(.c), :global(.d) { x: y }', ATTR)).toBe(`body .a[${ATTR}], .b[${ATTR}] .c, .d { x: y }`)
   })
@@ -134,6 +135,19 @@ describe('the style fence', () => {
 
     expect(html.split(attribute).length - 1).toBe(2)
     expect(html).not.toContain('<Child')
+  })
+
+  it('marks an element with a spread on the server as the browser does', () => {
+    const cases = ['div({...rest})', 'div.a({...rest})', 'div(class="q" {...rest} id="z")', 'a(href={u} {...rest})', 'input({...rest} type="text")', 'button({...rest} onClick={() => {}})']
+
+    for (const element of cases) {
+      const written = `---\nconst { rest, u } = props<any>()\n--- style\n.a { x: y }\n---\n${element} x\n`
+      const server = compileKay(written, join(root, 'src/a.kay'), { root, output: 'html' }).tsx
+      const dom = compileKay(written, join(root, 'src/a.kay'), { root, output: 'dom' }).tsx
+      const attribute = (/data-k-[a-z0-9]+/).exec(dom)![0]
+
+      expect(server, element).toContain(`{ "${attribute}": "" }`)
+    }
   })
 
   it('marks the elements of the island output alike', () => {
