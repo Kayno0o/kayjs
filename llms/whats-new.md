@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay upgrade` raises a dependency the app shares with kay, `elysia` first, to the version kay's range starts at when the app's range or installed copy is below it, so the app and kay install one copy and `kay check` no longer fails on Elysia's types ([kay upgrade](check-and-tools.md)).
+
 ## 1.102.0
 
 - Content: a `draft` function reads the entry's `excerpt`, `body` and `html` (it saw them empty in production and the CMS), an `s.Date()` that names no day or cannot be decoded is a content problem at its field instead of rolling into the next day or crashing `kay check`, and heading ids keep non-ASCII letters, are never empty and are unique in the entry ([Markdown files](content-markdown-to-caching.md), [upgrade line](upgrading.md)).

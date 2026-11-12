@@ -34,6 +34,8 @@ const KAY_PACKAGE = '@kaynooo/kayjs'
 const SECTION_OPEN = /\s*:\s*\{/y
 const LOCKFILES = ['bun.lock', 'bun.lockb']
 const PRERELEASE = /[-+].*$/
+// The version a range of kay's own dependencies starts at.
+const FLOOR = /(\d+\.\d+\.\d+)/
 const SEMVER = /^\d+\.\d+\.\d+$/
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
@@ -52,9 +54,10 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
 
       for (const { name, spec, section } of changes) {
         const installed = join(root, 'node_modules', name, 'package.json')
-        const wanted = spec.slice(spec.lastIndexOf('~') + 1)
+        // `~1.45.0` or `^1.4.31`, the range the installed copy has to satisfy.
+        const wanted = spec.slice(spec.lastIndexOf('@') + 1)
 
-        if (existsSync(installed) && Bun.semver.satisfies(((await Bun.file(installed).json()) as { version: string }).version, `~${wanted}`))
+        if (existsSync(installed) && Bun.semver.satisfies(((await Bun.file(installed).json()) as { version: string }).version, wanted))
           continue
 
         const flag = SECTION_FLAGS[section] ?? []
@@ -258,14 +261,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
     if (!await deps.install(root, phase.changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
-      await Bun.write(manifest, settled.source)
-
-      for (const { path, content } of settled.locks) {
-        if (content !== undefined)
-          await Bun.write(path, content)
-        else
-          await rm(path, { force: true })
-      }
+      await restore(manifest, settled)
 
       printFailure('upgrade', behind === from
         ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
@@ -286,6 +282,20 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     settled = { source: phase.source, locks: await readLocks(root) }
   }
 
+  const raised = await raiseShared(root, manifest, settled.source)
+
+  if (raised.length > 0) {
+    moved(raised.map(({ change }) => change))
+    step('raised', raised.map(({ change, held }) => `${change.name} to ${change.spec}, which kay ${latestKay} depends on (the app held ${held})`).join(', '))
+
+    if (!await deps.install(root, raised.map(({ change }) => change))) {
+      await restore(manifest, settled)
+      printFailure('upgrade', `the install of ${raised.map(({ change }) => change.name).join(', ')} failed, so package.json and the lockfile are back at kay ${latestKay}; raise them by hand to what kay asks for, then run \`bun install\``, format)
+
+      return 1
+    }
+  }
+
   step('checking', 'what is left')
 
   const left = await deps.kay(root, ['check', '--fix', '--deny-warnings', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
@@ -298,6 +308,86 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
   return finish(clean ? 0 : 1)
+}
+
+async function restore(manifest: string, settled: { source: string, locks: { path: string, content: Uint8Array | undefined }[] }): Promise<void> {
+  await Bun.write(manifest, settled.source)
+
+  for (const { path, content } of settled.locks) {
+    if (content !== undefined)
+      await Bun.write(path, content)
+    else
+      await rm(path, { force: true })
+  }
+}
+
+// A package the app and the installed kay both depend on is installed once only when the app's range and its locked version reach kay's: below it the app keeps its copy and kay gets a second one, whose types do not match the app's (Elysia's `~cookieConfig` is missing).
+// Every package of kay's `dependencies` that the app lists with a plain range is raised to the version kay's range starts at, keeping the app's `~` or `^`, and written in place; `source` is the manifest as the phases left it.
+async function raiseShared(root: string, manifest: string, source: string): Promise<{ change: DependencyChange, held: string }[]> {
+  let kayRanges: Record<string, string>
+
+  try {
+    kayRanges = ((await Bun.file(join(root, 'node_modules/kay/package.json')).json()) as { dependencies?: Record<string, string> }).dependencies ?? {}
+  }
+  catch {
+    // No installed kay to read: what it asks is not known.
+    return []
+  }
+
+  const raised: { change: DependencyChange, held: string }[] = []
+  let written = source
+
+  for (const dependency of sharedDependencies(JSON.parse(source) as Record<string, unknown>, kayRanges)) {
+    const wanted = FLOOR.exec(kayRanges[dependency.name]!)?.[1]
+    const installed = await installedVersion(root, dependency.name)
+    const held = installed !== undefined && Bun.semver.order(installed, dependency.version) === -1 ? installed : dependency.version
+
+    if (wanted === undefined || Bun.semver.order(wanted, held) !== 1)
+      continue
+
+    const spec = `${dependency.spec.startsWith('~') ? '~' : '^'}${wanted}`
+    const replaced = replaceSpec(written, dependency, spec)
+
+    if (replaced !== undefined) {
+      written = replaced
+      raised.push({ change: { name: dependency.name, spec, section: dependency.section }, held })
+    }
+  }
+
+  if (raised.length > 0)
+    await Bun.write(manifest, written)
+
+  return raised
+}
+
+async function installedVersion(root: string, name: string): Promise<string | undefined> {
+  try {
+    return ((await Bun.file(join(root, 'node_modules', name, 'package.json')).json()) as { version?: string }).version
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The app's dependencies that kay's own `dependencies` list too, as a plain range of the registry.
+function sharedDependencies(packageJson: Record<string, unknown>, kayRanges: Record<string, string>): KayDependency[] {
+  const found: KayDependency[] = []
+
+  for (const section of SECTIONS) {
+    const listed = packageJson[section]
+
+    if (typeof listed !== 'object' || listed === null)
+      continue
+
+    for (const [name, spec] of Object.entries(listed)) {
+      const range = typeof spec === 'string' && name in kayRanges ? RANGE.exec(spec) : null
+
+      if (range !== null && range[1] === '')
+        found.push({ name, spec: spec as string, section, registry: name, prefix: '', version: range[2]! })
+    }
+  }
+
+  return found
 }
 
 async function readLocks(root: string): Promise<{ path: string, content: Uint8Array | undefined }[]> {

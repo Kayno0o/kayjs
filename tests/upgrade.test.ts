@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
+import { dependencies as kayDependencies } from '../package.json'
 import { addMissingPeers } from '../src/commands/add-peers'
 import { registryDepsFor, steppingStones, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
@@ -16,7 +17,7 @@ const MANIFEST = `{
   "name": "app",
   "dependencies": {
     "@kaynooo/kayjs-ui": "^1.40.2",
-    "elysia": "^1.4.0",
+    "elysia": "${kayDependencies.elysia}",
     "local-lib": "workspace:*"
   },
   "devDependencies": {
@@ -194,6 +195,60 @@ describe('kay upgrade', () => {
         { name: '@kaynooo/kayjs-ui', spec: '~1.46.0', section: 'dependencies' },
         { name: 'kay', spec: 'npm:@kaynooo/kayjs@~1.46.0', section: 'devDependencies' },
       ]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('raises an elysia below the one kay depends on, whatever its range or its locked copy, so one copy is installed', async () => {
+    const floor = (/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+    const root = await project(MANIFEST.replace(kayDependencies.elysia, '^1.4.0'), { 'node_modules/elysia/package.json': '{ "name": "elysia", "version": "1.4.30" }' })
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(0)
+      expect(await Bun.file(join(root, 'package.json')).text()).toContain(`"elysia": "^${floor}"`)
+      expect(calls.installs.at(-1)).toEqual([{ name: 'elysia', spec: `^${floor}`, section: 'dependencies' }])
+      expect(log.mock.calls.map(call => call.join(' ')).join('\n')).toContain(`elysia to ^${floor}`)
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+
+    // A tilde range keeps its operator, a package kay does not depend on is left alone, and an app already at kay's range installs once.
+    const tilde = await project(MANIFEST.replace(kayDependencies.elysia, '~1.4.0').replace('"local-lib"', '"left-pad": "^1.0.0", "local-lib"'))
+    const same = await project()
+
+    try {
+      await quietly(async () => upgradeProject(tilde, fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' }).deps))
+      expect(await Bun.file(join(tilde, 'package.json')).text()).toContain(`"elysia": "~${floor}"`)
+      expect(await Bun.file(join(tilde, 'package.json')).text()).toContain('"left-pad": "^1.0.0"')
+
+      const untouched = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+
+      await quietly(async () => upgradeProject(same, untouched.deps))
+      expect(untouched.calls.installs).toHaveLength(1)
+    }
+    finally {
+      await rm(tilde, { recursive: true, force: true })
+      await rm(same, { recursive: true, force: true })
+    }
+  })
+
+  it('puts package.json back when the install of a raised dependency fails', async () => {
+    const root = await project(MANIFEST.replace(kayDependencies.elysia, '^1.4.0'))
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+    const moved = MANIFEST.replace(kayDependencies.elysia, '^1.4.0').replace('^1.40.2', '~1.46.0').replace('npm:@kaynooo/kayjs@~1.40.1', 'npm:@kaynooo/kayjs@~1.46.0')
+    let installs = 0
+
+    deps.install = async () => ++installs === 1
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(1)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(moved)
     }
     finally {
       await rm(root, { recursive: true, force: true })
