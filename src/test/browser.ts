@@ -10,7 +10,7 @@ import { afterAll } from 'bun:test'
 import { resolvePeer } from '../peers'
 import { withUnreadable } from '../runtime/dev-a11y'
 import { optionMs } from '../runtime/duration'
-import { ISLAND } from '../runtime/markers'
+import { EAGER_ISLANDS } from '../runtime/markers'
 import { installClock } from './clock'
 import { createNetwork } from './network'
 
@@ -76,8 +76,9 @@ const POINTS = [[0.5, 0.5], [0.5, 0.25], [0.5, 0.75], [0.25, 0.5], [0.75, 0.5]]
 const UNSETTLED = 'kay: timed out after'
 // Loaded, for a page with JavaScript off, which hydrates no island.
 const LOADED = `document.readyState === 'complete'`
+
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
-const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
+const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${EAGER_ISLANDS}')].every(island => island._$k)`
 
 // What kay makes for the Chrome of a process, named after it so a later run removes what a killed one left.
 const OWNED = /^kay-chrome-(\d+)-/
@@ -688,13 +689,13 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     fill: async (selector, text) => serial(async () => {
       // The field is waited on and focused in one script, as a render can replace it between two. A field of an island not hydrated yet is waited on too, as an island writing its state to the field as it mounts would wipe the text typed into the server's markup, which the events queued for replay do not restore.
-      await poll(script((css: string, island: string) => {
+      await poll(script((css: string, eager: string) => {
         const field = document.querySelector<HTMLInputElement>(css)
 
         if (field === null)
           return false
 
-        const owner = field.closest<HTMLElement & { _$k?: boolean }>(`${island}:not([data-hydrate=visible]):not([data-hydrate=idle])`)
+        const owner = field.closest<HTMLElement & { _$k?: boolean }>(eager)
 
         if (owner !== null && !owner._$k)
           return false
@@ -703,7 +704,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         field.select()
 
         return true
-      }, [selector, ISLAND]), selector)
+      }, [selector, EAGER_ISLANDS]), selector)
 
       await live(async () => text === '' ? view.press('Delete') : view.type(text))
     }),

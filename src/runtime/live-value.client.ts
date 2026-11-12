@@ -2,7 +2,7 @@ import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-
 import { withBase } from './base'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
-import { ISLAND } from './markers'
+import { EAGER_ISLANDS } from './markers'
 import { pageData } from './page-data'
 import { isHydrating, onCleanup, ownSignal, tracking, untrack, whenHydrated } from './reactive'
 import { decodeServerValue } from './wire'
@@ -153,8 +153,7 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-// The islands that hydrate as the page loads and have not yet (`_$k` marks one done, as in client.ts), so one waiting for the viewport or the browser's idle time is not waited for.
-const EAGER_ISLANDS = `${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])`
+// `EAGER_ISLANDS` are the ones hydrating as the page loads, to wait for until `_$k` marks one done (as in client.ts).
 let waits = 0
 
 // Each settle that finds an island hydrating as the page loads still to subscribe waits one more, so the keys they all read are carried by one connection however late their code arrives; one that subscribes later still moves it.

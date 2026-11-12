@@ -9,6 +9,8 @@ export const FAILED = 'kay-failed'
 export const ISLAND = 'slot[data-component]'
 // The event an island fires on its element once hydrated.
 export const HYDRATED = '$h'
+// The islands hydrating as the page loads, not those waiting for the viewport, idle time, an interaction or a media query.
+export const EAGER_ISLANDS = `${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle]):not([data-hydrate=interaction]):not([data-hydrate^="media("])`
 // The island the server rendered with a title of its own set in its `head`, which the browser leaves the page's title to the last of.
 export const TITLED_ATTRIBUTE = 'data-titled'
 export const TITLED = `slot[${TITLED_ATTRIBUTE}]`

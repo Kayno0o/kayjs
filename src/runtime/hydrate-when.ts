@@ -32,7 +32,7 @@ export function whenVisible(element: HTMLElement, run: () => Promise<void>, near
     }
 
     for (const { target, boundingClientRect: { width, height, top, left } } of entries) {
-      if (width + height + top + left === 0)
+      if (width === 0 && height === 0 && top === 0 && left === 0)
         boxless.add(target)
       else
         boxless.delete(target)

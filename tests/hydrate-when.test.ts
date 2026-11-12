@@ -131,8 +131,8 @@ describe('whenVisible on an island with no box', () => {
     when.whenVisible(slot, async () => void runs++)
     expect(watched).toEqual([first!, second!])
 
-    // A child with a box, even off screen, is reason enough not to watch the parent.
-    fire(callback, [{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }, { isIntersecting: false, target: second!, boundingClientRect: rect(10, 10, 500) }])
+    // A child with a box, even off screen above the viewport where its measures sum to zero, is reason enough not to watch the parent.
+    fire(callback, [{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }, { isIntersecting: false, target: second!, boundingClientRect: rect(100, 100, -200) }])
     expect(watched).toHaveLength(2)
 
     fire(callback, [{ isIntersecting: false, target: second!, boundingClientRect: rect(0, 0) }])
