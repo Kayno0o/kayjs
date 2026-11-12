@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mailLanguages } from '../src/mail'
 import { setSiteLocale } from '../../../src/runtime/locale-state'
+import { mailLanguages } from '../src/mail'
 
 afterEach(() => {
   setSiteLocale('en')
@@ -32,6 +32,6 @@ test('writes English for a site locale kayjs-auth has no texts for', () => {
 
   expect(Object.keys(templates)).toEqual(['pt', 'xx-site-only', 'fr'])
   expect(templates.pt).toEqual(templates['xx-site-only'])
-  expect(templates['pt']!['verify-email']).toBe(mailLanguages({ locales: ['en'] }).templates().en!['verify-email'])
+  expect(templates.pt!['verify-email']).toBe(mailLanguages({ locales: ['en'] }).templates().en!['verify-email'])
   expect(templates.fr!['verify-email']).not.toBe(templates.pt!['verify-email'])
 })
