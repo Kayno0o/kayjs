@@ -206,7 +206,7 @@ onCleanup(() => {
       iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-test-live={shownInFrame()} src={`/playground/frame.html?frame=${generation()}`} loading="lazy")
   if problems().length > 0
     ul.playground-problems(role="alert")
-      for problem of problems()
+      for problem, i of problems() key={i}
         li
           pre {problem.report}
   if failure()

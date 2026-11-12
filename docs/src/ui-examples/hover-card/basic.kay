@@ -6,7 +6,7 @@ const planets = [{ name: 'Mars', moons: 2 }, { name: 'Earth', moons: 1 }, { name
 const hovered = signal<{ element: Element, moons: number } | null>(null)
 ---
 .flex.gap-3.p-12
-  for planet of planets
+  for planet of planets key={planet.name}
     button.rounded-lg.border.border-muted.px-3.py-1(
       onPointerEnter={event => hovered = { element: event.currentTarget, moons: planet.moons }}
       onPointerLeave={() => hovered = null}
