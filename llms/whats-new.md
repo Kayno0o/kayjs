@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay upgrade` no longer stops on a stepping stone the registry has pruned: it installs the closest older minor that still holds the lints the stone is there for and says which, and when none installs it names the forms left unfixed and the `llms/upgrading.md` sections to read, then goes on ([kay upgrade](check-and-tools.md)).
 - kayjs-ui: the blocks and callbacks of TreeView (`@actions`, `onSelectedChange`, `onOpenChange`), AppSwitcher (`@tile`), AudioPlayer (`@actions`) and BellInbox (`@item`) hand a node, app, chapter or note whose `key` (or `label`) is always set, filled from `id` (`title`) for an item still under the old name, so no `!` or `nodeKey()` is needed.
 - kayjs-ui: the blocks and callbacks of TreeView (`@actions`, `onSelectedChange`, `onOpenChange`), AppSwitcher (`@tile`), AudioPlayer (`@actions`) and BellInbox (`@item`) hand a node, app, chapter or note whose `key` (or `label`) is always set, filled from `id` (`title`) for an item still under the old name, so no `!` or `nodeKey()` is needed (for an item still under the old name the argument is a copy, so `node === mine` is false there). Timeline's `onSelectedChange` hands the same.
+- `kay check` reports `innerHTML` bound to a name typed as a string literal, a `for` item over an `as const` array or a `const` string, as the runtime already dropped it: pass `sanitizeHtml(value)` or `trustHtml(value)`, or write the markup out ([templates](templates-elements-slots-snippets.md)).
 
 ## 1.102.0
 

@@ -10,6 +10,9 @@ type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<P
 [.] carrySchema
 function carrySchema(target: unknown): void
 
+[.] CheckedComputedHtml
+type CheckedComputedHtml<Markup> = [UnsafeComputedHtml<Markup>] extends [never] ? unknown : CheckedHtml<string>
+
 [.] CheckedHref
 type CheckedHref<Href extends string> = string extends Href ? unknown : Href extends `//${string}` | `/_kay/${string}` ? unknown : Href extends `/${string}` ? IsRoute<PathOf<Href>> extends true ? unknown : {
   kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}`

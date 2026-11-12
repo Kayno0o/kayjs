@@ -3638,6 +3638,8 @@ describe.concurrent('kay check, markup', () => {
       'div(innerHTML={lit as SafeHtml})',
       'div(innerHTML={\'<b>hi</b>\'})',
       'div(innerHTML="<b>hi</b>")',
+      'style(innerHTML={lit})',
+      'script(innerHTML={lit})',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/card.kay': page })

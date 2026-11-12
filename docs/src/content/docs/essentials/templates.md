@@ -301,7 +301,7 @@ An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTM
 
 On an element, `innerHTML={waves}` takes a project file imported as text, `import waves from '../public/waves.svg' with { type: 'text' }`, as it takes markup written out. A string from a package or a request still goes through `sanitizeHtml` or `trustHtml`, and a template drops one nothing vouched for when it renders, as a spread does, even if a cast told the type check to trust it.
 
-A string built from a vouched one, such as `markup + '<b>'`, is plain again.
+A string built from a vouched one, such as `markup + '<b>'`, is plain again. A name typed as a string literal, such as a `for` item over an `as const` array or a `const` string, is not markup written out either: `kay check` reports it.
 
 To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made.
 
