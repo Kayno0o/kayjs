@@ -285,18 +285,24 @@ export async function followingRenames(collection: CollectionInfo, data: Record<
     seen.add(key)
 
     try {
-      const renames = (await activityOf(target)).filter(event => event.verb === 'rename' && event.from !== undefined && (event.locale === undefined || locale === undefined || event.locale === locale))
+      const events = (await activityOf(target)).filter(event => event.locale === undefined || locale === undefined || event.locale === locale).sort((a, b) => a.at - b.at)
       let now = slug
+      let after = 0
       const walked = new Set([slug])
 
       while ((await entries(target, { slug: now })).length === 0) {
-        const next = renames.find(event => event.from === now)?.slug
+        const step = events.find(event => event.verb === 'rename' && event.from === now && event.at > after)
 
-        if (next === undefined || walked.has(next))
+        if (step === undefined || walked.has(step.slug))
           break
 
-        walked.add(next)
-        now = next
+        // The slug may hold another entry by now: one made, renamed to it or put there after a delete is not the one renamed.
+        if (events.some(event => event.at > step.at && event.slug === step.slug && (event.verb === 'add' || event.verb === 'duplicate' || event.verb === 'delete' || event.verb === 'rename')))
+          break
+
+        walked.add(step.slug)
+        now = step.slug
+        after = step.at
       }
 
       if (now !== slug && (await entries(target, { slug: now })).length > 0)

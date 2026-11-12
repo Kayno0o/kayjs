@@ -68,6 +68,33 @@ describe('restoring a version after a rename', () => {
     expect((await entryOf(note))?.data).toEqual({ title: 'N', by: 'ada-l' })
   })
 
+  test('refuses a reference whose new slug holds another entry since', async () => {
+    await saveEntry({ collection: 'authors', slug: 'ada', data: { title: 'Ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', by: 'ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N2', by: 'ada' } })
+    await renameEntry({ collection: 'authors', slug: 'ada' }, 'lovelace')
+    await deleteEntry({ collection: 'authors', slug: 'lovelace' })
+    await saveEntry({ collection: 'authors', slug: 'lovelace', data: { title: 'Someone else' } }, { create: true })
+
+    const out = await restoreOldest({ collection: 'notes', slug: 'n' })
+
+    expect(!out.ok && out.error.message).toBe('No entry ada in authors')
+  })
+
+  test('refuses a reference whose new slug was taken by another rename', async () => {
+    await saveEntry({ collection: 'authors', slug: 'ada', data: { title: 'Ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', by: 'ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N2', by: 'ada' } })
+    await renameEntry({ collection: 'authors', slug: 'ada' }, 'lovelace')
+    await deleteEntry({ collection: 'authors', slug: 'lovelace' })
+    await saveEntry({ collection: 'authors', slug: 'grace', data: { title: 'Grace' } }, { create: true })
+    await renameEntry({ collection: 'authors', slug: 'grace' }, 'lovelace')
+
+    const out = await restoreOldest({ collection: 'notes', slug: 'n' })
+
+    expect(!out.ok && out.error.message).toBe('No entry ada in authors')
+  })
+
   test('still refuses a reference to an entry that was deleted, not renamed', async () => {
     await saveEntry({ collection: 'authors', slug: 'bob', data: { title: 'Bob' } }, { create: true })
     await saveEntry({ collection: 'notes', slug: 'm', data: { title: 'M', by: 'bob' } }, { create: true })
