@@ -2,6 +2,26 @@
 
 Which errors a server raises, when a function throws or returns a `Result`, and the classes an app catches. The code of every error, and where its fix is written, is in [Errors](errors.md).
 
+## Common tasks
+
+### Telling one error from another
+
+Every error kay and its libraries throw extends `KayError`, so a `catch` reads its `code` rather than its message:
+
+```ts
+import { KayError } from 'kay/library'
+
+try {
+  await save(order)
+}
+catch (error) {
+  if (error instanceof KayError && error.code === 'save-conflict')
+    return reload()
+
+  throw error
+}
+```
+
 ## Reference
 
 ### Throwing and returning
