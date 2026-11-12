@@ -325,7 +325,7 @@ describe('the mail samples page', () => {
     expect(page).toContain('<th>Props</th><td>a sample of kayjs-auth\'s, through authMailer</td>')
     expect(page).toContain('Or type this code where you asked for it:\n\n482913')
     expect(frame).toContain('<html lang="en"')
-    expect(frame).toContain('See where your account is signed in, and end what you do not know: <a class="km-link"')
+    expect(frame).toContain('See where your account is signed in, and end what you do not know: <a href="https://')
     expect(outbox.mails).toEqual([])
   })
 

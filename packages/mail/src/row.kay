@@ -1,8 +1,14 @@
 ---
+import type { JSX } from 'kay'
+import type { Align } from './tone'
 import { mso } from './mso'
+import { withStyle } from './tone'
+
+// `align` sets where columns narrower than the row sit, `style` goes after the row's own, and the other attributes land on its `div`.
+const { align = 'left', style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'align' | 'style'> & { align?: Align | undefined, style?: string | undefined }>()
 ---
 // Columns side by side, stacking on a screen too narrow for them; Outlook, which ignores their widths, gets a table.
-div(style="text-align:left")
+div({...rest} style={withStyle(`text-align:${align}`, style)})
   {mso('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>', 'true')}
   slot
   {mso('</tr></table>', 'true')}

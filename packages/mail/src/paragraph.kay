@@ -1,7 +1,12 @@
 ---
+import type { JSX } from 'kay'
+import type { Align, Tone } from './tone'
 import settings from './settings'
+import { alignStyle, textTone, withStyle } from './tone'
 
-const { muted = false } = props<{ muted?: boolean | undefined }>()
+// `muted` is the small print; `tone` and `align` set the colour and alignment of one use, `style` goes after the paragraph's own, and the other attributes land on the element.
+const { muted = false, tone, align, style, ...rest } = props<Omit<JSX.IntrinsicElements['p'], 'class' | 'children' | 'align' | 'style'> & { muted?: boolean | undefined, tone?: Tone | undefined, align?: Align | undefined, style?: string | undefined }>()
+const look = textTone(settings, tone, muted ? 'muted' : 'text')
 ---
-p(class={muted ? 'km-muted' : 'km-text'} style={muted ? `font-size:13px;line-height:1.5;margin:0 0 12px;color:${settings.muted}` : `font-size:16px;line-height:1.6;margin:0 0 16px;color:${settings.text}`})
+p(class={look.className} {...rest} style={withStyle(`${muted ? 'font-size:13px;line-height:1.5;margin:0 0 12px' : 'font-size:16px;line-height:1.6;margin:0 0 16px'};color:${look.color}${alignStyle(align)}`, style)})
   slot

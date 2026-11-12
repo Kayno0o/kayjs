@@ -114,7 +114,7 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
 function cssColors(stylesheet: URL | string, name?: string): (property: string) => string
 
 [.] darkPalette
-function darkPalette(settings: MailSettings): Palette
+function darkPalette(settings: MailSettings): Palette & { danger: string; onDanger: string; }
 
 [.] Delivery
 interface Delivery
@@ -356,12 +356,14 @@ interface MailSettings extends Palette
   accent: string
   background: string
   border: string
+  danger?: string | undefined
   dark?: Partial<Palette> | undefined
   font: string
   logo?: Logo | undefined
   mono: string
   muted: string
   onAccent: string
+  onDanger?: string | undefined
   radius: string
   surface: string
   text: string
@@ -397,8 +399,10 @@ interface Palette
   accent: string
   background: string
   border: string
+  danger?: string | undefined
   muted: string
   onAccent: string
+  onDanger?: string | undefined
   surface: string
   text: string
 
@@ -576,17 +580,25 @@ component default
 
 [./button.kay] default
 component default
+  align?: Align | undefined
+  block?: boolean | undefined
   children?: Element
   href: string
+  style?: string | undefined
+  tone?: Tone | undefined
 
 [./code.kay] default
 component default
+  align?: Align | undefined
   children?: Element
+  style?: string | undefined
 
 [./column.kay] default
 component default
+  align?: Align | undefined
   children?: Element
   share?: number | undefined
+  style?: string | undefined
 
 [./contact-mail.kay] default
 component default
@@ -599,6 +611,7 @@ component default
 
 [./divider.kay] default
 component default
+  style?: string | undefined
 
 [./fields.kay] default
 component default
@@ -607,14 +620,20 @@ component default
 
 [./heading.kay] default
 component default
+  align?: Align | undefined
   children?: Element
   level?: 1 | 2 | 3 | undefined
+  style?: string | undefined
+  tone?: Tone | undefined
 
 [./image.kay] default
 component default
+  align?: Align | undefined
   alt: string
   height?: number | undefined
+  href?: string | undefined
   src: string
+  style?: string | undefined
   width?: number | undefined
 
 [./layout.kay] default
@@ -628,6 +647,7 @@ component default
 component default
   children?: Element
   href: string
+  style?: string | undefined
 
 [./list-confirm.kay] default
 component default
@@ -651,8 +671,11 @@ component default
 
 [./paragraph.kay] default
 component default
+  align?: Align | undefined
   children?: Element
   muted?: boolean | undefined
+  style?: string | undefined
+  tone?: Tone | undefined
 
 [./pg] createMailListTables
 function createMailListTables(source: PgSource): Promise<void>
@@ -671,11 +694,15 @@ function pgSuppressions(source: PgSource): SuppressionStore & { close: () => Pro
 
 [./quote.kay] default
 component default
+  align?: Align | undefined
+  style?: string | undefined
   text: string
 
 [./row.kay] default
 component default
+  align?: Align | undefined
   children?: Element
+  style?: string | undefined
 
 [./sqlite] openLists
 function openLists(path: string): {

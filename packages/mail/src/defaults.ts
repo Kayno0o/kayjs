@@ -1,4 +1,5 @@
 import type { Logo } from 'kay/library'
+import { DANGER, ON_DANGER } from './tone'
 
 export type { Logo }
 
@@ -15,6 +16,10 @@ export interface Palette {
   accent: string
   // A button's text.
   onAccent: string
+  // The `danger` tone's: a button's background, or the colour of a heading or paragraph. Left out, `#b42318`.
+  danger?: string | undefined
+  // A `danger` button's text. Left out, white.
+  onDanger?: string | undefined
 }
 
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few. Mail clients drop stylesheets, so every value lands in a `style` attribute.
@@ -41,6 +46,8 @@ const mailDefaults: MailSettings = {
   border: '#e5e5e0',
   accent: '#1a1a1a',
   onAccent: '#ffffff',
+  danger: DANGER,
+  onDanger: ON_DANGER,
   radius: '6px',
   width: 560,
 }

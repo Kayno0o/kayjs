@@ -1,7 +1,11 @@
 ---
+import type { JSX } from 'kay'
 import settings from './settings'
+import { linkAttributes, withStyle } from './tone'
 
-const { href } = props<{ href: string }>()
+// `style` goes after the link's own, and `target`, `rel` and the other attributes land on the element; a link sits in a line of text, so it takes no `align`.
+const { href, style, ...given } = props<Omit<JSX.IntrinsicElements['a'], 'class' | 'children' | 'align' | 'href' | 'style'> & { href: string, style?: string | undefined }>()
+const rest = linkAttributes(given)
 ---
-a(class="km-link" href={href} style={`color:${settings.accent};text-decoration:underline;overflow-wrap:anywhere;word-break:break-word`})
+a(class="km-link" href={href} {...rest} style={withStyle(`color:${settings.accent};text-decoration:underline;overflow-wrap:anywhere;word-break:break-word`, style)})
   slot

@@ -1,5 +1,22 @@
 ---
-const { src, alt, width, height } = props<{ src: string, alt: string, width?: number | undefined, height?: number | undefined }>()
+import type { JSX } from 'kay'
+import type { Align } from './tone'
+import { withStyle } from './tone'
+
+// `href` makes it a link, `align` places it in the card, `style` goes after the image's own, and the other attributes land on the `img`.
+const { src, alt, width, height, href, align, style, ...rest } = props<Omit<JSX.IntrinsicElements['img'], 'class' | 'children' | 'align' | 'src' | 'alt' | 'width' | 'height' | 'style'> & { src: string, alt: string, width?: number | undefined, height?: number | undefined, href?: string | undefined, align?: Align | undefined, style?: string | undefined }>()
+// An aligned image sits in a line of its own, as Outlook honours `text-align` and not `margin: auto`.
+const look = withStyle(`display:${align === undefined ? 'block' : 'inline-block;vertical-align:top'};max-width:100%;height:auto;border:0;outline:none;text-decoration:none`, style)
 ---
 // Outlook sizes an image by its attributes alone; other clients scale it down to a narrow screen. Mail clients ignore `loading` and `decoding`, so kay's image defaults are left off.
-img(src={src} alt={alt} width={width} height={height} loading={undefined} decoding={undefined} style="display:block;max-width:100%;height:auto;border:0;outline:none;text-decoration:none")
+snippet picture
+  if href
+    a(href={href} style="text-decoration:none")
+      img(src={src} alt={alt} width={width} height={height} loading={undefined} decoding={undefined} {...rest} style={look})
+  else
+    img(src={src} alt={alt} width={width} height={height} loading={undefined} decoding={undefined} {...rest} style={look})
+if align === undefined
+  {picture()}
+else
+  div(style={`text-align:${align}`})
+    {picture()}

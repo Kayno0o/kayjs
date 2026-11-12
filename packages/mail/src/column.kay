@@ -1,14 +1,17 @@
 ---
+import type { JSX } from 'kay'
+import type { Align } from './tone'
 import { contentWidth } from './card'
 import { mso } from './mso'
 import settings from './settings'
+import { alignStyle, withStyle } from './tone'
 
-// The share of the card's width the column takes beside the others, half by default.
-const { share = 0.5 } = props<{ share?: number | undefined }>()
+// The share of the card's width the column takes beside the others, half by default. `align` sets the text inside it, `style` goes after the padding's own, and the other attributes land on that padded `div`.
+const { share = 0.5, align, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'align' | 'style'> & { share?: number | undefined, align?: Align | undefined, style?: string | undefined }>()
 const width = Math.floor(contentWidth(settings.width) * share)
 ---
 {mso(`<td width="${width}" valign="top">`, 'true')}
 div(style={`display:inline-block;width:100%;max-width:${width}px;vertical-align:top`})
-  div(style="padding:0 8px")
+  div({...rest} style={withStyle(`padding:0 8px${alignStyle(align)}`, style)})
     slot
 {mso('</td>', 'true')}

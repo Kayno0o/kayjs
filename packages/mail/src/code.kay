@@ -1,9 +1,15 @@
 ---
+import type { JSX } from 'kay'
+import type { Align } from './tone'
 import settings from './settings'
+import { withStyle } from './tone'
+
+// `align` places the code in the card, `style` goes after the cell's own, and the other attributes land on the cell.
+const { align, style, ...rest } = props<Omit<JSX.IntrinsicElements['td'], 'class' | 'children' | 'align' | 'style'> & { align?: Align | undefined, style?: string | undefined }>()
 ---
 // A one-time or verification code: large, spaced, and selected whole by one click where the client allows it.
-table(role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0")
+table(role="presentation" cellpadding="0" cellspacing="0" border="0" align={align} style="margin:24px 0")
   tbody
     tr
-      td(class="km-bg km-text km-mono" bgcolor={settings.background} style={`padding:12px 20px;background:${settings.background};border-radius:${settings.radius};font-family:${settings.mono};font-size:28px;line-height:1.2;font-weight:700;letter-spacing:6px;color:${settings.text};user-select:all`})
+      td(class="km-bg km-text km-mono" bgcolor={settings.background} {...rest} style={withStyle(`padding:12px 20px;background:${settings.background};border-radius:${settings.radius};font-family:${settings.mono};font-size:28px;line-height:1.2;font-weight:700;letter-spacing:6px;color:${settings.text};user-select:all`, style)})
         slot

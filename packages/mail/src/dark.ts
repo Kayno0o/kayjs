@@ -1,6 +1,7 @@
 import type { JSX } from 'kay'
 import type { MailSettings, Palette } from './defaults'
 import { html } from 'kay/html'
+import { DANGER, ON_DANGER } from './tone'
 
 type Triple = [number, number, number]
 
@@ -104,13 +105,18 @@ function readableOn(colour: string, ground: string): string {
 }
 
 // The colours a mail switches to in a client's dark mode: `settings.dark`'s, and for each it leaves out one derived from the light colour.
-export function darkPalette(settings: MailSettings): Palette {
+export function darkPalette(settings: MailSettings): Palette & { danger: string, onDanger: string } {
   const given = settings.dark ?? {}
   const surface = given.surface ?? inverted(settings.surface)
   const accent = given.accent ?? readableOn(inverted(settings.accent), surface)
   const onAccent = given.onAccent ?? [settings.onAccent, inverted(settings.onAccent)].toSorted((a, b) => contrast(b, accent) - contrast(a, accent))[0]!
 
+  const danger = given.danger ?? readableOn(inverted(settings.danger ?? DANGER), surface)
+  const onDanger = given.onDanger ?? [settings.onDanger ?? ON_DANGER, inverted(settings.onDanger ?? ON_DANGER)].toSorted((a, b) => contrast(b, danger) - contrast(a, danger))[0]!
+
   return {
+    danger,
+    onDanger,
     text: given.text ?? inverted(settings.text),
     muted: given.muted ?? inverted(settings.muted),
     background: given.background ?? inverted(settings.background),
@@ -122,14 +128,18 @@ export function darkPalette(settings: MailSettings): Palette {
 }
 
 // The classes the components carry, each with what it sets in dark mode.
-const RULES: [className: string, declarations: (palette: Palette) => string[]][] = [
+const RULES: [className: string, declarations: (palette: ReturnType<typeof darkPalette>) => string[]][] = [
   ['km-bg', palette => [`background-color:${palette.background}`]],
   ['km-surface', palette => [`background-color:${palette.surface}`, `border-color:${palette.border}`]],
   ['km-text', palette => [`color:${palette.text}`]],
   ['km-muted', palette => [`color:${palette.muted}`]],
   ['km-border', palette => [`border-color:${palette.border}`]],
   ['km-button', palette => [`background-color:${palette.accent}`, `color:${palette.onAccent}`]],
+  ['km-button-neutral', palette => [`background-color:${palette.background}`, `color:${palette.text}`, `border-color:${palette.border}`]],
+  ['km-button-danger', palette => [`background-color:${palette.danger}`, `color:${palette.onDanger}`]],
   ['km-link', palette => [`color:${palette.accent}`]],
+  ['km-accent', palette => [`color:${palette.accent}`]],
+  ['km-danger', palette => [`color:${palette.danger}`]],
   ['km-quote', palette => [`border-color:${palette.accent}`]],
 ]
 

@@ -1,0 +1,29 @@
+---
+import Button from '@kaynooo/kayjs-mail/button.kay'
+import Code from '@kaynooo/kayjs-mail/code.kay'
+import Column from '@kaynooo/kayjs-mail/column.kay'
+import Divider from '@kaynooo/kayjs-mail/divider.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Image from '@kaynooo/kayjs-mail/image.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Link from '@kaynooo/kayjs-mail/link.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Quote from '@kaynooo/kayjs-mail/quote.kay'
+import Row from '@kaynooo/kayjs-mail/row.kay'
+---
+Layout
+  Image(src="https://fixture.test/logo.png" alt="Fixture" width={120} href="https://fixture.test" align="center" id="logo")
+  Heading(tone="danger" align="center" style="letter-spacing:1px" data-x="h") Alert
+  Heading(level={2} tone="accent") Sub
+  Paragraph(muted tone="danger" align="right" style="margin:0") Small
+  Paragraph(tone="neutral" muted) Plain
+  Button(href="https://fixture.test/a") Default
+  Button(href="https://fixture.test/b" tone="danger" block target="_blank" style="font-size:20px" id="go") Delete
+  Button(href="https://fixture.test/c" tone="neutral" align="center") Later
+  Link(href="https://fixture.test/l" target="_blank" style="font-weight:700") Link
+  Quote(text="Hi" align="center" style="font-size:12px" data-q="1")
+  Code(align="right" style="letter-spacing:2px") 123
+  Divider(style="border-top-style:dashed")
+  Row(align="center" style="margin:0" id="r")
+    Column(share={1 / 3} align="right" style="padding:0" data-c="1")
+      Paragraph Left

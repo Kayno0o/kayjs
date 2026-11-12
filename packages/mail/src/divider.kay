@@ -1,7 +1,12 @@
 ---
+import type { JSX } from 'kay'
 import settings from './settings'
+import { withStyle } from './tone'
+
+// `style` goes after the line's own, and the other attributes land on its cell; a line across the card takes no `align`.
+const { style, ...rest } = props<Omit<JSX.IntrinsicElements['td'], 'class' | 'children' | 'align' | 'style'> & { style?: string | undefined }>()
 ---
 table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0")
   tbody
     tr
-      td(class="km-border" height="1" style={`border-top:1px solid ${settings.border};font-size:0;line-height:0`}) {' '}
+      td(class="km-border" height="1" {...rest} style={withStyle(`border-top:1px solid ${settings.border};font-size:0;line-height:0`, style)}) {' '}

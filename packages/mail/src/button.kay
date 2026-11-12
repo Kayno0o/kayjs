@@ -1,15 +1,21 @@
 ---
+import type { JSX } from 'kay'
+import type { Align, Tone } from './tone'
 import { mso } from './mso'
 import settings from './settings'
+import { buttonTone, linkAttributes, withStyle } from './tone'
 
-const { href } = props<{ href: string }>()
+// `tone` takes the settings' accent, neutral or danger colours, `block` fills the card's width, `align` places a button that does not, and `style` goes after the button's own on the link, as `target` and the other attributes do.
+const { href, tone = 'accent', align, block = false, style, ...given } = props<Omit<JSX.IntrinsicElements['a'], 'class' | 'children' | 'align' | 'href' | 'style'> & { href: string, tone?: Tone | undefined, align?: Align | undefined, block?: boolean | undefined, style?: string | undefined }>()
+const look = buttonTone(settings, tone)
+const rest = linkAttributes(given)
 ---
-table(role="presentation" cellpadding="0" cellspacing="0" border="0")
+table(role="presentation" cellpadding="0" cellspacing="0" border="0" width={block ? '100%' : undefined} align={block ? undefined : align})
   tbody
     tr
-      td(style="padding:24px 0")
+      td(align={block ? 'center' : undefined} style="padding:24px 0")
         // Outlook drops an inline link's padding: hidden em spaces widened by `mso-font-width` and raised text stand in for it, so the whole button stays coloured and clickable.
-        a(class="km-button" href={href} style={`display:inline-block;padding:0.75em 1.25em;font-size:16px;font-weight:600;background:${settings.accent};color:${settings.onAccent};text-decoration:none;border-radius:${settings.radius};mso-padding-alt:0;text-underline-color:${settings.accent}`})
+        a(class={look.className} href={href} {...rest} style={withStyle(`display:${block ? 'block;text-align:center' : 'inline-block'};padding:0.75em 1.25em;font-size:16px;font-weight:600;${look.style};text-decoration:none;border-radius:${settings.radius};mso-padding-alt:0;text-underline-color:${look.underline}`, style)})
           {mso('<i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;</i><span style="mso-text-raise:75%">')}
           slot
           {mso('</span><i style="mso-font-width:125%" hidden>&emsp;&#8203;</i>')}

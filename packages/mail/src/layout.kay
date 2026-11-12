@@ -29,11 +29,8 @@ table(class="km-bg" role="presentation" width="100%" cellpadding="0" cellspacing
                 td(align="center" style="padding:0 0 20px")
                   if header
                     | {header}
-                  else if logo?.href
-                    a(href={logo.href} style="text-decoration:none")
-                      Image(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height})
                   else if logo
-                    Image(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height})
+                    Image(src={logo.src} alt={logo.alt} width={logo.width} height={logo.height} href={logo.href})
             tr
               td(class="km-surface km-text" align="left" bgcolor={settings.surface} style={`background:${settings.surface};border:1px solid ${settings.border};border-radius:${settings.radius};padding:32px ${CARD_PADDING_X}px;font-family:${settings.font};color:${settings.text}`})
                 slot

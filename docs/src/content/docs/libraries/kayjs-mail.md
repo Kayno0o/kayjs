@@ -96,6 +96,16 @@ Layout(preheader="Your account is ready")
 
 A `@header` replaces it for one mail, and an empty one shows nothing. The text part writes the logo's `alt`.
 
+One use that differs from the settings takes props instead of a copy of the component. `Button` takes `tone` (`accent`, `neutral` or `danger`), `block` for the card's full width and `target`; `Heading` and `Paragraph` take `tone`; `Button`, `Heading`, `Paragraph`, `Image`, `Quote` and `Code` take `align` (`left`, `center` or `right`); `Image` takes `href`.
+
+Every component takes `style`, a CSS string added after its own, and the element's other attributes, such as `id` or `data-*`. The Outlook fixes and the dark colours still apply, and the `danger` colours come from `danger` and `onDanger` in the settings, with `dark` overriding them.
+
+```kay
+Button(href={url} tone="danger" block) Delete my account
+Heading(align="center" tone="accent") Welcome
+Image(src={logo} alt="Example" width={120} href="https://example.com" align="center")
+```
+
 It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` with `Column` for columns that stack on a phone. `Fields` lays out a form's answers as label and value pairs, and `Quote` sets a visitor's message apart. They hold in Outlook for Windows.
 
 Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColors`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.

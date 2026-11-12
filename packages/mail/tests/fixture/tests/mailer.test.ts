@@ -10,6 +10,7 @@ import Contact from '../src/mails/contact.kay'
 import Hello from '../src/mails/hello.kay'
 import Kit from '../src/mails/kit.kay'
 import Plain from '../src/mails/plain.kay'
+import Styled from '../src/mails/styled.kay'
 import Welcome from '../src/mails/welcome.kay'
 import { logged } from './logged'
 
@@ -62,7 +63,7 @@ describe('rendering', () => {
   })
 
   it('takes the dark colours an app gives, deriving only the others', () => {
-    expect(darkPalette(mailDefaults)).toEqual({ text: '#d5d5d5', muted: '#a3a3a3', background: '#21211c', surface: '#141414', border: '#303028', accent: '#d5d5d5', onAccent: '#141414' })
+    expect(darkPalette(mailDefaults)).toMatchObject({ text: '#d5d5d5', muted: '#a3a3a3', background: '#21211c', surface: '#141414', border: '#303028', accent: '#d5d5d5', onAccent: '#141414' })
     expect(darkPalette({ ...mailDefaults, accent: 'rebeccapurple', dark: { surface: '#202020' } })).toMatchObject({ surface: '#202020', accent: 'rebeccapurple', onAccent: '#ffffff' })
   })
 
@@ -120,10 +121,76 @@ describe('rendering', () => {
     expect(html).toContain('font-family:ui-monospace')
     expect(html).toContain('letter-spacing:6px')
     expect(html).toContain('border-top:1px solid #e5e5e0')
-    expect(html).toContain('<h2 class="km-text" style="font-size:18px')
+    expect(html).toContain('<h2 style="font-size:18px')
     expect(html).toContain('<!--[if true]><td width="251" valign="top"><![endif]--><div style="display:inline-block;width:100%;max-width:251px;vertical-align:top">')
-    expect(html).toContain('<a class="km-link" href="https://fixture.test/help" target="_blank" rel="noopener" style="color:#0047ff;text-decoration:underline;overflow-wrap:anywhere;word-break:break-word">the help</a>')
+    expect(html).toContain('<a href="https://fixture.test/help" style="color:#0047ff;text-decoration:underline;overflow-wrap:anywhere;word-break:break-word" class="km-link" target="_blank" rel="noopener">the help</a>')
     expect(text).toBe('Fixture\n\nYour code\n\n482 913\n\nDetails\n\nLeft\n\nRight\n\nRead the help (https://fixture.test/help).')
+  })
+
+  describe('per-use props', () => {
+    const rendered = mail.render({ to: 'ada@example.com', subject: 'Styled', view: Styled })
+    const tag = async (pattern: RegExp) => (await rendered).html!.match(pattern)?.[0]
+
+    it('puts a style after the component\'s own and spreads the other attributes on its element', async () => {
+      expect(await tag(/<h1[^>]*>/)).toContain('data-x="h"')
+      expect(await tag(/<h1[^>]*>/)).toMatch(/color:#b42318;text-align:center;letter-spacing:1px"/)
+      expect(await tag(/<a href="https:\/\/fixture.test\/l"[^>]*>/)).toMatch(/word-break:break-word;font-weight:700"/)
+      expect(await tag(/<td[^>]*data-q="1"[^>]*>/)).toMatch(/overflow-wrap:anywhere;font-size:12px"/)
+      expect(await tag(/<td[^>]*user-select[^>]*>/)).toMatch(/user-select:all;letter-spacing:2px"/)
+      expect(await tag(/<td height="1"[^>]*>/)).toMatch(/line-height:0;border-top-style:dashed"/)
+      expect(await tag(/<div id="r"[^>]*>/)).toContain('style="text-align:center;margin:0"')
+      expect(await tag(/<div data-c="1"[^>]*>/)).toContain('style="padding:0 8px;text-align:right;padding:0"')
+    })
+
+    it('aligns a Button, Quote and Code by their table, an Image by a line of its own, and text by text-align', async () => {
+      expect(await tag(/<table[^>]*><tbody><tr><td style="padding:24px 0"><a href="https:\/\/fixture.test\/c"/)).toContain('align="center"')
+      expect(await tag(/<table[^>]*align="center" style="margin:20px 0">/)).toBeDefined()
+      expect(await tag(/<table[^>]*align="right" style="margin:24px 0">/)).toBeDefined()
+      expect((await rendered).html).toContain('<div style="text-align:center"><a href="https://fixture.test" target="_blank" rel="noopener" style="text-decoration:none"><img src="https://fixture.test/logo.png" alt="Fixture" width="120" id="logo"')
+      expect(await tag(/<p[^>]*text-align:right[^>]*>/)).toContain('color:#b42318')
+    })
+
+    it('draws a Button in its tone, and across the card with block, and keeps the Outlook wrapper and the dark class on each', async () => {
+      const { html } = await rendered
+      const danger = await tag(/<a href="https:\/\/fixture.test\/b"[^>]*>/)
+      const neutral = await tag(/<a href="https:\/\/fixture.test\/c"[^>]*>/)
+
+      expect(danger).toContain('background:#b42318;color:#ffffff')
+      expect(danger).toContain('display:block;text-align:center')
+      expect(danger).toContain('target="_blank"')
+      expect(danger).toContain('id="go"')
+      expect(danger).toContain('rel="noopener"')
+      expect(danger).toEndWith('font-size:20px" class="km-button-danger">')
+      expect(neutral).toContain('background:#f4f4f2;color:#1a1a1a;border:1px solid #e5e5e0')
+      expect(neutral).toContain('class="km-button-neutral"')
+      expect(html).toMatch(/<table[^>]*width="100%"><tbody><tr><td align="center" style="padding:24px 0"><a href="https:\/\/fixture.test\/b"/)
+      expect(html!.match(/<!--\[if mso\]><i style="mso-font-width:125%;mso-text-raise:150%" hidden>&emsp;<\/i><span style="mso-text-raise:75%"><!\[endif\]-->(Default|Delete|Later)<!--\[if mso\]><\/span>/g)).toHaveLength(3)
+      expect(html).toContain('class="km-button"')
+    })
+
+    it('draws a Heading and a Paragraph in a tone, the dark classes following it, and a muted one keeps its size', async () => {
+      const { html } = await rendered
+
+      expect(await tag(/<h2[^>]*>/)).toContain('color:#0047ff')
+      expect(await tag(/<h2[^>]*>/)).toContain('class="km-accent"')
+      expect(await tag(/<h1[^>]*>/)).toContain('class="km-danger"')
+      expect(await tag(/<p[^>]*>Small/)).toContain('font-size:13px')
+      expect(html).toMatch(/<p style="font-size:13px[^"]*color:#1a1a1a" class="km-text">Plain/)
+    })
+
+    it('carries each tone into the head\'s dark colours, the danger one lightened to read on the dark card', async () => {
+      const { html } = await rendered
+      const head = html!.slice(0, html!.indexOf('</head>'))
+
+      expect(head).toContain('.km-button-neutral{background-color:#21211c!important;color:#d5d5d5!important;border-color:#303028!important}')
+      expect(head).toMatch(/\.km-button-danger\{background-color:#[0-9a-f]{6}!important;color:#[0-9a-f]{6}!important\}/)
+      expect(head).toMatch(/\.km-danger\{color:#[0-9a-f]{6}!important\}/)
+      expect(head).toContain('.km-accent{color:#477bff!important}')
+    })
+
+    it('takes the danger colours from the settings when they give them', () => {
+      expect(darkPalette({ ...mailDefaults, danger: '#ff0000', dark: { danger: '#ee0000' } })).toMatchObject({ danger: '#ee0000' })
+    })
   })
 
   it('lays out a contact form\'s fields and quotes its message, line breaks kept, in html and text alike', async () => {
