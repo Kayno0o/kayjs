@@ -98,6 +98,9 @@ describe('answering a missing path', () => {
 
     expect(await answerFor(set, '/old', '?a=1', [])).toEqual({ location: '/new?a=1', status: 301 })
     expect(await answerFor(set, '/old/', '', [])).toEqual({ location: '/new', status: 301 })
+
+    set.add('/framed', '/new#top', 301, rules)
+    expect(await answerFor(set, '/framed', '?a=1', [])).toEqual({ location: '/new?a=1#top', status: 301 })
     expect(await answerFor(set, '/Old', '', [])).toBeUndefined()
     expect(await answerFor(set, '/other', '', [])).toBeUndefined()
   })

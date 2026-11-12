@@ -153,11 +153,13 @@ export function fillTarget(to: string, param: (name: string) => string, rest: st
   return to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? rest : param(name))
 }
 
-// Where a redirect to `target` goes: a target on the site loses extra leading slashes, which would read as another host, and the request's query is carried over unless the target gives its own.
+// Where a redirect to `target` goes: a target on the site loses extra leading slashes, which would read as another host, and the request's query is carried over, before the target's fragment, unless the target gives its own.
 export function redirectLocation(target: string, search: string): string {
   const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
+  const hash = path.indexOf('#')
+  const before = hash === -1 ? path : path.slice(0, hash)
 
-  return search !== '' && !path.includes('?') ? `${path}${search}` : path
+  return search !== '' && !before.includes('?') ? `${before}${search}${hash === -1 ? '' : path.slice(hash)}` : path
 }
 
 // Registered before the pages, the query carried over unless the target gives its own.

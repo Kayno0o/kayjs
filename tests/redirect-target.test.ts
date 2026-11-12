@@ -1,6 +1,7 @@
 import type { LocaleState } from '../src/runtime/locale-state'
 import { expect, it } from 'bun:test'
 import { runInLocale } from '../src/runtime/locale-state'
+import { redirectLocation } from '../src/server/redirects'
 import { Redirect, stoppers } from '../src/server/signals'
 
 const HOSTILE = [
@@ -82,4 +83,13 @@ it('ignores an empty configured host, so ///evil.com is refused', () => {
 
   for (const location of ['///evil.com', '//?x', '//'])
     expect(() => runInLocale(state, () => redirect(location)), location).toThrow('which a browser reads as another site')
+})
+
+it('carries the request query before the target fragment, unless the target has a query of its own', () => {
+  expect(redirectLocation('/new#top', '?utm=1')).toBe('/new?utm=1#top')
+  expect(redirectLocation('/new?a=1#top', '?utm=1')).toBe('/new?a=1#top')
+  expect(redirectLocation('/new#a?b', '?utm=1')).toBe('/new?utm=1#a?b')
+  expect(redirectLocation('//new#top', '?utm=1')).toBe('/new?utm=1#top')
+  expect(redirectLocation('/new#top', '')).toBe('/new#top')
+  expect(redirectLocation('https://x.example/p#top', '?utm=1')).toBe('https://x.example/p?utm=1#top')
 })
