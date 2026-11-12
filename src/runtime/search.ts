@@ -264,13 +264,15 @@ function snippet(text: string, terms: string[]): { snippet: SearchPart[], more: 
 }
 
 // Where each word starting as a term does, or being its singular, sits in the text, by the term's length.
-export function wordHits(text: string, terms: string[]): [number, number][] {
+export function wordHits(text: string, plain: string[]): [number, number][] {
+  // Alone, a capital sigma folds to σ where the index, folding the whole text, writes ς at a word's end: both sides compare as σ.
+  const terms = plain.map(term => term.replaceAll('ς', 'σ'))
   // Folding can change a character's length, so each folded character keeps the index of the one it came from.
   let folded = ''
   const from: number[] = []
 
   for (let i = 0; i < text.length; i++) {
-    const char = fold(text[i]!)
+    const char = fold(text[i]!).replaceAll('ς', 'σ')
 
     folded += char
     // Counted in UTF-16 units, as string indices are.

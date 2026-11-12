@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { writeSearchIndex } from '../src/build/search'
 import { flush, root as reactiveRoot, signal } from '../src/runtime'
-import { SEARCH_MANIFEST, searchShard, searchSite, searchWords } from '../src/runtime/search'
+import { SEARCH_MANIFEST, searchShard, searchSite, searchWords, wordHits } from '../src/runtime/search'
 import { searchResults } from '../src/runtime/search-results'
 import { scratchDir } from './scratch'
 
@@ -83,6 +83,16 @@ describe('search', () => {
 
   it('folds case and accents out of the words it indexes and searches', () => {
     expect(searchWords('Dépendances, ÉTÉ & co-op 42')).toEqual(['dependances', 'ete', 'co', 'op', '42'])
+  })
+
+  it('marks a Greek word ending in a capital sigma, as the index finds it', () => {
+    const text = 'Η ΟΔΟΣ ΑΘΗΝΩΝ'
+
+    expect(searchWords(text)).toContain('οδος')
+    expect(wordHits(text, ['οδος'])).toEqual([[2, 6]])
+    expect(wordHits('η οδος', ['οδος'])).toEqual([[2, 6]])
+    expect(wordHits('η οδοσ', ['οδος'])).toEqual([[2, 6]])
+    expect(wordHits('ΟΔΟΣΟΙ', ['οδος'])).toEqual([[0, 4]])
   })
 
   it('finds a section by the words of its heading, its text and its page, the heading first, with the anchor it sits under', async () => {
