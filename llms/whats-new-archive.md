@@ -1,6 +1,18 @@
 # What's new, older releases
 
-What each release before 1.98 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.99 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.98.0
+
+- `analytics()` takes `url` for the service address (`host` before), `site` for Plausible and Simple Analytics, and `privacy` for the policy link (`policyUrl` before); the old names keep working and `kay upgrade` renames them, and the site options are in one table ([analytics](analytics.md)).
+- Every `guard` option takes a guard, a list of guards run in order, or `{ load }`: `jobs`, `images`, `vitals()` and `cms()`, and `false` opens the screens of `vitals()` and `cms()`, closed without a guard ([guards](guards.md#path-and-guard-options)).
+- `serve.apiPrefix` names where the API is served, `apiPath` still read and renamed by `kay upgrade`; `live.rateLimit`, `images.rateLimit` and `mcp.rateLimit` are `{ max, window }` in place of `perMinute` and a bare number, as every rate limit option is; a Fontsource font takes `weight` beside `subset` as aliases of `weights` and `subsets`, and `manifest.themeColor` takes a `{ light, dark }` pair (`deprecated-config-keys`; [site config](sitemap-search-fonts.md)).
+- `schedule()` takes `timeZone`, as `kay.config.ts` names it, in place of `tz`, which keeps working and which `kay upgrade` renames ([background jobs](production.md)).
+- A workflow's `start(input, { key })` names the run as `enqueue`'s `key` names a job, in place of `id`, which keeps working and which `kay upgrade` renames; `id` stays the generated identity a run returns ([queues](queues.md)).
+- kayjs-ui: `title` is a string or a `@title` block on Dialog, SidePanel, FormDialog and ConfirmDelete, as on Card, with `label` naming the dialog for screen readers when it differs from the visible title; `heading` is deprecated. `Stat`, and `Chat` and `ChatLauncher` of kayjs-ai, take `layout` where `variant` was, `variant` naming only the frame of a control, and write `data-layout` in place of `data-variant` (an app's CSS on the old attribute changes, see [upgrading](upgrading.md)); `layout` wins over `variant` when both are given. `deprecated-ui-props` rewrites both old names ([blocks](../packages/ui/llms/slots-and-links.md), [lints](lints.md)).
+- kayjs-ui: `Tooltip` takes an `@content` block for markup in place of `text`, and `Popover` takes `role` (`dialog` by default) and `label`, its trigger's `aria-haspopup` following the role; Menu, AppSwitcher and Bell panels are `role="none"` around their own list ([popovers and tooltips](../packages/ui/llms/basics.md)).
+- A FormField showing a message (its own `issue` included) marks its control invalid in the server render too, `aria-invalid="true"` on a native field, so a refreshed form keeps the mark; `describeField` takes `invalid`, and a RowsField, Checkbox or Toggle in a static FormField is marked once the browser has it, as the choice groups are ([forms](../packages/ui/llms/forms.md), [describeField](islands-state-to-ids.md)).
+- A FormField showing a message (its own `issue` included) marks its control invalid in the server render too, `aria-invalid="true"` on a native field, so a refreshed form keeps the mark; `describeField` takes `invalid`, and a RowsField, Checkbox or Toggle in a static FormField is marked once the browser has it, as the choice groups are, and a RowsField now hands the app's own `ref` its group ([forms](../packages/ui/llms/forms.md), [describeField](islands-state-to-ids.md)).
 
 ## 1.97.0
 
