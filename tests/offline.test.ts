@@ -130,7 +130,7 @@ describe('service worker', () => {
   // Installs the worker on a cache that outlives it, returning the URLs the install fetched.
   async function install(script: string, store: Map<string, string>): Promise<string[]> {
     const fetched: string[] = []
-    const path = (key: Request | string) => decodeURI(new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname)
+    const path = (key: Request | string) => new URL(typeof key === 'string' ? key : key.url, 'http://localhost').pathname
     const cache = {
       match: async (key: string) => store.has(path(key)) ? new Response(store.get(path(key))) : undefined,
       put: async (key: string, response: Response) => void store.set(path(key), await response.text()),
@@ -204,7 +204,35 @@ describe('service worker', () => {
     try {
       await install(await build('"a"'), store)
       expect(await install(await build('"a"'), store)).toEqual([])
-      expect(await install(await build('"b"'), store)).toEqual(['/caf\u00E9'])
+      expect(await install(await build('"b"'), store)).toEqual(['/caf%C3%A9'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('lists a file and a page under the path the browser asks for, so the fetch handler finds each', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-sw-'))
+    const names = ['assets/My Font-abc123.woff2', 'assets/100%-a.js', 'assets/a#b.js', 'assets/été-a.css']
+
+    try {
+      for (const name of names)
+        await Bun.write(join(dir, name), 'a')
+
+      for (const base of ['', '/docs']) {
+        const app = new Elysia()
+        const client = { dir, pages: new Map([['/café', { pattern: '/café', file: 'index.html', status: 200, headers: {}, etag: '"a"', renderedAt: 0 }]]) } as unknown as ClientBuild
+
+        await serveServiceWorker(app, new ServedPaths(), { client, offline: { pages: ['/café'], fallback: '/café' }, base, publicPages: [] })
+
+        const { settings } = await worker(app)
+        const asked = names.map(name => new URL(`http://localhost${base}/_kay/${name.replaceAll('%', '%25').replaceAll('#', '%23')}`).pathname)
+
+        expect(settings!.files.toSorted()).toEqual(asked.toSorted())
+        expect(settings!.pages).toEqual([`${base}/caf%C3%A9`])
+        expect(settings!.fallback).toBe(`${base}/caf%C3%A9`)
+        expect(Object.keys(settings!.versions).toSorted()).toEqual([...settings!.files, ...settings!.pages].toSorted())
+      }
     }
     finally {
       await rm(dir, { recursive: true, force: true })

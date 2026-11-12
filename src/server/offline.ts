@@ -30,7 +30,7 @@ const BACKSLASH = /\\/g
 // A rule of the fonts' stylesheet naming its file and the range of characters it holds.
 const FACE_RANGE = /url\("([^"]+)"\)[^}]*?unicode-range:([^;}]+)/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 7
+const WORKER_VERSION = 8
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -54,11 +54,11 @@ self.addEventListener('install', (event) => {
     }
     catch {}
 
-    // A copy stays while its version is the one recorded, and one that changed is replaced by its download, so a failed install leaves the old copies; keys are decoded, as the URLs listed are written raw.
+    // A copy stays while its version is the one recorded, and one that changed is replaced by its download, so a failed install leaves the old copies; every URL listed is written as the browser writes the pathname of a request, as the keys are.
     const have = new Set()
 
     for (const request of await cache.keys()) {
-      const path = decodeURI(new URL(request.url).pathname)
+      const path = new URL(request.url).pathname
 
       if (path === KAY.env || path === KAY.index)
         continue
@@ -474,6 +474,11 @@ function pushOnlyScript(base: string): string {
   return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil((async () => {\n  for (const name of await caches.keys()) {\n    if (name.startsWith('kay-'))\n      await caches.delete(name)\n  }\n\n  await self.clients.claim()\n})()))\n${PUSH_WORKER}${LOCAL_WORKER}`
 }
 
+// A path as the browser's `url.pathname` writes it, which is what the worker compares: `raw` is a file name as it is on disk, where a `%`, `?` or `#` is part of the name.
+function urlPath(path: string, raw = false): string {
+  return new URL(raw ? path.replaceAll('%', '%25').replaceAll('?', '%3F').replaceAll('#', '%23').replaceAll('\\', '%5C') : path, 'http://localhost').pathname
+}
+
 // A test site is not built, so its client folder may not exist: the worker then lists no build files.
 async function buildEntries(dir: string): Promise<Dirent[]> {
   try {
@@ -493,11 +498,11 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     .map((entry) => {
       const relative = join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')
 
-      return { url: `${base}${ASSET_PREFIX}${relative}`, path: join(entry.parentPath, entry.name), named: relative.startsWith(`${ASSETS_DIR}/`) }
+      return { url: `${base}${ASSET_PREFIX}${relative}`, href: urlPath(`${base}${ASSET_PREFIX}${relative}`, true), path: join(entry.parentPath, entry.name), named: relative.startsWith(`${ASSETS_DIR}/`) }
     })
     .toSorted((a, b) => a.url < b.url ? -1 : 1)
-  const files = found.map(file => file.url)
-  const listed = (config.pages ?? options.publicPages).map(path => ({ path, url: slashedPath(`${base}${path}`, options.trailingSlash) })).toSorted((a, b) => a.url < b.url ? -1 : 1)
+  const files = found.map(file => file.href)
+  const listed = (config.pages ?? options.publicPages).map(path => ({ path, url: urlPath(slashedPath(`${base}${path}`, options.trailingSlash)) })).toSorted((a, b) => a.url < b.url ? -1 : 1)
   const pages = listed.map(page => page.url)
   const rendered = config.pages?.filter(path => client.pages.get(path)?.islands !== undefined) ?? []
 
@@ -508,12 +513,12 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
   if (config.pages === undefined && pages.length > MANY_PAGES)
     kayLog('warn', `offline keeps every prerendered page, ${pages.length} of them, which each visitor downloads on their first visit; list the ones worth reading offline in offline.pages`)
 
-  const fallback = config.fallback === undefined ? undefined : slashedPath(`${base}${config.fallback}`, options.trailingSlash)
+  const fallback = config.fallback === undefined ? undefined : urlPath(slashedPath(`${base}${config.fallback}`, options.trailingSlash))
   // A page the build holds no copy of, such as a fallback the routes render, is fetched again whenever any page changed.
   const anyPage = Bun.hash(JSON.stringify([...client.pages].map(([path, page]) => [path, page.etag]))).toString(36)
   const pageVersion = (path: string) => client.pages.get(path)?.etag ?? anyPage
   // A file the build names after its content keeps its URL as its version; the others, a script or a stylesheet, are hashed.
-  const versions: Record<string, string> = Object.fromEntries(await Promise.all(found.map(async file => [file.url, file.named ? '' : Bun.hash(await Bun.file(file.path).bytes()).toString(36)])))
+  const versions: Record<string, string> = Object.fromEntries(await Promise.all(found.map(async file => [file.href, file.named ? '' : Bun.hash(await Bun.file(file.path).bytes()).toString(36)])))
 
   for (const page of listed)
     versions[page.url] = pageVersion(page.path)
@@ -527,7 +532,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     cache: `kay-w${WORKER_VERSION}`,
     index: `${base}${ASSET_PREFIX}sw-versions`,
     versions,
-    precache: [...files.filter(file => PRECACHED.test(file) && !skipped.has(file.slice(base.length))), ...pages, ...fallback === undefined ? [] : [fallback]],
+    precache: [...found.filter(file => PRECACHED.test(file.url) && !skipped.has(file.url.slice(base.length))).map(file => file.href), ...pages, ...fallback === undefined ? [] : [fallback]],
     files,
     pages,
     fallback,
