@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import type { SideNavGroup } from './side-nav'
 import { memo, onMount, persisted, recipe, signal, uid } from 'kay'
-import { navHrefs, navMark } from './nav-current'
+import { navAddresses, navMark } from './nav-current'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SidePanel from './side-panel.kay'
@@ -100,7 +100,7 @@ const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | u
 const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
 const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
 
-const siblings = memo(() => navHrefs(...all().map(group => group.links)))
+const siblings = memo(() => navAddresses(...all().map(group => group.links)))
 
 // With nothing to list, and nothing loading or failed, the nav draws no landmark, no collapse toggle and no menu button.
 const empty = () => !pending() && !failed() && all().length === 0

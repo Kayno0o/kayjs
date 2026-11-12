@@ -5,7 +5,7 @@ import type { NavLink } from './defaults'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SiteNavState from './internal/site-nav-state.kay'
-import { navHrefs, navMark } from './nav-current'
+import { navAddresses, navMark } from './nav-current'
 import { wording } from 'kay/words'
 
 
@@ -51,7 +51,7 @@ const { id, links, link, current, label, menuLabel = wording('ui.siteNav.menu', 
 }>()
 
 const listId = id ?? uid()
-const siblings = memo(() => navHrefs(links))
+const siblings = memo(() => navAddresses(links))
 const anchor = `--_site-nav-${listId}`
 
 const expanded = (entry: NavLink) => expandLabel.replaceAll('{label}', entry.label)

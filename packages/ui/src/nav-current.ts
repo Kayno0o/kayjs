@@ -6,55 +6,57 @@ const TRAILING_SLASHES = /\/+$/
 // A path with a trailing slash is the same page as without one.
 const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHES, '') : path
 
-// Every enabled link of a navigation, the children under each included: what `navMark` weighs a link against.
-export function navHrefs(...lists: readonly (readonly NavLink[] | undefined)[]): string[] {
-  const hrefs: string[] = []
-
-  for (const link of lists.flatMap(list => list ?? [])) {
-    if (!link.disabled)
-      hrefs.push(link.href)
-
-    hrefs.push(...navHrefs(link.children))
-  }
-
-  return hrefs
-}
-
-// A link's address read against the page, a malformed one reading as a path of its own text.
-function addressOf(href: string, here: URL): URL {
+// A link's address as `currentTab` reads it, against the site's placeholder origin; nothing for a malformed one.
+function parse(href: string): URL | undefined {
   try {
-    return new URL(addressHref(href), here)
+    return new URL(addressHref(href), ORIGIN)
   }
   catch {
-    return new URL('/', here)
+    return undefined
   }
 }
 
-// Whether the page `here` holds every param the link `own` sets.
+// Every enabled link of a navigation, the children under each included, parsed once: what `navMark` weighs a link against.
+export function navAddresses(...lists: readonly (readonly NavLink[] | undefined)[]): URL[] {
+  const found: URL[] = []
+
+  for (const link of lists.flatMap(list => list ?? [])) {
+    const own = link.disabled ? undefined : parse(link.href)
+
+    if (own)
+      found.push(own)
+
+    found.push(...navAddresses(link.children))
+  }
+
+  return found
+}
+
+// Whether a link's address is on the page's site: a path of the app, or an address on the page's own origin.
+const sameSite = (own: URL, here: URL) => own.origin === ORIGIN || own.origin === here.origin
+
+// Whether the page `here` holds every param the link `own` sets; a link to another origin is never the page.
 function holds(own: URL, here: URL): boolean {
-  return trimmed(own.pathname) === trimmed(here.pathname) && [...own.searchParams].every(([name, value]) => here.searchParams.getAll(name).includes(value))
+  return sameSite(own, here) && trimmed(own.pathname) === trimmed(here.pathname) && [...own.searchParams].every(([name, value]) => here.searchParams.getAll(name).includes(value))
 }
 
 // How a navigation link stands to the page on screen, `current` being its path or its URL: `page` for the page itself, `true` for a section holding it, nothing else.
-// A link with a query is the page only when the page holds that query, as `currentTab` reads it, and when no link of `siblings` (every link of the navigation) sets more of the page's params on that path: `/settings?tab=billing` takes the page from `/settings`.
-// The home page holds every path, so only an exact match marks it; a link with a query is never a section.
-export function navMark(href: string, current: string | URL, siblings: readonly string[] = []): 'page' | 'true' | undefined {
+// A link with a query is the page only when the page holds that query, as `currentTab` reads it, and when no link of `siblings` (`navAddresses` of the navigation) sets more of the page's params on that path: `/settings?tab=billing` takes the page from `/settings`.
+// The home page holds every path, so only an exact match marks it; a link with a query is never a section, and a link to another site or a malformed one is never current.
+export function navMark(href: string, current: string | URL, siblings: readonly URL[] = []): 'page' | 'true' | undefined {
   const here = typeof current === 'string' ? new URL(current, ORIGIN) : current
-  const own = addressOf(href, here)
+  const own = parse(href)
+
+  if (!own)
+    return undefined
 
   if (holds(own, here)) {
     const params = [...own.searchParams].length
 
-    return siblings.some((other) => {
-      const sibling = addressOf(other, here)
-
-      return [...sibling.searchParams].length > params && holds(sibling, here)
-    })
-      ? undefined
-      : 'page'
+    return siblings.some(other => [...other.searchParams].length > params && holds(other, here)) ? undefined : 'page'
   }
 
   const path = trimmed(own.pathname)
 
-  return own.search === '' && path !== '/' && trimmed(here.pathname).startsWith(`${path}/`) ? 'true' : undefined
+  return sameSite(own, here) && own.search === '' && path !== '/' && trimmed(here.pathname).startsWith(`${path}/`) ? 'true' : undefined
 }
