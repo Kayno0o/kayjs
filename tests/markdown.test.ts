@@ -271,3 +271,12 @@ describe('heading ids', () => {
     expect(await idsOf('# Hello, World! 2\n\n## a_b--c\n\n## `code` x\n\n## Hello, World! 2')).toEqual(['hello-world-2', 'ab-c', 'code-x', 'hello-world-2-1'])
   })
 })
+
+describe('the runtime renderer\'s headings', () => {
+  it('carry no id, on the server and in an island, so no id scheme can differ from compileMarkdown\'s', () => {
+    const source = '## Été & Café\n\n## 日本語\n\n## --\n\n## A\n\n## A'
+
+    expect(markdownHtml(source)).not.toContain('id=')
+    expect(islandMarkdown(source)).not.toContain('id=')
+  })
+})
