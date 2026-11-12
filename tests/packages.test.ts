@@ -16,6 +16,10 @@ interface Manifest {
 }
 
 const RELEASE_HEADING = /^## .+$/gm
+const SHEBANG = /^#!.*/
+const MANIFEST_FILE = /\/?package\.json$/
+// A package name, not a relative path, a `#` import of the package's own, or one of Bun's or Node's modules.
+const BARE_IMPORT = /^(?![./#]|node:|bun(?::|$))/
 const root = await Bun.file('package.json').json() as Manifest
 const libraries = await Promise.all((await Array.fromAsync(new Glob('packages/*/package.json').scan())).sort().map(async path => ({ path, manifest: await Bun.file(path).json() as Manifest })))
 const names = new Set(libraries.map(({ manifest }) => manifest.name))
@@ -81,6 +85,32 @@ describe('kay\'s libraries', () => {
     })
 
     expect(peers.filter(({ range }) => !['7.2.0', '8.0.0'].every(version => Bun.semver.satisfies(version, range)))).toEqual([])
+  })
+
+  // An app installs only these fields of kay and of a library, so a bare import of a published file naming a devDependency fails in the app alone: cli-kit did so from 1.98 to 1.102 (#3276).
+  it.each([{ path: 'package.json', manifest: root }, ...libraries])('$path declares every package its published source imports', async ({ path, manifest }) => {
+    const dir = path.replace(MANIFEST_FILE, '') || '.'
+    const declared = new Set([manifest.name, ...[manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies].flatMap(field => Object.keys(field ?? {}))])
+    // `~icons` is the virtual module kay's build serves; kayjs-auth imports kayjs-mail only inside a try, when the app registers mail().
+    const known = new Set(['~icons', ...dir === 'packages/auth' ? ['@kaynooo/kayjs-mail'] : []])
+    const loaders = { ts: new Bun.Transpiler({ loader: 'ts' }), tsx: new Bun.Transpiler({ loader: 'tsx' }) }
+    const undeclared: string[] = []
+
+    for (const file of await Array.fromAsync(new Glob('src/**/*.{ts,tsx}').scan(dir))) {
+      const text = (await Bun.file(`${dir}/${file}`).text()).replace(SHEBANG, '')
+
+      for (const { path: specifier } of loaders[file.endsWith('.tsx') ? 'tsx' : 'ts'].scanImports(text)) {
+        if (!BARE_IMPORT.test(specifier))
+          continue
+
+        const name = specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/')
+
+        if (!declared.has(name) && !known.has(name))
+          undeclared.push(`${file}: ${name}`)
+      }
+    }
+
+    expect(undeclared).toEqual([])
   })
 
   it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
