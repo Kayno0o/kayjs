@@ -38,6 +38,8 @@ describe('deprecated-if-alias', () => {
     expect(run('if user then été\n  p {été.name}').errors).toEqual([])
     expect(run('if user then null\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
     expect(run('if user then class\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
+    expect(run('if user then public\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
+    expect(run('if user then _u$\n  p {_u$.name}').errors).toEqual([])
   })
 
   it('reports then with no name or with two', () => {

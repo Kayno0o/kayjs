@@ -6,9 +6,9 @@ import { parseExpression } from './estree'
 // What a condition naming its value holds: `then name` since 1.102, and before it an `as` that may as well be a cast.
 const MAY_ALIAS = /\sas\s/
 const MAY_THEN = /\sthen(?:\s|$)/
-const THEN_NAME = /^then(?:[ \t]+([\p{L}_$][\p{L}\p{N}_$]*))?[ \t]*(?:\/\/.*)?$/du
+const THEN_NAME = /^then(?:[ \t]+([\p{L}_$][\p{L}\p{M}\p{N}_$]*))?[ \t]*(?:\/\/.*)?$/du
 // Words that are no name for a value.
-const RESERVED = new Set(['null', 'true', 'false', 'this', 'class', 'await', 'in', 'as', 'of', 'new', 'typeof', 'void', 'delete', 'function', 'return', 'if', 'else', 'const', 'let', 'var', 'yield', 'import', 'export', 'default', 'super', 'switch', 'case', 'for', 'while', 'do', 'try', 'catch', 'finally', 'throw', 'with', 'break', 'continue', 'instanceof', 'enum', 'extends', 'debugger'])
+const RESERVED = new Set(['null', 'true', 'false', 'this', 'class', 'await', 'in', 'as', 'of', 'new', 'typeof', 'void', 'delete', 'function', 'return', 'if', 'else', 'const', 'let', 'var', 'yield', 'import', 'export', 'default', 'super', 'switch', 'case', 'for', 'while', 'do', 'try', 'catch', 'finally', 'throw', 'with', 'break', 'continue', 'instanceof', 'enum', 'extends', 'debugger', 'static', 'interface', 'implements', 'package', 'private', 'protected', 'public'])
 // A capitalized name after a condition's `as` is a type, so a cast.
 const CAPITALIZED_NAME = /^[\p{Lu}\p{Lt}]/u
 // What the tail of a condition is parsed behind, as the type of a cast.
