@@ -35,9 +35,11 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       const value = props[name]
 
+      const previous = set.get(name)
+
       seen.add(name)
 
-      if (set.get(name) === value)
+      if (previous === value)
         continue
 
       set.set(name, value)
@@ -48,9 +50,10 @@ export function spread(element: Element, sources: () => readonly object[], conte
       else if (handlerName(name) && typeof value === 'function') {
         runWithOwner(owner, () => (submits.listen ?? listen)(element, name, value as (event: Event) => void))
       }
-      // A handler given as text runs as script, which the server never writes either.
+      // A handler given as text runs as script, which the server never writes either; one that was a function before is gone.
       else if (handlerName(name)) {
-        continue
+        if (typeof previous === 'function')
+          unlisten(element, name)
       }
       // A function that is no handler, such as a slot given to the component, has no attribute form.
       else if (typeof value === 'function' && name !== 'class' && name !== 'style') {
@@ -79,6 +82,8 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       if (handlerName(name) && typeof previous === 'function')
         unlisten(element, name)
+      else if (name === 'class')
+        setClass(element, undefined)
       else if (name !== 'ref' && !handlerName(name))
         property(element, name, undefined)
     }
