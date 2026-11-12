@@ -150,6 +150,12 @@ describe('the Apps workflow dispatch', () => {
     expect(await dispatchRun('apps.yml', 'abc123', { path: silent })).toEqual({ error: 'exit 2' })
   })
 
+  it('answers an error, not a throw, when ft prints no run id', async () => {
+    const text = await stub({ out: 'Started apps.yml on main' })
+
+    expect(await dispatchRun('apps.yml', 'abc123', { path: text })).toEqual({ error: 'ft dispatch answered no run id: Started apps.yml on main' })
+  })
+
   it('fails clearly without ft', async () => {
     expect(await dispatchRun('apps.yml', 'abc123', { path: await scratchDir('no-ft') })).toEqual({ error: NO_FT })
   })

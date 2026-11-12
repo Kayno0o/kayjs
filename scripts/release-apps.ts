@@ -43,7 +43,17 @@ export async function dispatchRun(workflow: string, sha: string, options: { path
   if (started.exitCode !== 0)
     return { error: refusal(started.stderr.toString()) || `exit ${started.exitCode}` }
 
-  return { id: (JSON.parse(started.stdout.toString()) as { id: number }).id }
+  const out = started.stdout.toString().trim()
+
+  try {
+    const { id } = JSON.parse(out) as { id?: unknown }
+
+    if (typeof id === 'number')
+      return { id }
+  }
+  catch {}
+
+  return { error: `ft dispatch answered no run id: ${out || 'nothing'}` }
 }
 
 interface Run {
