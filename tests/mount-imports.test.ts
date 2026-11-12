@@ -1,5 +1,5 @@
-import { mkdir, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { cp, mkdir, symlink, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
@@ -350,4 +350,57 @@ describe('a package whose package.json cannot be read', () => {
       warn.mockRestore()
     }
   })
+})
+
+// kay installed as an app has it: its files sit under `node_modules`, where the checkout's own fixtures symlink it out. The project runs its own `bun test`, so the `kay` its store module and its test import is the installed one, as in an app.
+describe('kay installed under node_modules', () => {
+  const checkout = process.cwd()
+  const files: Record<string, string> = {
+    'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
+    'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nexport default defineConfig({ requireGuards: false })\n',
+    'src/store.ts': 'import { signal } from \'kay\'\nexport function session() {\n  const filed = signal({ done: false })\n\n  return { done: () => filed().done, submit() { filed.set({ done: true }) } }\n}\n',
+    'src/probe.kay': '---\nimport { session } from \'./store\'\nconst s = session()\n---\nbutton(onClick={() => s.submit()}) go\nif s.done()\n  p.yes done\nelse\n  p.no waiting\n',
+    'src/probe.test.ts': 'import { GlobalRegistrator } from \'@happy-dom/global-registrator\'\nimport { afterAll, beforeAll, expect, it } from \'bun:test\'\nimport { mountComponent, settle } from \'kay/test\'\nimport Probe from \'./probe.kay\'\n\nbeforeAll(() => GlobalRegistrator.register())\nafterAll(() => GlobalRegistrator.unregister())\n\nit(\'re-renders after a store signal changes\', async () => {\n  const { root } = await mountComponent(Probe)\n\n  expect(root.querySelector(\'.no\')).not.toBeNull()\n  root.querySelector(\'button\')!.click()\n  await settle()\n  expect(root.querySelector(\'.yes\')).not.toBeNull()\n})\n',
+  }
+
+  // Where kay's folder sits, from the project's: the layouts a package manager installs. `link` is a symlink to kay's folder, or to the checkout itself.
+  const layouts: Record<string, { app: string, kay: string, link?: string }> = {
+    'a real copy': { app: '.', kay: 'node_modules/kay' },
+    'a real copy hoisted above the project': { app: 'apps/web', kay: 'node_modules/kay' },
+    'a real copy behind the isolated linker\'s link': { app: '.', kay: 'node_modules/.bun/kay@0.0.0/node_modules/kay', link: 'node_modules/kay' },
+    'a symlink to the checkout': { app: '.', kay: 'node_modules/kay', link: 'checkout' },
+  }
+
+  for (const [name, layout] of Object.entries(layouts)) {
+    it(`shares its reactive core with the test when it is ${name}`, async () => {
+      const root = await scratchDir('mount-installed-')
+      const app = join(root, layout.app)
+      const kay = join(root, layout.kay)
+
+      await mkdir(app, { recursive: true })
+
+      for (const [file, text] of Object.entries(files)) {
+        await mkdir(dirname(join(app, file)), { recursive: true })
+        await writeFile(join(app, file), text)
+      }
+
+      await mkdir(dirname(kay), { recursive: true })
+
+      if (layout.link === 'checkout') {
+        await symlink(checkout, kay)
+      }
+      else {
+        for (const entry of ['package.json', 'src'])
+          await cp(join(checkout, entry), join(kay, entry), { recursive: true })
+
+        if (layout.link !== undefined)
+          await symlink(relative(dirname(join(root, layout.link)), kay), join(root, layout.link))
+      }
+
+      const run = Bun.spawn([process.execPath, 'test', 'src/probe.test.ts'], { cwd: app, stdout: 'pipe', stderr: 'pipe' })
+      const [out, err, code] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
+
+      expect(code, out + err).toBe(0)
+    }, 120_000)
+  }
 })

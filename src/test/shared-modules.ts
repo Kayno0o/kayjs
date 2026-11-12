@@ -117,9 +117,9 @@ function inLibrary(path: string): boolean {
   return known
 }
 
-// A package of the app's dependencies, whose own files are not walked; kay's libraries are, as they import kay.
+// A package of the app's dependencies, whose own files are not walked; kay's libraries are, as they import kay, and so is kay, wherever it is installed: the folder this file loads from is the kay the test imports, under `node_modules` or not.
 function isDependency(resolved: string): boolean {
-  return resolved.includes(NODE_MODULES) && !LIBRARY_FOLDER.test(resolved)
+  return resolved.includes(NODE_MODULES) && !LIBRARY_FOLDER.test(resolved) && !resolved.startsWith(KAY_SOURCE)
 }
 
 function versionOf(path: string): string {
@@ -300,7 +300,7 @@ export function sharedModules(apiDirs: string[]): Bun.BunPlugin {
 
       // Bun drops the import of an external module behind `export * from`, so the star names what the test process holds for the file: oven-sh/bun#15997, kaynooo/kayjs#2703.
       build.onLoad({ filter: SCRIPT, namespace: 'file' }, async ({ path }) => {
-        if (path.includes(NODE_MODULES))
+        if (isDependency(path))
           return undefined
 
         const text = readFileSync(path, 'utf8')
