@@ -31,7 +31,7 @@
     "max-lines-per-function": 283
   },
   "packages/auth/src/setup.ts": {
-    "complexity": 55
+    "complexity": 53
   },
   "packages/cms/src/drafts.ts": {
     "max-lines-per-function": 295
