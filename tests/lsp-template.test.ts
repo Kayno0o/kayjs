@@ -6,12 +6,12 @@ import { componentInterface } from '../src/lsp/component-props'
 import { islandLens } from '../src/lsp/island-lens'
 import { documentSymbols, foldingRanges } from '../src/lsp/outline'
 import { importEdits, moduleImportEdits } from '../src/lsp/renames'
-import { templateContext } from '../src/lsp/template-completion'
+import { templateContext, templateItems } from '../src/lsp/template-completion'
 import { scratchDir } from './scratch'
 
 // The context at the `|` of a source.
-function at(marked: string, templateStart = 0) {
-  const offset = marked.indexOf('|')
+function at(marked: string, templateStart = 0, mark = '|') {
+  const offset = marked.indexOf(mark)
   const source = marked.slice(0, offset) + marked.slice(offset + 1)
   const context = templateContext(source, offset, templateStart)
 
@@ -60,6 +60,34 @@ describe('template completion contexts', () => {
     expect(at('// kay-allow unread-name -- un|')).toBeUndefined()
     expect(at('// kay-allow-file unread-name -- why, un|')).toBeUndefined()
     expect(at('// kay-allow unread-name, -- |')).toBeUndefined()
+  })
+
+  it('finds the value of an attribute of a plain element and the modifiers of an event', () => {
+    expect(at('input(type="te|")')).toMatchObject({ kind: 'value', tag: 'input', name: 'type', replaced: 'te' })
+    expect(at('input(name="a" type=\'|\')')).toMatchObject({ kind: 'value', tag: 'input', name: 'type' })
+    expect(at('input(\n  role="|"\n)')).toMatchObject({ kind: 'value', tag: 'input', name: 'role' })
+    expect(at('Card(tone="|")')).toBeUndefined()
+    expect(at('a(href="/to|")')).toMatchObject({ kind: 'path' })
+
+    expect(at('button(onClick|prev#)', 0, '#')).toMatchObject({ kind: 'modifier', event: 'onClick', replaced: 'prev' })
+    expect(at('input(onKeyDown|enter|#)', 0, '#')).toMatchObject({ kind: 'modifier', event: 'onKeyDown', taken: new Set(['enter', '']) })
+    expect(at('Card(onPick|)')).toMatchObject({ kind: 'attribute', tag: 'Card' })
+  })
+
+  it('offers the names TypeScript gave a tag with kay\'s own, the lists only when it gave none', () => {
+    const edit = () => ({})
+    const labels = (data: Parameters<typeof templateItems>[1], taken: string[] = []) => templateItems({ kind: 'attribute', tag: 'input', taken: new Set(taken) }, data, edit).map(item => item.label)
+    const base = { lints: [], paths: [], messages: [], components: [], elements: [] }
+
+    expect(labels({ ...base, intrinsic: ['id', 'onDblClick', 'inputmode'] })).toEqual(expect.arrayContaining(['id', 'onDblClick', 'inputmode', 'part', 'bind:files', 'field']))
+    expect(labels({ ...base, intrinsic: ['id', 'onDblClick'] })).not.toContain('placeholder')
+    expect(labels({ ...base, intrinsic: ['id', 'class'] }, ['class'])).not.toContain('class')
+    expect(labels(base)).toEqual(expect.arrayContaining(['placeholder', 'onClick', 'bind:value']))
+    expect(labels({ ...base, intrinsic: [] })).toContain('placeholder')
+    expect(templateItems({ kind: 'attribute', tag: 'input', taken: new Set() }, { ...base, intrinsic: ['onDblClick'] }, edit).find(item => item.label === 'onDblClick')).toMatchObject({ kind: 23 })
+    expect(templateItems({ kind: 'value', tag: 'input', name: 'type' }, { ...base, values: ['text', 'email'] }, edit).map(item => item.label)).toEqual(['text', 'email'])
+    expect(templateItems({ kind: 'modifier', event: 'onKeyDown', taken: new Set(['once']) }, base, edit).map(item => item.label)).toEqual(expect.arrayContaining(['preventDefault', 'enter']))
+    expect(templateItems({ kind: 'modifier', event: 'onClick', taken: new Set() }, base, edit).map(item => item.label)).not.toContain('enter')
   })
 
   it('offers no element or attribute name inside a fence', () => {

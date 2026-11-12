@@ -18,6 +18,12 @@ type Keyword<Words extends string> = Words | false | null | undefined
 
 type OpenKeyword<Words extends string> = Words | (string & {}) | false | null | undefined
 
+// The WAI-ARIA roles an author writes by hand; any other word goes, as a role the list lacks is still valid.
+type AriaRole = 'alert' | 'alertdialog' | 'application' | 'article' | 'banner' | 'button' | 'cell' | 'checkbox' | 'columnheader' | 'combobox' | 'complementary' | 'contentinfo' | 'definition' | 'dialog' | 'directory' | 'document' | 'feed' | 'figure' | 'form' | 'grid' | 'gridcell' | 'group' | 'heading' | 'img' | 'link' | 'list' | 'listbox' | 'listitem' | 'log' | 'main' | 'marquee' | 'math' | 'menu' | 'menubar' | 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'navigation' | 'none' | 'note' | 'option' | 'presentation' | 'progressbar' | 'radio' | 'radiogroup' | 'region' | 'row' | 'rowgroup' | 'rowheader' | 'scrollbar' | 'search' | 'searchbox' | 'separator' | 'slider' | 'spinbutton' | 'status' | 'switch' | 'tab' | 'table' | 'tablist' | 'tabpanel' | 'term' | 'textbox' | 'timer' | 'toolbar' | 'tooltip' | 'tree' | 'treegrid' | 'treeitem'
+
+// What `autocomplete` takes on a field: a token of the autofill list, which a section or `billing` / `shipping` may precede, so any other word goes.
+type Autofill = OpenKeyword<'on' | 'off' | 'name' | 'honorific-prefix' | 'given-name' | 'additional-name' | 'family-name' | 'nickname' | 'email' | 'username' | 'new-password' | 'current-password' | 'one-time-code' | 'organization-title' | 'organization' | 'street-address' | 'address-line1' | 'address-line2' | 'address-line3' | 'address-level1' | 'address-level2' | 'country' | 'country-name' | 'postal-code' | 'cc-name' | 'cc-number' | 'cc-exp' | 'cc-exp-month' | 'cc-exp-year' | 'cc-csc' | 'cc-type' | 'bday' | 'bday-day' | 'bday-month' | 'bday-year' | 'sex' | 'tel' | 'tel-national' | 'url' | 'photo' | 'language' | 'transaction-currency' | 'transaction-amount' | 'webauthn'>
+
 type ClassValue = Value | Record<string, unknown> | readonly ClassValue[]
 
 type StyleValue = string | Record<string, string | number | null | undefined> | null | undefined
@@ -110,7 +116,7 @@ interface CommonAttributes<Target> {
   'hidden'?: AttributeValue
   'inert'?: AttributeValue
   'tabindex'?: AttributeValue
-  'role'?: AttributeValue
+  'role'?: OpenKeyword<AriaRole>
   'slot'?: AttributeValue
   'part'?: AttributeValue
   'exportparts'?: AttributeValue
@@ -151,8 +157,9 @@ interface CommonAttributes<Target> {
 
 // An element's own attributes are its DOM properties, by name and lowercased as HTML writes them: `maxLength` or `maxlength`.
 // A form or a select indexes its controls, which names no attribute.
-type OwnAttributes<Target> = {
-  [Name in keyof Target as Name extends keyof HTMLElement ? never : string extends Name ? never : Target[Name] extends (...args: never[]) => unknown ? never : Name extends string ? Name | Lowercase<Name> : never]?: AttributeValue
+// `Declared` names those an interface below types better, so `AttributeValue` is not intersected with their keywords, which would leave an editor with none to offer for an open list.
+type OwnAttributes<Target, Declared extends PropertyKey = never> = {
+  [Name in keyof Target as Name extends keyof HTMLElement ? never : string extends Name ? never : Target[Name] extends (...args: never[]) => unknown ? never : Name extends string ? Exclude<Name | Lowercase<Name>, Declared> : never]?: AttributeValue
 }
 
 type ButtonCommand = 'show-modal' | 'close' | 'request-close' | 'show-popover' | 'hide-popover' | 'toggle-popover' | `--${string}`
@@ -189,13 +196,15 @@ interface EnumeratedAttributes {
   audio: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin }
   base: { target?: BrowsingContext }
   button: { type?: Keyword<'button' | 'submit' | 'reset'>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
-  form: { method?: FormMethod, enctype?: FormEncoding, encoding?: FormEncoding, target?: BrowsingContext }
+  form: { autocomplete?: Autofill, method?: FormMethod, enctype?: FormEncoding, encoding?: FormEncoding, target?: BrowsingContext }
   iframe: { loading?: Keyword<'lazy' | 'eager'>, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   img: { loading?: Keyword<'lazy' | 'eager'>, decoding?: Keyword<'sync' | 'async' | 'auto'>, crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
-  input: { type?: Keyword<typeof INPUT_TYPES[number]>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
+  input: { autocomplete?: Autofill, type?: Keyword<typeof INPUT_TYPES[number]>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
   link: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   ol: { type?: Keyword<'1' | 'a' | 'A' | 'i' | 'I'> | 1 }
   script: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  select: { autocomplete?: Autofill }
+  textarea: { autocomplete?: Autofill }
   th: { scope?: Keyword<'row' | 'col' | 'rowgroup' | 'colgroup'> }
   video: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin }
 }
@@ -208,7 +217,7 @@ interface KayAttributes {
 
 type HtmlAttributes<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes<HTMLElementTagNameMap[Tag]>
   & Handlers<HTMLElementTagNameMap[Tag], HTMLElementEventMap>
-  & OwnAttributes<HTMLElementTagNameMap[Tag]>
+  & OwnAttributes<HTMLElementTagNameMap[Tag], Tag extends keyof EnumeratedAttributes ? keyof EnumeratedAttributes[Tag] : never>
   & (Tag extends keyof SpelledAttributes ? SpelledAttributes[Tag] : unknown)
   & (Tag extends keyof EnumeratedAttributes ? EnumeratedAttributes[Tag] : unknown)
   & (Tag extends keyof KayAttributes ? KayAttributes[Tag] : unknown)

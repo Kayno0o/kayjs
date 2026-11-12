@@ -1,6 +1,7 @@
 import type { Span } from '../compiler/ast'
 import type { CompletionItem } from './protocol'
 import type { ObjectCursor, UiData } from './ui-completion'
+import { eventModifiers } from '../compiler/event-modifiers'
 import { objectCursor, typedLength, uiItems } from './ui-completion'
 
 // What the cursor is at in a `.kay` file, outside every TypeScript expression: the part of the file kay completes itself, since TypeScript sees nothing there.
@@ -10,6 +11,10 @@ export type Wanted
     | { kind: 'message' }
     // The attribute names of the element whose parentheses the cursor is in, leaving out those already written.
     | { kind: 'attribute', tag: string, taken: Set<string> }
+    // The modifiers written after `|` on an event handler (`onClick|`), leaving out those already written.
+    | { kind: 'modifier', event: string, taken: Set<string> }
+    // The quoted value of an attribute of a plain element, for the attributes whose type is a union of words.
+    | { kind: 'value', tag: string, name: string }
     // A line start: block keywords and element names, or after `@` the blocks of the component the line is under.
     | { kind: 'line', slotOf?: string | undefined }
     // The key or the string the cursor is in inside the `class={{ }}` object of a component call.
@@ -38,6 +43,7 @@ const ATTRIBUTE_NAME = /(?:^|[\s,])([\w:-]+)(?:[|=\s,]|$)/g
 const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g
 // How many lines above the cursor an attribute list opened on may start.
 const MAX_ATTRIBUTE_LINES = 40
+const VALUE_BEFORE = /(?:^|[\s(,])([\w:-]+)=["']([^"'{}]*)$/
 const CLASS_OBJECT = /\bclass=\{\{/g
 const COMPONENT_LINE = /^\s*([A-Z][\w$]*)/
 
@@ -71,6 +77,11 @@ export function templateContext(source: string, offset: number, templateStart: n
   if (styled)
     return styled
 
+  const valued = valueContext(source, lineStart, prefix, offset, after)
+
+  if (valued)
+    return valued
+
   const here = openParenthesis(prefix)
   const open = here ?? earlierParenthesis(source, lineStart, prefix)
 
@@ -89,8 +100,14 @@ export function templateContext(source: string, offset: number, templateStart: n
 
     const taken = new Set([...before.replace(QUOTED, '""').matchAll(ATTRIBUTE_NAME)].map(found => found[1]!))
 
-    if (valid && tag !== undefined)
+    if (valid && tag !== undefined) {
+      const bar = word.indexOf('|')
+
+      if (bar !== -1 && !CAPITALIZED.test(tag))
+        return { wanted: { kind: 'modifier', event: word.slice(0, bar), taken: new Set(word.slice(bar + 1).split('|')) }, replace: reaching(offset - word.length + word.lastIndexOf('|') + 1) }
+
       return { wanted: { kind: 'attribute', tag, taken }, replace: reaching(offset - word.length) }
+    }
   }
 
   const line = LINE_START.exec(prefix)
@@ -101,6 +118,25 @@ export function templateContext(source: string, offset: number, templateStart: n
   const word = line[3]!
 
   return { wanted: { kind: 'line', slotOf: line[2] === '@' ? parentComponent(source, lineStart, line[1]!.length) : undefined }, replace: reaching(offset - word.length) }
+}
+
+// The value of `name="` of a plain element, when the cursor is inside the quotes: TypeScript lists the words the attribute's type allows.
+function valueContext(source: string, lineStart: number, prefix: string, offset: number, after: number): TemplateContext | undefined {
+  const found = VALUE_BEFORE.exec(prefix)
+
+  if (!found)
+    return undefined
+
+  const name = found[1]!
+  const text = prefix.slice(0, found.index + found[0].indexOf(name))
+  const open = openParenthesis(text) ?? earlierParenthesis(source, lineStart, text)
+  const tagged = open && TAG_BEFORE_PAREN.exec(open.text.slice(0, open.index))
+  const tag = tagged?.[1]
+
+  if (!tagged || tag === undefined || CAPITALIZED.test(tag) || name === 'href' || name === 'action' || !BEFORE_ELEMENT.test(open.text.slice(open.text.lastIndexOf('\n', tagged.index - 1) + 1, tagged.index)) || PATH.test(prefix))
+    return undefined
+
+  return { wanted: { kind: 'value', tag, name }, replace: { start: offset - found[2]!.length, end: offset + after } }
 }
 
 // The `class={{ }}` object of a component call the cursor is in: its keys are the component's parts.
@@ -231,13 +267,14 @@ const BLOCKS: { label: string, detail: string, snippet?: string }[] = [
   { label: 'error', detail: 'the message of a refused field of the form', snippet: `error ${hole(1, 'field')}` },
 ]
 
-const GLOBAL_ATTRIBUTES = ['id', 'class', 'style', 'title', 'role', 'tabindex', 'hidden', 'lang', 'dir', 'draggable', 'inert', 'aria-label', 'aria-labelledby', 'aria-describedby', 'aria-hidden', 'aria-live', 'aria-current', 'aria-expanded', 'aria-controls', 'innerHTML']
+// The lists below stand in while the language server's types are not ready: TypeScript lists the attributes and events of `JSX.IntrinsicElements[tag]`, and they are used only when it answers nothing.
+const GLOBAL_ATTRIBUTES = ['id', 'class', 'style', 'title', 'role', 'tabindex', 'hidden', 'lang', 'dir', 'draggable', 'inert', 'innerHTML']
 const ELEMENT_ATTRIBUTES: Record<string, string[]> = {
   a: ['href', 'target', 'rel', 'download', 'hreflang', 'section'],
   img: ['src', 'alt', 'width', 'height', 'loading', 'decoding', 'srcset', 'sizes'],
-  input: ['type', 'name', 'value', 'placeholder', 'required', 'disabled', 'checked', 'min', 'max', 'step', 'pattern', 'autocomplete', 'readonly', 'multiple', 'accept', 'field', 'bind:value', 'bind:checked', 'bind:group'],
-  textarea: ['name', 'rows', 'cols', 'placeholder', 'required', 'disabled', 'readonly', 'field', 'bind:value'],
-  select: ['name', 'required', 'disabled', 'multiple', 'field', 'bind:value'],
+  input: ['type', 'name', 'value', 'placeholder', 'required', 'disabled', 'checked', 'min', 'max', 'step', 'pattern', 'autocomplete', 'readonly', 'multiple', 'accept'],
+  textarea: ['name', 'rows', 'cols', 'placeholder', 'required', 'disabled', 'readonly'],
+  select: ['name', 'required', 'disabled', 'multiple'],
   option: ['value', 'selected', 'disabled'],
   button: ['type', 'name', 'value', 'disabled'],
   form: ['action', 'method', 'enctype'],
@@ -256,6 +293,16 @@ const ELEMENT_ATTRIBUTES: Record<string, string[]> = {
   details: ['open'],
   dialog: ['open'],
 }
+// What types cannot give: the `aria-*` names, which a template-literal index signature stands for, and kay's own attributes, which no type lists or which an element takes only through the compiler.
+const ARIA_ATTRIBUTES = ['activedescendant', 'atomic', 'autocomplete', 'busy', 'checked', 'colcount', 'colindex', 'colspan', 'controls', 'current', 'describedby', 'details', 'disabled', 'dropeffect', 'errormessage', 'expanded', 'flowto', 'grabbed', 'haspopup', 'hidden', 'invalid', 'keyshortcuts', 'label', 'labelledby', 'level', 'live', 'modal', 'multiline', 'multiselectable', 'orientation', 'owns', 'placeholder', 'posinset', 'pressed', 'readonly', 'relevant', 'required', 'roledescription', 'rowcount', 'rowindex', 'rowspan', 'selected', 'setsize', 'sort', 'valuemax', 'valuemin', 'valuenow', 'valuetext'].map(name => `aria-${name}`)
+const KAY_ATTRIBUTES = [...ARIA_ATTRIBUTES, 'part', 'transition', 'transition:enter', 'transition:enter-from', 'transition:enter-to', 'transition:leave', 'transition:leave-from', 'transition:leave-to']
+const KAY_ELEMENT_ATTRIBUTES: Record<string, string[]> = {
+  input: ['field', 'bind:value', 'bind:checked', 'bind:group', 'bind:files'],
+  textarea: ['field', 'bind:value'],
+  select: ['field', 'bind:value'],
+  details: ['bind:open'],
+}
+const EVENT_NAME = /^on[A-Z]/
 const EVENTS = ['onClick', 'onInput', 'onChange', 'onSubmit', 'onKeyDown', 'onKeyUp', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onPointerDown', 'onPointerUp', 'onScroll', 'onLoad', 'onError']
 
 // What the project and the file around the cursor hold, which the items are made of.
@@ -266,6 +313,9 @@ export interface TemplateData {
   // The component names the file imports, and for a local `.kay` one its props and the blocks it renders.
   components: { name: string, from: string, props: { name: string, optional: boolean }[], blocks: string[] }[]
   elements: string[]
+  // The attribute and event names TypeScript gives a plain element, and the words it gives the attribute a `value` completion is in.
+  intrinsic?: string[] | undefined
+  values?: string[] | undefined
   // The parts, variants and tokens of the components a `class={{ }}` or `src/ui.ts` is completed from.
   ui?: UiData | undefined
 }
@@ -282,13 +332,19 @@ export function templateItems(wanted: Wanted, data: TemplateData, edit: (label: 
       return data.messages.map(key => item(key, KIND_TEXT, 'message'))
     case 'attribute': {
       const component = data.components.find(candidate => candidate.name === wanted.tag)
-      const names = CAPITALIZED.test(wanted.tag)
-        ? (component?.props ?? []).map(prop => item(prop.name, KIND_PROPERTY, `prop of ${wanted.tag}`, prop.name))
-        : [...GLOBAL_ATTRIBUTES, ...ELEMENT_ATTRIBUTES[wanted.tag] ?? []].map(name => item(name, KIND_FIELD, `attribute of ${wanted.tag}`))
-      const events = CAPITALIZED.test(wanted.tag) ? [] : EVENTS.map(name => item(name, KIND_EVENT, 'event handler'))
 
-      return [...names, ...events].filter(candidate => !wanted.taken.has(candidate.label))
+      if (CAPITALIZED.test(wanted.tag))
+        return (component?.props ?? []).map(prop => item(prop.name, KIND_PROPERTY, `prop of ${wanted.tag}`, prop.name)).filter(candidate => !wanted.taken.has(candidate.label))
+
+      const known = data.intrinsic !== undefined && data.intrinsic.length > 0 ? data.intrinsic : [...GLOBAL_ATTRIBUTES, ...ELEMENT_ATTRIBUTES[wanted.tag] ?? [], ...EVENTS]
+      const names = new Set([...known, ...KAY_ATTRIBUTES, ...KAY_ELEMENT_ATTRIBUTES[wanted.tag] ?? []])
+
+      return [...names].filter(name => !wanted.taken.has(name)).map(name => EVENT_NAME.test(name) ? item(name, KIND_EVENT, 'event handler') : item(name, KIND_FIELD, `attribute of ${wanted.tag}`))
     }
+    case 'modifier':
+      return eventModifiers(wanted.event).filter(name => !wanted.taken.has(name)).map(name => item(name, KIND_KEYWORD, 'event modifier'))
+    case 'value':
+      return (data.values ?? []).map(value => item(value, KIND_TEXT, `${wanted.name} of ${wanted.tag}`))
     case 'ui':
       return uiItems(wanted.cursor, wanted.tag, data.ui ?? { components: [], tokens: [] }).map(found => ({ ...found, ...edit(found.label, found.label, false) }))
     case 'line': {

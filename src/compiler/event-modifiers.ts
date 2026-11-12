@@ -15,6 +15,11 @@ const KEY_EVENT = /^onKey(?:Down|Up|Press)$/
 // `once` and `self` join them: `once` runs the handler for one event only, `self` only when the event's target is the element.
 const EVENT_MODIFIERS: ReadonlySet<string> = new Set([...EVENT_METHODS, ...LISTENER_OPTIONS, 'once', 'self', ...KEYS.keys()])
 
+// The modifiers `event` takes: the key names only for a key event.
+export function eventModifiers(event: string): string[] {
+  return [...EVENT_METHODS, ...LISTENER_OPTIONS, 'once', 'self', ...KEY_EVENT.test(event) ? KEYS.keys() : []]
+}
+
 interface Problem {
   message: string
   help: string

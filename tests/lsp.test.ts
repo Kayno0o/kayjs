@@ -270,13 +270,19 @@ describe('kay lsp', () => {
   it('completes where TypeScript sees no code: props, attributes, blocks, lint names and routes', async () => {
     const path = 'site/src/routes/search.kay'
     const text = await Bun.file(join(workspace, path)).text()
-    const source = '---\nimport Card from \'../components/card.kay\'\n---\nCard()\nform(action="")\n  \na(href="/")\n// kay-allow \n'
+    const source = '---\nimport Card from \'../components/card.kay\'\n---\nCard()\nform(action="")\n  \na(href="/")\n// kay-allow \ninput(type="")\ninput(autocomplete="")\na(target="")\nbutton(onClick|)\ndiv()\n'
     const labels = async (line: number, character: number) => (await editor.request<CompletionList>('textDocument/completion', path, line, character)).items.map(item => item.label)
 
     await editor.open(path)
     await editor.change(path, source, 2)
 
     try {
+      // Names and words come from `JSX.IntrinsicElements`, kay's own attributes beside them.
+      expect(await labels(12, 4)).toEqual(expect.arrayContaining(['id', 'aria-label', 'onDblClick', 'onPointerMove', 'onDragStart', 'part', 'transition:enter']))
+      expect(await labels(8, 12)).toEqual(expect.arrayContaining(['text', 'email', 'checkbox']))
+      expect(await labels(9, 20)).toContain('on')
+      expect(await labels(10, 10)).toEqual(expect.arrayContaining(['_blank', '_self']))
+      expect(await labels(11, 15)).toEqual(expect.arrayContaining(['preventDefault', 'once']))
       expect(await labels(3, 5)).toEqual(['title'])
       expect(await labels(4, 5)).toEqual(expect.arrayContaining(['action', 'method', 'onSubmit']))
       expect(await labels(4, 5)).not.toContain('href')

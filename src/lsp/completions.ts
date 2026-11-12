@@ -129,9 +129,15 @@ export async function templateData(host: LspHost, document: Document, wanted: Wa
   else if (wanted.kind === 'message') {
     data.messages = await remembered(project.lookups, 'messages', async () => project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : [])
   }
-  else {
+  else if (wanted.kind === 'value') {
+    data.values = await typedValues(host, document, project, wanted.tag, wanted.name)
+  }
+  else if (wanted.kind !== 'modifier') {
     data.elements = [...HTML_ELEMENTS]
     data.components = await importedComponents(host, document, project, wanted.kind === 'attribute' ? wanted.tag : undefined)
+
+    if (wanted.kind === 'attribute' && !CAPITALIZED.test(wanted.tag))
+      data.intrinsic = (await typedProps(host, document, project, wanted.tag, ''))?.map(prop => prop.name)
   }
 
   return data
@@ -200,19 +206,48 @@ export async function typedProps(host: LspHost, document: Document, project: Pro
   return props
 }
 
+// The words TypeScript offers for `name="` on a plain element, when its type is a union of them, asked as the props are and kept in the same cache.
+export async function typedValues(host: LspHost, document: Document, project: Project, tag: string, name: string): Promise<string[]> {
+  const key = `${document.file}\0${tag}\0value:${name}`
+  const { typedProps } = project.lookups
+  const asked = typedProps.get(key) ?? askValues(host, document, tag, name)
+
+  typedProps.set(key, asked)
+
+  const values = await asked
+
+  if (values === undefined && typedProps.get(key) === asked)
+    typedProps.delete(key)
+
+  return values?.map(value => value.name) ?? []
+}
+
+async function askValues(host: LspHost, document: Document, tag: string, name: string): Promise<ComponentInterface['props'] | undefined> {
+  const call = `void (<${tag} ${name}="" />)`
+  const items = await probeCompletion(host, document, call, call.indexOf('""') + 1)
+
+  return items?.map(item => ({ name: item.label, optional: false }))
+}
+
 export async function askProps(host: LspHost, document: Document, tag: string): Promise<ComponentInterface['props'] | undefined> {
   const call = `void (<${tag}  />)`
+  const items = await probeCompletion(host, document, call, call.indexOf('  ') + 1)
+
+  return items?.filter(item => (item.kind === KIND_PROPERTY || item.kind === KIND_FIELD) && item.label !== 'key').map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') }))
+}
+
+// What TypeScript completes at `caret` in `call`, a line added to a copy of the file's shadow, since the cursor of a completion is not in the shadow itself; undefined when it cannot answer.
+async function probeCompletion(host: LspHost, document: Document, call: string, caret: number): Promise<CompletionItem[] | undefined> {
   const text = `${document.tsx}\n${call}\n`
   const uri = `${document.shadowUri}.props${host.nextProbe()}.tsx`
-  const position = toPosition(text, text.length - call.length - 1 + call.indexOf('  ') + 1)
+  const position = toPosition(text, text.length - call.length - 1 + caret)
 
   host.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescriptreact', version: 1, text } })
 
   try {
     const result = await host.server.request<CompletionList | CompletionItem[] | null>('textDocument/completion', { textDocument: { uri }, position })
-    const items = (Array.isArray(result) ? result : result?.items ?? []).filter(item => (item.kind === KIND_PROPERTY || item.kind === KIND_FIELD) && item.label !== 'key' && !GENERATED_NAME.test(item.label))
 
-    return items.map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') }))
+    return (Array.isArray(result) ? result : result?.items ?? []).filter(item => !GENERATED_NAME.test(item.label))
   }
   catch {
     return undefined
