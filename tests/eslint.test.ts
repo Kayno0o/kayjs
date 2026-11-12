@@ -201,7 +201,7 @@ p(
   title={n == 1 ? 'a' : 'b'}
   onClick={() => list['length']}
 ) {n == 2}
-if n == 3 as x
+if n == 3 then x
   span {x}
 for a, i of list key={a.id == i ? 1 : 2}
   span {a.id}
@@ -314,7 +314,7 @@ snippet row(key: string, fallback = list['x'])
   })
 
   it('reports the condition of an aliased if once, as the plain one is reported', async () => {
-    const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\nif n == 1 as one\n  p {one}\n')
+    const { messages } = await lint('---\nconst { n } = props<{ n: number }>()\n---\nif n == 1 then one\n  p {one}\n')
 
     expect(messages.map(message => [message.ruleId, message.line, message.column])).toEqual([['eqeqeq', 4, 6]])
   })

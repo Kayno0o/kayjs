@@ -53,7 +53,7 @@ else
     for row of rows key={row.revision}
       li.kcms-revision
         .kcms-revision-head
-          if row.savedAt as savedAt
+          if row.savedAt then savedAt
             EntryEdited(editedAt={savedAt} moment author={row.author})
           Badge(label={verbs[row.verb] ?? row.verb})
           if row.current

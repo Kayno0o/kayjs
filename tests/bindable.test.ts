@@ -69,7 +69,7 @@ describe('bind: on a component', () => {
   it('takes only the binding names of a pattern or a parameter list for a value, not a type or a key', () => {
     const child = (template: string) => `---\nimport { type Bindable, signal } from 'kay'\nimport Toggle from './Toggle.kay'\nimport Wrap from './Wrap.kay'\nconst { open } = props<{ open: Bindable<boolean> }>()\nconst flags = [signal(false)]\nconst box = { open: signal(false), other: signal(false) }\nconst load = async () => flags[0]!\n---\n${template}`
     const value = [
-      'if flags[0] as open\n  Toggle(bind:open={open})\n',
+      'if flags[0] then open\n  Toggle(bind:open={open})\n',
       'await load()\n  p wait\nthen open\n  Toggle(bind:open={open})\n',
       'Wrap\n  @row(open)\n    Toggle(bind:open={open})\n',
       'Wrap\n  @row({ shown: open })\n    Toggle(bind:open={open})\n',

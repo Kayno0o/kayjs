@@ -231,7 +231,7 @@ Each line is one of the following; deeper indentation nests children under the l
 | `\| text {expr}` | A text line, also the way to put a lone `{expr}` on its own line. Consecutive text lines are joined with a line break. |
 | `// note` | A comment. Lines indented under it are commented out too. |
 | `if cond` / `else if cond` / `else` | Conditional rendering. |
-| `if user() as u` | Binds the truthy value to `u` for the children. A last `as` outside brackets followed by a lowercase name aliases the whole condition, whatever operators it holds: `if a && b as u` binds `a && b`. A capitalized name or any other type stays a cast: `as Row`, `as string`, `as const`, `as Box<T>`. |
+| `if user() then u` | Binds the truthy value to `u` for the children. A last `then` outside brackets and one name, in any case, alias the whole condition, whatever operators it holds: `if a && b then u` binds `a && b`. `as` is only a cast: `as Row`, `as string`, `as const`. `if user() as u` still aliases until 1.105, `kay upgrade` rewrites it. |
 | `match value` / `when a, b` / `else` | Renders the block of the first `when` listing a value equal (`===`) to `value`, else the `else` block, else nothing. Only `when` lines and a last `else` sit under `match`. `value` is read once, and `kay check` narrows it in each block as a TypeScript `switch` does: `match shape.kind` types `shape` per `when`, and a value its type cannot hold is an error. A `match` with no `else` over a finite union that leaves members out is the `incomplete-match` lint, naming them. |
 | `for item of list` | A list, its rows matched across renders by `item.id`, else by the item itself (a copy of an item with no `id` is a new row, which `unkeyed-rows` reports in an island), `key={item.slug}` naming another key and `key={i}` matching by position; `else` right after it renders when the list is empty. |
 | `for item, i of list key={i}` | Rows matched by position, so a row removed before others hands them the wrong state: leave it out for rows with an `id`, and give rows without one an `id` or a `key` that names them. |
@@ -270,7 +270,7 @@ section.todo-list
       )
     else
       li.empty Nothing matches
-  if selected() as todo
+  if selected() then todo
     p Selected #[strong {todo.title}]
 ```
 

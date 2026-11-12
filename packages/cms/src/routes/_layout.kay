@@ -35,12 +35,12 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
       | {wording('cms.admin.brand', 'Content admin')}
     nav.kcms-admin-nav(aria-label={wording('cms.admin.navigation', 'Content admin')})
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}
-      if denied.redirects as reason
+      if denied.redirects then reason
         // A disabled link, with the reason a keyboard reaches too.
         Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
       else
         a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
-      if denied.site as reason
+      if denied.site then reason
         Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.admin.media', 'Media')}
         Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.admin.uploads', 'Unused uploads')}
       else

@@ -70,5 +70,5 @@ form(part="root" {...rest} action={action} novalidate)
       | {sent}
     else
       Notice(tone="success" size="sm") {sentLabel}
-  else if action.error() as message
+  else if action.error() then message
     Notice(tone="danger" size="sm") {message}

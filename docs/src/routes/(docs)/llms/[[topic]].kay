@@ -38,7 +38,7 @@ head
   header.page-head
     p.eyebrow
       | Full reference
-      if version as published
+      if version then published
         |  · {published}
     h1 {topic.data.title}
     p.lede Every option and edge case, written for coding agents as much as for people. For the common path, start from the #[a(href="/getting-started/introduction") guide].

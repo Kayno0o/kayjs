@@ -44,7 +44,7 @@ async function offer(text: string, wait = 0): Promise<void> {
 const add = editing ? wording('cms.redirects.save', 'Save') : wording('cms.missing.add', 'Add redirect')
 ---
 .kcms-missing-add
-  if suggested as target
+  if suggested then target
     Checkbox(checked={permanent()} onChange={on => permanent = on} label={wording('cms.missing.permanent', 'Permanent')} aria-label={wording('cms.missing.permanentAria', 'Make the redirect from {path} permanent (308)', { path })})
     Button(label={add} aria-label={wording('cms.missing.addAria', 'Add redirect from {path} to {target}', { path, target })} size="sm" variant="ghost" onClick={async () => { await onAdd(path, target, answer()) }})
   else

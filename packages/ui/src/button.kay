@@ -59,7 +59,7 @@ const handedOn = rest as Record<string, never>
 ---
 if rest.onClick
   BusyButton(part="root spinner" {...handedOn} variant={variant} tone={tone} size={size} icon={icon} busy={busy} spinner={spinner} label={label})
-else if linkOf(attributes) as link
+else if linkOf(attributes) then link
   a(part="root" {...link} data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} aria-busy={busy ? 'true' : undefined})
     if busy && spinner
       Icon(icon="spinner" part="spinner")
@@ -67,7 +67,7 @@ else if linkOf(attributes) as link
       Icon(icon={icon})
     | {label}
     slot
-else if buttonOf(attributes) as button
+else if buttonOf(attributes) then button
   button(part="root" {...button} data-variant={variant} data-size={size} data-spinner={spinner ? undefined : 'off'} aria-busy={busy ? 'true' : undefined})
     if busy && spinner
       Icon(icon="spinner" part="spinner")

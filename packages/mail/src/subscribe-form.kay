@@ -27,7 +27,7 @@ form(class="kmail-subscribe" action={action} novalidate)
     span(class="kmail-subscribe-label") {label}
     input(field="email" type="email" autocomplete="email" required)
   span(class="kmail-subscribe-issue" aria-live="polite")
-    if action.error('email') as issue
+    if action.error('email') then issue
       | {issue}
   p(class="kmail-subscribe-notice")
     | {notice}{' '}
@@ -37,5 +37,5 @@ form(class="kmail-subscribe" action={action} novalidate)
   button(type="submit") {submitLabel}
   if action.succeeded()
     p(class="kmail-subscribe-sent" role="status") {sentLabel}
-  else if action.error() as message
+  else if action.error() then message
     p(class="kmail-subscribe-error" role="alert") {message}

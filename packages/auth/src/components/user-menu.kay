@@ -11,7 +11,7 @@ const features = currentViewer().auth.features()
 const accountPage = features.pages ? localize(`${features.pages.prefix}/account`) : null
 const home = localize(features.pages?.home ?? '/')
 ---
-if ctx.user as found
+if ctx.user then found
   .kayjs-auth.flex.flex-wrap.items-center.gap-3
     span.text-muted {found.username ?? found.email}
     if account && accountPage

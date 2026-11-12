@@ -65,7 +65,7 @@ kayjs-auth ships every sign-in and account page as a kay extension, styled with 
 --- server
 const user = await ctx.locals.auth.user()
 ---
-if user as signedIn
+if user then signedIn
   p Signed in as {signedIn.email}
 else
   a(href="/login") Sign in

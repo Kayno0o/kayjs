@@ -11,7 +11,7 @@ const features = auth.features()
 const first = claimBanner('deletion')
 ---
 // Shown to a user whose account waits out `account.deleteAfter`, with the way to cancel; nothing for anyone else. Read ahead of the render, as the impersonation banner is.
-if first && ctx.deletion as at
+if first && ctx.deletion then at
   Notice.kayjs-auth(tone="warning" data-deletion-pending)
     .flex.flex-wrap.items-center.justify-between.gap-3
       span {wording('auth.deletion.banner', 'Your account will be deleted on {date}.', { date: formatDate(at, { dateStyle: 'long' }) })}

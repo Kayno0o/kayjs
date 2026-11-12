@@ -1,5 +1,5 @@
 ---
 import { ctx } from 'kay'
 ---
-if ctx.user as user
+if ctx.user then user
   p#who {user.name}

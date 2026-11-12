@@ -121,7 +121,7 @@
     "complexity": 75
   },
   "src/compiler/parser.ts": {
-    "max-lines": 1097
+    "max-lines": 1041
   },
   "src/compiler/validate.ts": {
     "complexity": 41

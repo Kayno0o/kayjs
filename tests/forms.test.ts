@@ -161,16 +161,16 @@ describe('the messages a refused form is described by', () => {
   input(name="tag")
   input(name="slug" aria-describedby={hint})
   p {add.error('tag')}
-  if add.error('title') as message
+  if add.error('title') then message
     p {message}
-  if add.error('slug') as message
+  if add.error('slug') then message
     p {message}
   for row of rows
-    if add.error('tag') as message
+    if add.error('tag') then message
       p.row {message}
-  if add.error() as message
+  if add.error() then message
     p(id="own-form") {message}
-  if other.error('x') as message
+  if other.error('x') then message
     p.other {message}
 `
 
@@ -358,7 +358,7 @@ describe('a form naming its fields with field and showing their messages with er
   textarea(field="body")
   for row of rows
     error title
-  if add.error('title') as message
+  if add.error('title') then message
     p.old {message}
 `
 

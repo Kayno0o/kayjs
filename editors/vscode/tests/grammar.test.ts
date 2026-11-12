@@ -157,7 +157,7 @@ describe('kay grammar', () => {
     const lines = tokenize([
       'for todo, i of todos key={todo.id}',
       '  li {i}',
-      'if saved() as id',
+      'if saved() then id',
       '  p {id}',
       'else if busy',
       'else',
@@ -185,7 +185,7 @@ describe('kay grammar', () => {
       'id: variable.other.ts',
       '}: punctuation.section.embedded.end.kay',
     ])
-    expect(lines[2]).toEqual(['if: keyword.control.conditional.kay', 'saved: variable.other.ts', '(): meta.embedded.expression.kay', 'as: keyword.control.as.kay', 'id: variable.other.readwrite.alias.kay'])
+    expect(lines[2]).toEqual(['if: keyword.control.conditional.kay', 'saved: variable.other.ts', '(): meta.embedded.expression.kay', 'then: keyword.control.as.kay', 'id: variable.other.readwrite.alias.kay'])
     expect(lines[4]).toEqual(['else if: keyword.control.conditional.kay', 'busy: variable.other.ts'])
     expect(lines[5]).toEqual(['else: keyword.control.conditional.kay'])
     expect(lines[6]).toEqual(['@: punctuation.definition.slot.kay', 'fallback: entity.other.attribute-name.slot.kay'])

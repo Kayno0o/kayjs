@@ -10,11 +10,11 @@ const scheduled = useGoesLive(() => goesLiveAt?.getTime())
 const ends = useGoesLive(() => endsAt?.getTime())
 const ended = () => endsAt !== undefined && ends() === undefined
 ---
-if scheduled() as when
+if scheduled() then when
   Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at: when })})
 else if ended()
   Badge(tone="warning" label={wording('cms.entry.ended', 'Ended')})
 else
   Badge(tone="success" label={wording('cms.table.published', 'Published')})
-  if ends() as when
+  if ends() then when
     Badge(tone="info" label={wording('cms.entry.endsAt', 'Ends {at}', { at: when })})

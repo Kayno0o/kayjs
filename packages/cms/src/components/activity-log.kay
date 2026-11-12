@@ -33,7 +33,7 @@ else
         .kcms-revision-head
           EntryEdited(editedAt={row.doneAt} moment author={row.author})
           Badge(label={action(row)})
-          if row.href as href
+          if row.href then href
             a(href={href}) {row.title}: {row.locale ? `${row.slug} (${row.locale})` : row.slug}
           else
             span {row.title}: {row.locale ? `${row.slug} (${row.locale})` : row.slug}

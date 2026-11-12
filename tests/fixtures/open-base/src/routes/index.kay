@@ -11,6 +11,6 @@ h1 Home
 Echo
 form(action={enter})
   input(name="name" aria-label="Name")
-  if enter.error() as message
+  if enter.error() then message
     p.error {message}
   button.enter Enter

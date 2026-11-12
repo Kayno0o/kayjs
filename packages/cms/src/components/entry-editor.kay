@@ -28,15 +28,15 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})
     if !form.stranded()
       EntryActions(form={form} denied={denied})
-  if form.review() as stage
+  if form.review() then stage
     EntryReviewLog(review={stage} draft={form.isDraft()})
-  if denied?.edit as reason
+  if denied?.edit then reason
     Notice(tone="info" label={reason})
   if presence
     EntryPresence(room={presence.room} member={presence.member})
   if translations && entry
     EntryLocales(prefix={prefix} entry={form.entry} translations={translations} compared={translations.compare?.locale})
-  if form.stranded() as gone
+  if form.stranded() then gone
     .kcms-entry-failure(role="alert")
       if gone.kind === 'created'
         p {wording('cms.entry.created', 'This entry is created.')}
@@ -52,5 +52,5 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
     fieldset.kcms-entry-fields(disabled={form.saving() || denied?.edit !== undefined})
       EntryIdentity(form={form})
       EntryFields(form={form})
-  if translations?.compare as other
+  if translations?.compare then other
     EntryCompare(collection={collection} other={other})

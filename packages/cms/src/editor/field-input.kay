@@ -454,13 +454,13 @@ function leaveJson(): void {
                       IconButton(icon="delete" label={wording('cms.field.removeItem', 'Remove {item}', { item: title, n: i + 1 })} variant="ghost" size="sm" disabled={held() || atMin()} data-kcms-item-control onClick={() => remove(i)})
                   .kcms-item-body(role="group" aria-label={title} hidden={foldedAt(i)})
                     if itemField.kind === 'group'
-                      if drafts.issues(entry, joinPath(path, i))[0] as own
+                      if drafts.issues(entry, joinPath(path, i))[0] then own
                         p.kcms-item-error(role="alert") {own.message}
                       for child of itemField.fields key={`${blockType}:${child.key}`}
                         FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(joinPath(path, i), child.key)})
                     else
                       FieldInput(drafts={drafts} entry={entry} field={itemField} path={joinPath(path, i)})
-          if removed() as gone
+          if removed() then gone
             p.kcms-item-removed
               span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
               Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={held() || atMax()} onClick={undo})

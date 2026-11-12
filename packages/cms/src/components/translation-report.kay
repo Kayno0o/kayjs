@@ -24,7 +24,7 @@ section.kcms-translations
           strong {row.slugs[base] ?? row.key}
           for locale of row.missing key={locale}
             |  
-            if row.slugs[base] as slug
+            if row.slugs[base] then slug
               a(href={translatePath(prefix, { collection: collection.name, slug, locale: base }, locale)}) {wording('cms.locales.translate', 'Translate to {locale}', { locale })}
             else
               span {wording('cms.table.missingLocales', 'No {locales}', { locales: locale })}

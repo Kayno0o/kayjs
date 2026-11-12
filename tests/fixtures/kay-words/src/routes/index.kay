@@ -61,20 +61,20 @@ form(action={listed})
   error after
   button List
 form(action={guarded})
-  if guarded.error('website') as message
+  if guarded.error('website') then message
     p.refused {message}
-  if guarded.error() as message
+  if guarded.error() then message
     p.whole {message}
   button Send
 form(action={owned})
-  if owned.error('website') as message
+  if owned.error('website') then message
     p.refused {message}
   button Send
 form(action={slow})
-  if slow.error() as message
+  if slow.error() then message
     p.refused {message}
   button Slow
 form(action={boom})
-  if boom.error() as message
+  if boom.error() then message
     p.refused {message}
   button Boom

@@ -9,7 +9,7 @@ const src = key === null ? undefined : files.url(key)
 --- script
 import Uploader from '../components/uploader.kay'
 ---
-if src as stored
+if src then stored
   // kay-allow unsized-image
   img(src={stored} alt="Stored")
 Uploader

@@ -534,7 +534,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           div(part="bulk")
             | {bulk(chosen(), () => commit([]))}
       if exportable
-        if (waiting() ? undefined : endpoint()) as address
+        if (waiting() ? undefined : endpoint()) then address
           Button(href={exportHref(address, current(), filterParam ?? 'q', typed(), fieldsNow())} download={exportName} label={exportLabel} variant="ghost" size="sm")
         else
           Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint() ? undefined : download})
@@ -592,7 +592,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 else
                   | {cellText(row, column)}
               if columnIndex === 0 && linked()
-                if rowHref?.(row) as href
+                if rowHref?.(row) then href
                   a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
                 else if onRowClick
                   button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})

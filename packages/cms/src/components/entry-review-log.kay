@@ -17,7 +17,7 @@ const verbs: Record<string, string> = {
 const events = () => [...review.events].reverse()
 const lastNote = () => draft && review.status === 'sent-back' ? events().find(event => event.verb === 'send-back') : undefined
 ---
-if lastNote() as sent
+if lastNote() then sent
   Notice.kcms-review-note(tone="warning" size="sm" label={wording('cms.review.sentBackNote', 'Sent back by {name}: {note}', { name: sent.by ?? '', note: sent.note ?? '' })})
 if review.events.length > 0
   ol.kcms-review-log(aria-label={wording('cms.review.log', 'Review')})

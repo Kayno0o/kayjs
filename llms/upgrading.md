@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `--- script` opening a file is written `---`
 
 `--- script` as the first fence of a file is `---` spelled out, so it is the `deprecated-script-fence` lint, which `kay upgrade` rewrites; it works until 1.105. A script that follows a `--- server`, `--- module` or `--- style` fence keeps `--- script`, as a bare `---` there closes that fence instead.
+### `if cond as name` is `if cond then name`
+
+`as` is a TypeScript cast and nothing else: the alias of an `if` or `else if` takes the word `await x then name` uses, so `if user as u` is `if user then u` and `else if list.find(f) as item` is `else if list.find(f) then item`. Before, a last `as` followed by a lowercase name aliased the condition and a capitalized name was a cast, so a lowercase type alias read as an alias. The old spelling still aliases until 1.105; the `deprecated-if-alias` lint reports it and `kay upgrade` writes `then`.
 
 ## 1.101.0
 

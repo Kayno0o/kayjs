@@ -116,19 +116,19 @@ function jump(event: MouseEvent, issue: Issue): void {
     field.scrollIntoView({ block: 'center' })
 }
 ---
-if form.drafts.recovery(form.entry) as recovery
+if form.drafts.recovery(form.entry) then recovery
   p.kcms-entry-notice(role="status")
     if recovery.restored
       {wording('cms.entry.restored', 'Your unsaved changes from {time} are back. Reset drops them.', { time: sinceText(recovery.editedAt.getTime()) })}
     else
       {wording('cms.entry.notRestored', 'Unsaved changes from {time} were left out: this entry was saved since.', { time: sinceText(recovery.editedAt.getTime()) })}
-if form.problem as problem
+if form.problem then problem
   p.kcms-failure(role="alert") {wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })}
-if form.drafts.refusal(form.entry) as refusal
+if form.drafts.refusal(form.entry) then refusal
   .kcms-entry-failure.kcms-refusal(role="alert" tabindex="-1")
     p {wording('cms.entry.refusal', 'Not saved: {message}.', { message: refusal.message })}
     if refusal.conflict
-      if theirs() as other
+      if theirs() then other
         if form.drafts.differences(form.entry, other).length > 0
           p {wording('cms.entry.differs', 'Both sides changed: {fields}.', { fields: form.drafts.differences(form.entry, other).map(label).join(', ') })}
       p {wording('cms.entry.conflict', 'Keeping your edits makes the next save write them over that save.')}

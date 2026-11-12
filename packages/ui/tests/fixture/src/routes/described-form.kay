@@ -23,7 +23,7 @@ main
   form#claim(action={claim})
     FormField(label="Handle" hint="As it shows on your profile")
       input(name="handle")
-    if claim.error('handle') as message
+    if claim.error('handle') then message
       p {message}
     button#post(formnovalidate) Claim
   button#bump(type="button" onClick={() => bumped = 1}) {bumped()}

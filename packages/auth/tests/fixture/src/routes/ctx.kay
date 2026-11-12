@@ -3,7 +3,7 @@ export const page = { guards: false }
 --- script
 import { ctx } from 'kay'
 ---
-if ctx.user as signedIn
+if ctx.user then signedIn
   p#who {signedIn.email}
 else
   p#who Anonymous

@@ -214,7 +214,7 @@ export const add = action(schema, async ({ title }, ctx) => {
 ```
 
 ```kay
-if add.failed()?.data as data
+if add.failed()?.data then data
   p.error {data.message}
 ```
 
@@ -287,7 +287,7 @@ async function submit(event: SubmitEvent) {
 ---
 form(action={add} onSubmit={submit})
   input(name="title" bind:value={title})
-  if add.error('title') as message
+  if add.error('title') then message
     p.error {message}
   button(disabled={add.pending()}) Add
 ```

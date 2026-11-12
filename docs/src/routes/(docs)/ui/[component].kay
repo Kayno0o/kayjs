@@ -51,7 +51,7 @@ head
                     span.required required
                 td
                   code {prop.type}
-                  if prop.comment as comment
+                  if prop.comment then comment
                     p.prop-comment
                       for part, i of comment.split('`') key={i}
                         if i % 2 === 1
@@ -59,7 +59,7 @@ head
                         else
                           | {part}
                 td
-                  if prop.default as value
+                  if prop.default then value
                     code {value}
       p.spread Attributes it does not declare go onto its root element.
     else

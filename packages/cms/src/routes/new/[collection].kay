@@ -21,7 +21,7 @@ if (collection.single && collection.problem === undefined && await writtenSlug(c
 ---
 head
   title {adminTitle(collection.single ? collectionTitle(collection) : wording('cms.admin.newEntryTitle', 'New entry - {collection}', { collection: collectionTitle(collection) }))}
-if collection.problem as problem
+if collection.problem then problem
   EntryHeader(prefix={prefix} collection={collection} title={wording('cms.admin.newEntry', 'New entry')})
   EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
 else

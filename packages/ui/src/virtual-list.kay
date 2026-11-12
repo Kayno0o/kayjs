@@ -112,7 +112,7 @@ div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0
       div(part="item" role="listitem" data-linked={linked() ? '' : undefined} data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})
         | {item(entry.row, entry.index)}
         if linked()
-          if itemHref?.(entry.row, entry.index) as href
+          if itemHref?.(entry.row, entry.index) then href
             a(part="itemLink" href={href} aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})
           else if onItemClick
             button(part="itemButton" type="button" aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})

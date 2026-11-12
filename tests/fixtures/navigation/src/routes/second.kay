@@ -30,15 +30,15 @@ head
 h1 Second
 form(action={add})
   input(name="title" value={failure?.values.title})
-  if add.error('title') as message
+  if add.error('title') then message
     p.title-error {message}
-  if add.error() as message
+  if add.error() then message
     p.form-error {message}
   button Add
   button.unchecked(formnovalidate) Add unchecked
-if failure?.data as data
+if failure?.data then data
   p.error {data.message}
-if success as done
+if success then done
   p.done Added {done.data}
 ul
   for title, i of titles key={i}

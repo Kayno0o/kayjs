@@ -8,7 +8,7 @@ export const signIn = action(t.Object({ name: t.String({ maxLength: 40 }) }), as
 h1 Login
 form(action={signIn})
   input(name="name" aria-label="Name")
-  if signIn.error() as message
+  if signIn.error() then message
     p.error {message}
   button Sign in
 a.home(href="/") Home

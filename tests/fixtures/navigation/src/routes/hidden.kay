@@ -10,6 +10,6 @@ h1 Hidden
 form(action={save})
   section.panel(hidden="until-found")
     input(name="code" aria-label="Code")
-    if save.error('code') as message
+    if save.error('code') then message
       p.code-error {message}
   button.unchecked(formnovalidate) Save

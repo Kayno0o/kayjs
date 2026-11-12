@@ -272,7 +272,7 @@ describe('slots, template consts and match', () => {
   const card = '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n'
   const box = '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n'
   const status = '---\nconst { status } = props<{ status: string }>()\n---\nmatch status\n  when \'draft\'\n    p Draft\n  when \'published\', \'scheduled\'\n    p Live\n  else\n    p Unknown'
-  const consts = '---\nimport Box from \'./box.kay\'\n\nconst { products } = props<{ products: { name: string, cents: number, stock: number }[] }>()\n---\nconst count = products.length\np {count} products\nfor product of products\n  const price = (product.cents / 100).toFixed(2)\n  const { name, stock: left = 0 } = product\n  li(title={price}) {name}: {price}\n    if left < 3 as low\n      const label = \'only \' + low\n      b {label}\nBox\n  const total = products.reduce((sum, product) => sum + product.cents, 0)\n  | {total}\ntry\n  const twice = count * 2\n  i {twice}'
+  const consts = '---\nimport Box from \'./box.kay\'\n\nconst { products } = props<{ products: { name: string, cents: number, stock: number }[] }>()\n---\nconst count = products.length\np {count} products\nfor product of products\n  const price = (product.cents / 100).toFixed(2)\n  const { name, stock: left = 0 } = product\n  li(title={price}) {name}: {price}\n    if left < 3 then low\n      const label = \'only \' + low\n      b {label}\nBox\n  const total = products.reduce((sum, product) => sum + product.cents, 0)\n  | {total}\ntry\n  const twice = count * 2\n  i {twice}'
   const siblings = '---\nconst { n } = props<{ n: number }>()\n---\nconst double = n * 2\nbutton#up {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}'
   const products = [{ name: 'Tea', cents: 250, stock: 1 }, { name: 'Mug', cents: 900, stock: 8 }]
 
@@ -332,7 +332,7 @@ describe('template consts', () => {
 
 describe('typeof in a template expression', () => {
   it('reads the type of a loop item, an alias and a prop with a default, which render as values', async () => {
-    const source = '---\nconst { rows, size = \'md\' } = props<{ rows: { id: number }[], size?: string }>()\n---\nfor row of rows key={row.id}\n  p {[row.id as typeof row.id, size as typeof size].join()}\nif rows[0] as first\n  p {(first as typeof first).id}'
+    const source = '---\nconst { rows, size = \'md\' } = props<{ rows: { id: number }[], size?: string }>()\n---\nfor row of rows key={row.id}\n  p {[row.id as typeof row.id, size as typeof size].join()}\nif rows[0] then first\n  p {(first as typeof first).id}'
 
     expect(await renderKay(source, { rows: [{ id: 1 }] })).toBe('<p>1,md</p><p>1</p>')
   })

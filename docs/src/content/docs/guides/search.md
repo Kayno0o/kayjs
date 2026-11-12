@@ -36,7 +36,7 @@ ul
   for hit of hits() key={hit.href}
     li
       a(href={hit.href}) {hit.page}
-      if hit.heading as heading
+      if hit.heading then heading
         |  · {heading}
       p
         for part, i of hit.snippet key={i}

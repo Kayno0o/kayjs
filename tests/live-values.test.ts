@@ -533,7 +533,7 @@ describe('writing a live value in a browser', () => {
 
   it('reads the state of the connection through status, pending, error and retry, left uncalled', () => {
     for (const name of ['visitors', 'room']) {
-      const source = `---\nimport { ${name} } from '../live'\n---\np {${name}.status()} {${name}.pending()}\nif ${name}.error() as error\n  p {error.message}\nbutton(onClick={${name}.retry}) Retry\n`
+      const source = `---\nimport { ${name} } from '../live'\n---\np {${name}.status()} {${name}.pending()}\nif ${name}.error() then error\n  p {error.message}\nbutton(onClick={${name}.retry}) Retry\n`
       const { diagnostics, tsx } = compileKay(source, 'src/components/writer.kay', { importedSignals: imported, check: true })
 
       expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual([])

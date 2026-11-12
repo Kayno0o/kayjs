@@ -4,7 +4,7 @@
 
 ### Show or hide a part for the signed-in user
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')` ([Request values](../../../llms/request-values.md)):
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user then user` or `if ctx.can('admin')` ([Request values](../../../llms/request-values.md)):
 
 ```kay
 ---

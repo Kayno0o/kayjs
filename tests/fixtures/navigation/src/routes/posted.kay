@@ -28,5 +28,5 @@ form.upload(action={upload})
 form.count(action={count})
   button Count
 p.posts {store.posts}
-if sent as done
+if sent then done
   p.sent Sent {done.data}

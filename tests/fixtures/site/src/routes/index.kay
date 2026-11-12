@@ -24,9 +24,9 @@ Card(title="Todos")
       li: a(href={`/todos/${todo.id}`}) {todo.title}
   form.add(action={add})
     input(name="title" placeholder="New todo" value={failure?.values.title})
-    if failure?.errors.title as message
+    if failure?.errors.title then message
       p.error {message}
-    if failure?.data as data
+    if failure?.data then data
       p.error {data.message}
     button Add
 Counter(start={open})

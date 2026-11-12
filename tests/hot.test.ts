@@ -90,7 +90,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       'src/api/bump.ts': 'import { api } from \'kay/server\'\nimport { visitors } from \'../live\'\n\nexport default api().post(\'/\', () => {\n  visitors.set(n => n + 1)\n\n  return { visitors: visitors() }\n})\n',
       'src/routes/other.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Other\np.static Other\nCounter\n',
       // A page posting a form and holding no island, which production gives the navigation-only entry.
-      'src/routes/sign.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const sign = action(t.Object({ name: t.String({ maxLength: 40 }) }), (_input, ctx) => ctx.fail(409, \'Taken\'))\n---\nh1 Sign\nform(action={sign})\n  input(name="name" aria-label="Name")\n  if sign.error() as message\n    p.error {message}\n  button Sign\na.home(href="/") Home\n',
+      'src/routes/sign.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const sign = action(t.Object({ name: t.String({ maxLength: 40 }) }), (_input, ctx) => ctx.fail(409, \'Taken\'))\n---\nh1 Sign\nform(action={sign})\n  input(name="name" aria-label="Name")\n  if sign.error() then message\n    p.error {message}\n  button Sign\na.home(href="/") Home\n',
     }
 
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))

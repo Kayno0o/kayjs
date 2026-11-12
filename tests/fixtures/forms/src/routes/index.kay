@@ -54,26 +54,26 @@ form(action={save})
   input(type="checkbox" name="news")
   input(type="checkbox" name="terms" checked)
   input(name="website" tabindex="-1" autocomplete="off" aria-hidden="true")
-  if save.error('name') as message
+  if save.error('name') then message
     p.error {message}
   if refusedWith
     p.status {refusedWith}
-  if save.failed()?.data as data
+  if save.failed()?.data then data
     p.taken {data.message}
   button Save
 form(action={ping})
-  if ping.succeeded() as done
+  if ping.succeeded() then done
     p.done {done.data}
   button Ping
 form.busy(action={busy})
   input(name="topic")
   input(name="note" aria-describedby="note-help")
   p#note-help Optional
-  if busy.error('topic') as message
+  if busy.error('topic') then message
     p#topic-problem {message}
-  if busy.error('note') as message
+  if busy.error('note') then message
     p.note-error {message}
-  if busy.error() as message
+  if busy.error() then message
     p.busy-error {message}
   button Busy
 form.enrol(action={enrol})

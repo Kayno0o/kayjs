@@ -1965,7 +1965,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('narrows a loop\'s row and an if\'s alias in the branches of an if, in an island as in a static component', async () => {
-    const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else if item.label === \'\'\n      li {item.label.length}\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] as first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
+    const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else if item.label === \'\'\n      li {item.label.length}\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] then first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
     const script = '---\ntype Entry = \'separator\' | { label: string }\nconst { items } = props<{ items: Entry[] }>()\n'
     const root = await scratchProject({
       'src/static.kay': `${script}---\n${template}`,
@@ -1981,7 +1981,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types an if\'s alias as the truthy part of its condition, an `&&` that can give false, 0 or \'\' included', async () => {
-    const template = 'if !query && row as found\n  p {found.label}\nif count && row as other\n  p {other.label}\nif row && query as text\n  p {text.length}\n'
+    const template = 'if !query && row then found\n  p {found.label}\nif count && row then other\n  p {other.label}\nif row && query then text\n  p {text.length}\n'
     const script = '---\nconst { query, row, count } = props<{ query: string, row?: { label: string }, count: number }>()\n'
     const root = await scratchProject({
       'src/static.kay': `${script}---\n${template}`,
@@ -2084,12 +2084,12 @@ describe.concurrent('kay check, edge cases', () => {
       'if dossier.latest',
       '  for entry of entries key={entry.id}',
       '    p {dossier.latest.id}{entry.id}',
-      '  if entries[0] as first',
+      '  if entries[0] then first',
       '    p {dossier.latest.id}{first.id}',
       'if dossier.latest !== null',
       '  for entry of entries key={entry.id}',
       '    p {dossier.latest.id}{entry.id}',
-      '  if entries[0] as first',
+      '  if entries[0] then first',
       '    p {dossier.latest.id}{first.id}',
       'if dossier.latest',
       '  for entry of entries key={entry.id}',
@@ -2098,7 +2098,7 @@ describe.concurrent('kay check, edge cases', () => {
       '        p {dossier.latest.id}{entry.next.id}{other.id}',
       'for entry of entries key={entry.id}',
       '  p {dossier.latest.id}',
-      'if entries[0] as first',
+      'if entries[0] then first',
       '  p {first.id}',
       '',
     ].join('\n')
@@ -2129,9 +2129,9 @@ describe.concurrent('kay check, edge cases', () => {
       '    p {index.toFixed()}{dossier.latest.id}{entry.id}',
       '  else',
       '    p {dossier.latest.id}',
-      '  if entries[0] as first',
+      '  if entries[0] then first',
       '    p {first.id}{dossier.latest.id}',
-      '  else if entries[1] as second',
+      '  else if entries[1] then second',
       '    p {second.id}{dossier.latest.id}',
       '  else',
       '    p {dossier.latest.id}',
@@ -2139,9 +2139,9 @@ describe.concurrent('kay check, edge cases', () => {
       '  p {index.length}{entry.id}',
       'else',
       '  p {dossier.latest.id}',
-      'if entries[0] as first',
+      'if entries[0] then first',
       '  p {first.id}',
-      'else if entries[1] as second',
+      'else if entries[1] then second',
       '  p {second.id}{first.id}',
       '',
     ].join('\n')
@@ -2275,7 +2275,7 @@ describe.concurrent('kay check, edge cases', () => {
       'const formWide: string | undefined = failure?.errors[\'\']',
       'const caught: string | undefined = failure?.errors.website',
       '---',
-      'if failure?.data as data',
+      'if failure?.data then data',
       '  p {data.error} {failure?.values.code} {saved} {formWide} {caught}',
       'p {wrong}',
       '',

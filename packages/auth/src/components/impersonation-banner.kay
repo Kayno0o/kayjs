@@ -12,7 +12,7 @@ const back = localize(features.admin && features.pages ? `${features.pages.prefi
 const first = claimBanner()
 ---
 // Shown to an admin acting as a user, with the way back; nothing for anyone else. Read ahead of the render of any page reaching a template that reads `ctx`, so it is in the first bytes.
-if first && ctx.impersonator && ctx.user as found
+if first && ctx.impersonator && ctx.user then found
   Notice.kayjs-auth(tone="warning" data-impersonating)
     .flex.flex-wrap.items-center.justify-between.gap-3
       span {wording('auth.impersonation.banner', 'You are acting as {user}.', { user: found.username ?? found.email ?? found.id })}

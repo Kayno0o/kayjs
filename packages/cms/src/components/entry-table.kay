@@ -119,7 +119,7 @@ Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}'
     if column.key === 'title'
       // Why an entry is broken shows on the link too, so a keyboard reaches it and a screen reader reads it with the title.
       a(href={entryPath(prefix, ref(row))} data-tooltip={row.problem} aria-describedby={row.problem === undefined ? undefined : problemId(collection.name, keyOf(row))}) {row.title}
-      if row.problem as problem
+      if row.problem then problem
         Badge(tone="danger" label={wording('cms.table.broken', 'Broken')})
         span.kcms-sr-only(id={problemId(collection.name, keyOf(row))}) {problem}
       if watched(row)
@@ -127,13 +127,13 @@ Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}'
     else if column.key.startsWith('cell:')
       span {row.cells?.[column.key.slice(5)] ?? ''}
     else if column.key === 'modified'
-      if row.modifiedAt as editedAt
+      if row.modifiedAt then editedAt
         EntryEdited(editedAt={editedAt})
     else if column.key === 'author'
       span {row.author ?? ''}
     else if column.key === 'locale'
       span {row.locale}
-      if row.missing as lacks
+      if row.missing then lacks
         Badge(tone="warning" label={wording('cms.table.missingLocales', 'No {locales}', { locales: lacks.join(', ') })})
     else if column.key === 'draft'
       if row.draft
@@ -147,15 +147,15 @@ Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}'
     else
       .kcms-row-actions
         if actions.has('move')
-          if row.move as place
-            if denied.move as reason
+          if row.move then place
+            if denied.move then reason
               Refused(label={wording('cms.table.moveUp', 'Up')} ariaLabel={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} reason={reason})
               Refused(label={wording('cms.table.moveDown', 'Down')} ariaLabel={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} reason={reason})
             else
               Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
               Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if actions.has('publish') && row.draft && collection.draftField !== undefined
-          if deniedFor(row).publish as reason
+          if deniedFor(row).publish then reason
             Refused(label={wording('cms.entry.publish', 'Publish')} ariaLabel={wording('cms.table.publish', 'Publish {title}', { title: row.title })} reason={reason})
           else
             Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publish', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
@@ -164,14 +164,14 @@ Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}'
         else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
           ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} aria-label={wording('cms.table.unpublish', 'Unpublish {title}', { title: row.title })} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
-          if deniedFor(row).edit as reason
+          if deniedFor(row).edit then reason
             Refused(label={wording('cms.table.duplicate', 'Duplicate')} ariaLabel={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} reason={reason})
           else
             Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('rename') && !collection.single && row.problem === undefined
           RowRename(collection={collection} row={row} denied={deniedFor(row)})
         if actions.has('editOnPage')
-          if row.url as url
+          if row.url then url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPage', 'Edit on page: {title}', { title: row.title })})
         if actions.has('delete') && deniedFor(row).delete !== undefined
           Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={deniedFor(row).delete} size="sm" variant="ghost")

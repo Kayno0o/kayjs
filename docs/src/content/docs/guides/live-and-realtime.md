@@ -42,7 +42,7 @@ Every live value carries the `status()`, `pending()`, `error()` and `retry()` of
 ---
 import { visitors } from '../live'
 ---
-if visitors.error() as error
+if visitors.error() then error
   p {error.message}
   button(onClick={visitors.retry} disabled={visitors.pending()}) Try now
 ```
@@ -221,7 +221,7 @@ import notes from '../api/notes'
 
 const list = resource(notes, '/')
 ---
-if list.error() as error
+if list.error() then error
   p {error.message}
   button(onClick={list.retry} disabled={list.pending()}) Retry
 ```

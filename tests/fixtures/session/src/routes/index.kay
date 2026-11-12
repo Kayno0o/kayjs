@@ -29,5 +29,5 @@ const failure = signIn.failed()
 const greeting = ctx.locals.greeting as string
 ---
 p {greeting}, {name === undefined ? 'signed out' : `signed in as ${name}`}
-if failure?.data as data
+if failure?.data then data
   p.error {data.error}

@@ -320,9 +320,9 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
     for entry, index of shown() key={index}
       if entry === 'separator'
         hr(part="separator")
-      else if headingOf(entry) as heading
+      else if headingOf(entry) then heading
         div(part="heading" id={`${menuId}-heading-${index}`} role="group" aria-labelledby={`${menuId}-heading-${index}`} aria-owns={announced().owns.get(index) || undefined}) {heading.heading}
-      else if submenuOf(entry) as submenu
+      else if submenuOf(entry) then submenu
         Menu(items={submenu.items} label={submenu.label} open={submenu.open} onOpenChange={submenu.onOpenChange} placement="right-start" loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} item={item})
           @trigger(attributes)
             button({...attributes} id={`${menuId}-item-${index}`} part="item" type="button" role="menuitem" tabindex="-1" disabled={submenu.disabled} data-label={submenu.label} data-tone={submenu.tone})
@@ -333,7 +333,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
                   Icon(icon={submenu.icon} part="icon")
                 | {submenu.label}
                 Icon(icon="chevron" part="chevron")
-      else if checkboxOf(entry) as box
+      else if checkboxOf(entry) then box
         button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemcheckbox" aria-checked={isChecked(box, index) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-tone={box.tone} onClick={() => toggle(box, index)})
           span(part="indicator" aria-hidden="true") {isChecked(box, index) ? '✓' : ''}
           if item
@@ -344,8 +344,8 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
             | {box.label}
             if box.shortcut
               kbd(part="shortcut") {box.shortcut}
-      else if radioOf(entry) as radio
-        if announced().radios.get(index) as group
+      else if radioOf(entry) then radio
+        if announced().radios.get(index) then group
           div(part="group" id={`${menuId}-group-${index}`} role="group" aria-labelledby={group.labelledby} aria-owns={group.owns})
         button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemradio" aria-checked={isChecked(radio, index) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-tone={radio.tone} onClick={() => choose(radio, index)})
           span(part="indicator" aria-hidden="true") {isChecked(radio, index) ? '●' : ''}
@@ -357,7 +357,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
             | {radio.label}
             if radio.shortcut
               kbd(part="shortcut") {radio.shortcut}
-      else if actionOf(entry) as action
+      else if actionOf(entry) then action
         if action.href !== undefined && !action.disabled
           a(part="item" id={`${menuId}-item-${index}`} href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-tone={action.tone} onClick={() => select(action)})
             if item

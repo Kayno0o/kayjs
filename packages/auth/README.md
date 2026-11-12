@@ -57,7 +57,7 @@ Any page, action or guard reads the signed-in user from `ctx.locals.auth`:
 --- server
 const user = await ctx.locals.auth.user()
 ---
-if user as signedIn
+if user then signedIn
   p Signed in as {signedIn.email}
 else
   a(href="/login") Sign in

@@ -208,7 +208,7 @@ div(part="root" {...rest} ref={ref})
   div(part="bar")
     if picked()
       span(part="selection" aria-live="polite")
-        if chosen() as icon
+        if chosen() then icon
           Icon(icon={icon})
         | {nameOf(picked())}
         IconButton(icon="close" label={clearLabel} size="xs" variant="inline" part="clear" disabled={disabled} onClick={() => pick('')})

@@ -16,8 +16,8 @@ h1 Costly
 form(action={pay})
   input(name="title" aria-label="Title")
   button Pay
-if success as done
+if success then done
   p.paid Paid {done.data}
-if failure as failed
+if failure then failed
   p.refused {failed.status}
 Payer

@@ -156,7 +156,7 @@ match post.status
     p Archived
 ```
 
-`if user as u` binds the truthy value to `u` for the children.
+`if user then u` binds the truthy value to `u` for the children.
 
 A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`. The key can read the index too, `for post, i of posts key={post.slug ?? i}`.
 

@@ -24,7 +24,7 @@ main
   form#claim(action={claim})
     FormField(label="Handle" issue={issue()})
       input(name="handle")
-    if claim.error('handle') as message
+    if claim.error('handle') then message
       p {message}
     button#post(formnovalidate) Claim
   form#grouped(action={claim})

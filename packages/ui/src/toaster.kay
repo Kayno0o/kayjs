@@ -189,7 +189,7 @@ if owns()
             p(part="message") {item.message}
             if item.description
               p(part="description") {item.description}
-          if item.action as action
+          if item.action then action
             if action.href
               Button(part="action" size="sm" variant="ghost" label={action.label} href={action.href} onClick={event => linked(event, item)})
             else

@@ -24,11 +24,11 @@ const unsaved = () => form.dirty() ? wording('cms.share.dirty', 'Save or reset y
 ---
 if form.isDraft()
   Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
-else if form.scheduled() as at
+else if form.scheduled() then at
   Badge(tone="info" label={wording('cms.table.scheduled', 'Scheduled for {at}', { at })})
 if form.ended()
   Badge(tone="warning" label={wording('cms.entry.ended', 'Ended')})
-else if form.ends() as at
+else if form.ends() then at
   Badge(tone="info" label={wording('cms.entry.endsAt', 'Ends {at}', { at })})
 .kcms-entry-actions
   EntrySaveState(changed={form.dirty()} saving={form.saving()} saved={form.savedAt()} url={entry?.url})
@@ -45,7 +45,7 @@ else if form.ends() as at
         Refused(label={wording('cms.entry.clearEnd', 'Clear end date')} reason={denied.publish})
       else
         Button(label={wording('cms.entry.clearEnd', 'Clear end date')} disabled={form.saving()} onClick={form.clearEnd})
-    if entry.url as url
+    if entry.url then url
       Button(href={onPagePath(form.prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')})
     if entry.url && (form.isDraft() || form.scheduled())
       if denied.publish !== undefined || unsaved() !== undefined
@@ -70,11 +70,11 @@ else if form.ends() as at
     ResetButton(disabled={form.saving()} onReset={form.reset})
   if !entry && !form.collection.single
     Button(href={collectionPath(form.prefix, form.collection.name)} label={wording('cms.entry.cancel', 'Cancel')} variant="ghost")
-    if denied.edit as reason
+    if denied.edit then reason
       Refused(label={wording('cms.entry.createAndAdd', 'Create and add another')} reason={reason})
     else
       Button(label={wording('cms.entry.createAndAdd', 'Create and add another')} disabled={!form.canSave()} onClick={form.saveAndAdd})
-  if denied.edit as reason
+  if denied.edit then reason
     Refused(label={entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} reason={reason} tone="accent")
   else
     Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})

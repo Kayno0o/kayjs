@@ -272,22 +272,22 @@ PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3}
       ResetButton(disabled={saving() || removed() || !unsaved()} onReset={() => drafts.reset(entry)})
       Button(label={saving() ? wording('cms.entry.saving', 'Saving…') : wording('cms.entry.save', 'Save')} tone="accent" busy={saving()} disabled={saving() || removed() || !unsaved()} onClick={save})
   // Under the head, which stays on one line on a phone.
-  if source.value() as answer
+  if source.value() then answer
     if draftField() !== undefined || (!isSingle() && !answer.seeded)
       .kcms-entry-more
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
         if answer.collection.review && !answer.seeded
           EntryReview(review={stages.review()} draft={isDraft()} denied={can.value()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={stages.sendBack})
   EntryPresence(room={room.room} member={room.member})
-  if stages.review() as stage
+  if stages.review() then stage
     EntryReviewLog(review={stage} draft={isDraft()})
-  if stranded() as screen
+  if stranded() then screen
     Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.deleted', 'This entry is deleted.')})
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else if source.status() === 'failed'
     Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.loadFailure', 'Could not load this entry: {message}', { message: source.error()?.message ?? '' })})
-  else if source.value() as answer
-    if answer.entry.problem as problem
+  else if source.value() then answer
+    if answer.entry.problem then problem
       Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.problem', 'This entry\'s file does not parse: {problem}. Saving writes the form over it.', { problem })})
     if unmarked() !== ''
       Notice.kcms-entry-hint(size="sm" label={wording('cms.entry.unclickable', 'A click on the page cannot reach {fields}, which it shows changed or not at all: edit it here.', { fields: unmarked() })})

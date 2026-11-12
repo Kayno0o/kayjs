@@ -150,13 +150,13 @@ h2 Add one
 form(action={add})
   label Title
     input(name="title")
-  if add.error('title') as message
+  if add.error('title') then message
     p.error {message}
   label Author
     input(name="author")
-  if add.error('author') as message
+  if add.error('author') then message
     p.error {message}
-  if add.failed()?.data as data
+  if add.failed()?.data then data
     p.error {data.message}
   button Add
 ```

@@ -34,7 +34,7 @@ form(action={enquire})
   input(name="message" aria-label="Message")
   error message
   button Send
-if enquire.error() as message
+if enquire.error() then message
   p.error {message}
 if sent
   p.sent Sent

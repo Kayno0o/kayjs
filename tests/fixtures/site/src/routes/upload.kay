@@ -23,8 +23,8 @@ form(action={upload})
   input(name="note" aria-label="Note" value={failure?.values.note})
   input(type="file" name="file" aria-label="File")
   input(type="file" name="attachment" aria-label="Attachment")
-  if failure?.errors.file as message
+  if failure?.errors.file then message
     p.error {message}
   button Upload
-if last as text
+if last then text
   p.received {text}

@@ -288,11 +288,11 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
           if section.group !== null
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
-            if linkOf(row.entry) as link
+            if linkOf(row.entry) then link
               a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...tabOf(link.href, link.newTab ?? (link.external ? true : undefined))} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined || row.remote === true)})
-                if link.icon as icon
+                if link.icon then icon
                   Icon(icon={icon} part="icon")
-                if row.snippet as snippet
+                if row.snippet then snippet
                   span(part="text")
                     span(part="label")
                       for part, partIndex of row.labelParts ?? [{ text: row.entry.label, hit: false }] key={partIndex}
@@ -306,7 +306,7 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
                           mark(part="mark") {part.text}
                         else
                           | {part.text}
-                    if row.more as more
+                    if row.more then more
                       span(part="more") {countedMore(more)}
                 else
                   span(part="label") {row.entry.label}
@@ -314,9 +314,9 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
                   span(part="group") {row.entry.group}
                 if row.entry.shortcut
                   kbd(part="shortcut") {row.entry.shortcut}
-            else if actionOf(row.entry) as action
+            else if actionOf(row.entry) then action
               button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => act(action)})
-                if action.icon as icon
+                if action.icon then icon
                   Icon(icon={icon} part="icon")
                 span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group

@@ -371,7 +371,7 @@ div(part="root" {...rest})
           button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
             span(part="start") {clock(chapter.start)}
             span(part="title") {chapterLabel(chapter)}
-          if chapterHref(chapter) as href
+          if chapterHref(chapter) then href
             IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapterLabel(chapter))} variant="ghost" size="sm")
           if actions
             span(part="actions")

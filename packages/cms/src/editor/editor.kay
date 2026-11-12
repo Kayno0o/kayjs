@@ -816,7 +816,7 @@ SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === u
       Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
     p {wording('cms.editor.discardAsk', 'You have changes that are not saved. Stopping drops them.')}
   .kcms-editor-status(role="status" aria-live="polite")
-    if removed() as gone
+    if removed() then gone
       .kcms-editor-undo
         span {wording('cms.list.removed', '{item} removed', { item: gone.title })}
         Button(label={wording('cms.list.undo', 'Undo')} variant="inline" disabled={unsettled()} onClick={undoRemoval})
@@ -826,7 +826,7 @@ SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === u
       Notice.kcms-editor-failure(tone="warning" size="sm" label={wording('cms.editor.stale', 'The page shows the saved text of {entries} until your changes there are valid.', { entries: drafts.stale().map(entry => `${entry.collection}/${entry.slug}`).join(', ') })})
     if rebuilding()
       p {wording('cms.editor.rebuilding', 'Your last save is still reaching the live site, which shows the old content until it has rebuilt.')}
-  if drafts.failure() as failure
+  if drafts.failure() then failure
     Notice.kcms-editor-failure(tone="danger" size="sm" label={wording('cms.editor.draftFailure', 'The page could not show your changes: {failure}', { failure })})
   if entries.length > 1
     .kcms-editor-all

@@ -54,7 +54,7 @@ async function convert(value: string) {
       CopyButton(text={converted().code} label="Copy")
     pre
       code {converted().code}
-  if converted().error as message
+  if converted().error then message
     p.html-converter-error(role="alert") {message}
   if converted().notes.length > 0
     ul.html-converter-notes

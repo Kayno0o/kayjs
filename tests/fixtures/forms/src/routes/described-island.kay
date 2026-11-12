@@ -30,9 +30,9 @@ form.described(action={choose})
   p#choose-hint Three letters at least
   p#last-hint Three letters too
   p#last-note As on your passport
-  if choose.error('first') as message
+  if choose.error('first') then message
     p {message}
-  if choose.error('last') as message
+  if choose.error('last') then message
     p {message}
   button.choose(formnovalidate) Choose
 button.bump(type="button" onClick={() => bumped = 1}) {bumped()}

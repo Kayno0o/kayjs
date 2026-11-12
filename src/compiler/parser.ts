@@ -1,8 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, SnippetNode, Span, TextNode, TryNode } from './ast'
-import type { Expression } from './estree'
 import { scanClassName } from './class-name'
 import { strayElse } from './else-problem'
-import { parseExpression } from './estree'
+import { ifAlias } from './if-alias'
 import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- island`, `--- static`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
@@ -45,12 +44,7 @@ const SLOT_HEAD = /(?=@)/y
 const MARKDOWN_HEAD = /markdown[ \t]*(?=\r?\n|$)/y
 // `- code`, which pug runs.
 const PUG_CODE = /-(?= |\r?\n|$)/y
-// What a condition naming its value holds, which may as well be a cast.
-const MAY_ALIAS = /\sas\s/
-// A capitalized name after a condition's `as` is a type, so a cast.
-const CAPITALIZED_NAME = /^[\p{Lu}\p{Lt}]/u
-// What the tail of a condition is parsed behind, as the type of a cast.
-const CAST = '_ as'
+
 const MATCH_LINE = /(when|else)(?=[ \t]|\r?\n|$)/y
 const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
 // `let x = 1`: a declaration kay has no counterpart for, told from a `var` element by the `=`.
@@ -520,82 +514,12 @@ class TemplateParser {
     if (test.start === test.end)
       this.error(start, test.end, 'Expected a condition')
 
-    const alias = this.alias(test)
+    const { alias, diagnostics } = ifAlias(this.src, this.quiet, test)
+
+    this.diagnostics.push(...diagnostics)
     const children = this.parseBlock(indent)
 
     return { start, end: this.lastContentEnd(), test, alias, children }
-  }
-
-  // `if user() as u` names the value it tests: a last `as` outside brackets, after the whole condition whatever operators it holds, then a name.
-  // TypeScript reads it as a cast to a type of that name, so a type it spells any other way stays a cast: a capitalized name, `as string`, `as const` or `as Box<T>`. Found, it is cut off the end of `test`.
-  private alias(test: Span): Span | undefined {
-    const at = MAY_ALIAS.test(this.src.slice(test.start, test.end)) ? this.lastAs(test) : undefined
-
-    if (at === undefined)
-      return undefined
-
-    let cast: Expression
-
-    try {
-      cast = parseExpression(`${CAST}${this.src.slice(at + 2, test.end)}`, { lang: 'ts' })
-    }
-    catch {
-      return undefined
-    }
-
-    const type = cast.type === 'TSAsExpression' && cast.typeAnnotation.type === 'TSTypeReference' && !cast.typeAnnotation.typeArguments ? cast.typeAnnotation.typeName : undefined
-
-    if (type?.type !== 'Identifier' || type.name === 'const' || CAPITALIZED_NAME.test(type.name))
-      return undefined
-
-    // The parsed text starts with `_ as` where the source has `as`.
-    const shift = at + 2 - CAST.length
-    let end = at
-
-    while (end > test.start && WHITESPACE.test(this.src[end - 1]!))
-      end--
-
-    test.end = end
-
-    return { start: type.start + shift, end: type.end + shift }
-  }
-
-  // Where the last ` as ` of `span` starts outside its brackets, strings, template literals, regex literals and comments.
-  private lastAs({ start, end }: Span): number | undefined {
-    const { src, quiet } = this
-    let found: number | undefined
-    let i = start
-
-    while (i < end) {
-      const char = src[i]!
-
-      if (char === '"' || char === '\'') {
-        i = quiet.string(i, char)
-      }
-      else if (char === '`') {
-        i = quiet.template(i)
-      }
-      else if (char === '/' && src[i + 1] === '/') {
-        break
-      }
-      else if (char === '/' && src[i + 1] === '*') {
-        i = quiet.blockComment(i)
-      }
-      else if (char === '/' && quiet.regex(start, i) !== -1) {
-        i = quiet.regex(start, i)
-      }
-      else if (char === '{' || char === '(' || char === '[') {
-        i = quiet.balanced(i)
-      }
-      else {
-        if (i > start && src.startsWith('as', i) && WHITESPACE.test(src[i - 1]!) && WHITESPACE.test(src[i + 2] ?? ''))
-          found = i
-
-        i++
-      }
-    }
-
-    return found
   }
 
   // Only `when` lines and a last `else` sit in a `match`, each holding the markup of its case.

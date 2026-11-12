@@ -125,7 +125,7 @@ span(part="root" {...rest})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
       for note of items() key={note.key}
-        if linked(note.href) as url
+        if linked(note.href) then url
           a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.key)})
             if drawRow
               | {drawRow(note)}

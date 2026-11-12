@@ -42,7 +42,7 @@ head
   meta(property="og:image:alt" content={title})
 .page
   header.page-head
-    if path as file
+    if path then file
       p.eyebrow: code {file}
     else
       p.eyebrow {sectionOf(slug)?.title}

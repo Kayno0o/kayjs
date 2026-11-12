@@ -11,7 +11,7 @@ A template reads `ctx.<key>` for the request values an extension gives it, with 
 import { ctx } from 'kay'
 ---
 nav
-  if ctx.user as user
+  if ctx.user then user
     p Signed in as {user.username}
   if ctx.can('admin')
     a(href="/admin") Admin

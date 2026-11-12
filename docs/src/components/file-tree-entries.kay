@@ -10,7 +10,7 @@ ul.file-tree-list
   for entry of entries key={entry.name}
     li
       span.file-tree-entry
-        if fileIcon(entry.name) as icon
+        if fileIcon(entry.name) then icon
           if icon === 'kay'
             img(src="/favicon.svg" alt="" width="16" height="16")
           else

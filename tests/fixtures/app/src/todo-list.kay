@@ -17,5 +17,5 @@ section.todo-list
       TodoItem(todo={todo} index={i} selected={selected.is(todo.id)} onToggle={id => selected.set(id)})
     else
       li.empty(transition={fadeIn}) Nothing matches
-  if todos.find(todo => todo.id === selected()) as todo
+  if todos.find(todo => todo.id === selected()) then todo
     p Selected #[strong {todo.title}]

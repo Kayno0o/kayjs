@@ -15,7 +15,7 @@ nav.kcms-locales(aria-label={wording('cms.locales.label', 'Translations')})
   for item of translations.locales key={item.locale}
     if here(item.locale)
       span.kcms-locale(aria-current="true") {item.locale}
-    else if item.slug as slug
+    else if item.slug then slug
       span.kcms-locale
         a(href={entryPath(prefix, { collection: entry.collection, slug, locale: item.locale })}) {item.locale}
         if compared === item.locale

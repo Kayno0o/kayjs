@@ -18,5 +18,5 @@ const failure = spend.failed()
 form#spend(action={spend})
   input(type="hidden" name="token" value={token})
   button Sign in
-if failure?.data as data
+if failure?.data then data
   p#error {data.error}

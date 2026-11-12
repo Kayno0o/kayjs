@@ -150,7 +150,7 @@ ul
 form(action={add})
   input(field="title" placeholder="New todo")
   error title
-  if add.failed()?.data as data
+  if add.failed()?.data then data
     p.error {data.message}
   button Add
 ```

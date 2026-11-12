@@ -470,7 +470,7 @@ describe('control flow', () => {
   it('aliases the whole condition before a last as and a lowercase name, whatever operators it holds', () => {
     const file = parse('if (a || b) as u\n  p\nif (x) as u\n  p\nif user() as u\nelse if (x) as v\n  p\nif a && b as u\n  p\nif a == b || c as u\n  p\nif a ? b : c as d\n  p\nif y as Row\n  p\nif x as u // the user\n  p\nif x as été\n  p\nif f("a as b") as found\n  p\nif x as u as v\n  p')
 
-    expect(file.diagnostics).toEqual([])
+    expect(file.diagnostics.filter(d => d.code !== 'deprecated-if-alias')).toEqual([])
     expect(outline(file)).toMatchObject([
       { if: [{ test: '(a || b)', alias: 'u' }] },
       { if: [{ test: '(x)', alias: 'u' }] },
@@ -484,6 +484,26 @@ describe('control flow', () => {
       { if: [{ test: 'f("a as b")', alias: 'found' }] },
       { if: [{ test: 'x as u', alias: 'v' }] },
     ])
+  })
+
+  it('aliases the whole condition before a last then and a name, in any case, and leaves an as a cast', () => {
+    const file = parse('if (a || b) then u\n  p\nif a && b then User\n  p\nif user() as u\nelse if (x) then v\n  p\nif f("a then b") then found\n  p\nif x as string then s\n  p\nif x then u // the user\n  p\nif (x then y)\n  p\nif x as Row\n  p')
+
+    expect(outline(file)).toMatchObject([
+      { if: [{ test: '(a || b)', alias: 'u' }] },
+      { if: [{ test: 'a && b', alias: 'User' }] },
+      { if: [{ test: 'user()', alias: 'u' }, { test: '(x)', alias: 'v' }] },
+      { if: [{ test: 'f("a then b")', alias: 'found' }] },
+      { if: [{ test: 'x as string', alias: 's' }] },
+      { if: [{ test: 'x', alias: 'u' }] },
+      { if: [{ test: '(x then y)', alias: undefined }] },
+      { if: [{ test: 'x as Row', alias: undefined }] },
+    ])
+  })
+
+  it('lints an alias written with as, and not one written with then', () => {
+    expect(parse('if user() as u\n  p').diagnostics.map(d => d.code)).toEqual(['deprecated-if-alias'])
+    expect(parse('if user() then u\n  p').diagnostics).toEqual([])
   })
 
   it('reads for with index, key and an else fallback', () => {

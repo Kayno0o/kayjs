@@ -2355,7 +2355,7 @@ describe('match blocks', () => {
 
 describe('if blocks with and without a name for the value', () => {
   const mountAliased = site({
-    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\nconst on = signal(true)\n---\nbutton#next(onClick={() => n.set(n() + 1)}) next\nbutton#off(onClick={() => on.set(false)}) off\nif n() > 100 as big\n  p.big {String(big)}\nelse if n() as count\n  p.named(class={[\'row\', \'row\', \'1\', { on: on() }]}) {count}\nelse\n  p.none none\nif n() > 1\n  p.free(class={[\'a\', \'b\', \'a\']}) free\nelse\n  p.base base\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\nconst on = signal(true)\n---\nbutton#next(onClick={() => n.set(n() + 1)}) next\nbutton#off(onClick={() => on.set(false)}) off\nif n() > 100 then big\n  p.big {String(big)}\nelse if n() then count\n  p.named(class={[\'row\', \'row\', \'1\', { on: on() }]}) {count}\nelse\n  p.none none\nif n() > 1\n  p.free(class={[\'a\', \'b\', \'a\']}) free\nelse\n  p.base base\n',
   })
 
   it('follows the value of a named branch while it stays, and a free branch with no value at all', async () => {

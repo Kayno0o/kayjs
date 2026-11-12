@@ -38,7 +38,7 @@ PageSection(title={title} level={1})
       Button(href={newEntryPath(prefix, collection.name)} label={wording('cms.admin.newEntry', 'New entry')} icon="plus" tone="accent")
   if collection.description
     p.kcms-entry-subtitle {collection.description}
-  if collection.problem as problem
+  if collection.problem then problem
     EmptyState(title={wording('cms.admin.collectionUnreadable', 'This collection cannot be read')} description={problem})
   else
     .kcms-tools

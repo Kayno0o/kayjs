@@ -2569,7 +2569,7 @@ describe('the build report', () => {
         'src/a.kay': 'p A\n',
         'src/b.kay': 'p B\n',
         'src/looped.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nfor shown of items\n  if shown\n    B\n',
-        'src/aliased.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nif pick() as shown\n  if shown\n    B\n',
+        'src/aliased.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nif pick() then shown\n  if shown\n    B\n',
         'src/snippet.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nsnippet inner(shown: boolean)\n  if shown\n    B\n{inner(true)}\n',
         'src/nested.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nfor row of nested\n  for shown of row\n    if shown\n      B\n',
         'src/declared.kay': '---\nimport B from \'./b.kay\'\n\nconst { shown } = props<{ shown?: boolean }>()\nconst items = [true]\nconst nested = [[true]]\nconst pick = () => true\n---\nconst shown = true\nif shown\n  B\n',

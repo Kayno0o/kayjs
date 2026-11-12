@@ -16,10 +16,10 @@ Layout(preheader={lead ?? words.lead})
   Heading {heading ?? words.subject}
   Paragraph {lead ?? words.lead}
   slot
-  if mail.url as url
+  if mail.url then url
     Button(href={url}) {button ?? words.button}
     Paragraph(muted) {words.orPaste} #[Link(href={url}) {url}]
-  if mail.code as code
+  if mail.code then code
     Paragraph(muted) {words.codeLead}
     Code {code}
   Paragraph(muted) {ending ?? words.ending}

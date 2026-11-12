@@ -11,13 +11,13 @@ const { previous, next, source } = props<{ previous?: Link | undefined, next?: L
 ---
 footer.page-foot
   nav.pager(aria-label="Previous and next pages")
-    if previous as link
+    if previous then link
       a.pager-previous(href={link.href})
         span.pager-label
           ArrowLeft
           | Previous
         span {link.title}
-    if next as link
+    if next then link
       a.pager-next(href={link.href})
         span.pager-label
           | Next

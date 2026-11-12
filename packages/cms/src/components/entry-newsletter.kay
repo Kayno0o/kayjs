@@ -73,7 +73,7 @@ Dialog(open={open()} title={wording('cms.newsletter.title', 'Send to the mailing
       Refused(label={wording('cms.newsletter.send', 'Send to the list')} reason={wording('cms.newsletter.draft', 'Publish the entry before sending it to the list')} tone="accent")
     else
       Button(label={confirming() ? wording('cms.newsletter.confirm', 'Yes, send to {count} subscribers', { count: preview()?.subscribers ?? 0 }) : wording('cms.newsletter.send', 'Send to the list')} tone="accent" busy={busy()} disabled={busy() || preview() === undefined} onClick={send})
-  if preview() as made
+  if preview() then made
     p.kcms-newsletter-subject {made.subject}
     iframe.kcms-newsletter-preview(sandbox="" title={wording('cms.newsletter.frame', 'The mail as it will be sent')} srcdoc={trustHtml(made.html ?? `<pre>${escapeHtml(made.text)}</pre>`)})
   else

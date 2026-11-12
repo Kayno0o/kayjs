@@ -136,7 +136,7 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
       '  const price = (product.cents / 100).toFixed(2)',
       '  const { name, stock: left = 0 } = product',
       '  li(title={price}) {name}: {price}',
-      '    if left < 3 as low',
+      '    if left < 3 then low',
       '      const label = \'only \' + low',
       '      b {label}',
       'Box',

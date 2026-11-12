@@ -93,7 +93,7 @@ Table.kcms-media(label={wording('cms.media.table', 'Uploads')} columns={columns}
           IconButton(icon="close" label={wording('cms.media.cancel', 'Cancel')} variant="ghost" size="sm" onClick={() => renaming = undefined})
       else
         span {row.name}
-        if dimensions(row) as size
+        if dimensions(row) then size
           span.kcms-entry-subtitle  {size}
     else if column.key === 'size'
       span {row.size === undefined ? '' : sizeText(row.size)}
@@ -108,9 +108,9 @@ Table.kcms-media(label={wording('cms.media.table', 'Uploads')} columns={columns}
           if row.usedIn.length > NAMED
             li {wording('cms.media.more', '{count} more', { count: row.usedIn.length - NAMED })}
     else if column.key === 'at'
-      if row.sentAt as sentAt
+      if row.sentAt then sentAt
         EntryEdited(editedAt={sentAt})
-      if row.by as by
+      if row.by then by
         span.kcms-entry-subtitle  {by}
     else
       IconButton(icon={pencil} label={wording('cms.media.renameAction', 'Rename {name}', { name: row.name })} variant="ghost" size="sm" onClick={() => startRename(row)})

@@ -146,7 +146,7 @@ snippet words(direction: 'previous' | 'next')
   else
     | {nextLabel}
 snippet body
-  if steps() as open
+  if steps() then open
     if open.previous || open.next
       nav(part="root" {...rest} aria-label={label})
         if open.previous
@@ -160,7 +160,7 @@ snippet body
 
   else if drawn()
     nav(part="root" {...rest} aria-label={label})
-      if summary() as text
+      if summary() then text
         span(part="range" role="status") {text}
       if count() > 1
         if shown() > 1

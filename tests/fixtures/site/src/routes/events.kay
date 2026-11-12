@@ -38,7 +38,7 @@ form(action={schedule})
   input(name="title" aria-label="Title")
   input(name="at" aria-label="At")
   button Schedule
-if scheduled as done
+if scheduled then done
   p.done Scheduled {done.data.title} on {done.data.at.toISOString()}, {done.data.tags.size} tag, {String(done.data.seats)} seats
-if failure?.data as data
+if failure?.data then data
   p.error Not before {data.earliest.getUTCFullYear()}

@@ -395,7 +395,7 @@ snippet box()
       onFocusIn={focusIn}
       onFocusOut={focusOut}
     )
-    if name && carried() as option
+    if name && carried() then option
       input(type="hidden" name={name} value={String(option.value)} disabled={disabled})
     if !remote
       datalist(id={`${listId}-native`})

@@ -29,7 +29,7 @@ async function save() {
 }
 ---
 input(bind:value={title} aria-invalid={add.error('title') ? 'true' : undefined})
-if add.error('title') as message
+if add.error('title') then message
   p.error {message}
 button(onClick={save} disabled={add.pending()}) Add
 ```

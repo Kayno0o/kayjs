@@ -131,7 +131,7 @@ Each table is exported on its own too, for a foreign key from a table of yours: 
 --- server
 const user = await ctx.locals.auth.user()
 ---
-if user as signedIn
+if user then signedIn
   p Signed in as {signedIn.email}
 else
   a(href="/auth/sign-in") Sign in
@@ -202,7 +202,7 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ## The signed-in user in templates
 
-`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user as user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
+`SignedIn`, `SignedOut` and `UserMenu` read the request's user themselves, so a layout or a component shows the user with no `--- server` fence. They are sugar over `ctx.user`, `ctx.can(role)` and `ctx.impersonator`, which any template reads the same way, `if ctx.user then user` or `if ctx.can('admin')`, typed in `kay check` and the editor:
 
 ```kay
 ---
