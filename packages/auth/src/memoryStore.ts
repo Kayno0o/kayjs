@@ -556,12 +556,12 @@ export function memoryAuth(): AuthStore {
   }
 }
 
-// Callers get their own copy, as from a database, so changing one changes nothing stored.
 // The first `limit` of the users by one date, as copies.
 function oldest(list: UserRecord[], limit: number, by: 'createdAt' | 'deleteAt'): UserRecord[] {
   return list.sort((a, b) => a[by]!.getTime() - b[by]!.getTime()).slice(0, limit).map(user => copy(user)!)
 }
 
+// Callers get their own copy, as from a database, so changing one changes nothing stored.
 function copy(user: UserRecord | undefined): UserRecord | undefined {
   return user && { ...user, roles: [...user.roles], data: structuredClone(user.data ?? {}) }
 }
