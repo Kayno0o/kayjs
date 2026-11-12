@@ -181,7 +181,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
     const { tags, titleTemplate } = tagsFor(state?.locale, state?.settings.defaultLocale)
 
     return {
-      defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash)] : tags,
+      defaults: origin !== undefined && status === 200 ? [...tags, ...pageLinks(origin, url, trailingSlash, base)] : tags,
       titleTemplate,
       social: social ? { origin, sizeOf } : undefined,
     }
@@ -189,7 +189,7 @@ export function seoHead(site: string | undefined, seo: SeoConfig = {}, extra: He
 }
 
 // The page's canonical URL, and in a site of several locales its copy in each, `x-default` the default locale's.
-function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | undefined): HeadTag[] {
+function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | undefined, base: string): HeadTag[] {
   const state = localeState()
 
   if (!state || state.implicit)
@@ -199,7 +199,7 @@ function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | unde
   const entryUrls = state.entryUrls?.get(shown)
   // A routed entry whose translation has another slug points at the translation's own url, as `alternate()` does.
   const copies = localeCopies(state.settings, state.path).map(copy => copy.locale !== undefined && entryUrls?.[copy.locale] !== undefined ? localeCopies(state.settings, entryUrls[copy.locale]!).find(own => own.locale === copy.locale)! : copy)
-  const absolute = (copy: LocaleCopy) => `${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`
+  const absolute = (copy: LocaleCopy) => `${copy.host === undefined ? origin : `https://${copy.host}${base}`}${slashedPath(copy.path, trailingSlash)}`
   const own = copies.find(copy => copy.locale === state.locale)!
   const fallback = copies.find(copy => copy.locale === state.settings.defaultLocale)!
 

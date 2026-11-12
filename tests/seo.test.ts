@@ -4,9 +4,10 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config-loader'
 import { collectHead, head, keepHeadMarkup } from '../src/runtime/head'
+import { runInLocale } from '../src/runtime/locale-state'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { isCrossSite } from '../src/server/cross-site'
-import { siteOrigin } from '../src/server/seo'
+import { seoHead, siteOrigin } from '../src/server/seo'
 import { pages } from './shared-pages'
 
 const HEAD = /<head>([\s\S]*)<\/head>/
@@ -363,5 +364,30 @@ describe('the social tags a render fills', () => {
     expect(render([{ tag: 'meta', props: { property: 'og:image:alt', content: long } }])).toContain(`<meta name="twitter:image:alt" content="${long}">`)
     expect(render([])).toContain('<meta name="twitter:image:alt" content="The site">')
     expect(render([])).toContain('<meta property="og:image:width" content="1200">')
+  })
+})
+
+describe('the canonical and alternate links of a site with a host per locale', () => {
+  const settings: any = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, hosts: { en: 'example.com', fr: 'exemple.fr' } }
+
+  function linksOf(base: string, path: string, trailingSlash?: 'always'): string[] {
+    const state: any = { locale: 'en', settings, path, host: 'example.com', messages: new Map(), fallback: undefined }
+    const out = runInLocale(state, () => seoHead('https://example.com', {}, [], trailingSlash, base)!(new URL(`https://example.com${base}${path}`), 200))
+
+    return out.defaults.filter(tag => tag.tag === 'link').map(tag => `${tag.props.rel} ${tag.props.hreflang ?? ''} ${tag.props.href}`.replace('  ', ' '))
+  }
+
+  it('puts the base after each host, as the sitemap does', () => {
+    expect(linksOf('/docs', '/about')).toEqual([
+      'canonical https://example.com/docs/about',
+      'alternate en https://example.com/docs/about',
+      'alternate fr https://exemple.fr/docs/about',
+      'alternate x-default https://example.com/docs/about',
+    ])
+  })
+
+  it('writes a host as it is without a base, and keeps trailingSlash', () => {
+    expect(linksOf('', '/about', 'always')[2]).toBe('alternate fr https://exemple.fr/about/')
+    expect(linksOf('/docs', '/about', 'always')[2]).toBe('alternate fr https://exemple.fr/docs/about/')
   })
 })
