@@ -29,13 +29,13 @@ async function passwordsOf(site: Pick<TestSite, 'cookies' | 'fetch'>) {
 }
 
 // Signs a test site in through `passwordGuard()` with no form: the sign-in cookie of `role`, which may be left out when the guard holds one password. A second call switches role; returns the role.
-export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, role?: string): Promise<string> {
+async function signIn(site: Pick<TestSite, 'cookies' | 'fetch'>, role?: string): Promise<string> {
   const passwords = await passwordsOf(site)
   const roles = passwords.roles()
   const chosen = role ?? (roles.length === 1 ? roles[0] : undefined)
 
   if (chosen === undefined || !roles.includes(chosen))
-    throw configError('cms', 'guard', `cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
+    throw configError('cms', 'guard', `signInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
 
   const cookie = passwords.issue(chosen, false)
 
@@ -45,17 +45,17 @@ export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, rol
 }
 
 // Posts the sign-in form with this password, as a visitor does, so a wrong one is answered 401 on the screen and the right one signs the site in; the answer is the page the form leads to.
-export async function cmsSignInWith(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>, password: string): Promise<Visit> {
+async function signInWith(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>, password: string): Promise<Visit> {
   await passwordsOf(site)
 
   // Imported once the site has loaded, which is what gives the action its address.
-  const { signIn } = await import(SIGN_IN) as { signIn: Action<{ password: string, redirect?: string | undefined }, unknown> }
+  const { signIn: action } = await import(SIGN_IN) as { signIn: Action<{ password: string, redirect?: string | undefined }, unknown> }
 
-  return site.submit(signIn, { password }, { from: `${settings().prefix}/sign-in` })
+  return site.submit(action, { password }, { from: `${settings().prefix}/sign-in` })
 }
 
 // Signs a test site out of the cms, its other cookies kept.
-export function cmsSignOut(site: CookieSite): void {
+function signOut(site: CookieSite): void {
   for (const value of sessionCookiesOf(site.cookies))
     activePasswords()?.revokeHere(value)
 
@@ -63,6 +63,15 @@ export function cmsSignOut(site: CookieSite): void {
   site.cookies.delete(SESSION_COOKIE)
   site.cookies.delete(HINT_COOKIE)
 }
+
+// Until 1.104: `cmsTest(site).signInAs(role)`.
+export const cmsSignInAs = signIn
+
+// Until 1.104: `cmsTest(site).signInWith(password)`.
+export const cmsSignInWith = signInWith
+
+// Until 1.104: `cmsTest(site).signOut()`.
+export const cmsSignOut = signOut
 
 export type CmsSaveOutcome = SaveOutcome
 
@@ -91,6 +100,8 @@ export interface CmsUpload {
 export interface CmsTest {
   // Signs the site in through `passwordGuard()` as `role`, left out when the guard holds one password; a second call switches role. Returns the role.
   signInAs: (role?: string) => Promise<string>
+  // Posts the sign-in form with this password, as a visitor does, so a wrong one is answered 401 on the screen and the right one signs the site in; the answer is the page the form leads to.
+  signInWith: (password: string) => Promise<Visit>
   // Signs the site out of the cms, its other cookies kept.
   signOut: () => void
   // Saves an entry as the signed-in editor does from the screen: the answer is `{ ok: true, saved: true, version }`, or `{ ok: false, error, issues }` for a refused entry, and a site not signed in throws.
@@ -119,7 +130,7 @@ async function answered(response: Response, what: string, missing = false): Prom
 
 // The cms as one test site uses it: sign in as an editor, save an entry and read it back, with no form and no cookie handled by hand.
 // Saves go to the content the test site holds, never to the project's.
-export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch'>): CmsTest {
+export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>): CmsTest {
   const path = (collection: string, slug: string) => `${apiUrl(entriesApi)}/${encodeURIComponent(collection)}/${encodeURIComponent(slug)}`
   const localeQuery = (locale: string | undefined) => locale === undefined ? '' : `?locale=${encodeURIComponent(locale)}`
 
@@ -137,8 +148,9 @@ export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch'>): CmsTest {
   const versioned = (locale: string | undefined, version: string | undefined) => new URLSearchParams({ ...locale !== undefined && { locale }, ...version !== undefined && { version } }).toString()
 
   return {
-    signInAs: async role => cmsSignInAs(site, role),
-    signOut: () => cmsSignOut(site),
+    signInAs: async role => signIn(site, role),
+    signInWith: async password => signInWith(site, password),
+    signOut: () => signOut(site),
     save: async (collection, slug, data, options = {}) => {
       const version = options.create ? options.version : await versionOf(collection, slug, options)
       const response = await site.fetch(path(collection, slug), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, ...options, ...version !== undefined && { version } }) })

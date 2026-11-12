@@ -4128,6 +4128,9 @@ interface PointerOptions extends WaitOptions
 [./test] readPersisted
 function readPersisted(key: string): unknown
 
+[./test] resetEachTest
+function resetEachTest(clear: () => void): void
+
 [./test] RouteHandler
 type RouteHandler = (request: PageRequest) => void | Promise<void>
 

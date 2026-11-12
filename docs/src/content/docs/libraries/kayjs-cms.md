@@ -75,7 +75,7 @@ An empty password throws, so an unset environment variable never opens the admin
 A test signs a site in without the form, saves an entry and reads it back, with `cmsTest(site)` from `@kaynooo/kayjs-cms/test`:
 
 ```ts
-import { cmsSignInAs, cmsSignInWith, cmsSignOut, cmsTest } from '@kaynooo/kayjs-cms/test'
+import { cmsTest } from '@kaynooo/kayjs-cms/test'
 
 const editor = cmsTest(site)
 
@@ -85,12 +85,12 @@ expect((await editor.entry('posts', 'hello'))?.data.title).toBe('Hello')
 await editor.rename('posts', 'hello', 'hi')
 await editor.delete('posts', 'hi')
 editor.signOut()
-expect((await cmsSignInWith(site, 'wrong')).status).toBe(401)
+expect((await editor.signInWith('wrong')).status).toBe(401)
 ```
 
 Saves go to the content the test site holds, never to the project's `src/content`. `save`, `delete` and `rename` read the entry's version themselves, as the editor does, so a test names one only to try a stale one. `move(collection, slug, 'up')` and `upload(collection, file)` do the rest of the editor's calls; an upload answers the path to keep, under `/_kay/files/cms-media/`.
 
-`signInAs` works with `passwordGuard()` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `cmsSignInAs(site, role)` and `cmsSignOut(site)` do the sign-in alone.
+`signInAs` works with `passwordGuard()` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `signInWith(password)` posts the sign-in form as a visitor does, to test a wrong password.
 
 The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
 

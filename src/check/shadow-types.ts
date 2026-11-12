@@ -35,18 +35,19 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { aiOptions } from './ai-options'
 import { analyticsOptions } from './analytics-options'
 import { awaitConsent } from './await-consent'
+import { cmsTestHelpers } from './cms-test-helpers'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { eventNames } from './event-names'
 import { filterOptions } from './filter-options'
-import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
+import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { infiniteListOptions } from './infinite-list-options'
-import { islandOnlyComponents } from './island-only'
 
+import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
@@ -172,6 +173,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => aiOptions(root, options),
   async ({ root, options }) => filterOptions(root, options),
   async ({ root, options }) => infiniteListOptions(root, options),
+  async ({ root, options }) => cmsTestHelpers(root, options),
   ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => eventNames(root, options),
 ]

@@ -888,7 +888,7 @@ function cmsSignInWith(site: Pick<TestSite, "cookies" | "fetch" | "submit">, pas
 function cmsSignOut(site: CookieSite): void
 
 [./test] cmsTest
-function cmsTest(site: Pick<TestSite, "cookies" | "fetch">): CmsTest
+function cmsTest(site: Pick<TestSite, "cookies" | "fetch" | "submit">): CmsTest
 
 [./test] CmsTest
 interface CmsTest
@@ -898,6 +898,7 @@ interface CmsTest
   rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome & { slug?: string; }>
   save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions | undefined) => Promise<SaveOutcome>
   signInAs: (role?: string | undefined) => Promise<string>
+  signInWith: (password: string) => Promise<Visit>
   signOut: () => void
   upload: (collection: string, file: File) => Promise<CmsUpload>
 

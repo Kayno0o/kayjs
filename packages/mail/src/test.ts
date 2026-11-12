@@ -1,6 +1,6 @@
 import type { TestSite } from 'kay/test'
 import type { MailWaitOptions, Outbox, SentMail } from './outbox'
-import { afterEach, beforeEach } from 'bun:test'
+import { resetEachTest } from 'kay/test'
 import { outbox } from './outbox'
 
 // The outbox as one test site reads it.
@@ -14,15 +14,7 @@ export interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' 
 // Reads the mails a test site sent, from an outbox that is empty at the start of every test, so no test clears it by hand.
 // Called at the top of a file or a `describe`, as `testSite()` is.
 export function mailTest(site: Pick<TestSite, 'runJobs'>): MailTest {
-  outbox.clear()
-
-  // Called inside a test or a hook, where Bun takes no hook, the outbox is emptied once here.
-  try {
-    beforeEach(() => outbox.clear())
-    // So a file running after this one in the same process meets none of its leftovers either.
-    afterEach(() => outbox.clear())
-  }
-  catch {}
+  resetEachTest(() => outbox.clear())
 
   return {
     get mails() {

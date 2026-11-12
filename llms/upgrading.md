@@ -21,6 +21,10 @@ A TreeNode's `id` is `key`, and a Bell or BellInbox item's `id`, `title` and `ur
 
 `CollectionInfo`, what `collectionInfo()` and `collections()` of `kay/content` answer, reports the number of entries as `total` in place of `count`, the word every list result uses (`pageOf`, kayjs-auth's `ListUsersResult`, kayjs-cms's `ListScreen`). A field an app reads cannot be found by `kay check`, so there is no lint: `count` is still set beside `total` until 1.104, and an app reading `info.count` writes `info.total`.
 
+### kayjs-cms test helpers: `cmsTest(site)`
+
+`cmsSignInAs(site, role)`, `cmsSignInWith(site, password)` and `cmsSignOut(site)` of `@kaynooo/kayjs-cms/test` are `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()`, as `auth.test(site)` signs in and out. They work until 1.104; `kay upgrade` rewrites them (`deprecated-cms-test-helpers`).
+
 ## 1.99.0
 
 ### DOM events are `<lib>:<verb>` on `document`

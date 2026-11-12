@@ -144,6 +144,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { infiniteList } from \'@kaynooo/kayjs-ui\'\n\nconst people = infiniteList([], { pageSize: 20, load: ({ offset }) => [] })\n---',
     right: '---\nimport { infiniteList } from \'@kaynooo/kayjs-ui\'\n\nconst people = infiniteList([], { limit: 20, load: ({ offset }) => [] })\n---',
   },
+  'deprecated-cms-test-helpers': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.100',
+    site: true,
+    summary: '`cmsSignInAs(site, role)`, `cmsSignInWith(site, password)` and `cmsSignOut(site)` of `@kaynooo/kayjs-cms/test`, `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()` since 1.100: every library\'s test helper takes the site and hands back its methods, and signing in and out is `signInAs` and `signOut` in kayjs-auth and kayjs-cms alike. The old functions work until 1.104. Found in the calls and the import, in the TypeScript files and `.kay` files of the project. The fix rewrites each call and the import; an import that is aliased, or a name read other than by calling it, is reported with no fix.',
+    wrong: '// tests/admin.test.ts\nimport { cmsSignInAs } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\nawait cmsSignInAs(site, \'admin\')',
+    right: '// tests/admin.test.ts\nimport { cmsTest } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\nawait cmsTest(site).signInAs(\'admin\')',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

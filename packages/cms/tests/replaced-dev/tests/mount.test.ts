@@ -3,7 +3,7 @@ import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
 import { passwordGuard } from '../../../src/password'
-import { cmsSignInAs } from '../../../src/test'
+import { cmsTest } from '../../../src/test'
 
 const ROOT = join(import.meta.dir, '..')
 
@@ -28,12 +28,12 @@ for (const { name, site: siteOptions, root } of [
     try {
       const mount = `${root}/_kay/cms`
 
-      await cmsSignInAs(site, 'editor')
+      await cmsTest(site).signInAs('editor')
       expect([(await site.fetch(mount)).status, (await site.fetch(`${mount}/`)).status]).toEqual([404, 404])
       expect((await site.fetch(`${mount}/redirects/paths?q=a`)).status).toBe(403)
       expect((await site.fetch(`${mount}/files/unused/delete`, { method: 'POST' })).status).toBe(403)
 
-      await cmsSignInAs(site, 'admin')
+      await cmsTest(site).signInAs('admin')
       expect((await site.fetch(`${mount}/redirects/paths?q=a`)).status).toBe(200)
       expect((await site.fetch(`${mount}/files/unused/delete`, { method: 'POST' })).status).not.toBe(403)
     }
