@@ -1318,6 +1318,13 @@ describe('serial-awaits', () => {
     expect(found('export const a = await one()\nexport const b = await two()')).toEqual([])
   })
 
+  it('keeps a sequence whole in the fix, restarts a run after a dependent step and ends it at a same-line comment', () => {
+    expect(fixed(page('const a = await (x(), y())\nconst b = await two()'))).toEqual([page('const [a, b] = await Promise.all([\n  (x(), y()),\n  two(),\n])')])
+    expect(found('const a = await one()\nconst b = await two()\nconst c = await three(a)\nconst d = await four()')).toHaveLength(2)
+    expect(found('const a = await one() // note\nconst b = await two()')).toEqual([])
+    expect(found('const a = await one()\nconst b = await two((a) => a)')).toEqual([])
+  })
+
   it('reads only a server fence, and a nested await of the expression stays inside it', () => {
     expect(lints('---\nconst a = await one()\nconst b = await two()\n---\np x').filter(d => d.code === 'serial-awaits')).toEqual([])
     expect(fixed(page('const a = await one()\nconst b = await two(await three())'))).toEqual([page('const [a, b] = await Promise.all([\n  one(),\n  two(await three()),\n])')])

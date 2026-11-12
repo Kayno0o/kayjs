@@ -99,7 +99,13 @@ function report(fence: ParsedFence, run: Step[]): Diagnostic {
   const first = run[0]!.statement
   const last = run.at(-1)!.statement
   const names = run.map(step => step.name)
-  const values = run.map(step => `  ${fence.code.slice(step.awaited.argument.start, step.awaited.argument.end)},`)
+  // A sequence loses the parentheses the parser drops, which would split it into array elements.
+  const values = run.map((step) => {
+    const { argument } = step.awaited
+    const text = fence.code.slice(argument.start, argument.end)
+
+    return `  ${argument.type === 'SequenceExpression' ? `(${text})` : text},`
+  })
   const text = `const [${names.join(', ')}] = await Promise.all([\n${values.join('\n')}\n])`
   const span = fence.shift({ start: first.start, end: last.end })
 
