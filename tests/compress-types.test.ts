@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { compressResponse } from '../src/server/compress'
+import { compressResponse, fixedTexts, wholeResponse } from '../src/server/compress'
 
 const body = 'x'.repeat(2000)
 
@@ -23,25 +23,63 @@ describe('compressResponse types', () => {
 })
 
 describe('compressResponse on HEAD', () => {
-  it('names the encoding and Vary its GET does, with no length, and reads nothing', async () => {
-    const make = () => new Response(body, { headers: { 'content-type': 'text/html', 'content-length': String(body.length) } })
-    const headers = { 'accept-encoding': 'gzip' }
-    const get = (await compressResponse(new Request('http://localhost/x', { headers }), make()))!
-    const source = make()
-    const head = (await compressResponse(new Request('http://localhost/x', { method: 'HEAD', headers }), source))!
+  const html = { 'content-type': 'text/html' }
+  const asked = (accept: string, method = 'GET') => new Request('http://localhost/x', { method, headers: { 'accept-encoding': accept } })
+  // A body that arrives over several ticks, so it is streamed.
+  const streamed = () => new Response(new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      for (let chunk = 0; chunk < 3; chunk++) {
+        await Bun.sleep(5)
+        controller.enqueue(new TextEncoder().encode(body))
+      }
 
-    expect(source.bodyUsed).toBe(false)
-    expect(head.body).toBeNull()
-    expect(head.headers.get('content-length')).toBeNull()
+      controller.close()
+    },
+  }), { headers: html })
 
-    for (const name of ['content-encoding', 'vary', 'content-type'])
-      expect([name, head.headers.get(name)]).toEqual([name, get.headers.get(name)])
+  it('names no encoding where its GET picks one only while compressing, and says Vary', async () => {
+    for (const [accept, sent] of [['zstd', null], ['gzip, br', 'br'], ['gzip', 'gzip']] as const) {
+      const get = (await compressResponse(asked(accept), streamed()))!
+      const source = streamed()
+      const head = (await compressResponse(asked(accept, 'HEAD'), source))!
+
+      expect([accept, get.headers.get('content-encoding')]).toEqual([accept, sent])
+      expect(source.bodyUsed).toBe(false)
+      expect(head.headers.get('content-encoding')).toBeNull()
+      expect(head.headers.get('content-length')).toBeNull()
+      expect(head.headers.get('vary')).toBe('accept-encoding')
+    }
   })
 
-  it('leaves a HEAD alone when its GET would not be compressed, naming Vary', async () => {
-    const small = new Response('tiny', { headers: { 'content-type': 'text/html', 'content-length': '4' } })
+  it('names no encoding for a body whose GET may stay as it is, and keeps Vary', async () => {
+    const make = () => new Response(body, { headers: { ...html, 'content-length': String(body.length) } })
+    const head = (await compressResponse(asked('gzip', 'HEAD'), make()))!
 
-    expect(await compressResponse(new Request('http://localhost/x', { method: 'HEAD', headers: { 'accept-encoding': 'gzip' } }), small)).toBeUndefined()
-    expect(await compressResponse(new Request('http://localhost/x', { method: 'HEAD' }), new Response(body, { headers: { 'content-type': 'text/html', 'content-length': '2000' } }))).toBeUndefined()
+    expect(head.headers.get('content-encoding')).toBeNull()
+    expect(head.headers.get('content-length')).toBeNull()
+    expect(head.headers.get('vary')).toBe('accept-encoding')
+  })
+
+  it('names gzip where a kept copy of the page decides it, as its GET sends', async () => {
+    const texts = fixedTexts([`<style>${'a{color:red}'.repeat(300)}</style>`])
+    const pieces = { strings: ['<html><body>', '</body></html>'], texts }
+    const page = () => wholeResponse(`<html><body>${texts[0]!.bytes.toString()}</body></html>`, { headers: html }, pieces)
+    const before = (await compressResponse(asked('gzip', 'HEAD'), page(), texts))!
+
+    expect(before.headers.get('content-encoding')).toBeNull()
+
+    const get = (await compressResponse(asked('gzip'), page(), texts))!
+
+    expect(get.headers.get('content-encoding')).toBe('gzip')
+    await get.arrayBuffer()
+    // A copy is kept the second time a page is seen.
+    await (await compressResponse(asked('gzip'), page(), texts))!.arrayBuffer()
+
+    const after = (await compressResponse(asked('gzip', 'HEAD'), page(), texts))!
+
+    expect(after.headers.get('content-encoding')).toBe('gzip')
+    expect(after.headers.get('vary')).toBe(get.headers.get('vary'))
+    expect(after.headers.get('content-length')).toBeNull()
+    expect(after.body).toBeNull()
   })
 })

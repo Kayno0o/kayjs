@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeZlib } from './builtins'
+import { forbidsFetch } from './compress-policy'
 import { dictionaryAsked, dictionaryBody, dictionaryBodySync } from './dictionary'
 import { limiter } from './limit'
 
@@ -49,11 +50,7 @@ const VARY_DICTIONARY = /\bavailable-dictionary\b/i
 export const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm|(?:x-)?ndjson)|font\/(?:ttf|otf)|image\/svg\+xml)/i
 // Statuses with no body to compress, or a partial one.
 const BODILESS = new Set([101, 204, 205, 206, 304])
-const CSP_SPACE = /\s+/
-// The verdicts kept for the first policies seen: a site sends one per page settings, and past these, as when a nonce makes each one new, a policy is judged again each time.
-const KEPT_POLICIES = 64
-const KEPT_POLICY_LENGTH = 8192
-const policyVerdicts = new Map<string, boolean>()
+
 const NO_TRANSFORM = /\bno-transform\b/i
 const VARY_ENCODING = /\baccept-encoding\b/i
 
@@ -724,11 +721,17 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   }
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read, or what was read of it before.
-  // A HEAD names the encoding its GET does, with no length, which only the compressed bytes tell: nothing is read or compressed for it.
+  // A HEAD names the encoding its GET sends only where a kept gzip decides it, and has no length: what GET picks otherwise is known once the body is compressed, which a HEAD does not do.
   if (encoding === undefined || request.method === 'HEAD') {
     varyOnEncoding(headers)
 
-    return encoding !== undefined ? new Response(null, { status, statusText: response.statusText, headers: compressedHeaders(headers, encodingName(encoding)) }) : read && new Response(read, { status, statusText: response.statusText, headers })
+    if (request.method === 'HEAD' && encoding !== undefined) {
+      const pieces = splicing(request, response, encoding, fixed) && wholePieces.get(response)
+
+      return new Response(null, { status, statusText: response.statusText, headers: compressedHeaders(headers, pieces && keptPieces(pieces) ? 'gzip' : undefined) })
+    }
+
+    return read && new Response(read, { status, statusText: response.statusText, headers })
   }
 
   if (read)
@@ -738,46 +741,15 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   if (!response.body)
     return undefined
 
-  const splice = typeof encoding === 'string' && fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
-
+  const splice = splicing(request, response, encoding, fixed)
   const pieces = splice ? wholePieces.get(response) : undefined
 
   return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces)
 }
 
-// Whether a response's own policy refuses every fetch, `connect-src` or its fallback `default-src` being `'none'`: the browser could not load a dictionary the page named, and logs a violation for the attempt. Several policies on one header all apply, so one refusing is enough.
-function forbidsFetch(policy: string | null): boolean {
-  if (policy === null)
-    return false
-
-  let verdict = policyVerdicts.get(policy)
-
-  if (verdict === undefined) {
-    verdict = refusesFetch(policy)
-
-    if (policy.length <= KEPT_POLICY_LENGTH && policyVerdicts.size < KEPT_POLICIES)
-      policyVerdicts.set(policy, verdict)
-  }
-
-  return verdict
-}
-
-function refusesFetch(policy: string): boolean {
-  return policy.split(',').some((one) => {
-    const directives = new Map<string, string>()
-
-    for (const directive of one.split(';')) {
-      const [name = '', ...sources] = directive.trim().split(CSP_SPACE).filter(word => word !== '')
-
-      if (name !== '' && !directives.has(name.toLowerCase()))
-        directives.set(name.toLowerCase(), sources.join(' ').toLowerCase())
-    }
-
-    const sources = directives.get('connect-src') ?? directives.get('default-src')
-
-    // An empty source list is the same as `'none'`.
-    return sources === '\'none\'' || sources === ''
-  })
+// The texts a whole page's gzip is spliced from, for a browser taking gzip.
+function splicing(request: Request, response: Response, encoding: Encoding | ServedDictionary, fixed: FixedText[] | undefined): FixedText[] | undefined {
+  return typeof encoding === 'string' && fixed !== undefined && fixed.length > 0 && HTML_TYPE.test(response.headers.get('content-type') ?? '') && preferredEncoding(request.headers.get('accept-encoding'), GZIP_ONLY) !== undefined ? fixed : undefined
 }
 
 function advertise(headers: Headers, { link }: ServedDictionary): void {
@@ -797,11 +769,13 @@ function encodingName(encoding: Encoding | ServedDictionary): Encoding | 'dcz' {
   return typeof encoding === 'string' ? encoding : 'dcz'
 }
 
-function compressedHeaders(headers: Headers, used: Encoding | 'dcz'): Headers {
+function compressedHeaders(headers: Headers, used: Encoding | 'dcz' | undefined): Headers {
   const compressed = new Headers(headers)
   const etag = compressed.get('etag')
 
-  compressed.set('content-encoding', used)
+  if (used !== undefined)
+    compressed.set('content-encoding', used)
+
   compressed.delete('content-length')
 
   // The bytes differ from the uncompressed copy's, so a strong tag no longer holds.

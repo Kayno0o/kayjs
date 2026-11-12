@@ -214,7 +214,7 @@
     "complexity": 59
   },
   "src/server/compress.ts": {
-    "max-lines": 684
+    "max-lines": 666
   },
   "src/server/image.ts": {
     "max-lines-per-function": 194,
