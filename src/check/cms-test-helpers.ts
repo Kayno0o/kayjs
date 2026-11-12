@@ -6,6 +6,7 @@ import { importedName, walk } from './ast'
 import { scan } from './renamed-exports'
 
 const NEEDLE = /\bcmsSign(?:InAs|InWith|Out)\b/
+const LINE_END = /^\r?\n/
 const OPENED = /^\(\s*$/
 const CLOSED = /^\s*\)$/
 const SEPARATED = /^\s*,\s*$/
@@ -90,12 +91,13 @@ export async function cmsTestHelpers(root: string, options: CheckOptions): Promi
         report(base + call.start, base + call.end, `\`${(call.callee as { name: string }).name}\` is deprecated since 1.100: \`cmsTest(site).${method}()\` does it, as \`auth.test(site)\` signs in and out`, HELP, edits)
       }
 
-      for (const statement of imports) {
+      // `cmsTest` is added by the first import alone, so a second one does not import it again.
+      for (const [index, statement] of imports.entries()) {
         const specifiers = statement.specifiers
         const kept = specifiers.filter(specifier => specifier.type !== 'ImportSpecifier' || !(importedName(specifier) in METHODS))
-        const names = [...kept.map(specifier => slice(specifier)), ...testName === undefined ? ['cmsTest'] : []]
+        const names = [...kept.map(specifier => slice(specifier)), ...testName === undefined && index === 0 ? ['cmsTest'] : []]
         // An import left with no name goes, with its line.
-        const gone = names.length === 0 ? [{ start: base + statement.start, end: base + statement.end + (span[statement.end] === '\n' ? 1 : 0), text: '' }] : undefined
+        const gone = names.length === 0 ? [{ start: base + statement.start, end: base + statement.end + (LINE_END.exec(span.slice(statement.end))?.[0].length ?? 0), text: '' }] : undefined
         const edits: Edit[] | null = importFixable && specifiers.length > 0 ? gone ?? [{ start: base + specifiers[0]!.start, end: base + specifiers.at(-1)!.end, text: names.join(', ') }] : null
 
         report(base + statement.start, base + statement.end, 'the sign-in functions of `@kaynooo/kayjs-cms/test` are deprecated since 1.100: `cmsTest(site)` has `signInAs`, `signInWith` and `signOut`', 'import `cmsTest`', edits)

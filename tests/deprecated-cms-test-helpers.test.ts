@@ -82,3 +82,18 @@ describe('deprecated-cms-test-helpers edge cases', () => {
     }
   })
 })
+
+describe('deprecated-cms-test-helpers safe fixes', () => {
+  it('imports cmsTest once for several import statements, and drops an emptied one with its CRLF', async () => {
+    const test = 'import { cmsSignInAs } from \'@kaynooo/kayjs-cms/test\'\r\nimport { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\r\n\r\ncmsSignInAs(site)\r\ncmsSignOut(site)\r\n'
+    const root = await project({ 'tests/a.test.ts': test })
+
+    try {
+      await applySafeFixes(root, await cmsTestHelpers(root, {}))
+      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\r\n\r\ncmsTest(site).signInAs()\r\ncmsTest(site).signOut()\r\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
