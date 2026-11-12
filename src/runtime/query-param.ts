@@ -35,6 +35,10 @@ export function readParam(rules: QueryRules | undefined, name: string, search: U
     return texts[0]
 
   if (rule.type === 'array') {
+    // A blank text is the empty list, as `persisted.query` writes it.
+    if (texts.length === 1 && texts[0] === '')
+      return []
+
     const items = texts.map(text => fromText(rule.items ?? {}, text))
 
     return texts.length === 0 || items.includes(REFUSED) ? leftOut(rule) : items
@@ -84,7 +88,7 @@ const followed = new Set<() => void>()
 // A value outside `values` reads as the param left out.
 // `history: 'push'` adds an entry for each write instead, which Back and Forward step through, the signal following.
 export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T, values?: readonly unknown[], history?: 'push' | 'replace'): Persisted<T> {
-  const stored = () => found<T>(readParam(pageRules(), name, new URL(location.href).searchParams), values)
+  const stored = () => found<T>(readParam(pageRules(), name, new URL(location.href).searchParams), values, fallback)
   const push = history === 'push'
 
   if (typeof document !== 'undefined') {
@@ -102,13 +106,20 @@ export function keepParam<T>(name: string, read: () => T, write: (value: T) => v
   }
 
   return keep<T>({
-    request: scope => found(scope.param(name), values),
+    request: scope => found(scope.param(name), values, fallback),
     stored,
     save: value => saveParam(name, value, fallback, push),
   }, read, write)
 }
 
-function found<T>(value: unknown, values?: readonly unknown[]): Stored<T> {
+// A param with no rule reads as text: a blank one is the empty list of a list signal, and text naming one of the `values` is that value, a number or a boolean.
+function found<T>(value: unknown, values?: readonly unknown[], fallback?: unknown): Stored<T> {
+  if (value === '' && Array.isArray(fallback))
+    value = []
+
+  if (typeof value === 'string' && values && !values.includes(value))
+    value = values.find(given => typeof given !== 'string' && String(given) === value) ?? value
+
   return value === undefined || (values !== undefined && !values.includes(value)) ? { found: false } : { found: true, value: value as T }
 }
 
@@ -195,7 +206,7 @@ function saveParam(name: string, value: unknown, fallback: unknown, push: boolea
 
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
 // A write asking for `history: 'push'` adds an entry instead, with the writes waiting.
-// A list as the param repeated; nothing, blank text or the default leaves it out, so a page left as it was keeps its plain address.
+// A list as the param repeated; the default leaves it out, so a page left as it was keeps its plain address, and an empty value is the param with blank text.
 function flush(): void {
   clearTimeout(timer)
   timer = undefined
@@ -220,9 +231,18 @@ function flush(): void {
 
     url.searchParams.delete(name)
 
-    if (value != null && value !== '' && !defaults.includes(JSON.stringify(value))) {
-      for (const item of Array.isArray(value) ? value as unknown[] : [value])
-        url.searchParams.append(name, String(item))
+    if (value != null && !defaults.includes(JSON.stringify(value))) {
+      const items = Array.isArray(value) ? value as unknown[] : [value]
+
+      // An empty value is written when a default is not empty, so a reload keeps it rather than reading the default back.
+      if (value === '' || items.length === 0) {
+        if (defaults.length > 0)
+          url.searchParams.append(name, '')
+      }
+      else {
+        for (const item of items)
+          url.searchParams.append(name, String(item))
+      }
     }
   }
 
