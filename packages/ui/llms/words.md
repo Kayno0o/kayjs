@@ -46,6 +46,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.chipGroup.*`: `failure` (`Could not load the options`), `loading` (`Loading…`), `required` (`Pick at least one`, said when a required group has none picked), `retry` (`Try again`)
 - `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `empty` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recent` (`Recent`), `results` (`{count} results, `1 result` for one`), `search` (`Found`), `searchError` (`The search failed`), `siteSearchError` (`The pages could not be searched`), `siteSearch` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
+- `ui.confirm.*`: `discard` (`Discard`), `discardMessage` (`What you typed has not been saved.`), `discardTitle` (`Discard changes?`), `keep` (`Keep editing`)
 - `ui.confirmDelete.*`: `cancel` (`Cancel`), `confirm` (`Confirm`), `delete` (`Delete`), `failure` (`Could not delete.`), `pending` (`Deleting…`), `title` (`Confirm Deletion`)
 - `ui.contactForm.*`: `consent` (`I agree that my details are used to answer my message.`), `email` (`Email`), `message` (`Message`), `name` (`Name`), `privacy` (`Privacy policy`), `sent` (`Thank you, your message has been sent.`), `submit` (`Send`)
 - `ui.contributionGraph.*`: `empty` (`No data yet.`), `label` (`Contributions`)

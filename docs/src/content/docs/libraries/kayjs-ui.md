@@ -107,7 +107,7 @@ slot
 
 ### Toaster and tooltips
 
-`ui()` renders one `Toaster` and one `TooltipHost` after every page's layouts. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one. A layout that renders its own, as below, keeps working: only one shows toasts and tooltips, the app's own before the extension's whichever hydrates first.
+`ui()` renders one `Toaster`, one `TooltipHost` and one `ConfirmHost` (which answers `confirm()`) after every page's layouts. Alt and T moves focus to the toasts on screen, and Escape dismisses the focused one. A layout that renders its own, as below, keeps working: only one shows toasts and tooltips, the app's own before the extension's whichever hydrates first.
 
 For a hover explanation of read-only text, such as a stat, write `data-hint="Damage per second"` instead of `data-tooltip`: the host shows it under the pointer only, and `kay check` does not report it as an `unreachable-tooltip`. A hint only adds to what the element already says, as the keyboard and screen readers never reach it.
 
@@ -276,7 +276,7 @@ Your own key wins over the French kayjs-ui ships, and a prop you pass to one com
 
 Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [BareIconButton](/ui/bare-icon-button), [ConfirmDelete](/ui/confirm-delete), [CopyButton](/ui/copy-button), [Menu](/ui/menu), [Toggle](/ui/toggle).
 
-Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [HoverCard](/ui/hover-card), [TooltipHost](/ui/tooltip-host), [Tooltip](/ui/tooltip), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
+Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [HoverCard](/ui/hover-card), [TooltipHost](/ui/tooltip-host), [Tooltip](/ui/tooltip), [Toaster](/ui/toaster), [ConfirmHost](/ui/confirm-host), [CommandPalette](/ui/command-palette).
 
 Forms: [FormField](/ui/form-field), [Form](/ui/form), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [SubscribeForm](/ui/subscribe-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea), [RowsField](/ui/rows-field)
 
@@ -304,7 +304,7 @@ Topics of the kayjs-ui reference the sections above do not link:
 
 - [Setup, settings and testing](/llms/kayjs-ui-setup)
 - [Restyle a component](/llms/kayjs-ui-restyle)
-- [toast and Toaster](/llms/kayjs-ui-toasts)
+- [toast, Toaster and confirm](/llms/kayjs-ui-toasts)
 - [Icons, buttons, dialogs, cards, popovers and stats](/llms/kayjs-ui-basics)
 - [Inputs, selects, editors and forms](/llms/kayjs-ui-forms)
 - [Sliders, pickers, file drops and menus](/llms/kayjs-ui-pickers)

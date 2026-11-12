@@ -1,4 +1,4 @@
-import { onCleanup, onMount, signal } from 'kay'
+import { onCleanup, onMount, signal, untrack } from 'kay'
 
 interface Claimant {
   me: symbol
@@ -7,9 +7,14 @@ interface Claimant {
 }
 
 // The jobs only one mounted component on the page should do, each with the components queued for it.
-const claimants = { toaster: signal<Claimant[]>([]), tooltips: signal<Claimant[]>([]) }
+const claimants = { toaster: signal<Claimant[]>([]), tooltips: signal<Claimant[]>([]), confirms: signal<Claimant[]>([]) }
 
 export type Job = keyof typeof claimants
+
+// Whether any mounted component does `job` right now, for a caller with no component of its own that must know whether anyone will answer it.
+export function claimed(job: Job): boolean {
+  return untrack(claimants[job]).length > 0
+}
 
 // Queues the calling component for `job` while it is mounted, and reads whether it does the job: the first mounted does, the next takes over once it unmounts, and a `fallback` one only does it while no other is mounted, as islands hydrate in no fixed order and the extension's host must not win over the app's own for being quicker. Before any is mounted, as on the server, every one does, so hydration finds the markup it rendered.
 export function claim(job: Job, fallback = false): () => boolean {

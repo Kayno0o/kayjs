@@ -2,8 +2,9 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, listen, onCleanup, persisted, recipe, signal, uid, untrack } from 'kay'
 import IconButton from './icon-button.kay'
+import type { Discard } from './confirm'
 import type { OverlaySize } from './overlay'
-import { closeWatcher, followsHref, leave, renderedOpen, syncOpen } from './overlay'
+import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOpen } from './overlay'
 import { wording } from 'kay/words'
 
 // 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css keeps the docked panel's shadow.
@@ -23,7 +24,7 @@ const look = recipe({
   },
 })
 
-const { open, title, label, heading, level = 2, actions, header, close, dirty = false, autosave = false, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, label, heading, level = 2, actions, header, close, dirty = false, autosave = false, discard, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   // The heading, and the panel's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the panel is then named by that heading's text, or by `label`.
@@ -40,8 +41,10 @@ const { open, title, label, heading, level = 2, actions, header, close, dirty = 
   header?: Snippet
   // The close button in place of the library's own: it closes by `onOpenChange(false)`, or by going to `closeHref`.
   close?: Snippet
-  // Work the panel must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside counts on its own, though Escape still closes a modal with no footer.
+  // Work the panel must not drop, such as a request in flight: a click outside, Escape and the close button leave it open. Typing is not that: it asks first, see `discard`.
   dirty?: boolean | undefined
+  // What a modal panel asks (`confirm()`, `danger`) when Escape, a click outside or the close button would drop typed text: `{ title, message, confirmLabel, cancelLabel }` to word it, `false` to lock the close instead, as before 1.100. Not asked with `autosave`, or while `dirty`.
+  discard?: Discard | undefined
   // Fields inside save as they are typed, so typing does not lock the close: a click outside and Escape close the panel as before anything was typed. `dirty` still locks it.
   autosave?: boolean | undefined
   footer?: Snippet
@@ -88,9 +91,43 @@ const titleId = uid()
 // Set by any typing inside, and cleared however the panel closes or opens.
 const edited = signal(false)
 
+// Typed text a modal panel would lose is asked about first.
+const guarded = () => edited() && modal && !autosave && !dirty && discard !== false
+
 function closed() {
   edited = false
   leave(closeHref, onOpenChange)
+}
+
+// Escape, which the panel hears itself while typed text is at stake.
+function cancelled(event: Event) {
+  if (!guarded())
+    return
+
+  event.preventDefault()
+  void discardAndClose(panel, discard || undefined)
+}
+
+// A click on the backdrop, which the browser leaves alone while the close is guarded.
+// The keydown comes first and stops the browser's own close, which a second Escape with no click or key between would otherwise take for an uncancellable request.
+function pressed(event: KeyboardEvent) {
+  if (event.key === 'Escape')
+    cancelled(event)
+}
+
+function clicked(event: MouseEvent) {
+  if (event.target === panel && guarded())
+    void discardAndClose(panel, discard || undefined)
+}
+
+function leaving() {
+  if (followsHref(closeHref, onOpenChange))
+    return
+
+  if (guarded())
+    void discardAndClose(panel, discard || undefined)
+  else
+    panel?.close()
 }
 
 const docked = () => !modal && dock !== undefined
@@ -328,7 +365,7 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
@@ -351,7 +388,7 @@ dialog(part="root" aria-label={name()} aria-labelledby={name() === undefined && 
         if close
           | {close}
         else
-          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => followsHref(closeHref, onOpenChange) || panel?.close()})
+          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={leaving})
     div(part="body" ref={element => body = element})
       slot
     if footer

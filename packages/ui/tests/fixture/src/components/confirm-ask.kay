@@ -1,0 +1,30 @@
+---
+import { signal } from 'kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import { confirm } from '@kaynooo/kayjs-ui/lib/confirm'
+
+// Every answer `confirm()` gave, and the dialog a dirty guard sits on.
+const answers = signal<string[]>([])
+const open = signal(false)
+const panel = signal(false)
+
+async function ask(tone: 'neutral' | 'danger') {
+  const answer = await confirm({ message: 'Go on?', tone })
+
+  answers = [...answers(), `${tone}:${answer}`]
+}
+---
+output#answers {answers().join(',')}
+button#neutral(onClick={() => ask('neutral')}) Neutral
+button#danger(onClick={() => ask('danger')}) Danger
+button#open(onClick={() => open = true}) Open
+button#open-panel(onClick={() => panel = true}) Panel
+SidePanel#side(open={panel()} title="Side" discard={{ message: 'Lose it?' }} onOpenChange={() => panel = false})
+  @footer
+    button(type="button" onClick={() => panel = false}) Done
+  input#side-field(name="side")
+Dialog#form(open={open()} title="Edit" onOpenChange={() => open = false})
+  @footer
+    button#save(type="button" onClick={() => open = false}) Save
+  input#field(name="field")

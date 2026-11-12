@@ -10,6 +10,9 @@ A refused redirect, a live value or action result that cannot reach the browser,
 ### kayjs-auth mails follow the site's locales
 
 `email.locales` defaults to the site's `i18n.locales` (English only before), so a reader whose language the site serves now gets the mail in it, in kayjs-auth's French or else English texts, and a reader whose language is none of them gets the default locale's mail. Set `email: { locales: ['en'] }` to keep English only.
+### kayjs-ui Dialog and SidePanel ask before dropping typed text
+
+Once something is typed in a modal Dialog or SidePanel, Escape, a click outside and the close button no longer do nothing (with a footer) or close it (without one): they ask "Discard changes?" through `confirm()`. `discard={{ title, message, confirmLabel, cancelLabel }}` words the question, and `discard={false}` keeps the old lock. `autosave` and `dirty` behave as before.
 
 ### kayjs-ui TreeView and Bell items: `key`, `label`, `href`
 

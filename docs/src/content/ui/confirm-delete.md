@@ -8,6 +8,14 @@ description: A delete trigger that asks for confirmation in a dialog before runn
 
 Pass `disabled` while something else is busy, such as a save running. It disables the trigger and the confirm button, and a dialog that is already open stays open until `disabled` is false again.
 
+## From code
+
+`await confirm({ message, title, tone, confirmLabel, cancelLabel })` (see [ConfirmHost](/ui/confirm-host)) asks from a handler and resolves `true` once the reader confirms, `false` on cancel, Escape or a click outside. No component needs mounting: `ui()` renders the `ConfirmHost` that shows it on every page.
+
+The dialog is an `alertdialog`, the focus starts on the cancel button, Escape cancels, and the focus goes back to what held it. `tone="danger"` is the delete preset: `Confirm Deletion` and `Delete` by default, a danger confirm button. ConfirmDelete is that preset with a trigger, a pending state and a toasted failure.
+
+<Demo name="confirm-delete/from-code" />
+
 ## A labelled button
 
 `triggerLook="button"` draws a labelled danger button instead of the icon, and `label` renames it for a delete the reader knows by another name.

@@ -4,6 +4,7 @@ import { effect, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
+import { confirmWords } from './confirm'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 import type { Size } from './size'
@@ -64,11 +65,13 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
 const kind = () => triggerLook ?? 'icon'
 
 const danger = () => tone === 'danger'
-const triggerLabel = () => label ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : wording('ui.confirmDelete.confirm', 'Confirm'))
-const dialogTitle = () => title ?? (danger() ? wording('ui.confirmDelete.title', 'Confirm Deletion') : triggerLabel())
-const confirmText = () => confirmLabel ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : triggerLabel())
-const pendingText = () => pendingLabel ?? (danger() ? wording('ui.confirmDelete.pending', 'Deleting…') : confirmText())
-const look = (): Tone => tone === 'neutral' ? 'accent' : tone
+// The danger preset of `confirm()`: the words and the colours come from the same place.
+const words = () => confirmWords(tone, { label, title, confirmLabel, pendingLabel })
+const triggerLabel = () => words().trigger
+const dialogTitle = () => words().title
+const confirmText = () => words().confirm
+const pendingText = () => words().pending
+const look = () => words().look
 
 const inner = signal(false)
 const isOpen = () => open ?? inner()

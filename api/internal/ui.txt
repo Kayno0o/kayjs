@@ -704,7 +704,10 @@ function linkChoice(root: HTMLElement | null | undefined): void
 function linkInvalid(root: HTMLElement | null | undefined): void
 
 [./lib/claim] claim
-function claim(job: "toaster" | "tooltips", fallback?: boolean): () => boolean
+function claim(job: "confirms" | "toaster" | "tooltips", fallback?: boolean): () => boolean
+
+[./lib/claim] claimed
+function claimed(job: "confirms" | "toaster" | "tooltips"): boolean
 
 [./lib/claim] Job
 type Job = keyof typeof claimants
@@ -733,6 +736,55 @@ function matchingOptions<Value extends string>(options: readonly ComboboxOption<
 
 [./lib/combobox] offersCreate
 function offersCreate(options: readonly ComboboxOption<string>[], text: string): boolean
+
+[./lib/confirm] answer
+function answer(question: Asked, answered: boolean): void
+
+[./lib/confirm] Asked
+interface Asked extends ConfirmOptions
+  cancelLabel?: string | undefined
+  confirmLabel?: string | undefined
+  id: number
+  message: string
+  settle: (answer: boolean) => void
+  title?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/confirm] confirm
+function confirm(options: ConfirmOptions | string): Promise<boolean>
+
+[./lib/confirm] confirmDiscard
+function confirmDiscard(given: Pick<ConfirmOptions, "cancelLabel" | "confirmLabel" | "message" | "title"> | undefined): Promise<boolean>
+
+[./lib/confirm] ConfirmOptions
+interface ConfirmOptions
+  cancelLabel?: string | undefined
+  confirmLabel?: string | undefined
+  message: string
+  title?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/confirm] confirmWords
+function confirmWords<Title = string>(tone: Tone, given: {
+  label?: string | undefined;
+  title?: Title | undefined;
+  confirmLabel?: string | undefined;
+  pendingLabel?: string | undefined;
+  cancelLabel?: string | undefined;
+}): {
+  trigger: string;
+  title: NonNullable<Title> | string;
+  confirm: string;
+  pending: string;
+  cancel: string;
+  look: "accent" | "danger" | "info" | "success" | "warning";
+}
+
+[./lib/confirm] Discard
+type Discard = Pick<ConfirmOptions, 'title' | 'message' | 'confirmLabel' | 'cancelLabel'> | false
+
+[./lib/confirm] questions
+function questions(): Asked[]
 
 [./lib/context] default
 const default: ContextDefinition<{ inbox: boolean; }>
@@ -1315,6 +1367,17 @@ type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOpti
 [./lib/index] ComboboxQuery
 type ComboboxQuery = OptionsQuery
 
+[./lib/index] confirm
+function confirm(options: ConfirmOptions | string): Promise<boolean>
+
+[./lib/index] ConfirmOptions
+interface ConfirmOptions
+  cancelLabel?: string | undefined
+  confirmLabel?: string | undefined
+  message: string
+  title?: string | undefined
+  tone?: Tone | undefined
+
 [./lib/index] ContributionDay
 interface ContributionDay
   day: string
@@ -1335,6 +1398,9 @@ interface DescriptionItem
   key?: string | undefined
   label: string
   value?: number | string | undefined
+
+[./lib/index] Discard
+type Discard = Pick<ConfirmOptions, 'title' | 'message' | 'confirmLabel' | 'cancelLabel'> | false
 
 [./lib/index] dismissToast
 function dismissToast(id: number, reason?: ToastDismissReason): void
@@ -2322,7 +2388,7 @@ function tabOf(href: string | undefined, newTab?: NewTab | undefined): Record<ne
 }
 
 [./lib/overlay] closeWatcher
-function closeWatcher({ modal, docked, dirty, edited, autosave, footer }: CloseWatcherState): "any" | "closerequest" | "none"
+function closeWatcher({ modal, docked, dirty, edited, autosave, footer, guarded }: CloseWatcherState): "any" | "closerequest" | "none"
 
 [./lib/overlay] CloseWatcherState
 interface CloseWatcherState
@@ -2331,7 +2397,11 @@ interface CloseWatcherState
   docked?: boolean | undefined
   edited: boolean
   footer: boolean
+  guarded?: boolean | undefined
   modal: boolean
+
+[./lib/overlay] discardAndClose
+function discardAndClose(dialog: HTMLDialogElement | undefined, discard: Pick<ConfirmOptions, "cancelLabel" | "confirmLabel" | "message" | "title"> | undefined): Promise<void>
 
 [./lib/overlay] followsHref
 function followsHref(closeHref: string | undefined, onOpenChange: unknown): closeHref is string

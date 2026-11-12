@@ -1,4 +1,6 @@
+import type { Discard } from './confirm'
 import { navigate } from 'kay'
+import { confirmDiscard } from './confirm'
 
 // The width every overlay (Dialog, SidePanel, CommandPalette, FormDialog) takes by name: `sm`, `md` (the default), `lg`, or `full`, which fills the window less the margin.
 export type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -16,20 +18,40 @@ export interface CloseWatcherState {
   autosave?: boolean | undefined
   // Whether a footer offers a way to close it.
   footer: boolean
+  // Typed text is asked about before it is dropped: the overlay then hears Escape itself, and a click outside is asked about too.
+  guarded?: boolean | undefined
 }
 
 // What the `closedby` attribute of an overlay says, from its guard: a click outside or Escape, Escape alone, or neither. Typing inside counts on its own unless the overlay `autosave`s, though Escape still closes a modal with no footer.
-export function closeWatcher({ modal, docked = false, dirty, edited, autosave = false, footer }: CloseWatcherState): 'any' | 'closerequest' | 'none' {
+export function closeWatcher({ modal, docked = false, dirty, edited, autosave = false, footer, guarded = false }: CloseWatcherState): 'any' | 'closerequest' | 'none' {
   if (docked || dirty)
     return 'none'
 
-  if (!modal)
+  if (!modal || guarded)
     return 'closerequest'
 
   if (!edited || autosave)
     return 'any'
 
   return footer ? 'none' : 'closerequest'
+}
+
+const asking = new WeakSet<HTMLDialogElement>()
+
+// Asks whether to drop what was typed and closes the overlay once the reader says so; a second request while the question is open is dropped.
+export async function discardAndClose(dialog: HTMLDialogElement | undefined, discard: Exclude<Discard, false> | undefined): Promise<void> {
+  if (dialog === undefined || asking.has(dialog))
+    return
+
+  asking.add(dialog)
+
+  try {
+    if (await confirmDiscard(discard))
+      dialog.close()
+  }
+  finally {
+    asking.delete(dialog)
+  }
 }
 
 // A close link and no handler: the overlay closes by going to the link, on a click and on Escape.

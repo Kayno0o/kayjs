@@ -1,4 +1,4 @@
-# kayjs-ui: toast and Toaster
+# kayjs-ui: toast, Toaster and confirm
 
 ## Common tasks
 
@@ -53,3 +53,18 @@ A call to an API route made with `call()` throws `ApiError`, which `attempt` rea
 What a screen reader hears: a message and its description are read from a polite status region, a danger one from an alert region, and the outcome of a `toast.promise` is always read politely, an error included, as the reader waited for it. A toast changed by `toast.update` is not read again unless its words change in the region.
 
 A toast stays for six seconds, an error for ten, or until its close button is pressed, named by `dismissLabel` on Toaster. Screen readers hear each one from a status region kept in the page, an error from an alert region. Its clock stops while the pointer rests on the toasts or focus is inside them, and goes on with the time it had left once both are gone. `alt+t` (`shortcut` on Toaster, `false` or `null` for none, `hotkey="t"` before 1.97) moves focus to the toasts on screen, where Escape dismisses the focused one. Toaster is a manual popover in the top layer, so toasts show above an open dialog.
+
+## confirm and ConfirmHost
+
+```ts
+import { confirm } from '@kaynooo/kayjs-ui'
+
+if (await confirm({ message: 'Publish to every subscriber?', title: 'Publish', confirmLabel: 'Publish' }))
+  await publish()
+```
+
+- `confirm(options | message)` resolves `true` on confirm, `false` on cancel, Escape or a click outside. `tone` is `neutral` (accent buttons, `Confirm`) by default and `danger` for the delete preset (`Confirm Deletion`, `Delete`, a danger button); `title`, `confirmLabel` and `cancelLabel` replace the words (`ui.confirmDelete.*`). Questions asked together queue.
+- `ui()` mounts one `ConfirmHost` on every page, so an app wires nothing. An app may render `ConfirmHost` itself, in a layout, and its own wins; with no host on the page the browser's `confirm` asks, and on the server it answers `false`.
+- The dialog is an `alertdialog`: the focus starts on the cancel button, Escape cancels, the focus goes back to what held it. `ConfirmHost` takes the other attributes of a Dialog on its root, and the parts `root` and `message`.
+- ConfirmDelete is the danger preset with a trigger, a pending state and a toasted failure; both take their words from the same `confirmWords`.
+- Dialog and SidePanel ask `confirm()` before Escape, a click outside or the close button drops typed text: `discard={{ title, message, confirmLabel, cancelLabel }}` words it (`ui.confirm.discard*`), `discard={false}` keeps the lock, `autosave` and `dirty` skip it.

@@ -58,6 +58,7 @@ export default defineMessages({
       siteSearch: 'Dans les pages',
       siteSearchMore: { one: '{count} autre résultat', other: '{count} autres résultats' },
     },
+    confirm: { discard: 'Abandonner', discardMessage: 'Ce que vous avez saisi n’a pas été enregistré.', discardTitle: 'Abandonner les modifications ?', keep: 'Continuer la saisie' },
     confirmDelete: {
       cancel: 'Annuler',
       confirm: 'Confirmer',

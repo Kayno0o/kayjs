@@ -3,7 +3,8 @@ import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import IconButton from './icon-button.kay'
-import { closeWatcher, followsHref, leave, renderedOpen, syncOpen } from './overlay'
+import type { Discard } from './confirm'
+import { closeWatcher, discardAndClose, followsHref, leave, renderedOpen, syncOpen } from './overlay'
 
 // 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
@@ -27,7 +28,7 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty = false, autosave = false, discard, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   // The heading, and the dialog's name for screen readers. A `@title` block draws markup in its place, such as an icon, a status badge or an emphasised name: the dialog is then named by that heading's text, or by `label`.
@@ -40,8 +41,10 @@ const { open, title, label, heading, level = 2, size = 'md', bare = false, dirty
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   // No inset or scroll on the body, for content that runs to the dialog's edge; the title and footer keep theirs.
   bare?: boolean | undefined
-  // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
+  // Work the dialog must not drop, such as a request in flight: a click outside, Escape and the close button leave it open. Typing is not that: it asks first, see `discard`.
   dirty?: boolean | undefined
+  // What a modal dialog asks (`confirm()`, `danger`) when Escape, a click outside or the close button would drop typed text: `{ title, message, confirmLabel, cancelLabel }` to word it, `false` to lock the close instead, as before 1.100. Not asked with `autosave`, or while `dirty`.
+  discard?: Discard | undefined
   // Fields inside save as they are typed, so typing does not lock the close: a click outside and Escape close the dialog as before anything was typed. `dirty` still locks it.
   autosave?: boolean | undefined
   // `false` shows the dialog over the page without blocking it: the page stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
@@ -79,13 +82,47 @@ effect(() => {
     syncOpen(dialog, shown, modal)
 })
 
+// Typed text a modal dialog would lose is asked about first.
+const guarded = () => edited() && modal && !autosave && !dirty && discard !== false
+
 function closed() {
   edited = false
   leave(closeHref, onOpenChange)
 }
+
+// Escape, which the dialog hears itself while typed text is at stake.
+function cancelled(event: Event) {
+  if (!guarded())
+    return
+
+  event.preventDefault()
+  void discardAndClose(dialog, discard || undefined)
+}
+
+// A click on the backdrop, which the browser leaves alone while the close is guarded.
+// The keydown comes first and stops the browser's own close, which a second Escape with no click or key between would otherwise take for an uncancellable request.
+function pressed(event: KeyboardEvent) {
+  if (event.key === 'Escape')
+    cancelled(event)
+}
+
+function clicked(event: MouseEvent) {
+  if (event.target === dialog && guarded())
+    void discardAndClose(dialog, discard || undefined)
+}
+
+function leaving() {
+  if (followsHref(closeHref, onOpenChange))
+    return
+
+  if (guarded())
+    void discardAndClose(dialog, discard || undefined)
+  else
+    dialog?.close()
+}
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(aria-label={name()} aria-labelledby={name() === undefined && !header ? titleId : undefined} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, autosave, edited: edited(), footer: footer !== undefined, guarded: guarded() })} onInput={() => edited = true} onCancel={event => { rest.onCancel?.(event); cancelled(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClose={closed})
   if open
     header(part="head")
       if header
@@ -105,7 +142,7 @@ dialog(aria-label={name()} aria-labelledby={name() === undefined && !header ? ti
         if close
           | {close}
         else
-          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => followsHref(closeHref, onOpenChange) || dialog?.close()})
+          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={leaving})
     div(part="body" data-bare={bare ? '' : undefined})
       slot
     if footer

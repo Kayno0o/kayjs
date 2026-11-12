@@ -100,6 +100,17 @@ type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOpti
 [.] ComboboxQuery
 type ComboboxQuery = OptionsQuery
 
+[.] confirm
+function confirm(options: ConfirmOptions | string): Promise<boolean>
+
+[.] ConfirmOptions
+interface ConfirmOptions
+  cancelLabel?: string | undefined
+  confirmLabel?: string | undefined
+  message: string
+  title?: string | undefined
+  tone?: Tone | undefined
+
 [.] ContributionDay
 interface ContributionDay
   day: string
@@ -120,6 +131,9 @@ interface DescriptionItem
   key?: string | undefined
   label: string
   value?: number | string | undefined
+
+[.] Discard
+type Discard = Pick<ConfirmOptions, 'title' | 'message' | 'confirmLabel' | 'cancelLabel'> | false
 
 [.] dismissToast
 function dismissToast(id: number, reason?: ToastDismissReason): void
@@ -1274,6 +1288,20 @@ component default
   triggerLook?: "button" | "icon" | "link" | "none" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
 
+[./confirm-host.kay] default
+component default
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined;
+    head?: string | undefined;
+    title?: string | undefined;
+    body?: string | undefined;
+    footer?: string | undefined;
+  };
+  message?: string | undefined;
+}
+  fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
+
 [./contact-form.kay] default
 component default
   action: Action<never, unknown, never>
@@ -1449,14 +1477,14 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: Element }
 
 [./dnd] Bar
 interface Bar
@@ -2612,7 +2640,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2626,7 +2654,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
   | { actions?: Element; autosave?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -2640,7 +2668,7 @@ component default
       root?: string | undefined;
     };
   };
-}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; discard?: Discard | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; label?: string | undefined; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: Element }
 
 [./site-favicon.kay] default
 component default

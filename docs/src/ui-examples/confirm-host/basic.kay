@@ -1,0 +1,16 @@
+---
+import { signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { confirm, toast } from '@kaynooo/kayjs-ui'
+
+const status = signal('Draft')
+
+async function publish() {
+  if (await confirm({ message: 'Publishing sends the post to every subscriber.', title: 'Publish the post', confirmLabel: 'Publish' }))
+    status = 'Published'
+  else
+    toast.info('Still a draft')
+}
+---
+p {status()}
+Button(label="Publish" onClick={publish})

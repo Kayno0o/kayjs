@@ -1,4 +1,5 @@
 ---
+import ConfirmHost from '../confirm-host.kay'
 import Toaster from '../toaster.kay'
 import TooltipHost from '../tooltip-host.kay'
 import './shell.css'
@@ -6,3 +7,4 @@ import './shell.css'
 slot
 Toaster(fallback)
 TooltipHost(fallback)
+ConfirmHost(fallback)

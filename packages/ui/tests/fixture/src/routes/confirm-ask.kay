@@ -1,0 +1,6 @@
+---
+import Ask from '../components/confirm-ask.kay'
+import '../app.css'
+---
+main
+  Ask

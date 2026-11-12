@@ -1,0 +1,50 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal } from 'kay'
+import { claim } from './claim'
+import Button from './button.kay'
+import Dialog from './dialog.kay'
+import { answer, confirmWords, questions } from './confirm'
+import type { Asked } from './confirm'
+
+const { fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'children' | 'role'> & {
+  // For an extension's own host only (the one `ui()` mounts): it gives way to every other ConfirmHost, whichever hydrates first, so an app setting it on its own loses it.
+  fallback?: boolean | undefined
+}>()
+
+// An app's own ConfirmHost outranks the extension's, so one question shows once.
+const owns = claim('confirms', fallback)
+// The question on screen: the next one waits until this one has closed, so its dialog opens afresh and takes the focus again.
+const current = signal<Asked>()
+const idle = signal(true)
+
+effect(() => {
+  const head = questions()[0]
+
+  if (owns() && idle() && current() === undefined && head !== undefined)
+    current = head
+})
+
+function close(question: Asked, answered: boolean) {
+  if (current() !== question)
+    return
+
+  current = undefined
+  idle = false
+  answer(question, answered)
+
+  // A tick for the dialog to close before the next question opens it again.
+  setTimeout(() => {
+    idle = true
+  }, 0)
+}
+
+const words = () => confirmWords(current()?.tone ?? 'neutral', { title: current()?.title, confirmLabel: current()?.confirmLabel, cancelLabel: current()?.cancelLabel })
+---
+if owns()
+  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onOpenChange={() => current() && close(current()!, false)})
+    @footer
+      // The safe button takes the focus, so a stray Enter cancels.
+      Button(label={words().cancel} autofocus onClick={() => current() && close(current()!, false)})
+      Button(label={words().confirm} tone={words().look} onClick={() => current() && close(current()!, true)})
+    p#kui-confirm-message(part="message") {current()?.message}

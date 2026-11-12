@@ -12,11 +12,11 @@ The `@footer` block holds the buttons. The content renders only while the dialog
 
 ## Typed work is kept
 
-Typing inside marks the dialog as edited, so a click outside or Escape no longer closes it and only its own buttons do.
+Typing inside marks the dialog as edited. Escape, a click outside and the close button then ask "Discard changes?" through [`confirm()`](/ui/confirm-delete#from-code), and close the dialog only once the reader says so.
 
 <Demo name="dialog/edited" />
 
-Set `autosave` when the fields save as they are typed: typing then locks nothing, and a click outside or Escape closes the dialog as before anything was typed. `dirty` still locks it.
+`discard` words the question, `{ title, message, confirmLabel, cancelLabel }`, and `discard={false}` locks the close instead: only the dialog's own buttons close it. Set `autosave` when the fields save as they are typed: typing then asks nothing, and a click outside or Escape closes the dialog as before anything was typed. `dirty` still locks it. SidePanel asks the same way.
 
 ## Work in progress
 
