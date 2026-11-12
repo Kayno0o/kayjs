@@ -38,6 +38,7 @@ const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex'
 const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 const FENCE_OPENING = '---'
 const SCRIPT_LABEL = /[ \t]+script\b/y
+const AWAIT = /\bawait\b/
 const TYPEOF_GLOBAL = /\btypeof\s+([a-z_$][\w$]*)/gi
 // What may render differently on the server and in the browser, worth a scope analysis in an island.
 const VARYING_HINT = /\b(?:Date|Math|toLocale\w*|Intl)\b/
@@ -420,7 +421,27 @@ function effectFix(file: KayFile, code: string, read: Read, toSource: (generated
 
   const expression = code.slice(statement.expression.start, statement.expression.end)
 
-  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }] }]
+  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }], ...onlyTouchesGlobal(statement.expression, read.name) && !AWAIT.test(expression) && { safe: true } }]
+}
+
+// A call on the global or an assignment to a member of it (`localStorage.setItem(...)`, `document.title = ...`) leaves nothing for the rest of the script to read, so moving it into an effect changes only that it stops running on the server.
+// A call of a function the script declares, or an assignment to a local, may be what later statements rely on: the wrap is offered but not applied unasked.
+function onlyTouchesGlobal(expression: Node, name: string): boolean {
+  let at: Node = expression.type === 'ChainExpression' ? expression.expression : expression
+
+  if (at.type === 'AssignmentExpression')
+    at = at.left
+  else if (at.type !== 'CallExpression')
+    return false
+
+  while (at.type === 'MemberExpression' || at.type === 'CallExpression' || at.type === 'ChainExpression' || at.type === 'TSNonNullExpression') {
+    if (at.type === 'CallExpression')
+      at = at.callee
+    else
+      at = at.type === 'MemberExpression' ? at.object : at.expression
+  }
+
+  return at.type === 'Identifier' && at.name === name
 }
 
 // `---` or `--- script` becomes `--- client`; a file without a script gets an empty one.

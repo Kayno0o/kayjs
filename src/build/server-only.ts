@@ -14,6 +14,8 @@ import { KAY_FILE } from './files'
 
 // Globals a server has and a browser has not: reading one in a chunk the page loads throws as the chunk evaluates, before anything of it runs.
 const SERVER_ONLY = new Set(['process', 'Bun'])
+// TypeScript nodes wrapping a value rather than spelling a type or declaring a name.
+const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 // Worth parsing a source for at all.
 const MENTIONED = /\b(?:process|Bun)\b/
 // The one read the client build replaces with a literal, so it reaches no chunk.
@@ -92,7 +94,8 @@ export interface LoadTimeRead {
 // What a module reads of the server as it loads, which no tree-shaking drops: the server-only globals `refuseServerOnlyReads` finds.
 // A `.kay` file is read by its script and module fences, the ones the browser runs.
 // A read inside a function is left out: whether it runs depends on what the importer calls, which only the build's own bundle knows.
-export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
+// `names` are the globals to look for: the server-only ones by default, or the browser-only ones a server render reaches.
+export function loadTimeReads(source: string, path: string, names: ReadonlySet<string> = SERVER_ONLY): LoadTimeRead[] {
   const file = KAY_FILE.test(path) ? parseKay(source) : undefined
   const spans = file ? [file.script, file.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
   const syntax = syntaxOf(path)
@@ -101,7 +104,7 @@ export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
   for (const { start, end } of spans) {
     const text = source.slice(start, end)
 
-    if (!MENTIONED.test(text))
+    if (names === SERVER_ONLY ? !MENTIONED.test(text) : !mentionsAny(text, names))
       continue
 
     const program = parsed(text, syntax)
@@ -113,16 +116,22 @@ export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
       Identifier(path) {
         const { name } = path.node
 
-        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.node.type === 'PropertyDefinition' || parent.node.type === 'TSAbstractPropertyDefinition') && !parent.node.static)) !== null)
+        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => (parent.node.type.startsWith('TS') && !TS_EXPRESSIONS.has(parent.node.type)) || (parent.node.type === 'PropertyDefinition' && !parent.node.static)) !== null)
           return
 
-        if (SERVER_ONLY.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, name))
+        if (names.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, name))
           found.push({ name, start: start + path.node.start })
       },
     })
   }
 
   return found
+}
+
+const WORD = /[\w$]+/g
+
+function mentionsAny(text: string, names: ReadonlySet<string>): boolean {
+  return Array.from(text.matchAll(WORD)).some(match => names.has(match[0]))
 }
 
 function namesIn(program: Program): Set<string> {

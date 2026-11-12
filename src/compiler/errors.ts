@@ -163,6 +163,11 @@ export const ERRORS = {
     summary: 'An island importing a module that reaches a Node built-in, which a browser does not have.',
     fix: { file: 'llms/browser-only.md', heading: 'Browser-only components' },
   },
+  'browser-global-at-load': {
+    group: 'build',
+    summary: 'A module a server render imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; `kay check` reports it at the read.',
+    fix: { file: 'llms/browser-only.md', heading: 'Browser globals on the server' },
+  },
   'server-only-in-island': {
     group: 'build',
     summary: 'A chunk a page loads reading `process` or `Bun`, so the island dies as it loads; `kay check` reports it too.',

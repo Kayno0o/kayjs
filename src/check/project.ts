@@ -23,6 +23,7 @@ import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_M
 import { projectPaths } from '../project'
 import { apiTrees } from '../server/api-modules'
 import { bootProblems } from './boot'
+import { browserGlobalAtLoad } from './browser-global-reads'
 import { builtinImportsInIsland } from './builtin-imports'
 import { configLocator, readConfigSource } from './config-keys'
 import { dockerfileProblems } from './dockerfile'
@@ -178,6 +179,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
     }),
     ...onceRead.flatMap(file => report(file, componentTexts.get(file)!, onceReadChecks(componentTexts.get(file)!))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
+    ...await browserGlobalAtLoad(root, componentTexts),
     ...await builtinImportsInIsland(root, browser?.seeds ?? islands, browser?.edges ?? islandEdges(islands, componentTexts, api), api),
   ]
 

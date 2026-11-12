@@ -5,6 +5,8 @@ import { recordOf } from './request-record'
 import { RequestTimeoutError } from './request-timeout'
 import { Denied, NotFound } from './signals'
 
+const named = new WeakSet<Error>()
+
 export function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   if (error instanceof NotFound)
     return { status: 404, message: 'Not Found' }
@@ -21,6 +23,20 @@ export function calmDeadline(ctx: RequestContext): void {
 
   recordOf(request)?.deadline?.stop()
   Object.defineProperty(ctx, 'signal', { get: () => request.signal, configurable: true })
+}
+
+// A server render failing on a browser-only global says which one, the component and line reading it and the ways out in the error's own message, so the log, `onError` and the development page all carry it, whatever the mode; only a failure pays for the source maps it reads.
+export function nameBrowserRead(error: unknown): void {
+  if (!(error instanceof Error) || named.has(error))
+    return
+
+  const stack = mappedStack(error)
+  const hint = stack === undefined ? undefined : browserOnlyHint(error, stack)
+
+  if (hint !== undefined && hint !== '') {
+    named.add(error)
+    error.message = hint
+  }
 }
 
 export function describeError(error: unknown, dev = false): PageError {

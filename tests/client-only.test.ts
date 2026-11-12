@@ -304,6 +304,20 @@ describe('browser-only globals read while rendering', () => {
     ])
   })
 
+  it('marks the `effect` wrap safe only for a statement that is a call on the global or an assignment to a member of it', () => {
+    const safe = (statement: string) => compileKay(`---\nlet seen = 0\nconst later = () => 1\n${statement}\n---\np {seen} {later()}\n`, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.flatMap(diagnostic => diagnostic.fixes ?? []).filter(fix => fix.title.startsWith('Read')).map(fix => fix.safe === true)
+
+    expect(safe('localStorage.setItem(\'seen\', \'1\')')).toEqual([true])
+    expect(safe('document.title = \'Home\'')).toEqual([true])
+    expect(safe('document.body.classList.add(\'js\')')).toEqual([true])
+    expect(safe('window.matchMedia(\'(min-width: 1px)\')?.addEventListener(\'change\', later)')).toEqual([true])
+    // A local the rest of the script reads, a function of the script, an awaited value and a read in a declaration's value are offered, never applied unasked.
+    expect(safe('seen = window.innerWidth')).toEqual([false])
+    expect(safe('later(window.innerWidth)')).toEqual([false])
+    expect(safe('await window.fetchLater()')).toEqual([false])
+    expect(safe('const width = window.innerWidth')).toEqual([])
+  })
+
   it('follows a read through functions nested several levels, only while each one runs as the component renders', () => {
     const source = '---\nimport { memo } from \'kay\'\n\nconst a = () => (() => (() => document.title)())()\nconst b = () => memo(() => (() => window.name)())\nconst c = () => () => () => localStorage.length\nconst d = () => { const inner = () => sessionStorage.length; return inner }\n---\np {a()} {b()} {c()} {d()}\n'
 

@@ -207,6 +207,7 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `allow-refused` | compile | A `// kay-allow` or `// kay-allow-file` comment that `lints.comments` refuses: no ` -- reason`, or any `kay-allow-file`. It allows nothing. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node or Bun built-in a browser build refuses, such as `async_hooks` or `bun:sqlite`; `kay check` reports it too. | [Browser-only components](/essentials/islands) |
+| `browser-global-at-load` | build | A module a server render imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; `kay check` reports it at the read. | [Browser globals on the server](/essentials/islands) |
 | `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, so the island dies as it loads; `kay check` reports it too. | [Browser globals on the server](/essentials/islands) |
 | `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](/guides/content) |
 | `worker-build` | build | A worker that fails to build, or starts itself again through other workers. | [Wasm and workers](/essentials/styling-and-assets) |

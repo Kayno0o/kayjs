@@ -4,6 +4,7 @@ import { errorCodeOf } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
+import { nameBrowserRead } from './page-error'
 import { judgingReads, RequestReadError } from './request-read'
 import { requestRecord } from './request-record'
 
@@ -31,6 +32,8 @@ export function reportServerError(error: unknown, request: Request, onError: Obs
     seen.add(error)
   else
     record.reported = new Set([error])
+
+  nameBrowserRead(error)
 
   // A read of what a request holds, met while the build renders a page once, is for the build to judge: it is no failure of a request.
   if (error instanceof RequestReadError && onError && judgingReads.has(onError)) {
