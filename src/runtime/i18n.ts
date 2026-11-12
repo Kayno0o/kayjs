@@ -110,8 +110,8 @@ const PATH_END = /[?#]/
 const LEADING_SLASHES = /^[/\\]{2,}/
 const SEGMENT_END = /[/?#]/
 const OPTIONAL_MARK = /\?$/
-// Each unit with its length in seconds, a relative time taking the largest one the span reaches.
-const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3600], ['minute', 60], ['second', 1]]
+// Each unit with its length in seconds, a relative time taking the largest one the span reaches, and the rounded count at which it reads as the unit above instead (60 minutes are an hour); weeks keep their 4, as a month is 30 days.
+const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number, number][] = [['year', 31_536_000, Infinity], ['month', 2_592_000, 12], ['week', 604_800, Infinity], ['day', 86_400, 7], ['hour', 3600, 24], ['minute', 60, 60], ['second', 1, 60]]
 
 export type Direction = 'ltr' | 'rtl'
 
@@ -269,10 +269,13 @@ export function formatNumber(page: string, value: number, given?: NumberFormatOp
   return cached(numberFormats, `${locale}\n${options === undefined ? '' : JSON.stringify(options)}`, () => new Intl.NumberFormat(locale, options)).format(value)
 }
 
+// What picks the parts of a date; options naming none of them, an empty object or a lone `timeZone`, get the medium date as no options do.
+const DATE_FIELDS = new Set(['dateStyle', 'timeStyle', 'weekday', 'era', 'year', 'month', 'day', 'dayPeriod', 'hour', 'minute', 'second', 'fractionalSecondDigits', 'timeZoneName'])
+
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
 export function formatDate(page: string, value: Date | number, given: DateFormatOptions = { dateStyle: 'medium' }): string {
   const [locale, named] = withLocale(page, given)
-  const base: Intl.DateTimeFormatOptions = named !== given && Object.keys(named!).length === 0 ? { dateStyle: 'medium' } : named!
+  const base: Intl.DateTimeFormatOptions = Object.keys(named!).some(key => DATE_FIELDS.has(key)) ? named! : { ...named, dateStyle: 'medium' }
   const options = siteZone === undefined || base.timeZone !== undefined ? base : { ...base, timeZone: siteZone }
 
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)
@@ -328,7 +331,10 @@ export function formatRelativeTime(page: string, value: Date | number, unitOrOpt
     return formatter.format(Number(value), unitOrOptions)
 
   const seconds = (Number(value) - Number(now ?? Date.now())) / 1000
-  const [unit, length] = RELATIVE_UNITS.find(([, length]) => Math.abs(seconds) >= length) ?? ['second', 1]
+  const reached = RELATIVE_UNITS.findIndex(([, length]) => Math.abs(seconds) >= length)
+  const at = reached === -1 ? RELATIVE_UNITS.length - 1 : reached
+  // A count that rounds up to the unit above is written in that one, so 3599 seconds read `in 1 hour`, not `in 60 minutes`.
+  const [unit, length] = RELATIVE_UNITS[at > 0 && Math.round(Math.abs(seconds) / RELATIVE_UNITS[at]![1]) >= RELATIVE_UNITS[at]![2] ? at - 1 : at]!
 
   // Rounded alike either side of now, so a day and a half reads `2 days ago` as it reads `in 2 days`.
   return formatter.format(Math.sign(seconds) * Math.round(Math.abs(seconds) / length), unit)

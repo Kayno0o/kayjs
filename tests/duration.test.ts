@@ -63,6 +63,13 @@ describe('duration words', () => {
     expect((['86400s', '7d', '3600s', '90m', '900s', '45s', '172801s'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '172,801 seconds'])
   })
 
+  it('picks the unit of a fractional duration as it does of the same time written whole', () => {
+    expect(wholeSeconds('1.1h', 'x')).toBe(3960)
+    expect(wholeSeconds('1.4d', 'x')).toBe(120_960)
+    expect(wholeSeconds('0.0004s', 'x')).toBe(1)
+    expect((['1.1h', '1.4d', '0.3h', '1.7h'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['66 minutes', '2,016 minutes', '18 minutes', '102 minutes'])
+  })
+
   it('takes a duration with its unit', () => {
     expect((['24h', '7d', '1h', '90m', '15m', '45s', '1500ms'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '1.5 seconds'])
   })

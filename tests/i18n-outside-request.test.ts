@@ -6,6 +6,19 @@ afterEach(() => {
   setSiteLocale('en')
 })
 
+describe('relative times at the edge of a unit', () => {
+  const now = Date.UTC(2026, 5, 1, 12)
+  const at = (seconds: number) => formatRelativeTime(now + seconds * 1000, { now, locale: 'en' })
+
+  it('write the rounded count in the unit above when it reaches one', () => {
+    expect([59.6, 3599, 86_399, 604_799, 31_535_999, -3599, -86_399].map(at)).toEqual(['in 1 minute', 'in 1 hour', 'tomorrow', 'next week', 'next year', '1 hour ago', 'yesterday'])
+  })
+
+  it('keep a count that stays under it', () => {
+    expect([29, 59.4, 3569, 82_000, 540_000, 2_000_000, 28_000_000].map(at)).toEqual(['in 29 seconds', 'in 59 seconds', 'in 59 minutes', 'in 23 hours', 'in 6 days', 'in 3 weeks', 'in 11 months'])
+  })
+})
+
 describe('the formatters outside a request', () => {
   it('format in English when the site names no locale', () => {
     expect(formatNumber(1234.5)).toBe('1,234.5')
@@ -51,12 +64,14 @@ describe('the formatters outside a request', () => {
     expect(formatNumber(1234.5, { locale: 'de' })).toBe('1.234,5')
   })
 
-  it('keep the medium date for a locale alone or left undefined, and the plain one for empty options', () => {
+  it('keep the medium date for a locale alone, left undefined or empty options, and for options naming no part of the date', () => {
     const date = Date.UTC(2024, 0, 5, 12)
 
     expect(formatDate(date, { locale: undefined })).toBe('Jan 5, 2024')
     expect(formatDate(date, { locale: 'fr' })).toBe('5 janv. 2024')
-    expect(formatDate(date, {})).toBe(new Intl.DateTimeFormat('en', {}).format(date))
+    expect(formatDate(date, {})).toBe('Jan 5, 2024')
+    expect(formatDate(date, { timeZone: 'UTC' })).toBe('Jan 5, 2024')
+    expect(formatDate(date, { year: 'numeric' })).toBe('2024')
     expect(formatRelativeTime(-2, 'day', { locale: 'fr', numeric: 'always' })).toBe('il y a 2 jours')
   })
 })

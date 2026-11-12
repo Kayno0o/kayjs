@@ -128,6 +128,15 @@ describe('sizeText', () => {
     expect(sizeText(1.5 * 1024 * 1024, 'fr')).toMatch(/^1,5\sMo$/)
     expect(sizeText(200, 'fr')).toMatch(/^200\soctets$/)
   })
+
+  it('moves a size that rounds to 1024 KB up to a megabyte, as formatBytes does', () => {
+    expect(sizeText(1_048_575)).toBe('1 MB')
+    expect(sizeText(1_048_575 - 511)).toBe('1 MB')
+    expect(sizeText(1_048_575 - 512)).toBe('1023 KB')
+    expect(sizeText(1_048_575, 'fr')).toMatch(/^1\sMo$/)
+    expect(sizeText(1_048_575, 'en-GB')).toBe('1 MB')
+    expect(sizeText(1_048_575 - 512, 'fr')).toMatch(/^1\s023\sko$/)
+  })
 })
 
 describe('the offline page', () => {

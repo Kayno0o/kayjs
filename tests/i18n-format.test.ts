@@ -53,7 +53,7 @@ describe('the site time zone', () => {
     expect(formatDate(LATE, { dateStyle: 'short', timeStyle: 'short' })).toBe('1/6/24, 8:30 AM')
     expect(formatDate(LATE)).toBe('Jan 6, 2024')
     expect(formatDate(LATE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'UTC' })).toBe('1/5/24, 11:30 PM')
-    expect(formatDate(LATE, {})).toBe(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Tokyo' }).format(LATE))
+    expect(formatDate(LATE, {})).toBe('Jan 6, 2024')
   })
 
   it('goes to the browser with the first script of a page, even on a site without i18n', () => {
