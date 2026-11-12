@@ -25,7 +25,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], shortcut?: string | false | null, hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> } = {}) {
+async function palette(props: { recent?: string[], shortcut?: string | false | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> } = {}) {
   mounted = await mountComponent(Palette, {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -83,8 +83,8 @@ describe('CommandPalette', () => {
     expect(targets.filter(([label]) => label !== 'Docs').every(([, target, rel, marked]) => target === null && rel === null && marked === false)).toBe(true)
   })
 
-  test('matches its hotkey whatever its case', async () => {
-    const { dialog } = await palette({ hotkey: 'P' })
+  test('matches its shortcut whatever its case', async () => {
+    const { dialog } = await palette({ shortcut: 'mod+P' })
 
     press(window, 'p', { ctrlKey: true })
     await settle()
@@ -106,21 +106,13 @@ describe('CommandPalette', () => {
     expect(dialog.open).toBe(true)
   })
 
-  test('opens on Ctrl or Cmd with K by default, and `shortcut` wins over the deprecated `hotkey`', async () => {
-    const { dialog } = await palette({ shortcut: 'mod+j', hotkey: 'p' })
-
-    press(window, 'p', { ctrlKey: true })
-    await settle()
-
-    expect(dialog.open).toBe(false)
-    mounted!.unmount()
-
-    const other = await palette()
+  test('opens on Ctrl or Cmd with K by default', async () => {
+    const { dialog } = await palette()
 
     press(window, 'k', { ctrlKey: true })
     await settle()
 
-    expect(other.dialog.open).toBe(true)
+    expect(dialog.open).toBe(true)
   })
 
   test('`false` and `null` leave opening to the app', async () => {
@@ -135,8 +127,8 @@ describe('CommandPalette', () => {
     }
   })
 
-  test('leaves opening to the app without a hotkey, and puts recently followed links on top', async () => {
-    const { dialog } = await palette({ recent: ['/content', '/gone'], hotkey: null })
+  test('leaves opening to the app without a shortcut, and puts recently followed links on top', async () => {
+    const { dialog } = await palette({ recent: ['/content', '/gone'], shortcut: null })
 
     press(window, 'k', { ctrlKey: true })
     await settle()

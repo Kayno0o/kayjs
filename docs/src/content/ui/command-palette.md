@@ -32,8 +32,7 @@ It is called once typing pauses, and its rows are listed under `searchLabel` (`F
 
 ## Opening it
 
-Cmd on macOS and Ctrl elsewhere with `shortcut` (`mod+k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `shortcut={false}` or `{null}` to leave opening to your app. `hotkey="k"` still works, and `kay upgrade` rewrites it.
-
+Cmd on macOS and Ctrl elsewhere with `shortcut` (`mod+k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `shortcut={false}` or `{null}` to leave opening to your app.
 <Demo name="command-palette/hotkey" />
 
 ## Recent links

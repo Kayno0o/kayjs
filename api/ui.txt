@@ -1227,7 +1227,6 @@ component default
   emptyLabel?: string | undefined
   entries: PaletteEntry[]
   groups?: string[] | undefined
-  hotkey?: null | string | undefined
   label?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   onRecentChange?: ((recent: string[]) => unknown) | undefined
@@ -3153,7 +3152,6 @@ component default
 }
   dismissLabel?: string | undefined
   fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
-  hotkey?: null | string | undefined
   limit?: number | undefined
   position?: "bottom-center" | "bottom-left" | "bottom-right" | "top-center" | "top-left" | "top-right" | undefined
   shortcut?: false | null | string | undefined

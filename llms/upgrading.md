@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.101.0
 
+### The `hotkey` of Toaster and CommandPalette 1.97 deprecated is gone
+
+`deprecated-ui-hotkey` goes with it: run `kay upgrade` on 1.100 first. `hotkey` is ignored now, so a Toaster or CommandPalette that still has one loses its key: `hotkey="j"` is `shortcut="alt+j"` on a Toaster and `shortcut="mod+j"` on a CommandPalette, and `hotkey={null}` is `shortcut={null}`.
+
 ### The `template-invalid` error code is split by problem
 
 `kay check --format json`, `kay build --format json` and the `code` of a thrown compile error no longer say `template-invalid`: each problem has its own code, `head-invalid`, `slot-invalid`, `duplicate-attribute`, `attribute-invalid`, `attribute-ineffective`, `element-invalid`, `part-invalid`, `form-misuse`, `server-island-invalid`, `fallback-invalid`, `bind-misuse` or `event-name`. A template `const` or snippet named like a name already declared is `name-clash` (it was `signal-misuse`). Messages that the old code covered and a fence rule fits better moved to `fence-invalid` (a name imported twice in the two fences, type parameters, a recipe or props on a page, `ctx` read in an island), `part-invalid` (the `class` prop or recipe of a component with parts) and `page-settings-invalid` (a `query` outside a page or a layout). Match on the new codes, or on the `compile` group; `kay explain <code>` says what each covers, and no `// kay-allow` comment reaches any of them, as before.
@@ -142,10 +146,6 @@ A run whose input, events no wait named and kept results (their text) pass 2,000
 - `organizations.members(ref)` gives `user.email` as `null` for every other member when the caller does not hold the `manage` role of the organizations options: a page listing members by email shows their username, or whatever the app keeps, instead.
 - `email-change-requested` is a new notice kind (`SecurityEvent`) mailed to the address an account is leaving when `email.change` sends its link, and a new event for `onEvent`: an app with its own `templates`, or a mailer switching on `mail.kind` exhaustively, handles it or falls back to the built-in.
 - `forwardAuth`'s `/forward` route now applies `twoFactor.require`: a user it names without two-factor is sent to the security page (a 403 without the prebuilt pages), where only `requireTwoFactor` did so before. Passing `requireTwoFactor` with a passkey sign-in no longer sends the user to set up an authenticator.
-
-### Toaster and CommandPalette take `shortcut`, not `hotkey`
-
-`shortcut` is the full chord, as SaveForm's already is: `shortcut="alt+t"` on a Toaster (its default) and `shortcut="mod+k"` on a CommandPalette (its default), `false` or `null` turning it off on all three. `hotkey="j"` keeps working for three minors; `deprecated-ui-hotkey` rewrites it to `shortcut="alt+j"` or `shortcut="mod+j"` in `kay upgrade`.
 
 ### A `role="group"` is marked `data-invalid`, not `aria-invalid`
 

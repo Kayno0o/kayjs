@@ -231,18 +231,6 @@ test('a Toaster takes the full chord of `shortcut`, and alt+t no longer moves th
   expect(document.activeElement?.closest('.kui-toast')).not.toBeNull()
 })
 
-test('a Toaster keeps the deprecated `hotkey` working beside Alt, and `shortcut` wins over it', async () => {
-  await keyed({ hotkey: 'j' })
-
-  expect(pressed('j', { altKey: true }).defaultPrevented).toBe(true)
-  mounted!.unmount()
-
-  await keyed({ hotkey: 'j', shortcut: 'alt+m' })
-
-  expect(pressed('j', { altKey: true }).defaultPrevented).toBe(false)
-  expect(pressed('m', { altKey: true }).defaultPrevented).toBe(true)
-})
-
 test('`false` and `null` turn the Toaster\'s key off', async () => {
   for (const off of [false, null]) {
     await keyed({ shortcut: off })

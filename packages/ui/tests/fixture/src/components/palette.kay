@@ -3,7 +3,7 @@ import type { PaletteEntry } from '@kaynooo/kayjs-ui'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 
 // What the test reads back: each change of the palette's state, and each action run.
-const { onOpenChange, onRecentChange, onAction, recent = [], shortcut, hotkey, siteSearch = false, hostile = false, loose = false, search } = props<{ onOpenChange: (open: boolean) => void, onRecentChange: (recent: string[]) => void, onAction: (name: string) => void, recent?: string[], shortcut?: string | false | null, hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> }>()
+const { onOpenChange, onRecentChange, onAction, recent = [], shortcut, siteSearch = false, hostile = false, loose = false, search } = props<{ onOpenChange: (open: boolean) => void, onRecentChange: (recent: string[]) => void, onAction: (name: string) => void, recent?: string[], shortcut?: string | false | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> }>()
 
 const entries: PaletteEntry[] = [
   { label: 'Table', group: 'Pages', href: '/table' },
@@ -14,6 +14,5 @@ const entries: PaletteEntry[] = [
   { label: 'New moon', group: 'Actions', icon: 'plus', shortcut: 'Ctrl+N', onSelect: () => onAction('new-moon') },
 ]
 ---
-// kay-allow deprecated-ui-hotkey: the deprecated alias is what this fixture tests
-CommandPalette(entries={entries} groups={['Actions', 'Pages']} recent={recent} shortcut={shortcut} hotkey={hotkey} onOpenChange={onOpenChange} onRecentChange={onRecentChange} siteSearch={siteSearch} search={search})
+CommandPalette(entries={entries} groups={['Actions', 'Pages']} recent={recent} shortcut={shortcut} onOpenChange={onOpenChange} onRecentChange={onRecentChange} siteSearch={siteSearch} search={search})
 input#outside(aria-label="Outside")

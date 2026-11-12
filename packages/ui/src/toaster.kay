@@ -41,13 +41,11 @@ const look = recipe({
   defaults: { position: 'bottom-right' },
 })
 
-const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), shortcut: keys, hotkey, position = 'bottom-right', limit, toast, fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
+const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), shortcut: keys, position = 'bottom-right', limit, toast, fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
   // The keys that move focus to the toasts on screen, where Escape dismisses the focused one, `alt+t` by default; `false` or `null` leaves it to the app. Written as kay's `shortcut` takes them.
   shortcut?: string | false | null | undefined
-  // Deprecated: the key that, with Alt, does the same as `shortcut`; `shortcut="alt+j"` for `hotkey="j"`.
-  hotkey?: string | null | undefined
 
   // At most this many toasts are shown, the newest; the older ones wait their turn with their clocks running, and show again as room is made.
   limit?: number | undefined
@@ -101,7 +99,7 @@ function focused(event: FocusEvent) {
   holdToasts('focus', true)
 }
 
-shortcut(() => keys === undefined ? (hotkey === undefined ? 'alt+t' : hotkey && `alt+${hotkey}`) || null : keys || null, (event) => {
+shortcut(() => keys === undefined ? 'alt+t' : keys || null, (event) => {
   const button = owns() ? toaster()?.querySelector<HTMLElement>('button:not(:disabled)') : null
 
   if (!button)

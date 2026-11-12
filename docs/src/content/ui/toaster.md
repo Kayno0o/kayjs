@@ -62,6 +62,5 @@ To keep what a refusal carries instead of its words, such as the output of a com
 
 `dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.
 
-`shortcut` is the keys that move the focus to the first toast's first button, its action when it has one, `alt+t` by default, written as kay's `shortcut` takes them. Pass `shortcut={false}` or `{null}` to turn it off. `hotkey="t"`, the key beside Alt, still works and `kay upgrade` rewrites it.
-
+`shortcut` is the keys that move the focus to the first toast's first button, its action when it has one, `alt+t` by default, written as kay's `shortcut` takes them. Pass `shortcut={false}` or `{null}` to turn it off.
 Other attributes, such as a `data-testid` or an `aria-label`, go on the toast stack's element.

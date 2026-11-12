@@ -61,7 +61,6 @@ import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
-import { uiHotkey } from './ui-hotkey'
 import { uiItemKeys, uiItems } from './ui-items'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
@@ -162,7 +161,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
-  async ({ root, options }) => uiHotkey(root, options),
   async ({ root, options }) => uiItems(root, options),
   async ({ root, options }) => uiItemKeys(root, options),
   async ({ root, options }) => scheduleTz(root, options),
