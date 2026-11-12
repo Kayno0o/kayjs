@@ -4090,6 +4090,51 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports unkeyed rows only where islands match them, and judges the row type of nullable, union, any and optional-id lists', async () => {
+    const types = [
+      '---',
+      'import { signal } from \'kay\'',
+      'const maybe = signal<{ slug: string }[] | null>(null)',
+      'const mixed = signal<({ id: number } | { id: number, extra: string })[]>([])',
+      'const loose = signal<any[]>([])',
+      'const optional = signal<{ id?: number, t: string }[]>([])',
+      'const flagged = signal<{ slug: string }[] | false>(false)',
+      '---',
+      'ul',
+      '  for a of maybe()',
+      '    li {a.slug}',
+      '  for b of mixed()',
+      '    li {b.id}',
+      '  for c of loose()',
+      '    li {c.x}',
+      '  for d of optional()',
+      '    li {d.t}',
+      '  for e of flagged()',
+      '    li {e.slug}',
+      'button(onClick={() => maybe = []}) Go',
+      '',
+    ].join('\n')
+    const rows = '---\nconst { rows } = props<{ rows: { text: string }[] }>()\n---\nfor row of rows\n  p {row.text}\n'
+    const root = await scratchProject({
+      'src/components/types.kay': types,
+      // Imported by an island only: its loop matches rows in the browser.
+      'src/components/inner.kay': rows,
+      'src/components/outer.kay': '---\nimport { signal } from \'kay\'\nimport Inner from \'./inner.kay\'\n\nconst list = signal([{ text: \'a\' }])\n---\nInner(rows={list()})\nbutton(onClick={() => list = []}) Clear\n',
+      // Imported by a page too: it may only ever render on the server, so it stays silent.
+      'src/components/shared.kay': rows,
+      'src/routes/index.kay': '---\nimport Outer from \'../components/outer.kay\'\nimport Shared from \'../components/shared.kay\'\nimport Types from \'../components/types.kay\'\n---\nOuter\nTypes\nShared(rows={[{ text: \'a\' }]})\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'unkeyed-rows')
+
+      expect(found.map(d => [basename(d.file), d.line]).toSorted()).toEqual([['inner.kay', 4], ['types.kay', 10], ['types.kay', 18]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports the flat checks of an action as a type error, now that they are gone', async () => {
     const root = await scratchProject({
       'src/actions.ts': 'import { action } from \'kay\'\n\nexport const a = action(async () => 1, { rateLimit: { max: 5, window: \'1m\' } })\nexport const b = action(async () => 1, { protect: { rateLimit: { max: 5, window: \'1m\' } } })\n',
