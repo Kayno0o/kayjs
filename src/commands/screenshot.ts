@@ -16,10 +16,10 @@ export const screenshotCommand: Command = {
   options: { 'width': { type: 'string', multiple: true }, 'height': { type: 'string' }, 'scheme': { type: 'string' }, 'full-page': { type: 'boolean' }, 'cookie': { type: 'string', multiple: true }, 'format': { type: 'string' } },
   positionals: 2,
   run: async ({ values, positionals: [path, dir] }, refuse) => {
-    const format = formatOption('screenshot', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (path === undefined)
       return refuse('kay screenshot takes the path of the page, such as /about')

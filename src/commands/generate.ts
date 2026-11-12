@@ -8,13 +8,13 @@ export const generateCommand: Command = {
   options: { 'dir': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'plural': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: [kind, name, ...rest] }, refuse) => {
-    const format = formatOption('generate', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (kind === undefined || name === undefined)
       return refuse()
 
     if (format === undefined)
-      return 1
+      return 2
 
     // A resource takes every argument after its name as a field, the project folder being `--dir`; every other kind takes the folder as its one argument or `--dir`, the cwd otherwise.
     const fields = kind === 'resource' ? rest : []

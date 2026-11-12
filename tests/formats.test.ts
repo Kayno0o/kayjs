@@ -52,10 +52,39 @@ describe('--format', () => {
     const built = await kay(['build', '.', '--format', 'yaml'])
     const listed = await kay(['routes', '--format', 'github'])
 
-    expect([built.code, built.stdout]).toEqual([1, ''])
-    expect(built.stderr).toBe('kay build: --format takes `text`, `github`, `json`, not `yaml`\n')
-    expect([listed.code, listed.stdout]).toEqual([1, ''])
-    expect(listed.stderr).toBe('kay routes: --format takes `text`, `json`, not `github`\n')
+    expect([built.code, built.stdout]).toEqual([2, ''])
+    expect(built.stderr).toBe('error: kay build: --format takes `text`, `github`, `json`, not `yaml`\n  hint: run kay build --help for its options\n')
+    expect([listed.code, listed.stdout]).toEqual([2, ''])
+    expect(listed.stderr).toBe('error: kay routes: --format takes `text`, `json`, not `github`\n  hint: run kay routes --help for its options\n')
+  })
+
+  // The command as it is named in the error, and the arguments that reach its --format.
+  it.each([
+    ['check', ''],
+    ['upgrade', ''],
+    ['fmt', ''],
+    ['env', ''],
+    ['docs', ''],
+    ['explain', ''],
+    ['types', ''],
+    ['migrate astro', ''],
+    ['doctor', ''],
+    ['a11y', ''],
+    ['not-found', ''],
+    ['i18n missing', ''],
+    ['i18n accept', 'fr'],
+    ['generate', 'page x'],
+    ['add', 'tailwind'],
+    ['new', 'x'],
+    ['render', '/'],
+    ['screenshot', ''],
+    ['editor install', ''],
+  ])('is a usage error in kay %s: exit 2, an error line and a hint', async (command, args) => {
+    const { code, stdout, stderr } = await kay([...command.split(' '), ...args.split(' ').filter(word => word !== ''), '--format', 'bad'])
+
+    expect([code, stdout]).toEqual([2, ''])
+    expect(stderr).toStartWith(`error: kay ${command}: --format takes `)
+    expect(stderr).toContain(`\n  hint: run kay ${command} --help for its options\n`)
   })
 
   it('answers a directory that is none with one error document', async () => {

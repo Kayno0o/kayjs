@@ -16,11 +16,11 @@ export const explain: Command = {
   usage: 'explain [lint|error|group|island [file]] [--format text|json]',
   options: { format: { type: 'string' } },
   positionals: 2,
-  run: async ({ values, positionals: [name, file] }) => {
-    const format = formatOption('explain', values.format)
+  run: async ({ values, positionals: [name, file] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (name === 'island')
       return explainIsland(file, format)

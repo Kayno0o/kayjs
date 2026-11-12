@@ -376,7 +376,7 @@ describe('kay env', () => {
     expect(lines).toContain('DATABASE_URL | src/env.ts | string | always')
     expect(lines).toContain('LIB_KEY | the extension lib | string | production | # the library\'s key')
     expect(lines.some(line => line.startsWith('Not read: src/broken.ts ('))).toBe(true)
-    expect((await kay(['env', '--format', 'xml'], root)).stderr).toBe('kay env: --format takes `text`, `json`, not `xml`\n')
+    expect((await kay(['env', '--format', 'xml'], root)).stderr).toBe('error: kay env: --format takes `text`, `json`, not `xml`\n  hint: run kay env --help for its options\n')
   })
 
   it('lists a mailer built at import time once, under the module that builds it and as the mailer is set up, and finds a caller whose path says defineEnv', async () => {

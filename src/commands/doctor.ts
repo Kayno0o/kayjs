@@ -54,10 +54,10 @@ export const doctor: Command = {
   options: { format: { type: 'string' }, port: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
-    const format = formatOption('doctor', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (typeof values.port === 'string' && !isPort(values.port))
       return refuse(`--port takes a port number, not ${values.port}`)

@@ -51,11 +51,11 @@ export const env: Command = {
   usage: 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json] [--quiet]',
   options: { format: { type: 'string' }, quiet: { type: 'boolean' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values, positionals: [path] }) => {
-    const format = formatOption('env', values.format)
+  run: async ({ values, positionals: [path] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const root = projectRoot('env', path, format)
 

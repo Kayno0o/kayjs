@@ -37,6 +37,13 @@ it('writes a page with its test, Tailwind classes only when the project has Tail
   expect(generatedFiles('page', 'pricing', { tailwind: false, tests: true, auth: true })['tests/pricing.test.ts']).toContain('/auth/sign-in')
 })
 
+it('imports an api under a valid identifier whatever its name', () => {
+  const project = { tailwind: false, tests: true, auth: false }
+
+  for (const [name, imported] of [['foo--bar', 'fooBar'], ['foo-', 'foo'], ['class', '_class'], ['default', '_default'], ['a-1b', 'a1b'], ['1up', '_1up'], ['notes', 'notes']] as const)
+    expect(Object.values(generatedFiles('api', name, project))[1]!.split('\n')[2]).toBe(`import ${imported} from '../src/api/${name}'`)
+})
+
 it('refuses names that are no route, component or action', () => {
   const project = { tailwind: false, tests: false, auth: false }
 

@@ -229,7 +229,7 @@ async function librariesDryRun(files: Record<string, string>, libraries: readonl
 // Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.
 export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host, runner?: string): Promise<Record<string, string>> {
   const has = (feature: Feature) => features.has(feature)
-  const name = packageName(basename(dir))
+  const name = packageName(basename(resolve(dir)))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string>, peerDependencies: Record<string, string> }
   // A kay minor may break, so the project takes its patches only.
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)

@@ -25,10 +25,10 @@ export const build: Command = {
     const entry = typeof values.entry === 'string' ? resolve(values.entry) : undefined
     const exported = values.static === true
     const checking = values['no-check'] !== true
-    const format = formatOption('build', values.format, PROBLEM_FORMATS)
+    const format = formatOption(refuseUsage, values.format, PROBLEM_FORMATS)
 
     if (format === undefined)
-      return 1
+      return 2
 
     // The text output prints the usage after why; the others say why in their format.
     const refuse = (reason: string) => {

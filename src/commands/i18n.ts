@@ -15,11 +15,11 @@ export const i18nMissing: Command = {
   usage: 'i18n missing [locale] [dir] [--format text|json] [--quiet]',
   options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 2,
-  run: async ({ values, positionals: [wanted, path] }) => {
-    const format = formatOption('i18n missing', values.format)
+  run: async ({ values, positionals: [wanted, path] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const project = await translated('i18n missing', path, format)
 
@@ -74,10 +74,10 @@ export const i18nAccept: Command = {
     if (locale === undefined)
       return refuse('i18n accept needs the locale whose drafts to accept')
 
-    const format = formatOption('i18n accept', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const project = await translated('i18n accept', path, format)
 

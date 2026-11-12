@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { APP_CONTEXT } from '../config'
 
 // What reloading the modules a change reached in the running server takes: the files to ask Bun for again, or why the change needs a new process.
@@ -54,6 +54,8 @@ interface Imports {
   mtime: number
   size: number
   files: string[]
+  // Where a relative import points that no file answers to, so a helper deleted before its importer was read is still found by the path.
+  missing: string[]
   globs: Glob[]
 }
 
@@ -112,7 +114,9 @@ export function planReload({ root, changed, loaded, owned, files = [], content, 
   for (const file of modules) {
     const read = importsRead(file, real)
 
-    for (const dependency of read.files.filter(dependency => modules.has(dependency)))
+    const missing = read.missing.flatMap(base => [...modules].filter(module => module === base || module.slice(0, module.length - extname(module).length) === base || module.startsWith(`${base}${sep}index.`)))
+
+    for (const dependency of new Set([...read.files.filter(dependency => modules.has(dependency)), ...missing]))
       importers.set(dependency, [...importers.get(dependency) ?? [], file])
 
     if (read.globs.length > 0)
@@ -157,7 +161,7 @@ export function planReload({ root, changed, loaded, owned, files = [], content, 
   return { evict: [...evict] }
 }
 
-const NOTHING: Imports = { mtime: 0, size: 0, files: [], globs: [] }
+const NOTHING: Imports = { mtime: 0, size: 0, files: [], missing: [], globs: [] }
 
 // What `file` imports, the files its globs match as of the last read and the globs themselves.
 function importsRead(file: string, root: string): Imports {
@@ -184,14 +188,18 @@ function importsRead(file: string, root: string): Imports {
   }
 
   const files = new Set<string>()
+  const missing: string[] = []
   const globs: Glob[] = []
   const dir = dirname(file)
 
   for (const [, , specifier] of source.matchAll(SPECIFIER)) {
-    const resolved = resolveImport(specifier!.replace(QUERY, ''), dir)
+    const written = specifier!.replace(QUERY, '')
+    const resolved = resolveImport(written, dir)
 
     if (resolved !== undefined)
       files.add(resolved)
+    else if (RELATIVE.test(written))
+      missing.push(resolve(dir, written))
   }
 
   for (const [, written] of source.matchAll(GLOB)) {
@@ -208,7 +216,7 @@ function importsRead(file: string, root: string): Imports {
       files.add(match)
   }
 
-  const read = { mtime: stats.mtimeMs, size: stats.size, files: [...files], globs }
+  const read = { mtime: stats.mtimeMs, size: stats.size, files: [...files], missing, globs }
 
   imports.set(file, read)
 

@@ -308,14 +308,14 @@ export interface PrintedProblem {
 // A problem that may lie in no file, as what stops a command does.
 export type FailureProblem = Omit<PrintedProblem, 'file' | 'line' | 'column'> & Partial<Pick<PrintedProblem, 'file' | 'line' | 'column'>>
 
-// `--format`, `text` when not given, among the `formats` the command prints in: undefined, once said which it takes, for another.
-export function formatOption(command: string, value: Parsed['values'][string], formats: readonly ProblemFormat[] = ['text', 'json']): ProblemFormat | undefined {
+// `--format`, `text` when not given, among the `formats` the command prints in: undefined, once `refuse` said which it takes, for another; the command answers what `refuse` returned, 2.
+export function formatOption(refuse: (reason?: string) => number, value: Parsed['values'][string], formats: readonly ProblemFormat[] = ['text', 'json']): ProblemFormat | undefined {
   const format = typeof value === 'string' ? value : 'text'
 
   if ((formats as readonly string[]).includes(format))
     return format as ProblemFormat
 
-  console.error(`kay ${command}: --format takes ${formats.map(name => `\`${name}\``).join(', ')}, not \`${format}\``)
+  refuse(`--format takes ${formats.map(name => `\`${name}\``).join(', ')}, not \`${format}\``)
 
   return undefined
 }

@@ -4489,7 +4489,7 @@ describe.concurrent('kay check, unused code', () => {
       expect(json.code).toBe(1)
       expect(document).toMatchObject({ errors: 1, warnings: 1 })
       expect(document.problems.map(problem => [problem.file, problem.line, problem.severity, problem.code])).toEqual([[file, 4, 'warning', 'positional-key'], [file, 6, 'error', 'missing-alt']])
-      expect(await runCheck(root, '--format', 'xml')).toEqual({ code: 1, output: 'kay check: --format takes `text`, `github`, `json`, not `xml`\n', report: '' })
+      expect(await runCheck(root, '--format', 'xml')).toEqual({ code: 2, output: 'error: kay check: --format takes `text`, `github`, `json`, not `xml`\n  hint: run kay check --help for its options\n', report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

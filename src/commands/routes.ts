@@ -65,11 +65,11 @@ export const routes: Command = {
   usage: 'routes [dir] [--format text|json] [--quiet]',
   options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values, positionals: [path] }) => {
-    const format = formatOption('routes', values.format)
+  run: async ({ values, positionals: [path] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const root = projectRoot('routes', path, format)
 

@@ -22,10 +22,10 @@ export const notFound: Command = {
   options: { 'format': { type: 'string' }, 'redirect': { type: 'string' }, 'to': { type: 'string' }, 'file': { type: 'string' }, 'runtime': { type: 'boolean' }, 'dry-run': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
-    const format = formatOption('not-found', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const root = projectRoot('not-found', path, format)
 

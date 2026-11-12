@@ -538,6 +538,36 @@ describe('the modules a change leaves stale', () => {
     }
   })
 
+  it('evicts the importer of a helper deleted before any plan read the importer', async () => {
+    const dir = await scratchDir('reload-plan-deleted-')
+
+    await Bun.write(join(dir, 'src/routes/p.kay'), '---\nimport { x } from \'../lib/helper\'\nimport { y } from \'../lib/folder\'\n---\np {x}{y}\n')
+    await Bun.write(join(dir, 'src/routes/q.kay'), 'p q\n')
+    await Bun.write(join(dir, 'src/lib/helper.ts'), 'export const x = 1\n')
+    await Bun.write(join(dir, 'src/lib/folder/index.ts'), 'export const y = 1\n')
+    await Bun.write(join(dir, 'src/server.ts'), '')
+    await Bun.write(join(dir, 'kay.config.ts'), 'export default {}\n')
+
+    try {
+      const real = realpathSync(dir)
+      const at = (file: string) => join(real, file)
+      const loaded = ['src/routes/p.kay', 'src/routes/q.kay', 'src/lib/helper.ts', 'src/lib/folder/index.ts', 'src/server.ts', 'kay.config.ts'].map(at)
+      const input = { root: dir, loaded, owned: [at('src/routes')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+
+      await rm(at('src/lib/helper.ts'))
+      await rm(at('src/lib/folder'), { recursive: true })
+
+      for (const file of ['src/lib/helper.ts', 'src/lib/folder/index.ts']) {
+        const plan = planReload({ ...input, changed: [file] })
+
+        expect('evict' in plan && plan.evict.sort()).toEqual([file, 'src/routes/p.kay', 'src/server.ts'].map(at).sort())
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('treats the files an extension names as its own: an added one reloads the app, an edited one and one that imports a helper too, and an undeclared file still needs a new process', async () => {
     const dir = await scratchDir('reload-plan-app-files-')
 

@@ -23,13 +23,13 @@ export const scaffold: Command = {
   options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'agents': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
-    const format = formatOption('new', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (dir === undefined || dir === '')
       return refuse()
 
     if (format === undefined)
-      return 1
+      return 2
 
     try {
       const { template, with: added, without: removed, yes } = values

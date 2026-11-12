@@ -9,11 +9,11 @@ export const types: Command = {
   usage: 'types [dir] [--format text|json] [--quiet]',
   options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values, positionals: [dir] }) => {
-    const format = formatOption('types', values.format)
+  run: async ({ values, positionals: [dir] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const root = projectRoot('types', dir, format)
 

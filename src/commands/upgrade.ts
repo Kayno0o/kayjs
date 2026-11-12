@@ -114,8 +114,8 @@ export const upgrade: Command = {
   usage: 'upgrade [dir] [--dry-run] [--quiet] [--format text|json]',
   options: { 'dry-run': { type: 'boolean' }, 'quiet': { type: 'boolean' }, 'format': { type: 'string' } },
   positionals: 1,
-  run: async ({ values, positionals: [dir] }) => {
-    const format = formatOption('upgrade', values.format)
+  run: async ({ values, positionals: [dir] }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
       return 2

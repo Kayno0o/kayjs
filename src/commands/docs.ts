@@ -27,11 +27,11 @@ export const docs: Command = {
   usage: 'docs [words...|<package>/<file>[#<heading>]] [--format text|json]',
   options: { format: { type: 'string' } },
   positionals: Number.POSITIVE_INFINITY,
-  run: ({ values, positionals }) => {
-    const format = formatOption('docs', values.format)
+  run: ({ values, positionals }, refuse) => {
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     const root = process.cwd()
     const files = docFiles(root)

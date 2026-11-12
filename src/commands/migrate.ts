@@ -13,12 +13,12 @@ export const migrate: Command = {
   usage: 'migrate astro [dir] [--outdir <dir>] [--dry-run] [--format text|json] [--quiet] | migrate content [dir] [--dry-run] [--format text|json] [--quiet]',
   options: { 'outdir': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
-  run: async ({ values, positionals }) => {
+  run: async ({ values, positionals }, refuse) => {
     const [from, dir = '.'] = positionals
-    const format = formatOption('migrate', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (from !== 'astro' && from !== 'content') {
       printFailure('migrate', `${from === undefined ? 'name what to migrate' : `${from} is not something kay migrates`}, as in \`kay migrate astro\` or \`kay migrate content\``, format)

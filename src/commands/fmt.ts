@@ -93,11 +93,11 @@ export const fmt: Command = {
       return refuse('--check fails on an unformatted file and --dry-run lists them and succeeds: take one')
 
     const write = !verify && values['dry-run'] !== true
-    const format = formatOption('fmt', values.format)
+    const format = formatOption(refuse, values.format)
     let result: Awaited<ReturnType<typeof formatFiles>>
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (values.stdin === true) {
       return fromStdin(paths, stdinClash(values, format), format)

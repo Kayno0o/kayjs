@@ -9,13 +9,13 @@ export const add: Command = {
   positionals: 2,
   run: async ({ values, positionals: [features, dir = '.'] }, refuse) => {
     const names = [...new Set((features ?? '').split(',').map(name => name.trim()).filter(name => name !== ''))]
-    const format = formatOption('add', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (names.length === 0)
       return refuse()
 
     if (format === undefined)
-      return 1
+      return 2
 
     const dryRun = values['dry-run'] === true
 

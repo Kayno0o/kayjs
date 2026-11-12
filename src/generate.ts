@@ -31,7 +31,7 @@ const IMPORT_END = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
 const KAY_IMPORT = /^import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/gm
 const DYNAMIC = /[[(]/
 const LEADING_DIGIT = /^\d/
-const DASH_LETTER = /-(\w)/g
+const DASHES = /-+/
 
 function sentence(slug: string): string {
   const words = slug.replace(WORD_BREAK, ' ').trim()
@@ -109,7 +109,8 @@ function apiFiles(segments: readonly string[], tests: boolean, auth: boolean): R
   }
 
   if (tests && !auth) {
-    const identifier = segments.at(-1)!.replace(DASH_LETTER, (_, letter: string) => letter.toUpperCase()).replace(LEADING_DIGIT, digit => `_${digit}`)
+    const camel = segments.at(-1)!.split(DASHES).filter(word => word !== '').map((word, at) => at === 0 ? word : `${word[0]!.toUpperCase()}${word.slice(1)}`).join('')
+    const identifier = LEADING_DIGIT.test(camel) || RESERVED.has(camel) ? `_${camel}` : camel
 
     files[`tests/api-${slugOf(route)}.test.ts`] = `${TEST_HEAD}import ${identifier} from '../src/api/${route}'\n\nconst site = await testSite()\n\nit('answers /api/${route}', async () => {\n  const answer = await site.api(${identifier}, '/')\n\n  expect(answer.ok).toBe(true)\n})\n`
   }

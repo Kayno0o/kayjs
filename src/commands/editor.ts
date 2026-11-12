@@ -9,10 +9,10 @@ export const editorInstall: Command = {
   options: { 'format': { type: 'string' }, 'dry-run': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [wanted, path] }, refuse) => {
-    const format = formatOption('editor install', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (wanted !== undefined && !EDITORS.includes(wanted as Editor))
       return refuse(`${wanted} is none of ${EDITORS.join(', ')}`)

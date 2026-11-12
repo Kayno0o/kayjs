@@ -1,7 +1,7 @@
 import type { Feature } from '../src/new'
 import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, posix, relative } from 'node:path'
+import { basename, dirname, join, posix, relative } from 'node:path'
 import process from 'node:process'
 import { runCli } from '@kaynooo/cli-kit'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
@@ -859,6 +859,14 @@ describe('kay new', () => {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
   }, SCAFFOLD_MS)
+
+  it('names the package after the folder when the project is `.` or `..`', async () => {
+    const name = async (dir: string) => (JSON.parse((await projectFiles(dir, new Set<Feature>(), '^1.0.0'))['package.json']!) as { name: string }).name
+
+    expect(await name('.')).toBe(await name(process.cwd()))
+    expect(await name('..')).toBe(await name(dirname(process.cwd())))
+    expect(await name('.')).not.toBe('app')
+  })
 
   it('gives each app its own dev database port and keeps its data in a bind-mounted folder of the checkout', async () => {
     const features = new Set<Feature>([...PRESETS.app.features, 'postgres'])

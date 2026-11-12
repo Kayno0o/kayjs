@@ -35,14 +35,14 @@ export const check: Command = {
   usage: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--dry-run] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'only': { type: 'string' }, 'since': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
-  run: async ({ values, positionals }) => {
+  run: async ({ values, positionals }, refuse) => {
     const { project, entry } = values
     const only = typeof values.only === 'string' ? values.only : undefined
     const since = typeof values.since === 'string' ? values.since : undefined
-    const format = formatOption('check', values.format, PROBLEM_FORMATS)
+    const format = formatOption(refuse, values.format, PROBLEM_FORMATS)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (only !== undefined && !isLintGroup(only)) {
       console.error(`kay check: --only takes a group of lints, ${Object.keys(LINT_GROUPS).map(group => `\`${group}\``).join(', ')}, not \`${only}\``)

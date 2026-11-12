@@ -20,10 +20,10 @@ export const a11y: Command = {
   options: { 'standard': { type: 'string' }, 'declaration': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
-    const format = formatOption('a11y', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
-      return 1
+      return 2
 
     if (values.standard !== undefined && !STANDARDS.has(values.standard as string))
       return refuse(`--standard takes rgaa or wcag, not ${String(values.standard)}`)

@@ -42,7 +42,7 @@ export const render: Command = {
     if (cookies.length > 0)
       headers.set('cookie', [headers.get('cookie'), ...cookies].filter(Boolean).join('; '))
 
-    const format = formatOption('render', values.format)
+    const format = formatOption(refuse, values.format)
 
     if (format === undefined)
       return 2
