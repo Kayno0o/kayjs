@@ -338,20 +338,6 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(ran).toEqual(['user-1:a', 'user-1:c'])
   })
 
-  it('takes the deprecated id as the key, the key winning when both are given', async () => {
-    const store = await open()
-    const ran: string[] = []
-    const flow = workflow<string>(named(), async ({ id, input, step }) => {
-      await step.run('go', () => void ran.push(`${id}:${input}`))
-    }, { store })
-
-    expect(await flow.start('a', { id: 'old' })).toBe('old')
-    expect(await flow.start('b', { key: 'old' })).toBe('old')
-    expect(await flow.start('c', { key: 'new', id: 'old' })).toBe('new')
-    await flow.drain()
-    expect(ran.toSorted()).toEqual(['new:c', 'old:a'])
-  })
-
   it('starts after a delay', async () => {
     const store = await open()
     const ran: number[] = []

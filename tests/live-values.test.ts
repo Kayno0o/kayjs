@@ -263,7 +263,7 @@ describe('live values on the server', () => {
 })
 
 describe('the connections of one client', () => {
-  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, perMinute?: number, rateLimit?: { max: number, window: '1m' | '1h' } }): Promise<void> {
+  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>, live?: { connections?: number, rateLimit?: { max: number, window: '1m' | '1h' } }): Promise<void> {
     const site = await testSite({ root: ROOT, live })
 
     try {
@@ -276,7 +276,7 @@ describe('the connections of one client', () => {
     }
   }
 
-  it('are capped by live.connections, and its openings a minute by live.perMinute', async () => {
+  it('are capped by live.connections, and its openings a minute by live.rateLimit', async () => {
     await withSite(async (connect) => {
       const first = new Feed(await connect())
       const second = new Feed(await connect())
@@ -294,7 +294,7 @@ describe('the connections of one client', () => {
       expect(first.status).toBe(200)
       await first.body!.cancel()
       expect((await connect()).status).toBe(429)
-    }, { perMinute: 1 })
+    }, { rateLimit: { max: 1, window: '1m' } })
 
     await withSite(async (connect) => {
       const first = await connect()

@@ -12,7 +12,6 @@ import type { DevRequest } from './dev'
 import type { PageModule, Rendering, RenderOptions } from './render'
 import { relative } from 'node:path'
 import process from 'node:process'
-import { apiPrefixOf } from '../config-shape'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { durationMs } from '../runtime/duration'
 import { escapeAttribute } from '../runtime/escape'
@@ -74,15 +73,19 @@ function headStart(head: RenderedHead): string {
   return `${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}`
 }
 
-// What the islands read off the page: the mount point, where the API is when `apiPath` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
+// What the islands read off the page: the mount point, where the API is when `serve.apiPrefix` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const apiAt = apiPrefixOf(options.serve)
+  const apiAt = options.serve?.apiPrefix
   const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (apiAt !== undefined && apiAt !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(apiAt)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.client?.pageTimeout === undefined ? '' : `<meta name="kay-page-timeout" content="${durationMs(options.client.pageTimeout)}">`) + (options.client?.loadingDelay === undefined ? '' : `<meta name="${LOADING_META}" content="${durationMs(options.client.loadingDelay)}">`) + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
 
   if (!hasIslands)
     return base
 
   return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
+}
+
+function pageSpeculation(options: RenderOptions, nearest: boolean): string {
+  return speculationRules(options.client?.prefetch, options.base, options.serve?.apiPrefix, nearest)
 }
 
 function devScripts(client: ClientBuild, files: string[], late: boolean): string {
@@ -486,7 +489,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const sheets = stylesheets(client, styled)
   // The nearest-`data-prefetch` selector is needed once the page holds the attribute or may gain it later: a streamed part, an island, or a server island spliced into a prerendered page.
   const mayPrefetchPerLink = shipsEntry || streamed || (scan?.modes.length ?? 0) > 0 || [markup, head.html, head.root].some(html => DATA_PREFETCH.test(html))
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : speculationRules(options.client?.prefetch, options.base, apiPrefixOf(options.serve), mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

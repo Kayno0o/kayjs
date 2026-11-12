@@ -100,14 +100,12 @@ describe('the image route limits', () => {
   })
 
   it('refuses a limit that is no whole number from 1', () => {
-    expect(() => imageLimits({ perMinute: 0 })).toThrow('images.perMinute')
     expect(() => imageLimits({ rateLimit: { max: 0, window: '1m' } })).toThrow('images.rateLimit.max is 0')
-    expect(() => imageLimits({ rateLimit: { max: 1, window: '1m' }, perMinute: 1 })).toThrow('both rateLimit and its older spelling images.perMinute')
+
     expect(() => imageLimits({ queue: 1.5 })).toThrow('images.queue')
     expect(() => imageLimits({ maxVariants: -1 })).toThrow('images.maxVariants')
     expect(imageLimits({ rateLimit: false, queue: false, maxVariants: false })).toEqual({ rate: undefined, queue: undefined, maxVariants: undefined })
-    expect(imageLimits({ perMinute: false }).rate).toBeUndefined()
-    expect(imageLimits({ perMinute: 7 }).rate).toEqual({ max: 7, windowMs: 60_000 })
+
     expect(imageLimits({ rateLimit: { max: 3, window: '10s' } }).rate).toEqual({ max: 3, windowMs: 10_000 })
     expect(imageLimits(undefined).rate).toEqual({ max: 120, windowMs: 60_000 })
   })

@@ -260,7 +260,7 @@ export default defineConfig({
 - `preload: true` on a Fontsource entry preloads each face it declares, as on a font: give it an entry of one subset.
 - Each style lists the same weights, so an italic of one weight alone, `italic` at 400 beside normal at 400, 600 and 700, is a second entry: `{ fontsource: '@fontsource/open-sans', weights: [400], styles: ['italic'] }`.
 - The family is the package's own name, `Figtree` for `@fontsource-variable/figtree`, not the `Figtree Variable` its stylesheet names.
-- `subsets` defaults to the package's own, `latin` for most; `subset` was the spelling before 1.98 and `weight` the one of `weights`, which `deprecated-config-keys` rewrites, a lone name or number going in a list.
+- `subsets` defaults to the package's own, `latin` for most.
 - Several, `subsets: ['latin', 'latin-ext']`, declare each face once per subset with its `unicode-range`, read from the package, so a page loads only the files its text needs.
 - `styles` defaults to `['normal']`, and `display` applies to every face.
 - A weight, style or subset the package lacks stops the build, naming the ones it has.

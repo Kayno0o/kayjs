@@ -59,8 +59,7 @@ export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store
 export interface StartOptions {
   // Names the run, as `key` of `enqueue()` names a job: while a run with this key is live (waiting, sleeping or running), starting it again starts nothing and resolves with the same id, the key itself. `send`, `status` and `cancel` take it, so a user's key here is all an app keeps. A random id otherwise.
   key?: string | undefined
-  /** @deprecated The old name of `key`, which wins when both are given. Removed in 1.102.0; `deprecated-workflow-start-id` rewrites it. */
-  id?: string | undefined
+
   // Starts the run this long from now.
   delay?: Duration | undefined
 }
@@ -484,7 +483,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
   return Object.assign(queued as Elysia, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {
-      const id = startOptions.key ?? startOptions.id ?? crypto.randomUUID()
+      const id = startOptions.key ?? crypto.randomUUID()
 
       if (id === '')
         throw new KayError('config-invalid', `kay: workflow('${name}') was started with an empty key; a key is a non-empty string`)

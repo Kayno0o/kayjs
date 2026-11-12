@@ -1498,7 +1498,6 @@ interface CloudflareOptions extends Common
   exclude?: undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "cloudflare"
   titles?: undefined
@@ -1521,7 +1520,6 @@ interface CustomOptions extends Common
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
   integrity?: string | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "custom"
   script: string
@@ -1535,7 +1533,6 @@ interface FathomOptions extends Common
   exclude?: undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "fathom"
   siteId: string
@@ -1550,11 +1547,9 @@ interface Ga4Options extends Counted
   /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
   measurementId: string
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "ga4"
   titles?: boolean | undefined
@@ -1564,24 +1559,28 @@ interface Ga4Options extends Counted
 type GuardOption = Guard | Guard[] | LazyGuard
 
 [./analytics] MatomoOptions
-type MatomoOptions = MatomoBase & ({
-  url: string, host?: undefined
-} | {
-  url?: undefined, /** @deprecated The old name of `url`. Removed in 1.102.0;
-  `deprecated-analytics-options` rewrites it. */ host: string
-})
+interface MatomoOptions extends MatomoBase
+  awaitConsent?: AnalyticsConsent | boolean | undefined
+  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
+  exclude?: string[] | undefined
+  hosts?: string[] | undefined
+  info?: AnalyticsInfo | false | undefined
+  privacy?: string | undefined
+  provider: "matomo"
+  siteId: number | string
+  titles?: boolean | undefined
+  tokenAuth?: string | undefined
+  url: string
 
 [./analytics] PlausibleOptions
 interface PlausibleOptions extends Counted
   awaitConsent?: AnalyticsConsent | boolean | undefined
   /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
-  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ domain?: string | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "plausible"
   site?: string | undefined
@@ -1601,11 +1600,8 @@ interface SimpleAnalyticsOptions extends Counted
   /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
-  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ hostname?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "simpleanalytics"
   site?: string | undefined
@@ -1621,10 +1617,8 @@ interface UmamiOptions extends Counted
   /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */ consent?: AnalyticsConsent | boolean | undefined
   events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host?: string | undefined
   hosts?: string[] | undefined
   info?: AnalyticsInfo | false | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ policyUrl?: string | undefined
   privacy?: string | undefined
   provider: "umami"
   titles?: boolean | undefined
@@ -3712,7 +3706,7 @@ function schedule<const Table extends Record<string, Jobs>>(table: Table & {
 }>
 
 [./server] ScheduleEveryOptions
-type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone' | 'tz'>
+type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone'>
 
 [./server] ScheduleOptions
 interface ScheduleOptions
@@ -3725,7 +3719,6 @@ interface ScheduleOptions
   store?: JobStore | undefined
   timeZone?: string | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  /** @deprecated The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it. */ tz?: string | undefined
 
 [./server] ScriptHashOptions
 interface ScriptHashOptions
@@ -3885,7 +3878,6 @@ function sqliteSessions(path: string): DeletableSessionStore
 [./server] StartOptions
 interface StartOptions
   delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  /** @deprecated The old name of `key`, which wins when both are given. Removed in 1.102.0; `deprecated-workflow-start-id` rewrites it. */ id?: string | undefined
   key?: string | undefined
 
 [./server] StoreBase

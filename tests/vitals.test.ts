@@ -139,7 +139,7 @@ describe('the script and the page', () => {
   })
 
   it('answers a script cached before a consent gate came or went with the one the config has now', async () => {
-    const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', awaitConsent: true }
+    const asked = { provider: 'plausible' as const, site: 'example.com', url: 'http://localhost:9', awaitConsent: true }
     const fetchScript = async (app: Site, etag?: string) => app.handle(new Request('http://localhost/_kay/vitals.js', { headers: etag === undefined ? {} : { 'if-none-match': etag } }))
     const plain = await site()
     const gated = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [analytics(asked), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
@@ -362,7 +362,7 @@ describe('the consent gate', () => {
   })
 
   it('follows analytics({ awaitConsent }) when the site has it, whichever extension is listed first', async () => {
-    const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', awaitConsent: true }
+    const asked = { provider: 'plausible' as const, site: 'example.com', url: 'http://localhost:9', awaitConsent: true }
 
     for (const order of [['analytics', 'vitals'], ['vitals', 'analytics']]) {
       store = memoryVitals()
@@ -380,7 +380,7 @@ describe('the consent gate', () => {
   })
 
   it('counts at once with awaitConsent: false though analytics asks, and serves the script that does not wait', async () => {
-    const asked = { provider: 'plausible' as const, domain: 'example.com', host: 'http://localhost:9', awaitConsent: true }
+    const asked = { provider: 'plausible' as const, site: 'example.com', url: 'http://localhost:9', awaitConsent: true }
     const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [analytics(asked), vitals({ awaitConsent: false })], proxy: { hops: 1 }, store: { vitals: store } })
 
     expect(await (await app.handle(new Request('http://localhost/_kay/vitals.js'))).text()).toBe(vitalsScript(false))
@@ -389,7 +389,7 @@ describe('the consent gate', () => {
   })
 
   it('does not wait for a yes an analytics counter that asks no one never asked', async () => {
-    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: 'http://localhost:9' }), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
+    const app = await build({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, extensions: [analytics({ provider: 'plausible', site: 'example.com', url: 'http://localhost:9' }), vitals()], proxy: { hops: 1 }, store: { vitals: store } })
 
     await report(app, view({ p: '/' }), visit())
     expect((await vitalsReport())[0]!.lcp!.views).toBe(1)

@@ -10,7 +10,6 @@ import { componentName } from '../compiler'
 import { CONFIG_FILE } from '../config'
 import { serverExtensions } from '../config-extensions'
 // The declarations kay writes to the shadow tree for what types cannot find on their own: the routes and files links point at, the app's messages, API and locals, the assets imports name and each library's components.
-import { apiPrefixOf } from '../config-shape'
 import { projectPaths } from '../project'
 import { apiPathOf, OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
 import { publicEnvModules } from '../server/env-state'
@@ -47,7 +46,7 @@ function openApiServed(openapi: CheckOptions['openapi'], apiPath: string | undef
 }
 
 export function kayPaths(options: CheckOptions): string[] {
-  return [...KAY_PATHS, ...openApiServed(options.openapi, apiPrefixOf(options.serve))]
+  return [...KAY_PATHS, ...openApiServed(options.openapi, options.serve?.apiPrefix)]
 }
 const UNWRITABLE = /[%?#]/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.

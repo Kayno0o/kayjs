@@ -1186,10 +1186,9 @@ describe('the setup', () => {
     [{ provider: 'plausible', url: 'ftp://x.example' }, 'url is'],
     [{ provider: 'plausible', url: 'https://u:p@x.example' }, 'url is'],
     [{ provider: 'plausible', url: 'not a url' }, 'url is'],
-    [{ provider: 'plausible', host: 'not a url' }, 'url is'],
-    [{ provider: 'matomo', siteId: 1, host: 'ftp://m.example' }, 'url is'],
+    [{ provider: 'matomo', siteId: 1, url: 'ftp://m.example' }, 'url is'],
     [{ provider: 'plausible', privacy: 'privacy' }, 'privacy is'],
-    [{ provider: 'plausible', policyUrl: 'privacy' }, 'privacy is'],
+
     [{ provider: 'matomo', siteId: 1 }, 'url is'],
     [{ provider: 'matomo', siteId: '', url: 'https://m.example' }, 'siteId'],
     [{ provider: 'matomo', siteId: 1, url: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],
@@ -1201,34 +1200,6 @@ describe('the setup', () => {
     [{ provider: 'custom', script: 'https://x.example/s.js', endpoint: 'https://u:p@x.example/c' }, 'endpoint is'],
   ])('refuses %j', (options, message) => {
     expect(() => analytics(options as never)).toThrow(message)
-  })
-})
-
-describe('the option names before 1.98', () => {
-  const page = async (options: AnalyticsOptions) => (await (await site(options)).handle(new Request('http://localhost/'))).text()
-
-  it('reads host, domain, hostname and policyUrl as url, site and privacy, the new name winning', async () => {
-    const old = { host: `http://localhost:${provider.port}`, domain: 'old.example', policyUrl: '/old-privacy' }
-
-    await send(await site({ provider: 'plausible', ...old }), visit())
-    expect((received[0]!.body as { domain: string }).domain).toBe('old.example')
-
-    await send(await site({ provider: 'plausible', ...old, site: 'new.example' }), visit())
-    expect((received[1]!.body as { domain: string }).domain).toBe('new.example')
-
-    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}`, hostname: 'sa.example' }), visit())
-    expect((received[2]!.body as { hostname: string }).hostname).toBe('sa.example')
-
-    expect(await page(plausible({ policyUrl: '/old-privacy', privacy: '/new-privacy' }))).toContain('data-policy="/new-privacy"')
-    expect(await page({ provider: 'plausible', url: 'http://localhost:1', policyUrl: '/old-privacy' })).toContain('data-policy="/old-privacy"')
-  })
-
-  it('reads a Matomo, a GA4 and an Umami written with host', async () => {
-    await send(await site({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/` }), visit())
-    expect(received[0]!.path).toBe('/matomo.php')
-
-    expect(await page({ provider: 'umami', websiteId: 'w', host: 'https://cloud.umami.is' })).toContain('data-consent')
-    expect(await page({ provider: 'umami', websiteId: 'w', host: 'https://u.example' })).toContain('data-info')
   })
 })
 

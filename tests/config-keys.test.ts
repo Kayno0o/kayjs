@@ -18,6 +18,10 @@ describe('the config keys of before 1.88', () => {
     expect(unknownConfigKeys(Object.fromEntries(flat.map(([, target]) => target.split('.') as [string, string]).map(([group, key]) => [group, { [key]: undefined }])))).toEqual([])
   })
 
+  it('refuses the keys 1.98 renamed, 1.102 having dropped them', () => {
+    expect(unknownConfigKeys({ serve: { apiPath: '/v1' }, live: { perMinute: 1 }, images: { perMinute: 1 } })).toHaveLength(3)
+  })
+
   it('refuses a flat key in the options of a call', () => {
     expect(() => mergeConfig({}, { compress: false } as never)).toThrow(/no longer reads: `compress`, now `serve\.compress`/)
   })

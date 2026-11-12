@@ -97,7 +97,7 @@ export default defineConfig({ extensions: [shopPages()] })
 An extension may set these fields. Only `name` is required.
 
 - `routes`: a folder of `.kay` pages, layouts and guards, served at `prefix`. A file of the app at the same path replaces the library's.
-- `api`: a folder of API modules, served at `/api/<prefix>`, replaceable the same way. A `prefix` starting with `/_kay/` is served there whatever `serve.apiPath` is, and `former` names the prefix it had under `serve.apiPath`, which keeps answering as the new one.
+- `api`: a folder of API modules, served at `/api/<prefix>`, replaceable the same way. A `prefix` starting with `/_kay/` is served there whatever `serve.apiPrefix` is, and `former` names the prefix it had under `serve.apiPrefix`, which keeps answering as the new one.
 - `api` modules: one may default-export a function of the `ExtensionApp` instead of an instance, `export default ({ modules }: ExtensionApp) => api({ cors }).get('/', () => modules.features?.FEATURES)`, to serve the app's `appFiles` with no module of the app's own forwarding them. Its `api()` options, `cors` included, apply as on any module, and an island calling it with `call()`, `socket()`, `stream()` or `resource()` is typed off the routes the function builds.
 - `config`: config laid under the app's own. Objects merge, arrays join with yours first, and a value the app sets wins.
 - `server`: an Elysia plugin used before the pages and API modules. Give a function to build it only when the server starts.

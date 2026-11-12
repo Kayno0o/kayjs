@@ -24,7 +24,6 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { MAPS_DIR } from '../build/assets'
 import { pageHooks, servedPageHooks } from '../config-extensions'
-import { apiPrefixOf } from '../config-shape'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
@@ -358,7 +357,7 @@ export function logAnswers({ app, options, log, health }: Boot): void {
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.
 export function rewriteAnswers({ app, env, options }: Boot): string[] {
   const apiMountsServed: string[] = []
-  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(apiPrefixOf(options.serve)), env.base, apiMountsServed)
+  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.serve?.apiPrefix), env.base, apiMountsServed)
 
   if (rewrite)
     rewriteRequests(app, rewrite, app)
@@ -563,7 +562,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api, endpoint
   const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt } = boot
   // Claimed before kay's own files, which give way to them.
   const openapi = openApiSettings(options.openapi)
-  const apiAt = apiPathOf(apiPrefixOf(options.serve))
+  const apiAt = apiPathOf(options.serve?.apiPrefix)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || env.devRoutes)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
@@ -741,7 +740,7 @@ export async function siteFiles(boot: Boot) {
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.offline !== false ? options.offline : undefined, base: env.base, apiPath: apiPrefixOf(options.serve), trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.offline !== false ? options.offline : undefined, base: env.base, apiPath: options.serve?.apiPrefix, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = env.serving ? await watchPublishing(collections) : NOT_PUBLISHING
 

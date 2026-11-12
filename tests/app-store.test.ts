@@ -148,7 +148,7 @@ describe('the app store of a test site', () => {
 describe('the MCP endpoint', () => {
   it('counts its limit in the store the site is given, so replicas share it', async () => {
     const app = counting()
-    const site = await testSite({ dirs: { routes: 'tests/fixtures/mcp/src/routes', api: 'tests/fixtures/mcp/src/api' }, mcp: { rateLimit: 2 }, islands: false, store: { rates: app.store } })
+    const site = await testSite({ dirs: { routes: 'tests/fixtures/mcp/src/routes', api: 'tests/fixtures/mcp/src/api' }, mcp: { rateLimit: { max: 2, window: '1m' } }, islands: false, store: { rates: app.store } })
     const ping = async () => site.fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) })
 
     try {

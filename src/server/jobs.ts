@@ -18,8 +18,7 @@ import { reportBackgroundError } from './report'
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the config's `timeZone` by default, else the system's.
   timeZone?: string | undefined
-  /** @deprecated The old name of `timeZone`. Removed in 1.102.0; `deprecated-schedule-tz` rewrites it. */
-  tz?: string | undefined
+
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
   // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.
   lock?: string | false | undefined
@@ -46,7 +45,7 @@ type Jobs = Job | readonly Job[]
 type WhenOf<Key extends string> = Key extends Duration ? PositiveDuration<Key> : CronSchedule<Key>
 
 // What a schedule repeating every so long takes: it runs on the epoch's multiples of its length, the same instants in every time zone.
-export type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone' | 'tz'>
+export type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone'>
 
 // A lock slot is the minute a run is due, the finest a cron schedule goes: a run falls due at its first second, so the nearest minute names it for a process running it up to 30 s early or late, its clock skewed or its event loop busy.
 const SLOT_MS = 60_000
@@ -135,7 +134,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
     const auto = options.lock === undefined && process.env.NODE_ENV === 'production' && process.env.KAY_LOCK_SCHEDULES !== 'false' ? autoLock(when, job) : undefined
 
     if (typeof when === 'number' || DURATION_TEXT.test(when))
-      return scheduleEvery(when as Duration, job, table ? { ...own, timeZone: undefined, tz: undefined } : own, auto)
+      return scheduleEvery(when as Duration, job, table ? { ...own, timeZone: undefined } : own, auto)
 
     return scheduleCron(when, job, own, auto)
   })
@@ -145,7 +144,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
 
 function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const zoneNow = (): { tz?: string } => {
-    const tz = options.timeZone ?? options.tz ?? timeZone()
+    const tz = options.timeZone ?? timeZone()
 
     return tz === undefined ? {} : { tz }
   }
@@ -198,10 +197,8 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
 function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const ms = durationSeconds(every, `the schedule ${String(every)}`) * 1000
 
-  const zone = ['timeZone', 'tz'].find(key => options[key as 'tz' | 'timeZone'] !== undefined)
-
-  if (zone !== undefined)
-    throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no ${zone}, it runs every ${String(every)} from the epoch`)
+  if (options.timeZone !== undefined)
+    throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no timeZone, it runs every ${String(every)} from the epoch`)
 
   let timer: Timer | undefined
   let forgetDrain: (() => void) | undefined

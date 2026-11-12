@@ -102,7 +102,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
       security: { reports: true },
       preview: { secret: 'a'.repeat(32) },
       publicEnv: true,
-      extensions: [analytics({ provider: 'plausible', domain: 'example.com' }), vitals()],
+      extensions: [analytics({ provider: 'plausible', site: 'example.com' }), vitals()],
     }).finally(() => {
       delete process.env.KAY_TEST_MAP_KEY
     })

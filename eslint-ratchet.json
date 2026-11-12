@@ -245,7 +245,7 @@
     "max-lines-per-function": 321
   },
   "src/server/render-document.ts": {
-    "complexity": 93
+    "complexity": 92
   },
   "src/server/render.ts": {
     "max-lines": 707

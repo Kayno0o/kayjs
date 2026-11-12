@@ -26,19 +26,6 @@ describe('apiPrefix', () => {
     expect((await moved.fetch('/api/openapi.json', { headers: KEY })).status).toBe(404)
   })
 
-  it('still reads the apiPath of before 1.98 as the prefix', async () => {
-    const legacy = await testSite({ requireGuards: false, root: 'tests/fixtures/openapi', serve: { apiPath: '/v1' }, base: '/shop' })
-
-    try {
-      expect((await legacy.fetch('/v1/items/1', { headers: KEY })).status).toBe(200)
-      expect((await legacy.fetch('/api/items/1', { headers: KEY })).status).toBe(404)
-      expect(await (await legacy.fetch('/')).text()).toContain('<meta name="kay-api" content="/v1">')
-    }
-    finally {
-      await legacy.close()
-    }
-  })
-
   it('tells the browser where the API is, and keeps pages from being prefetched under it', async () => {
     const page = await (await moved.fetch('/')).text()
 

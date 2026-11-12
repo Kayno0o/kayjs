@@ -147,7 +147,7 @@ Plausible, Umami on your own server (give it `websiteId` and `url`), Simple Anal
 | `ga4` | `measurementId` | yes |
 | `cloudflare` | `token` | yes |
 
-`url` is the address of a self-hosted service (Matomo needs it). Before 1.98 it was `host`, `site` was Plausible's `domain` and Simple Analytics' `hostname`, and `privacy` was `policyUrl`; the old names still work and `kay upgrade` renames them.
+`url` is the address of a self-hosted service (Matomo needs it).
 
 The first four set no cookie and can be run on your own server, so they count from the first page, with an information line and a way to opt out (see below). Matomo only gets the visitor's address if you give it a `tokenAuth` of a user with write access to the site, as Matomo requires; without one it sees your server's address.
 

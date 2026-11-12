@@ -20,7 +20,7 @@ const locals = (request: Request) => ({ key: request.headers.get('authorization'
 const site = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, locals })
 const dev = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, dev: true })
 const off = await testSite({ requireGuards: false, dirs: { routes, api }, islands: false })
-const throttled = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: { rateLimit: 3 }, islands: false })
+const throttled = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: { rateLimit: { max: 3, window: '1m' } }, islands: false })
 const unthrottled = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: { rateLimit: false }, islands: false })
 const mounted = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, islands: false, base: '/shop', trailingSlash: 'always', locals })
 const openapi = await testSite({ requireGuards: false, dirs: { routes, api }, mcp: true, openapi: true, islands: false, locals })
@@ -78,8 +78,8 @@ describe('the endpoint', () => {
     for (let n = 0; n < 130; n++)
       expect((await rpc(unthrottled, 'ping')).response.status).toBe(200)
 
-    for (const rateLimit of [0, -1, 1.5, Number.NaN])
-      await expect(testSite({ requireGuards: false, dirs: { routes, api }, mcp: { rateLimit }, islands: false })).rejects.toThrow('mcp.rateLimit')
+    for (const max of [0, -1, 1.5, Number.NaN])
+      await expect(testSite({ requireGuards: false, dirs: { routes, api }, mcp: { rateLimit: { max, window: '1m' } }, islands: false })).rejects.toThrow('mcp.rateLimit')
   })
 
   it('sends mcp.instructions on initialize, and none without it', async () => {

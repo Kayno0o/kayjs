@@ -57,9 +57,9 @@ const scheduleOf = schedule
 let copies = 0
 
 describe('schedule', () => {
-  it('reads a cron in the config\'s timeZone unless it names its own, `tz` the old name of it, and in the system\'s with neither', async () => {
+  it('reads a cron in the config\'s timeZone unless it names its own, and in the system\'s with neither', async () => {
     const cron = fakeCron()
-    const start = async (when: string, options: { timeZone?: string, tz?: string } = {}) => {
+    const start = async (when: string, options: { timeZone?: string } = {}) => {
       const app = new Elysia().use(schedule(when, () => undefined, options)).listen(0)
 
       await shutdown(app)
@@ -70,10 +70,9 @@ describe('schedule', () => {
       setTimeZone('Asia/Tokyo')
       await start('@hourly')
       await start('@hourly', { timeZone: 'UTC' })
-      await start('@hourly', { tz: 'Europe/Paris' })
-      await start('@hourly', { timeZone: 'UTC', tz: 'Europe/Paris' })
+
       await start('30s')
-      expect(cron.fired.map(entry => entry.zone)).toEqual([{}, { tz: 'Asia/Tokyo' }, { tz: 'UTC' }, { tz: 'Europe/Paris' }, { tz: 'UTC' }])
+      expect(cron.fired.map(entry => entry.zone)).toEqual([{}, { tz: 'Asia/Tokyo' }, { tz: 'UTC' }])
     }
     finally {
       setTimeZone(undefined)
@@ -943,13 +942,13 @@ describe('schedule every so long', () => {
     const computed = (every: number) => every
 
     expect(() => schedule(computed(0) as never, () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
-    expect(() => schedule('30s', () => undefined, { tz: 'UTC' } as object)).toThrow('the schedule 30s takes no tz')
+
     expect(() => schedule('30s', () => undefined, { timeZone: 'UTC' } as object)).toThrow('the schedule 30s takes no timeZone')
     expect(typed(() => [schedule('30s', () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
     // @ts-expect-error -- not positive
     expect(typed(() => schedule('0s', () => undefined))).toBe(true)
     // @ts-expect-error -- a time zone means nothing to a schedule running from the epoch
-    expect(typed(() => schedule('30s', () => undefined, { tz: 'UTC' }))).toBe(true)
+    expect(typed(() => schedule('30s', () => undefined, { timeZone: 'UTC' }))).toBe(true)
     // @ts-expect-error -- nor does it mean anything under its new name
     expect(typed(() => schedule('30s', () => undefined, { timeZone: 'UTC' }))).toBe(true)
   })

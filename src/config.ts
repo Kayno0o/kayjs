@@ -160,8 +160,7 @@ export interface LimitsConfig {
 export interface ServeConfig {
   // The prefix the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
   apiPrefix?: string | undefined
-  /** @deprecated The old name of `apiPrefix`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
-  apiPath?: string | undefined
+
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
   // A server build with a prerendered page uses its 404 page as a compression dictionary, sending a page to a browser that fetched it as the difference from it; `false` builds none, so no page names it and the build writes no `.dcz` copy.
@@ -277,8 +276,6 @@ export interface LiveConfig {
   connections?: number | undefined
   // How many openings a client address may make in a window, `{ max: 120, window: '1m' }` by default, the shape of every rate limit in kay, or `false` for no limit.
   rateLimit?: Pick<RateLimit, 'max' | 'window'> | false | undefined
-  /** @deprecated The old form of `rateLimit`, `perMinute: 120` standing for `rateLimit: { max: 120, window: '1m' }`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
-  perMinute?: number | undefined
 }
 
 export interface JobsConfig {
@@ -367,10 +364,7 @@ export interface FontsourceConfig {
   styles?: ('normal' | 'italic')[] | undefined
   // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
   subsets?: string[] | undefined
-  /** @deprecated The old name of `subsets`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
-  subset?: string | string[] | undefined
-  /** @deprecated The old name of `weights`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
-  weight?: number | number[] | undefined
+
   display?: FontConfig['display'] | undefined
   // Preloads every face the entry declares, as `preload` does a font's: give it to an entry of one subset and the faces the first paint shows.
   preload?: boolean | undefined
@@ -452,8 +446,7 @@ export interface ImagesConfig {
   remoteTimeout?: Duration | undefined
   // The most variants one client may have the image route encode in a window, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. `{ max: 120, window: '1m' }` by default, `false` for no limit.
   rateLimit?: Pick<RateLimit, 'max' | 'window'> | false | undefined
-  /** @deprecated The old form of `rateLimit`, `perMinute: 120` standing for `rateLimit: { max: 120, window: '1m' }`. Removed in 1.102.0; `deprecated-config-keys` rewrites it. */
-  perMinute?: number | false | undefined
+
   // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
   maxVariants?: number | false | undefined
   // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
@@ -563,7 +556,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // A module whose default export is `defineContext(load)` from `kay/library`, absolute or relative to the project root: `load(request)` returns the request values the extension gives every template as `ctx`, `ctx.user` or `ctx.can('admin')`, with no `--- server` fence. It runs at most once per request, ahead of the render of each page whose imports reach a template that reads `ctx`, and of no other, which is then the visitor's own as a page reading `ctx.locals` is. `defineContext({ key: load })` gives one loader per key instead, each run only for a page whose templates read that key. `kay check` and the editor type `ctx` off the module itself; two extensions giving one key stop the page.
   context?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
-  // A prefix starting with `/_kay/` is absolute, served there whatever `serve.apiPath` is. `former` is the prefix it had under `serve.apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
+  // A prefix starting with `/_kay/` is absolute, served there whatever `serve.apiPrefix` is. `former` is the prefix it had under `serve.apiPrefix` before it moved: that path still answers, as the new one, for the releases the library says.
   // A module may default-export a function of the `ExtensionApp` building its instance, `({ modules }) => api({ cors }).get('/', () => modules.features)`, called as the app is built, so it serves the app's `appFiles`.
   api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.

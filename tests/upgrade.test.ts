@@ -871,7 +871,7 @@ describe('the deprecations', () => {
     // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
     const overdue = new Set<string>()
     // Kept to 2.0 on purpose: the old form it recognises works until then (#2595 box 14 removes both).
-    const untilTwo = new Set(['deprecated-local-state'])
+    const untilTwo = new Set(['deprecated-local-state', 'deprecated-ui-props'])
     const past = Object.entries(LINTS).filter(([name, lint]) => {
       if (untilTwo.has(name))
         return false

@@ -33,10 +33,8 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { aiOptions } from './ai-options'
-import { analyticsOptions } from './analytics-options'
 import { awaitConsent } from './await-consent'
 import { cmsTestHelpers } from './cms-test-helpers'
-import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
@@ -55,7 +53,6 @@ import { unreadOpenSettings } from './open-settings'
 import { persistedStorage } from './persisted-storage'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { scheduleTz } from './schedule-tz'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
@@ -64,7 +61,6 @@ import { typingOptions } from './tsgo'
 import { uiItemKeys, uiItems } from './ui-items'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
-import { workflowStartId } from './workflow-start-id'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -163,16 +159,12 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
   async ({ root, options }) => uiItems(root, options),
   async ({ root, options }) => uiItemKeys(root, options),
-  async ({ root, options }) => scheduleTz(root, options),
   async ({ root, options }) => persistedStorage(root, options),
-  async ({ root, options }) => workflowStartId(root, options),
-  async ({ root, options }) => analyticsOptions(root, options),
   async ({ root, options }) => awaitConsent(root, options),
   async ({ root, options }) => aiOptions(root, options),
   async ({ root, options }) => filterOptions(root, options),
   async ({ root, options }) => infiniteListOptions(root, options),
   async ({ root, options }) => cmsTestHelpers(root, options),
-  ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => eventNames(root, options),
 ]
 

@@ -158,12 +158,12 @@ describe('images.remote caps', () => {
 })
 
 describe('mcp rate limit', () => {
-  it('takes { max, window }, false, or the number a minute it was before 1.98', () => {
+  it('takes { max, window } or false, and refuses a bare number', () => {
     expect(mcpRateLimit(true)).toEqual({ max: 120, windowMs: 60_000 })
     expect(mcpRateLimit({ rateLimit: { max: 5, window: '10s' } })).toEqual({ max: 5, windowMs: 10_000 })
-    expect(mcpRateLimit({ rateLimit: 60 })).toEqual({ max: 60, windowMs: 60_000 })
+    expect(() => mcpRateLimit({ rateLimit: 60 } as never)).toThrow('mcp.rateLimit is 60')
     expect(mcpRateLimit({ rateLimit: false })).toBeUndefined()
-    expect(() => mcpRateLimit({ rateLimit: 0 })).toThrow('mcp.rateLimit is 0')
+
     expect(() => mcpRateLimit({ rateLimit: { max: 1.5, window: '1m' } })).toThrow('mcp.rateLimit.max is 1.5')
   })
 })
@@ -172,16 +172,14 @@ describe('live limits', () => {
   it('default to 20 connections and 120 openings a minute, and refuse anything but whole numbers from 1', () => {
     expect(liveLimits(undefined)).toEqual({ connections: 20, rate: { max: 120, windowMs: 60_000 } })
     expect(liveLimits({ connections: 3 })).toEqual({ connections: 3, rate: { max: 120, windowMs: 60_000 } })
-    expect(liveLimits({ perMinute: 30 })).toEqual({ connections: 20, rate: { max: 30, windowMs: 60_000 } })
+
     expect(liveLimits({ rateLimit: { max: 5, window: '10s' } })).toEqual({ connections: 20, rate: { max: 5, windowMs: 10_000 } })
     expect(liveLimits({ rateLimit: false }).rate).toBeUndefined()
-    expect(() => liveLimits({ rateLimit: { max: 5, window: '10s' }, perMinute: 5 })).toThrow('both rateLimit and its older spelling live.perMinute')
+
     expect(() => liveLimits({ rateLimit: { max: 0, window: '1m' } })).toThrow('live.rateLimit.max is 0')
 
     for (const value of [0, 1.5, -2, Number.NaN, Infinity])
       expect(() => liveLimits({ connections: value })).toThrow('live.connections is')
-
-    expect(() => liveLimits({ perMinute: 0 })).toThrow('live.perMinute is 0')
   })
 })
 

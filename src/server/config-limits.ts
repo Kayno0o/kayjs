@@ -73,24 +73,20 @@ export interface RateWindowMs {
   windowMs: number
 }
 
-// A `rateLimit` option of the config: `{ max, window }`, `false` for none, or the number a minute it was before 1.98 (`legacy`, read under `legacy.name`, which is `perMinute` or the number form of `rateLimit` itself). Left out, `fallback` a minute.
-export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'window'> | number | false | undefined, legacy: { name: string, value: number | false | undefined }, fallback: number): RateWindowMs | undefined {
-  if (rateLimit !== undefined && legacy.value !== undefined && typeof rateLimit !== 'number')
-    throw new KayError('config-invalid', `kay: ${what} sets both rateLimit and its older spelling ${legacy.name}; keep rateLimit`)
-
-  const given = typeof rateLimit === 'number' ? rateLimit : rateLimit ?? legacy.value
-
-  if (given === false)
+// A `rateLimit` option of the config: `{ max, window }`, or `false` for none. Left out, `fallback` a minute.
+export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'window'> | false | undefined, fallback: number): RateWindowMs | undefined {
+  if (rateLimit === false)
     return undefined
 
-  const object = typeof given === 'object' ? given : undefined
-  const max = object?.max ?? (object === undefined ? given : undefined) ?? fallback
-  const name = object === undefined && given !== undefined ? legacy.name : `${what}.rateLimit.max`
+  if (typeof rateLimit !== 'object' && rateLimit !== undefined)
+    throw new KayError('config-invalid', `kay: ${what}.rateLimit is ${String(rateLimit)}; it takes { max, window } or false for no limit`)
 
-  if (!Number.isSafeInteger(max) || (max as number) < 1)
-    throw new KayError('config-invalid', `kay: ${name.includes('.') ? name : `${what}.${name}`} is ${String(max)}; it takes a whole number from 1, or false for no limit`)
+  const max = rateLimit?.max ?? fallback
 
-  return { max: max as number, windowMs: object === undefined ? MINUTE_MS : optionMs(object.window, `${what}.rateLimit.window`) }
+  if (!Number.isSafeInteger(max) || max < 1)
+    throw new KayError('config-invalid', `kay: ${what}.rateLimit.max is ${String(max)}; it takes a whole number from 1, or false for no limit`)
+
+  return { max, windowMs: rateLimit === undefined ? MINUTE_MS : optionMs(rateLimit.window, `${what}.rateLimit.window`) }
 }
 
 // `live` from kay.config.ts with its defaults, each limit a whole number from 1.
@@ -100,7 +96,7 @@ export function liveLimits(config: LiveConfig | undefined): { connections: numbe
   if (!Number.isSafeInteger(connections) || connections < 1)
     throw new KayError('config-invalid', `kay: live.connections is ${String(connections)}; it takes a whole number from 1`)
 
-  return { connections, rate: rateLimitOf('live', config?.rateLimit, { name: 'live.perMinute', value: config?.perMinute }, DEFAULT_PER_MINUTE) }
+  return { connections, rate: rateLimitOf('live', config?.rateLimit, DEFAULT_PER_MINUTE) }
 }
 
 // Refuses a `timeZone` the engine does not know.
@@ -145,7 +141,7 @@ export interface ImageLimits {
 const DEFAULT_IMAGE_LIMITS = { maxVariants: 256, queue: 128 } as const
 
 // The limits of the image route on variants it has to encode, each a whole number from 1 or `false` for none.
-export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'perMinute' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
+export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
   const read = (name: 'maxVariants' | 'queue'): number | undefined => {
     const value = images?.[name] ?? DEFAULT_IMAGE_LIMITS[name]
 
@@ -158,7 +154,7 @@ export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'perMinute'
     return value
   }
 
-  return { rate: rateLimitOf('images', images?.rateLimit, { name: 'images.perMinute', value: images?.perMinute }, DEFAULT_IMAGE_PER_MINUTE), maxVariants: read('maxVariants'), queue: read('queue') }
+  return { rate: rateLimitOf('images', images?.rateLimit, DEFAULT_IMAGE_PER_MINUTE), maxVariants: read('maxVariants'), queue: read('queue') }
 }
 
 // `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.

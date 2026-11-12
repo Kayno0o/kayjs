@@ -58,8 +58,7 @@ interface Common {
   info?: false | AnalyticsInfo | undefined
   // The app's privacy policy, a path written without the `base` (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
   privacy?: string | undefined
-  /** @deprecated The old name of `privacy`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  policyUrl?: string | undefined
+
   // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
   hosts?: string[] | undefined
 }
@@ -80,12 +79,9 @@ export interface PlausibleOptions extends Counted {
   provider: 'plausible'
   // The site as it is named in Plausible; the host of the visited page when left out.
   site?: string | undefined
-  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  domain?: string | undefined
+
   // A self-hosted Plausible, `https://plausible.example.com`.
   url?: string | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  host?: string | undefined
 }
 
 export interface UmamiOptions extends Counted {
@@ -94,20 +90,14 @@ export interface UmamiOptions extends Counted {
   websiteId: string
   // A self-hosted Umami; Umami Cloud, `https://cloud.umami.is`, by default, which asks for consent unless `awaitConsent: false`.
   url?: string | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  host?: string | undefined
 }
 
 export interface SimpleAnalyticsOptions extends Counted {
   provider: 'simpleanalytics'
   // The site as it is named in Simple Analytics; the host of the visited page when left out.
   site?: string | undefined
-  /** @deprecated The old name of `site`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  hostname?: string | undefined
   // Where Simple Analytics takes events, `https://queue.simpleanalyticscdn.com` by default.
   url?: string | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  host?: string | undefined
 }
 
 interface MatomoBase extends Counted {
@@ -118,8 +108,10 @@ interface MatomoBase extends Counted {
   tokenAuth?: string | undefined
 }
 
-// `url` is your Matomo, `https://matomo.example.com`: visits go to its `matomo.php`. `host` is its name before 1.98.
-export type MatomoOptions = MatomoBase & ({ url: string, host?: undefined } | { url?: undefined, /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */ host: string })
+// `url` is your Matomo, `https://matomo.example.com`: visits go to its `matomo.php`.
+export interface MatomoOptions extends MatomoBase {
+  url: string
+}
 
 // Google Analytics 4 through its Measurement Protocol, sent from the server: no Google script, cookie or CSP exception.
 // The visitor's client id is made on the server from a salt that changes every day, so nothing is stored in the browser, and a visitor is told apart for a day at most.
@@ -131,8 +123,6 @@ export interface Ga4Options extends Counted {
   apiSecret: string
   // Where Google takes events, `https://www.google-analytics.com` by default; `https://region1.google-analytics.com` for EU data collection.
   url?: string | undefined
-  /** @deprecated The old name of `url`. Removed in 1.102.0; `deprecated-analytics-options` rewrites it. */
-  host?: string | undefined
   // Passes the visitor's address on as `ip_override` so Google places the visit; off by default, Google then places visits at this server.
   address?: boolean | undefined
 }
@@ -203,18 +193,14 @@ const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
 // The providers that wait for a yes unless the app wrote `awaitConsent: false`; Umami joins them while it has no `host`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
-// The options with the names before 1.98 (`host`, `domain` and `hostname`, `policyUrl`) and 1.99 (`consent`) under the current ones, which win when both are written.
-// `deprecated-analytics-options` and `deprecated-await-consent` rewrite the old names in an app's files; an options object built elsewhere is out of its sight, so the old names are read here until they go.
+// The options with the name before 1.99 (`consent`) under the current one, which wins when both are written.
+// `deprecated-await-consent` rewrites the old name in an app's files; an options object built elsewhere is out of its sight, so the old name is read here until it goes.
 function current(options: AnalyticsOptions): AnalyticsOptions {
   const copy: Record<string, unknown> = { ...options }
-  const renamed = [['host', 'url'], ['policyUrl', 'privacy'], ['consent', 'awaitConsent'], ...options.provider === 'plausible' ? [['domain', 'site']] : [], ...options.provider === 'simpleanalytics' ? [['hostname', 'site']] : []]
 
-  for (const [old, name] of renamed) {
-    if (copy[old!] === undefined)
-      continue
-
-    copy[name!] ??= copy[old!]
-    delete copy[old!]
+  if (copy.consent !== undefined) {
+    copy.awaitConsent ??= copy.consent
+    delete copy.consent
   }
 
   return copy as unknown as AnalyticsOptions
@@ -235,7 +221,7 @@ export function isGated(options: AnalyticsOptions): boolean {
   if (options.awaitConsent !== undefined)
     return options.awaitConsent !== false
 
-  return ASKS_BY_DEFAULT.has(options.provider) || (options.provider === 'umami' && onUmamiCloud(options.url ?? options.host))
+  return ASKS_BY_DEFAULT.has(options.provider) || (options.provider === 'umami' && onUmamiCloud(options.url))
 }
 
 function onUmamiCloud(host: string | undefined): boolean {

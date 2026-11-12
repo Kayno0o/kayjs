@@ -4,6 +4,22 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.102.0
 
+### The `analytics()` option names 1.98 deprecated are gone
+
+`deprecated-analytics-options` goes with them: run `kay upgrade` on 1.101 first. `host` is ignored now, so a provider that still has one loses its service address: write `url`, and `site` for the `domain` of Plausible and the `hostname` of Simple Analytics, and `privacy` for `policyUrl`. Matomo needs `url`, so it refuses to start without it.
+
+### The `kay.config.ts` keys 1.98 deprecated are gone
+
+`deprecated-config-keys` goes with them: run `kay upgrade` on 1.101 first. `serve.apiPath` is `serve.apiPrefix`, `live: { perMinute: 120 }` and `images: { perMinute: 120 }` are `rateLimit: { max: 120, window: '1m' }`, `mcp: { rateLimit: 60 }` is `{ max: 60, window: '1m' }` (a number now fails at boot), and a Fontsource entry's `subset` and `weight` are `subsets` and `weights`, each a list. An old key is an unknown key now, so `kay check` reports it.
+
+### The `tz` of `schedule()` that 1.98 deprecated is gone
+
+`deprecated-schedule-tz` goes with it: run `kay upgrade` on 1.101 first. `tz` is ignored now, so a cron schedule that still has one runs in the `timeZone` of `kay.config.ts`: write `timeZone`.
+
+### The `id` of a workflow's `start()` that 1.98 deprecated is gone
+
+`deprecated-workflow-start-id` goes with it: run `kay upgrade` on 1.101 first. `id` is ignored now, so a `start(input, { id })` begins a run with a random id each time: write `key`.
+
 ### Content dates that named no day are refused
 
 An `s.Date()` field written `2024-02-30`, `2024-2-30`, `2024/02/30` or `2024-03-10T24:00:00Z` used to decode to the next day or month; it now fails `kay check` and `kay build` at its field, so correct the date. A date with a time and no seconds, `2024-03-10 10:00`, which crashed `kay check`, is refused the same way: write `2024-03-10T10:00:00Z`. Heading ids of a title with letters beyond ASCII change (`Café` was `caf`, now `café`), as do repeats that collided, so a link to one of those anchors needs the new id; ids of ASCII titles are unchanged, a typographic apostrophe included (`Don’t stop` keeps `dont-stop`).
@@ -108,22 +124,6 @@ The items of a Timeline, Accordion, MediaGallery, AppSwitcher and AudioPlayer ta
 The third argument of `@cell(column, row, index, set, issue)` is `index()`, the row's place (from 0), so a cell is drawn once per row and no longer again when a row above it is removed: `aria-label={`${column.label} ${index + 1}`}` becomes `${index() + 1}`. `kay check` flags arithmetic and comparisons on `index`, but not a bare `${index}` in a template, so no `deprecated` lint can carry it.
 
 ## 1.98.0
-
-### `analytics()` takes `url`, `site` and `privacy`
-
-`host` of an `analytics()` provider (the service address, which Matomo requires) is `url`, so it no longer shares a word with the `hosts` list of page hostnames. `domain` of Plausible and `hostname` of Simple Analytics are `site`; `websiteId`, `siteId`, `measurementId` and `token` stay, being each provider's own word. `policyUrl` is `privacy`, as in mail and kayjs-ui. The old names still work for three minors, and `kay upgrade` renames them (`deprecated-analytics-options`); an options object built outside the call is not found by the lint but is still read.
-
-### `serve.apiPath`, `live.perMinute`, `images.perMinute`, `mcp.rateLimit`, `subset` and `weight` of a Fontsource font
-
-`serve.apiPath` is `serve.apiPrefix`, a prefix as every library's `prefix` is. `live: { perMinute: 120 }` is `live: { rateLimit: { max: 120, window: '1m' } }`, `images: { perMinute: 120 }` is `images: { rateLimit: { max: 120, window: '1m' } }` (`false` stays `rateLimit: false`) and `mcp: { rateLimit: 60 }` is `mcp: { rateLimit: { max: 60, window: '1m' } }`, the shape of every rate limit option. A Fontsource entry's `subset` is `subsets` and a `weight` it never took is `weights`. The old keys still work for three minors, and `kay upgrade` rewrites them (`deprecated-config-keys`).
-
-### `tz` of `schedule()` is `timeZone`
-
-`schedule(cron, job, { tz })` takes `timeZone`, the name of the `timeZone` in `kay.config.ts` it falls back to. `tz` still works for three minors, and `kay upgrade` renames it (`deprecated-schedule-tz`).
-
-### `id` of a workflow's `start()` is `key`
-
-`workflow.start(input, { id })` takes `key`, the name `enqueue()` gives the caller-chosen identity that makes a repeat a no-op; `id` stays the identity a run returns. `id` still works for three minors, and `kay upgrade` renames it (`deprecated-workflow-start-id`).
 
 ### Stat and Chat write `data-layout`, not `data-variant`
 
