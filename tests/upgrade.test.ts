@@ -6,7 +6,7 @@ import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { dependencies as kayDependencies } from '../package.json'
 import { addMissingPeers } from '../src/commands/add-peers'
-import { registryDepsFor, steppingStones, upgradeProject } from '../src/commands/upgrade'
+import { registryDepsFor, steppingStones, stoneFallbacks, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
@@ -660,7 +660,7 @@ describe('kay upgrade across removed deprecations', () => {
     }
   })
 
-  it('puts everything back when the first stop fails to install, and says so without claiming nothing is left', async () => {
+  it('puts everything back when no install works, stones and latest alike, and says so without claiming nothing is left', async () => {
     const root = await project(appOn('1.70.0'), { 'bun.lock': 'old lock\n' })
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' })
     const log = spyOn(console, 'log').mockImplementation(() => undefined)
@@ -677,7 +677,8 @@ describe('kay upgrade across removed deprecations', () => {
       expect(await upgradeProject(root, deps)).toBe(1)
       expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.70.0'))
       expect(await Bun.file(join(root, 'bun.lock')).text()).toBe('old lock\n')
-      expect(calls.installs).toHaveLength(1)
+      // Stone 1.73 and its fallbacks 1.72 and 1.71, stone 1.76 and its fallbacks 1.75 and 1.74, then the latest.
+      expect(calls.installs).toHaveLength(7)
       expect(calls.kay).toEqual([])
       expect([...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')).not.toContain('nothing left')
     }
@@ -746,6 +747,74 @@ describe('kay upgrade across removed deprecations', () => {
       log.mockRestore()
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('falls back to the closest older minor that still holds a stop\'s lints when the stop no longer installs', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (_dir, changes) => {
+      calls.installs.push(changes)
+
+      return changes[0]!.spec !== '~1.73.0'
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(0)
+      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.0', '~1.72.0', '~1.76.0', '~1.77.0'])
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.0'))
+
+      const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('kay 1.73.0 does not install, so kay 1.72.0 rewrites what 1.71 deprecated')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('names what a stop left unfixed and the upgrading sections to read when no minor of it installs, then goes on', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (_dir, changes) => {
+      calls.installs.push(changes)
+
+      return !['~1.73.0', '~1.72.0', '~1.71.0'].includes(changes[0]!.spec)
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.0', '~1.72.0', '~1.71.0', '~1.76.0', '~1.77.0'])
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.0'))
+
+      const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('no kay from 1.71 to 1.73 installs')
+      expect(printed).toContain('what 1.71 deprecated')
+      expect(printed).toContain('llms/upgrading.md')
+      expect(printed).toContain('1.74.0')
+      expect(printed).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('lists the older minors a stop can fall back to, down to the oldest lint it is there for', () => {
+    const table = [{ since: '1.70', removedIn: '1.74' }, { since: '1.71', removedIn: '1.74' }, { since: '1.72' }]
+
+    expect(stoneFallbacks('1.73.0', '1.68.0', table)).toEqual({ minors: ['1.72.0', '1.71.0', '1.70.0'], sinces: ['1.70', '1.71'], removedIn: '1.74' })
+    // Never at or behind the version the app holds.
+    expect(stoneFallbacks('1.73.0', '1.70.0', table)).toEqual({ minors: ['1.72.0', '1.71.0'], sinces: ['1.71'], removedIn: '1.74' })
   })
 
   it('ignores a minor whose lints are still declared when it picks the stops', () => {

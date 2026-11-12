@@ -33,6 +33,7 @@ const SECTION_FLAGS: Record<string, string[]> = { devDependencies: ['--dev'], op
 const KAY_PACKAGE = '@kaynooo/kayjs'
 const SECTION_OPEN = /\s*:\s*\{/y
 const LOCKFILES = ['bun.lock', 'bun.lockb']
+const PATCH = /\.\d+$/
 const PRERELEASE = /[-+].*$/
 // The first plain version in a range of kay's own dependencies, where it starts.
 const FLOOR = /(\d+\.\d+\.\d+)/
@@ -283,17 +284,51 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   // A stone's rewrite that leaves a form behind: the latest kay no longer knows its lint, so only this run can still report it.
   let leftOnTheWay = false
 
-  for (const phase of phases) {
-    if (phase.changes.length === 0)
-      continue
-
+  // Installs a phase; when it does not, package.json and the lockfile go back to what the last phase that landed left.
+  const attempt = async (phase: Phase): Promise<boolean> => {
     await Bun.write(manifest, phase.source)
     moved(phase.changes)
     step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
-    if (!await deps.install(root, phase.changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
-      await restore(manifest, settled)
+    if (await deps.install(root, phase.changes) && existsSync(join(root, 'node_modules/kay/src/cli.ts')))
+      return true
 
+    await restore(manifest, settled)
+
+    return false
+  }
+  // The phases left to run from the text the last landed phase wrote, on the stones given.
+  const replan = (stones: string[]): Phase[] => {
+    const fresh = kayDependencies(JSON.parse(settled.source) as Record<string, unknown>)
+
+    return planPhases(settled.source, fresh, new Map(fresh.map(dependency => [dependency, latest.get(found.find(({ name }) => name === dependency.name)!)!])), stones) as Phase[]
+  }
+  let queue = phases
+
+  for (let index = 0; index < queue.length; index++) {
+    let phase = queue[index]!
+
+    if (phase.changes.length === 0)
+      continue
+
+    let installed = await attempt(phase)
+
+    if (!installed && phase.stone) {
+      const stood = await standIn(phase.version, behind, queue.slice(index + 1).filter(({ stone }) => stone).map(({ version }) => version), replan, attempt, (verb, rest) => say(verb, rest, true))
+
+      queue = [...queue.slice(0, index), ...stood.phases]
+      leftOnTheWay ||= stood.left
+      installed = stood.installed
+      phase = queue[index]!
+
+      if (!installed) {
+        index--
+
+        continue
+      }
+    }
+
+    if (!installed) {
       printFailure('upgrade', behind === from
         ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
         : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, format)
@@ -487,6 +522,48 @@ export function steppingStones(from: string, to: string, table: typeof DEPRECATI
   }
 
   return stones
+}
+
+// The older minors, closest first, that stand in for a stepping stone the registry no longer installs, down to the oldest lint the stone is there for and never at or behind the version the app holds, with the `since` of those lints and the release that dropped them.
+export function stoneFallbacks(stone: string, behind: string, table: typeof DEPRECATION_MINORS = DEPRECATION_MINORS): { minors: string[], sinces: string[], removedIn: string } {
+  const [major, minor] = minorOf(stone)!
+  const held = table.filter(entry => entry.removedIn !== undefined && minorOf(entry.removedIn)!.join('.') === `${major}.${minor + 1}` && minorAfter(minorOf(entry.since)!, minorOf(behind)!))
+  const lowest = Math.min(...held.map(({ since }) => minorOf(since)![1]))
+  const minors: string[] = []
+
+  for (let candidate = minor - 1; candidate >= lowest; candidate--)
+    minors.push(`${major}.${candidate}.0`)
+
+  return { minors, sinces: held.map(({ since }) => since), removedIn: `${major}.${minor + 1}` }
+}
+
+// A stone the registry no longer installs: the closest older minor that still holds its lints stands in, saying which; when none installs, the stone is skipped, saying which forms the app keeps and where to read how to change them. The phases to run from the stone on, whether one installed and whether a form is left.
+async function standIn(
+  stone: string,
+  behind: string,
+  later: string[],
+  replan: (stones: string[]) => Phase[],
+  attempt: (phase: Phase) => Promise<boolean>,
+  say: (verb: string, rest: string) => void,
+): Promise<{ phases: Phase[], installed: boolean, left: boolean }> {
+  const { minors, sinces, removedIn } = stoneFallbacks(stone, behind)
+
+  for (const minor of minors) {
+    const phases = replan([minor, ...later])
+
+    if (!await attempt(phases[0]!))
+      continue
+
+    const lost = sinces.filter(since => minorAfter(minorOf(since)!, minorOf(minor)!))
+
+    say('fell back', `kay ${stone} does not install, so kay ${minor} rewrites what ${sinces.filter(since => !lost.includes(since)).join(', ')} deprecated${lost.length === 0 ? '' : `; what ${lost.join(', ')} deprecated is left for you, see the upgrading sections below`}`)
+
+    return { phases, installed: true, left: lost.length > 0 }
+  }
+
+  say('skipped', `no kay from ${(minors.at(-1) ?? stone).replace(PATCH, '')} to ${stone.replace(PATCH, '')} installs, so what ${sinces.join(', ')} deprecated is left for you: read the sections ${sinces[0]}.0 to ${removedIn}.0 of llms/upgrading.md (llms/upgrading-archive.md for older ones), then run \`kay check\``)
+
+  return { phases: replan(later), installed: false, left: true }
 }
 
 // The phases from the app's ranges to the latest ones, the ranges of each written over the text of the one before; the name of a dependency whose entry cannot be found in the text when one cannot.
