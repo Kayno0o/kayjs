@@ -8,6 +8,8 @@ description: An on and off switch, a real checkbox that submits inside a form.
 
 `checked` sets the starting state and a switch whose parent passes another value follows it. `onChange` receives the new state. Without a `label`, pass `aria-label`.
 
+`label` always names the control for screen readers, and `showLabel` chooses whether it is also written as text: on by default here, so `showLabel={false}` keeps it for screen readers alone. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 ## Busy
 
 Return a promise from `onChange` to hold the switch busy until it settles. If it rejects or resolves to `false`, the switch goes back to where it was.

@@ -15,7 +15,7 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+const { size = 'md', invalid, value, min = 0, max = 100, step, label, showLabel = true, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
   // The thumb's size: `md` by default, `sm` and `lg` resize the thumb.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -26,8 +26,10 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
   min?: number | undefined
   max?: number | undefined
   step?: number | undefined
-  // Shown beside the slider and naming it for screen readers.
+  // Names the slider for screen readers, and is written above it unless `showLabel` is false.
   label: string
+  // Whether `label` is written as text. On by default; off keeps it for screen readers only, as an `aria-label`.
+  showLabel?: boolean | undefined
   // Whether the value is written beside the label.
   showValue?: boolean | undefined
   // Words the value for the display and for screen readers, such as `value => `${value} ms``.
@@ -82,7 +84,8 @@ function held(event: Event) {
 }
 ---
 div(part="root")
-  span(part="label") {label}
+  if showLabel
+    span(part="label") {label}
   input({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} part="input" ref={sliderRef} type="range" aria-label={rest['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value.

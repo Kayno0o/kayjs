@@ -13,8 +13,10 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'c
   checked?: boolean | undefined
   // Neither ticked nor not, for a box standing over a partly ticked set; a click toggles it from `checked`, and the box stays drawn so while the parent keeps it.
   indeterminate?: boolean | undefined
-  // Shown next to the box; omit it and pass `aria-label` instead to keep the box label-only for screen readers.
+  // Names the box, and is written next to it unless `showLabel` is false; omit it and pass `aria-label` instead to leave it unnamed here.
   label?: string | undefined
+  // Whether `label` is written as text. On by default; off keeps it for screen readers only, as an `aria-label`.
+  showLabel?: boolean | undefined
   // A note after the label, quieter: a count, a shortcut, a code name.
   hint?: string | number | undefined
   // The field the box posts as: inside a FormDialog, the message its call was refused with for that field shows under the box, as a FormField shows it.
@@ -32,7 +34,8 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'c
 
 // Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
 const name = given.name
-const rest = without(given, 'checked', 'indeterminate', 'label', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+const rest = without(given, 'checked', 'indeterminate', 'label', 'showLabel', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+const showLabel = given.showLabel ?? true
 
 let box: HTMLInputElement | undefined
 
@@ -71,8 +74,8 @@ effect(() => {
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
 snippet control()
   label(part="root")
-    input({...rest} name={name} part="input" ref={ref} type="checkbox" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
-    if given.label
+    input({...rest} aria-label={rest['aria-label'] || (showLabel ? undefined : given.label)} name={name} part="input" ref={ref} type="checkbox" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+    if given.label && showLabel
       span(part="label") {given.label}
     if given.hint !== undefined
       span(part="hint") {given.hint}

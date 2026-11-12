@@ -5,7 +5,7 @@ import { defaultKept, onFormReset, startRef } from './form-reset'
 import { effect, flush, formErrors, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import type { FieldSize } from './field-look'
-import { FIELD_MESSAGE } from './field-look'
+import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { linkChoice } from './choice-link'
 import { formIssues } from './forms'
 import { labelText } from './label-text'
@@ -17,6 +17,8 @@ import TextInput from './text-input.kay'
 const look = recipe({
   parts: {
     root: 'kui-rows-field flex flex-col gap-2',
+    field: 'flex flex-col gap-1',
+    title: LABEL_TEXT,
     head: 'grid grid-cols-[repeat(var(--_columns),minmax(0,1fr))_2rem] gap-2 px-px text-xs text-muted',
     heading: 'truncate',
     row: 'grid grid-cols-[repeat(var(--_columns),minmax(0,1fr))_2rem] items-center gap-2',
@@ -30,7 +32,7 @@ const look = recipe({
 
 const NONE: never[] = []
 
-const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssues, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
+const { rows = NONE, style, columns, label, showLabel = false, name, invalid, size = 'md', rowIssues, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
   style?: string | undefined
   // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
   rows?: readonly Row[] | undefined
@@ -38,6 +40,8 @@ const { rows = NONE, style, columns, label, name, invalid, size = 'md', rowIssue
   columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | 'number' | undefined, name?: string | undefined, cell?: boolean | undefined }[]
   // Names the field for screen readers.
   label: string
+  // Writes `label` above the rows, in a Slider's label type, and names it by that text (`aria-labelledby`) in place of `aria-label`. Off by default.
+  showLabel?: boolean | undefined
   // Marks the field as refused: its text boxes in the danger colour, with `data-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
   invalid?: boolean | undefined
   // The size of every text box, `md` by default; a cell drawn by `@cell` reads it as `column.size`.
@@ -237,23 +241,32 @@ onFormReset(() => root, () => {
   ids = start.map(() => nextId++)
   commit(start)
 })
+// The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
+const heading = showLabel && label ? uid() : undefined
 ---
-div(part="root" {...rest} ref={ref} data-kui-choice="" role="group" aria-label={label} data-invalid={invalid ? '' : undefined} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
-  if current().length > 0
-    div(part="head" aria-hidden="true")
-      for column of columns key={column.key}
-        span(part="heading") {column.label}
-  for id of ids()
-    div(part="row")
-      for column of columns key={column.key}
-        if column.cell === true && cell
-          | {drawCell(id, column)}
-        else if column.type === 'number'
-          TextInput(part="input" type="number" name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={figure => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
-        else
-          TextInput(part="input" type={column.type} name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={text => edit(placeOf(id), column.key, text)})
-      IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(placeOf(id))} disabled={current().length <= min} onClick={() => drop(placeOf(id))})
-      p(part="issue" id={`${issuesBase}_${id}`} aria-live="polite" hidden={issueOf(id) === undefined})
-        for item of messagesOf(id) key={item.key ?? item.message}
-          span(part="issueItem" data-field={item.key}) {item.message}
-  Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})
+snippet editor()
+  div(part="root" {...rest} ref={ref} data-kui-choice="" role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} data-invalid={invalid ? '' : undefined} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
+    if current().length > 0
+      div(part="head" aria-hidden="true")
+        for column of columns key={column.key}
+          span(part="heading") {column.label}
+    for id of ids()
+      div(part="row")
+        for column of columns key={column.key}
+          if column.cell === true && cell
+            | {drawCell(id, column)}
+          else if column.type === 'number'
+            TextInput(part="input" type="number" name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={figure => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
+          else
+            TextInput(part="input" type={column.type} name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={text => edit(placeOf(id), column.key, text)})
+        IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(placeOf(id))} disabled={current().length <= min} onClick={() => drop(placeOf(id))})
+        p(part="issue" id={`${issuesBase}_${id}`} aria-live="polite" hidden={issueOf(id) === undefined})
+          for item of messagesOf(id) key={item.key ?? item.message}
+            span(part="issueItem" data-field={item.key}) {item.message}
+    Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})
+if heading
+  div(part="field")
+    span(part="title" id={heading}) {label}
+    {editor()}
+else
+  {editor()}

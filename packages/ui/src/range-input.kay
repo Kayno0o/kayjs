@@ -1,17 +1,17 @@
 ---
 import type { FieldSize } from './field-look'
-import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
+import { fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT } from './field-look'
 import type { JSX } from 'kay'
 import type { RangeValue } from './range'
-import { effect, recipe, untrack } from 'kay'
+import { effect, recipe, uid, untrack } from 'kay'
 import { onFormReset, startRef } from './form-reset'
 import { linkChoice } from './choice-link'
 import { rangeFrom } from './range'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-range-input', box: 'kui-range-input-box', separator: 'kui-range-input-separator', unit: 'kui-range-input-unit' } })
+const look = recipe({ parts: { field: 'inline-flex flex-col items-start gap-1', heading: LABEL_TEXT, root: 'kui-range-input', box: 'kui-range-input-box', separator: 'kui-range-input-separator', unit: 'kui-range-input-unit' } })
 
-const { size = 'md', invalid, value = [null, null], min, max, step, label, fromLabel, toLabel, unit, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { size = 'md', invalid, value = [null, null], min, max, step, label, showLabel = false, fromLabel, toLabel, unit, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The size of both boxes: `md` by default, `sm` and `lg` change their padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -24,6 +24,8 @@ const { size = 'md', invalid, value = [null, null], min, max, step, label, fromL
   step?: number | undefined
   // Names the pair for screen readers, each box adding "from" or "to".
   label: string
+  // Writes `label` above the boxes, in a Slider's label type, and names it by that text (`aria-labelledby`) in place of `aria-label`. Off by default.
+  showLabel?: boolean | undefined
   // Each box's whole name in place of the label and "from" or "to", for another language.
   fromLabel?: string | undefined
   toLabel?: string | undefined
@@ -72,10 +74,19 @@ const highRef = startRef<HTMLInputElement>((element) => {
 
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of.
 onFormReset(() => low, commit)
+// The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
+const heading = showLabel && label ? uid() : undefined
 ---
-div(part="root" {...rest} role="group" data-kui-choice="" aria-label={label})
-  input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? wording('ui.rangeInput.from', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
-  span(part="separator" aria-hidden="true") -
-  input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? wording('ui.rangeInput.to', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
-  if unit
-    span(part="unit") {unit}
+snippet range()
+  div(part="root" {...rest} role="group" data-kui-choice="" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']})
+    input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? wording('ui.rangeInput.from', '{label} from', { label })} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+    span(part="separator" aria-hidden="true") -
+    input.kui-field-input(part="box" data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid)} ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? wording('ui.rangeInput.to', '{label} to', { label })} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+    if unit
+      span(part="unit") {unit}
+if heading
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {range()}
+else
+  {range()}

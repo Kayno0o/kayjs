@@ -24,6 +24,8 @@ One that moves onto the value being changed while the promise is pending (set fr
 
 An `aria-label` passed to Slider names the input in place of `label`. With a `name` the input posts its number in a plain form, and `id`, `disabled` and the other input attributes go on the input.
 
+`label` always names the control for screen readers, and `showLabel` chooses whether it is also written as text: on by default here, so `showLabel={false}` keeps it for screen readers alone. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 The track and the thumb are drawn from the theme tokens, so an app styles no `::-webkit-slider-thumb` itself.
 
 

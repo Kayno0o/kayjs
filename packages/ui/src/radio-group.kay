@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import { postedValue, recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
-import { RADIO_INVALID } from './field-look'
+import { LABEL_TEXT, RADIO_INVALID } from './field-look'
 import { loadOptions } from './options-source'
 import type { OptionsSource } from './options-source'
 import { wording } from 'kay/words'
@@ -13,6 +13,8 @@ import { sentOption } from './refill'
 const look = recipe({
   parts: {
     root: 'kui-radio-group group/radios flex flex-col gap-2',
+    field: 'inline-flex flex-col items-start gap-1',
+    heading: LABEL_TEXT,
     radio: 'flex flex-col',
     choice: 'inline-flex cursor-pointer items-center gap-2 self-start has-[input:disabled]:opacity-50 group-aria-busy/radios:cursor-progress group-not-aria-busy/radios:has-[input:disabled]:cursor-not-allowed',
     input: `m-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${RADIO_INVALID}`,
@@ -23,7 +25,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, name, invalid, required, disabled = false, loadingLabel = wording('ui.radioGroup.loading', 'Loading…'), retryLabel = wording('ui.radioGroup.retry', 'Try again'), failureLabel = wording('ui.radioGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
+const { options, value, label, showLabel = false, name, invalid, required, disabled = false, loadingLabel = wording('ui.radioGroup.loading', 'Loading…'), retryLabel = wording('ui.radioGroup.retry', 'Try again'), failureLabel = wording('ui.radioGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: OptionsSource<{ value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }> & NullOption<Value, Held>
@@ -37,6 +39,8 @@ const { options, value, label, name, invalid, required, disabled = false, loadin
   value?: Held | undefined
   // Names the group for screen readers; omit it and pass `aria-label` or `aria-labelledby` instead, such as inside a FormField that names it.
   label?: string | undefined
+  // Writes `label` above the options, in a Slider's label type, and names it by that text (`aria-labelledby`) in place of `aria-label`. Off by default.
+  showLabel?: boolean | undefined
   // Disables every option; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
   // Marks the group as refused, its radios in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the radios on its own.
@@ -72,23 +76,32 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 })
 
 const prefix = uid()
+// The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
+const heading = showLabel && label ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field. The description sits beside the label, not inside it, so the option is named by its label alone.
-div(part="root" {...rest} ref={ref} role="radiogroup" data-kui-choice="" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-busy={busy() || source.loading() ? 'true' : undefined})
-  for option, index of list() key={option.value}
-    div(part="radio")
-      label(part="choice")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), value === undefined ? first() : value))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
-        span(part="label")
-          if drawRow
-            | {drawRow(option)}
-          else
-            | {option.label}
-      if option.description
-        span(part="description" id={`${prefix}-${index}`}) {option.description}
-  if source.loading()
-    p(part="status" role="status") {loadingLabel}
-  if source.failed()
-    p(part="status" role="alert") {failureLabel}
-    if source.retryable()
-      button(part="retry" type="button" onClick={source.retry}) {retryLabel}
+snippet radios()
+  div(part="root" {...rest} ref={ref} role="radiogroup" data-kui-choice="" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-required={required ? 'true' : rest['aria-required']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+    for option, index of list() key={option.value}
+      div(part="radio")
+        label(part="choice")
+          input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), value === undefined ? first() : value))} type="radio" name={group} required={required} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+          span(part="label")
+            if drawRow
+              | {drawRow(option)}
+            else
+              | {option.label}
+        if option.description
+          span(part="description" id={`${prefix}-${index}`}) {option.description}
+    if source.loading()
+      p(part="status" role="status") {loadingLabel}
+    if source.failed()
+      p(part="status" role="alert") {failureLabel}
+      if source.retryable()
+        button(part="retry" type="button" onClick={source.retry}) {retryLabel}
+if heading
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {radios()}
+else
+  {radios()}

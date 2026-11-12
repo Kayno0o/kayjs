@@ -14,11 +14,13 @@ const look = recipe({
   },
 })
 
-const { value = '#000000', label, invalid, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
+const { value = '#000000', label, showLabel = true, invalid, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
   // The colour as `#rrggbb`, which is what the native picker and a form hold, black when left out; a box whose parent passes another one follows it.
   value?: string | undefined
   // Written beside the swatch and naming the input for screen readers.
   label: string
+  // Whether `label` is written as text. On by default; off keeps it for screen readers only, as an `aria-label`.
+  showLabel?: boolean | undefined
   // Marks the swatch as refused, its keyline in the danger colour, with `aria-invalid`. A FormField showing a message marks it on its own.
   invalid?: boolean | undefined
   // Called with each shade the picker is dragged over, as `#rrggbb`, and with the colour put back after a refused change or a form reset: the live value, which a preview follows. It is not held back by a pending `onChange`.
@@ -65,5 +67,6 @@ function moved(event: Event) {
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")
   input({...rest} part="input" ref={boxRef} type="color" aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} aria-label={rest['aria-label'] || label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
-  span(part="label") {label}
+  if showLabel
+    span(part="label") {label}
   span(part="value" aria-hidden="true") {shown()}

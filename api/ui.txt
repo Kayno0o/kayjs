@@ -1091,6 +1091,7 @@ component default
   name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
   required?: boolean | undefined
+  showLabel?: boolean | undefined
 
 [./chip-group.kay] default
 component default
@@ -1157,6 +1158,7 @@ component default
   label: string
   onChange?: ((value: string) => unknown) | undefined
   onInput?: ((value: string) => unknown) | undefined
+  showLabel?: boolean | undefined
   value?: string | undefined
 
 [./combobox.kay] default
@@ -1173,6 +1175,8 @@ component default
   optionDescription?: string | undefined;
   empty?: string | undefined;
   status?: string | undefined;
+  field?: string | undefined;
+  heading?: string | undefined;
 }
   create?: boolean | undefined
   createLabel?: ((text: string) => string) | string | undefined
@@ -1196,6 +1200,7 @@ component default
   open?: boolean | undefined
   option?: ((option: ComboboxOption<Value>) => Element) | undefined
   options: ComboboxOptions<Value>
+  showLabel?: boolean | undefined
   size?: FieldSize | undefined
   value?: "" | Value | undefined
   valueLabel?: string | undefined
@@ -1418,7 +1423,7 @@ component default
 
 [./date-range-input.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; separator?: string | undefined; }
+  class?: string | undefined | { root?: string | undefined; separator?: string | undefined; field?: string | undefined; heading?: string | undefined; }
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabled?: boolean | undefined
   disabledDay?: ((iso: string) => boolean) | undefined
@@ -1433,6 +1438,7 @@ component default
   onMonthChange?: ((month: string, box: "from" | "to") => unknown) | undefined
   onOpenChange?: ((open: boolean, box: "from" | "to") => unknown) | undefined
   open?: "from" | "to" | false | undefined
+  showLabel?: boolean | undefined
   size?: FieldSize | undefined
   toLabel?: string | undefined
   toName?: string | undefined
@@ -2268,6 +2274,8 @@ component default
   description?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
+  field?: string | undefined;
+  heading?: string | undefined;
 }
   disabled?: boolean | undefined
   failureLabel?: string | undefined
@@ -2287,17 +2295,26 @@ component default
   options: OptionsSource<{ value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }> & NullOption<Value, Held>
   required?: boolean | undefined
   retryLabel?: string | undefined
+  showLabel?: boolean | undefined
   value?: Held | undefined
 
 [./range-input.kay] default
 component default
-  class?: string | undefined | { root?: string | undefined; box?: string | undefined; separator?: string | undefined; unit?: string | undefined; }
+  class?: string | undefined | {
+  root?: string | undefined;
+  box?: string | undefined;
+  separator?: string | undefined;
+  unit?: string | undefined;
+  field?: string | undefined;
+  heading?: string | undefined;
+}
   fromLabel?: string | undefined
   invalid?: boolean | undefined
   label: string
   max?: number | undefined
   min?: number | undefined
   onChange?: ((value: RangeValue) => unknown) | undefined
+  showLabel?: boolean | undefined
   size?: FieldSize | undefined
   step?: number | undefined
   toLabel?: string | undefined
@@ -2316,6 +2333,8 @@ component default
   };
   stars?: string | undefined;
   fill?: string | undefined;
+  field?: string | undefined;
+  heading?: string | undefined;
 }
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
@@ -2325,6 +2344,7 @@ component default
   name?: string | undefined
   onChange?: ((value: null | number) => unknown) | undefined
   required?: boolean | undefined
+  showLabel?: boolean | undefined
   value?: number | undefined
 
 [./record-button.kay] default
@@ -2425,6 +2445,8 @@ component default
       root?: string | undefined;
     };
   };
+  field?: string | undefined;
+  title?: string | undefined;
 }
   columns: readonly {
   key: string;
@@ -2445,6 +2467,7 @@ component default
   removeLabel?: ((index: number) => string) | string | undefined
   rowIssues?: ((index: number) => string | undefined) | Record<number, string | undefined> | undefined
   rows?: readonly Row[] | undefined
+  showLabel?: boolean | undefined
   size?: FieldSize | undefined
   style?: string | undefined
 
@@ -2733,6 +2756,7 @@ component default
   min?: number | undefined
   onChange?: ((value: number) => unknown) | undefined
   onInput?: ((value: number) => unknown) | undefined
+  showLabel?: boolean | undefined
   showValue?: boolean | undefined
   size?: FieldSize | undefined
   step?: number | undefined
@@ -3177,6 +3201,7 @@ component default
   name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
   required?: boolean | undefined
+  showLabel?: boolean | undefined
 
 [./toolbar.kay] default
 component default

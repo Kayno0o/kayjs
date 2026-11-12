@@ -8,6 +8,8 @@ description: A labelled checkbox, native so it submits inside a form, with an op
 
 `checked` sets the starting state and a box whose parent passes another value follows it. `onChange` receives the new state. `hint` adds a quieter note after the label. Without a `label`, pass `aria-label`. Use [Toggle](/ui/toggle) for a setting that applies as it is flipped.
 
+`label` always names the control for screen readers, and `showLabel` chooses whether it is also written as text: on by default here, so `showLabel={false}` keeps it for screen readers alone. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 ## Indeterminate
 
 `indeterminate` draws the box as neither ticked nor not, for a box standing over a partly ticked list. A click toggles it from `checked`, and it is drawn so again while the parent keeps `indeterminate`.

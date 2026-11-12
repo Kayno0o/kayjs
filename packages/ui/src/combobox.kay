@@ -1,6 +1,6 @@
 --- <Value extends string | number>
 import type { FieldSize } from './field-look'
-import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid } from './field-look'
+import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
@@ -16,6 +16,8 @@ import type { IconSlot } from './defaults'
 // 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
 const look = recipe({
   parts: {
+    field: 'flex min-w-0 flex-col gap-1',
+    heading: LABEL_TEXT,
     root: 'kui-combobox relative inline-flex min-w-0 flex-col',
     input: `kui-field-input ${FIELD_ICON_PAD}`,
     icon: `${FIELD_ICON.icon} top-1/2 -translate-y-1/2`,
@@ -28,7 +30,7 @@ const look = recipe({
   },
 })
 
-const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
+const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, showLabel = false, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -45,6 +47,8 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   valueLabel?: string | undefined
   // Names the input for screen readers, unless a FormField labels it.
   label?: string | undefined
+  // Writes `label` above the input, in a Slider's label type, and names it by that text (`aria-labelledby`) in place of `aria-label`. Off by default.
+  showLabel?: boolean | undefined
   // Submits the value picked, or the text typed while nothing is. Without JavaScript the input posts its text.
   name?: string | undefined
   // The characters typed before a function is asked for options.
@@ -360,54 +364,64 @@ const ref = fieldRef<HTMLInputElement>((element) => {
   input = element
   keepInvalid(element, () => invalid)
 }, rest.ref)
+// The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
+const heading = showLabel && label ? uid() : undefined
 ---
-div(part="root")
-  if icon
-    Icon(icon={icon} part="icon")
-  input(
-    part="input"
-    data-icon={icon ? '' : undefined}
-    {...rest}
-    data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
-    ref={ref}
-    type="text"
-    role="combobox"
-    autocomplete="off"
-    name={carried() ? undefined : name}
-    value={text()}
-    disabled={disabled}
-    list={!remote && !enhanced() ? `${listId}-native` : undefined}
-    aria-label={label}
-    aria-expanded={shown() ? 'true' : 'false'}
-    aria-controls={listId}
-    aria-autocomplete="list"
-    aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
-    onInput={event => type(event.currentTarget.value)}
-    onKeyDown={keyDown}
-    onFocusIn={focusIn}
-    onFocusOut={focusOut}
-  )
-  if name && carried() as option
-    input(type="hidden" name={name} value={String(option.value)} disabled={disabled})
-  if !remote
-    datalist(id={`${listId}-native`})
-      for option of known() key={option.value}
-        option(value={option.label})
-  // Pressing the list, its scrollbar included, keeps focus in the input.
-  ul(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
-    for option, index of rows() key={option.value}
-      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && described(option) ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && described(option) ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
-        if drawRow
-          | {drawRow(option)}
-        else if described(option)
-          span(part="optionLabel" id={`${optionId(index)}-label`}) {option.label}
-          span(part="optionDescription" id={`${optionId(index)}-description`}) {described(option)}
-        else
-          | {option.label}
-    if none()
-      li(part="empty" role="presentation")
-        | {empty}
-    if offered()
-      li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel === undefined ? wording('ui.combobox.create', 'Create "{text}"', { text: text().trim() }) : labelText(createLabel, { text: text().trim() }, text().trim())}
-  // Read out as the list loads and settles, which otherwise changes in silence.
-  p(part="status" role="status") {status()}
+snippet box()
+  div(part="root")
+    if icon
+      Icon(icon={icon} part="icon")
+    input(
+      part="input"
+      data-icon={icon ? '' : undefined}
+      {...rest}
+      data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']}
+      ref={ref}
+      type="text"
+      role="combobox"
+      autocomplete="off"
+      name={carried() ? undefined : name}
+      value={text()}
+      disabled={disabled}
+      list={!remote && !enhanced() ? `${listId}-native` : undefined}
+      aria-label={heading ? undefined : label}
+      aria-labelledby={heading ?? rest['aria-labelledby']}
+      aria-expanded={shown() ? 'true' : 'false'}
+      aria-controls={listId}
+      aria-autocomplete="list"
+      aria-activedescendant={shown() && active() !== -1 ? optionId(active()) : undefined}
+      onInput={event => type(event.currentTarget.value)}
+      onKeyDown={keyDown}
+      onFocusIn={focusIn}
+      onFocusOut={focusOut}
+    )
+    if name && carried() as option
+      input(type="hidden" name={name} value={String(option.value)} disabled={disabled})
+    if !remote
+      datalist(id={`${listId}-native`})
+        for option of known() key={option.value}
+          option(value={option.label})
+    // Pressing the list, its scrollbar included, keeps focus in the input.
+    ul(part="list" id={listId} role="listbox" aria-label={heading ? undefined : label} aria-labelledby={heading} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
+      for option, index of rows() key={option.value}
+        li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && described(option) ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && described(option) ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
+          if drawRow
+            | {drawRow(option)}
+          else if described(option)
+            span(part="optionLabel" id={`${optionId(index)}-label`}) {option.label}
+            span(part="optionDescription" id={`${optionId(index)}-description`}) {described(option)}
+          else
+            | {option.label}
+      if none()
+        li(part="empty" role="presentation")
+          | {empty}
+      if offered()
+        li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel === undefined ? wording('ui.combobox.create', 'Create "{text}"', { text: text().trim() }) : labelText(createLabel, { text: text().trim() }, text().trim())}
+    // Read out as the list loads and settles, which otherwise changes in silence.
+    p(part="status" role="status") {status()}
+if heading
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {box()}
+else
+  {box()}

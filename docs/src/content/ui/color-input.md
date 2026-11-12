@@ -20,4 +20,6 @@ Return a promise from `onChange` to hold the input busy until it settles, for a 
 
 `label` is required. It names the input for screen readers, which do not hear the hex beside it. An `aria-label` or `aria-labelledby` passed to ColorInput names the input in its place.
 
+`label` always names the control for screen readers, and `showLabel` chooses whether it is also written as text: on by default here, so `showLabel={false}` keeps it for screen readers alone. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 `id`, `disabled` and the other input attributes go on the input. A `value` that is not `#rrggbb` shows as black, as the native input does.

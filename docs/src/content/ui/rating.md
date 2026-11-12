@@ -14,6 +14,8 @@ description: Stars filled to a value, part of a star included.
 
 `max` is 5 by default. `label` is required and is the text screen readers read, such as `Rated 4 out of 5`, as Meter's and Progress's are; `kay check` refuses a Rating without one.
 
+`showLabel` writes `label` above the stars and names it by that text, and the `field` part wraps the two with the label as `heading`; `label` names it for screen readers alone otherwise. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 <Demo name="rating/scale" />
 
 ## In a list

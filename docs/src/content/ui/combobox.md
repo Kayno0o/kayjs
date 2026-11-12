@@ -55,6 +55,8 @@ Enter picks the active row, Escape closes the list, even one with no rows, and, 
 
 `label` names the input for screen readers, unless a FormField labels it, in which case the FormField's label text alone names it, not the status line nor the rows.
 
+`showLabel` writes `label` above the input and names it by that text, and the `field` part wraps the two with the label as `heading`; `label` names it for screen readers alone otherwise. Every control with a `label` takes `showLabel`, as on [Segmented](/ui/segmented#label).
+
 `id` is the listbox's id. `createLabel(text)`, `loadingLabel`, `emptyLabel` and `failureLabel` replace the texts, which read `Create "text"`, `Loading…`, `No match` and `Could not load the options`. The other attributes land on the input, and `class` on the wrapper or, as an object, on its parts: `list`, `option`, `optionLabel`, `optionDescription` and `status`.
 
 ## Opened by the app

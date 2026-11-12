@@ -23,8 +23,10 @@ const look = recipe({
 const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'checked' | 'class' | 'children' | 'onChange'> & {
   // Whether it starts on; a switch whose parent passes another value follows it. Inside a form posting to an action, a switch with no `onChange` takes the refused post's choice in its place.
   checked?: boolean | undefined
-  // Shown next to the switch; omit it and pass `aria-label` instead to keep the switch label-only for screen readers.
+  // Names the switch, and is written next to it unless `showLabel` is false; omit it and pass `aria-label` instead to leave it unnamed here.
   label?: string | undefined
+  // Whether `label` is written as text. On by default; off keeps it for screen readers only, as an `aria-label`.
+  showLabel?: boolean | undefined
   // A note after the label, quieter: a count, a shortcut, a code name.
   hint?: string | number | undefined
   // The field the switch posts as: inside a FormDialog, the message its call was refused with for that field shows under the switch, as a FormField shows it.
@@ -42,7 +44,8 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'chec
 
 // Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
 const name = given.name
-const rest = without(given, 'checked', 'label', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+const rest = without(given, 'checked', 'label', 'showLabel', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+const showLabel = given.showLabel ?? true
 
 const sent = given.onChange ? undefined : postedChecked(name, rest.value as string | number | undefined, given.checked ?? false)
 // Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
@@ -63,9 +66,9 @@ const { on, busy, ref, change } = controlledCheckbox({ control: 'Toggle', checke
 // A real checkbox, so it submits inside a form like any other. A click while a change is under way flips nothing.
 snippet control()
   label(part="root")
-    input({...rest} name={name} part="input" ref={ref} type="checkbox" role="switch" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+    input({...rest} aria-label={rest['aria-label'] || (showLabel ? undefined : given.label)} name={name} part="input" ref={ref} type="checkbox" role="switch" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
     span(part="track")
-    if given.label
+    if given.label && showLabel
       span(part="label") {given.label}
     if given.hint !== undefined
       span(part="hint") {given.hint}

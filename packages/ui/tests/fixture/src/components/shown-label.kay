@@ -1,6 +1,16 @@
 ---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // A Segmented and a ChipGroup writing their label above them, beside ones keeping it for screen readers only.
 const shapes = [{ value: 'grid', label: 'Grid' }, { value: 'list', label: 'List' }] as const
@@ -9,3 +19,22 @@ Segmented#shown(label="Layout" showLabel options={shapes} value="grid")
 Segmented#hidden(label="Hidden layout" options={shapes} value="list")
 ChipGroup#chips-shown(label="Shapes" showLabel options={shapes} value={['grid']})
 ChipGroup#chips-hidden(label="Hidden shapes" options={shapes} value={[]})
+RadioGroup#radio-shown(label="Plan" showLabel options={shapes} value="grid")
+RadioGroup#radio-hidden(label="Hidden plan" options={shapes} value="grid")
+Rating#rating-shown(label="Score" showLabel value={3} onChange={() => undefined})
+Rating#rating-hidden(label="Hidden score" value={3} onChange={() => undefined})
+Rating#rating-static(label="Static score" showLabel value={3})
+RangeInput#range-shown(label="Price" showLabel)
+RangeInput#range-hidden(label="Hidden price")
+DateRangeInput#dates-shown(label="Stay" showLabel)
+DateRangeInput#dates-hidden(label="Hidden stay")
+RowsField#rows-shown(label="Links" showLabel columns={[{ key: 'url', label: 'URL' }]})
+RowsField#rows-hidden(label="Hidden links" columns={[{ key: 'url', label: 'URL' }]})
+Combobox#combo-shown(label="Country" showLabel options={shapes} value="")
+Combobox#combo-hidden(label="Hidden country" options={shapes} value="")
+Slider#slider-shown(label="Delay" value={5})
+Slider#slider-hidden(label="Hidden delay" showLabel={false} value={5})
+ColorInput#color-hidden(label="Hidden colour" showLabel={false})
+Checkbox#check-hidden(label="Hidden check" showLabel={false})
+Toggle#toggle-hidden(label="Hidden switch" showLabel={false})
+Checkbox#check-shown(label="Shown check")

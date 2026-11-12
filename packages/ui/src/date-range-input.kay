@@ -1,8 +1,9 @@
 ---
 import type { FieldSize } from './field-look'
+import { LABEL_TEXT } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { DateRange } from './date'
-import { effect, postedValue, recipe, signal, untrack } from 'kay'
+import { effect, postedValue, recipe, signal, uid, untrack } from 'kay'
 import DateInput from './date-input.kay'
 import { dateRangeFrom } from './date'
 import { defaultKept, onFormReset, startRef } from './form-reset'
@@ -11,11 +12,13 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-date-range-input inline-flex items-center gap-1.5',
+    field: 'inline-flex flex-col items-start gap-1',
+    heading: LABEL_TEXT,
     separator: 'text-xs text-muted',
   },
 })
 
-const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, disabledDay, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, showLabel = false, fromLabel, toLabel, fromName, toName, disabled, disabledDay, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The size of both date boxes: `md` by default, `sm` and `lg` change their padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -29,6 +32,8 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, f
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // Names the pair for screen readers, each box adding "from" or "to".
   label: string
+  // Writes `label` above the boxes, in a Slider's label type, and names it by that text (`aria-labelledby`) in place of `aria-label`. Off by default.
+  showLabel?: boolean | undefined
   // Each box's whole name in place of the label and "from" or "to", for another language.
   fromLabel?: string | undefined
   toLabel?: string | undefined
@@ -85,8 +90,17 @@ function commit(from: string, to: string) {
   pair = next
   onChange?.(next)
 }
+// The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
+const heading = showLabel && label ? uid() : undefined
 ---
-div({...rest} ref={ref} role="group" aria-label={label})
-  DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'from')} open={open === undefined ? undefined : open === 'from'} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
-  span(part="separator" aria-hidden="true") -
-  DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'to')} open={open === undefined ? undefined : open === 'to'} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+snippet range()
+  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']})
+    DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'from')} open={open === undefined ? undefined : open === 'from'} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+    span(part="separator" aria-hidden="true") -
+    DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'to')} open={open === undefined ? undefined : open === 'to'} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+if heading
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {range()}
+else
+  {range()}
