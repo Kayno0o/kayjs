@@ -34,6 +34,12 @@ describe('deprecated-if-alias', () => {
     expect(result.at).toEqual([])
   })
 
+  it('takes a name with non-ASCII letters and refuses a reserved word', () => {
+    expect(run('if user then été\n  p {été.name}').errors).toEqual([])
+    expect(run('if user then null\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
+    expect(run('if user then class\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
+  })
+
   it('reports then with no name or with two', () => {
     expect(run('if user then\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])
     expect(run('if user then u v\n  p x').errors.map(e => e.code)).toEqual(['template-syntax'])

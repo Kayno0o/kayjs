@@ -44,7 +44,6 @@ const SLOT_HEAD = /(?=@)/y
 const MARKDOWN_HEAD = /markdown[ \t]*(?=\r?\n|$)/y
 // `- code`, which pug runs.
 const PUG_CODE = /-(?= |\r?\n|$)/y
-
 const MATCH_LINE = /(when|else)(?=[ \t]|\r?\n|$)/y
 const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
 // `let x = 1`: a declaration kay has no counterpart for, told from a `var` element by the `=`.

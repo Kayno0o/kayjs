@@ -407,7 +407,7 @@ function errorId(action: string, field: string): string {
   return `${action.replaceAll('.', '-')}-${field ? `${field.replace(ID_UNSAFE, '-')}-` : ''}error`
 }
 
-// An `error` line names the message its field is described by; failing one, as before it, the element `if add.error('title') as message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
+// An `error` line names the message its field is described by; failing one, as before it, the element `if add.error('title') then message` and `p {add.error('title')}`: the element shown holds the message, outside a `for`, which would repeat its id, for an action a form of the file posts to.
 export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   const found: ErrorMessages = { ids: new Map(), lines: new Map(), describing: new Map() }
   const posted = new Set<string>()

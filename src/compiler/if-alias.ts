@@ -6,7 +6,9 @@ import { parseExpression } from './estree'
 // What a condition naming its value holds: `then name` since 1.102, and before it an `as` that may as well be a cast.
 const MAY_ALIAS = /\sas\s/
 const MAY_THEN = /\sthen(?:\s|$)/
-const THEN_NAME = /^then(?:[ \t]+([\p{L}_$][\w$]*))?[ \t]*(?:\/\/.*)?$/du
+const THEN_NAME = /^then(?:[ \t]+([\p{L}_$][\p{L}\p{N}_$]*))?[ \t]*(?:\/\/.*)?$/du
+// Words that are no name for a value.
+const RESERVED = new Set(['null', 'true', 'false', 'this', 'class', 'await', 'in', 'as', 'of', 'new', 'typeof', 'void', 'delete', 'function', 'return', 'if', 'else', 'const', 'let', 'var', 'yield', 'import', 'export', 'default', 'super', 'switch', 'case', 'for', 'while', 'do', 'try', 'catch', 'finally', 'throw', 'with', 'break', 'continue', 'instanceof', 'enum', 'extends', 'debugger'])
 // A capitalized name after a condition's `as` is a type, so a cast.
 const CAPITALIZED_NAME = /^[\p{Lu}\p{Lt}]/u
 // What the tail of a condition is parsed behind, as the type of a cast.
@@ -30,11 +32,12 @@ export function ifAlias(src: string, quiet: Scanner, test: Span): { alias?: Span
 
 function thenAlias(src: string, test: Span, at: number): { alias?: Span, diagnostics: Diagnostic[] } {
   const tail = THEN_NAME.exec(src.slice(at, test.end))
+  // The end of the line, where the error stops once `test` is cut before the `then`.
   const lineEnd = test.end
 
   test.end = trimEnd(src, test.start, at)
 
-  if (tail?.[1] === undefined)
+  if (tail?.[1] === undefined || RESERVED.has(tail[1]))
     return { diagnostics: [{ start: at, end: lineEnd, message: '`then` takes one name after a condition', help: '`if user() then u`' }] }
 
   const [from, to] = tail.indices![1]!
