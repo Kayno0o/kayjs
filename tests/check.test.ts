@@ -3165,7 +3165,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
   it('types apiUrl() from the module: its paths, their params and query, and reports what the module has not (#2832)', async () => {
     const root = await scratchProject({
       'src/api/items.ts': 'import { api, s } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', () => [])\n  .get(\'/:id\', ({ params }) => params.id, { query: s.Object({ q: s.Optional(s.String()) }) })\n  .get(\'/:id/files/:name\', ({ params }) => params.name)\n',
-      'src/lib.ts': 'import { apiUrl } from \'kay\'\nimport items from \'./api/items\'\n\nexport const root = apiUrl(items)\nexport const one = apiUrl(items, \'/:id\', { params: { id: 1 }, query: { q: \'a\' } })\nexport const deep = apiUrl(items, \'/:id/files/:name\', { params: { id: 1, name: \'a\' } })\nexport const request = (r: Request) => apiUrl(r, \'/anything\')\nexport const unknown = apiUrl(items, \'/nope\')\nexport const missing = apiUrl(items, \'/:id\')\nexport const wrong = apiUrl(items, \'/:id/files/:name\', { params: { id: 1 } })\n',
+      'src/lib.ts': 'import { apiUrl } from \'kay\'\nimport items from \'./api/items\'\n\nexport const root = apiUrl(items)\nexport const one = apiUrl(items, \'/:id\', { params: { id: 1 }, query: { q: \'a\' } })\nexport const deep = apiUrl(items, \'/:id/files/:name\', { params: { id: 1, name: \'a\' } })\nexport const request = (r: Request) => apiUrl(r, \'/anything\')\nexport const unknown = apiUrl(items, \'/nope\')\nexport const missing = apiUrl(items, \'/:id\')\nexport const wrong = apiUrl(items, \'/:id/files/:name\', { params: { id: 1 } })\nexport const between = apiUrl(items, \'/:id/files\')\n',
     })
 
     try {
@@ -3175,6 +3175,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
         [join(root, 'src/lib.ts'), 8],
         [join(root, 'src/lib.ts'), 9],
         [join(root, 'src/lib.ts'), 10],
+        [join(root, 'src/lib.ts'), 11],
       ])
     }
     finally { await rm(root, { recursive: true, force: true }) }

@@ -53,10 +53,10 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
   return `${mount}${joined === '/' ? '' : joined}${search}`
 }
 
-// Every route path of a module, its websocket routes and its streams included; any string for a module typed `unknown`.
-export type ApiPath<Module> = unknown extends Module ? string : Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path } ? Path : never : never
+// Every path a route of the module answers at, its websocket routes and its streams included, and `/` for the mount itself; any string for a module typed `unknown`.
+export type ApiPath<Module> = unknown extends Module ? string : Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? Path extends '/' ? Path : [RouteKey<Node>] extends [never] ? never : Path : never : never
 
-// What the routes answering at a path ask of its URL: a path with no method of its own, a segment of deeper routes, takes any.
+// What the routes answering at a path ask of its URL; the mount, which may answer nothing, takes any.
 export type ApiUrlOptions<Module, Path> = unknown extends Module ? UrlInput : NodeAt<Module, Path> extends infer Node ? [RouteKey<Node>] extends [never] ? UrlInput : UrlOptions<Numbered<Node[RouteKey<Node>]>> : never
 
 // A path param is text to Elysia, and a number fills it as it does in `route()`.
