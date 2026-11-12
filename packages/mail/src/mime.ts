@@ -12,7 +12,7 @@ export interface Part {
 
 const MAX_DEPTH = 8
 const MAX_PARTS = 200
-const WORD = /=\?([\w-]+)\?([bq])\?([^?]*)\?=/gi
+const WORD = /=\?([\w-]+)(?:\*[\w-]+)?\?([bq])\?([^?]*)\?=/gi
 const WORD_GAP = /(\?=)\s+(?==\?)/g
 const SOFT_BREAK = /=\r?\n/g
 const WHITESPACE = /\s+/g
@@ -247,7 +247,11 @@ function transferDecoded(raw: string, encoding: string | undefined): Uint8Array 
   return kind === 'quoted-printable' ? quotedPrintable(raw) : bytesOf(raw)
 }
 
+// A text opening on a line break has no headers: RFC 2046 reads such a part as text/plain.
 function split(text: string): [head: string, body: string] {
+  if (FIRST_BREAK.test(text))
+    return ['', text.replace(FIRST_BREAK, '')]
+
   const match = BLANK_LINE.exec(text)
 
   return match === null ? [text, ''] : [text.slice(0, match.index), text.slice(match.index + match[0].length)]

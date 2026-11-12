@@ -82,3 +82,24 @@ describe('attachment names', () => {
     expect(name('attachment; filename*=bogus-charset\'\'a%ZZb.pdf')).toBe('a%ZZb.pdf')
   })
 })
+
+const crlf = (message: string): Uint8Array => new TextEncoder().encode(message.replaceAll('\n', '\r\n'))
+
+describe('a part with no headers', () => {
+  it('reads as text/plain, per RFC 2046', () => {
+    const reply = replyOf(parseMime(crlf('From: a@b.com\nTo: x@y.com\nSubject: hi\nContent-Type: multipart/mixed; boundary="B"\n\n--B\n\nplain part with no headers\n--B\nContent-Type: text/html\n\n<p>hi</p>\n--B--\n')))
+
+    expect(reply.text).toBe('plain part with no headers')
+    expect(reply.html).toBe('<p>hi</p>')
+  })
+})
+
+describe('encoded words with a language', () => {
+  it('decodes =?charset*lang?...?= and ignores the language', () => {
+    const subject = (value: string) => replyOf(parseMime(crlf(`From: a@b.com\nSubject: ${value}\n\nbody\n`))).subject
+
+    expect(subject('=?utf-8*fr?Q?caf=C3=A9?=')).toBe('café')
+    expect(subject('=?UTF-8*fr-FR?B?Y2Fmw6k=?=')).toBe('café')
+    expect(subject('=?utf-8?Q?caf=C3=A9?=')).toBe('café')
+  })
+})
