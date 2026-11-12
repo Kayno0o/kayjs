@@ -1,0 +1,6 @@
+---
+import SelectedAsync from '../components/selected-async.kay'
+import '../app.css'
+---
+main
+  SelectedAsync

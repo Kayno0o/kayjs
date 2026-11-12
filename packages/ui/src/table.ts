@@ -121,7 +121,10 @@ export function cellText<Row>(row: Row, column: Column<Row>): string {
   return value === undefined || value === null ? '' : String(value)
 }
 
-// The row's own value as `sortValue: true` sorts it: a date by its time, a boolean as 0 or 1, and nothing for a missing value, which sorts last either way.
+// A sort key that stands for no value: nothing, or a `NaN` (what an invalid date reads as too).
+const isMissing = (key: string | number | undefined) => key === undefined || (typeof key === 'number' && Number.isNaN(key))
+
+// The row's own value as `sortValue: true` sorts it: a date by its time, a boolean as 0 or 1, and nothing for a missing value (`NaN` and an invalid date included), which sorts last either way.
 function sortable(value: unknown): string | number | undefined {
   if (value === undefined || value === null)
     return undefined
@@ -147,10 +150,12 @@ export function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortS
 
   // Each row's key is read once, where a comparison would read two per step of the sort.
   return rows.map(row => ({ row, key: value(row) })).sort((a, b) => {
-    if (a.key === undefined || b.key === undefined)
-      return Number(a.key === undefined) - Number(b.key === undefined)
+    const [gone, other] = [isMissing(a.key), isMissing(b.key)]
 
-    return factor * compareValues(a.key, b.key)
+    if (gone || other)
+      return Number(gone) - Number(other)
+
+    return factor * compareValues(a.key as string | number, b.key as string | number)
   }).map(({ row }) => row)
 }
 

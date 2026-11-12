@@ -323,14 +323,6 @@ const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? la
 const scrolls = signal(virtual)
 const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
 
-// A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
-effect(() => {
-  const next = chosen()
-
-  if (selectable && next.length !== picked().length)
-    commit(next)
-})
-
 function commit(keys: RowKeyValue<Row, Key>[]) {
   picked = keys
 
@@ -368,6 +360,15 @@ const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skelet
 const skeletonCells = () => Array.from({ length: columnCount() }, (_, index) => index)
 const openLabel = (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row)
 const broke = () => list ? list.failed() : source.failed()
+
+// A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
+// With no rows yet, loading or failed, `selected` is held: its rows are on their way, not gone.
+effect(() => {
+  const next = chosen()
+
+  if (selectable && next.length !== picked().length && (rows().length > 0 || !(waiting() || broke())))
+    commit(next)
+})
 const linked = () => rowHref !== undefined || onRowClick !== undefined
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 

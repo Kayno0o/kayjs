@@ -1,6 +1,7 @@
 import type { LabelContext } from '../src/chart-axis'
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { fixedScaleAxis } from 'chartist'
+import { setTimeZone } from '../../../src/runtime/i18n'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tickIndices, tickTexts, totalAt, xAxisOptions } from '../src/chart-axis'
 
 const DAYS = ['2026-01-01', '2026-01-02', '2026-01-11']
@@ -133,5 +134,40 @@ describe('tickTexts', () => {
 
   test('hands the app its own format the tick place', () => {
     expect(tickTexts(['a', 'b'], null, (label, context) => `${label}${context.index}${context.place}`)).toEqual(['a0tick', 'b1tick'])
+  })
+})
+
+describe('tick labels and the zones', () => {
+  const machine = process.env.TZ
+
+  afterEach(() => {
+    setTimeZone(undefined)
+
+    if (machine === undefined)
+      delete process.env.TZ
+    else
+      process.env.TZ = machine
+  })
+
+  test('keep the machine zone whatever the site timeZone is, so a day reads as the day it names', () => {
+    process.env.TZ = 'Europe/Paris'
+
+    const days = ['2026-10-01', '2026-10-02', '2026-10-09']
+    const plain = tickTexts(days, labelTimes(days))
+
+    setTimeZone('America/New_York')
+
+    expect(plain).toEqual(['1 Oct', '2 Oct', '9 Oct'])
+    expect(tickTexts(days, labelTimes(days))).toEqual(plain)
+    expect(headings(days, labelTimes(days))[0]).toContain('1 Oct')
+  })
+
+  test('read as dates when the labels run newest first', () => {
+    process.env.TZ = 'UTC'
+
+    const labels = ['2026-10-05', '2026-10-04', '2026-10-03', '2026-10-02', '2026-10-01']
+
+    expect(tickTexts(labels, labelTimes(labels))).toEqual(['5 Oct', '4 Oct', '3 Oct', '2 Oct', '1 Oct'])
+    expect(tickTexts(['2026-10-01T12:00', '2026-10-01T10:00'], labelTimes(['2026-10-01T12:00', '2026-10-01T10:00']))).toEqual(['12:00', '10:00'])
   })
 })

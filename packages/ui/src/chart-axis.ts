@@ -79,9 +79,9 @@ export function secondsApart(labels: string[]): boolean {
   return gap < 60_000
 }
 
-// How long the labels span, in milliseconds, 0 when they are not all dates.
+// How long the labels span, in milliseconds, 0 when they are not all dates; the same whichever way they run.
 export function spanOf(times: number[] | null): number {
-  return times ? times.at(-1)! - times[0]! : 0
+  return times ? Math.abs(times.at(-1)! - times[0]!) : 0
 }
 
 // Each label as the tooltip heads it: a date in the page's locale, with its time of day when it has one, seconds when points sit under a minute apart; any other label as written.
@@ -149,7 +149,7 @@ export function xAxisOptions(labels: string[], times: number[] | null, showLabel
 
     return {
       type: fixedScale,
-      ...times.length > 0 ? { low: times[0]!, high: times.at(-1)! } : {},
+      ...times.length > 0 ? { low: Math.min(times[0]!, times.at(-1)!), high: Math.max(times[0]!, times.at(-1)!) } : {},
       ticks: ticks.map(index => times[index]!),
       showLabel: true,
       showGrid: false,

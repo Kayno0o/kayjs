@@ -1,0 +1,19 @@
+--- island
+import type { Column } from '@kaynooo/kayjs-ui'
+import { signal } from 'kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Row {
+  id: number
+  name: string
+}
+
+// The rows come from a promise a click settles, and every change of the selection is written on the window.
+const columns: Column<Row>[] = [{ key: 'name', header: 'Name' }]
+const rows = new Promise<Row[]>((resolve) => {
+  (window as unknown as { settle: () => void }).settle = () => resolve([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }, { id: 3, name: 'Ganymede' }])
+})
+const heard = signal<string[]>([])
+---
+Table(columns={columns} rows={rows} rowKey="id" selectable selected={[2]} onSelectedChange={keys => heard = [...heard(), `[${keys.join(',')}]`]})
+p#heard {heard().join(' | ')}

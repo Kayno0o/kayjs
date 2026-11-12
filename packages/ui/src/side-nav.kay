@@ -2,8 +2,8 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import type { SideNavGroup } from './side-nav'
-import { onMount, persisted, recipe, signal, uid } from 'kay'
-import { navMark } from './nav-current'
+import { memo, onMount, persisted, recipe, signal, uid } from 'kay'
+import { navHrefs, navMark } from './nav-current'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SidePanel from './side-panel.kay'
@@ -100,6 +100,8 @@ const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | u
 const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
 const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
 
+const siblings = memo(() => navHrefs(...all().map(group => group.links)))
+
 // With nothing to list, and nothing loading or failed, the nav draws no landmark, no collapse toggle and no menu button.
 const empty = () => !pending() && !failed() && all().length === 0
 
@@ -186,7 +188,7 @@ snippet destination(entry: NavLink, inPanel: boolean)
     span(part="link" aria-disabled="true" data-hint={folded() && !inPanel ? entry.label : undefined})
       | {inside(entry)}
   else
-    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)} data-tooltip={folded() && !inPanel ? entry.label : undefined})
+    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current, siblings())} data-tooltip={folded() && !inPanel ? entry.label : undefined})
       | {inside(entry)}
 snippet lists(inPanel: boolean)
   nav(part="nav" id={inPanel ? `${navId}-panel` : navId} aria-label={label} data-collapsed={folded() && !inPanel ? '' : undefined} data-panel={panel && !inPanel ? '' : undefined})

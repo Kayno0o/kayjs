@@ -158,3 +158,17 @@ describe('columnStyle', () => {
     expect(columnStyle({ key: 'a', header: 'A', width: '1rem; color: red' })).toBe('--column-width: 1rem color: red')
   })
 })
+
+test('NaN and an invalid date are missing values, sorted last either way, from sortValue: true or a function', () => {
+  const column: Column<{ a: unknown }> = { key: 'a', header: 'a', sortValue: true }
+  const picked = (rows: unknown[], direction: 'asc' | 'desc', by: Column<{ a: unknown }> = column) => sortedRows(rows.map(a => ({ a })), [by], { key: 'a', direction }).map(row => row.a)
+
+  expect(picked([3, Number.NaN, 1, 2], 'asc')).toEqual([1, 2, 3, Number.NaN])
+  expect(picked([3, Number.NaN, 1, 2], 'desc')).toEqual([3, 2, 1, Number.NaN])
+
+  const dates = [new Date('x'), new Date(5), new Date(1)]
+
+  expect(picked(dates, 'asc').map(Number)).toEqual([1, 5, Number.NaN])
+  expect(picked(dates, 'desc').map(Number)).toEqual([5, 1, Number.NaN])
+  expect(picked([3, Number.NaN, 1], 'asc', { ...column, sortValue: row => row.a as number })).toEqual([1, 3, Number.NaN])
+})

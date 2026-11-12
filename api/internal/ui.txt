@@ -2298,8 +2298,11 @@ function selectionSummary<Value extends string | number>(options: readonly Multi
 [./lib/multi-select] toggledValue
 function toggledValue<Value extends string | number>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
 
+[./lib/nav-current] navHrefs
+function navHrefs(...lists: readonly (readonly NavLink[] | undefined)[]): string[]
+
 [./lib/nav-current] navMark
-function navMark(href: string, current: URL | string): "page" | "true" | undefined
+function navMark(href: string, current: URL | string, siblings?: readonly string[]): "page" | "true" | undefined
 
 [./lib/nav-item] NavItem
 interface NavItem

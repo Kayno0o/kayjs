@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { setTimeZone } from '../../../src/runtime/i18n'
 import { monthStarts } from '../src/contribution'
 import { stepIndex } from '../src/cycle'
 import { isPlayable } from '../src/media'
@@ -93,6 +94,25 @@ describe('monthStarts', () => {
   test('labels the column each month starts in, dropping one too close to the next', () => {
     expect(monthStarts(weeks('2026-01-26', 10)).map(start => start.column)).toEqual([0, 4, 9])
     expect(monthStarts(weeks('2026-01-05', 10)).map(start => start.column)).toEqual([0, 3, 7])
+  })
+
+  test('names a month as its days do, in the machine zone, whatever the site timeZone is', () => {
+    const machine = process.env.TZ
+
+    process.env.TZ = 'Europe/Paris'
+    setTimeZone('America/New_York')
+
+    try {
+      expect(monthStarts(weeks('2026-10-01', 10)).map(start => start.label)).toEqual(['Oct', 'Nov', 'Dec'])
+    }
+    finally {
+      setTimeZone(undefined)
+
+      if (machine === undefined)
+        delete process.env.TZ
+      else
+        process.env.TZ = machine
+    }
   })
 })
 

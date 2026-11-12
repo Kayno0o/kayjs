@@ -1,11 +1,11 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { recipe, uid } from 'kay'
+import { memo, recipe, uid } from 'kay'
 import type { NavLink } from './defaults'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SiteNavState from './internal/site-nav-state.kay'
-import { navMark } from './nav-current'
+import { navHrefs, navMark } from './nav-current'
 import { wording } from 'kay/words'
 
 
@@ -51,6 +51,7 @@ const { id, links, link, current, label, menuLabel = wording('ui.siteNav.menu', 
 }>()
 
 const listId = id ?? uid()
+const siblings = memo(() => navHrefs(links))
 const anchor = `--_site-nav-${listId}`
 
 const expanded = (entry: NavLink) => expandLabel.replaceAll('{label}', entry.label)
@@ -71,7 +72,7 @@ snippet destination(entry: NavLink)
     span(part="link" aria-disabled="true")
       | {inside(entry)}
   else
-    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)})
+    a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current, siblings())})
       | {inside(entry)}
 // The list is a popover its toggle opens, so the browser owns showing it, closing it on a press outside or Escape, and giving the focus back; the page swap closes one left open.
 // The toggle is an IconButton's markup with both icons drawn, so CSS shows the close one while the list is open.
