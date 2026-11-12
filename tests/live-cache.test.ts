@@ -476,7 +476,8 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
 
     const offlineAt = connections.length
 
-    await Bun.sleep(1500)
+    // Long enough that several attempts of a reconnect ignoring the network would land in it.
+    await Bun.sleep(5000)
     expect(connections.length).toBe(offlineAt)
     drop = false
     await page.evaluate(() => {
