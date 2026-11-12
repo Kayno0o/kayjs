@@ -2,7 +2,7 @@ import type { Action, Failure, NoInputAction } from '../src/runtime'
 import type { NavigationHooks } from '../src/runtime/navigation'
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
-import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
+import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, throttled, untrack, watch } from '../src/runtime'
 import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
@@ -1736,6 +1736,7 @@ describe('durations as delays', () => {
       stop()
       dispose()
       expect(() => root(() => debounced(typed, 300 as never))).toThrow('a duration here takes its unit')
+      expect(() => root(() => throttled(typed, 300 as never))).toThrow('a duration here takes its unit')
     }
     finally {
       jest.useRealTimers()

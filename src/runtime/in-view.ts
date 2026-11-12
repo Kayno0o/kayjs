@@ -24,6 +24,8 @@ export interface InView {
 export function inView(options: InViewOptions = {}): InView {
   const [visible, setVisible] = ownSignal(false)
   const showing = new Set<Element>()
+  // How many times each element was given to `ref` and not yet let go, so a report queued for a removed element is ignored.
+  const given = new Map<Element, number>()
   let observer: IntersectionObserver | undefined
   let seen = false
 
@@ -35,25 +37,49 @@ export function inView(options: InViewOptions = {}): InView {
     if (typeof IntersectionObserver === 'undefined')
       return () => undefined
 
-    observer ??= new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting)
-          showing.add(entry.target)
-        else
-          showing.delete(entry.target)
-      }
+    if (!observer) {
+      const init: IntersectionObserverInit = { root: options.root ?? null }
 
-      seen ||= showing.size > 0
-      publish()
+      if (options.margin !== undefined)
+        init.rootMargin = options.margin
 
-      if (options.once && seen)
-        observer?.disconnect()
-    }, { root: options.root ?? null, ...options.margin !== undefined && { rootMargin: options.margin }, ...options.threshold !== undefined && { threshold: options.threshold } })
+      if (options.threshold !== undefined)
+        init.threshold = options.threshold
+
+      observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!given.has(entry.target))
+            continue
+
+          if (entry.isIntersecting)
+            showing.add(entry.target)
+          else
+            showing.delete(entry.target)
+        }
+
+        seen ||= showing.size > 0
+        publish()
+
+        if (options.once && seen)
+          observer?.disconnect()
+      }, init)
+    }
+
+    given.set(element, (given.get(element) ?? 0) + 1)
 
     if (!(options.once && seen))
       observer.observe(element)
 
     return () => {
+      const left = (given.get(element) ?? 1) - 1
+
+      if (left > 0) {
+        given.set(element, left)
+
+        return
+      }
+
+      given.delete(element)
       observer?.unobserve(element)
 
       if (showing.delete(element))

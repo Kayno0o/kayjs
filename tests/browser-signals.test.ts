@@ -214,6 +214,28 @@ describe('inView', () => {
   })
 })
 
+describe('a ref given twice', () => {
+  it('is observed until both bindings are let go, and a queued report for a removed element is ignored', () => {
+    FakeObserver.instances = []
+    stub('IntersectionObserver', FakeObserver)
+
+    root(() => {
+      const seen = inView()
+      const stopA = seen.ref(one)
+      const stopB = seen.ref(one)
+      const [observer] = FakeObserver.instances
+
+      stopA()
+      expect(observer!.observed.has(one)).toBe(true)
+      stopB()
+      expect(observer!.observed.has(one)).toBe(false)
+
+      observer!.callback([{ target: one, isIntersecting: true }] as never)
+      expect(seen.visible()).toBe(false)
+    })
+  })
+})
+
 describe('elementSize', () => {
   const measure = (observer: FakeObserver, target: Element, width: number, height: number) =>
     observer.callback([{ target, contentRect: { width, height } }] as never)
@@ -225,6 +247,23 @@ describe('elementSize', () => {
 
       size.ref(one)()
       expect([size.width(), size.height()]).toEqual([0, 0])
+    })
+  })
+
+  it('keeps an element observed until every binding of it is let go', () => {
+    FakeObserver.instances = []
+    stub('ResizeObserver', FakeObserver)
+
+    root(() => {
+      const size = elementSize()
+      const stopA = size.ref(one)
+      const stopB = size.ref(one)
+      const [observer] = FakeObserver.instances
+
+      stopA()
+      expect(observer!.observed.has(one)).toBe(true)
+      stopB()
+      expect(observer!.observed.has(one)).toBe(false)
     })
   })
 

@@ -1313,6 +1313,7 @@ describe('module signals', () => {
   it('finds the signals and memos a module exports as export const, made by kay\'s functions', () => {
     expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'signal' })
     expect(moduleSignals('import { debounced, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const settled = debounced(typed, \'300ms\')\n')).toEqual({ typed: 'signal', settled: 'memo' })
+    expect(moduleSignals('import { throttled, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const slow = throttled(typed, \'300ms\')\n')).toEqual({ typed: 'signal', slow: 'memo' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
   })
 })

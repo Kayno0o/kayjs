@@ -17,6 +17,8 @@ export function elementSize(): ElementSize {
   const [height, setHeight] = ownSignal(0)
   // The elements in the order they were given, each with the size last measured (none before its first measure).
   const elements = new Map<Element, { width: number, height: number } | undefined>()
+  // How many times each element was given to `ref` and not yet let go.
+  const given = new Map<Element, number>()
   let observer: ResizeObserver | undefined
 
   const publish = () => {
@@ -41,10 +43,20 @@ export function elementSize(): ElementSize {
       publish()
     })
 
-    elements.set(element, undefined)
+    given.set(element, (given.get(element) ?? 0) + 1)
+    elements.set(element, elements.get(element))
     observer.observe(element)
 
     return () => {
+      const left = (given.get(element) ?? 1) - 1
+
+      if (left > 0) {
+        given.set(element, left)
+
+        return
+      }
+
+      given.delete(element)
       observer?.unobserve(element)
       elements.delete(element)
       publish()

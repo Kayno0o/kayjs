@@ -652,6 +652,13 @@ describe('uncalled-signal', () => {
     expect(found.map(d => d.message)).toEqual(['`settled` is a memo, read by calling it'])
   })
 
+  it('reports a throttled value left uncalled, a memo kay makes', () => {
+    const source = '---\nimport { throttled, signal } from \'kay\'\n\nconst typed = signal(\'\')\nconst slow = throttled(typed, \'300ms\')\n---\np {slow}\n'
+    const found = compileKay(source, 'search.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
+
+    expect(found.map(d => d.message)).toEqual(['`slow` is a memo, read by calling it'])
+  })
+
   it('leaves a call, a write, a bind and the signal handed whole to a component or a function, which pass the signal itself', () => {
     const source = script('const open = signal(false)', 'button(onClick={() => open++}) {open()}\ninput(aria-label="Open" bind:checked={open})\nToggle(open={open} label={describe(open)})\nbutton(onClick={() => open.set(true)}) Open')
 

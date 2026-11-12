@@ -281,6 +281,33 @@ describe('ref returning a cleanup', () => {
 
   const mountRef = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst on = signal(true)\nconst log: string[] = ((globalThis as any).refLog ??= [])\nconst track = (el: HTMLElement) => {\n  log.push(\'attach \' + el.id)\n  return () => log.push(\'detach \' + el.id)\n}\n---\nbutton#t(onClick={() => on.set(!on())}) toggle\nif on()\n  p#a(ref={track}) a\n' })
 
+  const mountSize = site({ 'main.kay': '---\nimport { elementSize, signal } from \'kay\'\nconst on = signal(true)\nconst size = elementSize()\n---\nbutton#t(onClick={() => on.set(!on())}) toggle\nif on()\n  p#a(ref={size.ref}) a\n' })
+
+  it('has elementSize let go of an element an if removes', async () => {
+    const observed = new Set<Element>()
+    const original = globalThis.ResizeObserver
+
+    globalThis.ResizeObserver = class {
+      observe = (element: Element) => void observed.add(element)
+      unobserve = (element: Element) => void observed.delete(element)
+      disconnect = () => observed.clear()
+    }
+
+    const { root, dispose } = await mountSize()
+
+    try {
+      await settle()
+      expect(observed.size).toBe(1)
+      root.querySelector<HTMLButtonElement>('#t')!.click()
+      await settle()
+      expect(observed.size).toBe(0)
+    }
+    finally {
+      await dispose()
+      globalThis.ResizeObserver = original
+    }
+  })
+
   it('runs the cleanup when the element goes away', async () => {
     const log: string[] = ((globalThis as unknown as { refLog?: string[] }).refLog ??= [])
 
