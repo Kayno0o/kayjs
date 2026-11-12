@@ -23,7 +23,7 @@ interface TreeNodeBase<Id extends TreeId> {
 }
 
 // A node of a TreeView, a branch when it has children, even an empty list of them. `key` tells it apart and is what `selected`, `expanded` and the callbacks carry; `id` is the name it had before 1.100, deprecated: `key` wins when both are given.
-export type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & { key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined } & ({ key: NoInfer<Id> } | { id: NoInfer<Id> })
+export type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & { key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined } & ({ key: NoInfer<Id> } | { id: NoInfer<Id> })
 
 // The identity of a node, its `key` or the older `id`.
 export function nodeKey<Id extends TreeId>(node: { key?: Id | undefined, id?: Id | undefined }): Id {

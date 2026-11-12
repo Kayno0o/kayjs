@@ -108,7 +108,7 @@ export interface CollectionInfo {
   seed?: Record<string, DataValue> | undefined
   // How many entries it holds, every locale's; absent when `problem` says why they fail to read.
   total?: number | undefined
-  /** @deprecated Named `total` since 1.100, as every count of a list is. Removed in 1.103. No lint: a field an app reads cannot be found by `kay check`. */
+  /** @deprecated Named `total` since 1.100, as every count of a list is. Removed in 1.104. No lint: a field an app reads cannot be found by `kay check`. */
   count?: number | undefined
   // Why its entries fail to read, a loader throwing say; `body` is then assumed.
   problem?: string | undefined

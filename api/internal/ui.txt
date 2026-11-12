@@ -144,15 +144,15 @@ function bellItem<Item extends BellItem>(item: Item): Item & { key: string; labe
 
 [./lib/bell] BellItem
 type BellItem = BellItemBase & ({
-  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: string | undefined
+  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: string | undefined
 } | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id: string
+  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id: string
 }) & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ title?: string | undefined
+  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ title?: string | undefined
 } | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ title: string
+  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ title: string
 }) & {
-  href?: string | undefined, /** @deprecated Use `href`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ url?: string | undefined
+  href?: string | undefined, /** @deprecated Use `href`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ url?: string | undefined
 }
 
 [./lib/bell] BellItems
@@ -1847,7 +1847,7 @@ type TreeId = string | number
 
 [./lib/index] TreeNode
 type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
-  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
 } & ({
   key: NoInfer<Id>
 } | {
@@ -3011,7 +3011,7 @@ type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } 
 
 [./lib/tree] TreeNode
 type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
-  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
+  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
 } & ({
   key: NoInfer<Id>
 } | {

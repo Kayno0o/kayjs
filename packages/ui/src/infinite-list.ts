@@ -26,7 +26,7 @@ export interface PageAt<Row> {
 }
 
 // The rows a full page holds: a page of fewer ends the list. It is the `limit` of the window each page asks for, as `PageInput` and `pageFields` name it; `pageSize` is its name before 1.100, which `deprecated-infinite-list-options` rewrites, and `limit` wins when both are given.
-type PageLimit = { limit: number, pageSize?: number | undefined } | { limit?: number | undefined, /** @deprecated Named `limit` since 1.100: it is the window each page asks for. Removed in 1.103; `deprecated-infinite-list-options` rewrites it. */ pageSize: number }
+type PageLimit = { limit: number, pageSize?: number | undefined } | { limit?: number | undefined, /** @deprecated Named `limit` since 1.100: it is the window each page asks for. Removed in 1.104; `deprecated-infinite-list-options` rewrites it. */ pageSize: number }
 
 interface InfiniteListBase<Row> {
   // Tells a row from another, so one already shown is dropped when the list shifts between two pages, and `patch` finds the row to change.
