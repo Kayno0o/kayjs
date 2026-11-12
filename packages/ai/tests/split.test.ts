@@ -53,3 +53,14 @@ it('leaves a single line longer than the limit whole', () => {
   expect(splitMarkdown(text, 50).join('')).toBe(text)
   expect(splitMarkdown(text, 50)[0]).toBe(`${'y'.repeat(200)}\n\n`)
 })
+
+it('never cuts a code fence indented under a list item, whatever its indent', () => {
+  for (const indent of ['  ', '    ', '        ']) {
+    const fence = ['```sh', 'bun add x', 'bun add some-long-package-name another-long-package', '', 'bun run y --flag --other-flag --third-flag', '```'].map(line => `${indent}${line}\n`).join('')
+    const text = `1. Install it:\n\n${fence}\n2. Done\n`
+    const parts = splitMarkdown(text, 60)
+
+    expect(parts.join('')).toBe(text)
+    expect(parts.filter(part => part.includes('bun add x'))[0]).toContain('bun run y')
+  }
+})

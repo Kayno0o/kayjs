@@ -1,5 +1,6 @@
 // Cuts a Markdown body into parts a model can translate one request at a time, joined back they are the body byte for byte.
-const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/
+// Any indent: a fence inside a list item sits four spaces or more in, which only a top-level one would make a code block.
+const FENCE_LINE = /^ *(`{3,}|~{3,})/
 
 interface Block {
   text: string
