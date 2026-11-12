@@ -55,9 +55,9 @@ export function packageOf(input: string): string {
   return path.startsWith('src/') ? 'kay' : 'app'
 }
 
-// The minified bytes each package adds to the chunks a page loads, read from the lines `KAY_SIZE_MODULES` collected.
-export async function packageBytes(file: string, chunks: Iterable<string>): Promise<Record<string, number>> {
-  const text = await Bun.file(file).exists() ? await Bun.file(file).text() : ''
+// The minified bytes each package adds to the chunks a page loads, read from the lines `KAY_SIZE_MODULES` collected; none when nothing was recorded, as for a page measured by hand with `--measure`.
+export async function packageBytes(file: string | undefined, chunks: Iterable<string>): Promise<Record<string, number>> {
+  const text = file !== undefined && await Bun.file(file).exists() ? await Bun.file(file).text() : ''
   const known: ChunkModules = Object.assign({}, ...text.split('\n').filter(Boolean).map(line => JSON.parse(line) as ChunkModules))
   const bytes: Record<string, number> = {}
 

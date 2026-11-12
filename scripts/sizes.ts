@@ -24,7 +24,7 @@ const BENCH: Record<string, string> = { 'bench-products': 'components/counter.ka
 
 // What a page loads up front, with the minified bytes each package adds to it as the builds of this process recorded them.
 async function total(loaded: Map<string, { size: number }>): Promise<Size> {
-  return { gzip: loaded.values().reduce((sum, { size }) => sum + size, 0), files: loaded.size, packages: await packageBytes(process.env.KAY_SIZE_MODULES!, loaded.keys()) }
+  return { gzip: loaded.values().reduce((sum, { size }) => sum + size, 0), files: loaded.size, packages: await packageBytes(process.env.KAY_SIZE_MODULES, loaded.keys()) }
 }
 
 // A copy at a path of its own, the same every run, as Bun hashes chunk names from it.
@@ -190,6 +190,9 @@ const rows = compare(baseline, sizes)
 const failure = growth(rows)
 
 console.log(table(rows))
+
+if (flag === '--report')
+  console.log(`\nMinified bytes by package:\n${PAGES.map(page => `  ${page}: ${Object.entries(sizes[page].packages ?? {}).map(([name, bytes]) => `${name} ${bytes}`).join(', ')}`).join('\n')}`)
 
 const moved = origins(baseline, sizes, rows)
 
