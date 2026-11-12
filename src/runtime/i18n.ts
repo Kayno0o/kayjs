@@ -270,12 +270,12 @@ export function formatNumber(page: string, value: number, given?: NumberFormatOp
 }
 
 // What picks the parts of a date; options naming none of them, an empty object or a lone `timeZone`, get the medium date as no options do.
-const DATE_FIELDS = new Set(['dateStyle', 'timeStyle', 'weekday', 'era', 'year', 'month', 'day', 'dayPeriod', 'hour', 'minute', 'second', 'fractionalSecondDigits', 'timeZoneName'])
+const DATE_FIELD = /Style$|^(?:weekday|era|year|month|day|dayPeriod|hour|minute|second|fractionalSecondDigits|timeZoneName)$/
 
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
-export function formatDate(page: string, value: Date | number, given: DateFormatOptions = { dateStyle: 'medium' }): string {
+export function formatDate(page: string, value: Date | number, given?: DateFormatOptions): string {
   const [locale, named] = withLocale(page, given)
-  const base: Intl.DateTimeFormatOptions = Object.keys(named!).some(key => DATE_FIELDS.has(key)) ? named! : { ...named, dateStyle: 'medium' }
+  const base: Intl.DateTimeFormatOptions = Object.entries(named ?? {}).some(([key, option]) => option !== undefined && DATE_FIELD.test(key)) ? named! : { ...named, dateStyle: 'medium' }
   const options = siteZone === undefined || base.timeZone !== undefined ? base : { ...base, timeZone: siteZone }
 
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)

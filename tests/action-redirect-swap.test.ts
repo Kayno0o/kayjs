@@ -3,6 +3,13 @@ import { expect, it, vi } from 'bun:test'
 import { readActionResponse } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 
+async function until(condition: () => boolean, timeout = 5000): Promise<void> {
+  for (const start = Date.now(); !condition(); await Bun.sleep(5)) {
+    if (Date.now() - start > timeout)
+      throw new Error('timed out')
+  }
+}
+
 // The base is read once per page, so this file keeps to one site mounted under `/app`.
 it('does not put the base on a redirect again when the swap has taken the app over', async () => {
   GlobalRegistrator.register({ url: 'http://localhost/app/admin' })
@@ -28,7 +35,7 @@ it('does not put the base on a redirect again when the swap has taken the app ov
     for (const [target, fetched] of [['/app/about', '/app/about'], ['/app/about/', '/app/about/'], ['/app/fr/about?x=1#top', '/app/fr/about?x=1'], ['/app', '/app'], ['/app/app/x', '/app/app/x']] as const) {
       seen.length = 0
       await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': target } }), '/_kay/action/test/go')).rejects.toMatchObject({ location: target })
-      await Bun.sleep(100)
+      await until(() => seen.length > 0)
       expect(seen).toEqual([fetched])
     }
   }

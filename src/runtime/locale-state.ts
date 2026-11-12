@@ -24,9 +24,12 @@ export function runInLocale<T>(state: LocaleState, run: () => T): T {
 
 // The url of the entry the page shows in each locale having it, which `alternate` gives for another locale instead of the same slug.
 export function shownEntryUrls(state: LocaleState): Record<string, string> | undefined {
-  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
+  return state.entryUrls?.get(shownPath(state.path))
+}
 
-  return state.entryUrls?.get(shown)
+// A page's path as `entryUrls` keys it, without a trailing slash.
+export function shownPath(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
 }
 
 export function localeState(): LocaleState | undefined {

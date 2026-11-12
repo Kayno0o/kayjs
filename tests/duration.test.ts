@@ -67,6 +67,7 @@ describe('duration words', () => {
     expect(wholeSeconds('1.1h', 'x')).toBe(3960)
     expect(wholeSeconds('1.4d', 'x')).toBe(120_960)
     expect(wholeSeconds('0.0004s', 'x')).toBe(1)
+    expect(wholeSeconds('0.0000001s', 'x')).toBe(1)
     expect((['1.1h', '1.4d', '0.3h', '1.7h'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['66 minutes', '2,016 minutes', '18 minutes', '102 minutes'])
   })
 

@@ -13,7 +13,7 @@ import { feedPaths } from '../content/feed'
 import { contentKey } from '../content/key'
 import { onKeysInvalidated } from '../runtime/cache'
 import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, timeZone, translatedPath } from '../runtime/i18n'
-import { localeState, setSiteLocale, shownEntryUrls } from '../runtime/locale-state'
+import { localeState, setSiteLocale, shownEntryUrls, shownPath } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
@@ -512,7 +512,8 @@ export function messagesScript(keys: Set<string>, first: boolean, pinned = false
 
     return message === undefined ? [] : [[key, message]]
   }))
-  const entries = first && !state.implicit ? shownEntryUrls(state) : undefined
+  // Under the page's path, which the browser looks it up by, as a swap brings the next page's own.
+  const entries = first && !state.implicit && shownEntryUrls(state) ? { [shownPath(state.path)]: shownEntryUrls(state) } : undefined
   const parts = [...first ? [`"locale":${escaped(state.locale)}`, ...state.implicit ? [] : [`"settings":${settingsJson(state.settings)}`], ...entries === undefined ? [] : [`"entryUrls":${escaped(entries)}`], ...zone === undefined ? [] : [`"timeZone":${escaped(zone)}`]] : [], `"messages":${escaped(messages)}`, ...now !== undefined ? [`"now":${escaped(now)}`] : []]
 
   return `<script type="application/json" data-kay-i18n>{${parts.join(',')}}</script>`

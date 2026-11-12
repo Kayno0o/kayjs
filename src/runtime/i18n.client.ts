@@ -14,8 +14,8 @@ export { defineMessages } from './i18n'
 interface Payload {
   locale?: string
   settings?: LocaleSettings
-  // The url of the routed entry the page shows in each locale having it, for `alternate`.
-  entryUrls?: Record<string, string>
+  // The url of the routed entry the page shows in each locale having it, by the page's path, for `alternate`.
+  entryUrls?: Record<string, Record<string, string>>
   messages: Record<string, Message>
   // When the server rendered the page, for `relativeTime`.
   now?: number
@@ -27,7 +27,7 @@ const PAYLOAD = 'script[data-kay-i18n]'
 const read = new WeakSet<Payload>()
 const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
-let entryUrls: Record<string, string> | undefined
+const entryUrls: Record<string, Record<string, string>> = {}
 let pageLocale = ''
 let renderedAt: number | undefined
 // Whether a read ran once the page was parsed: the locale and settings are known from then on, a swap to another locale loading the page afresh, so only a missing message and `relativeTime`, for the render time, read again.
@@ -43,11 +43,7 @@ function load(): void {
 
     read.add(payload)
     settings ??= payload.settings
-
-    // Each page names its own entry, so a page swapped in replaces the last one's, with none when it shows no entry.
-    if (payload.locale !== undefined)
-      entryUrls = payload.entryUrls
-
+    Object.assign(entryUrls, payload.entryUrls)
     pageLocale ||= payload.locale ?? ''
     renderedAt ??= payload.now
     noteLinkPayload(payload)
@@ -101,13 +97,18 @@ export function alternate(target: Locale): string {
   const { locale: current } = translations()
   const path = withoutBase(location.pathname)
 
+  // A page swapped in brought its own payload, read now; an entry is found by the path shown, so another page's is never taken.
+  load()
+
   if (!settings)
     return withBase(path)
 
   // The page's own path first, which its locale may translate; a routed entry's translation has a slug of its own.
   const { locale, path: own } = splitLocale(settings, path)
 
-  return withBase(localePath(settings, entryUrls?.[target] ?? untranslatedPath(settings, own, locale ?? current), target, location.host))
+  const page = untranslatedPath(settings, own, locale ?? current)
+
+  return withBase(localePath(settings, entryUrls[page.length > 1 && page.endsWith('/') ? page.slice(0, -1) : page]?.[target] ?? page, target, location.host))
 }
 
 export function locales(): Locale[] {

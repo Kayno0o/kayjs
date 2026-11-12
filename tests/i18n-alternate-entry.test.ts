@@ -37,3 +37,22 @@ it('keeps the same slug for a page that showed no translated entry', () => {
 
   expect(runInLocale(state, () => messagesScript(new Set(), true))).not.toContain('entryUrls')
 })
+
+it('follows a swap: no translated slug on a page without an entry, the new one on another entry page', async () => {
+  const state = { locale: 'en', messages: new Map(), settings, path: '/blog/other', entryUrls }
+  const scripts = (path: string) => runInLocale({ ...state, path }, () => messagesScript(new Set(), true))
+  const { alternate } = await import('../src/runtime/i18n.client')
+
+  history.pushState({}, '', '/app/about')
+  document.head.innerHTML = `<meta name="kay-base" content="/app">${scripts('/about')}`
+  expect(alternate('fr')).toBe('/app/fr/about')
+
+  history.pushState({}, '', '/app/blog/other')
+  document.head.innerHTML = `<meta name="kay-base" content="/app">${scripts('/blog/other')}`
+  expect(alternate('fr')).toBe('/app/fr/blog/autre')
+
+  // A swapped page with no payload of its own never takes the last page's entry.
+  history.pushState({}, '', '/app/about')
+  document.head.innerHTML = '<meta name="kay-base" content="/app">'
+  expect(alternate('fr')).toBe('/app/fr/about')
+})

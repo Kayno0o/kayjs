@@ -122,10 +122,9 @@ export function formatDate(value: Date | number, options?: DateFormatOptions): s
   if (zone === undefined)
     return formatDateIn(here, value, options)
 
-  // The site's zone goes in as given, so the options keep the default `medium` date they have when they name nothing but a locale.
   const { locale, ...rest } = options ?? {}
 
-  return formatDateIn(locale ?? here, value, { timeZone: zone, ...Object.keys(rest).length === 0 ? { dateStyle: 'medium' } : rest })
+  return formatDateIn(locale ?? here, value, { timeZone: zone, ...rest })
 }
 
 // A number as the page's locale writes it, as `kay/i18n`'s `formatNumber` does it, without the rest of that module.

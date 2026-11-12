@@ -72,6 +72,7 @@ describe('the formatters outside a request', () => {
     expect(formatDate(date, {})).toBe('Jan 5, 2024')
     expect(formatDate(date, { timeZone: 'UTC' })).toBe('Jan 5, 2024')
     expect(formatDate(date, { year: 'numeric' })).toBe('2024')
+    expect(formatDate(date, { dateStyle: undefined, year: undefined })).toBe('Jan 5, 2024')
     expect(formatRelativeTime(-2, 'day', { locale: 'fr', numeric: 'always' })).toBe('il y a 2 jours')
   })
 })

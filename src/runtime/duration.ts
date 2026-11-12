@@ -12,9 +12,12 @@ export function isZeroDuration(value: unknown): boolean {
   return (typeof value === 'string' && ZERO_DURATION.test(value))
 }
 
-// Rounded to the microsecond, so `1.1h` is 3960 seconds and not 3960.0000000000005, which a ceiling or a modulo would read as one more.
+// Rounded to the microsecond, so `1.1h` is 3960 seconds and not 3960.0000000000005, which a ceiling or a modulo would read as one more; a span too short to round stays as it is.
 function inSeconds(amount: number, unit: string): number {
-  return Math.round((unit === 'ms' ? amount / 1000 : amount * UNIT_SECONDS[unit as keyof typeof UNIT_SECONDS]) * 1e6) / 1e6
+  const seconds = unit === 'ms' ? amount / 1000 : amount * UNIT_SECONDS[unit as keyof typeof UNIT_SECONDS]
+  const rounded = Math.round(seconds * 1e6) / 1e6
+
+  return rounded > 0 || seconds === 0 ? rounded : seconds
 }
 
 // The seconds a positive duration stands for; `what` names the option in the error anything else throws.

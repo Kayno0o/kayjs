@@ -8,7 +8,7 @@ import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { inlineText, keepHeadMarkup } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
-import { localeState } from '../runtime/locale-state'
+import { localeState, shownEntryUrls } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
 import { CUSTOM_SCRIPT_PATH, TRACKER_TAGS } from './analytics'
@@ -195,8 +195,7 @@ function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | unde
   if (!state || state.implicit)
     return [{ tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }]
 
-  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
-  const entryUrls = state.entryUrls?.get(shown)
+  const entryUrls = shownEntryUrls(state)
   // A routed entry whose translation has another slug points at the translation's own url, as `alternate()` does.
   const copies = localeCopies(state.settings, state.path).map(copy => copy.locale !== undefined && entryUrls?.[copy.locale] !== undefined ? localeCopies(state.settings, entryUrls[copy.locale]!).find(own => own.locale === copy.locale)! : copy)
   const absolute = (copy: LocaleCopy) => `${copy.host === undefined ? origin : `https://${copy.host}${base}`}${slashedPath(copy.path, trailingSlash)}`
