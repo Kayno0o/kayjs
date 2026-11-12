@@ -28,6 +28,7 @@ const KNOWN: Record<string, [name: string, calls: string[], why: string][]> = {
     ['consent', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
   ],
   'install-prompt.ts': [['readAvailable', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read']],
+  'persisted.ts': [['persisted', ['Object.assign'], 'attaches each storage\'s entry to the function the module exports']],
   'push.ts': [
     ['readState', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
   ],

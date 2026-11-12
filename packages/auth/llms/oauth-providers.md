@@ -2,6 +2,12 @@
 
 The presets `oauth: { name: true }` and `oauth: { name: { ...options } }` take, their options and what each provider gives back. The flow itself (state, PKCE, linking, failures) is in [OAuth sign-in, two-factor and passkeys](oauth-passkeys-two-factor.md).
 
+## Common tasks
+
+### Adding a provider
+
+`auth({ oauth: { github: true, x: true } })` in `kay.config.ts` turns on two presets, each reading `<NAME>_CLIENT_ID` and `<NAME>_CLIENT_SECRET` (`X_CLIENT_ID`, `X_CLIENT_SECRET`), which `kay env` lists. An object in place of `true` takes the preset's options: `oauth: { facebook: { version: 'v27.0' } }`. A provider with no preset that speaks OpenID Connect is `oidcProvider({ issuer, name })`, below.
+
 ## Reference
 
 ### Provider presets
