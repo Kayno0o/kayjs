@@ -713,14 +713,14 @@ function claimed(job: "confirms" | "toaster" | "tooltips"): boolean
 type Job = keyof typeof claimants
 
 [./lib/combobox] ComboboxOption
-interface ComboboxOption<Value extends string = string>
+interface ComboboxOption<Value extends string | number = string>
   description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value
 
 [./lib/combobox] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
+type ComboboxOptions<Value extends string | number = string> = OptionsSource<ComboboxOption<Value>>
 
 [./lib/combobox] ComboboxQuery
 type ComboboxQuery = OptionsQuery
@@ -729,13 +729,13 @@ type ComboboxQuery = OptionsQuery
 function enabledIndex(disabled: readonly boolean[], from: number, step: -1 | 1): number
 
 [./lib/combobox] exactOption
-function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined
+function exactOption<Value extends string | number>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined
 
 [./lib/combobox] matchingOptions
-function matchingOptions<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[]
+function matchingOptions<Value extends string | number>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[]
 
 [./lib/combobox] offersCreate
-function offersCreate(options: readonly ComboboxOption<string>[], text: string): boolean
+function offersCreate(options: readonly ComboboxOption<number | string>[], text: string): boolean
 
 [./lib/confirm] answer
 function answer(question: Asked, answered: boolean): void
@@ -1355,14 +1355,14 @@ interface Column<Row>
   width?: number | string
 
 [./lib/index] ComboboxOption
-interface ComboboxOption<Value extends string = string>
+interface ComboboxOption<Value extends string | number = string>
   description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value
 
 [./lib/index] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
+type ComboboxOptions<Value extends string | number = string> = OptionsSource<ComboboxOption<Value>>
 
 [./lib/index] ComboboxQuery
 type ComboboxQuery = OptionsQuery
@@ -1576,7 +1576,7 @@ type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true'
 function messageOf(error: unknown, fallback: string): string
 
 [./lib/index] MultiSelectOption
-interface MultiSelectOption<Value extends string = string>
+interface MultiSelectOption<Value extends string | number = string>
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -2280,23 +2280,23 @@ const MENU_ITEM: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text
 const MENU_LIST: "flex flex-col gap-px p-1 outline-none"
 
 [./lib/multi-select] MultiSelectOption
-interface MultiSelectOption<Value extends string = string>
+interface MultiSelectOption<Value extends string | number = string>
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label: string
   value: Value
 
 [./lib/multi-select] pickedLabels
-function pickedLabels<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[]): string[]
+function pickedLabels<Value extends string | number>(options: readonly MultiSelectOption<Value>[], value: readonly Value[]): string[]
 
 [./lib/multi-select] pickedShown
-function pickedShown<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], shown: readonly MultiSelectOption<Value>[], pick: boolean): Value[]
+function pickedShown<Value extends string | number>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], shown: readonly MultiSelectOption<Value>[], pick: boolean): Value[]
 
 [./lib/multi-select] selectionSummary
-function selectionSummary<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], placeholder: string, counted?: (count: number) => string): string
+function selectionSummary<Value extends string | number>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], placeholder: string, counted?: (count: number) => string): string
 
 [./lib/multi-select] toggledValue
-function toggledValue<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
+function toggledValue<Value extends string | number>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
 
 [./lib/nav-current] navMark
 function navMark(href: string, current: URL | string): "page" | "true" | undefined
