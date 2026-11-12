@@ -1,20 +1,10 @@
 import type { NavLink } from './defaults'
-import { addressHref, ORIGIN } from './tab-nav'
+import { onSite, ORIGIN, parseAddress as parse } from './tab-nav'
 
 const TRAILING_SLASHES = /\/+$/
 
 // A path with a trailing slash is the same page as without one.
 const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHES, '') : path
-
-// A link's address as `currentTab` reads it, against the site's placeholder origin; nothing for a malformed one.
-function parse(href: string): URL | undefined {
-  try {
-    return new URL(addressHref(href), ORIGIN)
-  }
-  catch {
-    return undefined
-  }
-}
 
 // Every enabled link of a navigation, the children under each included, parsed once: what `navMark` weighs a link against.
 export function navAddresses(...lists: readonly (readonly NavLink[] | undefined)[]): URL[] {
@@ -32,12 +22,9 @@ export function navAddresses(...lists: readonly (readonly NavLink[] | undefined)
   return found
 }
 
-// Whether a link's address is on the page's site: a path of the app, or an address on the page's own origin.
-const sameSite = (own: URL, here: URL) => own.origin === ORIGIN || own.origin === here.origin
-
 // Whether the page `here` holds every param the link `own` sets; a link to another origin is never the page.
 function holds(own: URL, here: URL): boolean {
-  return sameSite(own, here) && trimmed(own.pathname) === trimmed(here.pathname) && [...own.searchParams].every(([name, value]) => here.searchParams.getAll(name).includes(value))
+  return onSite(own, here) && trimmed(own.pathname) === trimmed(here.pathname) && [...own.searchParams].every(([name, value]) => here.searchParams.getAll(name).includes(value))
 }
 
 // How a navigation link stands to the page on screen, `current` being its path or its URL: `page` for the page itself, `true` for a section holding it, nothing else.
@@ -58,5 +45,5 @@ export function navMark(href: string, current: string | URL, siblings: readonly 
 
   const path = trimmed(own.pathname)
 
-  return sameSite(own, here) && own.search === '' && path !== '/' && trimmed(here.pathname).startsWith(`${path}/`) ? 'true' : undefined
+  return onSite(own, here) && own.search === '' && path !== '/' && trimmed(here.pathname).startsWith(`${path}/`) ? 'true' : undefined
 }

@@ -2823,8 +2823,14 @@ function currentTab(links: readonly TabLink[], current: URL | string): string | 
 [./lib/tab-nav] keptHref
 function keptHref(href: string, current: URL | string, keep: readonly string[]): string
 
+[./lib/tab-nav] onSite
+function onSite(own: URL, here: URL): boolean
+
 [./lib/tab-nav] ORIGIN
 const ORIGIN: "http://kay.invalid"
+
+[./lib/tab-nav] parseAddress
+function parseAddress(href: string): URL | undefined
 
 [./lib/tab-nav] TabEntry
 interface TabEntry extends NavItem

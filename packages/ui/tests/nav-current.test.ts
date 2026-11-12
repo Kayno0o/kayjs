@@ -62,3 +62,18 @@ test('navAddresses lists every enabled, well-formed link and the children under 
 
   expect(found.map(url => url.pathname + url.search)).toEqual(['/a', '/a?x=1'])
 })
+
+describe('addresses on the page\'s own host', () => {
+  test('a protocol-relative link takes the page\'s scheme, an absolute own-origin link is read as written, base path included', () => {
+    const page = new URL('https://example.com/x')
+
+    expect(navMark('//example.com/x', page)).toBe('page')
+    expect(navMark('//other.com/x', page)).toBeUndefined()
+
+    const based = new URL('https://example.com/base/settings')
+
+    expect(navMark('https://example.com/base/settings', based)).toBe('page')
+    expect(navMark('https://example.com/base/settings', new URL('https://example.com/settings'))).toBeUndefined()
+    expect(navMark('https://example.com/base', based)).toBe('true')
+  })
+})

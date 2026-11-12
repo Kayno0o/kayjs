@@ -58,3 +58,16 @@ describe('currentTab', () => {
     expect(currentTab([{ href: '/traffic', prefix: true }], '/traffic/requests/12')).toBeUndefined()
   })
 })
+
+describe('currentTab and other sites', () => {
+  test('never marks a link to another site, a protocol-relative or absolute one of the page\'s own host as written', () => {
+    const page = new URL('https://example.com/settings')
+
+    expect(currentTab(links('https://other.com/settings'), page)).toBeUndefined()
+    expect(currentTab(links('//other.com/settings', '/settings'), page)).toBe('/settings')
+    expect(currentTab(links('//example.com/settings'), page)).toBe('//example.com/settings')
+    expect(currentTab(links('http://'), page)).toBeUndefined()
+    expect(currentTab(links('https://example.com/base/settings'), new URL('https://example.com/base/settings'))).toBe('https://example.com/base/settings')
+    expect(currentTab(links('https://example.com/base/settings'), page)).toBeUndefined()
+  })
+})

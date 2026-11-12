@@ -8,6 +8,19 @@ export const ORIGIN = 'http://kay.invalid'
 
 const TRAILING_SLASH = /\/$/
 
+// A link's address as the page's address spells it, against the site's placeholder origin; nothing for a malformed one.
+export function parseAddress(href: string): URL | undefined {
+  try {
+    return new URL(addressHref(href), ORIGIN)
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Whether a parsed link is on the page's site: a path of the app, or an address on the page's own host, whatever its scheme, so `//example.com/x` is the page's own on `https://example.com/x`; another site's link is never current.
+export const onSite = (own: URL, here: URL) => own.origin === ORIGIN || own.host === here.host
+
 // `href` as the page's address spells it: in the page's locale, under no mount point, which is how the address of the page on screen reads.
 // Where nothing renders a locale, such as a unit test, and for a relative or other site's href, it stays as written.
 export function addressHref(href: string): string {
@@ -79,9 +92,9 @@ function isCurrentTab(href: string, current: string | URL): boolean {
   if (typeof current === 'string')
     return href === current || addressHref(href) === current
 
-  const target = new URL(addressHref(href), current)
+  const target = parseAddress(href)
 
-  return trimmed(target.pathname) === trimmed(current.pathname) && [...target.searchParams].every(([name, value]) => current.searchParams.getAll(name).includes(value))
+  return target !== undefined && onSite(target, current) && trimmed(target.pathname) === trimmed(current.pathname) && [...target.searchParams].every(([name, value]) => current.searchParams.getAll(name).includes(value))
 }
 
 // `href` carrying each param `keep` names from `current`, unless the link sets that param itself; a relative `href` stays relative.
