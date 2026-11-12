@@ -5,7 +5,7 @@ import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, throttled, untrack, watch } from '../src/runtime'
 import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
-import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
+import { catchError, createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
 import { eventually, turn } from './helpers/eventually'
 
@@ -110,6 +110,130 @@ describe('memos', () => {
     flush()
     expect(runs).toBe(2)
     dispose()
+  })
+})
+
+describe('a memo that throws', () => {
+  const failing = () => {
+    const errors: unknown[] = []
+    const spy = spyOn(console, 'error').mockImplementation((...args) => void errors.push(args))
+    const [source, set] = createSignal(0)
+    const m = memo(() => {
+      if (source() === 1)
+        throw new Error('boom')
+
+      return source() * 10
+    })
+
+    return { errors, spy, source, set, m }
+  }
+
+  it('keeps an effect reading it subscribed, reporting the throw once', () => {
+    const { errors, spy, set, m } = failing()
+
+    try {
+      root(() => {
+        const seen: number[] = []
+
+        effect(() => void seen.push(m()))
+        flush()
+        set(1)
+        flush()
+        set(2)
+        flush()
+        set(3)
+        flush()
+        expect(seen).toEqual([0, 20, 30])
+        expect(errors).toHaveLength(1)
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('keeps a render effect reading it subscribed', () => {
+    const { spy, set, m } = failing()
+
+    try {
+      root(() => {
+        const seen: number[] = []
+
+        renderEffect(() => void seen.push(m()))
+        set(1)
+        flush()
+        set(2)
+        flush()
+        expect(seen).toEqual([0, 20])
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('throws on each read until its sources change, never handing out the value before', () => {
+    const { spy, set, m } = failing()
+
+    try {
+      root(() => {
+        expect(m()).toBe(0)
+        set(1)
+        expect(() => m()).toThrow('boom')
+        expect(() => m()).toThrow('boom')
+        set(2)
+        expect(m()).toBe(20)
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('reaches the error boundary of the effect reading it, through nested memos, and the effect runs again after', () => {
+    const [source, set] = createSignal(0)
+    const inner = memo(() => {
+      if (source() === 1)
+        throw new Error('inner')
+
+      return source()
+    })
+    const outer = memo(() => inner() + 1)
+    const caught: string[] = []
+    const seen: number[] = []
+
+    root(() => {
+      catchError(() => effect(() => void seen.push(outer())), error => void caught.push((error as Error).message))
+      flush()
+      set(1)
+      flush()
+      set(2)
+      flush()
+    })
+
+    expect(caught).toEqual(['inner'])
+    expect(seen).toEqual([1, 3])
+  })
+
+  it('runs what read it again when it recovers to the value it had before the throw', () => {
+    const { spy, set, m } = failing()
+
+    try {
+      root(() => {
+        const seen: number[] = []
+
+        effect(() => void seen.push(m()))
+        flush()
+        set(1)
+        flush()
+        set(0)
+        flush()
+        expect(seen).toEqual([0, 0])
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
   })
 })
 
