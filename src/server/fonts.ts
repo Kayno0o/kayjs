@@ -247,6 +247,11 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   const { fontsource, weights, styles = ['normal'], display, preload } = font
   let file: string
 
+  for (const [old, name] of [['subset', 'subsets'], ['weight', 'weights']] as const) {
+    if (old in font)
+      throw new KayError('font-invalid', `kay: the font ${fontsource} sets ${old}, which 1.102 dropped; write ${name}, a list`)
+  }
+
   try {
     file = Bun.resolveSync(`${fontsource}/metadata.json`, root)
   }
@@ -255,11 +260,6 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   }
 
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
-
-  for (const [old, name] of [['subset', 'subsets'], ['weight', 'weights']] as const) {
-    if (old in font)
-      throw new KayError('font-invalid', `kay: the font ${fontsource} sets ${old}, which 1.102 dropped; write ${name}, a list`)
-  }
 
   const subsets = font.subsets ?? [metadata.defSubset]
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
