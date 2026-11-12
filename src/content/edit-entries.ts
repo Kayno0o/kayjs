@@ -824,14 +824,11 @@ function decodedData(collection: Collection<unknown>, entry: Omit<SourceEntry, '
 
 // Whether the collection's `draft` holds the entry back, a function reading its body compiled for the `excerpt` and `html`.
 export async function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draft'>, data: unknown): Promise<boolean> {
-  const { draft } = collection.options
+  // The body compiles only for a function that reads what compiling gives, so one reading the data alone costs a list nothing.
+  let reads = false
+  const first = sourceDraft(collection, entry, data, undefined, () => reads = true)
 
-  if (draft === undefined)
-    return false
-
-  const compiled = typeof draft === 'function' && entry.body !== undefined ? await compiledSource(entry.body, await compileOptions(collection, entry.slug, entry.locale)) : undefined
-
-  return sourceDraft(collection, entry, data, compiled)
+  return reads && typeof collection.options.draft === 'function' && entry.body !== undefined ? sourceDraft(collection, entry, data, await compiledSource(entry.body, await compileOptions(collection, entry.slug, entry.locale))) : first
 }
 
 // The options the build compiles an entry's body with, hooks bound to the entry as the build names it: its file from the project root for a folder's, the loader's name and the locale and slug for a loaded one's.

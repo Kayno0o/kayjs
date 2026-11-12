@@ -127,7 +127,7 @@
     "complexity": 41
   },
   "src/content/edit-entries.ts": {
-    "max-lines": 629
+    "max-lines": 627
   },
   "src/content/index.ts": {
     "max-lines-per-function": 214

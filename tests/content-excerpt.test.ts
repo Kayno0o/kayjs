@@ -4,7 +4,7 @@ import { mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { $ } from 'bun'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { collection } from '../src/content'
 import { draftOf } from '../src/content/edit-entries'
@@ -12,6 +12,7 @@ import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
 import { heldBack } from '../src/content/held-back'
 import { bodiesFile, contentPlace, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import * as markdownModule from '../src/content/markdown'
 import { gitSpawns } from '../src/content/modified'
 import { slugsOf, writeContentManifests } from '../src/content/server'
 import { html } from '../src/runtime/html'
@@ -394,6 +395,23 @@ describe('the CMS\'s reading of a draft function', () => {
 
       expect(await draftOf(posts, source('WIP: later'), { title: 'T' })).toBe(true)
       expect(await draftOf(posts, source('Done later'), { title: 'T' })).toBe(false)
+    })
+  })
+
+  it('compiles the body only when the function reads the excerpt or html', async () => {
+    await inProject({ 'p/a.md': post('x') }, async () => {
+      const source = { slug: 'a', path: 'p/a.md', data: { title: 'T' }, body: 'Hello' }
+      const compile = spyOn(markdownModule, 'compileMarkdown')
+
+      try {
+        expect(await draftOf(collection('p', { schema, draft: entry => entry.data.title === 'T' && entry.body === 'Hello' }), source, { title: 'T' })).toBe(true)
+        expect(compile).not.toHaveBeenCalled()
+        expect(await draftOf(collection('p', { schema, draft: entry => entry.excerpt === 'Hello' }), source, { title: 'T' })).toBe(true)
+        expect(compile).toHaveBeenCalledTimes(1)
+      }
+      finally {
+        compile.mockRestore()
+      }
     })
   })
 })
