@@ -1,10 +1,11 @@
 import type { RateLimit, RateWindow } from 'kay'
 import type { Core } from './core'
 import type { AuthLimiters } from './rates'
-import { configError, durationSeconds } from 'kay/library'
+import { configError, durationSeconds, limitRefused } from 'kay/library'
 
 // `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`, counted in `store` when given. kayjs-auth counts under keys of its own, so it takes no `key`.
-export type AuthRateLimit = Omit<RateLimit, 'key'>
+// A `rateLimit()` object is not taken: its counter is under the client's address, where kayjs-auth counts under keys of its own. `onLimit` is told of each attempt refused.
+export type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
 
 // The limits of one bucket once resolved: the first, which the lockouts read `max` of, and the others counted beside it.
 export type LimitSet = [AuthRateLimit, ...AuthRateLimit[]]
@@ -80,9 +81,15 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
 
       if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
         throw configError('auth', 'rateLimit', `${place}.store has no hit(key, window) method; give it a RateStore`)
+
+      if (limit.onLimit !== undefined && typeof limit.onLimit !== 'function')
+        throw configError('auth', 'rateLimit', `${place}.onLimit is not a function; give it a function of the refusal`)
+
+      if (typeof (limit as { hit?: unknown }).hit === 'function')
+        throw configError('auth', 'rateLimit', `${place} is a rateLimit() object, which counts under the client's address; kayjs-auth counts under keys of its own, so give it { max, window, store?, onLimit? }`)
     }
 
-    limits[name] = list.map(({ max, window, store }) => ({ max, window, store })) as LimitSet
+    limits[name] = list.map(({ max, window, store, onLimit }) => ({ max, window, store, onLimit })) as LimitSet
   }
 
   return limits
@@ -93,8 +100,12 @@ export async function spend(rates: AuthLimiters, key: string, limits: LimitSet):
   let over = false
 
   for (const [index, limit] of limits.entries()) {
-    if (await rates(limit).enforce(apart(key, index)) !== undefined)
+    const wait = await rates(limit).enforce(apart(key, index))
+
+    if (wait !== undefined) {
       over = true
+      limitRefused('kayjs-auth', limit, { key, wait })
+    }
   }
 
   return over
@@ -111,8 +122,15 @@ export async function tally(rates: AuthLimiters, key: string, limits: LimitSet):
   let beside = false
 
   for (const [index, limit] of limits.entries()) {
-    if (index > 0 && (await rates(limit).hit(apart(key, index))).count > limit.max)
+    if (index === 0)
+      continue
+
+    const window = await rates(limit).hit(apart(key, index))
+
+    if (window.count > limit.max) {
       beside = true
+      limitRefused('kayjs-auth', limit, { key, wait: secondsTo(window.resetAt) })
+    }
   }
 
   return { ...first, beside }
@@ -132,11 +150,20 @@ function apart(key: string, index: number): string {
 // Whether the count under `key` has reached `max` in any limit of the bucket.
 export async function reached(rates: AuthLimiters, key: string, limits: LimitSet): Promise<boolean> {
   for (const [index, limit] of limits.entries()) {
-    if (((await rates(limit).peek(apart(key, index)))?.count ?? 0) >= limit.max)
+    const window = await rates(limit).peek(apart(key, index))
+
+    if (window && window.count >= limit.max) {
+      limitRefused('kayjs-auth', limit, { key, wait: secondsTo(window.resetAt) })
+
       return true
+    }
   }
 
   return false
+}
+
+function secondsTo(resetAt: number): number {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
 }
 
 // A limit that only names a window in milliseconds, for a count nothing is refused by.

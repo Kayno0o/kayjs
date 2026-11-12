@@ -1,0 +1,7 @@
+--- server
+import { action } from 'kay'
+import { visits } from '../limits'
+
+export const post = action(() => 'ok', { protect: { rateLimit: visits } })
+---
+h1 Home

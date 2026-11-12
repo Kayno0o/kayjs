@@ -1,0 +1,6 @@
+--- server
+import { section } from '../../limits'
+
+export const page = { rateLimit: section }
+---
+slot

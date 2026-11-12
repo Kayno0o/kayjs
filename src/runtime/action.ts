@@ -71,6 +71,9 @@ export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionCo
   for (const limit of [protection?.rateLimit ?? []].flat()) {
     durationSeconds(limit.window, 'rateLimit.window')
 
+    if (limit.onLimit !== undefined && typeof limit.onLimit !== 'function')
+      throw new Error('kay: a rateLimit has an onLimit that is not a function; it takes a function of the refusal')
+
     if (limit.count === 'succeeded' && limit.store && !limit.store.peek)
       throw new Error('kay: a rateLimit counting only the posts that went through reads its count before the handler runs, so its store needs a peek(key) method')
   }

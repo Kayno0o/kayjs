@@ -3,8 +3,8 @@ import type { GuardContext } from '../runtime'
 import type { RateLimit } from '../runtime/action'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
-import { actionKey, clientAddress, makeLimiter, rateKey, waitFor } from './protection'
-import { refused, SHARED } from './rate-refusal'
+import { actionKey, clientAddress, makeLimiter, rateKey, shareLimiter, waitFor } from './protection'
+import { refused } from './rate-refusal'
 import { kayWord } from './words'
 
 // What `rateLimit()` returns: the limit itself, so it goes wherever a `RateLimit` does (an action's `protect.rateLimit`, `api({ rateLimit })`, `page.rateLimit`) and every place counts in its one counter.
@@ -12,7 +12,7 @@ export interface RateLimiter extends RateLimit {
   // Counts an attempt from the request's client, or under the app's own key such as an account id: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
   // `weight` counts that many at once, the tokens a reply used say, against a `max` of tokens.
   hit: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<number | undefined>
-  // Counts the request as a guard's `ctx` holds it, under its `key` or the client's address, and once over the limit sets `Retry-After` and denies with 429, `message` (a text or a function of the seconds to wait) in place of kay's.
+  // Not `limiter().enforce(key, weight)`, which takes a key and answers the seconds to wait. This one takes a guard's `ctx`: it counts the request under the limit's `key` or the client's address and, once over the limit, sets `Retry-After` and denies with 429, `message` (a text or a function of the seconds to wait) in place of kay's.
   enforce: (ctx: Pick<GuardContext, 'request' | 'headers' | 'deny' | 'locale' | 'cookies' | 'locals'>, message?: string | ((wait: number) => string)) => Promise<void>
 }
 
@@ -48,7 +48,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
     },
     enforce: async (ctx, message) => {
       const { request } = ctx
-      const key = await actionKey(name, limit, request, clientAddress(request, undefined), () => ({ request, locale: ctx.locale, cookies: ctx.cookies, locals: ctx.locals }))
+      const key = await actionKey(name, limiter, request, clientAddress(request, undefined), () => ({ request, locale: ctx.locale, cookies: ctx.cookies, locals: ctx.locals }))
       const wait = await hit(key, 1, request)
 
       if (wait === undefined)
@@ -59,5 +59,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
     },
   }
 
-  return Object.assign(limiter, { [SHARED]: counting })
+  shareLimiter(limiter, counting)
+
+  return limiter
 }

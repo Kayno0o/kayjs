@@ -532,7 +532,7 @@ interface AuthProofOfWorkOptions
   store?: RateStore | undefined
 
 [.] AuthRateLimit
-type AuthRateLimit = Omit<RateLimit, 'key'>
+type AuthRateLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
 
 [.] AuthRates
 type AuthRates = RateStore

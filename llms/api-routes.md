@@ -190,7 +190,7 @@ export default api()
 
 - `api({ rateLimit: { max: 60, window: '1m' } })` lets one client send `max` requests to the module's routes every `window`, then answers 429 with `Retry-After` and `Too many requests; try again in N s`.
 - A route sets its own in its `detail`, `.post('/send', send, { detail: { rateLimit: { max: 5, window: '1m' }, maxSize: '4kb' } })`: counted apart from the module's, which also applies, one limit for every value of a param, a wildcard and an optional segment, and for a route answering every method, `all`, whichever one.
-- `rateLimit` takes a list, `key`, `store` and `window` as an action's does (see [Rate limits](rate-limits.md)).
+- `rateLimit` takes a list, `key`, `store`, `window` and `onLimit` as an action's does (see [Rate limits](rate-limits.md)). The object `rateLimit(name, ...)` returns goes there too (`api({ rateLimit: visits })`) and counts in the same counter as the guards and actions using it; `visits.enforce(ctx)` in the module's guard answers its 429 in one call.
 - It counts after the module's guards, so a caller they refuse costs no allowance and `key: ctx => ctx.locals.user?.id` reads what they and `derive` set; `ctx` also holds `request`, `locale`, `cookies` and `client`.
 - A refusal carries the module's `cors` grant, so the calling page reads it.
 - `maxSize` in a route's `detail` is the most it may be sent, a size or bytes, in place of the module's and the app's; a bigger request answers 413 before it is read.

@@ -1,10 +1,11 @@
+import type { RateLimitRefusal } from 'kay'
 import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout, setSystemTime, spyOn } from 'bun:test'
 import { nameUser } from 'kay/library'
-import { files, memoryRates, sqliteRates } from 'kay/server'
+import { files, memoryRates, rateLimit, sqliteRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
@@ -121,6 +122,19 @@ describe('ai({ rateLimit })', () => {
 
     expect(refused.retryAfter).toBeGreaterThan(60)
     expect(refused.retryAfter).toBeLessThanOrEqual(3600)
+  })
+
+  it('tells onLimit of each ask it refuses, and refuses an onLimit that is no function or a rateLimit() object', async () => {
+    const seen: RateLimitRefusal[] = []
+
+    ai({ rateLimit: { max: 1, window: '1m', onLimit: refusal => void seen.push(refusal) } })
+    await ask('a', { key: 'v' })
+    expect(seen).toHaveLength(0)
+    await failure(ask('b', { key: 'v' }))
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({ name: 'ai:limit', wait: expect.any(Number) as number })
+    expect(() => ai({ rateLimit: { max: 1, window: '1m', onLimit: 'log' as never } })).toThrow('onLimit')
+    expect(() => ai({ rateLimit: rateLimit('shared', { max: 1, window: '1m' }) as never })).toThrow('rateLimit() object')
   })
 
   it('refuses an empty list as it refuses a limit with no max', () => {

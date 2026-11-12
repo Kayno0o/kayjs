@@ -6,7 +6,7 @@ import type { ModelsOptions } from './models'
 import type { AskHooks, Piece, Resilience, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { configError, currentRequest, durationSeconds, keyedDigest, knownAddress, limiter, userOf } from 'kay/library'
+import { configError, currentRequest, durationSeconds, keyedDigest, knownAddress, limiter, limitRefused, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -22,7 +22,8 @@ let storeTimeoutMs = 5000
 
 // How many asks a visitor makes in a window: kay's `RateLimit` without its `key`, which `ai({ key })` names for the whole library.
 // The store is the app's `store.rates` unless given, else this process's memory: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
-export type AskLimit = Omit<RateLimit, 'key'>
+// A `rateLimit()` object is not taken: its counter is under the client's address, where kayjs-ai counts under keys of its own. `onLimit` is told of each ask refused for it.
+export type AskLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
 
 // How many tokens, input and output, the replies to a visitor may use in a window, and to all visitors with `total`.
 export interface BudgetOptions {
@@ -55,7 +56,7 @@ interface Counter {
 }
 
 interface Settings {
-  limit: (Counter & { max: number })[]
+  limit: (Counter & { max: number, name: string, onLimit: AskLimit['onLimit'] })[]
   budget: (Counter & { tokens: number, total: number | undefined }) | undefined
   key: AiOptions['key']
 }
@@ -126,7 +127,13 @@ function settingsOf({ rateLimit, budget, key }: AiOptions, memories: Map<string,
       const what = Array.isArray(chosenLimit) ? `ai({ rateLimit })[${index}]` : 'ai({ rateLimit })'
       const name = index === 0 ? 'ai:limit' : `ai:limit#${index}`
 
-      return { max: wholeNumber(own.max, `${what}.max`), ms: durationSeconds(own.window, `${what}.window`) * 1000, counting: counterOf(name, own, memoryFor(memories, index === 0 ? 'limit' : `limit#${index}`)) }
+      if (own.onLimit !== undefined && typeof own.onLimit !== 'function')
+        throw configError('ai', 'rateLimit', `${what}.onLimit is not a function; give it a function of the refusal`)
+
+      if (typeof (own as { hit?: unknown }).hit === 'function')
+        throw configError('ai', 'rateLimit', `${what} is a rateLimit() object, which counts under the client's address; kayjs-ai counts under keys of its own, so give it { max, window, store?, onLimit? }`)
+
+      return { name, onLimit: own.onLimit, max: wholeNumber(own.max, `${what}.max`), ms: durationSeconds(own.window, `${what}.window`) * 1000, counting: counterOf(name, own, memoryFor(memories, index === 0 ? 'limit' : `limit#${index}`)) }
     })
   }
 
@@ -277,8 +284,12 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
       for (const own of limit) {
         const window = checked(await bounded(async () => own.counting.hit(key)))!
 
-        if (window.count > own.max && (over === undefined || window.resetAt > over))
-          over = window.resetAt
+        if (window.count > own.max) {
+          limitRefused(own.name, own, { key, wait: seconds(window.resetAt), request: asker.request })
+
+          if (over === undefined || window.resetAt > over)
+            over = window.resetAt
+        }
       }
 
       if (over !== undefined)

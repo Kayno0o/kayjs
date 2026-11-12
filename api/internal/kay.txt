@@ -1135,6 +1135,9 @@ interface LimiterOptions
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
+[./library] limitRefused
+function limitRefused(name: string, limit: Pick<RateLimit, "onLimit">, event: Omit<RateLimitRefusal, "name">): void
+
 [./library] LISTENED_IDLE_MS
 const LISTENED_IDLE_MS: 30000
 

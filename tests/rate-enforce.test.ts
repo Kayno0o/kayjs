@@ -1,7 +1,20 @@
 import type { RateLimitRefusal } from 'kay'
-import { describe, expect, it, spyOn } from 'bun:test'
+import type { Action } from '../src/runtime'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { memoryRates, rateLimit } from 'kay/server'
+import { action } from '../src/runtime'
 import { apiLimitWait, protectionRefusal } from '../src/server/protection'
+import { checkApiLimit } from '../src/server/rate-refusal'
+import { testSite } from '../src/test'
+import { eventually } from './helpers/eventually'
+
+const root = 'tests/fixtures/rate-shared'
+const site = await testSite({ root, islands: false, requireGuards: false })
+const { seen } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/limits.ts')) as typeof import('./fixtures/rate-shared/src/limits')
+const { post } = await import(join(import.meta.dir, 'fixtures/rate-shared/src/routes/index.kay')) as { post: Action<Record<never, never>, string> }
+
+afterAll(async () => site.close())
 
 const refusalOptions = { body: {}, form: false, server: null, plain: false }
 const request = (headers: Record<string, string> = {}) => new Request('http://localhost/', { method: 'POST', headers })
@@ -93,6 +106,34 @@ describe('a limit object shared with an action', () => {
     expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
   })
 
+  it('counts a copy of the object apart, whatever it overrides', async () => {
+    const limit = rateLimit('shared-copy', { max: 1, window: '1m', store: memoryRates() })
+    const copy = { ...limit, max: 5 }
+    const action = { url: '/_kay/action/copy', protection: { rateLimit: copy } } as never
+
+    await limit.enforce(guardContext(request()).ctx)
+    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+
+    // The guard's counter is over its max of 1, yet the copy has a window and max of its own.
+    for (let posts = 0; posts < 5; posts++)
+      expect(await protectionRefusal(action, request(), refusalOptions)).toBeUndefined()
+
+    expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
+  })
+
+  it('counts a shared object on a page limit with a guard, and tells onLimit', async () => {
+    const seenHere: RateLimitRefusal[] = []
+    const limit = rateLimit('shared-page', { max: 1, window: '1m', store: memoryRates(), onLimit: refusal => void seenHere.push(refusal) })
+    const pageLimits = [{ name: '/section', limit }]
+    const context = () => ({ request: request(), locale: 'en', cookies: {}, locals: {} }) as never
+
+    expect(await apiLimitWait(pageLimits, request(), null, context)).toBeUndefined()
+    await expect(limit.enforce(guardContext(request()).ctx)).rejects.toThrow('denied')
+    expect(seenHere).toHaveLength(1)
+    expect(await apiLimitWait(pageLimits, request(), null, context)).toBeGreaterThan(0)
+    expect(seenHere).toHaveLength(2)
+  })
+
   it('keeps a plain options object counting as before, apart from the shared one', async () => {
     const limit = rateLimit('shared-apart', { max: 1, window: '1m', store: memoryRates() })
     const plain = { url: '/_kay/action/plain', protection: { rateLimit: { max: 1, window: '1m' } } } as never
@@ -103,7 +144,31 @@ describe('a limit object shared with an action', () => {
   })
 })
 
+describe('a site with one limit on a guard, an action and a layout', () => {
+  it('counts the guard and the action together, and the pages of the layout together', async () => {
+    expect(await site.call(post, {})).toBe('ok')
+    expect((await site.visit('/guarded')).status).toBe(200)
+    expect((await site.refusal(post, {})).status).toBe(429)
+
+    const refused = await site.fetch('/guarded')
+
+    expect(refused.status).toBe(429)
+    expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(seen.map(({ name }) => name)).toEqual(expect.arrayContaining(['shared-fixture']))
+
+    expect((await site.fetch('/section/one')).status).toBe(200)
+    expect((await site.fetch('/section/two')).status).toBe(200)
+    expect((await site.fetch('/section/one')).status).toBe(429)
+    expect(seen.at(-1)?.request).toBeInstanceOf(Request)
+  })
+})
+
 describe('onLimit', () => {
+  it('is refused when it is not a function', () => {
+    expect(() => checkApiLimit('GET /x', { max: 1, window: '1m', onLimit: 'log' as never })).toThrow('onLimit')
+    expect(() => action(() => 'ok', { protect: { rateLimit: { max: 1, window: '1m', onLimit: 'log' as never } } })).toThrow('onLimit')
+  })
+
   it('is told of each refusal of an action, a guard and an API route, never of one let through', async () => {
     const seen: RateLimitRefusal[] = []
     const onLimit = (refusal: RateLimitRefusal) => void seen.push(refusal)
@@ -149,8 +214,7 @@ describe('onLimit', () => {
         expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
       }
 
-      await Bun.sleep(5)
-      expect(warn).toHaveBeenCalled()
+      await eventually(() => expect(warn).toHaveBeenCalledTimes(2))
     }
     finally {
       warn.mockRestore()

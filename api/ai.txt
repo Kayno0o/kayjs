@@ -105,7 +105,7 @@ interface AskHooks
   onToolCall?: Hook<AiToolCall> | undefined
 
 [.] AskLimit
-type AskLimit = Omit<RateLimit, 'key'>
+type AskLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
 
 [.] AskOptions
 interface AskOptions extends AskHooks, Resilience

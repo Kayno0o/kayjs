@@ -20,7 +20,7 @@ import { checkRequestIdHeader } from './config-limits'
 import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
-import { refused, SHARED } from './rate-refusal'
+import { refused } from './rate-refusal'
 import { onReload } from './reload'
 import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
@@ -311,7 +311,7 @@ export interface Limiter {
   peek: (key: string) => Promise<RateWindow | undefined>
   // Forgets the window under `key`. A store with no `reset` has the count taken off with a hit of the negative weight, which leaves an empty window open.
   reset: (key: string) => Promise<void>
-  // Counts an attempt and answers the seconds to wait once the count is past `max`, else undefined.
+  // Counts an attempt under `key` and answers the seconds to wait once the count is past `max`, else undefined; it answers and refuses nothing. Not `rateLimit().enforce(ctx)`, which takes a guard's context and denies with 429.
   enforce: (key: string, weight?: number) => Promise<number | undefined>
   // Takes back one attempt `hit` counted in the window closing at `resetAt`; false when the store has no `refund`.
   refund: (key: string, resetAt: number) => Promise<boolean>
@@ -400,9 +400,15 @@ export function makeLimiter({ name, max, ms, store: given, failure, memory }: { 
 
 // The limiter of each limit an action or API route declares, made once.
 const limiters = new WeakMap<object, Limiter>()
+// The limiter of each object `rateLimit()` returned, which every place taking that object counts in; a copy of the object, a spread say, is another limit and counts apart.
+const sharedLimiters = new WeakMap<object, Limiter>()
+
+export function shareLimiter(limit: object, counting: Limiter): void {
+  sharedLimiters.set(limit, counting)
+}
 
 function limiterOf(entry: { name: string, limit: RateLimit }): Limiter {
-  const shared = (entry.limit as { [SHARED]?: Limiter })[SHARED]
+  const shared = sharedLimiters.get(entry.limit)
 
   if (shared)
     return shared
@@ -446,20 +452,6 @@ export async function apiLimitWait(limits: { name: string, limit: RateLimit }[],
   }
 
   return wait
-}
-
-// Checks a limit declared on an API module or route, as `rateLimit()` checks its own.
-export function checkApiLimit(name: string, limit: RateLimit): void {
-  if (!Number.isInteger(limit.max) || limit.max < 1)
-    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a max of ${limit.max}; it takes a whole number of at least 1`)
-
-  durationSeconds(limit.window, `the rateLimit window of ${name}`)
-
-  if (limit.key !== undefined && typeof limit.key !== 'function')
-    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a key that is not a function; it takes a function of the request returning the string to count under`)
-
-  if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
-    throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a store without a hit(key, window) method; give it a RateStore`)
 }
 
 // Seconds until the next attempt may go through, or undefined while under the limit.
