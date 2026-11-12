@@ -658,6 +658,25 @@ describe('the modules a change leaves stale', () => {
     }
   })
 
+  it.each(['my[app]', 'a{b,c}'])('follows a glob of a project whose folder is %s', async (name) => {
+    const dir = join(await scratchDir('reload-plan-'), name)
+
+    await Bun.write(join(dir, 'src/routes/index.kay'), '---\nconst a = import.meta.glob(\'../cards/*.txt\')\nconst b = import.meta.glob([\'/src/more/*.txt\', \'!/src/more/skip.txt\'])\n---\np home\n')
+
+    const real = realpathSync(dir)
+    const at = (file: string) => join(real, file)
+    const input = { root: dir, loaded: [at('src/routes/index.kay')], owned: [at('src/routes')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+    const evicted = (changed: string) => {
+      const plan = planReload({ ...input, changed: [changed] })
+
+      return 'evict' in plan ? plan.evict : plan
+    }
+
+    expect(evicted('src/cards/new.txt')).toEqual([at('src/routes/index.kay'), at('src/server.ts')])
+    expect(evicted('src/more/new.txt')).toEqual([at('src/routes/index.kay'), at('src/server.ts')])
+    expect(evicted('src/more/skip.txt')).toEqual({ restart: 'src/more/skip.txt is no module kay loaded' })
+  })
+
   it('evicts a library component holding a glob of the app\'s files for a file added to it, one in node_modules or outside the project', async () => {
     const dir = await scratchDir('reload-plan-')
     const library = await scratchDir('reload-plan-library-')

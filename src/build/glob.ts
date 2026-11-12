@@ -29,21 +29,26 @@ const OPTIONS = new Set(['eager', 'import'])
 const ICON_USAGE = 'import.meta.glob(\'~icons/tabler/{home,mail}\', { eager: true, import: \'default\' })'
 const USAGE = 'import.meta.glob(\'./demos/*.kay\', { eager: true, import: \'default\' })'
 
+// A pattern read from its anchor, the folder it is written against: `glob` matches an absolute path, `base` is the folder a scan starts from and `scan` the pattern from there. The anchor is a path, not a pattern, so a project in `my[app]` is matched as written.
+export function anchoredPattern(anchor: string, pattern: string): { glob: string, base: string, scan: string } {
+  const parts = pattern.split('/')
+  const magic = parts.findIndex(part => GLOB_MAGIC.test(part))
+  const head = magic === -1 ? parts.slice(0, -1) : parts.slice(0, magic)
+
+  return { glob: join(anchor.replace(GLOB_SPECIAL, '\\$&'), pattern), base: join(anchor, ...head), scan: parts.slice(head.length).join('/') }
+}
+
 // Every file a call's patterns match, by the key it gets: as written from the importer, `./demos/a.kay`, or from the project's root for a pattern starting at it, `/src/demos/a.kay`; an icon pattern, `~icons/tabler/{home,mail}`, gives the icon's own import specifier as both.
 // Negated patterns, `!./demos/draft.kay`, leave files out; `node_modules` is only searched by a pattern naming it, and the importer never matches itself.
 export function globFiles(patterns: string[], importer: string, root: string): Map<string, string> {
   const from = dirname(importer)
   const icons = iconMatches(patterns, root)
   const anchorOf = (pattern: string) => RELATIVE.test(pattern) ? from : root
-  // The folder a pattern starts from is a path, not a pattern: a project in `my[app]` is matched as written.
-  const excluded = patterns.filter(pattern => pattern.startsWith('!') && !pattern.startsWith(`!${ICONS}`)).map(pattern => new Bun.Glob(join(anchorOf(pattern.slice(1)).replace(GLOB_SPECIAL, '\\$&'), pattern.slice(1))))
+  const excluded = patterns.filter(pattern => pattern.startsWith('!') && !pattern.startsWith(`!${ICONS}`)).map(pattern => new Bun.Glob(anchoredPattern(anchorOf(pattern.slice(1)), pattern.slice(1)).glob))
   const files = new Map<string, string>()
 
   for (const pattern of patterns.filter(pattern => !pattern.startsWith('!') && !pattern.startsWith(ICONS))) {
-    const parts = pattern.split('/')
-    const magic = parts.findIndex(part => GLOB_MAGIC.test(part))
-    const head = magic === -1 ? parts.slice(0, -1) : parts.slice(0, magic)
-    const base = join(anchorOf(pattern), ...head)
+    const { base, scan } = anchoredPattern(anchorOf(pattern), pattern)
 
     GLOBBED.add(base)
 
@@ -53,7 +58,7 @@ export function globFiles(patterns: string[], importer: string, root: string): M
 
     const searchesModules = pattern.includes('node_modules')
 
-    for (const found of new Bun.Glob(parts.slice(head.length).join('/')).scanSync({ cwd: base, absolute: true, onlyFiles: true })) {
+    for (const found of new Bun.Glob(scan).scanSync({ cwd: base, absolute: true, onlyFiles: true })) {
       if (found === importer || (!searchesModules && relative(base, found).split(sep).includes('node_modules')) || excluded.some(glob => glob.match(found)))
         continue
 

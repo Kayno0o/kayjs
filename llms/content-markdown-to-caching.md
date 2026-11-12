@@ -9,10 +9,10 @@
 ### Markdown files
 
 - A Markdown file starts with YAML frontmatter between `---` lines.
-- Every entry's data is read against the schema: defaults filled in, an `s.Date()` decoded from its text.
+- Every entry's data is read against the schema: defaults filled in, an `s.Date()` decoded from its text. A date that names no day, `2024-02-30` or `T24:00`, or that cannot be decoded, `2024-03-10 10:00` (seconds are needed), is refused at its field's line.
 - An entry it refuses, or one that does not parse, fails `kay check` at the field's line, naming the field's whole path (`packs.0.price`), and fails `kay build` and the first load; a loader's refused entry is instead left out and logged ([Loaded collections](content-cms.md#loaded-collections)).
 - Defaults fill nested objects and list items too, and `migrations: [renameField(...), convertField(...), setField(...)]` on the collection carries entries over after a schema change ([Loaded collections](content-cms.md#loaded-collections)).
-- Headings get ids, deduplicated, and link to themselves.
+- Headings get ids, unique in the entry, and link to themselves: an ASCII title keeps the lowercase words joined by `-` (`Don’t stop` is `dont-stop`), a title with letters beyond ASCII keeps them (`Été & Café` is `été-café`, `日本語` is `日本語`), a title with no letter or digit is `heading`, and a repeat takes `-1`, `-2` (`a`, `a-1`, `a-1-1`).
 - Bare URLs become links.
 - A link leaving the site gets `target="_blank" rel="noopener"` as each page renders against its `site`, and `renderMarkdown` writes it too, unless the tag writes its own `target` ([Navigation](navigation.md#navigation)).
 - `markdown: { highlight, transform, preprocess, containers, footnotes, headingLinks, readingSpeed, imageSizes }` in `kay.config.ts` sets these once for every collection; a collection's option of the same name wins. `headingLinks: false` leaves a heading's text plain, its id kept, and `readingSpeed` is the words a minute `readingTime` counts at, 230 by default.

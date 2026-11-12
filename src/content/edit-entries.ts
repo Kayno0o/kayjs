@@ -3,7 +3,7 @@ import type { ErrorShape } from '../runtime/api-error'
 import type { WriteResult } from '../runtime/draft-issues'
 import type { DraftIssue } from '../runtime/edit'
 import type { CollectionInfo, ContentLoaderOf, DataValue, EntryFile, EntryFilter, EntryPath, JsonSchema, SourceEntry, TranslationIndex, WrittenEntry } from './edit-shared'
-import type { Collection, ContentLoader, Entry } from './index'
+import type { Collection, ContentLoader } from './index'
 import type { CompiledMarkdown, CompileOptions } from './markdown'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
@@ -14,8 +14,6 @@ import { onKeysInvalidated } from '../runtime/cache'
 import { accepted, failureOf, refusedIssues } from '../runtime/draft-issues'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
-import { html } from '../runtime/rendered'
-import { isDraft } from './drafts'
 import { editSite, registeredCollections } from './edit-registry'
 import { CRLF, DELETE, folderOf, indexes, LEADING_NEWLINE, MARKDOWN, SLASHES, SPACE, TRAILING_NEWLINES, YAML_FILE } from './edit-shared'
 import { entryPath } from './entry-route'
@@ -24,6 +22,7 @@ import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, so
 import { compileMarkdown, componentHtml, MarkdownError, markdownHooks, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { referencesIn } from './references'
+import { compiledSource, sourceDraft } from './source-draft'
 import { takeTurn } from './turns'
 import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './validate'
 
@@ -104,7 +103,7 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
     const decoded = entry.problem === undefined ? decodedData(collection, entry) : undefined
     const url = await pageUrl(collection, entry, decoded)
 
-    return { ...entry, draft: entry.problem === undefined && draftOf(collection, entry, decoded?.data ?? entry.data), ...url !== undefined && { url } }
+    return { ...entry, draft: entry.problem === undefined && await draftOf(collection, entry, decoded?.data ?? entry.data), ...url !== undefined && { url } }
   }))
 }
 
@@ -823,16 +822,16 @@ function decodedData(collection: Collection<unknown>, entry: Omit<SourceEntry, '
   }
 }
 
-// Whether the collection's `draft` holds the entry back.
-function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draft'>, data: unknown): boolean {
+// Whether the collection's `draft` holds the entry back, a function reading its body compiled for the `excerpt` and `html`.
+export async function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draft'>, data: unknown): Promise<boolean> {
   const { draft } = collection.options
 
   if (draft === undefined)
     return false
 
-  const read: Entry<unknown> = { slug: entry.slug, locale: entry.locale, data, headings: [], words: 0, readingTime: 0, Content: () => html(''), excerpt: '', body: entry.body ?? '', html: '', file: entry.path ?? entry.slug }
+  const compiled = typeof draft === 'function' && entry.body !== undefined ? await compiledSource(entry.body, await compileOptions(collection, entry.slug, entry.locale)) : undefined
 
-  return isDraft(draft as ((entry: Entry<unknown>) => boolean) | string, read)
+  return sourceDraft(collection, entry, data, compiled)
 }
 
 // The options the build compiles an entry's body with, hooks bound to the entry as the build names it: its file from the project root for a folder's, the loader's name and the locale and slug for a loaded one's.

@@ -266,3 +266,22 @@ describe('humanize', () => {
     expect(humanizeLabel('éclairageDeLaVille')).toBe('Éclairage de la ville')
   })
 })
+
+describe('every spelling of an impossible date', () => {
+  const dated = t.Object({ date: t.Date() })
+
+  it.each(['2024-2-30', '2024/02/30', '2024-02-30T10:00:00Z', '2024-2-3 25:00'])('is refused whatever its spelling: %s', (date) => {
+    expect(() => decodeEntries([{ slug: 'a', file: 'a.md', data: { date }, lines: { date: 2 } }], dated, {})).toThrow(/a.md:2 date: /)
+  })
+
+  it('reads the years 0 to 99 as written', () => {
+    expect(() => decodeEntries([{ slug: 'a', file: 'a.md', data: { date: '0000-02-29' }, lines: {} }], dated, {})).not.toThrow()
+    expect(() => decodeEntries([{ slug: 'a', file: 'a.md', data: { date: '0001-02-29' }, lines: {} }], dated, {})).toThrow(ContentError)
+  })
+
+  it('is an issue of the CMS save validator too', () => {
+    expect(dataIssues(dated, { date: '2024-02-30' })).toEqual([{ path: 'date', message: 'Date is not valid' }])
+    expect(dataIssues(dated, { date: '2024-03-10 10:00' })).toEqual([{ path: 'date', message: 'Date is not valid' }])
+    expect(dataIssues(dated, { date: '2024-03-10' })).toEqual([])
+  })
+})

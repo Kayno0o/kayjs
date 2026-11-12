@@ -267,6 +267,10 @@ describe('heading ids', () => {
     expect(html).toContain('<h2 id="a-1-1"><a href="#a-1-1">A 1</a></h2>')
   })
 
+  it('stay Bun\'s for a title of ASCII letters, a typographic apostrophe included', async () => {
+    expect(await idsOf('## Don’t stop\n\n## It’s – fine')).toEqual(['dont-stop', 'its-fine'])
+  })
+
   it('stay Bun\'s for an ASCII title', async () => {
     expect(await idsOf('# Hello, World! 2\n\n## a_b--c\n\n## `code` x\n\n## Hello, World! 2')).toEqual(['hello-world-2', 'ab-c', 'code-x', 'hello-world-2-1'])
   })

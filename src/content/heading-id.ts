@@ -1,6 +1,7 @@
 import type { Heading } from './markdown'
 
-const NON_ASCII = /\P{ASCII}/u
+// A letter, digit or mark outside ASCII: a typographic apostrophe or dash alone leaves the title to Bun, so `Don’t stop` keeps `dont-stop`.
+const NON_ASCII = /(?!\p{ASCII})[\p{L}\p{N}\p{M}]/u
 const SEPARATORS = /[^\p{L}\p{N}\p{M}]+/gu
 const UNDERSCORES = /_/g
 const EDGES = /^-+|-+$/g

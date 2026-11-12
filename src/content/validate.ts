@@ -99,7 +99,7 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
 }
 
 // A date as written, to its day and time: the schema's check lets `2024-02-30` and `T24:00` through and Decode rolls them into the next month or day.
-const WRITTEN_DATE = /^(\d{4})-(\d\d)-(\d\d)(?:[T ](\d\d):(\d\d)(?::(\d\d)(?:\.\d+)?)?)?/i
+const WRITTEN_DATE = /^\s*(\d{1,6})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.\d+)?)?)?/i
 
 function isImpossibleDate(text: string): boolean {
   const match = WRITTEN_DATE.exec(text)
@@ -108,7 +108,10 @@ function isImpossibleDate(text: string): boolean {
     return false
 
   const [year, month, day, hour = 0, minute = 0, second = 0] = match.slice(1).map(Number) as [number, number, number, number | undefined, number | undefined, number | undefined]
-  const real = new Date(Date.UTC(year, month - 1, day))
+  const real = new Date(0)
+
+  // Not `Date.UTC`, which reads the years 0 to 99 as 1900 to 1999.
+  real.setUTCFullYear(year, month - 1, day)
 
   return real.getUTCMonth() !== month - 1 || real.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59
 }
@@ -131,14 +134,13 @@ function impossibleDateAt(data: unknown, decoded: unknown, path = ''): string | 
   return undefined
 }
 
-// The data decoded, or nothing with the field a value that the check let through but cannot be decoded, or decodes to another day, reported as an entry the schema refuses.
-function decodedValue(check: ReturnType<typeof compiledCheck>, schema: TSchema, data: unknown, entry: RawEntry, problems: ContentProblem[]): { data: unknown } | undefined {
-  let path: string | undefined
-  let value: unknown
-
+// What the data decodes to, or the JSON pointer of the field the check let through but cannot be decoded, or decodes to another day.
+function decoding(check: ReturnType<typeof compiledCheck>, data: unknown): { value: unknown } | { path: string } {
   try {
-    value = check.Decode(data)
-    path = impossibleDateAt(data, value)
+    const value = check.Decode(data)
+    const path = impossibleDateAt(data, value)
+
+    return path === undefined ? { value } : { path }
   }
   catch (error) {
     const failed = (error as { path?: unknown }).path
@@ -146,15 +148,25 @@ function decodedValue(check: ReturnType<typeof compiledCheck>, schema: TSchema, 
     if (typeof failed !== 'string')
       throw error
 
-    path = failed
+    return { path: failed }
   }
+}
 
-  if (path === undefined)
-    return { data: value }
+// The sentence for a field whose value the check let through but cannot be decoded.
+function undecodableSentence(schema: TSchema, path: string, data: unknown): string {
+  return entryRefusal(labelOf(schema, path, data), { schema: {}, value: 'invalid' })
+}
 
-  const dotted = dottedPath(path)
+// The data decoded, or nothing with the field reported as an entry the schema refuses.
+function decodedValue(check: ReturnType<typeof compiledCheck>, schema: TSchema, data: unknown, entry: RawEntry, problems: ContentProblem[]): { data: unknown } | undefined {
+  const decoded = decoding(check, data)
 
-  problems.push({ file: entry.file, line: entry.lines[fieldOf(path)] ?? 1, message: `${dotted === '' ? '' : `${dotted}: `}${entryRefusal(labelOf(schema, path, data), { schema: {}, value: 'invalid' })}` })
+  if ('value' in decoded)
+    return { data: decoded.value }
+
+  const dotted = dottedPath(decoded.path)
+
+  problems.push({ file: entry.file, line: entry.lines[fieldOf(decoded.path)] ?? 1, message: `${dotted === '' ? '' : `${dotted}: `}${undecodableSentence(schema, decoded.path, data)}` })
 
   return undefined
 }
@@ -188,8 +200,11 @@ export function dataIssues(schema: TSchema, data: unknown): { path: string, mess
   const check = compiledCheck(schema)
   const filled = withDefaults(data, schema)
 
-  if (check.Check(filled))
-    return []
+  if (check.Check(filled)) {
+    const decoded = decoding(check, filled)
+
+    return 'value' in decoded ? [] : [{ path: dottedPath(decoded.path), message: undecodableSentence(schema, decoded.path, filled) }]
+  }
 
   return [...refusals(check, filled, dottedPath, issue => refusalSentence(schema, issue, filled))].map(([path, message]) => ({ path, message }))
 }

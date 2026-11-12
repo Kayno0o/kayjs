@@ -233,7 +233,8 @@ export async function slugsOf(root: string, collection: Collection<unknown>): Pr
   const localized = collection.options.localized === true
 
   try {
-    const found = await loadEntries(dir, { ...markdownOf(collection.options), live: true, localized, modified: modifiedMode(collection.options) })
+    const markdown = markdownOf(collection.options)
+    const found = await loadEntries(dir, { ...markdown, live: true, localized, modified: modifiedMode(collection.options) })
 
     const { draft, publishAt, unpublishAt } = collection.options
     // Decoding is only needed to read a draft or a publication date, and an entry that does not decode is not told held back.
@@ -252,7 +253,7 @@ export async function slugsOf(root: string, collection: Collection<unknown>): Pr
     for (const entry of found) {
       const slug = localized ? entry.slug.slice(entry.slug.indexOf('/') + 1) : entry.slug
 
-      held.set(slug, (held.get(slug) ?? true) && data !== undefined && heldBackRaw(collection, entry, data.get(entry)))
+      held.set(slug, (held.get(slug) ?? true) && data !== undefined && heldBackRaw(collection, markdown, entry, data.get(entry)))
     }
 
     return held
@@ -269,9 +270,10 @@ export async function slugsOf(root: string, collection: Collection<unknown>): Pr
 // `notes` takes, when given, the references of an entry shown to one held back from production, which the site then renders as no link or none.
 async function danglingReferences(root: string, collection: Collection<unknown>, decoded: { entry: RawEntry, data: unknown }[], named: [string, Collection<unknown>][], slugs: Map<string, Promise<Map<string, boolean> | undefined>>, notes?: ContentProblem[]): Promise<ContentProblem[]> {
   const found: ContentProblem[] = []
+  const markdown = markdownOf(collection.options)
 
   for (const { entry, data } of decoded) {
-    const shown = notes !== undefined && !heldBackRaw(collection, entry, data)
+    const shown = notes !== undefined && !heldBackRaw(collection, markdown, entry, data)
 
     for (const use of referencesIn(collection.options.schema, data)) {
       const target = named.find(([name]) => name === use.collection)?.[1]
@@ -460,8 +462,8 @@ export async function localizedSlugs(root: string, config?: string): Promise<Map
 }
 
 // Whether production holds an entry back, its `draft` function reading the entry the app reads, with its `excerpt`, `body` and `html`.
-function heldBackRaw(collection: Collection<unknown>, raw: RawEntry, data: unknown): boolean {
-  const { readingSpeed, imageSizes } = markdownOf(collection.options)
+function heldBackRaw(collection: Collection<unknown>, markdown: ReturnType<typeof markdownOf>, raw: RawEntry, data: unknown): boolean {
+  const { readingSpeed, imageSizes } = markdown
 
   return heldBack(collection.options, toEntry(raw, data, (collection.options.components ?? {}), collection.options.localized === true, readingSpeed, imageSizes, undefined))
 }

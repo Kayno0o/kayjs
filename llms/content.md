@@ -259,6 +259,7 @@ article
 
 #### Drafts
 
+- A `draft` function reads the entry the app reads, `excerpt`, `body` and `html` included.
 - An entry `draft` returns true for shows in development (`kay dev`, or the server's `dev` option, which wins over `NODE_ENV`) and to a visitor in preview mode only.
 - Everywhere else a draft is left out of `all()`, `get()`, prerendering, the sitemap and the feed.
 - `draft: 'draft'`, a boolean field's name, holds back the entries where it is true, which a CMS then reads and publishes by writing false.

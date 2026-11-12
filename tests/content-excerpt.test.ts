@@ -7,6 +7,7 @@ import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { collection } from '../src/content'
+import { draftOf } from '../src/content/edit-entries'
 import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
 import { heldBack } from '../src/content/held-back'
@@ -381,6 +382,18 @@ describe('a draft function', () => {
       }
 
       expect([...(await slugsOf(root, posts))!]).toEqual([['a', true], ['b', false]])
+    })
+  })
+})
+
+describe('the CMS\'s reading of a draft function', () => {
+  it('gives it the entry\'s excerpt, body and html, as production does', async () => {
+    await inProject({ 'p/a.md': post('WIP: later') }, async () => {
+      const posts = collection('p', { schema, draft: entry => entry.excerpt.startsWith('WIP') && entry.body.includes('later') && entry.html.includes('<p>') })
+      const source = (body: string) => ({ slug: 'a', path: 'p/a.md', data: { title: 'T' }, body })
+
+      expect(await draftOf(posts, source('WIP: later'), { title: 'T' })).toBe(true)
+      expect(await draftOf(posts, source('Done later'), { title: 'T' })).toBe(false)
     })
   })
 })

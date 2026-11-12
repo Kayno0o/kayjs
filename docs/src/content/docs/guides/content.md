@@ -40,7 +40,11 @@ ul
     li: a(href={`/blog/${post.slug}`}) {post.data.title}
 ```
 
-An entry has `slug`, `data`, `headings` for a table of contents, and `Content`, the component rendering its body.
+An entry has `slug`, `data`, `headings` for a table of contents, and `Content`, the component rendering its body. Each heading's `id` is its title in lowercase words joined by `-`, `getting-started`, keeping letters beyond ASCII (`Été & Café` is `été-café`). A title with no letter or digit is `heading`, and a repeated id takes `-1`, `-2`, so an id is unique in the entry.
+
+A date field is read when the entry loads, and a date that names no day, such as `2024-02-30`, or a time without seconds, `2024-03-10 10:00`, fails `kay check` and `kay build` at that field.
+
+A `draft` function gets the same entry your pages read, with its `excerpt`, `body` and `html`, so `draft: post => post.excerpt.startsWith('WIP')` works.
 
 Entries marked as drafts show in development only. That means under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 

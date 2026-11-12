@@ -62,7 +62,7 @@ const BAD_SLUG = /[\\?#\0-\x1F\x7F]/
 const UNSAFE_PATH = /[\\\0-\x1F\x7F]/
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 9
+const CACHE_VERSION = 10
 
 // What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
 interface CachedEntry {

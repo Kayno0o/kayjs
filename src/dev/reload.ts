@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, relative, sep } from 'node:path'
+import { anchoredPattern } from '../build/glob'
 import { APP_CONTEXT } from '../config'
 
 // What reloading the modules a change reached in the running server takes: the files to ask Bun for again, or why the change needs a new process.
@@ -31,14 +32,14 @@ const ENTRY_FILE = /\.(?:md|json|ya?ml)$/
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const QUERY = /\?.*$/
 const RELATIVE = /^\.\.?\//
-const GLOB_MAGIC = /[*?[\]{}()!]/
+
 // A dependency, or what kay keeps of the project under `.kay`.
 const NOT_PROJECT = /^\/(?:\.kay|(?:.*\/)?node_modules)\//
 
 // One pattern as an absolute glob, with the folder its fixed part names and whether it names `node_modules`.
 interface Pattern {
   glob: Bun.Glob
-  text: string
+  scan: string
   base: string
   segments: Set<string>
   modules: boolean
@@ -204,7 +205,7 @@ function importsRead(file: string, root: string): Imports {
 
   for (const [, written] of source.matchAll(GLOB)) {
     const patterns = [...written!.matchAll(QUOTED)].map(([, , pattern]) => pattern!)
-    const absolute = (pattern: string) => patternOf(RELATIVE.test(pattern) ? resolve(dir, pattern) : join(root, pattern))
+    const absolute = (pattern: string) => patternOf(RELATIVE.test(pattern) ? dir : root, pattern)
     const glob = {
       include: patterns.filter(pattern => !pattern.startsWith('!')).map(absolute),
       exclude: patterns.filter(pattern => pattern.startsWith('!')).map(pattern => absolute(pattern.slice(1))),
@@ -223,12 +224,10 @@ function importsRead(file: string, root: string): Imports {
   return read
 }
 
-function patternOf(text: string): Pattern {
-  const segments = text.split(sep)
-  const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
-  const base = magic === -1 ? dirname(text) : segments.slice(0, magic).join(sep) || sep
+function patternOf(anchor: string, pattern: string): Pattern {
+  const { glob, base, scan } = anchoredPattern(anchor, pattern)
 
-  return { glob: new Bun.Glob(text), text, base, segments: new Set(segments), modules: text.includes('node_modules') }
+  return { glob: new Bun.Glob(glob), scan, base, segments: new Set(join(anchor, pattern).split(sep)), modules: pattern.includes('node_modules') }
 }
 
 // Whether the loader's scan would find `path` by the pattern: `Bun.Glob.match` alone also takes the dotfiles and the `node_modules` the scan leaves out, unless the pattern names them.
@@ -259,9 +258,9 @@ function resolveImport(specifier: string, dir: string): string | undefined {
 function globbed(glob: Glob): string[] {
   const files = new Set<string>()
 
-  for (const { text, base } of glob.include) {
+  for (const { scan, base } of glob.include) {
     try {
-      for (const match of new Bun.Glob(relative(base, text)).scanSync({ cwd: base, absolute: true, onlyFiles: true }))
+      for (const match of new Bun.Glob(scan).scanSync({ cwd: base, absolute: true, onlyFiles: true }))
         files.add(realpathOf(match))
     }
     catch {}
