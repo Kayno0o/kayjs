@@ -161,6 +161,53 @@ describe('style:prop and event modifiers', () => {
   })
 })
 
+describe('event modifiers that filter or pass listener options', () => {
+  const mountListeners = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst log = signal(\'\')\nconst add = (letter: string) => log.set(log() + letter)\n---\ndiv#outer(onClick|capture={() => add(\'c\')})\n  button#once(onClick|once={() => add(\'1\')}) o\n  div#self(onClick|self={() => add(\'s\')})\n    span#child x\n  button#plain(onClick={() => add(\'p\')}) p\ninput#key(onKeyDown|enter|escape={e => add(e.key)})\ndiv#pass(onTouchStart|passive={e => add(String(e.defaultPrevented))})\np#out {log()}\n' })
+
+  it('runs a once handler a single time, a self handler for its own element and a capture handler first', async () => {
+    const { root, dispose } = await mountListeners()
+    const out = root.querySelector('#out')!
+
+    try {
+      const once = root.querySelector<HTMLButtonElement>('#once')!
+
+      once.click()
+      once.click()
+      await settle()
+      expect(out.textContent).toBe('c1c')
+      root.querySelector<HTMLElement>('#child')!.click()
+      root.querySelector<HTMLElement>('#self')!.click()
+      await settle()
+      expect(out.textContent).toBe('c1cccs')
+      root.querySelector<HTMLButtonElement>('#plain')!.click()
+      await settle()
+      expect(out.textContent).toBe('c1cccscp')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('filters a key handler by event.key and adds a passive listener', async () => {
+    const { root, dispose } = await mountListeners()
+    const out = root.querySelector('#out')!
+
+    try {
+      const input = root.querySelector('#key')!
+
+      for (const key of ['a', 'Enter', 'ArrowUp', 'Escape'])
+        input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+      root.querySelector('#pass')!.dispatchEvent(new Event('touchstart', { bubbles: true, cancelable: true }))
+      await settle()
+      expect(out.textContent).toBe('EnterEscapefalse')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('style:prop and bind: next to a spread', () => {
   const mountSpreads = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst color = signal(\'red\')\nconst text = signal(\'a\')\nconst on = signal(false)\nconst pick = signal(\'b\')\nconst log = signal(\'\')\nconst carried = { style: \'top:1px\', onInput: () => log.set(log() + \'s\') }\n---\ninput#t(bind:value={text} style:color={color()} {...carried})\ninput#c(type="checkbox" bind:checked={on} {...carried})\ninput#ra(type="radio" name="p" value="a" bind:group={pick} {...carried})\ninput#rb(type="radio" name="p" value="b" bind:group={pick} {...carried})\nbutton#toggle(onClick={() => { color.set(\'blue\'); text.set(\'z\'); on.set(true); pick.set(\'a\') }}) t\np#out {text()} {on() ? \'on\' : \'off\'} {pick()} {log()}\n' })
 

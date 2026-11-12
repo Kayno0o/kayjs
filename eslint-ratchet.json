@@ -92,7 +92,7 @@
     "complexity": 115
   },
   "src/compiler/ast.ts": {
-    "max-lines": 652
+    "max-lines": 651
   },
   "src/compiler/codegen.ts": {
     "max-lines": 813,
@@ -117,7 +117,7 @@
     "max-lines": 966
   },
   "src/compiler/markup.ts": {
-    "max-lines": 618,
+    "max-lines": 611,
     "complexity": 75
   },
   "src/compiler/parser.ts": {

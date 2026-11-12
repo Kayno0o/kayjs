@@ -19,6 +19,7 @@ declare const KAY_BROWSER: true | undefined
 declare const KAY_FRENCH: true | undefined
 
 export { holdSubmits, listenSubmit } from './form-hold'
+export { listenWith } from './listen-with'
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
 export { checkedMarkup, componentClass, merge, omit, partClass, partHanded, partsClass, spreadAttributes, spreadWith } from './values'
@@ -916,8 +917,7 @@ export const submits: { listen?: typeof listen } = {}
 export function listen(element: Element, name: string, handler: (event: Event) => void): void {
   const type = name.slice(2).toLowerCase()
 
-  ;(element as ElementRecord)[`$$${type}`] = handler
-  ;(element as ElementRecord).$o = activeOwner
+  Object.assign(element, { [`$$${type}`]: handler, $o: activeOwner })
 
   if (!DELEGATED.test(type)) {
     element.addEventListener(type, fire)

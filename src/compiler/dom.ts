@@ -5,15 +5,16 @@ import type { CodeBuilder } from './mapping'
 import type { BindingPlan, LinkPlan } from './plan'
 import { mayLeaveSite } from '../runtime/outside'
 import { marksServerIsland, modifiersOf } from './ast'
+import { addHandler, listenerOptions } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { addKeyParameters, addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
-import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { addGroupChecked, checksMarkup, groupValue, staticAttributeText } from './plan'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attribute', 'branches', 'checkedMarkup', 'choose', 'close', 'component', 'componentClass', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'insert', 'listen', 'listenSubmit', 'listenWith', 'markers', 'memo', 'merge', 'omit', 'outside', 'partClass', 'partHanded', 'partsClass', 'property', 'ref', 'setClass', 'setStyle', 'spreadAttributes', 'spreadWith', 'template', 'text', 'transition', 'untrack']
 // The helpers in modules of their own, as their runtimes weigh on a page whose islands use none of them: the module of each is only loaded by a page with an island that compiles to it.
 const APART = [['kay/dom-loop', ['loop', 'rowKey']], ['kay/dom-await', ['awaited']], ['kay/dom-try', ['attempt']], ['kay/dom-spread', ['dynamic', 'spread']], ['kay/dom-image', ['image']], ['kay/pending', ['pendingCall']]] as const
 
@@ -669,12 +670,14 @@ export class DomTemplate extends TemplateWriter {
 
         // Read at each event rather than once, so a handler a prop, a signal or a loop item holds stays current.
         return (variable) => {
-          // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
-          b.add(`${helperName(name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen')}(${variable(node)}, ${JSON.stringify(name)}, `)
+          const modifiers = modifiersOf(attribute, this.src)
+          const options = listenerOptions(modifiers)
+          // A `submit` handler is held while it answers a promise, which only an island listening to one loads; one with listener options is not.
+          const submit = name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen'
 
-          addHandler(b, attribute.expression, modifiersOf(attribute, this.src), isFunctionAt(this.src, attribute.expression, this.facts.functions))
-
-          b.add(');')
+          b.add(`${helperName(options === undefined ? submit : 'listenWith')}(${variable(node)}, ${JSON.stringify(name)}, `)
+          addHandler(b, attribute.expression, modifiers, isFunctionAt(this.src, attribute.expression, this.facts.functions))
+          b.add(`${options === undefined ? '' : `, ${options}`});`)
         }
       }
       case 'inert':

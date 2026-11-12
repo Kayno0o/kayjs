@@ -203,15 +203,12 @@ export interface PendingNode extends Span {
 
 export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | SnippetNode | ConstNode | ErrorNode | PendingNode
 
-// An attribute written with a name, which a spread is not.
-// The event methods a handler may call before it runs, written after its name: `onSubmit|preventDefault`.
-export const EVENT_MODIFIERS: ReadonlySet<string> = new Set(['preventDefault', 'stopPropagation'])
-
 // The modifiers written on a handler, in order; `validate` refuses the ones that are none.
 export function modifiersOf(attribute: Attribute, source: string): string[] {
   return attribute.kind === 'expression' && attribute.modifiers ? source.slice(attribute.modifiers.start + 1, attribute.modifiers.end).split('|') : []
 }
 
+// An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
 
 // The `action={...}` an element is written with.

@@ -263,6 +263,12 @@ input(type="file" bind:files={picked})
 
 A modifier after an event name calls an event method before the handler: `form(onSubmit|preventDefault={save})`, and `|stopPropagation`, which chain. In an island it replaces the `event.preventDefault()` line of the handler; the server renders no handler, so the form still posts natively without JavaScript.
 
+More modifiers follow the same way and run in the order written. `|once` runs the handler for one event only, and `|self` only when the event's target is the element itself.
+
+`|capture` and `|passive` are the options `addEventListener` takes, so `div(onTouchStart|passive={track})` never blocks scrolling. They do not work on an element that spreads props, and a passive listener cannot call `preventDefault`.
+
+On `onKeyDown`, `onKeyUp` and `onKeyPress`, a key name runs the handler for that key only: `input(onKeyDown|enter={send})`. The names are `enter`, `escape`, `space`, `tab`, `backspace`, `delete`, `up`, `down`, `left` and `right`, and several of them run the handler for any of those keys.
+
 A `ref` function may return a cleanup, which runs when the element goes away: `ref={element => { const stop = watch(element); return stop }}`.
 
 On a component, `bind:open={open}` binds a prop typed `Bindable<boolean>` to a signal: see [Components](/essentials/components).

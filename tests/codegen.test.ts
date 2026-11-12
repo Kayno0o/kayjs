@@ -423,6 +423,24 @@ describe('elements', () => {
     expect(compileKay('form(onSubmit|preventDefault={save}) x\n', 'test.kay', { output: 'html' }).tsx).not.toContain('preventDefault')
   })
 
+  it('compiles once, self and key filters into the handler and capture and passive into the listener options', () => {
+    const dom = (attributes: string, tag = 'button') => compileKay(`${ISLAND}${tag}(${attributes}) x\n`, 'test.kay', { output: 'dom' }).tsx
+
+    expect(dom('onClick|self={f}')).toContain('(kayEvent) => { if (kayEvent.target !== kayEvent.currentTarget) return; return (f)?.(kayEvent) }')
+    expect(dom('onKeyDown|enter={f}', 'input')).toContain('(kayEvent) => { if (!["Enter"].includes(kayEvent.key)) return; return (f)?.(kayEvent) }')
+    expect(dom('onKeyDown|enter|space|preventDefault={f}', 'input')).toContain('if (!["Enter"," "].includes(kayEvent.key)) return; kayEvent.preventDefault();')
+    expect(dom('onKeyUp|up={f}', 'input')).toContain('"ArrowUp"')
+    expect(dom('onClick|once={f}')).toContain('(() => { let kayDone = false; return (kayEvent) => { if (kayDone) return; kayDone = true; return (f)?.(kayEvent) } })()')
+    expect(dom('onClick|capture|passive={f}')).toContain('KayListenWith(KayN0_0, "onClick", (kayEvent) => { return (f)?.(kayEvent) }, { capture: true, passive: true });')
+    expect(dom('onClick={f}')).not.toContain('capture')
+    expect(compileKay('button(onClick|once|capture={f}) x\n', 'test.kay', { output: 'html' }).tsx).not.toContain('kayDone')
+    expect(errors('input(onKeyDown|enter|escape={f})')).toEqual([])
+    expect(errors('input(onInput|enter={f})')).toEqual([expect.stringContaining('filters a key event')])
+    expect(errors('button(onClick|capture={f} {...rest}) x')).toEqual([expect.stringContaining('spreads props')])
+    expect(errors('button(onClick|passive|preventDefault={f}) x')).toEqual([expect.stringContaining('cannot call `preventDefault`')])
+    expect(errors('button(onClick|once|self|capture|passive={f}) x')).toEqual([])
+  })
+
   it('refuses style:prop on a component, without a value or with a bad name', () => {
     expect(errors('p(style:color={c}) x')).toEqual([])
     expect(errors('p(style:--gap={c} style:background-color={c}) x')).toEqual([])

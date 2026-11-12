@@ -5,9 +5,10 @@ import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
-import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { deprecatedAiProps } from './deprecated-ai-props'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
+import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
@@ -680,16 +681,8 @@ class Validator {
       return
     }
 
-    const seen = new Set<string>()
-
-    for (const modifier of modifiersOf(attribute, this.src)) {
-      if (!EVENT_MODIFIERS.has(modifier))
-        this.error(attribute.modifiers!, `\`${modifier}\` is no event modifier`, { help: `use ${[...EVENT_MODIFIERS].map(known => `\`|${known}\``).join(' or ')}` })
-      else if (seen.has(modifier))
-        this.error(attribute.modifiers!, `\`|${modifier}\` is written twice`, { help: 'drop one of them' })
-
-      seen.add(modifier)
-    }
+    for (const { message, help } of modifierProblems(modifiersOf(attribute, this.src), name, element.attributes.some(candidate => candidate.kind === 'spread')))
+      this.error(attribute.modifiers!, message, { help })
   }
 
   // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.

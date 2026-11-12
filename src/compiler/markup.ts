@@ -6,6 +6,7 @@ import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
 import { contentOf } from './items'
 import { PROPS } from './names'
@@ -85,16 +86,6 @@ export function addBindWrite(b: CodeBuilder, expression: Span, read: BindRead, t
   else {
     b.add('(').addSource(expression).add(`).set(kayEvent.currentTarget.${read})`)
   }
-}
-
-// An event handler read at each event, so one a prop, a signal or a loop item holds stays current; its modifiers call their event methods first.
-export function addHandler(b: CodeBuilder, expression: Span, modifiers: string[], literal: boolean): void {
-  if (modifiers.length > 0)
-    b.add(`(kayEvent) => { ${modifiers.map(modifier => `kayEvent.${modifier}();`).join(' ')} return (`).addSource(expression).add(')?.(kayEvent) }')
-  else if (literal)
-    b.add('(').addSource(expression).add(')')
-  else
-    b.add('(kayEvent) => (').addSource(expression).add(')?.(kayEvent)')
 }
 
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
