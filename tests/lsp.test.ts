@@ -295,6 +295,25 @@ describe('kay lsp', () => {
     }
   })
 
+  it('completes the pattern of route() and the path of apiUrl() in a fence (#2832)', async () => {
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
+    const source = '---\nimport { apiUrl, route } from \'kay\'\nimport items from \'../api/items\'\n\nconst page = route(\'/\')\nconst one = apiUrl(items, \'\')\n---\np x\n'
+    const labels = async (line: number, character: number) => (await editor.request<CompletionList>('textDocument/completion', path, line, character)).items.map(item => item.label)
+
+    await Bun.write(join(workspace, 'site/src/api/items.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', () => []).get(\'/:id\', ({ params }) => params.id)\n')
+    await editor.open(path)
+    await editor.change(path, source, 2)
+
+    try {
+      expect(await labels(4, 21)).toContain('/todos/:id')
+      expect(await labels(5, 27)).toEqual(expect.arrayContaining(['/', '/:id']))
+    }
+    finally {
+      await editor.change(path, text, 3)
+    }
+  })
+
   it('completes the props of a package\'s component and of a props type declared in another file', async () => {
     const path = 'site/src/routes/search.kay'
     const text = await Bun.file(join(workspace, path)).text()

@@ -171,7 +171,9 @@ type ApiRoutesOf<Module> = Module extends {
 } ? RoutesOfInstance<Exported extends (...args: never[]) => infer Built ? Awaited<Built> : Exported> : Record<never, never>
 
 [.] apiUrl
-function apiUrl(module: unknown, path?: string, options?: UrlInput): string
+function apiUrl(request: Request, path?: string | undefined, options?: UrlInput | undefined): string
+function apiUrl(module: unknown): string
+function apiUrl<Module, const Path extends ApiPath<Module>>(module: Module, path: Path, ...options: Optional<ApiUrlOptions<Module, Path>>): string
 
 [.] AwaitProps
 interface AwaitProps<T>

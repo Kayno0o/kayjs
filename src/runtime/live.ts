@@ -1,9 +1,11 @@
+import type { UrlInput } from './api-url'
 import type { CallResult, TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { Seed } from './live-resource.server'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
+import { routeUrl } from './api-url'
 import { withBase } from './base'
-import { callBody, fieldText } from './call-body'
+import { callBody } from './call-body'
 import { trackCalls } from './call-result'
 import { connection, connectionHooks, ended } from './connection'
 import { durationSeconds } from './duration'
@@ -20,9 +22,6 @@ declare const KAY_BROWSER: true | undefined
 
 // A timer waits 2^31 - 1 ms at most.
 const MAX_TIMER = 2_147_483_647
-
-// Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
-export const API_MOUNT = Symbol.for('kay.api')
 
 // Type only: what each value an event stream sends is.
 declare const EVENTS: unique symbol
@@ -43,7 +42,7 @@ const MAX_QUEUED = 50
 // What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
 const JSON_START = /^["[{]/
 const NUMERIC = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
-const PARAM_SEGMENT = /^:(.+)$/
+
 const JSON_TYPE = /^application\/(?:[\w.+-]+\+)?json\b/i
 // An answer without a type, an empty one say, reads as text too.
 const TEXT_TYPE = /^(?:text\/|$)/i
@@ -51,19 +50,19 @@ const TEXT_TYPE = /^(?:text\/|$)/i
 type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options' | 'connect' | 'trace' | 'all' | 'subscribe'
 
 // The route tree of a module's default export, or of what the function an extension's module exports builds, as `ApiRoutesOf` reads it for `kay check`.
-type RoutesOf<Module> = (Module extends (...args: never[]) => infer Built ? Awaited<Built> : Module) extends { '~Routes': infer Routes } ? Routes : never
+export type RoutesOf<Module> = (Module extends (...args: never[]) => infer Built ? Awaited<Built> : Module) extends { '~Routes': infer Routes } ? Routes : never
 
 // One less, to stop walking a route tree past any depth an app reaches, and never instantiate it without end while `Module` is still generic.
 type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 // The keys of a node that are its methods' routes, a path segment named like a method, `/post`, being none.
-type RouteKey<Node> = { [Key in keyof Node & Method]: Node[Key] extends { response: unknown } ? Key : never }[keyof Node & Method]
+export type RouteKey<Node> = { [Key in keyof Node & Method]: Node[Key] extends { response: unknown } ? Key : never }[keyof Node & Method]
 type RouteField = 'body' | 'params' | 'query' | 'headers' | 'response'
 // What a key leads down to: a segment's node, or what a method's route holds besides itself, the segments of a path named like the method, `/post/:id` beside a POST to `/`.
 type Below<Tree, Key extends keyof Tree> = Key extends RouteKey<Tree> ? Omit<Tree[Key], RouteField> : Tree[Key]
 
 // Every node of an Elysia route tree with the path reaching it: keys are path segments down to the methods.
-type Nodes<Tree, Path extends string = '', Depth extends number = 10> = [Depth] extends [never] ? never : { path: Path extends '' ? '/' : Path, node: Tree } | {
+export type Nodes<Tree, Path extends string = '', Depth extends number = 10> = [Depth] extends [never] ? never : { path: Path extends '' ? '/' : Path, node: Tree } | {
   [Key in keyof Tree & string]: [keyof Below<Tree, Key>] extends [never] ? never : Nodes<Below<Tree, Key>, `${Path}/${Key}`, Shallower[Depth]>
 }[keyof Tree & string]
 
@@ -82,7 +81,7 @@ type MethodRoute<Module, Path, M> = NodeAt<Module, Path> extends infer Node ? M 
 type StreamValue<Route> = Route extends { response: { 200: EventStream<infer Value> } } ? Value : never
 
 // What the route's schema asks of the URL: params a path names are required, a query only when its schema requires one.
-type UrlOptions<Route> = (Route extends { params: infer Params } ? Record<never, never> extends Params ? { params?: Params } : { params: Params } : { params?: Record<string, unknown> })
+export type UrlOptions<Route> = (Route extends { params: infer Params } ? Record<never, never> extends Params ? { params?: Params } : { params: Params } : { params?: Record<string, unknown> })
   & (Route extends { query: infer Query } ? unknown extends Query ? { query?: Record<string, unknown> } : Record<never, never> extends Query ? { query?: Query } : { query: Query } : { query?: Record<string, unknown> })
 
 // A route answering nothing, `() => {}`, declares no response at all.
@@ -437,67 +436,6 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
       run?.abort()
     },
   }
-}
-
-interface UrlInput {
-  params?: Record<string, unknown>
-  query?: Record<string, unknown>
-}
-
-// Where a module's route is served: its params filled in, its query appended.
-export function routeUrl(module: unknown, path: string, options: UrlInput = {}): string {
-  const mount = (module as { [API_MOUNT]?: string } | undefined)?.[API_MOUNT]
-
-  if (mount === undefined)
-    throw new TypeError('kay: socket(), stream(), resource(), call() and apiUrl() take the default export of a module under src/api')
-
-  const segments = path.split('/').map((segment) => {
-    if (segment === '*')
-      return String(options.params?.['*'] ?? '').split('/').map(part => encodeSegment(part, path)).join('/')
-
-    const param = PARAM_SEGMENT.exec(segment)?.[1]
-
-    if (param === undefined)
-      return segment
-
-    const value = options.params?.[param]
-
-    if (value === undefined)
-      throw new TypeError(`kay: ${path} takes the param ${param}`)
-
-    if (value === '')
-      throw new TypeError(`kay: ${path} cannot take an empty ${param}, it would reach the collection route`)
-
-    return encodeSegment(String(value), path)
-  })
-  const query = new URLSearchParams()
-
-  for (const [name, value] of Object.entries(options.query ?? {})) {
-    for (const item of Array.isArray(value) ? value as unknown[] : [value]) {
-      if (item !== undefined && item !== null)
-        query.append(name, fieldText(item))
-    }
-  }
-
-  const search = query.size > 0 ? `?${query}` : ''
-  const joined = segments.join('/')
-
-  return `${mount}${joined === '/' ? '' : joined}${search}`
-}
-
-// Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`. On the server the module must be mounted, which a prerender never does.
-// A handler passes its `request` for the module it runs in, which it cannot name inside its own chain.
-// kept: request, it names a route of a module the running server mounted, which a prerender never loads.
-export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): string {
-  return withBase(routeUrl(module, path, options))
-}
-
-// A dot segment would be resolved by the URL parser and reach the parent route.
-function encodeSegment(value: string, path: string): string {
-  if (value === '.' || value === '..')
-    throw new TypeError(`kay: ${path} cannot take "${value}" as a param, it would reach the parent route`)
-
-  return encodeURIComponent(value)
 }
 
 export type SocketOptions<Module, Path> = UrlOptions<SocketRoute<Module, Path>> & ConnectionHooks<Received<SocketRoute<Module, Path>>>
@@ -1095,6 +1033,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
 }
 
 export { ApiError }
+export { API_MOUNT, apiUrl, routeUrl } from './api-url'
 
 // The methods a node answers over HTTP, a websocket's left out.
 export type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
