@@ -406,16 +406,36 @@ describe('kay installed under node_modules', () => {
 })
 
 describe('a kay library under node_modules', () => {
-  it('exposes the names a library file re-exports with export *', async () => {
+  for (const name of ['kayjs-x', '@kaynooo/kayjs-x']) {
+    it(`exposes the names ${name} re-exports with export *`, async () => {
+      const at = await project({
+        [`node_modules/${name}/package.json`]: `{"name":"${name}","type":"module","exports":{".":"./index.ts"}}\n`,
+        [`node_modules/${name}/index.ts`]: 'export * from \'./plain\'\n',
+        [`node_modules/${name}/plain.ts`]: 'export const word = \'hello\'\n',
+        'page.kay': `---\nimport { word } from '${name}'\n---\np.word {word}\n`,
+      })
+      const { root, unmount } = await mountComponent(await componentAt(at('page.kay')))
+
+      expect(root.querySelector('.word')!.textContent).toBe('hello')
+      unmount()
+    })
+  }
+
+  // The nested kay selects its entry by `browser`, so the library file importing it is built for the browser: run again by the bundle, not shared with the test. Taken for a library, it would be walked as the app's own file and shared.
+  it('bundles a library file reaching a kay nested in it, as a dependency', async () => {
+    const counter = '__nestedKayLoads'
     const at = await project({
       'node_modules/kayjs-x/package.json': '{"name":"kayjs-x","type":"module","exports":{".":"./index.ts"}}\n',
-      'node_modules/kayjs-x/index.ts': 'export * from \'./plain\'\n',
-      'node_modules/kayjs-x/plain.ts': 'export const word = \'hello\'\n',
-      'page.kay': '---\nimport { word } from \'kayjs-x\'\n---\np.word {word}\n',
+      'node_modules/kayjs-x/index.ts': `import './helper'\nexport const loads = (): number => (globalThis as Record<string, any>).${counter}\n`,
+      'node_modules/kayjs-x/helper.ts': `import './node_modules/kay/src/mod'\n;(globalThis as Record<string, any>).${counter} = ((globalThis as Record<string, any>).${counter} ?? 0) + 1\n`,
+      'node_modules/kayjs-x/node_modules/kay/package.json': '{"name":"kay","type":"module","browser":"./src/mod.ts"}\n',
+      'node_modules/kayjs-x/node_modules/kay/src/mod.ts': 'export const nested = 1\n',
+      'page.kay': '---\nimport { loads } from \'kayjs-x\'\n---\np.loads {loads()}\n',
     })
     const { root, unmount } = await mountComponent(await componentAt(at('page.kay')))
 
-    expect(root.querySelector('.word')!.textContent).toBe('hello')
+    expect(root.querySelector('.loads')!.textContent).toBe('2')
     unmount()
+    Reflect.deleteProperty(globalThis, counter)
   })
 })
