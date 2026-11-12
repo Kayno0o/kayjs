@@ -113,8 +113,9 @@ function closed() {
 
     leave(closeHref, onOpenChange)
   }
-  else
+  else {
     change(false)
+  }
 }
 
 // Escape, which the dialog hears itself while typed text is at stake.

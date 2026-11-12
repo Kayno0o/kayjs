@@ -122,8 +122,9 @@ function closed() {
 
     leave(closeHref, onOpenChange)
   }
-  else
+  else {
     change(false)
+  }
 }
 
 // Escape, which the panel hears itself while typed text is at stake.
