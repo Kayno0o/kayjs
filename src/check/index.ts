@@ -77,8 +77,8 @@ export const CHECK_CONFIG = [
 ] as const satisfies readonly (keyof KayConfig)[]
 
 export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, 'observe'>, InternalConfig {
-  // Only the request id header is checked, so the rest of the bag is not carried.
-  observe?: Pick<ObserveConfig, 'requestIdHeader'> | undefined
+  // Only the request id header and the load budget are checked, so the rest of the bag is not carried.
+  observe?: Pick<ObserveConfig, 'requestIdHeader' | 'loadBudget'> | undefined
   tsconfig?: string | undefined
   // The database url of the app's `store`, where the redirects added while the site runs may be kept.
   storeDatabase?: string | undefined
@@ -113,7 +113,7 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
   const { observe, ...picked } = pickConfig(config, CHECK_CONFIG)
 
-  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader, loadBudget: observe.loadBudget } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

@@ -23,9 +23,7 @@ import type { Revalidation } from './stale-pages'
 import type { Rendered } from './stream'
 import { newServerIslands, withServerIslands } from '../runtime/html'
 import { unrevivableAction } from '../runtime/island.server'
-import { unansweredLoads } from '../runtime/load-scope'
 import { localeState } from '../runtime/locale-state'
-import { kayLog } from '../runtime/log'
 import { STREAMED_HEADER } from '../runtime/markers'
 import { editing } from '../runtime/preview'
 import { currentServerScope } from '../runtime/reactive'
@@ -45,6 +43,7 @@ import { guardRuns } from './guard-runs'
 import { runGuards } from './guards'
 import { DEFAULT_LANG } from './i18n'
 import { inLiveReads, retryForViewer } from './live'
+import { warnAboutLoads } from './load-budget'
 import { errorPage } from './overlay'
 import { calmDeadline, pageErrorOf } from './page-error'
 import { pageLimits, pageOverLimit, quietly } from './page-limits'
@@ -95,9 +94,6 @@ function startingPageHeaders(context: RequestContext, copies: HeaderCopies | und
 
   return (copies && set ? startingHeaders(set, copies, context.request) : undefined) ?? new Headers(HTML_HEADERS)
 }
-
-// The refreshed loads development already warned of, by route, so a button asking for one does not fill the log.
-const warnedLoads = new Set<string>()
 
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
@@ -219,6 +215,7 @@ export interface Rendering {
   loads?: Pick<LoadedRoute, 'files' | 'modules' | 'timings'> | undefined
   guards?: DevRequest['guards'] | undefined
   prerender?: DevRequest['prerender']
+  slow?: DevRequest['slow']
 }
 
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -436,17 +433,12 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const loading = runLoads(files, modules, rendering.ctx, loaded, timings)
     const data = loading instanceof Promise ? await againstDeadline(rendering.ctx.request, loading) : loading
 
-    if (options.dev) {
-      for (const name of unansweredLoads(rendering.ctx.request)) {
-        if (warnedLoads.has(`${route.file} ${name}`))
-          continue
+    const loadsTook = performance.now() - loadsStarted
 
-        warnedLoads.add(`${route.file} ${name}`)
-        kayLog('warn', `a refresh asked for the load \`${name}\`, which no load the build read in this route's page or layouts answers to (the binding of a top-level \`const ${name} = await ...\` in a server fence): nothing was refreshed for it`)
-      }
-    }
+    if (options.dev)
+      warnAboutLoads(route.file, files, timings, loadsTook, rendering, options)
 
-    return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }
+    return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: loadsTook } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)

@@ -132,6 +132,7 @@ function requestBlock(files: string[], rendering: Rendering, base: string): stri
     id: requestId(rendering.ctx.request),
     guards: rendering.guards ?? [],
     prerender: rendering.prerender,
+    slow: rendering.slow,
     locale: rendering.ctx.locale,
     locales,
     status: rendering.status,

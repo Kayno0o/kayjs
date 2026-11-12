@@ -40,6 +40,13 @@ export function shutdownSeconds(timeout: Duration): number {
   return durationSeconds(timeout, 'serve.shutdownTimeout')
 }
 
+// How long a page's loads may take in development before kay warns: `observe.loadBudget`, 300 ms when unset, none for `false`.
+export const DEFAULT_LOAD_BUDGET_MS = 300
+
+export function loadBudgetMs(value: Duration | false | undefined): number | undefined {
+  return value === undefined ? DEFAULT_LOAD_BUDGET_MS : timeoutMs(value, 'observe.loadBudget')
+}
+
 // A timeout as milliseconds: `false` and an unset value mean none; anything else is a positive duration.
 export function timeoutMs(value: Duration | false | undefined, what: string): number | undefined {
   if (value === undefined || value === false)

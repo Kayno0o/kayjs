@@ -659,6 +659,8 @@ export interface DevRequest {
   status: number
   error?: string | undefined
   loads: { file: string, ms?: number | undefined }[]
+  // Set in development when the loads together took longer than `observe.loadBudget`: the slowest load, its time, the time of all of them and the budget, in milliseconds.
+  slow?: { file: string, ms: number, took: number, budget: number } | undefined
   // The id the server recorded the response under, which `DEV_REQUEST` answers with the headers, the time and the redirects.
   id: string
   // Every guard of the route in the order they run, with what each did; the ones after a refusal did not run.

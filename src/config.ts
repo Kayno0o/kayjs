@@ -177,6 +177,8 @@ export interface ObserveConfig {
   log?: Logger | undefined
   // A `Server-Timing` header on each action, endpoint and API route, timing its guards and handler, and on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
   serverTiming?: boolean | undefined
+  // In development, how long a page's loads may take before kay warns in the console and the dev tool, naming the slowest load: a duration such as `'500ms'`, `'300ms'` by default, `false` for no warning. A page waits for its loads before anything is sent, so one past the budget is a click that waits as long; start what the first paint does not need unawaited and read it in an `await` block.
+  loadBudget?: Duration | false | undefined
   // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.
   requestIdHeader?: string | undefined
   // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.

@@ -1082,6 +1082,28 @@ describe('the dev tool', () => {
     fetching.mockRestore()
   })
 
+  it('warns in the Request tab and the console when the loads passed the budget, naming the slowest', async () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const fetching = spyOn(window, 'fetch').mockImplementation((async () => new Response(null, { status: 404 })) as unknown as typeof window.fetch)
+    const script = document.createElement('script')
+
+    script.type = 'application/json'
+    script.id = 'kay-dev-request'
+    script.textContent = JSON.stringify({ page: 'src/routes/items/[id].kay', layouts: [], params: {}, id: 'slow', guards: [], locale: 'en', status: 200, loads: [{ file: 'src/routes/items/[id].kay', ms: 420 }], slow: { file: 'src/routes/items/[id].kay', ms: 420, took: 430, budget: 300 } })
+    document.head.append(script)
+    tool = startDevTool(document, loadTab)
+    await turn()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
+    await turn()
+
+    expect(shadow().querySelector('#kay-dev-request .timing + .note, #kay-dev-request section.group > p.note')?.textContent).toContain('The loads took 430 ms, over the 300 ms of observe.loadBudget; the slowest is src/routes/items/[id].kay at 420 ms')
+    expect(shadow().querySelector('#kay-dev-tab-request .count')?.textContent).toBe('1')
+    expect(shadow().querySelector('#kay-dev-tab-request .count')?.classList.contains('warn')).toBe(true)
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('over the 300 ms of observe.loadBudget'))
+    warned.mockRestore()
+    fetching.mockRestore()
+  })
+
   it('adds an i18n tab for a site with locales alone: the page\'s locale, a link to it in each, the messages no locale has, cleared as a swap starts', async () => {
     const block = (request: object) => {
       const script = document.createElement('script')
