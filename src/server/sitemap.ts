@@ -403,7 +403,8 @@ async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash:
   const urls = routes.flatMap((route, index) => lists[index]!.flatMap(({ params, modified }) => {
     const copies = copiesOf(route, params, settings)
     const fallback = copies.find(copy => copy.locale === settings?.defaultLocale)
-    const alternates = settings && fallback ? [...copies.map(copy => `<xhtml:link rel="alternate" hreflang="${copy.locale}" href="${absolute(copy)}"/>`), `<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(fallback)}"/>`].join('') : ''
+    // The alternates that exist are listed; `x-default` only when the default locale has a copy to point at.
+    const alternates = settings ? [...copies.map(copy => `<xhtml:link rel="alternate" hreflang="${copy.locale}" href="${absolute(copy)}"/>`), ...fallback ? [`<xhtml:link rel="alternate" hreflang="x-default" href="${absolute(fallback)}"/>`] : []].join('') : ''
 
     return copies.filter(copy => (only === undefined || copy.locale === only) && (copy.own ?? true)).map(copy => `<url><loc>${absolute(copy)}</loc>${modified}${alternates}</url>`)
   }))

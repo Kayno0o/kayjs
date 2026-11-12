@@ -40,7 +40,9 @@ describe('the sitemap of a localized collection whose translations have slugs of
       { slug: 'de/hallo', translationKey: 'greeting' },
     ])
 
-    expect(urls).toEqual(['<url><loc>https://x.example/fr/blog/bonjour</loc></url>', '<url><loc>https://x.example/de/blog/hallo</loc></url>'])
+    const alternates = '<xhtml:link rel="alternate" hreflang="fr" href="https://x.example/fr/blog/bonjour"/><xhtml:link rel="alternate" hreflang="de" href="https://x.example/de/blog/hallo"/>'
+
+    expect(urls).toEqual([`<url><loc>https://x.example/fr/blog/bonjour</loc>${alternates}</url>`, `<url><loc>https://x.example/de/blog/hallo</loc>${alternates}</url>`])
   })
 
   it('keeps entries that share their slug as they were', async () => {
