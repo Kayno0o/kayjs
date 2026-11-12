@@ -1,6 +1,6 @@
 import type { OptionsQuery, OptionsSource } from './options-source'
 
-export interface ComboboxOption<Value extends string = string> {
+export interface ComboboxOption<Value extends string | number = string> {
   value: Value
   label: string
   // A quieter second line under the label in the list. The label alone is what the input shows once picked and names the row, the description read after it.
@@ -13,24 +13,24 @@ export interface ComboboxOption<Value extends string = string> {
 export type ComboboxQuery = OptionsQuery
 
 // A list of options, or a function answering the options for a query, such as an action or a wrapped API call.
-export type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
+export type ComboboxOptions<Value extends string | number = string> = OptionsSource<ComboboxOption<Value>>
 
 // The options whose label holds the text typed, any case; all of them for a blank text.
-export function matchingOptions<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[] {
+export function matchingOptions<Value extends string | number>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[] {
   const needle = text.trim().toLowerCase()
 
   return needle ? options.filter(option => option.label.toLowerCase().includes(needle)) : options
 }
 
 // Whether a `create` row is offered for `text`: something is typed and no option is already named so.
-export function offersCreate(options: readonly ComboboxOption[], text: string): boolean {
+export function offersCreate(options: readonly ComboboxOption<string | number>[], text: string): boolean {
   const typed = text.trim().toLowerCase()
 
   return typed !== '' && !options.some(option => option.label.trim().toLowerCase() === typed)
 }
 
 // The one enabled option whose label is the text typed, any case, or undefined when none or several are.
-export function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined {
+export function exactOption<Value extends string | number>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined {
   const typed = text.trim().toLowerCase()
   const same = typed === '' ? [] : options.filter(option => !option.disabled && option.label.trim().toLowerCase() === typed)
 

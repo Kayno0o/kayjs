@@ -4,7 +4,7 @@ description: A trigger summing up what is picked, opening a popover of checkboxe
 
 <Demo name="multi-select/basic" />
 
-`onChange` hands back the picked values in the options' order, typed like the options' values, so a union of strings needs no cast. An option may carry an `icon`, drawn before its label, and be `disabled`: it cannot be flipped and stays as it is under All and None.
+`onChange` hands back the picked values in the options' order, typed like the options' values, so a union of strings needs no cast, and numeric ids stay numbers (each is posted as its string). An option may carry an `icon`, drawn before its label, and be `disabled`: it cannot be flipped and stays as it is under All and None.
 
 ## Search and forms
 
@@ -30,7 +30,7 @@ The trigger opens the panel on its search box, or its first checkbox. ArrowDown 
 
 `options` can be a promise, or a function answering the options for the text typed, such as an action or a wrapped API call: `options={({ q }) => people(q)}`. It is asked when the panel opens and after a pause in typing, and the latest answer wins.
 
-The status line says `loadingLabel` while it waits and `failureLabel` when it fails, and `minLength` holds the ask back until enough is typed. What is picked keeps its label when a later search no longer lists it. For a value picked before any answer lists it, give its label in `valueLabels`. `onLoad(options, query)` and `onError({ error, query })` follow each answer.
+The status line says `loadingLabel` while it waits and `failureLabel` when it fails, and `minLength` holds the ask back until enough is typed. What is picked keeps its label when a later search no longer lists it. For a value picked before any answer lists it, give its label in `valueLabels`, keyed by the value's string. `onLoad(options, query)` and `onError({ error, query })` follow each answer.
 
 ## Drawing an option
 

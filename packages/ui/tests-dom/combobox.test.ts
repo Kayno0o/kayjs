@@ -5,7 +5,7 @@ import Combobox from '../tests/fixture/src/components/combobox.kay'
 import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
-const changes: string[] = []
+const changes: (string | number)[] = []
 const created: string[] = []
 
 // The load waits out a debounce after the last keystroke, so these tests run it on a fake clock.
@@ -19,7 +19,7 @@ afterEach(() => {
 const PLANETS = [{ value: 'mars', label: 'Mars' }, { value: 'moon', label: 'Moon', disabled: true }, { value: 'earth', label: 'Earth' }]
 
 async function combobox(options: unknown = PLANETS, minLength?: number, create = true, extra: Record<string, unknown> = {}) {
-  mounted = await mountComponent(Combobox, { options, minLength, create, ...extra, onChange: (value: string) => changes.push(value), onCreate: (text: string) => created.push(text) })
+  mounted = await mountComponent(Combobox, { options, minLength, create, ...extra, onChange: (value: string | number) => changes.push(value), onCreate: (text: string) => created.push(text) })
 
   const { root } = mounted
   const input = root.querySelector<HTMLInputElement>('input[role="combobox"]')!
@@ -526,4 +526,32 @@ test('a promise of options is answered once and filtered by the text typed, as a
   await clock.elapse(260)
 
   expect(rows()).toEqual(['Earth'])
+})
+
+test('numeric ids from a remote source come back as numbers, and the form posts their string', async () => {
+  const { root, input } = await combobox(async ({ q }: { q: string }) => [{ value: 7, label: `Ada ${q}` }, { value: 0, label: 'Zero' }], 0, false)
+
+  clock.start()
+  type(input, 'ad')
+  await clock.elapse(260)
+  click(root.querySelector('[role="option"]'))
+  await clock.settle()
+
+  expect(changes).toEqual([7])
+  expect(input.value).toBe('Ada ad')
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"][name="planet"]')?.value).toBe('7')
+
+  type(input, 'ze')
+  await clock.elapse(260)
+  click(root.querySelectorAll('[role="option"]')[1] ?? null)
+  await clock.settle()
+
+  expect(changes).toEqual([7, '', 0])
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"][name="planet"]')?.value).toBe('0')
+})
+
+test('starts on a numeric value, zero included, posting its string', async () => {
+  const { root } = await combobox(async () => [], 0, false, { value: 0, valueLabel: 'Zero' })
+
+  expect(root.querySelector<HTMLInputElement>('input[type="hidden"][name="planet"]')?.value).toBe('0')
 })

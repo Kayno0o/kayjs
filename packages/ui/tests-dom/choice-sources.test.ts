@@ -81,6 +81,31 @@ test('a MultiSelect says so when its function rejects', async () => {
   expect(status()).toBe('Could not load the options')
 })
 
+test('a MultiSelect over numeric ids from a function hands numbers back, posts their strings and finds a number\'s valueLabels entry', async () => {
+  const { root, calls } = await mount()
+  const hidden = () => [...root.querySelectorAll<HTMLInputElement>('#numeric input[type=hidden]')].map(input => input.value)
+  const trigger = () => root.querySelector('#numeric [data-part=trigger]')?.getAttribute('aria-label')
+
+  expect(trigger()).toBe('Ids: One')
+  expect(hidden()).toEqual(['1'])
+
+  click(root.querySelector('#show-ids'))
+  await settle()
+  await settle()
+
+  const boxes = () => root.querySelectorAll('#numeric [data-part=checkbox]')
+
+  expect([...boxes()].map(box => (box as HTMLInputElement).checked)).toEqual([true, false])
+  click(boxes()[1] ?? null)
+  await settle()
+  expect(calls.at(-1)).toBe('ids [1,2]')
+  expect(hidden()).toEqual(['1', '2'])
+  click(boxes()[0] ?? null)
+  await settle()
+  expect(calls.at(-1)).toBe('ids [2]')
+  expect(trigger()).toBe('Ids: Two')
+})
+
 test('a Select given a function is busy until the answer lists its options, the value kept', async () => {
   const { root } = await mount()
 

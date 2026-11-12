@@ -1,4 +1,4 @@
---- <Value extends string>
+--- <Value extends string | number>
 import type { FieldSize } from './field-look'
 import { FIELD_ICON, FIELD_ICON_PAD, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
@@ -39,7 +39,7 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   id?: string | undefined
   // A list, filtered as the visitor types, a promise of one, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
   options: ComboboxOptions<Value>
-  // The value picked; a control whose parent passes another follows it. Empty while nothing is picked.
+  // The value picked, a number for a number option; a control whose parent passes another follows it. Empty while nothing is picked. The posted value is its string.
   value?: Value | '' | undefined
   // The text of `value`, for a remote list that has not returned it: the input shows it, and no load is made for it.
   valueLabel?: string | undefined
@@ -49,7 +49,7 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   name?: string | undefined
   // The characters typed before a function is asked for options.
   minLength?: number | undefined
-  // Offers what was typed as a new option when no option bears its label. Picking it hands the text as the value, and `onCreate` the text.
+  // Offers what was typed as a new option when no option bears its label. Picking it hands the text as the value, a string even where the options are numbers, and `onCreate` the text.
   create?: boolean | undefined
   createLabel?: string | ((text: string) => string) | undefined
   loadingLabel?: string | undefined
@@ -81,13 +81,13 @@ const known = () => isRemote(options) ? [] : options
 const startOption = () => known().find(option => option.value === value)
 
 // A remote value has no label to show until the visitor searches, so its raw id stays out of the input; a list shows the value for want of a label.
-const fallbackLabel = (next: string) => valueLabel ?? (remote ? '' : next)
+const fallbackLabel = (next: Value | '') => valueLabel ?? (remote ? '' : String(next))
 const startLabel = () => startOption()?.label ?? fallbackLabel(value)
 
 // Without JavaScript the input posts its text, which a refused post of its form gives back in place of the starting one.
 const sent = onChange ? undefined : postedValue(name, startLabel())
 const text = signal(sent ?? startLabel())
-const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
+const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value !== '' ? { value: value as Value, label: startLabel() } : undefined))
 const opened = signal(false)
 const active = signal(-1)
 // The text the answers held in `found` are for. Only the latest question lands: an answer arriving after a newer key press is dropped.
@@ -111,7 +111,7 @@ effect(() => {
     return
 
   const option = untrack(() => [...known(), ...found()].find(candidate => candidate.value === next))
-  const chosen = option ?? (next ? { value: next, label: fallbackLabel(next) } : undefined)
+  const chosen = option ?? (next !== '' ? { value: next, label: fallbackLabel(next) } : undefined)
 
   picked = chosen
   text = chosen?.label ?? ''
@@ -140,7 +140,7 @@ effect(() => {
 const carried = () => {
   const option = picked()
 
-  return enhanced() && option && option.value !== option.label ? option : undefined
+  return enhanced() && option && String(option.value) !== option.label ? option : undefined
 }
 
 // A function answers for the text itself; a list, or a promise once answered, is filtered by it.
@@ -388,7 +388,7 @@ div(part="root")
     onFocusOut={focusOut}
   )
   if name && carried() as option
-    input(type="hidden" name={name} value={option.value} disabled={disabled})
+    input(type="hidden" name={name} value={String(option.value)} disabled={disabled})
   if !remote
     datalist(id={`${listId}-native`})
       for option of known() key={option.value}

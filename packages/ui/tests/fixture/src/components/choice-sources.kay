@@ -25,6 +25,12 @@ function answer(entries: MultiSelectOption[] | Error) {
   waiting.shift()?.resolve(entries)
 }
 
+const idsOpened = signal(false)
+
+async function numbers() {
+  return [{ value: 1, label: 'One' }, { value: 2, label: 'Two' }]
+}
+
 async function sizes() {
   return [{ value: 's', label: 'Small' }, { value: 'l', label: 'Large' }]
 }
@@ -34,6 +40,9 @@ const icons = ['tabler:home', 'tabler:search', 'tabler:user'].map(drawn)
 ---
 div#box
   MultiSelect(options={people} label="People" open={opened()} onOpenChange={now => opened = now} valueLabels={{ ada: 'Ada' }} value={['ada']} onChange={value => calls.push(`picked ${value.join(',')}`)})
+div#numeric
+  MultiSelect(options={numbers} label="Ids" name="ids" open={idsOpened()} onOpenChange={now => idsOpened = now} valueLabels={{ 1: 'One' }} value={[1]} onChange={value => calls.push(`ids ${JSON.stringify(value)}`)})
+button#show-ids(type="button" onClick={() => idsOpened = true}) Show ids
 button#show(type="button" onClick={() => opened = true}) Show
 button#hide(type="button" onClick={() => opened = false}) Hide
 button#answer(type="button" onClick={() => answer([{ value: 'bob', label: 'Bob' }, { value: 'cy', label: 'Cy' }])}) Answer

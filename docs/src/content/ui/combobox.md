@@ -6,6 +6,8 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 `options` is a list of `{ value, label, description?, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange(value, option)` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate(text)`.
 
+Values are strings or numbers, as Select's are: `onChange` hands back the option's own type, so a numeric id stays a number, and the form posts it as a string.
+
 A label typed whole, with no row chosen, counts as a pick of that option once the input loses focus or Enter is pressed. That Enter only adopts the option, so a form around the input is not submitted by it; the next Enter submits.
 
 `icon` draws an icon inside the input at its start, as a TextInput does. It is the `icon` part, placed in the root beside the input, so the input is the same element with or without it.

@@ -88,14 +88,14 @@ interface Column<Row>
   width?: number | string
 
 [.] ComboboxOption
-interface ComboboxOption<Value extends string = string>
+interface ComboboxOption<Value extends string | number = string>
   description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value
 
 [.] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
+type ComboboxOptions<Value extends string | number = string> = OptionsSource<ComboboxOption<Value>>
 
 [.] ComboboxQuery
 type ComboboxQuery = OptionsQuery
@@ -306,7 +306,7 @@ type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true'
 function messageOf(error: unknown, fallback: string): string
 
 [.] MultiSelectOption
-interface MultiSelectOption<Value extends string = string>
+interface MultiSelectOption<Value extends string | number = string>
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label: string

@@ -1,4 +1,4 @@
---- <Value extends string>
+--- <Value extends string | number>
 import type { FieldSize } from './field-look'
 import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
@@ -55,7 +55,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   id?: string | undefined
   // A list, filtered by the search box, a promise of one, or a function answering the options for the text typed, such as an action or a wrapped API call: it is asked when the panel opens and after each pause in typing, and only the latest answer lands.
   options: OptionsSource<MultiSelectOption<Value>>
-  // The values picked to start with; a control whose parent passes others follows them.
+  // The values picked to start with, numbers for number options; a control whose parent passes others follows them. Each is posted as its string.
   value?: readonly Value[] | undefined
   // Names the control for screen readers.
   label: string
@@ -74,7 +74,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   failureLabel?: string | undefined
   // The fewest characters a function `options` is asked for; shorter text shows no options.
   minLength?: number | undefined
-  // The labels of values picked before any answer lists them, for a function `options`; a value no answer or label names reads as itself.
+  // The labels of values picked before any answer lists them, for a function `options`, keyed by the value's string; a value no answer or label names reads as itself.
   valueLabels?: Readonly<Record<string, string>> | undefined
   // Called with each answer of a function `options` and the text it was asked for, and with what it rejected with.
   onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
@@ -136,7 +136,8 @@ const pool = (): readonly MultiSelectOption<Value>[] => {
   if (!remote)
     return listed()
 
-  const named = Object.entries(valueLabels ?? {}).map(([entry, text]) => ({ value: entry as Value, label: text }))
+  // A label is keyed by the string of its value, so a number picked is found by its string.
+  const named = Object.entries(valueLabels ?? {}).map(([entry, text]) => ({ value: (picked().find(one => String(one) === entry) ?? entry) as Value, label: text }))
   const byValue = new Map([...named, ...seen(), ...found()].map(option => [option.value, option]))
 
   return [...byValue.values()]
@@ -273,4 +274,4 @@ div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined 
         | {status()}
   if name
     for entry of picked() key={entry}
-      input(type="hidden" name={name} value={entry} disabled={disabled})
+      input(type="hidden" name={name} value={String(entry)} disabled={disabled})
