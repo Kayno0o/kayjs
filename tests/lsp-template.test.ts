@@ -70,7 +70,8 @@ describe('template completion contexts', () => {
     expect(at('a(href="/to|")')).toMatchObject({ kind: 'path' })
 
     expect(at('button(onClick|prev#)', 0, '#')).toMatchObject({ kind: 'modifier', event: 'onClick', replaced: 'prev' })
-    expect(at('input(onKeyDown|enter|#)', 0, '#')).toMatchObject({ kind: 'modifier', event: 'onKeyDown', taken: new Set(['enter', '']) })
+    expect(at('input(onKeyDown|enter|#)', 0, '#')).toMatchObject({ kind: 'modifier', event: 'onKeyDown', taken: new Set(['enter']) })
+    expect(at('div(class|x#)', 0, '#')).toMatchObject({ kind: 'attribute' })
     expect(at('Card(onPick|)')).toMatchObject({ kind: 'attribute', tag: 'Card' })
   })
 

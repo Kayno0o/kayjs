@@ -30,6 +30,7 @@ const SNIPPET_FORMAT = 2
 const OPTIONAL_MARK = /\?$/
 const KIND_FIELD = 5
 const KIND_PROPERTY = 10
+const KIND_CONSTANT = 21
 
 export async function completion(host: LspHost, params: TextDocumentPositionParams & { context?: unknown }): Promise<CompletionList | null> {
   const ui = host.uiFiles.get(params.textDocument.uri)
@@ -136,8 +137,13 @@ export async function templateData(host: LspHost, document: Document, wanted: Wa
     data.elements = [...HTML_ELEMENTS]
     data.components = await importedComponents(host, document, project, wanted.kind === 'attribute' ? wanted.tag : undefined)
 
-    if (wanted.kind === 'attribute' && !CAPITALIZED.test(wanted.tag))
+    if (wanted.kind === 'attribute' && !CAPITALIZED.test(wanted.tag)) {
       data.intrinsic = (await typedProps(host, document, project, wanted.tag, ''))?.map(prop => prop.name)
+
+      // A plain element always has attributes, so an empty answer means tsgo was not ready: ask again next time.
+      if (data.intrinsic?.length === 0)
+        project.lookups.typedProps.delete(`${document.file}\0${wanted.tag}\0`)
+    }
   }
 
   return data
@@ -216,7 +222,7 @@ export async function typedValues(host: LspHost, document: Document, project: Pr
 
   const values = await asked
 
-  if (values === undefined && typedProps.get(key) === asked)
+  if ((values === undefined || values.length === 0) && typedProps.get(key) === asked)
     typedProps.delete(key)
 
   return values?.map(value => value.name) ?? []
@@ -226,7 +232,7 @@ async function askValues(host: LspHost, document: Document, tag: string, name: s
   const call = `void (<${tag} ${name}="" />)`
   const items = await probeCompletion(host, document, call, call.indexOf('""') + 1)
 
-  return items?.map(item => ({ name: item.label, optional: false }))
+  return items?.filter(item => item.kind === KIND_CONSTANT).map(item => ({ name: item.label, optional: false }))
 }
 
 export async function askProps(host: LspHost, document: Document, tag: string): Promise<ComponentInterface['props'] | undefined> {

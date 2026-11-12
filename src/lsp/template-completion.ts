@@ -34,6 +34,7 @@ const WORD_BEFORE = /[\w:|.-]*$/
 const PATH_AFTER = /^[^"'`\s]*/
 const SEPARATED = /[\s,]$/
 const CAPITALIZED = /^[A-Z]/
+const EVENT_NAME = /^on[A-Z]/
 const WORD_AFTER = /^[\w-]*/
 const TAG_BEFORE_PAREN = /([A-Z][\w-]*)(?:[.#][\w-]+)*$/di
 // What may come before an element on its line: indentation, and the `li:` of a nested element.
@@ -103,8 +104,8 @@ export function templateContext(source: string, offset: number, templateStart: n
     if (valid && tag !== undefined) {
       const bar = word.indexOf('|')
 
-      if (bar !== -1 && !CAPITALIZED.test(tag))
-        return { wanted: { kind: 'modifier', event: word.slice(0, bar), taken: new Set(word.slice(bar + 1).split('|')) }, replace: reaching(offset - word.length + word.lastIndexOf('|') + 1) }
+      if (bar !== -1 && !CAPITALIZED.test(tag) && EVENT_NAME.test(word.slice(0, bar)))
+        return { wanted: { kind: 'modifier', event: word.slice(0, bar), taken: new Set(word.slice(bar + 1).split('|').slice(0, -1)) }, replace: reaching(offset - word.length + word.lastIndexOf('|') + 1) }
 
       return { wanted: { kind: 'attribute', tag, taken }, replace: reaching(offset - word.length) }
     }
@@ -302,7 +303,6 @@ const KAY_ELEMENT_ATTRIBUTES: Record<string, string[]> = {
   select: ['field', 'bind:value'],
   details: ['bind:open'],
 }
-const EVENT_NAME = /^on[A-Z]/
 const EVENTS = ['onClick', 'onInput', 'onChange', 'onSubmit', 'onKeyDown', 'onKeyUp', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onPointerDown', 'onPointerUp', 'onScroll', 'onLoad', 'onError']
 
 // What the project and the file around the cursor hold, which the items are made of.
