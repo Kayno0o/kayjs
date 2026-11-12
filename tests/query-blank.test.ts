@@ -1,5 +1,6 @@
 import { expect, it } from 'bun:test'
 import { persisted, s } from '../src/runtime'
+import { formInput } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
 import { queryRules, readQuery } from '../src/server/query'
 import { inServerScope } from '../src/server/scope'
@@ -48,4 +49,27 @@ it('reads a blank optional field as left out on both sides, its default filling 
   expect(readQuery(optional, url)).toEqual({ q: 'x' })
   expect(readParam(queryRules(optional), 'q', url.searchParams)).toBe('x')
   expect(readParam(queryRules(optional), 'r', url.searchParams)).toBeUndefined()
+})
+
+it('reads a blank among other values of a list alike on both sides, as the items it holds', () => {
+  const url = new URL('http://localhost/page?tags=&tags=a')
+
+  expect(readQuery(schema, url).tags).toEqual(['', 'a'])
+  expect(readParam(rules, 'tags', url.searchParams)).toEqual(['', 'a'])
+})
+
+it('refuses a blank required number and leaves an optional boolean blank out, as the server reads them', () => {
+  const typed = s.Object({ n: s.Number(), b: s.Optional(s.Boolean()) })
+
+  expect(() => readQuery(typed, new URL('http://localhost/page?n='))).toThrow('n: Expected number')
+  expect(readQuery(typed, new URL('http://localhost/page?n=1&b='))).toEqual({ n: 1 })
+  expect(readParam(queryRules(typed), 'b', new URLSearchParams('b='))).toBeUndefined()
+})
+
+it('leaves an action body as it was: a cleared optional field keeps its blank in JSON and is left out in a form, a blank number list stays refused', () => {
+  const body = s.Object({ note: s.Optional(s.String()), nums: s.Array(s.Number()) })
+
+  expect(formInput(body, { note: '', nums: [] }, false)).toEqual({ note: '', nums: [] })
+  expect(formInput(body, { note: '', nums: [] })).toEqual({ nums: [] })
+  expect(formInput(body, { nums: '' })).toEqual({ nums: [Number.NaN] })
 })

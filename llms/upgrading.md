@@ -16,6 +16,10 @@ An `s.Date()` field written `2024-02-30`, `2024-2-30`, `2024/02/30` or `2024-03-
 
 `as` is a TypeScript cast and nothing else: the alias of an `if` or `else if` takes the word `await x then name` uses, so `if user as u` is `if user then u` and `else if list.find(f) as item` is `else if list.find(f) then item`. Before, a last `as` followed by a lowercase name aliased the condition and a capitalized name was a cast, so a lowercase type alias read as an alias. The old spelling still aliases until 1.105; the `deprecated-if-alias` lint reports it and `kay upgrade` writes `then`.
 
+### A blank query param reads the default, a blank list reads `[]`
+
+In `ctx.query` and `queryParam`, a blank param (`?q=`) of an optional field with a default reads that default, and a blank list param (`?tags=`) reads `[]`, where it read `[""]`, or answered 400 for a list of numbers. `persisted.query` writes `?q=` or `?tags=` when the user clears a field whose default is not empty, so a reload keeps it. A required field keeps its blank, and an action's body reads as before. A page that took a blank list as one empty item, or relied on a blank number list answering 400, reads the new value.
+
 ## 1.101.0
 
 ### The `hotkey` of Toaster and CommandPalette 1.97 deprecated is gone

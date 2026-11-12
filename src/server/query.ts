@@ -148,10 +148,10 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, form
   const required = (schema as { required?: string[] }).required ?? []
 
   for (const [name, field] of Object.entries((schema as ObjectSchema).properties ?? {})) {
-    // A blank list is the empty one, as `persisted.query` writes it, never one blank item; a blank optional field is left out, so its default fills in.
-    if (filled[name] === '' && (field as { type?: unknown }).type === 'array')
+    // A blank list is the empty one, as `persisted.query` writes it, never one blank item; a blank optional field with a default is left out, so the default fills in. Only here: an action's body goes through `formInput` alone.
+    if (form && filled[name] === '' && (field as { type?: unknown }).type === 'array')
       filled[name] = []
-    else if (form && filled[name] === '' && !required.includes(name))
+    else if (form && filled[name] === '' && field.default !== undefined && !required.includes(name))
       delete filled[name]
 
     if (filled[name] === undefined && field.default !== undefined)
