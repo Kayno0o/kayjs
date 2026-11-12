@@ -43,9 +43,9 @@ import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-typ
 import { eventNames } from './event-names'
 import { filterOptions } from './filter-options'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-import { infiniteListOptions } from './infinite-list-options'
-
 import { unguardedRoutes, unguardedTools } from './guards'
+
+import { infiniteListOptions } from './infinite-list-options'
 import { islandOnlyComponents } from './island-only'
 
 import { largePublicImages } from './large-images'
