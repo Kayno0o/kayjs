@@ -297,7 +297,7 @@ export async function followingRenames(collection: CollectionInfo, data: Record<
           break
 
         // The slug may hold another entry by now: one made, renamed to it or put there after a delete is not the one renamed.
-        if (events.some(event => event.at > step.at && event.slug === step.slug && (event.verb === 'add' || event.verb === 'duplicate' || event.verb === 'delete' || event.verb === 'rename')))
+        if (events.some(event => event !== step && event.at >= step.at && event.slug === step.slug && (event.verb === 'add' || event.verb === 'duplicate' || event.verb === 'delete' || event.verb === 'rename')))
           break
 
         walked.add(step.slug)

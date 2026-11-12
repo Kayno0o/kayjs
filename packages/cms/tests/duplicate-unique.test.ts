@@ -5,6 +5,7 @@ import { registerCollections, registerEditSite } from '../../../src/content/edit
 import { sqliteLoader } from '../src/loaders/sqlite'
 import { configure } from '../src/settings'
 import { duplicateEntry, entryOf, saveEntry } from '../src/store'
+import { withFreeUniques } from '../src/unique'
 
 let count = 0
 
@@ -74,5 +75,19 @@ describe('duplicateEntry on a collection with a unique field', () => {
 
     expect(out.ok).toBe(false)
     expect(!out.ok && out.error.message).toMatch(/^rank: /)
+  })
+})
+
+describe('withFreeUniques', () => {
+  const copy = (properties: Record<string, unknown>, data: Record<string, unknown>) => withFreeUniques({ properties } as never, data, [], value => `${value}-copy`)
+
+  test('looks under a union, as a nullable field is, for what a suffix would break', () => {
+    const limited = { 'anyOf': [{ type: 'string', maxLength: 4 }, { type: 'null' }], 'x-kay-unique': true }
+    const formatted = { 'oneOf': [{ type: 'string', format: 'email' }, { type: 'null' }], 'x-kay-unique': true }
+    const open = { 'anyOf': [{ type: 'string' }, { type: 'null' }], 'x-kay-unique': true }
+
+    expect(copy({ code: limited }, { code: 'ab12' })).toEqual({})
+    expect(copy({ code: formatted }, { code: 'a@b.fr' })).toEqual({})
+    expect(copy({ code: open }, { code: 'ab12' })).toEqual({ code: 'ab12-copy' })
   })
 })

@@ -1,12 +1,14 @@
+import type { Activity } from '../src/activity'
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, reference } from 'kay/content'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { sqliteLoader } from '../src/loaders/sqlite'
+import { followingRenames } from '../src/references'
 import { restoreRevision } from '../src/restore'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
-import { deleteEntry, entryOf, renameEntry, saveEntry } from '../src/store'
+import { collectionNamed, deleteEntry, entryOf, renameEntry, saveEntry } from '../src/store'
 
 let count = 0
 
@@ -95,6 +97,19 @@ describe('restoring a version after a rename', () => {
     expect(!out.ok && out.error.message).toBe('No entry ada in authors')
   })
 
+  test('refuses a reference to the first name once the middle one is reused after a chain of renames', async () => {
+    await saveEntry({ collection: 'authors', slug: 'ada', data: { title: 'Ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', by: 'ada' } }, { create: true })
+    await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N2', by: 'ada' } })
+    await renameEntry({ collection: 'authors', slug: 'ada' }, 'lovelace')
+    await renameEntry({ collection: 'authors', slug: 'lovelace' }, 'ada-l')
+    await saveEntry({ collection: 'authors', slug: 'lovelace', data: { title: 'Someone else' } }, { create: true })
+
+    const out = await restoreOldest({ collection: 'notes', slug: 'n' })
+
+    expect(!out.ok && out.error.message).toBe('No entry ada in authors')
+  })
+
   test('still refuses a reference to an entry that was deleted, not renamed', async () => {
     await saveEntry({ collection: 'authors', slug: 'bob', data: { title: 'Bob' } }, { create: true })
     await saveEntry({ collection: 'notes', slug: 'm', data: { title: 'M', by: 'bob' } }, { create: true })
@@ -105,5 +120,20 @@ describe('restoring a version after a rename', () => {
 
     expect(out.ok).toBe(false)
     expect(!out.ok && out.error.message).toBe('No entry bob in authors')
+  })
+})
+
+describe('followingRenames', () => {
+  const event = (at: number, verb: Activity['verb'], slug: string, from?: string): Activity => ({ at, verb, collection: 'authors', slug, from })
+
+  test('refuses a reuse of the new slug logged in the same millisecond as the rename', async () => {
+    await saveEntry({ collection: 'authors', slug: 'lovelace', data: { title: 'Someone' } }, { create: true })
+
+    const notes = await collectionNamed('notes')
+    const data = { title: 'N', by: 'ada' }
+
+    expect(await followingRenames(notes, data, undefined, async () => [event(5, 'rename', 'lovelace', 'ada')])).toEqual({ title: 'N', by: 'lovelace' })
+    expect(await followingRenames(notes, data, undefined, async () => [event(5, 'rename', 'lovelace', 'ada'), event(5, 'delete', 'lovelace')])).toEqual(data)
+    expect(await followingRenames(notes, data, undefined, async () => [event(5, 'add', 'lovelace'), event(5, 'rename', 'lovelace', 'ada')])).toEqual(data)
   })
 })
