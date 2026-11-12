@@ -242,6 +242,31 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     expect((await server()).saves).toBe(0)
   }, 60_000)
 
+  it('keeps what a later queued write to the same row made while an earlier one is rolled back', async () => {
+    const page = await opened()
+
+    await write(page, 'button.add', 'first')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'first 1')
+    await page.offline()
+    await write(page, 'button.edit', 'one')
+    await write(page, 'button.edit', 'two')
+
+    let answered = 0
+
+    // The server refuses the first write and the connection drops for the next, which stays queued.
+    await page.route('/_kay/action/*', async (request) => {
+      answered++
+
+      return answered === 1 ? request.fulfill({ status: 400, body: '' }) : request.abort()
+    })
+    await page.online()
+    await page.waitUntil(() => document.querySelector('li.issue') !== null)
+
+    expect(await page.text('li.issue')).toBe('rejected a 400')
+    expect(await page.text('p.pending')).toBe('1')
+    expect(await page.text('li.note')).toBe('two 1')
+  }, 60_000)
+
   it('merges a conflicting write by default: the server\'s row with the fields this write changed', async () => {
     const page = await opened()
 

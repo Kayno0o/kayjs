@@ -820,10 +820,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     outbox.delete(entry.seq!)
 
-    // Back to what the server last gave, or gone for a row it never knew.
-    if (current?.base !== undefined)
+    const later = (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).some(other => other.k === entry.k && other.seq !== entry.seq)
+
+    // A write to the row still queued made the row as it is and stands, the server settling it; else back to what the server last gave, or gone for a row it never knew.
+    if (!later && current?.base !== undefined)
       rows.put({ ...current, row: current.base, gone: false })
-    else
+    else if (!later)
       rows.delete([this.c, entry.k])
 
     issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, actionFailed(answer.status)), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, createdAt: new Date() })
