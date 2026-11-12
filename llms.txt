@@ -7,7 +7,7 @@
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
 - A signal or memo is read by calling it, `count()`, in the template and the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it: `count = 0`, `count += step` and `count++` compile to `.set`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
-- An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes.
+- An `await` block streams any promise: `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - Browser globals (`window`, `document`) are read in `effect`, `onMount` or a `--- client` component; reading one while rendering throws on the server.
@@ -87,8 +87,8 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
 - [Lints and warnings](llms/lints.md): each lint's level and fix, allowing one
-- [SEO lints](llms/seo-lints.md): its group
-- [Performance lints](llms/performance-lints.md): its group
+- [SEO lints](llms/seo-lints.md): the `seo` group
+- [Performance lints](llms/performance-lints.md): images, serial awaits
 - [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
 - [Errors](llms/errors.md): error codes and fixes, `Result`
 - [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, from Astro
