@@ -66,6 +66,14 @@ function pressed(event: KeyboardEvent) {
   pick(question, false)
 }
 
+// A click on the backdrop answers at the click for the same reason.
+function clicked(event: MouseEvent) {
+  const question = current()
+
+  if (question !== undefined && event.target === event.currentTarget)
+    pick(question, false)
+}
+
 // A host that goes leaves nobody to answer the open question and those queued, unless another host takes over.
 onMount(() => onCleanup(() => {
   const question = current()
@@ -84,7 +92,7 @@ onMount(() => onCleanup(() => {
 const words = () => confirmWords(current()?.tone ?? 'neutral', { title: current()?.title, confirmLabel: current()?.confirmLabel, cancelLabel: current()?.cancelLabel })
 ---
 if owns()
-  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onOpenChange={closed})
+  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onClick={event => { rest.onClick?.(event); clicked(event) }} onOpenChange={closed})
     @footer
       // The safe button takes the focus, so a stray Enter cancels.
       Button(label={words().cancel} autofocus onClick={() => current() && pick(current()!, false)})

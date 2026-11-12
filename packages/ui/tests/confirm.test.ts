@@ -102,3 +102,13 @@ it('settles the open question and the queued ones with false when the only host 
     await bare.close()
   }
 }, 120_000)
+
+it('opens a second question asked right after a click on the backdrop cancelled the first', async () => {
+  await using page = await opened()
+
+  await page.click('#neutral')
+  await page.waitUntil(shown)
+  await page.click('body', { at: { x: 2, y: 2 } })
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>('#danger')!.click())
+  await page.waitUntil(() => document.querySelector('#answers')!.textContent === 'neutral:false,neutral:false' && document.querySelector('dialog[role=alertdialog][open] h2')?.textContent === 'Confirm Deletion')
+}, 120_000)
