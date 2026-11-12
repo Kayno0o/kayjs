@@ -62,6 +62,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   publicEnv: 'request',
   queryParam: 'request',
   randomId: 'request',
+  reactiveMap: 'free',
+  reactiveSet: 'free',
   recipe: 'free',
   reducedMotion: 'free',
   refresh: 'free',
