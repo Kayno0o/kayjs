@@ -118,4 +118,5 @@ export default defineConfig({
 - A server under `base` sits behind a proxy taking the path off requests: kay's routes stay at the root.
 - An island rendering in the browser puts the same attributes under it as it sets them, leaving a path already under it as it is, so `a(href={localize('/about')})` gets it once.
 - Under `base: '/blog'`, an island links to the route `/blog/hello` with `withBase('/blog/hello')`.
+- A redirect a handler sends, a returned `Response`, `redirect()` or `set.headers.location`, names the path without the base, which kay adds once; a path already under it goes under it again.
 - A URL a script uses outside a template, such as `location.assign()` or `fetch()`, goes through `withBase('/about')` from `kay`, which leaves a path as it is on the server, where kay adds the base itself; island actions, their redirects and `localize()` do already.

@@ -21,3 +21,27 @@ describe('compressResponse types', () => {
       expect(await encodingOf(type), type).toBeNull()
   })
 })
+
+describe('compressResponse on HEAD', () => {
+  it('names the encoding and Vary its GET does, with no length, and reads nothing', async () => {
+    const make = () => new Response(body, { headers: { 'content-type': 'text/html', 'content-length': String(body.length) } })
+    const headers = { 'accept-encoding': 'gzip' }
+    const get = (await compressResponse(new Request('http://localhost/x', { headers }), make()))!
+    const source = make()
+    const head = (await compressResponse(new Request('http://localhost/x', { method: 'HEAD', headers }), source))!
+
+    expect(source.bodyUsed).toBe(false)
+    expect(head.body).toBeNull()
+    expect(head.headers.get('content-length')).toBeNull()
+
+    for (const name of ['content-encoding', 'vary', 'content-type'])
+      expect([name, head.headers.get(name)]).toEqual([name, get.headers.get(name)])
+  })
+
+  it('leaves a HEAD alone when its GET would not be compressed, naming Vary', async () => {
+    const small = new Response('tiny', { headers: { 'content-type': 'text/html', 'content-length': '4' } })
+
+    expect(await compressResponse(new Request('http://localhost/x', { method: 'HEAD', headers: { 'accept-encoding': 'gzip' } }), small)).toBeUndefined()
+    expect(await compressResponse(new Request('http://localhost/x', { method: 'HEAD' }), new Response(body, { headers: { 'content-type': 'text/html', 'content-length': '2000' } }))).toBeUndefined()
+  })
+})

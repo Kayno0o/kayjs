@@ -415,3 +415,31 @@ describe('service worker of a test site with no client build', () => {
     expect((await worker(app)).text).toContain('skipWaiting')
   })
 })
+
+describe('the worker activating', () => {
+  it('deletes every kay cache but its own, and keeps others', async () => {
+    const app = new Elysia()
+
+    await serveServiceWorker(app, new ServedPaths(), { client: { dir: '/nonexistent', pages: new Map() } as unknown as ClientBuild, offline: true, base: '', publicPages: [] })
+
+    const { text, settings } = await worker(app)
+    const names = new Set([settings!.cache, 'kay-w7', 'kay-w3', 'other-cache'])
+    const listeners = new Map<string, (event: unknown) => void>()
+    const caches = { keys: async () => [...names], delete: async (name: string) => names.delete(name) }
+    const sandbox = { self: { addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener), clients: { claim: async () => undefined } }, caches, location: { origin: 'http://localhost' } }
+    // eslint-disable-next-line no-new-func
+    const run = new Function(...Object.keys(sandbox), text) as (...globals: unknown[]) => void
+
+    run(...Object.values(sandbox))
+
+    let waited: Promise<unknown> = Promise.resolve()
+
+    listeners.get('activate')!({ waitUntil: (promise: Promise<unknown>) => {
+      waited = promise
+    } })
+    await waited
+
+    expect([...names].toSorted()).toEqual([settings!.cache, 'other-cache'].toSorted())
+    expect(settings!.cache).toBe('kay-w8')
+  })
+})

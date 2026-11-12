@@ -109,3 +109,32 @@ describe('a redirect under a base, whoever writes it', () => {
     expect(await location('/redirect')).toBe('/app/about')
   })
 })
+
+describe('a redirect under a base, in a mounted app', () => {
+  it('is rebased once whether the handler sets the header, returns a Response, or both', async () => {
+    const inner = new Elysia().use(await pages({ root: 'tests/fixtures/static', prebuilt: false, security: false, site: 'https://x.example', base: '/repo' })).get('/set', ({ set }) => {
+      set.status = 302
+      set.headers.location = '/about'
+
+      return ''
+    }).get('/both', ({ set }) => {
+      set.headers.location = '/about'
+
+      return new Response(null, { status: 302, headers: { location: '/about' } })
+    }).get('/redirect', ({ redirect }) => redirect('/about')).get('/based', ({ set }) => {
+      set.status = 302
+      set.headers.location = '/repo/about'
+
+      return ''
+    })
+    // The app mounted in another one is not rebased a second time.
+    const outer = new Elysia().use(inner)
+
+    const location = async (path: string) => (await outer.handle(new Request(`http://localhost${path}`))).headers.get('location')
+
+    expect(await location('/set')).toBe('/repo/about')
+    expect(await location('/both')).toBe('/repo/about')
+    expect(await location('/redirect')).toBe('/repo/about')
+    expect(await location('/based')).toBe('/repo/repo/about')
+  })
+})

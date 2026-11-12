@@ -724,10 +724,11 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   }
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read, or what was read of it before.
-  if (encoding === undefined) {
+  // A HEAD names the encoding its GET does, with no length, which only the compressed bytes tell: nothing is read or compressed for it.
+  if (encoding === undefined || request.method === 'HEAD') {
     varyOnEncoding(headers)
 
-    return read && new Response(read, { status, statusText: response.statusText, headers })
+    return encoding !== undefined ? new Response(null, { status, statusText: response.statusText, headers: compressedHeaders(headers, encodingName(encoding)) }) : read && new Response(read, { status, statusText: response.statusText, headers })
   }
 
   if (read)
