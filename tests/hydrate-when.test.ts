@@ -16,6 +16,8 @@ afterAll(async () => {
 
 const rect = (width: number, height: number, top = 0, left = 0) => ({ width, height, top, left }) as DOMRectReadOnly
 
+const fire = (callback: IntersectionObserverCallback, entries: object[]) => callback(entries as unknown as IntersectionObserverEntry[], {} as IntersectionObserver)
+
 describe('hydrate="interaction"', () => {
   it('hydrates once on the first pointer event inside, and not before', () => {
     document.body.innerHTML = '<slot><button>A</button></slot>'
@@ -53,6 +55,22 @@ describe('hydrate="media(...)"', () => {
     return { list, listeners }
   }
 
+  it('reads a bare feature as one in brackets, and a full query as it is', () => {
+    const asked: string[] = []
+
+    globalThis.matchMedia = ((query: string) => {
+      asked.push(query)
+
+      return { matches: true, media: query.startsWith('(') || query.includes(' and ') ? query : 'not all' }
+    }) as unknown as typeof matchMedia
+
+    const nothing = async () => undefined
+
+    when.whenMedia('max-width: 40rem', nothing)
+    when.whenMedia('screen and (min-width: 1px)', nothing)
+    expect(asked).toEqual(['max-width: 40rem', '(max-width: 40rem)', 'screen and (min-width: 1px)'])
+  })
+
   it('hydrates at once when the query matches', () => {
     stub(true)
 
@@ -75,7 +93,7 @@ describe('hydrate="media(...)"', () => {
     expect(runs).toBe(0)
     list.matches = true
 
-    for (const listener of [...listeners])
+    for (const listener of listeners)
       listener()
 
     expect(runs).toBe(1)
@@ -114,17 +132,17 @@ describe('whenVisible on an island with no box', () => {
     expect(watched).toEqual([first!, second!])
 
     // A child with a box, even off screen, is reason enough not to watch the parent.
-    callback([{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }, { isIntersecting: false, target: second!, boundingClientRect: rect(10, 10, 500) }] as IntersectionObserverEntry[], {} as IntersectionObserver)
+    fire(callback, [{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }, { isIntersecting: false, target: second!, boundingClientRect: rect(10, 10, 500) }])
     expect(watched).toHaveLength(2)
 
-    callback([{ isIntersecting: false, target: second!, boundingClientRect: rect(0, 0) }] as IntersectionObserverEntry[], {} as IntersectionObserver)
+    fire(callback, [{ isIntersecting: false, target: second!, boundingClientRect: rect(0, 0) }])
     expect(watched).toEqual([first!, second!, section])
 
     // Watched once.
-    callback([{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }] as IntersectionObserverEntry[], {} as IntersectionObserver)
+    fire(callback, [{ isIntersecting: false, target: first!, boundingClientRect: rect(0, 0) }])
     expect(watched).toHaveLength(3)
 
-    callback([{ isIntersecting: true, target: section, boundingClientRect: rect(100, 100) }] as IntersectionObserverEntry[], {} as IntersectionObserver)
+    fire(callback, [{ isIntersecting: true, target: section, boundingClientRect: rect(100, 100) }])
     expect(runs).toBe(1)
     expect(disconnected).toBe(1)
   })

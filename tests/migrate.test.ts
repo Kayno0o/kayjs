@@ -151,6 +151,8 @@ import Counter from './Counter.astro'
 </Card>
 <Counter client:visible />
 <Counter client:load />
+<Counter client:media="(max-width: 50em)" />
+<Counter client:only="react" />
 `)
 
     expect(code).toEndWith(`Card
@@ -159,6 +161,8 @@ import Counter from './Counter.astro'
   p Body
 Counter(hydrate="visible")
 Counter
+Counter(hydrate="media(max-width: 50em)")
+Counter(hydrate="client")
 `)
   })
 

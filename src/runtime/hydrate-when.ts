@@ -58,7 +58,7 @@ export function whenIdle(run: () => Promise<void>) {
     setTimeout(() => void run(), IDLE_FALLBACK_MS)
 }
 
-// `hydrate="media(...)"`: now when the query matches, else the first time it does.
+// `hydrate="media(...)"`: now when the query matches, else the first time it does. A bare feature, `max-width: 40rem`, is no query to the browser (`media` reads `not all`), so it is tried in brackets.
 export function whenMedia(query: string, run: () => Promise<void>) {
   if (typeof matchMedia !== 'function') {
     void run()
@@ -66,7 +66,10 @@ export function whenMedia(query: string, run: () => Promise<void>) {
     return
   }
 
-  const list = matchMedia(query)
+  let list = matchMedia(query)
+
+  if (list.media === 'not all')
+    list = matchMedia(`(${query})`)
 
   if (list.matches) {
     void run()

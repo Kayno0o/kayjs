@@ -44,10 +44,22 @@ const BLOCK_TAGS = new Set(['address', 'article', 'aside', 'blockquote', 'detail
 const INLINE = new Set(['a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'kbd', 'mark', 's', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u'])
 // Elements whose line break beside another renders as a space: `br` is left out, a break there collapses.
 const FLOW_TAGS = new Set([...INLINE].filter(tag => tag !== 'br').concat(['audio', 'bdi', 'bdo', 'button', 'canvas', 'cite', 'data', 'del', 'dfn', 'iframe', 'img', 'input', 'ins', 'label', 'picture', 'q', 'samp', 'select', 'svg', 'textarea', 'var', 'video']))
-const HYDRATE: Record<string, string | undefined> = { 'client:load': undefined, 'client:idle': 'idle', 'client:visible': 'visible' }
+// A media query of one feature in brackets, which `hydrate="media(...)"` takes as it is; a longer one has no counterpart and is noted.
+const SINGLE_FEATURE = /^\([^()"]+\)$/
+const HYDRATE: Record<string, string | undefined> = { 'client:load': undefined, 'client:idle': 'idle', 'client:visible': 'visible', 'client:only': 'client' }
 // Attributes Astro reads and kay has no use for: the page swap is kay's own, and an inline script is the only kind.
 const DROPPED = new Set(['is:inline', 'is:raw', 'transition:animate', 'transition:name', 'transition:persist', 'transition:persist-props'])
 const ROUTER_COMPONENTS = new Set(['ClientRouter', 'ViewTransitions'])
+
+// What kay's `hydrate` an Astro `client:` directive becomes, `{ value: undefined }` for the default, and nothing for one with no counterpart.
+function hydrateOf(name: string, attribute: { type: string, value?: unknown } | null | undefined): { value: string | undefined } | undefined {
+  const text = attribute?.type === 'Literal' && typeof attribute.value === 'string' ? decodeEntities(attribute.value).trim() : undefined
+
+  if (name === 'client:media')
+    return text !== undefined && SINGLE_FEATURE.test(text) ? { value: `media${text}` } : undefined
+
+  return name in HYDRATE ? { value: HYDRATE[name] } : undefined
+}
 
 export interface RawBlock {
   tag: string
@@ -529,8 +541,10 @@ class Translator {
         continue
 
       if (name.startsWith('client:')) {
-        if (name in HYDRATE)
-          hydrate = HYDRATE[name]
+        const mapped = hydrateOf(name, value)
+
+        if (mapped)
+          hydrate = mapped.value
         else
           this.note(this.line(attribute), `${name} has no kay counterpart: an interactive .kay component hydrates by itself, \`hydrate="idle"\` or \`"visible"\` delaying it`)
 

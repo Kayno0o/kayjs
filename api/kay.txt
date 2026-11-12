@@ -485,7 +485,7 @@ interface HoneypotOptions<Field extends string = string>
   pretend?: boolean | undefined
 
 [.] HydrateWhen
-type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
+type HydrateWhen = 'load' | 'idle' | 'visible' | 'interaction' | `media(${string})` | 'client'
 
 [.] InputOf
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never

@@ -52,7 +52,7 @@ const CONTENT_ATTRIBUTES = new Set(['innerHTML', 'textContent', 'innerText', 'ch
 // One string literal, the way CSS with braces is written in a template's text.
 const STRING_LITERAL = /^\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)\s*$/
 // A `media(...)` hydrate with a query between its brackets.
-const MEDIA_HYDRATE = /^media\(\s*\S[^]*\)$/
+const MEDIA_HYDRATE = /^media\(\s*\S.*\)$/s
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a control's `role`.
@@ -778,10 +778,10 @@ class Validator {
 
     // Writing either drops the size kay would have written.
     if (names.has('width') || names.has('height'))
-      return element.name === 'img' || this.isImageInput(element)
+      return element.name === 'img' || (element.name === 'input' && this.staticType(element) === 'image')
 
     if (element.name === 'input')
-      return this.isImageInput(element)
+      return this.staticType(element) === 'image'
 
     if (element.name !== 'img')
       return false
@@ -819,10 +819,6 @@ class Validator {
     const height = names.has('height') || tokens.some(token => HEIGHT_CLASS.test(token))
 
     return style || (tokens.some(token => ASPECT_CLASS.test(token)) && (width || height)) || (width && height)
-  }
-
-  private isImageInput(element: ElementNode): boolean {
-    return element.name === 'input' && element.attributes.some(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type' && attribute.text === 'image')
   }
 
   // The text of the static `type` of an element, if it has one.
