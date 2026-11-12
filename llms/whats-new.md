@@ -2,12 +2,15 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## 1.101.0
+## Unreleased
 
 - kayjs-ui: every control with a `label` takes `showLabel`: RadioGroup, Rating, RangeInput, DateRangeInput, RowsField and Combobox write it above the control on request (a `field` part, the label as `heading`, `title` on RowsField), and Slider, ColorInput, Checkbox and Toggle can drop their text with `showLabel={false}` while `label` still names the control for screen readers. Defaults are unchanged; see [forms](../packages/ui/llms/forms.md).
 - `kay new`'s presets no longer include the `accents` picker: `--with accents` or `kay add accents` adds it, and a project made without `ci` or `docker` is told to run `kay add ci` and `kay add docker` ([Scaffold with kay new and kay add](project-new-and-add.md)).
 - `--- script` opening a file is written `---`: `kay upgrade` rewrites it (`deprecated-script-fence`), and the one place the word stays is a script after a `--- server`, `--- module` or `--- style` fence, in the [fence table](components.md#file-layout).
 - `if user then u` names the value an `if` or `else if` tests, as `await x then v` does, so `as` is only a cast and no longer an alias by the casing of what follows; `if user as u` works until 1.105 and `kay upgrade` rewrites it ([templates](templates.md)).
+
+## 1.101.0
+
 - Compile errors carry their own code per problem instead of `template-invalid` (`head-invalid`, `duplicate-attribute`, `part-invalid`, `bind-misuse`, `name-clash` and more), and the ones with one right answer carry a quick fix `kay check --fix` applies: `onclick` and `on:click`, a repeated static `class`, a valueless `class`, a `part`, `field` or `style:` value written the wrong way. `kay explain` covers lints and errors alike. See [Errors](errors.md).
 - A browser global read while rendering is caught earlier and says more: `kay check --fix` wraps a call on the global (`localStorage.setItem(...)`, `document.title = ...`) in `effect`, `kay check` and the build report a module a page imports that reads `window` or `document` as it loads (the `browser-global-at-load` lint), and a server render failing on one names the global, the component and its line in production too ([browser-only](browser-only.md#browser-globals-on-the-server)).
 - `apiUrl(module, path, { params, query })` is typed from the module: the path is one of its routes (the editor completes them), a path with params asks for them as `route()` does (a number fills one), and an unknown path is a type error; `apiUrl(request, path)` in a handler takes any path. See [API routes](api-routes.md).
