@@ -24,7 +24,7 @@ import { mountEventRoutes, secretsOf } from './events'
 import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { messageId } from './message-id'
-import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
+import { addressOf, outbox, PREVIEW_ROUTES, sameAddress } from './outbox'
 import { providerFromUrl, providerName, providerOf } from './providers'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
@@ -873,9 +873,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (typeof match !== 'object')
         return jobs.remove(match)
 
-      const recipient = match.recipient.toLowerCase()
+      const recipient = sameAddress(match.recipient)
 
-      return jobs.remove(mail => recipientsOf(mail).some(address => address.toLowerCase() === recipient))
+      return jobs.remove(mail => recipientsOf(mail).some(address => sameAddress(address) === recipient))
     },
   })
 

@@ -2,7 +2,7 @@ import type { Duration } from 'kay'
 import type { Address, Delivery, Mail, MailAttachment, Transport } from './types'
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, normalizeAddress } from 'kay/library'
 import { devFile, devServer } from './delivery'
 import { log } from './log'
 import { linksOf } from './text'
@@ -79,8 +79,13 @@ export function addressOf(address: Address): string {
   return (open === -1 ? address : address.slice(open + 1, address.indexOf('>', open))).trim()
 }
 
+// An address as the mailer stores it, so a recipient spelled in NFD, with a space around it or in another case still matches; one `normalizeAddress` refuses is compared as typed, folded the same way.
+export function sameAddress(address: string): string {
+  return normalizeAddress(address) ?? address.normalize('NFC').trim().toLowerCase()
+}
+
 function sentTo(mail: Mail, wanted: string): boolean {
-  return [...mail.to, ...mail.cc, ...mail.bcc].some(to => addressOf(to).toLowerCase() === wanted)
+  return [...mail.to, ...mail.cc, ...mail.bcc].some(to => sameAddress(addressOf(to)) === wanted)
 }
 
 // A mail as the file holds it: its date as text and an attachment's bytes as base64.
@@ -175,7 +180,7 @@ export function createOutbox(file?: string): Outbox {
     },
     last: () => mails.at(-1),
     to: (address) => {
-      const wanted = address.toLowerCase()
+      const wanted = sameAddress(address)
 
       return mails.filter(mail => sentTo(mail, wanted))
     },
@@ -204,7 +209,7 @@ export function createOutbox(file?: string): Outbox {
       return token
     },
     waitFor: async (address, options = {}) => {
-      const wanted = address.toLowerCase()
+      const wanted = sameAddress(address)
       const { find = () => true, site } = options
       const lookup = () => mails.findLast(mail => sentTo(mail, wanted) && find(mail))
       const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout') * 1000
