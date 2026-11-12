@@ -57,7 +57,6 @@ export interface QueryHistoryOptions {
 
 // A signal whose value is kept across pages and visits in a cookie named `name`, which the server reads too; `persisted.local()`, `persisted.session()` and `persisted.query()` keep it in localStorage, sessionStorage and the URL.
 // A string unless `T` says otherwise.
-// kept: local, it reads the request's cookie, so it is free only where every call is `persisted.local()` or `persisted.session()`, kept in the browser's storage and read once the page has hydrated; `storage: 'local'` of the deprecated form says the same.
 function persistedCall<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values' | 'sync'> & QueryHistoryOptions & { storage: 'query' }): Signal<T>
 // `values` types the signal as their union, and the default must be one of them.
 function persistedCall<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge' | 'sync'> & QueryHistoryOptions & { storage: 'query', values: readonly T[] }): Signal<T>
@@ -101,6 +100,7 @@ function query<T>(name: string, value: PlainValue<T>, options?: PersistedQueryOp
   return keptSignal('query', name, value, options)
 }
 
+// kept: local, it reads the request's cookie, so it is free only where every call is `persisted.local()` or `persisted.session()`, kept in the browser's storage and read once the page has hydrated; `storage: 'local'` of the deprecated form says the same.
 // The entries are attached in a pure call, so a page that never reads `persisted` drops it with every storage's code.
 export const persisted: typeof persistedCall & { cookie: typeof cookie, local: typeof local, session: typeof session, query: typeof query } = /* @__PURE__ */ Object.assign(persistedCall, { cookie, local, session, query })
 
