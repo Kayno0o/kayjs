@@ -7,7 +7,7 @@ import { refuseStaticConfig } from '../src/build/static'
 import { image } from '../src/runtime/image'
 import { imageSize, processImage } from '../src/server'
 import * as avifCodec from '../src/server/avif'
-import { applyImageConfig, writeImageVariants } from '../src/server/image'
+import { applyImageConfig, sourceFile, writeImageVariants } from '../src/server/image'
 import { imageHeader, isAvif } from '../src/server/image-format'
 import { kayBuild } from './check-helper'
 import { gif } from './gif'
@@ -322,5 +322,20 @@ describe('images.resolve and images.guard', () => {
 
   it('leaves imported and runtime directory images unguarded', async () => {
     expect((await get('/uploads/still.gif')).status).toBe(200)
+  })
+})
+
+describe('the file a src names', () => {
+  const options: any = { clientDir: '/client', cacheDir: '/x', dirs: { '/uploads/': '/tmp/up' } }
+
+  it('ends at a ?, so a query is never part of the path and never hides another file', () => {
+    expect(sourceFile('/uploads/a.png', options)).toEqual({ path: '/tmp/up/a.png', immutable: false })
+    expect(sourceFile('/uploads/a.png?v=2', options)).toEqual({ path: '/tmp/up/a.png', immutable: false })
+    expect(sourceFile('/uploads/sub/a.png?/../secret.txt', options)).toEqual({ path: '/tmp/up/sub/a.png', immutable: false })
+    expect(sourceFile('/uploads/a.png?/../../x.png', options)).toEqual({ path: '/tmp/up/a.png', immutable: false })
+    expect(sourceFile('/uploads/secret.txt?a.png', options)).toBeUndefined()
+    expect(sourceFile('/uploads/a.png%3Fv=2', options)).toEqual({ path: '/tmp/up/a.png?v=2', immutable: false })
+    expect(sourceFile('/_kay/assets/hero-a1.png?v=2', options)).toEqual({ path: '/client/assets/hero-a1.png', immutable: true })
+    expect(sourceFile('/_kay/assets/x.txt?a.png', options)).toBeUndefined()
   })
 })

@@ -699,8 +699,9 @@ export function builtAsset(clientDir: string, name: string | undefined): string 
   return path.startsWith(dir + sep) ? path : undefined
 }
 
-// The file a `src` names, never one outside the built assets or the directories of runtime images.
-export function sourceFile(src: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
+// The file a `src` names, never one outside the built assets or the directories of runtime images; a `?` ends the path, so a query is never read as part of the file.
+export function sourceFile(whole: string, options: ImageRouteOptions): { path: string, immutable: boolean } | undefined {
+  const src = whole.split('?', 1)[0]!
   const decoded = decodePath(src)
 
   if (decoded === undefined || decoded.includes('\0') || !RESIZABLE.test(decoded))
