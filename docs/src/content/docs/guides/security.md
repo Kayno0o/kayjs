@@ -249,7 +249,7 @@ A prerendered page with a limit is still counted by the kay server, and answered
 
 ## Rate limit a guard or an API route
 
-Outside an action, use `rateLimit(name, { max, window })` from `kay/server`. Call `hit` with the request, and it gives the seconds to wait once the client is over the limit.
+Outside an action, use `rateLimit(name, { max, window })` from `kay/server`. Call `enforce` with the guard's context: it counts the request, and once the client is over the limit it sets `Retry-After` and denies with 429.
 
 ```ts
 import { guard } from 'kay'
@@ -257,17 +257,16 @@ import { rateLimit } from 'kay/server'
 
 const visits = rateLimit('account', { max: 60, window: '1m' })
 
-export default guard(async ({ request, headers, deny }) => {
-  const wait = await visits.hit(request)
-
-  if (wait !== undefined) {
-    headers.set('retry-after', String(wait))
-    deny(429, `Too many requests; try again in ${wait} s`)
-  }
+export default guard(async (ctx) => {
+  await visits.enforce(ctx)
 })
 ```
 
-Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
+`enforce(ctx, message)` words the refusal: a text, or a function of the seconds to wait. To answer another way, call `hit` with the request: it gives the seconds to wait once the client is over the limit, else `undefined`. Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
+
+The object `rateLimit()` returns is a limit like any other, so `protect: { rateLimit: visits }` on an action, `api({ rateLimit: visits })` or a page's `rateLimit` takes it and counts in the same counter: one client, one allowance across the guard, the action and the API.
+
+Any limit takes `onLimit`, called with `{ name, key, wait, request }` for each request it refuses. Use it to log or alert; the answer does not wait for it.
 
 A third argument counts several at once. With `max` set to tokens, `budget.hit(user.email, undefined, usage.tokens)` caps the tokens a visitor spends, not their requests.
 

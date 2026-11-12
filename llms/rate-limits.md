@@ -26,7 +26,7 @@ form(action={subscribe})
 
 ### Limit attempts in a guard or an API route
 
-`rateLimit(name, { max, window })` from `kay/server` counts attempts from the request's client and gives the seconds to wait once over the limit:
+`rateLimit(name, { max, window })` from `kay/server` counts attempts from the request's client; `await limit.enforce(ctx)` counts the guard's request and, once over the limit, sets `Retry-After` and denies with 429 in one call:
 
 ```ts
 // src/routes/account/_guard.ts
@@ -35,17 +35,20 @@ import { rateLimit } from 'kay/server'
 
 const visits = rateLimit('account', { max: 60, window: '1m' })
 
-export default guard(async ({ request, headers, deny }) => {
-  const wait = await visits.hit(request)
-
-  if (wait !== undefined) {
-    headers.set('retry-after', String(wait))
-    deny(429, `Too many requests; try again in ${wait} s`)
-  }
+export default guard(async (ctx) => {
+  await visits.enforce(ctx)
 })
 ```
 
 An API route or module sets its own with `api({ rateLimit })` or the route's `detail`, see [API routes](api-routes.md#limits).
+
+### Share one limit between an action, a guard and an API route
+
+The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: visits }`, `api({ rateLimit: visits })` or `page.rateLimit` and they count in the guard's counter, so one client has one allowance across all of them. An options object keeps counting apart, as before.
+
+### Hear of the refused requests
+
+`onLimit` in a limit is called with `{ name, key, wait, request }` each time it refuses a request, to log it or raise an alarm: `{ max: 5, window: '1m', onLimit: ({ key, wait }) => console.warn(key, wait) }`.
 
 ### Count a person instead of an address
 
@@ -84,6 +87,8 @@ An API route or module sets its own with `api({ rateLimit })` or the route's `de
 ### Outside an action
 
 - A guard, an API route or a library limits attempts the same way with `rateLimit(name, { max, window, store })` from `kay/server`: `await limit.hit(request)` counts one from the request's client and gives the seconds to wait once over the limit, else `undefined`.
+- `await limit.enforce(ctx, message?)` takes a guard's `ctx`, counts under the limit's `key` or the client's address, and past the limit sets `Retry-After` and calls `ctx.deny(429, message)`, `message` a text or a function of the seconds to wait.
+- `onLimit(refusal)` on a limit (`RateLimitRefusal`: `name`, the key counted, `wait` in seconds, `request` when there is one) runs for each request an action, a page, an API route, `enforce` or `hit` refused, beside the answer, which never waits for it; one that throws or rejects is logged. A limit object from `rateLimit()` shared with an action reports the action's URL as `name`.
 - `await limit.hit(user.email)` counts under the app's own key instead, such as an account or a socket, whoever sends the request.
 - `await limit.hit(user.email, undefined, tokens)` counts `tokens` at once, a whole number from 1, so `max` caps tokens or bytes rather than attempts; a store of the app's own must add the weight, and one ignoring it throws when a window's first hit shows it.
 - Limits of one name count together; an action's counts under its URL.

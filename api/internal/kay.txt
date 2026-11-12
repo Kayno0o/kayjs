@@ -1253,8 +1253,16 @@ function privilegeRefused(error: unknown): boolean
 interface RateLimit
   key?: RateKey | undefined
   max: number
+  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
+[./library] RateLimitRefusal
+interface RateLimitRefusal
+  key: string
+  name: string
+  request?: Request | undefined
+  wait: number
 
 [./library] ratesFallingBack
 function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory?: FallbackMemory): RateStore & Sure<Store>

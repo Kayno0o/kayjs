@@ -20,6 +20,7 @@ import { checkRequestIdHeader } from './config-limits'
 import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
+import { refused, SHARED } from './rate-refusal'
 import { onReload } from './reload'
 import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
@@ -34,12 +35,6 @@ export interface ProtectionRefusal {
   field: string
   message: string
   headers?: Record<string, string>
-}
-
-export interface RateLimiter {
-  // Counts an attempt from the request's client, or under the app's own key such as an account id: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
-  // `weight` counts that many at once, the tokens a reply used say, against a `max` of tokens.
-  hit: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<number | undefined>
 }
 
 // A post a honeypot caught, answered as if it went through.
@@ -295,29 +290,6 @@ function openRates(path: string): OpenRates {
   }
 }
 
-// A limit for a guard, an API route or a library, counted as an action's `rateLimit` is: `max` attempts from one client every `window`, under `name`, which limits sharing it count together.
-export function rateLimit(name: string, limit: RateLimit): RateLimiter {
-  if (!Number.isInteger(limit.max) || limit.max < 1)
-    throw new KayError('config-invalid', `kay: rateLimit('${name}')'s max is ${limit.max}; it takes a whole number of at least 1`)
-
-  const counting = makeLimiter({ name, max: limit.max, ms: durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000, store: limit.store })
-
-  return {
-    hit: async (from, server, weight = 1) => {
-      if (!Number.isSafeInteger(weight) || weight < 1)
-        throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
-
-      const window = await counting.hit(typeof from === 'string' ? `key:${from}` : rateKey(clientAddress(from, server)), weight)
-
-      // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
-      if (window.count < weight)
-        throw new KayError('config-invalid', `kay: rateLimit('${name}')'s store ignores the weight of a hit; its hit(key, window, weight) adds weight to the count`)
-
-      return waitFor(window, limit.max)
-    },
-  }
-}
-
 export interface LimiterOptions {
   max: number
   window: Duration
@@ -354,7 +326,7 @@ export function limiter({ max, window, name = 'limiter', ...rest }: LimiterOptio
   return makeLimiter({ name, max, ms: optionMs(window, `limiter('${name}')'s window`), ...rest })
 }
 
-function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: string, max: number, ms: number } & Pick<LimiterOptions, 'store' | 'failure' | 'memory'>): Limiter {
+export function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: string, max: number, ms: number } & Pick<LimiterOptions, 'store' | 'failure' | 'memory'>): Limiter {
   let standIn: { of: RateStore, rates: RateStore } | undefined
   // Read on each call, as the server sets the app's `store.rates` up after a library may have made its limiter.
   const store = (): RateStore => {
@@ -430,6 +402,11 @@ function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: s
 const limiters = new WeakMap<object, Limiter>()
 
 function limiterOf(entry: { name: string, limit: RateLimit }): Limiter {
+  const shared = (entry.limit as { [SHARED]?: Limiter })[SHARED]
+
+  if (shared)
+    return shared
+
   let made = limiters.get(entry)
 
   if (!made)
@@ -457,10 +434,15 @@ export async function apiLimitWait(limits: { name: string, limit: RateLimit }[],
   let wait: number | undefined
 
   for (const entry of limits) {
-    const own = await limiterOf(entry).enforce(await actionKey(entry.name, entry.limit, request, client, context))
+    const key = await actionKey(entry.name, entry.limit, request, client, context)
+    const own = await limiterOf(entry).enforce(key)
 
-    if (own !== undefined && (wait === undefined || own > wait))
-      wait = own
+    if (own !== undefined) {
+      refused(entry.name, entry.limit, { key, wait: own, request })
+
+      if (wait === undefined || own > wait)
+        wait = own
+    }
   }
 
   return wait
@@ -481,7 +463,7 @@ export function checkApiLimit(name: string, limit: RateLimit): void {
 }
 
 // Seconds until the next attempt may go through, or undefined while under the limit.
-function waitFor(window: { count: number, resetAt: number }, max: number): number | undefined {
+export function waitFor(window: { count: number, resetAt: number }, max: number): number | undefined {
   return window.count > max ? Math.ceil((window.resetAt - Date.now()) / 1000) : undefined
 }
 
@@ -599,8 +581,12 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       record.refundableHits.push({ limiter: counting, key, resetAt: window.resetAt })
     }
 
-    if (own !== undefined && (wait === undefined || own > wait))
-      wait = own
+    if (own !== undefined) {
+      refused(name, limit, { key, wait: own, request })
+
+      if (wait === undefined || own > wait)
+        wait = own
+    }
   }
 
   if (wait === undefined)
@@ -645,7 +631,7 @@ const warnedKeys = new WeakSet<object>()
 
 // What the limit counts the request under: its `key`'s text, else the client's address; an empty text, one that is not a text or a key that throws counts the address, so the limit stays.
 // The key each limit counted a request under is kept, so the count after the handler follows the one before it, whatever the handler changed.
-async function actionKey(name: string, limit: { key?: RateKey | undefined }, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
+export async function actionKey(name: string, limit: { key?: RateKey | undefined }, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
   const known = recordOf(request)?.countedKeys?.get(limit)
 
   if (known !== undefined)

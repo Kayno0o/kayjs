@@ -47,6 +47,16 @@ export interface RateLimit {
   store?: RateStore | undefined
   // What the limit counts a request under, in place of the client's address: `key: ctx => ctx.locals.user?.id`, so a person has their own allowance from any address and many of them behind one address do not share one. Without it, or when it gives `undefined`, the client's address. A library that counts under keys of its own, kayjs-auth and kayjs-ai, takes none.
   key?: RateKey | undefined
+  // Told of each request the limit refused, to log it or count it elsewhere: `{ name, key, wait, request }`, `key` what it counted under and `wait` the seconds until it may go through. It runs beside the 429, which never waits for it, and one that throws is logged.
+  onLimit?: ((refusal: RateLimitRefusal) => void | Promise<void>) | undefined
+}
+
+// What a limit's `onLimit` is told: the limit's name (an action's URL, a route's place, the name `rateLimit()` was given), the key the request counted under, the seconds to wait, and the request when there is one.
+export interface RateLimitRefusal {
+  name: string
+  key: string
+  wait: number
+  request?: Request | undefined
 }
 
 // What a rate limit's `key` reads of the request it counts: the cookies, the app's `derive` values as `locals` and the client's address, which the count falls back to.
@@ -120,6 +130,7 @@ export interface ActionTool<Output = never, Shape extends OutputSchema = OutputS
 // The checks that keep scripts from an action: `action(schema, handler, { protect: { rateLimit, honeypot, minTime, proofOfWork } })`.
 export interface ActionProtect<Field extends string = never> {
   // At most `max` posts from one client every `window`, a string such as '1m'; past that a post fails with 429 without reaching the handler. `store` shares the count between processes.
+  // A limit made with `rateLimit(name, ...)` goes here as it is and counts with the guards and API routes using the same object.
   // Several limits all apply, such as one on every attempt and a tighter one on the posts that went through.
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   // A field a form posting to the action renders out of sight by itself, which people leave empty and bots fill in; a post filling it fails with 422 without reaching the handler.

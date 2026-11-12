@@ -107,6 +107,7 @@ interface ActionRateLimit extends RateLimit
   count?: "succeeded" | undefined
   key?: RateKey | undefined
   max: number
+  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
@@ -958,8 +959,16 @@ type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookies' | 'l
 interface RateLimit
   key?: RateKey | undefined
   max: number
+  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
+[.] RateLimitRefusal
+interface RateLimitRefusal
+  key: string
+  name: string
+  request?: Request | undefined
+  wait: number
 
 [.] RateStore
 interface RateStore extends StoreBase
@@ -3393,12 +3402,26 @@ function rateLimit(name: string, limit: RateLimit): RateLimiter
 interface RateLimit
   key?: RateKey | undefined
   max: number
+  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
   store?: RateStore | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [./server] RateLimiter
-interface RateLimiter
+interface RateLimiter extends RateLimit
+  enforce: (ctx: Pick<GuardContext, "cookies" | "deny" | "headers" | "locale" | "locals" | "request">, message?: ((wait: number) => string) | string | undefined) => Promise<void>
   hit: (from: Request | string, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<number | undefined>
+  key?: RateKey | undefined
+  max: number
+  onLimit?: ((refusal: RateLimitRefusal) => Promise<void> | void) | undefined
+  store?: RateStore | undefined
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
+[./server] RateLimitRefusal
+interface RateLimitRefusal
+  key: string
+  name: string
+  request?: Request | undefined
+  wait: number
 
 [./server] RenderedPage
 interface RenderedPage
