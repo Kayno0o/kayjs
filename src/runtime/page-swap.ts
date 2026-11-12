@@ -138,8 +138,8 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   inFlight.fetch = flight
   void holding()
 
-  // Another page only: the same one with another query, or a form sending it back to itself, is not left.
-  if (url.pathname !== location.pathname)
+  // Another page only than the one shown (a traversal has moved the address already): the same one with another query, or a form sending it back to itself, is not left.
+  if (url.pathname !== new URL(navigation.shown || location.href).pathname)
     navigation.visits = (navigation.visits ?? 0) + 1
 
   const isCurrent = () => token === navigation.current
