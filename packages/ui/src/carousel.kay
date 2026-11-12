@@ -17,7 +17,7 @@ const look = recipe({
     // A vertical drag still scrolls the page, a horizontal one is the swipe.
     viewport: 'relative w-full touch-pan-y select-none overflow-hidden bg-surface',
     // Every slide sits over the viewport, a `perView`th of its width, moved a slide's width aside per place it stands from the first one shown.
-    slide: 'absolute inset-y-0 left-0 w-[calc(100%/var(--per-view,1))] transition-transform duration-[calc(700ms*var(--motion-scale))] ease-in-out motion-reduce:transition-none',
+    slide: 'absolute inset-y-0 start-0 [--dir:1] rtl:[--dir:-1] w-[calc(100%/var(--per-view,1))] transition-transform duration-[calc(700ms*var(--motion-scale))] ease-in-out motion-reduce:transition-none',
     link: 'block size-full',
     image: 'size-full object-cover',
     controls: 'flex items-center justify-center gap-4',
@@ -138,8 +138,11 @@ function step(delta: number) {
 // A field or a control of a slide's own keeps its arrows.
 const EDITABLE = 'input, textarea, select, [contenteditable]'
 
+// Under a right-to-left direction the slides run from the right, so the arrows and the swipe point the other way.
+const sense = (element: Element) => getComputedStyle(element).direction === 'rtl' ? -1 : 1
+
 function keyDown(event: KeyboardEvent) {
-  const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+  const delta = (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0) * sense(event.currentTarget as Element)
 
   if (delta === 0 || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || (event.target as Element).closest(EDITABLE) || all().length <= view())
     return
@@ -182,7 +185,7 @@ function pressUp(event: PointerEvent) {
 
   target.addEventListener('click', stop, { capture: true, once: true })
   setTimeout(() => target.removeEventListener('click', stop, { capture: true }), 0)
-  step(across < 0 ? 1 : -1)
+  step((across < 0 ? 1 : -1) * sense(target))
 }
 
 function numbered(text: string, position: number) {
@@ -198,7 +201,7 @@ section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-lab
         | {emptyLabel}
   div(part="viewport" hidden={none()} style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'} onPointerDown={pressDown} onPointerUp={pressUp} onPointerCancel={() => pressed = undefined})
     for entry, position of all() key={entry.key ?? entry.src ?? position}
-      div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={inView(position) ? undefined : 'true'} inert={!inView(position)} style={`--per-view: ${view()}; transform: translateX(${offset(position) * 100}%)`})
+      div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={inView(position) ? undefined : 'true'} inert={!inView(position)} style={`--per-view: ${view()}; transform: translateX(calc(${offset(position) * 100}% * var(--dir)))`})
         if slide
           slot slide(entry, position)
         else if entry.href !== undefined

@@ -810,7 +810,7 @@ describe('charts', () => {
     ['/data', 'root', ['kui-site-favicon', 'inline-flex', 'size-5', 'shrink-0', 'overflow-hidden']],
     ['/content', 'root', ['kui-carousel', 'flex', 'flex-col', 'gap-3']],
     ['/content', 'viewport', ['relative', 'w-full', 'overflow-hidden', 'bg-surface']],
-    ['/content', 'slide', ['absolute', 'inset-0', 'transition-transform', 'motion-reduce:transition-none']],
+    ['/content', 'slide', ['absolute', 'inset-y-0', 'transition-transform', 'motion-reduce:transition-none']],
     ['/content', 'root', ['kui-qr-code', 'block', 'h-auto', 'max-w-full']],
   ] as const)('%s draws its %s part with %j', async (path, part, utilities) => {
     const tags = (await visit(path)).html.match(/<[a-z0-9](?:[^>"]|"[^"]*")*>/g) ?? []

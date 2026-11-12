@@ -425,3 +425,21 @@ test('a slide drawn by a @slide block needs no src or alt, and is told apart by 
   expect(cards.map(card => card.textContent)).toEqual(['First', 'Second'])
   expect(mounted.root.querySelectorAll('#cards img').length).toBe(0)
 })
+
+test('under a right-to-left direction the arrows and the swipe point the other way, and the slides run from the right', async () => {
+  const view = await configured({})
+
+  view.section.style.direction = 'rtl'
+  key(view.section, 'ArrowLeft')
+  await clock.settle()
+  swipe(view.viewport, [100, 50], [200, 50])
+  await clock.settle()
+
+  expect(turns).toEqual([1, 2])
+
+  key(view.section, 'ArrowRight')
+  swipe(view.viewport, [200, 50], [100, 50])
+  await clock.settle()
+
+  expect(turns).toEqual([1, 2, 1, 0])
+})
