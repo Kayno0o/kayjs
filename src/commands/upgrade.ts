@@ -1,7 +1,7 @@
 import type { Command, ProblemFormat } from './command'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
@@ -34,8 +34,9 @@ const KAY_PACKAGE = '@kaynooo/kayjs'
 const SECTION_OPEN = /\s*:\s*\{/y
 const LOCKFILES = ['bun.lock', 'bun.lockb']
 const PRERELEASE = /[-+].*$/
-// The version a range of kay's own dependencies starts at.
+// The first plain version in a range of kay's own dependencies, where it starts.
 const FLOOR = /(\d+\.\d+\.\d+)/
+const OPERATOR = /^[~^]/
 const SEMVER = /^\d+\.\d+\.\d+$/
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
@@ -234,13 +235,13 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     moved(raised.map(({ change }) => change))
 
     if (dryRun) {
-      for (const { change, held } of raised)
-        say('would raise', `${change.name} to ${change.spec}, which the installed kay depends on (the app held ${held})`, true)
+      for (const one of raised)
+        say(one.rewritten ? 'would raise' : 'would install', describeRaise(one, 'the installed kay'), true)
 
       return true
     }
 
-    step('raised', raised.map(({ change, held }) => `${change.name} to ${change.spec}, which kay ${latestKay} depends on (the app held ${held})`).join(', '))
+    step('raised', raised.map(one => describeRaise(one, `kay ${latestKay}`)).join(', '))
 
     if (await deps.install(root, raised.map(({ change }) => change)))
       return true
@@ -346,51 +347,78 @@ async function restore(manifest: string, settled: Settled): Promise<void> {
   }
 }
 
-// A package the app and the installed kay both depend on is installed once only when the app's range and its locked version reach kay's: below it the app keeps its copy and kay gets a second one, whose types do not match the app's (Elysia's `~cookieConfig` is missing).
-// Every package of kay's `dependencies` that the app lists with a plain range is raised to the version kay's range starts at, keeping the app's `~` or `^`, and written in place; `source` is the manifest as the phases left it.
-async function raiseShared(root: string, manifest: string, source: string, write = true): Promise<{ change: DependencyChange, held: string }[]> {
-  let kayRanges: Record<string, string>
+// A package the app and the installed kay both depend on is installed once only when the app's range and its installed copy reach kay's: below it the app keeps its copy and kay gets a second one, whose types do not match the app's (Elysia's `~cookieConfig` is missing).
+// Every package of kay's `dependencies` that the app lists with a plain range gets its range raised to the version kay's range starts at when the range is below it, keeping the app's `~`, `^` or exact form, and is installed again when only its installed copy is; `source` is the manifest as the phases left it.
+async function raiseShared(root: string, manifest: string, source: string, write = true): Promise<Raise[]> {
+  const kayManifest = await findInstalled(root, 'kay')
 
-  try {
-    kayRanges = ((await Bun.file(join(root, 'node_modules/kay/package.json')).json()) as { dependencies?: Record<string, string> }).dependencies ?? {}
-  }
-  catch {
-    // No installed kay to read: what it asks is not known.
+  if (kayManifest === undefined) {
+    console.error('kay upgrade: no installed kay was found in node_modules from here up, so the dependencies the app shares with kay are not checked against what it asks; run `bun install`, then `kay upgrade` again')
+
     return []
   }
 
-  const raised: { change: DependencyChange, held: string }[] = []
+  const kayRanges = kayManifest.dependencies ?? {}
+  const raised: Raise[] = []
   let written = source
 
   for (const dependency of sharedDependencies(JSON.parse(source) as Record<string, unknown>, kayRanges)) {
+    // A prerelease tag or an `x` range in kay's range is skipped on purpose: only a plain version is a floor.
     const wanted = FLOOR.exec(kayRanges[dependency.name]!)?.[1]
-    const installed = await installedVersion(root, dependency.name)
-    const held = installed !== undefined && Bun.semver.order(installed, dependency.version) === -1 ? installed : dependency.version
+    const installed = (await findInstalled(root, dependency.name))?.version
+    const lowRange = wanted !== undefined && Bun.semver.order(wanted, dependency.version) === 1
+    const lowCopy = wanted !== undefined && installed !== undefined && Bun.semver.order(wanted, installed) === 1
 
-    if (wanted === undefined || Bun.semver.order(wanted, held) !== 1)
+    if (!lowRange && !lowCopy)
       continue
 
-    const spec = `${dependency.spec.startsWith('~') ? '~' : '^'}${wanted}`
-    const replaced = replaceSpec(written, dependency, spec)
+    const operator = OPERATOR.exec(dependency.spec)?.[0] ?? ''
+    const spec = lowRange ? `${operator}${wanted}` : dependency.spec
 
-    if (replaced !== undefined) {
+    if (lowRange) {
+      const replaced = replaceSpec(written, dependency, spec)
+
+      if (replaced === undefined)
+        continue
+
       written = replaced
-      raised.push({ change: { name: dependency.name, spec, section: dependency.section }, held })
     }
+
+    raised.push({ change: { name: dependency.name, spec, section: dependency.section }, held: lowRange ? dependency.version : installed!, wanted, rewritten: lowRange })
   }
 
-  if (write && raised.length > 0)
+  if (write && written !== source)
     await Bun.write(manifest, written)
 
   return raised
 }
 
-async function installedVersion(root: string, name: string): Promise<string | undefined> {
-  try {
-    return ((await Bun.file(join(root, 'node_modules', name, 'package.json')).json()) as { version?: string }).version
-  }
-  catch {
-    return undefined
+interface Raise {
+  change: DependencyChange
+  // What the app had: the version of its range when that was below kay's, else of its installed copy.
+  held: string
+  wanted: string
+  // Whether the range in package.json moved, or only the installed copy did.
+  rewritten: boolean
+}
+
+// What a raise says, as a step.
+function describeRaise({ change, held, wanted, rewritten }: Raise, kay: string): string {
+  return rewritten ? `${change.name} to ${change.spec}, which ${kay} depends on (the app held ${held})` : `installed ${change.name} ${wanted}, which ${kay} asks for (the app had ${held})`
+}
+
+// The manifest of a package as `node_modules` holds it from the app's folder up, as a hoisted install or a workspace puts it; undefined when none is found.
+async function findInstalled(root: string, name: string): Promise<{ version?: string, dependencies?: Record<string, string> } | undefined> {
+  for (let dir = root; ; dir = dirname(dir)) {
+    try {
+      return (await Bun.file(join(dir, 'node_modules', name, 'package.json')).json()) as { version?: string, dependencies?: Record<string, string> }
+    }
+    catch {
+      // Not here, or unreadable: look in the folder above.
+    }
+
+    if (dirname(dir) === dir)
+      return undefined
   }
 }
 

@@ -267,6 +267,59 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('never lowers a range: a range above kay\'s floor with a stale copy is reinstalled as it is, an exact pin stays exact', async () => {
+    const [major, minor, patch] = (/(\d+)\.(\d+)\.(\d+)/).exec(kayDependencies.elysia)!.slice(1).map(Number)
+    const above = `^${major}.${minor}.${patch! + 4}`
+    const stale = { 'node_modules/elysia/package.json': '{ "name": "elysia", "version": "1.4.0" }' }
+    const versions = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    const high = await project(MANIFEST.replace(kayDependencies.elysia, above), stale)
+    const pinned = await project(MANIFEST.replace(`^${(/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]}`, '1.4.0'), stale)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      const reinstall = fakes(versions)
+
+      expect(await upgradeProject(high, reinstall.deps)).toBe(0)
+      expect(await Bun.file(join(high, 'package.json')).text()).toContain(`"elysia": "${above}"`)
+      expect(reinstall.calls.installs).toEqual([[{ name: 'elysia', spec: above, section: 'dependencies' }]])
+      expect(log.mock.calls.map(call => call.join(' ')).join('\n')).toContain('installed elysia')
+
+      expect(await upgradeProject(pinned, fakes(versions).deps)).toBe(0)
+      expect(await Bun.file(join(pinned, 'package.json')).text()).toContain(`"elysia": "${major}.${minor}.${patch}"`)
+    }
+    finally {
+      log.mockRestore()
+      await rm(high, { recursive: true, force: true })
+      await rm(pinned, { recursive: true, force: true })
+    }
+  })
+
+  it('finds kay hoisted above the app, and says so when it finds none', async () => {
+    const floor = (/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]
+    const versions = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    const manifest = MANIFEST.replace(kayDependencies.elysia, '^1.4.0')
+    const top = await project(MANIFEST, { 'apps/a/package.json': manifest })
+    // Outside the checkout, whose own node_modules an app scratch folder would find above it.
+    const bare = await mkdtemp(join(tmpdir(), 'upgrade-bare-'))
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(join(top, 'apps/a'), fakes(versions).deps)).toBe(0)
+      expect(await Bun.file(join(top, 'apps/a/package.json')).text()).toContain(`"elysia": "^${floor}"`)
+
+      await Bun.write(join(bare, 'package.json'), manifest)
+      expect(await upgradeProject(bare, fakes(versions).deps)).toBe(0)
+      expect(error.mock.calls.map(call => String(call[0])).join('\n')).toContain('no installed kay')
+    }
+    finally {
+      error.mockRestore()
+      log.mockRestore()
+      await rm(top, { recursive: true, force: true })
+      await rm(bare, { recursive: true, force: true })
+    }
+  })
+
   it('puts package.json back when the install of a raised dependency fails', async () => {
     const root = await project(MANIFEST.replace(kayDependencies.elysia, '^1.4.0'))
     const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
