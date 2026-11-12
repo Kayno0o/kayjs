@@ -228,7 +228,7 @@ describe('a block at the root of a component', () => {
 
     try {
       await Bun.write(join(root, 'src/components/box.kay'), '@aside\n  p Hi\n.box\n  slot\n')
-      await Bun.write(join(root, 'src/routes/box.kay'), '--- script\nimport Box from \'../components/box.kay\'\n---\nBox\n  p Inside\n')
+      await Bun.write(join(root, 'src/routes/box.kay'), '---\nimport Box from \'../components/box.kay\'\n---\nBox\n  p Inside\n')
 
       const { code, output } = await kayBuildSpawned([root, '--no-check'])
 

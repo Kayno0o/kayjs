@@ -233,7 +233,7 @@ describe('a library\'s stylesheet in an app', () => {
     await Promise.all(Object.entries({
       ...project('@import "@kaynooo/kayjs-ui/theme.css";\n'),
       'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
-      'src/routes/index.kay': '--- script\nimport \'../app.css\'\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(tone="danger") Delete\n',
+      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(tone="danger") Delete\n',
     }).map(async ([name, text]) => Bun.write(join(root, name), text)))
 
     const client = await buildClient(root, {})

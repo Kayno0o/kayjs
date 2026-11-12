@@ -106,7 +106,7 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
   })
 
   it('still builds no reviver for an app with no action', async () => {
-    const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n' })
+    const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n' })
 
     expect((await readClientSources(root)).actionProps).toBe(false)
   })
@@ -151,7 +151,7 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
       'p {k.action}',
       'p(title={action}) Hi',
     ]) {
-      const root = await app({ 'src/routes/index.kay': `--- script\nimport Caller from '../components/caller.kay'\nimport * as k from 'kay'\n---\n${template}\n` })
+      const root = await app({ 'src/routes/index.kay': `---\nimport Caller from '../components/caller.kay'\nimport * as k from 'kay'\n---\n${template}\n` })
 
       expect([template, (await readClientSources(root)).actionProps]).toEqual([template, true])
     }
@@ -166,24 +166,24 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
       `export const a = 'action'`,
       `// action\nexport const a = 1`,
     ]) {
-      const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np action\n', 'src/actions.ts': code })
+      const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\n---\np action\n', 'src/actions.ts': code })
 
       expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
     }
 
-    const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\nconst form = { action: 1 }\n---\nform(action="/x")\n  p {form.action} action(x) "action"\n' })
+    const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\nconst form = { action: 1 }\n---\nform(action="/x")\n  p {form.action} action(x) "action"\n' })
 
     expect((await readClientSources(root)).actionProps).toBe(false)
   })
 
   it('counts action in a markdown block, destructured under another name, through a cast namespace or across fences', async () => {
-    const kayPage = (body: string, fences = '--- script\nimport Caller from \'../components/caller.kay\'\n'): string => `${fences}---\n${body}\n`
+    const kayPage = (body: string, fences = '---\nimport Caller from \'../components/caller.kay\'\n'): string => `${fences}---\n${body}\n`
 
     for (const page of [
       kayPage('markdown\n  Hello {action(a, b)} there'),
       kayPage('markdown\n  {action}'),
       kayPage('p {k.action}', `--- module\nimport * as k from 'kay'\n--- script\nimport Caller from '../components/caller.kay'\n`),
-      kayPage('p {k.action}', `--- script\nimport Caller from '../components/caller.kay'\n--- module\nimport * as k from 'kay'\n`),
+      kayPage('p {k.action}', `---\nimport Caller from '../components/caller.kay'\n--- module\nimport * as k from 'kay'\n`),
       kayPage('snippet f(a = action)\n  p {a}'),
       kayPage('Caller(run={x})\n  @row(a = action)\n    p {a}'),
     ]) {
@@ -218,19 +218,19 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
       `export interface P { action(): void }`,
       `export enum E { action }`,
     ]) {
-      const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n', 'src/actions.ts': code })
+      const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n', 'src/actions.ts': code })
 
       expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
     }
 
-    const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n', 'src/actions.ts': 'export const run = (action: string) => action' })
+    const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\n---\np Hi\n', 'src/actions.ts': 'export const run = (action: string) => action' })
 
     expect((await readClientSources(root)).actionProps).toBe(true)
   })
 
   it('does not count a comment, a string or another function holding action( as an action', async () => {
     for (const code of [`// action(schema, run)\nexport const a = 1`, `export const a = 'action(x)'`, `export const a = reaction(1)`, `export * from './other'`]) {
-      const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np action(x)\n', 'src/actions.ts': code })
+      const root = await app({ 'src/routes/index.kay': '---\nimport Caller from \'../components/caller.kay\'\n---\np action(x)\n', 'src/actions.ts': code })
 
       expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
     }

@@ -1,4 +1,4 @@
---- script
+---
 import Alpha from '../components/alpha.kay'
 import Panel from '../components/panel.kay'
 ---

@@ -601,7 +601,7 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     await Bun.write(join(root, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'Bonjour\' })\n')
     await route('about.kay', '--- server\nimport { t } from \'kay/i18n\'\n---\nh1 {t(\'title\')}\n')
     await route('index.kay', 'h1 Home\n')
-    await route('box.kay', '--- script\nimport \'./box.css\'\n---\ndiv.box\n')
+    await route('box.kay', '---\nimport \'./box.css\'\n---\ndiv.box\n')
     await Bun.write(join(root, 'src/routes/box.css'), BOX_CSS(100, '#c00'))
     await route('who.kay', '--- server\nconst who = ctx.cookies.get(\'session\') ?? \'nobody\'\n---\nh1 {who}\n')
     await route('tall.kay', 'div(style="height: 3000px; background: #eee")\n')
@@ -610,7 +610,7 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     await route('hang.kay', 'img(src="/stall.png" loading="eager" alt="")\n')
     await mkdir(join(root, 'src/components'), { recursive: true })
     await Bun.write(join(root, 'src/components/bad.kay'), '--- client\nconst label = (): string => {\n  throw new Error(\'client boom\')\n}\n---\np {label()}\n')
-    await route('bad.kay', '--- script\nimport Bad from \'../components/bad.kay\'\n---\nBad\n')
+    await route('bad.kay', '---\nimport Bad from \'../components/bad.kay\'\n---\nBad\n')
 
     stop = await dev(root, { port: freePort(), log: () => undefined, quiet: true })
 

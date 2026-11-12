@@ -172,7 +172,7 @@ describe('server islands', () => {
     const build = await scratchBuild()
 
     await Bun.write(join(copy, 'src/components/reply.kay'), '---\nasync function* reply() {\n  yield \'Hel\'\n  yield \'Hello\'\n}\n---\n// kay-allow uncaught-await\nawait reply()\n  p.pending Thinking\nthen text\n  p.reply {text}\n')
-    await Bun.write(join(copied, 'reply.kay'), '--- script\nimport Reply from \'../components/reply.kay\'\n---\nh1 Reply\nReply(server)\n')
+    await Bun.write(join(copied, 'reply.kay'), '---\nimport Reply from \'../components/reply.kay\'\n---\nh1 Reply\nReply(server)\n')
 
     try {
       await build.prerender({ dirs: { routes: copied } })

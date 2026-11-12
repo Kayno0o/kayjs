@@ -1,4 +1,4 @@
---- script
+---
 import { persisted } from 'kay'
 
 const scheme = persisted<'system' | 'light' | 'dark'>('scheme', 'system', { values: ['system', 'light', 'dark'] })

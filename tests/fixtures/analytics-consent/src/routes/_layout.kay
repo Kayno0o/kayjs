@@ -1,4 +1,4 @@
---- script
+---
 import { consent } from 'kay/analytics'
 ---
 p.state {consent() || 'asking'}

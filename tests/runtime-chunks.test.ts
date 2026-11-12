@@ -73,7 +73,7 @@ describe('the blocks an island compiles to', () => {
 
     dirs.push(root)
     await Promise.all(Object.entries(BLOCK_ISLANDS).map(async ([name, source]) => Bun.write(join(root, `src/components/${name}.kay`), source)))
-    await Bun.write(join(root, 'src/routes/blocks.kay'), `--- script\n${Object.keys(BLOCK_ISLANDS).map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\nh1 Blocks\n${Object.keys(BLOCK_ISLANDS).map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`)
+    await Bun.write(join(root, 'src/routes/blocks.kay'), `---\n${Object.keys(BLOCK_ISLANDS).map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\nh1 Blocks\n${Object.keys(BLOCK_ISLANDS).map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`)
 
     const client = await buildClient(root)
     const loaded = async (chunks: string[]) => (await Promise.all(chunks.map(async chunk => chunkText(client, chunk)))).join('\n')
@@ -105,7 +105,7 @@ describe('the blocks an island compiles to', () => {
 
     for (const name of ['loopy', 'loopy-twin']) {
       await Bun.write(join(root, `src/components/${name}.kay`), BLOCK_ISLANDS.loopy!)
-      await Bun.write(join(root, `src/routes/${name}.kay`), `--- script\nimport Loopy from '../components/${name}.kay'\n---\nh1 Loopy\nLoopy\n`)
+      await Bun.write(join(root, `src/routes/${name}.kay`), `---\nimport Loopy from '../components/${name}.kay'\n---\nh1 Loopy\nLoopy\n`)
     }
 
     const client = await buildClient(root, options)
@@ -231,7 +231,7 @@ describe('the value encoder', () => {
 
     dirs.push(root)
     await Bun.write(join(root, 'src/components/kept.kay'), '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\nbutton.kept(onClick={() => theme.set(\'dark\')}) Kept {theme()}\n')
-    await Bun.write(join(root, 'src/routes/kept.kay'), '--- script\nimport Kept from \'../components/kept.kay\'\n---\nh1 Kept\nKept\n')
+    await Bun.write(join(root, 'src/routes/kept.kay'), '---\nimport Kept from \'../components/kept.kay\'\n---\nh1 Kept\nKept\n')
 
     const client = await buildClient(root)
     const loaded = async (chunks: string[]) => (await Promise.all(chunks.map(async chunk => chunkText(client, chunk)))).join('\n')
@@ -251,7 +251,7 @@ describe('a runtime module half of the islands use', () => {
     const names = ['two', 'three', 'four', 'five'].slice(0, extra)
 
     await Promise.all(names.map(async name => Bun.write(join(root, `src/components/failing-${name}.kay`), failing)))
-    await Bun.write(join(root, 'src/routes/many.kay'), `--- script\n${names.map(name => `import Failing${name} from '../components/failing-${name}.kay'`).join('\n')}\n---\nh1 Many\n${names.map(name => `Failing${name}`).join('\n')}\n`)
+    await Bun.write(join(root, 'src/routes/many.kay'), `---\n${names.map(name => `import Failing${name} from '../components/failing-${name}.kay'`).join('\n')}\n---\nh1 Many\n${names.map(name => `Failing${name}`).join('\n')}\n`)
 
     return buildClient(root)
   }

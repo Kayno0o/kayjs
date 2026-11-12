@@ -1,4 +1,4 @@
---- script
+---
 import Kept from '../components/kept.kay'
 ---
 h1 Pers

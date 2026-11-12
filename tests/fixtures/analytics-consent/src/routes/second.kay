@@ -1,4 +1,4 @@
---- script
+---
 import { consent } from 'kay/analytics'
 ---
 h1 Second

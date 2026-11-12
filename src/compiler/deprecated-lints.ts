@@ -144,6 +144,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { persisted } from \'kay\'\n\nconst draft = persisted(\'draft\', \'\', { storage: \'local\' })\n---\ninput(bind:value={draft})',
     right: '---\nimport { persisted } from \'kay\'\n\nconst draft = persisted.local(\'draft\', \'\')\n---\ninput(bind:value={draft})',
   },
+  'deprecated-script-fence': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.102',
+    summary: '`--- script` as the first fence of a file, `---` since 1.102: the bare line opens the component script wherever no named fence comes before it, so one fence had two spellings. `--- script` stays for a script that follows a `--- server` or `--- module` fence, where a bare `---` would close that fence instead, and `--- client` still replaces `---` rather than modifying it. The old form still works. The fix drops the word, keeping the type parameters of `--- script <T>` as `--- <T>`.',
+    wrong: '--- script\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
+    right: '---\nconst { title } = props<{ title: string }>()\n---\nh1 {title}',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
@@ -173,4 +181,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.99' },
   { since: '1.100' },
   { since: '1.101' },
+  { since: '1.102' },
 ]

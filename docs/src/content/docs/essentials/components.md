@@ -30,7 +30,7 @@ li(class={size})
 
 `---` opens the component script: imports, props, signals, functions. It runs wherever the component renders.
 
-`--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
+`--- server` runs on the server for each request and never reaches the browser. Only a page or a layout has one: a component takes its values as props, which the page computes in its own `--- server`.
 
 `--- module` holds code that runs once per bundle rather than per render. What it exports, such as `export const visits = signal(0)` or `export function label(n: number)`, other files import from the `.kay` file with its types: `import { label } from './counter.kay'`. It takes no props and no default export, and a `--- client` component has none.
 
@@ -38,7 +38,7 @@ li(class={size})
 
 A `@keyframes` name is scoped to the component with the `animation` values that use it, and `@keyframes :global(spin)` keeps it as written. `kay check` warns of a rule no element of the template can match (`unused-selector`), and reports a rule ending on `:root`, `html` or `body` (`unreachable-selector`), since those elements carry no `data-k-` attribute: write `:global(body)`, and `kay check --fix` does.
 
-A fence ends on a `---` line, or on the line opening the next one. `--- script` spells the component script out, for when it follows another fence.
+A fence ends on a `---` line, or on the line opening the next one. A script that follows another fence opens with `--- script`, since a bare `---` there would close the fence before it. A script that comes first is written `---`.
 
 ```kay
 --- server

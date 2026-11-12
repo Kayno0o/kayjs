@@ -1,4 +1,4 @@
---- script
+---
 import Watcher from '../components/watcher.kay'
 ---
 head
