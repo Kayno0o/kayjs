@@ -160,7 +160,6 @@ export interface LimitsConfig {
 export interface ServeConfig {
   // The prefix the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPrefix: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
   apiPrefix?: string | undefined
-
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
   // A server build with a prerendered page uses its 404 page as a compression dictionary, sending a page to a browser that fetched it as the difference from it; `false` builds none, so no page names it and the build writes no `.dcz` copy.
@@ -364,7 +363,6 @@ export interface FontsourceConfig {
   styles?: ('normal' | 'italic')[] | undefined
   // Defaults to the package's own, `latin` for most; several, `['latin', 'latin-ext']`, give each face its subset's `unicode-range`, so a page loads only the files its text needs.
   subsets?: string[] | undefined
-
   display?: FontConfig['display'] | undefined
   // Preloads every face the entry declares, as `preload` does a font's: give it to an entry of one subset and the faces the first paint shows.
   preload?: boolean | undefined
@@ -446,7 +444,6 @@ export interface ImagesConfig {
   remoteTimeout?: Duration | undefined
   // The most variants one client may have the image route encode in a window, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. `{ max: 120, window: '1m' }` by default, `false` for no limit.
   rateLimit?: Pick<RateLimit, 'max' | 'window'> | false | undefined
-
   // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
   maxVariants?: number | false | undefined
   // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.

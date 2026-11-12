@@ -1188,7 +1188,11 @@ describe('the setup', () => {
     [{ provider: 'plausible', url: 'not a url' }, 'url is'],
     [{ provider: 'matomo', siteId: 1, url: 'ftp://m.example' }, 'url is'],
     [{ provider: 'plausible', privacy: 'privacy' }, 'privacy is'],
-
+    [{ provider: 'plausible', host: 'https://p.example' }, 'takes url, not host'],
+    [{ provider: 'umami', websiteId: 'w', host: 'https://u.example' }, 'takes url, not host'],
+    [{ provider: 'plausible', domain: 'example.com' }, 'takes site, not domain'],
+    [{ provider: 'simpleanalytics', hostname: 'example.com' }, 'takes site, not hostname'],
+    [{ provider: 'plausible', policyUrl: '/privacy' }, 'takes privacy, not policyUrl'],
     [{ provider: 'matomo', siteId: 1 }, 'url is'],
     [{ provider: 'matomo', siteId: '', url: 'https://m.example' }, 'siteId'],
     [{ provider: 'matomo', siteId: 1, url: 'https://m.example', tokenAuth: 'a&b' }, 'tokenAuth'],

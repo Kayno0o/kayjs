@@ -101,7 +101,6 @@ describe('the image route limits', () => {
 
   it('refuses a limit that is no whole number from 1', () => {
     expect(() => imageLimits({ rateLimit: { max: 0, window: '1m' } })).toThrow('images.rateLimit.max is 0')
-
     expect(() => imageLimits({ queue: 1.5 })).toThrow('images.queue')
     expect(() => imageLimits({ maxVariants: -1 })).toThrow('images.maxVariants')
     expect(imageLimits({ rateLimit: false, queue: false, maxVariants: false })).toEqual({ rate: undefined, queue: undefined, maxVariants: undefined })

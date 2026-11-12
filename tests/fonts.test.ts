@@ -118,6 +118,9 @@ describe('fonts', () => {
       ...['latin', 'latin-ext', 'greek'].map(async subset => Bun.write(join(root, `node_modules/@fontsource-variable/grotesk/files/grotesk-${subset}-wght-normal.woff2`), display)),
     ])
 
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource-variable/grotesk', subset: 'latin-ext' } as never], scratch)).rejects.toThrow('sets subset, which 1.102 dropped; write subsets')
+    await expect(prepareFonts(root, [{ fontsource: '@fontsource/anton', weight: 400 }], scratch)).rejects.toThrow('sets weight, which 1.102 dropped; write weights')
+
     const { css } = await prepareFonts(root, [{ fontsource: '@fontsource/anton', weights: [400], subsets: ['latin', 'latin-ext'] }, { fontsource: '@fontsource-variable/grotesk', subsets: ['latin', 'latin-ext'] }], join(root, 'out'))
     const faces = css.split(/(?<=\})(?=@)/).map(rule => rule.replace(/url\("[^"]+"\)/, 'url()'))
 

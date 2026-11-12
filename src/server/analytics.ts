@@ -49,7 +49,7 @@ export interface AnalyticsInfo {
 
 interface Common {
   // Waits for the visitor's yes before counting a visit, with a notice kay shows until they chose; `true` for the notice in English.
-  // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `host`) ask like `true`, as they are not self-hostable cookieless counters; `awaitConsent: false` counts them without asking, which shows `info` and its opt-out.
+  // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `url`) ask like `true`, as they are not self-hostable cookieless counters; `awaitConsent: false` counts them without asking, which shows `info` and its opt-out.
   // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `awaitConsent: false`, whose own script kay then loads until the visitor opts out.
   awaitConsent?: boolean | AnalyticsConsent | undefined
   /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */
@@ -58,7 +58,6 @@ interface Common {
   info?: false | AnalyticsInfo | undefined
   // The app's privacy policy, a path written without the `base` (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
   privacy?: string | undefined
-
   // Hosts besides the one a page is served from that a visit may name, such as `www.example.com` for a site also served at `example.com`.
   hosts?: string[] | undefined
 }
@@ -79,7 +78,6 @@ export interface PlausibleOptions extends Counted {
   provider: 'plausible'
   // The site as it is named in Plausible; the host of the visited page when left out.
   site?: string | undefined
-
   // A self-hosted Plausible, `https://plausible.example.com`.
   url?: string | undefined
 }
@@ -190,13 +188,19 @@ const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
 const PROVIDER_NAMES: Record<string, string> = { plausible: 'Plausible', umami: 'Umami', simpleanalytics: 'Simple Analytics', matomo: 'Matomo', ga4: 'Google Analytics', fathom: 'Fathom', cloudflare: 'Cloudflare Web Analytics' }
 const LOCAL_PATH = /^\/(?![/\\])/
 const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
-// The providers that wait for a yes unless the app wrote `awaitConsent: false`; Umami joins them while it has no `host`.
+// The providers that wait for a yes unless the app wrote `awaitConsent: false`; Umami joins them while it has no `url`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
-// The options with the name before 1.99 (`consent`) under the current one, which wins when both are written.
+// Refuses the names 1.102 dropped, and puts the name before 1.99 (`consent`) under the current one, which wins when both are written.
 // `deprecated-await-consent` rewrites the old name in an app's files; an options object built elsewhere is out of its sight, so the old name is read here until it goes.
 function current(options: AnalyticsOptions): AnalyticsOptions {
   const copy: Record<string, unknown> = { ...options }
+  const dropped: Record<string, string> = { host: 'url', policyUrl: 'privacy', ...options.provider === 'plausible' && { domain: 'site' }, ...options.provider === 'simpleanalytics' && { hostname: 'site' } }
+
+  for (const [old, name] of Object.entries(dropped)) {
+    if (old in copy)
+      throw new KayError('config-invalid', `kay: analytics takes ${name}, not ${old}, which 1.102 dropped`)
+  }
 
   if (copy.consent !== undefined) {
     copy.awaitConsent ??= copy.consent
@@ -216,7 +220,7 @@ function consentSeconds(age: unknown): number {
   }
 }
 
-// Whether a visit waits for the visitor's yes: the app's `awaitConsent`, else the provider's default. Umami on its cloud host is a third party that gets the visitor's address, so it asks unless the app names another `host`.
+// Whether a visit waits for the visitor's yes: the app's `awaitConsent`, else the provider's default. Umami on its cloud host is a third party that gets the visitor's address, so it asks unless the app names another `url`.
 export function isGated(options: AnalyticsOptions): boolean {
   if (options.awaitConsent !== undefined)
     return options.awaitConsent !== false
@@ -224,8 +228,8 @@ export function isGated(options: AnalyticsOptions): boolean {
   return ASKS_BY_DEFAULT.has(options.provider) || (options.provider === 'umami' && onUmamiCloud(options.url))
 }
 
-function onUmamiCloud(host: string | undefined): boolean {
-  return host === undefined || URL.parse(host)?.hostname === 'cloud.umami.is'
+function onUmamiCloud(url: string | undefined): boolean {
+  return url === undefined || URL.parse(url)?.hostname === 'cloud.umami.is'
 }
 
 // Counts the site's visits with a provider, through the site's own origin where the provider takes visits from a server: the browser loads one small script from the app and posts to a route of the app, which forwards each visit to the provider, so the CSP needs no third-party host and ad blockers have nothing to match.

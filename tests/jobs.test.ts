@@ -942,14 +942,13 @@ describe('schedule every so long', () => {
     const computed = (every: number) => every
 
     expect(() => schedule(computed(0) as never, () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
-
+    expect(() => schedule('30s', () => undefined, { tz: 'UTC' } as object)).toThrow('takes timeZone, not tz')
+    expect(() => schedule('@hourly', () => undefined, { tz: 'UTC' } as object)).toThrow('takes timeZone, not tz')
     expect(() => schedule('30s', () => undefined, { timeZone: 'UTC' } as object)).toThrow('the schedule 30s takes no timeZone')
     expect(typed(() => [schedule('30s', () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
     // @ts-expect-error -- not positive
     expect(typed(() => schedule('0s', () => undefined))).toBe(true)
     // @ts-expect-error -- a time zone means nothing to a schedule running from the epoch
-    expect(typed(() => schedule('30s', () => undefined, { timeZone: 'UTC' }))).toBe(true)
-    // @ts-expect-error -- nor does it mean anything under its new name
     expect(typed(() => schedule('30s', () => undefined, { timeZone: 'UTC' }))).toBe(true)
   })
 })

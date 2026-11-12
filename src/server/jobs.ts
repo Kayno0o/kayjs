@@ -18,7 +18,6 @@ import { reportBackgroundError } from './report'
 export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the config's `timeZone` by default, else the system's.
   timeZone?: string | undefined
-
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
   // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.
   lock?: string | false | undefined
@@ -121,6 +120,9 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
   const table = typeof first === 'object'
   const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
   const options = (table ? second : third) as ScheduleOptions | undefined ?? {}
+
+  if ('tz' in options)
+    throw new KayError('config-invalid', 'kay: schedule takes timeZone, not tz, which 1.102 dropped')
 
   if (options.enabled === false)
     return new Elysia()

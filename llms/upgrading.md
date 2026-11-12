@@ -6,19 +6,19 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### The `analytics()` option names 1.98 deprecated are gone
 
-`deprecated-analytics-options` goes with them: run `kay upgrade` on 1.101 first. `host` is ignored now, so a provider that still has one loses its service address: write `url`, and `site` for the `domain` of Plausible and the `hostname` of Simple Analytics, and `privacy` for `policyUrl`. Matomo needs `url`, so it refuses to start without it.
+`deprecated-analytics-options` goes with them: run `kay upgrade` on 1.101 first. A server that still has `host`, `domain`, `hostname` or `policyUrl` does not boot, naming the new key: write `url`, `site` (for the `domain` of Plausible and the `hostname` of Simple Analytics) and `privacy`.
 
 ### The `kay.config.ts` keys 1.98 deprecated are gone
 
-`deprecated-config-keys` goes with them: run `kay upgrade` on 1.101 first. `serve.apiPath` is `serve.apiPrefix`, `live: { perMinute: 120 }` and `images: { perMinute: 120 }` are `rateLimit: { max: 120, window: '1m' }`, `mcp: { rateLimit: 60 }` is `{ max: 60, window: '1m' }` (a number now fails at boot), and a Fontsource entry's `subset` and `weight` are `subsets` and `weights`, each a list. An old key is an unknown key now, so `kay check` reports it.
+`deprecated-config-keys` goes with them: run `kay upgrade` on 1.101 first. `serve.apiPath` is `serve.apiPrefix`, `live: { perMinute: 120 }` and `images: { perMinute: 120 }` are `rateLimit: { max: 120, window: '1m' }`, `mcp: { rateLimit: 60 }` is `{ max: 60, window: '1m' }` (a number now fails at boot), and a Fontsource entry's `subset` and `weight` are `subsets` and `weights`, each a list. An old key is an unknown key now, so `kay check` reports it, and a Fontsource entry with `subset` or `weight` stops the build, naming the new key.
 
 ### The `tz` of `schedule()` that 1.98 deprecated is gone
 
-`deprecated-schedule-tz` goes with it: run `kay upgrade` on 1.101 first. `tz` is ignored now, so a cron schedule that still has one runs in the `timeZone` of `kay.config.ts`: write `timeZone`.
+`deprecated-schedule-tz` goes with it: run `kay upgrade` on 1.101 first. A `schedule()` that still has `tz` throws at boot: write `timeZone`.
 
 ### The `id` of a workflow's `start()` that 1.98 deprecated is gone
 
-`deprecated-workflow-start-id` goes with it: run `kay upgrade` on 1.101 first. `id` is ignored now, so a `start(input, { id })` begins a run with a random id each time: write `key`.
+`deprecated-workflow-start-id` goes with it: run `kay upgrade` on 1.101 first. A `start(input, { id })` throws: write `key`.
 
 ### Content dates that named no day are refused
 

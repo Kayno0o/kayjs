@@ -331,6 +331,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
 
     expect(await flow.start('a', { key: 'user-1' })).toBe('user-1')
     expect(await flow.start('b', { key: 'user-1' })).toBe('user-1')
+    await expect(flow.start('d', { id: 'user-1' } as never)).rejects.toThrow('start takes key, not id')
     await flow.drain()
     expect(ran).toEqual(['user-1:a'])
     await flow.start('c', { key: 'user-1' })

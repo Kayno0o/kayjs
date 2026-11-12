@@ -84,6 +84,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
   return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.imageWidths === undefined ? '' : `<meta name="kay-image-widths" content="${options.imageWidths.join(',')}">`}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
 }
 
+// Split out of `documentOf` to hold its complexity under the ratchet.
 function pageSpeculation(options: RenderOptions, nearest: boolean): string {
   return speculationRules(options.client?.prefetch, options.base, options.serve?.apiPrefix, nearest)
 }

@@ -78,7 +78,7 @@ export function rateLimitOf(what: string, rateLimit: Pick<RateLimit, 'max' | 'wi
   if (rateLimit === false)
     return undefined
 
-  if (typeof rateLimit !== 'object' && rateLimit !== undefined)
+  if (rateLimit === null || (typeof rateLimit !== 'object' && rateLimit !== undefined))
     throw new KayError('config-invalid', `kay: ${what}.rateLimit is ${String(rateLimit)}; it takes { max, window } or false for no limit`)
 
   const max = rateLimit?.max ?? fallback

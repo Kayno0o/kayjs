@@ -162,8 +162,8 @@ describe('mcp rate limit', () => {
     expect(mcpRateLimit(true)).toEqual({ max: 120, windowMs: 60_000 })
     expect(mcpRateLimit({ rateLimit: { max: 5, window: '10s' } })).toEqual({ max: 5, windowMs: 10_000 })
     expect(() => mcpRateLimit({ rateLimit: 60 } as never)).toThrow('mcp.rateLimit is 60')
+    expect(() => mcpRateLimit({ rateLimit: null } as never)).toThrow('mcp.rateLimit is null')
     expect(mcpRateLimit({ rateLimit: false })).toBeUndefined()
-
     expect(() => mcpRateLimit({ rateLimit: { max: 1.5, window: '1m' } })).toThrow('mcp.rateLimit.max is 1.5')
   })
 })
