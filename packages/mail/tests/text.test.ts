@@ -45,6 +45,7 @@ describe('htmlToText, ordered lists and references', () => {
     expect(htmlToText('<ol start="3"><li>c</li><li>d</li></ol>')).toBe('3. c\n4. d')
     expect(htmlToText('<ol start="0"><li>a</li></ol>')).toBe('0. a')
     expect(htmlToText('<ol start="x"><li>a</li></ol>')).toBe('1. a')
+    expect(htmlToText('<ol start="99999999999999999999"><li>a</li></ol>')).toBe('1. a')
   })
 
   it('reads a NUL reference as the replacement character, never as a placeholder', () => {

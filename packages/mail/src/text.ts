@@ -169,7 +169,7 @@ function withAddress(text: string, start: number, href: string): string {
 function listOf(tag: string, attributes: string): { ordered: boolean, index: number } {
   const start = WHOLE_NUMBER.exec(attribute(attributes, 'start') ?? '')?.[1]
 
-  return { ordered: tag === 'ol', index: start === undefined ? 0 : Number(start) - 1 }
+  return { ordered: tag === 'ol', index: Number.isSafeInteger(Number(start)) ? Number(start) - 1 : 0 }
 }
 
 function hidden(attributes: string): boolean {
