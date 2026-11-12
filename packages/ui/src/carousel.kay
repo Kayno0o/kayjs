@@ -202,7 +202,7 @@ section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-lab
         if slide
           slot slide(entry, position)
         else if entry.href !== undefined
-          a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)})
+          a(part="link" draggable="false" href={entry.href} {...tabOf(entry.href, entry.newTab)})
             // kay-allow unsized-image
             img(part="image" draggable="false" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
         else
