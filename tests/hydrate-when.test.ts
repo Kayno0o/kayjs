@@ -71,6 +71,15 @@ describe('hydrate="media(...)"', () => {
     expect(asked).toEqual(['max-width: 40rem', '(max-width: 40rem)', 'screen and (min-width: 1px)'])
   })
 
+  it('hydrates at once on a query the browser cannot read, rather than never', () => {
+    globalThis.matchMedia = (() => ({ matches: false, media: 'not all' })) as unknown as typeof matchMedia
+
+    let runs = 0
+
+    when.whenMedia('max-width 40rem', async () => void runs++)
+    expect(runs).toBe(1)
+  })
+
   it('hydrates at once when the query matches', () => {
     stub(true)
 

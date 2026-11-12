@@ -71,7 +71,8 @@ export function whenMedia(query: string, run: () => Promise<void>) {
   if (list.media === 'not all')
     list = matchMedia(`(${query})`)
 
-  if (list.matches) {
+  // A query the browser cannot read would never match, leaving the island dead: it hydrates at once instead.
+  if (list.matches || list.media === 'not all') {
     void run()
 
     return
