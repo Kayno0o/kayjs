@@ -585,9 +585,9 @@ class RewriteFinder {
   }
 
   private madeSignal(path: Path<VariableDeclarator>, id: Identifier, init: CallExpression) {
-    // `relativeTime` from `kay/i18n` makes a memo too.
     // `persisted.local(...)` and the other entries make a signal as `persisted(...)` does.
     const entry = init.callee.type === 'MemberExpression' && !init.callee.computed && init.callee.property.type === 'Identifier' && PERSISTED_ENTRIES.has(init.callee.property.name) && importedFromKay(path.scope, init.callee.object) === 'persisted' ? 'persisted' : undefined
+    // `relativeTime` from `kay/i18n` makes a memo too.
     const made = entry ?? importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)
     const binding = path.scope.getBinding(id.name)
     const start = this.input.map.isExact(id.start) ? this.input.map.toSource(id.start) : undefined

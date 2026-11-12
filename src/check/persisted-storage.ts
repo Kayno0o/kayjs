@@ -10,7 +10,8 @@ const PERSISTED = /\bpersisted\b/
 const FROM_KAY = (source: string) => source === 'kay'
 const HELP = 'call `persisted.local()`, `persisted.session()` or `persisted.query()`, and `persisted()` for a cookie'
 // The entry that keeps a value where the option said, none for the cookie `persisted()` is.
-const ENTRIES: Record<string, string> = { local: '.local', session: '.session', query: '.query', cookie: '' }
+const ENTRIES: Record<string, string> = { local: '.local', query: '.query', cookie: '' }
+const COMMENT = /\/[*/]/
 
 type ObjectNode = NodeOfType<'ObjectExpression'>
 type Property = Extract<ObjectNode['properties'][number], { type: 'Property' }>
@@ -21,7 +22,7 @@ export async function persistedStorage(root: string, options: CheckOptions): Pro
   if (lintLevel('deprecated-persisted-storage', options.lints) === 'allow')
     return []
 
-  return scan(root, options, 'deprecated-persisted-storage', PERSISTED, ({ parsed, report }) => {
+  return scan(root, options, 'deprecated-persisted-storage', PERSISTED, ({ source, parsed, report }) => {
     for (const { ast, base } of parsed) {
       const { locals, namespaces } = importsOf(ast, FROM_KAY, 'persisted')
 
@@ -49,8 +50,10 @@ export async function persistedStorage(root: string, options: CheckOptions): Pro
         const named = storage.value.type === 'Literal' && typeof storage.value.value === 'string' && Object.hasOwn(ENTRIES, storage.value.value) ? storage.value.value : undefined
         const refused = argument.properties.some(property => property.type === 'SpreadElement' || property.computed || (property.type === 'Property' && refuses(named, keyName(property))))
         const edits = named === undefined || storage.computed || storage.shorthand || storage.method || refused ? null : fixOf(node, argument, storage, ENTRIES[named]!, base)
+        // A comment in a range the fix removes would be lost with it.
+        const lost = edits?.some(edit => COMMENT.test(source.slice(edit.start, edit.end)))
 
-        report(base + storage.start, base + storage.end, '`storage` of `persisted()` is deprecated since 1.101: each storage has its own entry', HELP, edits)
+        report(base + storage.start, base + storage.end, '`storage` of `persisted()` is deprecated since 1.101: each storage has its own entry', HELP, lost ? null : edits)
       })
     }
   })

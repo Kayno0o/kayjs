@@ -1,3 +1,3 @@
 import { persisted } from 'kay'
 
-export const tone = persisted('shared-tone', 'peach', { storage: 'cookie' })
+export const tone = persisted.cookie('shared-tone', 'peach')

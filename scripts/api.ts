@@ -190,6 +190,14 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
         }
         else if (signatures.length > 0) {
           lines.push(...signatures.map(signature => `function ${exported.name}${sign(signature)}`))
+
+          // What the function carries as properties assigned after it (`persisted.local = local`), as the entries of `persisted`.
+          for (const property of checker.getPropertiesOfType(type).filter(one => one.valueDeclaration !== undefined && (ts.isBinaryExpression(one.valueDeclaration) || ts.isPropertyAccessExpression(one.valueDeclaration)))) {
+            const carried = checker.getTypeOfSymbolAtLocation(property, source)
+            const calls = carried.getCallSignatures()
+
+            lines.push(...calls.length > 0 ? calls.map(signature => `function ${exported.name}.${property.name}${sign(signature)}`) : [`const ${exported.name}.${property.name}: ${show(carried)}`])
+          }
         }
         else {
           lines.push(`const ${exported.name}: ${show(type)}`)

@@ -1,7 +1,7 @@
 ---
 import { navigate, persisted } from 'kay'
 
-const search = persisted('q', '', { storage: 'query' })
+const search = persisted.query('q', '')
 ---
 input.search(aria-label="Search" value={search()} onInput={event => search = event.currentTarget.value})
 p.searched Searched {search() || 'nothing'}

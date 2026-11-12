@@ -92,6 +92,21 @@ describe('deprecated-persisted-storage', () => {
     }
   })
 
+  it('reports with no fix a call whose removed text holds a comment, and one kept in a session', async () => {
+    const script = 'import { persisted } from \'kay\'\n\npersisted(\'a\', \'x\', { sync: false,\n  // why\n  storage: \'local\' })\npersisted(\'b\', \'x\', /* options */ { storage: \'local\' })\npersisted(\'c\', \'x\', { storage: \'session\' })\n'
+    const root = await project({ 'src/state.ts': script })
+
+    try {
+      const found = await persistedStorage(root, {})
+
+      expect(found).toHaveLength(3)
+      expect(found.every(one => one.fixes === undefined)).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves the other calls, the other persisted and a persisted not from kay alone', async () => {
     const script = 'import { persisted } from \'kay\'\nimport { persisted as other } from \'./mine\'\n\npersisted(\'a\', \'x\')\npersisted(\'b\', \'x\', { values: [\'x\'] })\npersisted.local(\'c\', \'x\')\nother(\'d\', \'x\', { storage: \'local\' })\nfoo(\'e\', \'x\', { storage: \'local\' })\n'
     const root = await project({ 'src/state.ts': script, 'src/other.ts': 'import { persisted } from \'./mine\'\n\npersisted(\'a\', \'x\', { storage: \'local\' })\n' })
