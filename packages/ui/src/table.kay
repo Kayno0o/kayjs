@@ -3,61 +3,46 @@ import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid, untrack } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
 import Pagination from './pagination.kay'
-import { currentPage, pageCount } from './pagination'
+import { followList } from './table-list'
+import { paging } from './table-page'
+import { selection } from './table-select'
+import { tableFilter } from './table-filter'
+import { expanding } from './table-expand'
+import { downloadCsv } from './table-export'
+import { uses } from './uses'
 import Popover from './popover.kay'
 import Select from './select.kay'
-import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
+import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
 import { asyncRows } from './source'
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
-
-const DEBOUNCE_MS = 200
 
 // 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
 const look = recipe({
   parts: {
     root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-[length:var(--border-width)] border-border bg-surface data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--table-height,70vh)] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-accent',
-    // Sticky, so the filter and the selection bar stay in view while a wide table scrolls under them.
-    filter: 'sticky left-0 flex flex-wrap items-center gap-x-4 gap-y-2 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2',
-    field: 'flex items-center gap-2',
-    filterInput: 'w-56 max-w-full',
-    count: 'sr-only',
     caption: 'sr-only',
-    selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
-    selected: 'm-0',
-    bulk: 'flex flex-wrap items-center gap-2',
     table: 'aria-busy:opacity-60 w-full border-collapse text-sm group-data-[narrow=stack]/table:[overflow-wrap:anywhere] @max-[30rem]/table:block',
     // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays. Each card draws its own top line instead of the row's bottom border, so an app dropping the row borders of the wide table still sees the cards apart.
     head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-2 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     body: '@max-[30rem]/table:block',
     headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
-    selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
     selectText: 'sr-only',
     foot: '@max-[30rem]/table:block',
     footRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     footCell: 'border-t border-border px-3 py-2 text-sm text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:empty:hidden',
-    columnsPanel: 'flex flex-col gap-1 p-3',
-    toggleHead: 'border-b border-border px-3 py-2 text-left text-xs w-0 @max-[30rem]/table:hidden',
-    toggleCell: 'px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
-    // The chevron turns over while the row is open.
-    toggle: 'aria-expanded:[&_svg]:rotate-180',
-    // The detail stands under its row across every column, and under its card in the narrow form.
-    detailRow: 'border-b border-border @max-[30rem]/table:block @max-[30rem]/table:border-b-0',
-    detailCell: 'px-3 py-3 text-foreground @max-[30rem]/table:block @max-[30rem]/table:px-3 @max-[30rem]/table:pt-0',
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
     row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:z-1 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:[tr:not(:hover,[aria-selected=true])>&]:bg-surface data-[sticky]:[tr:is(:hover,[aria-selected=true])>&]:bg-hover data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
-    // The box is 1rem, so its label grows to the 1.5rem a finger needs.
-    selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
     // Outside a narrow table a cell holds its content alone: the column header names it.
     cellLabel: 'hidden @max-[30rem]/table:block @max-[30rem]/table:text-left [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     cellBody: 'contents @max-[30rem]/table:block @max-[30rem]/table:min-w-0 @max-[30rem]/table:[overflow-wrap:anywhere] @max-[30rem]/table:first:col-span-full',
@@ -66,16 +51,67 @@ const look = recipe({
     skeletonCell: 'px-3 py-2.5 @max-[30rem]/table:block @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
     skeletonBar: 'block h-[1em] w-full animate-pulse bg-surface-strong motion-reduce:animate-none',
     status: 'sr-only',
-    // The Pagination under the rows of a table with a `pageSize`, kept in view like the filter bar.
-    pager: 'sticky left-0 border-solid border-t-[length:var(--border-width)] border-border px-3 py-2',
-    // A row that is a link or a button: the first cell holds an anchor or a button stretched over the whole row.
-    rowLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-    rowButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     failure: 'flex flex-wrap items-center justify-center gap-3 px-3 py-4 text-sm',
     message: 'm-0',
-    // The rows standing for those a virtual table does not draw.
-    spacer: '@max-[30rem]/table:block',
     emptyCell: 'px-3 py-8 text-center text-xs text-muted @max-[30rem]/table:block',
+    ...(uses('filter') || uses('filterParam') || uses('fields'))
+      ? {
+        // Sticky, so the filter and the selection bar stay in view while a wide table scrolls under them.
+        filter: 'sticky left-0 flex flex-wrap items-center gap-x-4 gap-y-2 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2',
+        field: 'flex items-center gap-2',
+        filterInput: 'w-56 max-w-full',
+        count: 'sr-only',
+      }
+      : {},
+    ...(uses('selectable') || uses('exportable') || uses('columnToggle'))
+      ? {
+        selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
+      }
+      : {},
+    ...(uses('selectable'))
+      ? {
+        selected: 'm-0',
+        bulk: 'flex flex-wrap items-center gap-2',
+        selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
+        // The box is 1rem, so its label grows to the 1.5rem a finger needs.
+        selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
+      }
+      : {},
+    ...(uses('columnToggle'))
+      ? {
+        columnsPanel: 'flex flex-col gap-1 p-3',
+      }
+      : {},
+    ...(uses('expandable'))
+      ? {
+        toggleHead: 'border-b border-border px-3 py-2 text-left text-xs w-0 @max-[30rem]/table:hidden',
+        toggleCell: 'px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
+        // The chevron turns over while the row is open.
+        toggle: 'aria-expanded:[&_svg]:rotate-180',
+        // The detail stands under its row across every column, and under its card in the narrow form.
+        detailRow: 'border-b border-border @max-[30rem]/table:block @max-[30rem]/table:border-b-0',
+        detailCell: 'px-3 py-3 text-foreground @max-[30rem]/table:block @max-[30rem]/table:px-3 @max-[30rem]/table:pt-0',
+      }
+      : {},
+    ...(uses('pageSize'))
+      ? {
+        // The Pagination under the rows of a table with a `pageSize`, kept in view like the filter bar.
+        pager: 'sticky left-0 border-solid border-t-[length:var(--border-width)] border-border px-3 py-2',
+      }
+      : {},
+    ...(uses('rowHref') || uses('onRowClick'))
+      ? {
+        // A row that is a link or a button: the first cell holds an anchor or a button stretched over the whole row.
+        rowLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+        rowButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+      }
+      : {},
+    ...(uses('virtual'))
+      ? {
+        // The rows standing for those a virtual table does not draw.
+        spacer: '@max-[30rem]/table:block',
+      }
+      : {},
   },
 })
 
@@ -207,33 +243,22 @@ if (expandable && virtual)
 if (pageSize !== undefined && (virtual || list))
   throw new Error('kayjs-ui: a Table with a pageSize cannot be virtual or take a list, which already hold their rows by the window or by the page')
 
-const tableId = uid()
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
-const keptKey = sortParam === undefined ? undefined : persisted.query(sortParam, '')
-const directionParam = sortParam === undefined ? undefined : sortParam === 'sort' ? 'direction' : `${sortParam}Direction`
+// The sort kept in the address is read when the table is made.
+const keptKey = uses('sortParam') && sortParam !== undefined ? persisted.query(sortParam, '') : undefined
+const directionParam = uses('sortParam') && sortParam !== undefined ? sortParam === 'sort' ? 'direction' : `${sortParam}Direction` : undefined
 const keptDirection = directionParam === undefined ? undefined : persisted.query(directionParam, '')
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
-const typed = filterParam === undefined ? signal('') : persisted.query(filterParam, '')
-// kay-allow once-read-prop: the extra fields are read when the table is created
-const extra = fields ?? []
-// The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
-const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]])
-
-for (const field of extra) {
-  if (taken.has(field.key))
-    throw new Error(`kayjs-ui: a Table field cannot be keyed ${field.key}, a name the table's sort, search or export address already writes in the query`)
-}
-
-const fieldValues = extra.map(field => persisted.query(field.key, ''))
-const fieldsNow = () => Object.fromEntries(extra.flatMap((field, index) => fieldValues[index]!() === '' ? [] : [[field.key, fieldValues[index]!()]]))
-const asked = () => ({ text: typed(), fields: fieldsNow() })
+// The search box and the extra fields, decided when the table is made.
+const search = uses('filter') || uses('fields') || uses('filterParam') ? tableFilter({ filterParam, fields, reserved: [sortParam, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]] }) : undefined
 // A table over a list searches on the server, so a `filterParam` alone shows the box.
 const searching = () => filter !== undefined || (list !== undefined && filterParam !== undefined)
-const filtering = () => typed() !== '' || extra.some((_, index) => fieldValues[index]!() !== '')
+const fielded = () => (search?.extra.length ?? 0) > 0
+const filtering = () => search?.active() ?? false
 
 effect(() => {
   const next = sort
@@ -245,68 +270,12 @@ effect(() => {
   following = true
 })
 
-// A list follows the table's sort and filter whatever set them: a header click, the URL's, the parent's `sort`, a typed text or a field. The first run loads at once, a text waits for a pause in typing, and one load serves a sort and a filter changed together.
-let started = false
-
-effect(() => {
-  if (!list)
-    return
-
-  const wanted = current()
-  const filtered = asked()
-  const now = !started
-
-  started = true
-
-  const [sortChanged, filterChanged] = untrack(() => {
-    const held = list.sort()
-    const filter = list.filter()
-
-    return [wanted?.key !== held?.key || wanted?.direction !== held?.direction, filtered.text !== filter.text || !sameFields(filtered.fields, filter.fields)]
-  })
-
-  if (!sortChanged && !filterChanged)
-    return
-
-  const run = () => void list.restart({ ...sortChanged && { sort: wanted }, ...filterChanged && { filter: filtered } })
-
-  // A sort runs at once, taking a filter still waiting for its pause along.
-  if (now || sortChanged) {
-    run()
-
-    return
-  }
-
-  const timer = setTimeout(run, DEBOUNCE_MS)
-
-  onCleanup(() => clearTimeout(timer))
-})
+if (uses('list'))
+  followList(() => list, current, () => search?.asked() ?? { text: '', fields: {} })
 
 // The rows the filter keeps, all of them without one.
-const kept = memo(() => filter === undefined || list ? rows() : rowsMatching(rows(), filter, typed()))
+const kept = memo(() => uses('filter') && filter !== undefined && !list ? rowsMatching(rows(), filter, search!.typed()) : rows())
 const counted = (count: number) => countLabel ? countLabel(count) : wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count })
-const none: RowKeyValue<Row, Key>[] = []
-const picked = signal(selected ?? none)
-
-effect(() => picked = selected ?? none)
-
-const keyed = memo(() => rows().map(row => rowKeyOf(row, rowKey)))
-const chosen = memo(() => {
-  const set = new Set(picked())
-
-  return keyed().filter(key => set.has(key))
-}, { equals: (a, b) => a.length === b.length && a.every((key, index) => key === b[index]) })
-const chosenSet = memo(() => new Set(chosen()))
-const visible = memo(() => kept().map(row => rowKeyOf(row, rowKey)))
-const allChosen = memo(() => visible().length > 0 && visible().every(key => chosenSet().has(key)))
-const someChosen = memo(() => visible().some(key => chosenSet().has(key)))
-const noneOpen: RowKeyValue<Row, Key>[] = []
-const opened = signal(expanded ?? noneOpen)
-
-effect(() => opened = expanded ?? noneOpen)
-
-const openSet = memo(() => new Set(opened()))
-const detailId = (row: Row) => `${tableId}-detail-${String(rowKeyOf(row, rowKey)).replace(/\s/g, '_')}`
 const hiddenKeys = signal(hiddenColumns ?? given.filter(column => column.hidden).map(column => column.key))
 
 effect(() => {
@@ -322,37 +291,6 @@ const columnCount = () => shownColumns().length + (selectable ? 1 : 0) + (expand
 const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? label
 const scrolls = signal(virtual)
 const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
-
-function commit(keys: RowKeyValue<Row, Key>[]) {
-  picked = keys
-
-  if (!onSelectedChange)
-    return
-
-  const wanted = new Set(keys)
-  const chosen = rows().filter(row => wanted.has(rowKeyOf(row, rowKey)))
-
-  onSelectedChange(keys, chosen)
-}
-
-function toggleRow(key: RowKeyValue<Row, Key>) {
-  const open = !openSet().has(key)
-
-  opened = open ? [...opened(), key] : opened().filter(other => other !== key)
-  onOpenChange?.(key, open)
-}
-
-function pick(key: RowKeyValue<Row, Key>, on: boolean) {
-  commit(on ? keyed().filter(other => other === key || chosenSet().has(other)) : chosen().filter(other => other !== key))
-}
-
-// Only the rows the filter shows are picked or dropped, so a row it hides keeps its state.
-function pickAll(on: boolean) {
-  const shownKeys = new Set(visible())
-
-  commit(on ? keyed().filter(key => chosenSet().has(key) || shownKeys.has(key)) : chosen().filter(key => !shownKeys.has(key)))
-}
-
 const shown = memo(() => serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
 const waiting = () => busy || (list ? list.pending() && !list.failed() : source.loading())
 const skeleton = () => waiting() && shown().length === 0
@@ -360,15 +298,8 @@ const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skelet
 const skeletonCells = () => Array.from({ length: columnCount() }, (_, index) => index)
 const openLabel = (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row)
 const broke = () => list ? list.failed() : source.failed()
-
-// A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
-// With no rows yet, loading or failed, `selected` is held: its rows are on their way, not gone.
-effect(() => {
-  const next = chosen()
-
-  if (selectable && next.length !== picked().length && (rows().length > 0 || !(waiting() || broke())))
-    commit(next)
-})
+const select = uses('selectable') ? selection({ rowKey, rows, kept, selected: () => selected, onChange: () => onSelectedChange, enabled: () => selectable, settling: () => waiting() || broke() }) : undefined
+const expansion = uses('expandable') ? expanding({ rowKey, expanded: () => expanded, onOpenChange: () => onOpenChange }) : undefined
 const linked = () => rowHref !== undefined || onRowClick !== undefined
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
@@ -378,67 +309,17 @@ const endpoint = memo(() => {
   return typeof value === 'string' ? value : undefined
 })
 
-// The page and the size live in the address like the sort does, read from the request on the server, unless the app holds the page itself.
-// kay-allow once-read-prop: whether the table pages is decided when it is made
-const keptPage = pageSize === undefined ? undefined : persisted.query(pageParam, '', { history: 'push' })
-const keptSize = pageSize === undefined ? undefined : persisted.query(limitParam, '')
-const pageNow = () => page ?? (Number(keptPage?.()) || 1)
-
-const sizeNow = () => {
-  const asked = Number(keptSize?.())
-
-  return asked > 0 && pageSizes?.includes(asked) ? asked : pageSize ?? 0
-}
-
-let restarted = false
-
-// A sort or a filter shows the rows from their first page again, which `onPageChange` hears like a click. The first run is the page loading, which keeps the page the address names.
-effect(() => {
-  current()
-  typed()
-  fieldsNow()
-
-  if (!restarted) {
-    restarted = true
-
-    return
-  }
-
-  untrack(() => {
-    if (pageNow() === 1)
-      return
-
-    if (page === undefined)
-      keptPage?.set('')
-
-    onPageChange?.(1, sizeNow())
-  })
-})
-
-// The page as one that exists, as rows leave or the size grows.
-const pageShown = memo(() => currentPage(pageNow(), pageCount(shown().length, sizeNow())))
-const paging = () => pageSize !== undefined && sizeNow() > 0
-const pageRows = () => paging() ? shown().slice((pageShown() - 1) * sizeNow(), pageShown() * sizeNow()) : shown()
-
-function goTo(next: number) {
-  if (page === undefined)
-    keptPage?.set(next > 1 ? String(next) : '')
-
-  onPageChange?.(next, sizeNow())
-}
-
-function resize(size: number) {
-  keptSize?.set(size === pageSize ? '' : String(size))
-
-  if (page === undefined)
-    keptPage?.set('')
-
-  onPageChange?.(1, size)
-}
+const pager = uses('pageSize')
+  ? paging({ pageSize: () => pageSize, pageSizes: () => pageSizes, page: () => page, pageParam: () => pageParam, limitParam: () => limitParam, onPageChange: () => onPageChange, shown, restarts: () => {
+    current()
+    search?.typed()
+    search?.fieldsNow()
+  } })
+  : undefined
 
 // Without `virtual` every row is drawn; with it the others stand for room above and below.
-const windowed = virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: () => 48, overscan: () => 8 }) : undefined
-const drawn = memo(() => windowed ? windowed.rows() : pageRows())
+const windowed = uses('virtual') && virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: () => 48, overscan: () => 8 }) : undefined
+const drawn = memo(() => windowed ? windowed.rows() : pager ? pager.pageRows() : shown())
 let box: HTMLElement | undefined
 let body: HTMLElement | undefined
 
@@ -469,24 +350,16 @@ onMount(() => {
   onCleanup(() => observer.disconnect())
 })
 
-function showColumn(key: string, on: boolean) {
-  const next = on ? hiddenKeys().filter(other => other !== key) : [...hiddenKeys(), key]
+const showColumn = uses('columnToggle')
+  ? (key: string, on: boolean) => {
+    const next = on ? hiddenKeys().filter(other => other !== key) : [...hiddenKeys(), key]
 
-  if (hiddenColumns === undefined)
-    hiddenKeys = next
+    if (hiddenColumns === undefined)
+      hiddenKeys = next
 
-  onHiddenColumnsChange?.(next)
-}
-
-function download() {
-  const url = URL.createObjectURL(new Blob([toCsv(shown(), shownColumns())], { type: 'text/csv;charset=utf-8' }))
-  const link = document.createElement('a')
-
-  link.href = url
-  link.download = exportName
-  link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
+    onHiddenColumnsChange?.(next)
+  }
+  : undefined
 
 function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)
@@ -505,40 +378,40 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
 }
 ---
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
-  if searching() || extra.length > 0
+  if (uses('filter') || uses('filterParam') || uses('fields')) && (searching() || fielded())
     div(part="filter")
       if searching()
         label(part="field")
           span.kui-label-text(part="filterLabel") {filterLabel}
-          input.kui-field-input(part="filterInput" type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
-      for field, index of extra key={field.key}
+          input.kui-field-input(part="filterInput" type="search" value={search!.typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => search!.typed.set(event.currentTarget.value)})
+      for field, index of search!.extra key={field.key}
         label(part="field")
           span.kui-label-text(part="filterLabel") {field.label}
           if field.options
-            Select(value={fieldValues[index]!()} options={field.options} emptyOption onChange={fieldValues[index]!.set})
+            Select(value={search!.values[index]!()} options={field.options} emptyOption onChange={search!.values[index]!.set})
           else
-            input.kui-field-input(part="filterInput" type="search" value={fieldValues[index]!()} autocomplete="off" onInput={event => fieldValues[index]!.set(event.currentTarget.value)})
-    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (typed() ? counted(kept().length) : '')}
-  if selectable || exportable || columnToggle
+            input.kui-field-input(part="filterInput" type="search" value={search!.values[index]!()} autocomplete="off" onInput={event => search!.values[index]!.set(event.currentTarget.value)})
+    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (search!.typed() ? counted(kept().length) : '')}
+  if (uses('selectable') && selectable) || (uses('exportable') && exportable) || (uses('columnToggle') && columnToggle)
     div(part="selection")
-      if columnToggle
+      if uses('columnToggle') && columnToggle
         Popover(placement="bottom-start" part="columnsPanel" label={columnsLabel})
           @trigger(attributes)
             Button({...attributes} label={columnsLabel} variant="ghost" size="sm")
           for column of columns() key={column.key}
             if column.header
-              Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={on => showColumn(column.key, on)})
-      if selectable
-        Checkbox(label={selectAllLabel} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
-        p(part="selected" role="status") {chosen().length > 0 ? countChosen(chosen().length) : ''}
-        if chosen().length > 0 && bulk
+              Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={on => showColumn!(column.key, on)})
+      if uses('selectable') && selectable
+        Checkbox(label={selectAllLabel} checked={select!.allChosen()} indeterminate={select!.someChosen() && !select!.allChosen()} disabled={select!.visible().length === 0} onChange={select!.pickAll})
+        p(part="selected" role="status") {select!.chosen().length > 0 ? countChosen(select!.chosen().length) : ''}
+        if select!.chosen().length > 0 && bulk
           div(part="bulk")
-            | {bulk(chosen(), () => commit([]))}
-      if exportable
+            | {bulk(select!.chosen(), () => select!.commit([]))}
+      if uses('exportable') && exportable
         if (waiting() ? undefined : endpoint()) then address
-          Button(href={exportHref(address, current(), filterParam ?? 'q', typed(), fieldsNow())} download={exportName} label={exportLabel} variant="ghost" size="sm")
+          Button(href={exportHref(address, current(), filterParam ?? 'q', search?.typed() ?? '', search?.fieldsNow() ?? {})} download={exportName} label={exportLabel} variant="ghost" size="sm")
         else
-          Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint() ? undefined : download})
+          Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint() ? undefined : () => downloadCsv(shown(), shownColumns(), exportName)})
   p(part="status" role="status") {skeleton() && (!list || !list.pending()) ? loadingLabel : ''}
   if source.failed()
     div(part="failure" role="alert")
@@ -550,10 +423,10 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       caption(part="caption") {label}
     thead(part="head")
       tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
-        if expandable
+        if uses('expandable') && expandable
           th(part="toggleHead" scope="col")
             span(part="selectText") {wording('ui.table.details', 'Details')}
-        if selectable
+        if uses('selectable') && selectable
           th(part="selectHead" scope="col")
             span(part="selectText") {selectAllLabel}
         for column of shownColumns() key={column.key}
@@ -571,18 +444,18 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             else
               | {column.header}
     tbody(part="body" ref={element => body = element})
-      if windowed && windowed.before() > 0
+      if uses('virtual') && windowed && windowed.before() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
           td(colspan={columnCount()} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
-        tr(part="row" data-linked={linked() ? '' : undefined} data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={selectable ? (chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
-          if expandable
+        tr(part="row" data-linked={linked() ? '' : undefined} data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={uses('selectable') && selectable ? (select!.chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
+          if uses('expandable') && expandable
             td(part="toggleCell")
-              IconButton(part="toggle" icon="chevron" variant="ghost" size="xs" label={(expandLabel ?? (item => wording('ui.table.expandRow', 'Details of {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} aria-expanded={openSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false'} aria-controls={detailId(row)} onClick={() => toggleRow(rowKeyOf(row, rowKey))})
-          if selectable
+              IconButton(part="toggle" icon="chevron" variant="ghost" size="xs" label={(expandLabel ?? (item => wording('ui.table.expandRow', 'Details of {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} aria-expanded={expansion!.openSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false'} aria-controls={expansion!.detailId(row)} onClick={() => expansion!.toggleRow(rowKeyOf(row, rowKey))})
+          if uses('selectable') && selectable
             td(part="selectCell")
               div(part="cellBody")
-                Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
+                Checkbox(checked={select!.chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => select!.pick(rowKeyOf(row, rowKey), on)})
           for column, columnIndex of shownColumns() key={column.key}
             td(part="cell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
               if narrow === 'stack' && column.header
@@ -592,13 +465,13 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   | {cell(row, column)}
                 else
                   | {cellText(row, column)}
-              if columnIndex === 0 && linked()
+              if (uses('rowHref') || uses('onRowClick')) && columnIndex === 0 && linked()
                 if rowHref?.(row) then href
                   a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
                 else if onRowClick
                   button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
-        if expandable && detail && openSet().has(rowKeyOf(row, rowKey))
-          tr(part="detailRow" id={detailId(row)})
+        if uses('expandable') && expandable && detail && expansion!.openSet().has(rowKeyOf(row, rowKey))
+          tr(part="detailRow" id={expansion!.detailId(row)})
             td(part="detailCell" colspan={columnCount()})
               | {detail(row)}
       else
@@ -619,15 +492,15 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {empty}
               else
                 | {emptyLabel}
-      if windowed && windowed.after() > 0
+      if uses('virtual') && windowed && windowed.after() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
           td(colspan={columnCount()} style="padding: 0; border: 0")
     if hasFoot()
       tfoot(part="foot")
         tr(part="footRow" aria-rowindex={virtual ? shown().length + 2 : undefined})
-          if expandable
+          if uses('expandable') && expandable
             td(part="footCell")
-          if selectable
+          if uses('selectable') && selectable
             td(part="footCell")
           for column of shownColumns() key={column.key}
             td(part="footCell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
@@ -635,7 +508,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 | {footer(column)}
               else
                 | {column.footer ?? ''}
-  if paging() && !skeleton()
-    Pagination(part="pager" page={pageShown()} total={shown().length} pageSize={sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={goTo} onSize={resize})
-  if list
+  if uses('pageSize') && pager!.paged() && !skeleton()
+    Pagination(part="pager" page={pager!.pageShown()} total={shown().length} pageSize={pager!.sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={pager!.goTo} onSize={pager!.resize})
+  if uses('list') && list
     LoadMore(list={list})

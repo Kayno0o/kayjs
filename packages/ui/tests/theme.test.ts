@@ -907,7 +907,7 @@ describe('theme.css', () => {
       const start = source.indexOf('recipe({')
       const recipe = source.slice(start, Math.min(...['defaults:', '\n})', '\n\nconst', '\n---'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
 
-      for (const name of new Set([...recipe.replace(LINE_COMMENT, '').replaceAll(QUOTED_KEY, '').replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
+      for (const name of new Set([...recipe.replace(LINE_COMMENT, '').replaceAll(/\buses\('\w+'\)/g, '').replaceAll(QUOTED_KEY, '').replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
         const next = compiler.build([name])
 
         if (next.length === css.length && !seen.has(name))

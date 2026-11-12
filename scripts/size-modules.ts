@@ -8,6 +8,8 @@ const ROOT = resolve(import.meta.dir, '..')
 const FILE = process.env.KAY_SIZE_MODULES
 const PACKAGE = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//
 const LIBRARY = /^packages\/([^/]+)\//
+const VARIANT_PREFIX = /^kay-variant:/
+const VARIANT_QUERY = /\?uses=[\w.]*$/
 
 export type ChunkModules = Record<string, Record<string, number>>
 
@@ -38,7 +40,9 @@ export function packageOf(input: string): string {
   if (input.startsWith('kay-runtime:'))
     return 'kay'
 
-  const path = relative(ROOT, resolve(ROOT, input)).replaceAll('\\', '/')
+  // A variant of a component keeps the folder of the file it is made from.
+  const file = input.replace(VARIANT_PREFIX, '').replace(VARIANT_QUERY, '')
+  const path = relative(ROOT, resolve(ROOT, file)).replaceAll('\\', '/')
   const pkg = PACKAGE.exec(path)?.[1]
 
   if (pkg === '@kaynooo/kayjs-ui')

@@ -57,6 +57,8 @@ export interface TransformOptions {
   inspect?: boolean | undefined
   // The browser's build only: resolves literal classes written together while compiling, so a change of the table compiles again.
   classTable?: ClassTable | undefined
+  // The features of a component its importer's call sites use, as `variants.ts` reads them: part of the cache key, as the source it was specialized from is the same file's.
+  variant?: string | undefined
   // The server's build of an app with Tailwind, which merges a shorthand beside a static `class` while rendering; set by `transformKayCached` from the app's stylesheets.
   classMerge?: boolean | undefined
 }
@@ -117,7 +119,7 @@ export async function transformKayCached(source: string, filename: string, given
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}${options.variant === undefined ? '' : `-uses-${Bun.hash(options.variant).toString(36)}`}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${options.target === 'ssr' && namedRefresh(withoutTwin(filename), root)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)

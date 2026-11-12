@@ -22,6 +22,7 @@ import { liveIds } from './live-ids'
 import { withLocaleLinks } from './navigation-locale'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
+import { specializedSource, USES_QUERY, variantImports } from './variants'
 
 export interface KayPluginOptions {
   // Defaults to `dom` when bundling for the browser and `ssr` everywhere else, the Bun runtime included.
@@ -67,6 +68,9 @@ export interface KayPluginOptions {
 const TWIN_IMPORT = /\.kay\?island$/
 // Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
 const TWIN_NAMESPACE = 'kay-island'
+// A component imported as the variant its importer's call sites need, `table.kay?uses=pageSize`: see variants.ts.
+const VARIANT_NAMESPACE = 'kay-variant'
+const USES_SUFFIX = /\?uses=.*$/
 const ICON_SPECIFIER = /^~icons\//
 const ICON_NAMESPACE = 'kay-icon'
 const ANY = /.*/
@@ -227,10 +231,12 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const pointed = async (contents: string, loader: Bun.JavaScriptLoader = 'ts') => options.direct === true ? directImports(contents, loader) : contents
 
       // A twin's frames show its namespace and the whole path, where a file's show its path from where the build ran.
-      const load = async (file: string, twin = false) => {
-        const source = await Bun.file(withoutTwin(file)).text()
+      const load = async (file: string, twin = false, features?: ReadonlySet<string>) => {
+        const original = await Bun.file(withoutTwin(file)).text()
+        const source = features === undefined ? original : specializedSource(original, features)
 
-        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable })
+        const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, variant: features === undefined ? undefined : [...features].sort().join('.') })
+        const code = target === 'dom' ? await variantImports(compiled, withoutTwin(file), source) : compiled
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
@@ -248,6 +254,17 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       if (build.config !== undefined) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
         build.onLoad({ filter: KAY_MODULE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path, true))
+        build.onResolve({ filter: USES_QUERY }, ({ path, importer }) => {
+          const features = USES_QUERY.exec(path)![1]!
+          const base = path.slice(0, path.length - features.length - '?uses='.length)
+
+          return { path: `${Bun.resolveSync(base, dirname(withoutTwin(importer.replace(USES_SUFFIX, ''))))}?uses=${features}`, namespace: VARIANT_NAMESPACE }
+        })
+        build.onLoad({ filter: USES_QUERY, namespace: VARIANT_NAMESPACE }, async ({ path }) => {
+          const features = USES_QUERY.exec(path)![1]!
+
+          return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('.').filter(Boolean)))
+        })
         build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))
         build.onLoad({ filter: ANY, namespace: ICON_NAMESPACE }, ({ path }) => ({ contents: iconModule(iconSets, path), loader: 'js' }))
       }

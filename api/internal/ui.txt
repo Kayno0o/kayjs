@@ -2947,6 +2947,91 @@ interface SortState
 [./lib/table] toCsv
 function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
 
+[./lib/table-expand] expanding
+function expanding<Row, Key extends RowKey<Row>>(input: ExpandInput<Row, Key>): {
+  openSet: () => Set<RowKeyValue<Row, Key>>;
+  detailId: (row: Row) => string;
+  toggleRow: (key: RowKeyValue<Row, Key>) => void;
+}
+
+[./lib/table-expand] ExpandInput
+interface ExpandInput<Row, Key extends RowKey<Row>>
+  expanded: () => RowKeyValue<Row, Key>[] | undefined
+  onOpenChange: () => ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+  rowKey: Key
+
+[./lib/table-export] downloadCsv
+function downloadCsv<Row>(rows: Row[], columns: Column<Row>[], name: string): void
+
+[./lib/table-filter] FilterInput
+interface FilterInput
+  fields: readonly FilterField[] | undefined
+  filterParam: string | undefined
+  reserved: (string | undefined)[]
+
+[./lib/table-filter] tableFilter
+function tableFilter(input: FilterInput): {
+  typed: Signal<string>;
+  extra: readonly FilterField[];
+  values: Signal<string>[];
+  fieldsNow: () => {
+    [k: string]: string;
+  };
+  asked: () => {
+    text: string;
+    fields: {
+      [k: string]: string;
+    };
+  };
+  active: () => boolean;
+}
+
+[./lib/table-list] followList
+function followList<Row>(list: () => InfiniteList<Row> | undefined, sort: () => SortState | undefined, asked: () => ListFilter): void
+
+[./lib/table-page] paging
+function paging<Row>(input: PagingInput<Row>): {
+  pageShown: () => number;
+  paged: () => boolean;
+  pageRows: () => Row[];
+  sizeNow: () => number;
+  goTo: (next: number) => void;
+  resize: (next: number) => void;
+}
+
+[./lib/table-page] PagingInput
+interface PagingInput<Row>
+  limitParam: () => string
+  onPageChange: () => ((page: number, size: number) => unknown) | undefined
+  page: () => number | undefined
+  pageParam: () => string
+  pageSize: () => number | undefined
+  pageSizes: () => readonly number[] | undefined
+  restarts: () => void
+  shown: () => Row[]
+
+[./lib/table-select] selection
+function selection<Row, Key extends RowKey<Row>>(input: SelectionInput<Row, Key>): {
+  chosen: () => RowKeyValue<Row, Key>[];
+  chosenSet: () => Set<RowKeyValue<Row, Key>>;
+  visible: () => RowKeyValue<Row, Key>[];
+  allChosen: () => boolean;
+  someChosen: () => boolean;
+  commit: (keys: RowKeyValue<Row, Key>[]) => void;
+  pick: (key: RowKeyValue<Row, Key>, on: boolean) => void;
+  pickAll: (on: boolean) => void;
+}
+
+[./lib/table-select] SelectionInput
+interface SelectionInput<Row, Key extends RowKey<Row>>
+  enabled: () => boolean
+  kept: () => Row[]
+  onChange: () => ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
+  rowKey: Key
+  rows: () => Row[]
+  selected: () => RowKeyValue<Row, Key>[] | undefined
+  settling: () => boolean
+
 [./lib/theme-mode] applyMode
 function applyMode(mode: ThemeMode): void
 
@@ -3143,6 +3228,9 @@ const uiDefaults: UiSettings
 
 [./lib/unnamed] warnUnnamed
 function warnUnnamed(element: Probe): void
+
+[./lib/uses] uses
+function uses(_feature: string): boolean
 
 [./lib/virtual] INITIAL_VIEWPORT
 const INITIAL_VIEWPORT: 640
