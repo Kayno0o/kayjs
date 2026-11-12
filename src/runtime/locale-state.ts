@@ -22,6 +22,13 @@ export function runInLocale<T>(state: LocaleState, run: () => T): T {
   return store.run(state, run)
 }
 
+// The url of the entry the page shows in each locale having it, which `alternate` gives for another locale instead of the same slug.
+export function shownEntryUrls(state: LocaleState): Record<string, string> | undefined {
+  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
+
+  return state.entryUrls?.get(shown)
+}
+
 export function localeState(): LocaleState | undefined {
   return store.getStore()
 }

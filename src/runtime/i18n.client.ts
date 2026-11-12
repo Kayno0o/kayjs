@@ -14,6 +14,8 @@ export { defineMessages } from './i18n'
 interface Payload {
   locale?: string
   settings?: LocaleSettings
+  // The url of the routed entry the page shows in each locale having it, for `alternate`.
+  entryUrls?: Record<string, string>
   messages: Record<string, Message>
   // When the server rendered the page, for `relativeTime`.
   now?: number
@@ -25,6 +27,7 @@ const PAYLOAD = 'script[data-kay-i18n]'
 const read = new WeakSet<Payload>()
 const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
+let entryUrls: Record<string, string> | undefined
 let pageLocale = ''
 let renderedAt: number | undefined
 // Whether a read ran once the page was parsed: the locale and settings are known from then on, a swap to another locale loading the page afresh, so only a missing message and `relativeTime`, for the render time, read again.
@@ -40,6 +43,11 @@ function load(): void {
 
     read.add(payload)
     settings ??= payload.settings
+
+    // Each page names its own entry, so a page swapped in replaces the last one's, with none when it shows no entry.
+    if (payload.locale !== undefined)
+      entryUrls = payload.entryUrls
+
     pageLocale ||= payload.locale ?? ''
     renderedAt ??= payload.now
     noteLinkPayload(payload)
@@ -96,10 +104,10 @@ export function alternate(target: Locale): string {
   if (!settings)
     return withBase(path)
 
-  // The page's own path first, which its locale may translate.
+  // The page's own path first, which its locale may translate; a routed entry's translation has a slug of its own.
   const { locale, path: own } = splitLocale(settings, path)
 
-  return withBase(localePath(settings, untranslatedPath(settings, own, locale ?? current), target, location.host))
+  return withBase(localePath(settings, entryUrls?.[target] ?? untranslatedPath(settings, own, locale ?? current), target, location.host))
 }
 
 export function locales(): Locale[] {

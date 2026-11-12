@@ -4,7 +4,7 @@ import type { LocaleState } from './locale-state'
 import { KayError } from '../compiler/errors'
 import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, onSite, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
-import { localeState, siteDefaultLocale } from './locale-state'
+import { localeState, shownEntryUrls, siteDefaultLocale } from './locale-state'
 import { PART_END, PART_START } from './markers'
 import { html } from './rendered'
 
@@ -67,9 +67,7 @@ export function alternate(target: Locale): string {
   if (state.implicit)
     return onSite(state.path)
 
-  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
-
-  return localePath(state.settings, state.entryUrls?.get(shown)?.[target] ?? state.path, target, state.host)
+  return localePath(state.settings, shownEntryUrls(state)?.[target] ?? state.path, target, state.host)
 }
 
 // Every locale the site is served in, the default one first as `i18n` lists it, for a language switcher: `for code of locales()` with `alternate(code)` and `localeName(code)`.
