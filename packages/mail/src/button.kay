@@ -5,7 +5,7 @@ import { mso } from './mso'
 import settings from './settings'
 import { buttonTone, linkAttributes, withStyle } from './tone'
 
-// `tone` takes the settings' accent, neutral or danger colours, `block` fills the card's width, `align` places a button that does not, and `style` goes after the button's own on the link, as `target` and the other attributes do.
+// `align` places a button that is not `block`, which fills the card and has nothing to place. `tone` takes the settings' accent, neutral or danger colours, `block` fills the card's width, `align` places a button that does not, and `style` goes after the button's own on the link, as `target` and the other attributes do.
 const { href, tone = 'accent', align, block = false, style, ...given } = props<Omit<JSX.IntrinsicElements['a'], 'class' | 'children' | 'align' | 'href' | 'style'> & { href: string, tone?: Tone | undefined, align?: Align | undefined, block?: boolean | undefined, style?: string | undefined }>()
 const look = buttonTone(settings, tone)
 const rest = linkAttributes(given)

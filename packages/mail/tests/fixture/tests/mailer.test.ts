@@ -135,16 +135,16 @@ describe('rendering', () => {
       expect(await tag(/<h1[^>]*>/)).toContain('data-x="h"')
       expect(await tag(/<h1[^>]*>/)).toMatch(/color:#b42318;text-align:center;letter-spacing:1px"/)
       expect(await tag(/<a href="https:\/\/fixture.test\/l"[^>]*>/)).toMatch(/word-break:break-word;font-weight:700"/)
-      expect(await tag(/<td[^>]*data-q="1"[^>]*>/)).toMatch(/overflow-wrap:anywhere;font-size:12px"/)
+      expect(await tag(/<td[^>]*data-q="1"[^>]*>/)).toMatch(/overflow-wrap:anywhere;text-align:center;font-size:12px"/)
       expect(await tag(/<td[^>]*user-select[^>]*>/)).toMatch(/user-select:all;letter-spacing:2px"/)
       expect(await tag(/<td height="1"[^>]*>/)).toMatch(/line-height:0;border-top-style:dashed"/)
       expect(await tag(/<div id="r"[^>]*>/)).toContain('style="text-align:center;margin:0"')
       expect(await tag(/<div data-c="1"[^>]*>/)).toContain('style="padding:0 8px;text-align:right;padding:0"')
     })
 
-    it('aligns a Button, Quote and Code by their table, an Image by a line of its own, and text by text-align', async () => {
+    it('aligns a Button and Code by their table, a Quote by its text, an Image by a line of its own, and text by text-align', async () => {
       expect(await tag(/<table[^>]*><tbody><tr><td style="padding:24px 0"><a href="https:\/\/fixture.test\/c"/)).toContain('align="center"')
-      expect(await tag(/<table[^>]*align="center" style="margin:20px 0">/)).toBeDefined()
+      expect(await tag(/<td[^>]*data-q="1"[^>]*>/)).toContain('overflow-wrap:anywhere;text-align:center;font-size:12px"')
       expect(await tag(/<table[^>]*align="right" style="margin:24px 0">/)).toBeDefined()
       expect((await rendered).html).toContain('<div style="text-align:center"><a href="https://fixture.test" target="_blank" rel="noopener" style="text-decoration:none"><img src="https://fixture.test/logo.png" alt="Fixture" width="120" id="logo"')
       expect(await tag(/<p[^>]*text-align:right[^>]*>/)).toContain('color:#b42318')
