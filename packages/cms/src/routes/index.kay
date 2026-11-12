@@ -62,7 +62,7 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
             if row.scheduled
               Badge(tone="info" label={wording('cms.admin.scheduledCount', row.scheduled === 1 ? '1 scheduled' : '{count} scheduled', { count: row.scheduled })})
             if !row.collection.single
-              span {wording('cms.admin.entryCount', row.collection.count === 1 ? '1 entry' : '{count} entries', { count: row.collection.count ?? 0 })}
+              span {wording('cms.admin.entryCount', row.collection.total === 1 ? '1 entry' : '{count} entries', { count: row.collection.total ?? 0 })}
             if row.newHref as href
               Button(href={href} label={wording('cms.admin.newEntry', 'New entry')} aria-label={wording('cms.admin.newEntryIn', 'New entry in {collection}', { collection: collectionTitle(row.collection) })} icon="plus" size="sm")
         a(href={row.href} data-tooltip={row.collection.problem} aria-describedby={row.collection.problem === undefined ? undefined : problemId(row.collection.name)}) {collectionTitle(row.collection)}
