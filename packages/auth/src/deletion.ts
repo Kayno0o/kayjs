@@ -31,7 +31,12 @@ export async function scheduleDeletion(state: RequestState, record: UserRecord):
     return { ok: true, deleteAt: record.deleteAt }
 
   const deleteAt = new Date(Date.now() + core.deletion!.after * 1000)
-  const updated = await core.store.users.update(record.id, { deleteAt }) ?? { ...record, deleteAt }
+
+  // Only the request that sets the mark mails and reports: of two together, the other keeps the first deadline.
+  if (!await core.store.users.markForDeletion!(record.id, deleteAt))
+    return { ok: true, deleteAt: (await core.store.users.get(record.id))?.deleteAt ?? deleteAt }
+
+  const updated = await core.store.users.get(record.id) ?? { ...record, deleteAt }
 
   state.adopt(updated)
   await report(state, updated, 'account-deletion-scheduled', deleteAt.toISOString())

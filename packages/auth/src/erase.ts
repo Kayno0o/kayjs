@@ -98,19 +98,26 @@ async function dropInvitations(core: Core, record: UserRecord): Promise<void> {
 
 // `eraseLeavingUser` for an account whose grace period (`account.deleteAfter`) ended, run by the prune with no request: the audit log and `onEvent` hear of the deletion and the notice is mailed to the user's language. An organization it solely owned passes to its longest-standing member, as nobody is there to refuse. Throws, leaving the account to be tried again, when `beforeDelete` refuses.
 export async function eraseDue(core: Core, record: UserRecord): Promise<void> {
+  // Read again once beforeDelete is done, which can take a while: a cancel that came meanwhile wins.
+  const stillDue = async () => {
+    const current = await core.store.users.get(record.id)
+
+    return current?.deleteAt != null && current.deleteAt.getTime() <= Date.now()
+  }
+
   const erased = await eraseThen(core, record, true, undefined, async () => {
     await dropInvitations(core, record)
     await reportFrom(core, { address: '', userAgent: '' }, record, 'account-deleted')
     mailNotice(core, [], record, 'account-deleted')
-  })
+  }, stillDue)
 
   if (!erased.ok)
-    throw new Error(`beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
+    throw new Error(`the deletion of ${record.id} did not go through (${erased.error.code}): ${erased.error.message}`)
 }
 
 // `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.
 // A throwing `afterDelete` fails the erase too, but only once the hand-over and the second strip have run.
-async function eraseThen(core: Core, record: UserRecord, handOver: boolean, actor?: UserRecord, afterDelete?: () => Promise<void>): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>> {
+async function eraseThen(core: Core, record: UserRecord, handOver: boolean, actor?: UserRecord, afterDelete?: () => Promise<void>, stillDue?: () => Promise<boolean>): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>> {
   const { store } = core
 
   if (!handOver && (await soleOwned(core, record)).some(organization => !organization.alone))
@@ -120,6 +127,9 @@ async function eraseThen(core: Core, record: UserRecord, handOver: boolean, acto
 
   if (refusal)
     return { ok: false, error: refusal }
+
+  if (stillDue && !await stillDue())
+    return failed('refused')
 
   const owners = await owning(core, record)
   const pseudonym = crypto.randomUUID()

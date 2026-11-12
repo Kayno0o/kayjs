@@ -14,7 +14,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(options: { refuse?: () => boolean } = {}) {
+async function setup(options: { refuse?: () => boolean, during?: () => Promise<void> } = {}) {
   const mails = mailbox()
   const deleted: string[] = []
   const heard: AuthEventInfo[] = []
@@ -27,7 +27,9 @@ async function setup(options: { refuse?: () => boolean } = {}) {
     onEvent: (info) => {
       heard.push(info)
     },
-    beforeDelete: ({ user }: { user: User }) => {
+    beforeDelete: async ({ user }: { user: User }) => {
+      await options.during?.()
+
       if (options.refuse?.())
         return false
 
@@ -85,6 +87,32 @@ describe('a grace period before an account is deleted', () => {
 
     expect(second.deleteAt).toBe(first.deleteAt)
     expect(mails.length).toBe(count)
+  })
+
+  test('two deletions at once mail one cancel link, both answering the same deadline', async () => {
+    const { ada, mails, heard } = await setup()
+    const [first, second] = await Promise.all([ada.callOk('account.delete', { password: PASSWORD }), ada.callOk('account.delete', { password: PASSWORD })])
+
+    expect(second.deleteAt).toBe(first.deleteAt)
+    expect(mails.filter(mail => mail.kind === 'cancel-deletion')).toHaveLength(1)
+    expect(heard.filter(info => info.event === 'account-deletion-scheduled')).toHaveLength(1)
+  })
+
+  test('a cancel arriving while beforeDelete runs wins: the account stays', async () => {
+    let cancel: () => Promise<void> = async () => undefined
+    const { ada, user, store, prune } = await setup({ during: async () => cancel() })
+
+    await ada.callOk('account.delete', { password: PASSWORD })
+
+    cancel = async () => {
+      cancel = async () => undefined
+      await ada.callOk('account.cancelDeletion')
+    }
+
+    await prune(15 * DAY_MS)
+
+    expect(await store.users.get(user.id)).toBeDefined()
+    expect((await store.users.get(user.id))?.deleteAt).toBeNull()
   })
 
   test('the proof is still asked before anything is marked', async () => {
@@ -187,6 +215,12 @@ describe('without account.deleteAfter', () => {
     delete store.users.dueForDeletion
 
     expect(() => testApp({ store, account: { deleteAfter: '14d', cancelPage: '/x' } })).toThrow('dueForDeletion')
+
+    const marking = memoryAuth()
+
+    delete marking.users.markForDeletion
+
+    expect(() => testApp({ store: marking, account: { deleteAfter: '14d', cancelPage: '/x' } })).toThrow('markForDeletion')
     expect(() => testApp({ account: { deleteAfter: '14d' } })).toThrow('cancelPage')
     expect(() => testApp({ pages: true, account: { deleteAfter: '14d' } })).not.toThrow()
   })

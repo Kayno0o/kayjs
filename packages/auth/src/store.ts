@@ -244,6 +244,8 @@ export interface AuthStore {
     staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Up to `limit` users whose `deleteAt` is at or before `now`, earliest first; needed by the `account.deleteAfter` option, which a store without it refuses at boot.
     dueForDeletion?: (now: Date, limit: number) => MaybePromise<UserRecord[]>
+    // Sets `deleteAt` only on a user whose is null, false when it is set already or the user is gone, even when two requests try it together; needed by `account.deleteAfter` too.
+    markForDeletion?: (id: string, deleteAt: Date) => MaybePromise<boolean>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     // With `total: false` the caller does not read `total`, so a store may skip counting.
     list: (query: { search?: string, offset: number, limit: number, total?: boolean }) => MaybePromise<{ users: UserRecord[], total: number }>

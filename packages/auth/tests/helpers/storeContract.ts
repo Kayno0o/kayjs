@@ -529,6 +529,21 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.users.dueForDeletion!(at(0), 10))).toEqual([])
     })
 
+    test('markForDeletion sets the deadline once, false for one set already or a missing user', async () => {
+      const first = new Date(Date.UTC(2026, 5, 1))
+
+      await store.users.create(userRecord({ id: 'marked' }))
+
+      expect(await store.users.markForDeletion!('marked', first)).toBe(true)
+      expect(await store.users.markForDeletion!('marked', new Date(first.getTime() + 1000))).toBe(false)
+      expect(await store.users.markForDeletion!('ghost', first)).toBe(false)
+      expect((await store.users.get('marked'))?.deleteAt).toEqual(first)
+
+      await store.users.update('marked', { deleteAt: null })
+
+      expect(await store.users.markForDeletion!('marked', first)).toBe(true)
+    })
+
     describe('the OAuth server', () => {
       const bearer = (id: string, oauth?: { clientId: string, family: string, resource?: string | null }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
       const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })

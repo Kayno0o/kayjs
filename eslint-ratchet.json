@@ -28,7 +28,7 @@
     "complexity": 52
   },
   "packages/auth/src/pg.ts": {
-    "max-lines-per-function": 282
+    "max-lines-per-function": 281
   },
   "packages/auth/src/setup.ts": {
     "complexity": 53

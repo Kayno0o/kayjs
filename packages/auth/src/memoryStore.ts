@@ -93,11 +93,11 @@ export function memoryAuth(): AuthStore {
         return oldest([...users.values()].filter(user => user.guest && user.createdAt < createdBefore && !withSession.has(user.id)), limit, 'createdAt')
       },
       staleUnverified(createdBefore, limit) {
-        const withSession = new Set([...sessions.values()].map(session => session.userId))
-        const withIdentity = new Set([...identities.values()].map(identity => identity.userId))
+        const held = new Set([...sessions.values(), ...identities.values()].map(held => held.userId))
 
-        return oldest([...users.values()].filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !withSession.has(user.id) && !withIdentity.has(user.id)), limit, 'createdAt')
+        return oldest([...users.values()].filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !held.has(user.id)), limit, 'createdAt')
       },
+      markForDeletion: (id, deleteAt) => users.has(id) && users.get(id)!.deleteAt == null && Boolean(users.set(id, { ...users.get(id)!, deleteAt })),
       dueForDeletion(now, limit) {
         return oldest([...users.values()].filter(user => user.deleteAt != null && user.deleteAt <= now), limit, 'deleteAt')
       },

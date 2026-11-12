@@ -684,6 +684,7 @@ interface AuthStore
   staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   dueForDeletion?: (now: Date, limit: number) => MaybePromise<UserRecord[]>;
+  markForDeletion?: (id: string, deleteAt: Date) => MaybePromise<boolean>;
   list: (query: {
     search?: string;
     offset: number;

@@ -254,6 +254,7 @@ export function pgAuth(db: Database): AuthStore {
 
         return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
       },
+      markForDeletion: async (id, deleteAt) => (await users.write.updateMany({ delete_at: deleteAt }, e => e.and(e.eq('id', id), e.isNull('delete_at')), { pk: true })).length > 0,
       dueForDeletion: async (now, limit) => (await users.read.findMany(q => q.where({ delete_at: { lte: now } }).orderBy('delete_at', 'asc').limit(limit))).map(row => toUser(row)!),
       delete: async id => await users.write.deleteById(id) !== null,
       async list({ search, offset, limit, total: counted = true }) {
@@ -312,10 +313,7 @@ export function pgAuth(db: Database): AuthStore {
       get: async id => toPasskey(await passkeys.read.findById(id)),
       listByUser: async userId => (await passkeys.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toPasskey(row)!),
       async update(id, patch) {
-        const row = withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, user_verified: patch.userVerified, last_used_at: patch.lastUsedAt })
-
-        if (!isEmpty(row))
-          await passkeys.write.updateById(id, row)
+        await whenFilled(withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, user_verified: patch.userVerified, last_used_at: patch.lastUsedAt }), async row => passkeys.write.updateById(id, row))
       },
       delete: async (userId, id) => await passkeys.write.deleteOne({ id, user_id: userId }) !== null,
     },

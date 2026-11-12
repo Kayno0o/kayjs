@@ -260,7 +260,7 @@ For your own page, `auth.account.deletion()` gives the date (or null), `ctx.dele
 
 The deletion itself is the prune's, within an hour of the date. That is the moment `beforeDelete` runs, the audit log records `account-deleted`, `onEvent` is called and the account-deleted mail goes out. A `beforeDelete` that refuses keeps the account pending, and the next run tries again.
 
-A custom store needs `users.dueForDeletion(now, limit)` and a `deleteAt` on its users, which `memoryAuth` and `pgAuth` have; the Postgres table gets a nullable `delete_at` column from `db.sync()` or a generated migration.
+A custom store needs `users.dueForDeletion(now, limit)`, `users.markForDeletion(id, deleteAt)` (sets the date only when none is, and says whether it did) and a `deleteAt` on its users, which `memoryAuth` and `pgAuth` have; the Postgres table gets a nullable `delete_at` column from `db.sync()` or a generated migration.
 
 ## Signing in with a password
 

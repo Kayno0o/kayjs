@@ -113,8 +113,8 @@ function deletionOf(options: { account?: AccountOptions | undefined, store: Auth
   if (account?.deleteAfter === undefined)
     return undefined
 
-  if (!options.store.users.dueForDeletion)
-    throw configError('auth', 'account', '`account.deleteAfter` needs a store with `users.dueForDeletion`, as `memoryAuth` and `pgAuth` have')
+  if (!options.store.users.dueForDeletion || !options.store.users.markForDeletion)
+    throw configError('auth', 'account', '`account.deleteAfter` needs a store with `users.dueForDeletion` and `users.markForDeletion`, as `memoryAuth` and `pgAuth` have')
 
   if (!pages && account.cancelPage === undefined)
     throw configError('auth', 'account', '`account.deleteAfter` mails a link to cancel the deletion: set `pages` for the prebuilt account page, or `account.cancelPage` to your own')
