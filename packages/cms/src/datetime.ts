@@ -1,6 +1,6 @@
 import type { CollectionInfo } from './kay/contract'
 import { effect, onCleanup, onMount, signal } from 'kay'
-import { formatDate } from 'kay/i18n'
+import { formatDate } from 'kay/words'
 
 const LOCAL_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 const MINUTE = 16

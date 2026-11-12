@@ -1,7 +1,6 @@
 ---
 import type { SavedState } from '../editor/live'
-import { formatDate } from 'kay/i18n'
-import { wording } from 'kay/words'
+import { formatDate, wording } from 'kay/words'
 
 // Where an entry stands, kept on screen and read out as it changes: saving, edits not saved yet, or the time of the last save, with a link to the public page when the site shows the save only once it has rebuilt.
 const { changed, saving, saved, url } = props<{ changed: boolean, saving: boolean, saved: SavedState | undefined, url?: string | undefined }>()

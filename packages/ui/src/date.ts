@@ -1,4 +1,4 @@
-import { formatDate } from 'kay/i18n'
+import { formatDate } from 'kay/words'
 
 // A date range's two bounds as `YYYY-MM-DD`, each open when empty.
 export type DateRange = [string | null, string | null]

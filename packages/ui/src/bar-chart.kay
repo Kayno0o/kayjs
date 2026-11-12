@@ -10,8 +10,7 @@ import type { PlacedEvent } from './chart-marks'
 import { activeMarks, chartTooltip, EVENT_LOOK, markKind, placeEvents, TOOLTIP_LOOK } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, seriesFill, steppedPoint, valueTicks } from './plot'
-import { formatNumber } from 'kay/i18n'
-import { wording } from 'kay/words'
+import { formatNumber, wording } from 'kay/words'
 
 const look = recipe({
   parts: {

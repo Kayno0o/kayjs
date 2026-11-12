@@ -1,4 +1,5 @@
-import type { MessageValue, Plural } from './i18n'
+import type { DateFormatOptions, MessageValue, NumberFormatOptions, Plural } from './i18n'
+import { formatDate as formatDateIn, formatNumber as formatNumberIn, setTimeZone } from './i18n'
 import { sizeText as sizeIn } from './size-text'
 
 // What the server writes for a page's islands and checked forms: the locale and the messages they use. Kept small, as every island of a library reaches it, and free of `pageData`, which a lazy chunk reading it would keep in the eager entry; `kay/i18n` reads the same scripts for `t`.
@@ -60,6 +61,9 @@ function load(): void {
     locale ||= payload.locale ?? ''
     zone ??= payload.timeZone
 
+    if (payload.timeZone !== undefined)
+      setTimeZone(payload.timeZone)
+
     for (const [key, message] of Object.entries(payload.messages))
       messages.set(key, message)
   }
@@ -112,6 +116,16 @@ export function wording(key: string, english: string, params: Record<string, Mes
 
     return typeof value === 'number' ? new Intl.NumberFormat(here).format(value) : String(value)
   })
+}
+
+// A date as the page's locale writes it, in the site's `timeZone`: what `kay/i18n`'s `formatDate` does, without the rest of that module, for the components of a library every page reaches.
+export function formatDate(value: Date | number, options?: DateFormatOptions): string {
+  return formatDateIn(pageLocale(), value, options)
+}
+
+// A number as the page's locale writes it, as `kay/i18n`'s `formatNumber` does it, without the rest of that module.
+export function formatNumber(value: number, options?: NumberFormatOptions): string {
+  return formatNumberIn(pageLocale(), value, options)
 }
 
 // `1 MB`, `512 KB`, `200 bytes` as the page's locale writes a size (`1 Mo`, `200 octets`), for a text that names a file's weight or a limit.

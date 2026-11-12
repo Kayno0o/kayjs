@@ -24,3 +24,14 @@ test('keeps the locales the app gives over the site\'s', () => {
   expect(mailLanguages({ locales: ['en', 'de'] }).locales()).toEqual(['en', 'de'])
   expect(mailLanguages({ locales: [] }).locales()).toEqual(['fr', 'en'])
 })
+
+test('writes English for a site locale kayjs-auth has no texts for', () => {
+  setSiteLocale('pt', ['pt', 'xx-site-only', 'fr'])
+
+  const templates = mailLanguages({}).templates()
+
+  expect(Object.keys(templates)).toEqual(['pt', 'xx-site-only', 'fr'])
+  expect(templates.pt).toEqual(templates['xx-site-only'])
+  expect(templates['pt']!['verify-email']).toBe(mailLanguages({ locales: ['en'] }).templates().en!['verify-email'])
+  expect(templates.fr!['verify-email']).not.toBe(templates.pt!['verify-email'])
+})

@@ -1,5 +1,5 @@
-import type { MessageValue } from './i18n'
-import { formatDate, lookup } from './i18n'
+import type { DateFormatOptions, MessageValue, NumberFormatOptions } from './i18n'
+import { formatDate as formatDateIn, formatNumber as formatNumberIn, lookup } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 import { sizeText as sizeIn } from './size-text'
@@ -14,7 +14,7 @@ function plainEnglish(english: string, params: Record<string, MessageValue>): st
 
     const value = params[name]!
 
-    return value instanceof Date ? formatDate(localeState()?.locale ?? 'en', value) : String(value)
+    return value instanceof Date ? formatDateIn(localeState()?.locale ?? 'en', value) : String(value)
   })
 }
 
@@ -35,6 +35,16 @@ export function wording(key: string, english: string, params: Record<string, Mes
 // The request's locale, `en` outside one: for the formats a library draws itself, such as a chart's dates.
 export function pageLocale(): string {
   return localeState()?.locale ?? 'en'
+}
+
+// A date as the page's locale writes it, in the site's `timeZone`; `kay/i18n`'s `formatDate` too, which the browser's entry of this module does without the rest of that one.
+export function formatDate(value: Date | number, options?: DateFormatOptions): string {
+  return formatDateIn(pageLocale(), value, options)
+}
+
+// A number as the page's locale writes it; `kay/i18n`'s `formatNumber` too.
+export function formatNumber(value: number, options?: NumberFormatOptions): string {
+  return formatNumberIn(pageLocale(), value, options)
 }
 
 // `1 MB`, `512 KB`, `200 bytes` as the page's locale writes a size (`1 Mo`, `200 octets`), for a text that names a file's weight or a limit.

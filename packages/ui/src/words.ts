@@ -1,5 +1,4 @@
-import { formatDate } from 'kay/i18n'
-import { pageLocale } from 'kay/words'
+import { formatDate, pageLocale } from 'kay/words'
 
 const ENGLISH = /^en(?:-|$)/
 

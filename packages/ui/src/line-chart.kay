@@ -12,8 +12,7 @@ import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tota
 import { isExternal, tabOf } from './outside'
 import type { NewTab } from './outside'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
-import { formatNumber } from 'kay/i18n'
-import { wording } from 'kay/words'
+import { formatNumber, wording } from 'kay/words'
 
 // The 1.x events chartist emits only with its compat plugin, and the mark chartist puts on a chart whose output a plugin may change, which it then redraws on every update.
 const LEGACY_EVENTS = new Set(['data', 'optionsChanged', 'draw', 'created', 'animationBegin', 'animationEnd'])

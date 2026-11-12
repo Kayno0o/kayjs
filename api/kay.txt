@@ -4448,6 +4448,12 @@ interface WaitUntilOptions
 [./test] writePersisted
 function writePersisted(key: string, value: unknown): void
 
+[./words] formatDate
+function formatDate(value: Date | number, options?: DateFormatOptions | undefined): string
+
+[./words] formatNumber
+function formatNumber(value: number, options?: NumberFormatOptions | undefined): string
+
 [./words] pageLocale
 function pageLocale(): string
 
