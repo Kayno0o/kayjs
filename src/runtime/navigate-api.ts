@@ -40,7 +40,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
   return navigateTo(typeof to === 'string' && navigation.localize ? navigation.localize(to) : to, options, true)
 }
 
-// `navigate()`, with `hooked` off for a redirect an action's call asks for, which `onBeforeNavigate` cannot refuse as the action already ran: the leave guards still ask.
+// `navigate()`, with `hooked` off for a redirect an action's call asks for, which `onBeforeNavigate` cannot refuse as the action already ran: the leave guards still ask. That redirect is the server's final location, already under the base, so it is not put under it again.
 export async function navigateTo(to: string | { query: QueryChanges }, options: NavigateOptions, hooked: boolean): Promise<boolean> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return true
@@ -48,7 +48,7 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
   navigation.flush?.()
 
   // A query change keeps the path and the other params, and leaves the hash out.
-  const url = new URL(typeof to === 'string' ? withBase(to) : location.pathname + location.search, location.href)
+  const url = new URL(typeof to === 'string' ? hooked ? withBase(to) : to : location.pathname + location.search, location.href)
 
   // A `javascript:` URL, as one read from a query param could be, would run in the page; a `data:` one browsers refuse to load, and `vbscript:` is gone.
   if (url.protocol === 'javascript:')
