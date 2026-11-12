@@ -2,11 +2,11 @@ import type { LivePage, LiveRequest, LiveUpdate } from './live-value'
 import { withBase } from './base'
 import { CACHE_LIVE_ID } from './cache-live-id'
 import { dirtyGuard, navigation } from './navigation'
+import { retryLater } from './retry-later'
 import { decodeServerValue } from './wire'
 
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 // A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
-// It keeps its own reconnect rather than `retryLater` of connection.ts, because Bun hoists a module two lazy chunks import into the entry chunk, which costs every page +260 to +360 B (kaynooo/kayjs#2875). Its backoff starts at a second rather than half of one, and waits for the tab to show but not for the network to come back.
 
 const ROUTE = '/_kay/live'
 // A deferred island's script is told from the page's by its attribute, so a page's renewal of its proofs leaves it alone.
@@ -14,8 +14,6 @@ const SCRIPT = 'script[data-kay-live],script[data-kay-island]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
 // The longest a tab waits before it loads the page again, so every tab showing a value does not ask for the page at the same moment.
 const JITTER_MS = 750
-const FIRST_RETRY_MS = 1000
-const LAST_RETRY_MS = 30_000
 // A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
 const REFUSAL_MS = 60_000
 // Fired by live-value.client.ts when it asks for new proofs.
@@ -45,7 +43,7 @@ const waitingRoutes = new Map<object, Map<string, number>>()
 let connection: { controller: AbortController, keys: string } | undefined
 let attempt = 0
 let refused = 0
-let retry: ReturnType<typeof setTimeout> | undefined
+let cancelRetry: (() => void) | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 let running = false
 // What was invalidated while the page loaded, by key, to be held against the page that arrives.
@@ -139,8 +137,8 @@ function stop(): void {
   connection?.controller.abort()
   connection = undefined
   attempt = 0
-  clearTimeout(retry)
-  retry = undefined
+  cancelRetry?.()
+  cancelRetry = undefined
 }
 
 async function connect(keys: string): Promise<void> {
@@ -219,31 +217,12 @@ async function read(body: ReadableStream<Uint8Array>, controller: AbortControlle
   }
 }
 
-// Opens the connection again after a growing delay, shortened by up to half at random so the tabs a restart dropped together come back apart, and not while the tab is hidden.
+// Opens the connection again after a growing delay, once the tab is shown and online.
 function reconnect(controller: AbortController, keys: string): void {
-  const delay = Math.min(FIRST_RETRY_MS * 2 ** attempt++, LAST_RETRY_MS) * (0.5 + Math.random() / 2)
-  const open = () => {
+  cancelRetry = retryLater(attempt++, () => {
     if (connection?.controller === controller)
       void connect(keys)
-  }
-
-  retry = setTimeout(() => {
-    if (!document.hidden) {
-      open()
-
-      return
-    }
-
-    const shown = () => {
-      if (document.hidden)
-        return
-
-      document.removeEventListener('visibilitychange', shown)
-      open()
-    }
-
-    document.addEventListener('visibilitychange', shown)
-  }, delay)
+  })
 }
 
 // A key was invalidated at `at` by the server's clock, the same clock that dated the page's read of it: at or after the read, the page shows what is gone.

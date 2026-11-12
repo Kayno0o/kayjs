@@ -302,6 +302,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
   const ownLoads = (tag: string) => loads.filter(url => url.endsWith(`?${tag}`))
   const latestLoads: string[] = []
   let refuse = false
+  let drop = false
   let gate: Promise<void> | undefined
 
   const shows = (count: number) => [(expected: number) => document.querySelector('p.orders')?.textContent === `${expected} orders`, { timeout: '5s' }, count] as const
@@ -319,6 +320,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
 
         if (refuse)
           return new Response(null, { status: 403 })
+
+        if (drop)
+          return new Response(null, { status: 502 })
       }
 
       if (request.method === 'GET' && pathname === '/')
@@ -423,6 +427,36 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
     refuse = false
     change(9)
     await page.waitUntil(...shows(9))
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
+  it('reconnects after a drop with a backoff, not while the tab is hidden, and follows again once the server answers', async () => {
+    change(20)
+    drop = true
+    connections.length = 0
+
+    await using page = await site.open('/?drop')
+
+    // The first attempt dropped, the second follows after the backoff.
+    await waitFor(() => connections.length >= 2)
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    })
+    // An attempt already waiting on its timer may still ask once: a hidden tab then waits.
+    await Bun.sleep(1500)
+
+    const hiddenAt = connections.length
+
+    await Bun.sleep(1500)
+    expect(connections.length).toBe(hiddenAt)
+    drop = false
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => connections.length > hiddenAt)
+    change(21)
+    await page.waitUntil(...shows(21))
     expect(page.errors).toEqual([])
   }, 30_000)
 
