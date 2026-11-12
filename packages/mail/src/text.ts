@@ -90,7 +90,7 @@ export function htmlToText(html: string): string {
       if (closing)
         lists.pop()
       else
-        lists.push({ ordered: tag === 'ol', index: tag === 'ol' ? startOf(attributes!) - 1 : 0 })
+        lists.push(listOf(tag, attributes!))
 
       text += '\n\n'
     }
@@ -165,11 +165,11 @@ function withAddress(text: string, start: number, href: string): string {
   return label === address || label === href ? text : `${text} (${address})`
 }
 
-// Where an ordered list starts counting, per its `start` attribute.
-function startOf(attributes: string): number {
+// A list opening, an ordered one counting from its `start` attribute: `index` is the number before its first item.
+function listOf(tag: string, attributes: string): { ordered: boolean, index: number } {
   const start = WHOLE_NUMBER.exec(attribute(attributes, 'start') ?? '')?.[1]
 
-  return start === undefined ? 1 : Number(start)
+  return { ordered: tag === 'ol', index: start === undefined ? 0 : Number(start) - 1 }
 }
 
 function hidden(attributes: string): boolean {
@@ -185,7 +185,10 @@ export function decode(text: string): string {
 
     const point = code[1] === 'x' || code[1] === 'X' ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1))
 
-    return point === 0 ? REPLACEMENT : point <= LAST_CODE_POINT ? String.fromCodePoint(point) : entity
+    if (point === 0)
+      return REPLACEMENT
+
+    return point <= LAST_CODE_POINT ? String.fromCodePoint(point) : entity
   }).replaceAll('\0', REPLACEMENT)
 }
 

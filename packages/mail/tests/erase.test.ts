@@ -10,7 +10,7 @@ function queued() {
   return mailer({ from: 'dev@example.com', transport: { send: async () => ({ accepted: [], rejected: [], response: 'ok' }) }, queue: { store: memoryJobs(), name: `erase-${counter}` } })
 }
 
-const NFC = `Jos${String.fromCharCode(0xe9)}@example.com`
+const NFC = `Jos${String.fromCharCode(0xE9)}@example.com`
 const NFD = `Jose${String.fromCharCode(0x301)}@example.com`
 
 const CASES: [string, string, string][] = [
