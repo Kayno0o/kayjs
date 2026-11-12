@@ -1,11 +1,26 @@
 import type { Identity } from './files'
-import type { EntryRef } from './kay/contract'
+import type { CollectionInfo, EntryRef } from './kay/contract'
 import type { SaveOutcome } from './store'
 import { wording } from 'kay/words'
+import { activityOf } from './activity'
 import { keepingOrder, keepingPublication } from './publishing'
+import { followingRenames } from './references'
 import { revisionAt } from './revisions'
 import { collectionNamed, entryOf, refused, saveEntry } from './store'
 import { discardTrashed, trashed } from './trash'
+
+// The key an entry's translations pair it by is a fact of its place, which a rename may have set since the version was saved: the entry's own now, or none when it has none.
+function pairedWith(collection: CollectionInfo, data: Record<string, unknown>, existing: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (collection.localized !== true || collection.schema.properties?.translationKey === undefined)
+    return data
+
+  const key = existing?.translationKey
+  const rest = { ...data }
+
+  delete rest.translationKey
+
+  return key === undefined ? rest : { ...rest, translationKey: key }
+}
 
 // Saves an older version of an entry again, as a new save: the editor's version check, the schema and the hooks all apply. `restrained` is for a role that may not publish, whose restore leaves the draft flag and the dates as the entry has them. `keep` are fields the entry holds now that the old version does not bring back, such as the writer a role limited to its own entries may not change.
 export async function restoreRevision(ref: EntryRef, at: number, author?: Identity, { version, restrained = false, keep }: { version?: string | undefined, restrained?: boolean | undefined, keep?: Record<string, unknown> | undefined } = {}): Promise<SaveOutcome> {
@@ -20,7 +35,9 @@ export async function restoreRevision(ref: EntryRef, at: number, author?: Identi
   if (!existing)
     return refused(ref, wording('cms.store.missing', '{slug} does not exist', { slug: ref.slug }), 'slug')
 
-  const data = restrained ? keepingPublication(collection, revision.data, existing.data) : revision.data
+  const current = restrained ? keepingPublication(collection, revision.data, existing.data) : revision.data
+  // What a rename did since: the entries the version names are under their new slug, and the key pairing the entry with its translations is the one it has now.
+  const data = pairedWith(collection, await followingRenames(collection, current, ref.locale, activityOf), existing.data)
   // A move is no save, so a version carries the place the entry had when it was saved, which a restore must not send it back to.
   const placed = collection.orderField === undefined ? data : keepingOrder(collection.orderField, data, existing.data)
 

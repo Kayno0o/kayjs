@@ -1,3 +1,4 @@
+import type { Activity } from './activity'
 import type { Field } from './fields'
 import type { CmsDraftEntry, CollectionInfo, Issue, SourceEntry } from './kay/contract'
 import { KayError } from 'kay/library'
@@ -263,4 +264,48 @@ export async function missingReferences(collection: CollectionInfo, entry: CmsDr
   }
 
   return fresh.filter(each => exists.get(JSON.stringify([each.target, each.slug])) === false).map(each => ({ collection: entry.collection, slug: entry.slug, locale: entry.locale, path: each.path, message: wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: each.slug, collection: each.target }) }))
+}
+
+// The data of an older version with each reference to an entry that is gone pointing at the slug the entry was renamed to since, as the rename pointed the live entries; read from the target's activity log. A reference whose entry exists, or whose rename the log does not hold, stays as it is, and the save judges it.
+export async function followingRenames(collection: CollectionInfo, data: Record<string, unknown>, locale: string | undefined, activityOf: (collection: string) => Promise<Activity[]>): Promise<Record<string, unknown>> {
+  const found: Named[] = []
+
+  for (const field of fieldsOf(collection.schema))
+    named(field, data[String(field.key)], String(field.key), found)
+
+  let result = data
+  const seen = new Set<string>()
+
+  for (const { target, slug } of found) {
+    const key = JSON.stringify([target, slug])
+
+    if (seen.has(key))
+      continue
+
+    seen.add(key)
+
+    try {
+      const renames = (await activityOf(target)).filter(event => event.verb === 'rename' && event.from !== undefined && (event.locale === undefined || locale === undefined || event.locale === locale))
+      let now = slug
+      const walked = new Set([slug])
+
+      while ((await entries(target, { slug: now })).length === 0) {
+        const next = renames.find(event => event.from === now)?.slug
+
+        if (next === undefined || walked.has(next))
+          break
+
+        walked.add(next)
+        now = next
+      }
+
+      if (now !== slug && (await entries(target, { slug: now })).length > 0)
+        result = pointReferences(collection, result, target, slug, now) ?? result
+    }
+    catch (error) {
+      log.error(`${target}'s renames failed to read for the references of ${collection.name}`, error)
+    }
+  }
+
+  return result
 }
