@@ -204,10 +204,10 @@ section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-lab
         else if entry.href !== undefined
           a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)})
             // kay-allow unsized-image
-            img(part="image" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
+            img(part="image" draggable="false" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
         else
           // kay-allow unsized-image
-          img(part="image" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
+          img(part="image" draggable="false" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
   if all().length > view()
     div(part="controls")
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" disabled={!loop && active() === 0} onClick={() => step(-1)})
