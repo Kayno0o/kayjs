@@ -25,21 +25,48 @@ export function withKept(given: string | null, kept: string): string {
 
 export function cookieJar(): CookieJar {
   const cookies = new Bun.CookieMap()
-  const scopes = new Map<string, string>()
-  const header = (path?: string) => [...cookies].filter(([name]) => path === undefined || covers(scopes.get(name) ?? '/', path)).map(([name, value]) => `${name}=${value}`).join('; ')
+  // What responses set, identified as a browser does: by name, domain and path (RFC 6265 5.3). `cookies` shows the latest of each name; a value a test wrote there itself differs from what was mirrored and is sent for every path.
+  const stored = new Map<string, { name: string, value: string, path: string }>()
+  const mirrored = new Map<string, string>()
+  const mirror = (name: string) => {
+    const latest = [...stored.values()].findLast(cookie => cookie.name === name)
+
+    if (latest) {
+      cookies.set(name, latest.value)
+      mirrored.set(name, latest.value)
+    }
+    else {
+      cookies.delete(name)
+      mirrored.delete(name)
+    }
+  }
+
+  const header = (path?: string) => {
+    const pieces: string[] = []
+
+    for (const [name, value] of cookies) {
+      const own = mirrored.get(name) === value ? [...stored.values()].filter(cookie => cookie.name === name) : []
+
+      if (own.length === 0)
+        pieces.push(`${name}=${value}`)
+      else
+        pieces.push(...own.filter(cookie => path === undefined || covers(cookie.path, path)).map(cookie => `${name}=${cookie.value}`))
+    }
+
+    return pieces.join('; ')
+  }
 
   const keep = (response: Response) => {
     for (const line of response.headers.getSetCookie()) {
       const cookie = Bun.Cookie.parse(line)
+      const key = `${cookie.domain ?? ''}\0${cookie.path}\0${cookie.name}`
 
-      if (cookie.isExpired()) {
-        cookies.delete(cookie.name)
-        scopes.delete(cookie.name)
-      }
-      else {
-        cookies.set(cookie)
-        scopes.set(cookie.name, cookie.path)
-      }
+      if (cookie.isExpired())
+        stored.delete(key)
+      else
+        stored.set(key, { name: cookie.name, value: cookie.value, path: cookie.path })
+
+      mirror(cookie.name)
     }
   }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { CodeBuilder } from '../src/compiler/mapping'
+import { applyEdit, importEdit } from '../src/lsp/mapping'
 
 describe('CodeBuilder', () => {
   it('applies the rewrites inside each span copied, whatever order they were found in', () => {
@@ -59,5 +60,23 @@ describe('CodeBuilder', () => {
     expect(map.toSource(at)).toBe(3)
     expect(map.toSource(builder.code.indexOf('5'))).toBe(12)
     expect(map.toSource(builder.code.indexOf('W'))).toBe(0)
+  })
+})
+
+describe('importEdit', () => {
+  const add = (source: string) => {
+    const edit = importEdit(source, 0, 'import { b } from \'kay\'')
+
+    return applyEdit(source, edit.range, edit.newText)
+  }
+
+  it('ends the line it adds as the file ends its own', () => {
+    expect(add('---\r\nconst a = 1\r\n---\r\np {a}\r\n')).toBe('---\r\nimport { b } from \'kay\'\r\nconst a = 1\r\n---\r\np {a}\r\n')
+    expect(add('---\r\nimport { a } from \'kay\'\r\n---\r\np {a}\r\n')).toBe('---\r\nimport { a } from \'kay\'\r\nimport { b } from \'kay\'\r\n---\r\np {a}\r\n')
+    expect(add('---\nconst a = 1\n---\np {a}\n')).toBe('---\nimport { b } from \'kay\'\nconst a = 1\n---\np {a}\n')
+  })
+
+  it('opens a script in a file without one with the file\'s line ending', () => {
+    expect(add('p hi\r\n')).toBe('---\r\nimport { b } from \'kay\'\r\n---\r\np hi\r\n')
   })
 })

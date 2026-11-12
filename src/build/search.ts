@@ -2,6 +2,7 @@ import type { SearchLanguage, SearchManifest, SearchSection } from '../runtime/s
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { KayError } from '../compiler/errors'
+import { namedEntity } from '../entities'
 import { INVISIBLE, MIN_WORD, SEARCH_CHUNK, SEARCH_DIR, SEARCH_MANIFEST, searchShard, searchWords } from '../runtime/search'
 import { ASSET_PREFIX } from './assets'
 
@@ -48,40 +49,6 @@ const SKIPPED = 'script, style, template, noscript, nav, footer, svg, [data-sear
 // Block elements part words, as does a button left out between two; an inline one such as `code` sits inside a sentence.
 const BLOCKS = 'p, li, dt, dd, td, th, tr, br, div, pre, blockquote, section, article, figcaption, button, h1, h2, h3, h4, h5, h6'
 const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|([a-z]+\d*));/gi
-// The named entities a page may hold: HTML's own, Latin-1's from `nbsp` (U+00A0) on, and typography's.
-const LATIN_1 = 'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml'
-const ENTITIES: Record<string, string> = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: '\'',
-  OElig: 'Œ',
-  oelig: 'œ',
-  Scaron: 'Š',
-  scaron: 'š',
-  Yuml: 'Ÿ',
-  ndash: '–',
-  mdash: '\u2014',
-  lsquo: '‘',
-  rsquo: '’',
-  sbquo: '‚',
-  ldquo: '“',
-  rdquo: '”',
-  bdquo: '„',
-  hellip: '…',
-  ZeroWidthSpace: '\u200B',
-  zwnj: '\u200C',
-  zwj: '\u200D',
-  bull: '•',
-  prime: '′',
-  Prime: '″',
-  euro: '€',
-  trade: '™',
-  larr: '←',
-  rarr: '→',
-  ...Object.fromEntries(LATIN_1.split(' ').map((name, index) => [name, String.fromCodePoint(0xA0 + index)])),
-}
 const MAX_CODE_POINT = 0x10FFFF
 // What a link to its own heading shows beside the heading's text, left out of it: a mark, or nothing visible.
 const ANCHOR_MARKS = /^[\s#¶§\u200B]*$/
@@ -376,7 +343,7 @@ function plain(html: string): string {
     const code = decimal === undefined ? hexCode(hex) : Number(decimal)
 
     if (code === undefined)
-      return ENTITIES[name!] ?? ENTITIES[name!.toLowerCase()] ?? entity
+      return namedEntity(name!) ?? entity
 
     return code <= MAX_CODE_POINT ? String.fromCodePoint(code) : entity
   }).replace(INVISIBLE, '').replace(SPACES, ' ').trim()

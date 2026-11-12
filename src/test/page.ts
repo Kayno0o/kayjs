@@ -1,3 +1,4 @@
+import { namedEntity } from '../entities'
 import { SHELL_END } from '../runtime/markers'
 import { SWAP_CALL, SWAP_SCRIPT } from '../server/swap'
 
@@ -27,8 +28,8 @@ export interface PageReading {
   text: (selector?: string) => string | undefined
 }
 
-const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|(amp|lt|gt|quot|apos|nbsp));/gi
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' }
+const ENTITY = /&(?:#(\d+)|#x([\da-f]+)|([a-z]+\d*));/gi
+const MAX_CODE_POINT = 0x10FFFF
 const WHITESPACE = /\s+/g
 const LOC = /<loc>([^<]*)<\/loc>/g
 // What holds text a visitor never reads.
@@ -99,9 +100,12 @@ function closing(stack: readonly { tag: string }[], tag: string): number | undef
 function decode(text: string): string {
   return text.replace(ENTITY, (entity, decimal: string | undefined, hex: string | undefined, name: string | undefined) => {
     if (name !== undefined)
-      return NAMED[name.toLowerCase()] ?? entity
+      return namedEntity(name) ?? entity
 
-    return String.fromCodePoint(Number.parseInt(decimal ?? hex!, decimal === undefined ? 16 : 10))
+    const code = Number.parseInt(decimal ?? hex!, decimal === undefined ? 16 : 10)
+
+    // A browser reads a reference past the last code point, a lone surrogate or zero as U+FFFD.
+    return code === 0 || code > MAX_CODE_POINT || (code >= 0xD800 && code <= 0xDFFF) ? '�' : String.fromCodePoint(code)
   })
 }
 

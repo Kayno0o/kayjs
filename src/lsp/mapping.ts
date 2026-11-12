@@ -80,9 +80,10 @@ export function importEdit(source: string, offset: number, declaration: string):
   const inModule = module !== undefined && offset >= module.start && offset <= module.end
   const component = inModule ? module : script
   const fence = inServer ? server : component
+  const eol = source.includes('\r\n') ? '\r\n' : '\n'
 
   if (!fence)
-    return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }
+    return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---${eol}${declaration.replace(TRAILING_SEMICOLON, '')}${eol}---${eol}` }
 
   const hoisted = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, script, [], module).hoisted.filter(span => span.start >= fence.start && span.end <= fence.end)) ?? []
   const last = hoisted.filter(span => source.startsWith('import', span.start)).at(-1)
@@ -90,7 +91,7 @@ export function importEdit(source: string, offset: number, declaration: string):
   // tsgo reads the semicolon style off generated code; the fence's own imports, or kay's style without them, decide instead.
   const statement = last && source.slice(last.start, last.end).trimEnd().endsWith(';') ? declaration : declaration.replace(TRAILING_SEMICOLON, '')
 
-  return { range: { start: position, end: position }, newText: last ? `\n${statement}` : `${statement}\n` }
+  return { range: { start: position, end: position }, newText: last ? `${eol}${statement}` : `${statement}${eol}` }
 }
 
 // A source range in the shadow TSX, when both ends were copied there.
