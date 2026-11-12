@@ -2,6 +2,7 @@
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import DeletionBanner from '../../../components/deletion-banner.kay'
 import ImpersonationBanner from '../../../components/impersonation-banner.kay'
 import UserMenu from '../../../components/user-menu.kay'
 import Frame from '../../components/frame.kay'
@@ -28,6 +29,7 @@ head
   title {title}
 Frame(size="max-w-3xl" gap="gap-6" landmark={features.pages?.main !== false})
   ImpersonationBanner
+  DeletionBanner
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {wording('auth.account.title', 'Your account')}
     UserMenu(account={false})

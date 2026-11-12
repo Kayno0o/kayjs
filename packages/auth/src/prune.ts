@@ -33,19 +33,35 @@ async function prune(core: Core, settings: SessionSettings, now: number): Promis
 
   await pruneStale(core, now, 'guest')
   await pruneStale(core, now, 'unverified')
+  await pruneStale(core, now, 'pending')
 }
 
 function staleKept(core: Core): boolean {
-  return core.store.users.staleGuests !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined)
+  return core.store.users.staleGuests !== undefined || core.deletion !== undefined || (core.unverifiedMaxAge !== undefined && core.store.users.staleUnverified !== undefined)
 }
 
-// Guests older than `guests.maxAge` whose sessions ended, and with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, go as any deleted user does, `onDelete` first. One whose `onDelete` fails stays, to be tried again the next run, and the run goes on past it and past any that is kept.
-async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified'): Promise<void> {
+type StaleKind = 'guest' | 'unverified' | 'pending'
+
+// The listing of a kind of account, and the instant it asks it at: guests and unverified accounts older than their max age, accounts pending deletion whose period ended by now.
+function listing(core: Core, now: number, kind: StaleKind): { list: NonNullable<Core['store']['users']['dueForDeletion']>, at: Date } | undefined {
+  if (kind === 'pending')
+    return core.deletion && core.store.users.dueForDeletion ? { list: core.store.users.dueForDeletion, at: new Date(now) } : undefined
+
   const maxAge = kind === 'guest' ? core.guestMaxAge : core.unverifiedMaxAge
   const list = kind === 'guest' ? core.store.users.staleGuests : core.store.users.staleUnverified
 
-  if (maxAge === undefined || !list)
+  return maxAge === undefined || !list ? undefined : { list, at: new Date(now - maxAge * 1000) }
+}
+
+// Guests older than `guests.maxAge` whose sessions ended, with `requireVerified` the accounts registered and never verified for `email.unverifiedMaxAge`, and the accounts whose `account.deleteAfter` period ended, go as any deleted user does, `beforeDelete` first; the last ones also report the deletion and mail the notice. One whose `beforeDelete` fails stays, to be tried again the next run, and the run goes on past it and past any that is kept.
+async function pruneStale(core: Core, now: number, kind: StaleKind): Promise<void> {
+  const found = listing(core, now, kind)
+
+  if (!found)
     return
+
+  const { list, at } = found
+  const what = kind === 'pending' ? 'an account pending deletion' : `a stale ${kind}`
 
   // The listing is oldest first and cannot skip, so what a run keeps (a role beyond the default ones, a failed `onDelete`) is listed again each batch: the batch grows by that many and the kept ones are left out, to reach the accounts behind them.
   const kept = new Set<string>()
@@ -53,7 +69,7 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
   try {
     for (let batch = 0; batch < STALE_BATCHES_PER_RUN; batch++) {
       const size = STALE_PER_BATCH + kept.size
-      const listed = await list(new Date(now - maxAge * 1000), size)
+      const listed = await list(at, size)
 
       let deleted = 0
       let failed = 0
@@ -63,15 +79,17 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
           continue
 
         try {
-          if (await stillStale(core, account.id, kind)) {
-            await (await import('./erase')).eraseUser(core, account)
+          if (await stillStale(core, account.id, kind, now)) {
+            const erase = await import('./erase')
+
+            await (kind === 'pending' ? erase.eraseDue(core, account) : erase.eraseUser(core, account))
             deleted++
 
             continue
           }
         }
         catch (error) {
-          log.error(`deleting a stale ${kind} failed`, error)
+          log.error(`deleting ${what} failed`, error)
           failed++
         }
 
@@ -84,16 +102,19 @@ async function pruneStale(core: Core, now: number, kind: 'guest' | 'unverified')
     }
   }
   catch (error) {
-    log.error(`listing the stale ${kind}s failed`, error)
+    log.error(`listing the ${kind} accounts to delete failed`, error)
   }
 }
 
-// Read again just before the erase: a guest registered since the list was read is a real account, and an unverified one given a role beyond the default ones was set up on purpose, as registering again does not replace it.
-async function stillStale(core: Core, id: string, kind: 'guest' | 'unverified'): Promise<boolean> {
+// Read again just before the erase: a guest registered since the list was read is a real account, an unverified one given a role beyond the default ones was set up on purpose, as registering again does not replace it, and a deletion cancelled since stays cancelled.
+async function stillStale(core: Core, id: string, kind: StaleKind, now: number): Promise<boolean> {
   const current = await core.store.users.get(id)
 
   if (!current)
     return false
+
+  if (kind === 'pending')
+    return current.deleteAt != null && current.deleteAt.getTime() <= now
 
   if (kind === 'guest')
     return current.guest

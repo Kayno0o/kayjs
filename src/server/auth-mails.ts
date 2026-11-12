@@ -3,8 +3,8 @@
 import type { Duration } from '../runtime/duration'
 
 // A link to follow or a code to type, then news of a change to the account.
-export const AUTH_LINK_KINDS = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists'] as const
-export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-change-requested', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over', 'impersonation-started'] as const
+export const AUTH_LINK_KINDS = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists', 'cancel-deletion'] as const
+export const AUTH_NOTICE_KINDS = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-change-requested', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'account-deletion-cancelled', 'organization-handed-over', 'impersonation-started'] as const
 
 export type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
 export type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
@@ -34,6 +34,7 @@ export const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData,
   'change-email': { url: LINK },
   'invitation': { url: 'https://example.com/invitation?invitation=sample', detail: 'Acme' },
   'account-exists': { url: 'https://example.com/sign-in' },
+  'cancel-deletion': { url: 'https://example.com/auth/account/data', detail: 'March 14, 2026' },
   'new-sign-in': { url: 'https://example.com/account/sessions' },
   'sign-in-locked': {},
   'password-changed': {},
@@ -50,6 +51,7 @@ export const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData,
   'token-created': { detail: 'Deploys' },
   'signed-out-everywhere': {},
   'account-deleted': {},
+  'account-deletion-cancelled': {},
   'organization-handed-over': { detail: 'Acme' },
   'impersonation-started': {},
 }
@@ -92,6 +94,7 @@ export const AUTH_MAIL_ENGLISH = {
   'change-email': { subject: 'Confirm your new email for {site}', lead: 'Confirm {email} as the new address of your {site} account.', button: 'Confirm the change', lasts: 'one hour', ending: 'If you did not ask for this change, ignore this mail.' },
   'invitation': { subject: 'Join {detail} on {site}', lead: 'You are invited to join {detail} on {site}, with an account at {email}.', button: 'See the invitation', lasts: '', ending: 'If you did not expect it, ignore this mail.' },
   'account-exists': { subject: 'You already have a {site} account', lead: 'Someone tried to create a {site} account for {email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.', button: 'Sign in', lasts: '', ending: 'If this was not you, ignore this mail: nothing changed on your account.' },
+  'cancel-deletion': { subject: 'Your {site} account will be deleted on {detail}', lead: 'Deleting the {site} account for {email} was asked. It stays open until {detail}, then it is deleted for good.', button: 'Cancel the deletion', lasts: '', ending: 'To keep it, cancel before then. If you did not ask for this, cancel it and change your password at once.' },
   'new-sign-in': { subject: 'New sign-in on {site}', lead: 'Your {site} account was just signed into from a device or network it had not used before.', ending: NOT_YOU },
   'sign-in-locked': { subject: 'Sign-in locked on {site}', lead: 'Too many wrong passwords or codes were tried on your {site} account, so signing in to it is paused for a while.', ending: NOT_YOU },
   'password-changed': { subject: 'Password changed on {site}', lead: 'The password of your {site} account was changed, and its other sessions signed out.', ending: NOT_YOU },
@@ -108,6 +111,7 @@ export const AUTH_MAIL_ENGLISH = {
   'token-created': { subject: 'New access token on {site}', lead: 'An access token named {detail} was created for your {site} account.', ending: NOT_YOU },
   'signed-out-everywhere': { subject: 'Signed out everywhere on {site}', lead: 'Your {site} account was signed out everywhere: every session and access token it had has ended.', ending: NOT_YOU },
   'account-deleted': { subject: 'Account deleted on {site}', lead: 'Your {site} account was deleted.', ending: CONTACT_SITE },
+  'account-deletion-cancelled': { subject: 'Account deletion cancelled on {site}', lead: 'The deletion of your {site} account was cancelled: it stays open.', ending: NOT_YOU },
   'organization-handed-over': { subject: 'You own an organization on {site}', lead: 'You are now an owner of {detail} on {site}: its only owner\'s account was deleted.', ending: CONTACT_SITE },
   'impersonation-started': { subject: 'An administrator signed in as you on {site}', lead: 'An administrator of {site} signed in as you for up to 30 minutes, to help with your account. They cannot change your organizations or your sign-in methods meanwhile.', ending: CONTACT_SITE },
 } as const satisfies AuthMailWording
@@ -132,6 +136,7 @@ export const AUTH_MAIL_FRENCH = {
   'change-email': { subject: 'Confirmez votre nouvelle adresse pour {site}', lead: 'Confirmez {email} comme nouvelle adresse de votre compte {site}.', button: 'Confirmer le changement', lasts: 'une heure', ending: 'Si vous n\'avez pas demandé ce changement, ignorez ce message.' },
   'invitation': { subject: 'Rejoignez {detail} sur {site}', lead: 'Vous êtes invité à rejoindre {detail} sur {site}, avec un compte à l\'adresse {email}.', button: 'Voir l\'invitation', lasts: '', ending: 'Si vous ne l\'attendiez pas, ignorez ce message.' },
   'account-exists': { subject: 'Vous avez déjà un compte {site}', lead: 'Quelqu\'un a tenté de créer un compte {site} pour {email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l\'avez oublié.', button: 'Me connecter', lasts: '', ending: 'Si ce n\'était pas vous, ignorez ce message : rien n\'a changé sur votre compte.' },
+  'cancel-deletion': { subject: 'Votre compte {site} sera supprimé le {detail}', lead: 'La suppression du compte {site} de {email} a été demandée. Il reste ouvert jusqu\'au {detail}, puis il est supprimé définitivement.', button: 'Annuler la suppression', lasts: '', ending: 'Pour le garder, annulez avant cette date. Si vous n\'êtes pas à l\'origine de cette demande, annulez-la et changez votre mot de passe sans attendre.' },
   'new-sign-in': { subject: 'Nouvelle connexion sur {site}', lead: 'Votre compte {site} vient d\'être utilisé depuis un appareil ou un réseau qu\'il n\'avait jamais utilisé.', ending: NOT_YOU_FR },
   'sign-in-locked': { subject: 'Connexion suspendue sur {site}', lead: 'Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.', ending: NOT_YOU_FR },
   'password-changed': { subject: 'Mot de passe modifié sur {site}', lead: 'Le mot de passe de votre compte {site} a été modifié, et ses autres sessions déconnectées.', ending: NOT_YOU_FR },
@@ -148,6 +153,7 @@ export const AUTH_MAIL_FRENCH = {
   'token-created': { subject: 'Nouveau jeton d\'accès sur {site}', lead: 'Un jeton d\'accès nommé {detail} a été créé pour votre compte {site}.', ending: NOT_YOU_FR },
   'signed-out-everywhere': { subject: 'Déconnexion partout sur {site}', lead: 'Votre compte {site} a été déconnecté partout : toutes ses sessions et tous ses jetons d\'accès ont pris fin.', ending: NOT_YOU_FR },
   'account-deleted': { subject: 'Compte supprimé sur {site}', lead: 'Votre compte {site} a été supprimé.', ending: CONTACT_SITE_FR },
+  'account-deletion-cancelled': { subject: 'Suppression du compte annulée sur {site}', lead: 'La suppression de votre compte {site} a été annulée : il reste ouvert.', ending: NOT_YOU_FR },
   'organization-handed-over': { subject: 'Vous dirigez une organisation sur {site}', lead: 'Vous êtes désormais propriétaire de {detail} sur {site} : le compte de son seul propriétaire a été supprimé.', ending: CONTACT_SITE_FR },
   'impersonation-started': { subject: 'Un administrateur s\'est connecté en tant que vous sur {site}', lead: 'Un administrateur de {site} s\'est connecté en tant que vous pour 30 minutes au plus, afin de vous aider avec votre compte. Il ne peut modifier ni vos organisations ni vos moyens de connexion pendant ce temps.', ending: CONTACT_SITE_FR },
 } as const satisfies AuthMailWording

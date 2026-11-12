@@ -145,9 +145,10 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   return { ok: true }
 }
 
-export type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
+// `deleteAt` is set with `account.deleteAfter`: the account is pending until then and the session stays signed in, so the user can cancel.
+export type DeleteAccountResult = { ok: true, deleteAt?: Date } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
 
-// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin, and the only owner of an organization with other members, are refused before the proof is spent; an organization the user is alone in is deleted with them.
+// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin, and the only owner of an organization with other members, are refused before the proof is spent; an organization the user is alone in is deleted with them. With `account.deleteAfter` it only marks the account pending: the prune deletes it, `beforeDelete` and the notices included, once the period ends.
 export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<DeleteAccountResult> {
   const current = await state.current()
   // Without the `admin` option nobody is an admin: no last one to keep and no roles to set aside.
@@ -163,6 +164,9 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
 
   if (!proved.ok)
     return proved
+
+  if (state.core.deletion)
+    return (await import('./deletion')).scheduleDeletion(state, proved.record)
 
   const aside = admins
     ? await admins.stepAside(state, proved.record)

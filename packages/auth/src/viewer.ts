@@ -13,8 +13,10 @@ const viewers = new WeakMap<Request, Viewer>()
 const loaded = new WeakMap<Request, BareUser | null>()
 // The admin behind an impersonation read ahead of the render, `null` for none.
 const impersonators = new WeakMap<Request, BareUser | null>()
-// The requests whose impersonation banner is already drawn, so a layout and a page both holding one show a single.
-const banners = new WeakSet<Request>()
+// When the user's account is deleted if they do nothing, `null` for an account not pending deletion.
+const deletions = new WeakMap<Request, Date | null>()
+// The banners already drawn for a request, so a layout and a page both holding one show a single.
+const banners = new WeakMap<Request, Set<string>>()
 let requestReader: (() => Request | undefined) | undefined
 
 // Given by the server code of `authCore`, so this module imports nothing server-only and a component using it never drags kay's server into a browser build.
@@ -37,16 +39,18 @@ export async function loadViewer(request: Request): Promise<void> {
 
     loaded.set(request, await auth.bareUser())
     impersonators.set(request, await auth.impersonator())
+    deletions.set(request, (await auth.account.deletion())?.deleteAt ?? null)
   }
   catch (error) {
     log.error('could not read the signed-in user ahead of the render', error)
   }
 }
 
-// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy, and `ctx.impersonator`, the admin acting as that user (null for none).
+// What templates read off `ctx`: `ctx.user`, the signed-in user (none for a visitor or a guest), `ctx.can(role)`, whether they hold the role under the app's `roles` hierarchy, `ctx.impersonator`, the admin acting as that user (null for none), and `ctx.deletion`, when the user's account is deleted if they do nothing (null unless `account.deleteAfter` marked it pending).
 export interface ViewerValues {
   user: BareUser | null
   impersonator: BareUser | null
+  deletion: Date | null
   can: (role: string) => boolean
 }
 
@@ -56,7 +60,7 @@ export async function viewerValues(request: Request): Promise<ViewerValues> {
   const viewer = viewers.get(request)
   const user = loaded.has(request) ? asViewer(loaded.get(request)!) : null
 
-  return { user, impersonator: user && (impersonators.get(request) ?? null), can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
+  return { user, impersonator: user && (impersonators.get(request) ?? null), deletion: user && (deletions.get(request) ?? null), can: role => user !== null && viewer !== undefined && viewer.isGranted(role, user) }
 }
 
 // The auth and role check of the page being rendered, for `SignedIn`, `SignedOut` and `UserMenu`.
@@ -86,12 +90,16 @@ async function read(auth: Auth, within: (user: BareUser | null) => BareUser | nu
   return within(await auth.bareUser())
 }
 
-// True the first time it is asked for the request being rendered, false after.
-export function claimBanner(): boolean {
+// True the first time the banner is asked for by the request being rendered, false after.
+export function claimBanner(banner = 'impersonation'): boolean {
   const { request } = currentViewer()
-  const free = !banners.has(request)
+  const drawn = banners.get(request) ?? new Set<string>()
 
-  banners.add(request)
+  banners.set(request, drawn)
+
+  const free = !drawn.has(banner)
+
+  drawn.add(banner)
 
   return free
 }

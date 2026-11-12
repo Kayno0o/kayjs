@@ -1,4 +1,5 @@
 import type { ChangeUsernameResult, DeleteAccountResult, UpdateLocaleResult } from '../account'
+import type { CancelDeletionResult } from '../deletion'
 import type { DeletionImpact } from '../erase'
 import type { ExportResult } from '../export'
 import type { ProfileFieldView } from '../pages'
@@ -23,9 +24,21 @@ export class AccountMethods {
     return (await load.account()).updateLocale(this.state, locale)
   }
 
-  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
+  // Deletes the signed-in user, calling `beforeDelete` for the app's own records, and signs this session out, or with `account.deleteAfter` only marks the account pending (`{ ok: true, deleteAt }`) and stays signed in, the prune deleting it once the period ends; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
   async delete(proof: Proof): Promise<DeleteAccountResult> {
     return (await load.account()).deleteAccount(this.state, proof, this.state.signOut)
+  }
+
+  // With `account.deleteAfter`, takes the pending deletion off the signed-in user's account and tells them; refused with `signed-out`, or `not-pending` when the account is not pending deletion.
+  async cancelDeletion(): Promise<CancelDeletionResult> {
+    return (await load.deletion()).cancelDeletion(this.state)
+  }
+
+  // When the signed-in user's account is deleted if they do nothing, or null when it is not pending deletion: what a banner or an app's own page shows beside the way to `cancelDeletion`.
+  async deletion(): Promise<{ deleteAt: Date } | null> {
+    const record = await this.state.current()
+
+    return record?.deleteAt == null ? null : { deleteAt: record.deleteAt }
   }
 
   // The organizations deleting the signed-in user's account touches, by name: `deleted` are the ones they are the only member of, which go with them, `blocked` the ones they solely own with other members, which refuse the deletion (`last-owner`) until another owner is named.

@@ -144,6 +144,8 @@ describe('onEvent', () => {
       'token-created': [['CI', { name: 'CI' }]],
       'signed-out-everywhere': [['this-one-kept', { keptThisOne: true }], [undefined, { keptThisOne: false }]],
       'account-deleted': [[undefined, {}]],
+      'account-deletion-scheduled': [['2026-03-14T10:00:00.000Z', { deleteAt: new Date('2026-03-14T10:00:00.000Z') }]],
+      'account-deletion-cancelled': [[undefined, {}]],
       'organization-handed-over': [['org1', { organizationId: 'org1' }]],
     }
 

@@ -90,21 +90,16 @@ export function memoryAuth(): AuthStore {
       staleGuests(createdBefore, limit) {
         const withSession = new Set([...sessions.values()].map(session => session.userId))
 
-        return [...users.values()]
-          .filter(user => user.guest && user.createdAt < createdBefore && !withSession.has(user.id))
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-          .slice(0, limit)
-          .map(user => copy(user)!)
+        return oldest([...users.values()].filter(user => user.guest && user.createdAt < createdBefore && !withSession.has(user.id)), limit, 'createdAt')
       },
       staleUnverified(createdBefore, limit) {
         const withSession = new Set([...sessions.values()].map(session => session.userId))
         const withIdentity = new Set([...identities.values()].map(identity => identity.userId))
 
-        return [...users.values()]
-          .filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !withSession.has(user.id) && !withIdentity.has(user.id))
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-          .slice(0, limit)
-          .map(user => copy(user)!)
+        return oldest([...users.values()].filter(user => !user.guest && user.email !== null && user.emailVerifiedAt === null && user.createdAt < createdBefore && !withSession.has(user.id) && !withIdentity.has(user.id)), limit, 'createdAt')
+      },
+      dueForDeletion(now, limit) {
+        return oldest([...users.values()].filter(user => user.deleteAt != null && user.deleteAt <= now), limit, 'deleteAt')
       },
       delete(id) {
         const existed = users.delete(id)
@@ -562,6 +557,11 @@ export function memoryAuth(): AuthStore {
 }
 
 // Callers get their own copy, as from a database, so changing one changes nothing stored.
+// The first `limit` of the users by one date, as copies.
+function oldest(list: UserRecord[], limit: number, by: 'createdAt' | 'deleteAt'): UserRecord[] {
+  return list.sort((a, b) => a[by]!.getTime() - b[by]!.getTime()).slice(0, limit).map(user => copy(user)!)
+}
+
 function copy(user: UserRecord | undefined): UserRecord | undefined {
   return user && { ...user, roles: [...user.roles], data: structuredClone(user.data ?? {}) }
 }

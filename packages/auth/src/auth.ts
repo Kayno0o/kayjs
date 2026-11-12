@@ -5,6 +5,7 @@ import type { Access } from './access'
 import type { IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaOptions } from './captcha'
 import type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
+import type { AccountOptions } from './deletion'
 import type { EmailOptions } from './email'
 import type { AuthEventInfo, AuthHookContext } from './events'
 import type { ForwardAuthOptions, ForwardDomains } from './forwardAuth'
@@ -25,7 +26,7 @@ import { gateOf, guardOf, memberOf } from './guards'
 import { load } from './load'
 import { AUTH_OF, CHECK_USER, PAGES_OF } from './pages'
 import { requestAuth, socketUser } from './request'
-import { callbackRoute, exportRoute, formPostRoute, sendCookies, serveUntypedRoutes, signOutRoute, startOAuthRoute, stopImpersonatingRoute } from './routes'
+import { callbackRoute, cancelDeletionRoute, exportRoute, formPostRoute, sendCookies, serveUntypedRoutes, signOutRoute, startOAuthRoute, stopImpersonatingRoute } from './routes'
 import { createCore, pagesHandle } from './setup'
 import { testHelpers } from './testHelpers'
 import { readRequestWith } from './viewer'
@@ -84,6 +85,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 
   // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `beforeDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
+  // How `account.delete` behaves: `deleteAfter` (a string such as '14d') marks the account pending instead of deleting it, mails a link to cancel, and leaves the deletion to the prune once the period ends, `beforeDelete`, the audit log and the mails following the real deletion; `cancelPage` is the page that link opens, the prebuilt account data page by default. Without `deleteAfter` the deletion is immediate. Needs a store with `users.dueForDeletion`, as `memoryAuth` and `pgAuth` have.
+  account?: AccountOptions | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
   exportData?: ((event: { user: User }) => unknown) | undefined
   // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. A throw is logged and reported with source `auth.onEvent`. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
@@ -160,6 +163,7 @@ export function authCore<Data extends AuthSessionData, Role extends string = str
     .get(`${core.prefix}/export` as `${Prefix}/export`, async ctx => exportRoute(ctx, core))
     .post(`${core.prefix}/sign-out` as `${Prefix}/sign-out`, async ctx => signOutRoute(ctx, core))
     .post(`${core.prefix}/stop-impersonating` as `${Prefix}/stop-impersonating`, async ctx => stopImpersonatingRoute(ctx, core))
+    .post(`${core.prefix}/cancel-deletion` as `${Prefix}/cancel-deletion`, async ctx => cancelDeletionRoute(ctx, core))
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ctx => startOAuthRoute(ctx, core, options.failurePage))
     .get(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ctx => callbackRoute(ctx, core, options.failurePage))
     .post(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, ctx => formPostRoute(ctx, core))

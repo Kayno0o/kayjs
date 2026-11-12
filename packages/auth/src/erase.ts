@@ -79,17 +79,33 @@ export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
 export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver: true }): Promise<{ ok: true } | AuthFailed<'refused'>>
 export async function eraseLeavingUser(state: RequestState, record: UserRecord, options?: { actor?: UserRecord, handOver?: false }): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>>
 export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver?: boolean } = {}): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>> {
-  const { store } = state.core
   const { actor, handOver = false } = options
 
   return eraseThen(state.core, record, handOver, actor, async () => {
-    if (record.email !== null && record.email !== '' && store.invitations) {
-      for (const invitation of await store.invitations.listByEmail(record.email))
-        await store.invitations.delete(invitation.id)
-    }
-
+    await dropInvitations(state.core, record)
     await securityNotice(state, record, 'account-deleted', undefined, undefined, actor)
   })
+}
+
+async function dropInvitations(core: Core, record: UserRecord): Promise<void> {
+  const { invitations } = core.store
+
+  if (record.email !== null && record.email !== '' && invitations) {
+    for (const invitation of await invitations.listByEmail(record.email))
+      await invitations.delete(invitation.id)
+  }
+}
+
+// `eraseLeavingUser` for an account whose grace period (`account.deleteAfter`) ended, run by the prune with no request: the audit log and `onEvent` hear of the deletion and the notice is mailed to the user's language. An organization it solely owned passes to its longest-standing member, as nobody is there to refuse. Throws, leaving the account to be tried again, when `beforeDelete` refuses.
+export async function eraseDue(core: Core, record: UserRecord): Promise<void> {
+  const erased = await eraseThen(core, record, true, undefined, async () => {
+    await dropInvitations(core, record)
+    await reportFrom(core, { address: '', userAgent: '' }, record, 'account-deleted')
+    mailNotice(core, [], record, 'account-deleted')
+  })
+
+  if (!erased.ok)
+    throw new Error(`beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
 }
 
 // `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.

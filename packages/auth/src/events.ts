@@ -17,7 +17,7 @@ const AUDIT_PAGE_MAX = 200
 
 // What happens to an account without changing what protects it, handed to `onEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
 // An organization event's detail is its id, then the roles given for `member-joined` and `member-roles-changed`.
-export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
+export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked' | 'account-deletion-scheduled'
 
 export type AuthEvent = SecurityEvent | ActivityEvent
 
@@ -63,6 +63,9 @@ export interface EventFields {
   // `keptThisOne` is whether the session that asked stayed signed in.
   'signed-out-everywhere': { keptThisOne: boolean }
   'account-deleted': Record<never, never>
+  // `deleteAt` is when the prune deletes the account, unless the user cancels first.
+  'account-deletion-scheduled': { deleteAt: Date }
+  'account-deletion-cancelled': Record<never, never>
   'organization-handed-over': { organizationId: string }
 }
 
@@ -134,6 +137,8 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
       return { client: text ?? '' }
     case 'impersonation-ended':
       return impersonationEnd(text)
+    case 'account-deletion-scheduled':
+      return { deleteAt: new Date(text ?? Number.NaN) }
     case 'signed-out':
     case 'unbanned':
     case 'impersonation-started':
@@ -144,7 +149,7 @@ export function eventFields(event: AuthEvent, detail: string | undefined): Event
 }
 
 // The events that tell the user of a change to what protects the account.
-type NoticeEvent = 'email-change-requested' | 'email-changed' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'account-deleted'
+type NoticeEvent = 'email-change-requested' | 'email-changed' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'account-deleted' | 'account-deletion-cancelled'
 
 function noticeFields(event: NoticeEvent, text: string | undefined): EventFields[NoticeEvent] {
   switch (event) {
@@ -168,6 +173,7 @@ function noticeFields(event: NoticeEvent, text: string | undefined): EventFields
     case 'recovery-code-used':
     case 'recovery-codes-regenerated':
     case 'account-deleted':
+    case 'account-deletion-cancelled':
       return {}
   }
 }

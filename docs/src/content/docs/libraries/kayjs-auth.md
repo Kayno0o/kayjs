@@ -241,6 +241,27 @@ slot
 
 A page whose imports reach one of the three, or any template reading `ctx`, through its layouts, components and helpers however deep, reads the user before it renders, so they show in the first bytes, with JavaScript off too; no other page reads the session. Such a page is the visitor's own, so no cache shares it between visitors. `viewer: true` in `auth({ ... })` reads it on every page, for an app whose own components call `currentUser`.
 
+### Give deleted accounts a grace period
+
+By default `account.delete(proof)` deletes the account at once, so a stolen session that passes the re-proof wipes it for good. Give it a period instead:
+
+```ts
+authCore({
+  // ...
+  account: { deleteAfter: '14d' },
+})
+```
+
+`account.delete` then asks for the proof as before, and only marks the account pending. The user stays signed in, gets a mail with a link to cancel, and `onEvent` and the audit log hear `account-deletion-scheduled` with the date. Asking again keeps the first date.
+
+Every prebuilt page shows a banner while the deletion is pending ("Your account will be deleted on March 14"), with a button that cancels it, and so does every page of your app with `viewer: true`. Elsewhere, put `DeletionBanner` from `@kaynooo/kayjs-auth/components/deletion-banner.kay` in a layout.
+
+For your own page, `auth.account.deletion()` gives the date (or null), `ctx.deletion` gives it in a template, and `auth.account.cancelDeletion()` cancels. The mailed link opens the account data page. A site without the prebuilt pages names its own page with `account: { cancelPage: '/settings/delete' }`.
+
+The deletion itself is the prune's, within an hour of the date. That is the moment `beforeDelete` runs, the audit log records `account-deleted`, `onEvent` is called and the account-deleted mail goes out. A `beforeDelete` that refuses keeps the account pending, and the next run tries again.
+
+A custom store needs `users.dueForDeletion(now, limit)` and a `deleteAt` on its users, which `memoryAuth` and `pgAuth` have; the Postgres table gets a nullable `delete_at` column from `db.sync()` or a generated migration.
+
 ## Signing in with a password
 
 Passwords are 10 to 128 characters and usernames 2 to 32. The `rules` option changes them, and adds a check of your own for the password:

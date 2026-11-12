@@ -113,6 +113,7 @@ describe('features', () => {
       admin: false,
       organizations: null,
       audit: false,
+      deleteAfter: null,
       pages: null,
       rules: { password: { min: 10, max: 128 }, username: { min: 2, max: 32 } },
     })

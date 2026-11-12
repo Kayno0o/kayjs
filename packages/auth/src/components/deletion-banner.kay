@@ -1,0 +1,20 @@
+---
+import { ctx } from 'kay'
+import { formatDate } from 'kay/i18n'
+import { wording } from 'kay/words'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import { claimBanner, currentViewer } from '../viewer'
+
+const { auth, request } = currentViewer()
+const features = auth.features()
+const first = claimBanner('deletion')
+---
+// Shown to a user whose account waits out `account.deleteAfter`, with the way to cancel; nothing for anyone else. Read ahead of the render, as the impersonation banner is.
+if first && ctx.deletion as at
+  Notice.kayjs-auth(tone="warning" data-deletion-pending)
+    .flex.flex-wrap.items-center.justify-between.gap-3
+      span {wording('auth.deletion.banner', 'Your account will be deleted on {date}.', { date: formatDate(at, { dateStyle: 'long' }) })}
+      form(method="post" action={`${features.prefix}/cancel-deletion`})
+        input(type="hidden" name="redirect" value={new URL(request.url).pathname})
+        Button(type="submit" label={wording('auth.deletion.cancel', 'Cancel the deletion')})

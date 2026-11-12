@@ -3,6 +3,7 @@ export const load = {
   account: async () => import('./account'),
   admin: async () => import('./admin'),
   bearer: async () => import('./bearer'),
+  deletion: async () => import('./deletion'),
   email: async () => import('./email'),
   erase: async () => import('./erase'),
   profile: async () => import('./profile'),

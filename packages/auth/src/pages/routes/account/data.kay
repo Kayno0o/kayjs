@@ -1,6 +1,7 @@
 --- server
 import { action } from 'kay'
-import { localize } from 'kay/i18n'
+import { formatDate, localize } from 'kay/i18n'
+import { durationWords } from 'kay/library'
 import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
@@ -21,7 +22,18 @@ export const remove = action(schemas.proof, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error.code })
 
-  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
+  const { pages, prefix } = ctx.locals.auth.features()
+
+  // A deletion left pending keeps the user signed in, on the page that offers to cancel it.
+  return ctx.redirect(localize(result.deleteAt === undefined ? pages?.home ?? '/' : `${pages?.prefix ?? prefix}/account/data`))
+})
+
+export const cancelPending = action(async (ctx) => {
+  const { pages, prefix } = ctx.locals.auth.features()
+
+  await ctx.locals.auth.account.cancelDeletion()
+
+  return ctx.redirect(localize(`${pages?.prefix ?? prefix}/account/data`))
 })
 
 // An account with neither a password nor a second factor proves it is still the user by a recent sign-in alone, so it signs in again and comes back here.
@@ -44,6 +56,10 @@ const proved = await auth.provedLately()
 const impersonated = await auth.impersonator() !== null
 const impact = await auth.account.deletionImpact()
 const stale = !proved && !user.hasPassword && !user.twoFactor
+const pending = await auth.account.deletion()
+const deleteIntro = features.deleteAfter === null
+  ? wording('auth.account.data.deleteIntro', 'Your account and everything tied to it are deleted for good. This cannot be undone.')
+  : wording('auth.account.data.deleteGraceIntro', 'Your account and everything tied to it are deleted for good {after} from now. Until then you can cancel, and signing in is enough to reach the button.', { after: durationWords(`${features.deleteAfter}s`, ctx.locale) })
 ---
 if impersonated
   p {failure('impersonating')}
@@ -64,9 +80,13 @@ else
             Message(text={failure(notProved)})
           Button(type="submit" label={wording('auth.account.data.confirmExport', 'Confirm to download my data')})
   PageSection(title={wording('auth.account.data.delete', 'Delete your account')})
-    if stale
+    if pending
+      form.flex.flex-col.items-start.gap-3(action={cancelPending})
+        p {wording('auth.account.data.deletePending', 'Your account will be deleted on {date}.', { date: formatDate(pending.deleteAt, { dateStyle: 'long' }) })}
+        Button(type="submit" label={wording('auth.deletion.cancel', 'Cancel the deletion')})
+    else if stale
       form.flex.flex-col.items-start.gap-3(action={signInAgain})
-        p {wording('auth.account.data.deleteIntro', 'Your account and everything tied to it are deleted for good. This cannot be undone.')}
+        p {deleteIntro}
         if impact.deleted.length > 0
           p {wording('auth.account.data.deleteOrganizations', 'These organizations are deleted with it, as you are their only member: {names}.', { names: impact.deleted.join(', ') })}
         if impact.blocked.length > 0
@@ -75,7 +95,7 @@ else
         Button(type="submit" label={wording('auth.proof.signInAgain', 'Sign in again')})
     else
       form.flex.flex-col.gap-3(action={remove})
-        p {wording('auth.account.data.deleteIntro', 'Your account and everything tied to it are deleted for good. This cannot be undone.')}
+        p {deleteIntro}
         if impact.deleted.length > 0
           p {wording('auth.account.data.deleteOrganizations', 'These organizations are deleted with it, as you are their only member: {names}.', { names: impact.deleted.join(', ') })}
         if impact.blocked.length > 0

@@ -512,6 +512,23 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.users.staleUnverified!(at(10), 10)).map(user => user.id)).toEqual(['u1', 'u2', 'u3', 'live', 'linked'])
     })
 
+    test('deleteAt round-trips and dueForDeletion lists the users whose deadline passed, earliest first, up to a limit', async () => {
+      const at = (minutes: number) => new Date(Date.UTC(2026, 5, 1, 0, minutes))
+
+      for (const [id, deleteAt] of [['late', at(3)], ['early', at(1)], ['exact', at(10)], ['future', at(11)], ['none', null]] as const)
+        await store.users.create(userRecord({ id, deleteAt }))
+
+      expect((await store.users.get('early'))?.deleteAt).toEqual(at(1))
+      expect((await store.users.get('none'))?.deleteAt ?? null).toBeNull()
+      expect((await store.users.dueForDeletion!(at(10), 10)).map(user => user.id)).toEqual(['early', 'late', 'exact'])
+      expect((await store.users.dueForDeletion!(at(10), 2)).map(user => user.id)).toEqual(['early', 'late'])
+
+      await store.users.update('early', { deleteAt: null })
+
+      expect((await store.users.dueForDeletion!(at(10), 10)).map(user => user.id)).toEqual(['late', 'exact'])
+      expect((await store.users.dueForDeletion!(at(0), 10))).toEqual([])
+    })
+
     describe('the OAuth server', () => {
       const bearer = (id: string, oauth?: { clientId: string, family: string, resource?: string | null }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
       const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })

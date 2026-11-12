@@ -34,7 +34,7 @@ const STATUS: Readonly<Record<string, number>> = {
 }
 
 // Kinds that conflict with the state of the account or the organization.
-const CONFLICTS = new Set(['last-owner', 'last-admin', 'last-way-in', 'slug-taken', 'taken', 'member', 'enabled', 'verified', 'signed-in', 'not-enabled', 'not-set-up', 'not-linked', 'unverified'])
+const CONFLICTS = new Set(['last-owner', 'last-admin', 'last-way-in', 'slug-taken', 'taken', 'member', 'enabled', 'verified', 'signed-in', 'not-enabled', 'not-set-up', 'not-linked', 'unverified', 'not-pending'])
 
 export function failureStatus(kind: string): number {
   return STATUS[kind] ?? (CONFLICTS.has(kind) ? 409 : 400)

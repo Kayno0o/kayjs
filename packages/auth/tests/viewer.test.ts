@@ -14,7 +14,7 @@ function answering(found: User | null) {
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => {
+  registerViewer(request, { auth: { account: { deletion: async () => null }, impersonator: async () => null, bareUser: async () => {
     reads++
 
     return found
@@ -65,7 +65,7 @@ test('a failed read ahead leaves it to the component, which reads again', async 
   const request = new Request('http://localhost/')
   let reads = 0
 
-  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => {
+  registerViewer(request, { auth: { account: { deletion: async () => null }, impersonator: async () => null, bareUser: async () => {
     if (reads++ === 0)
       throw new Error('store down')
 
@@ -80,17 +80,32 @@ test('a failed read ahead leaves it to the component, which reads again', async 
 test('a request draws its banner once', async () => {
   const request = new Request('http://localhost/')
 
-  registerViewer(request, { auth: { impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(request, { auth: { account: { deletion: async () => null }, impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
   readRequestWith(() => request)
   expect([claimBanner(), claimBanner()]).toEqual([true, false])
+})
+
+test('ctx.deletion is when the signed-in user\'s account is deleted, and null for anyone else', async () => {
+  const pending = new Request('http://localhost/pending')
+  const plain = new Request('http://localhost/plain')
+  const guest = new Request('http://localhost/guest')
+  const at = new Date('2030-03-14T10:00:00Z')
+
+  registerViewer(pending, { auth: { account: { deletion: async () => ({ deleteAt: at }) }, impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(plain, { auth: { account: { deletion: async () => null }, impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(guest, { auth: { account: { deletion: async () => ({ deleteAt: at }) }, impersonator: async () => null, bareUser: async () => user({ guest: true }) } as unknown as Auth, isGranted })
+
+  expect((await viewerValues(pending)).deletion).toEqual(at)
+  expect((await viewerValues(plain)).deletion).toBeNull()
+  expect((await viewerValues(guest)).deletion).toBeNull()
 })
 
 test('ctx.impersonator is the admin acting as the signed-in user, and null for anyone else', async () => {
   const acted = new Request('http://localhost/acted')
   const plain = new Request('http://localhost/plain')
 
-  registerViewer(acted, { auth: { impersonator: async () => user({ id: 'root', roles: ['admin'] }), bareUser: async () => user({}) } as unknown as Auth, isGranted })
-  registerViewer(plain, { auth: { impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(acted, { auth: { account: { deletion: async () => null }, impersonator: async () => user({ id: 'root', roles: ['admin'] }), bareUser: async () => user({}) } as unknown as Auth, isGranted })
+  registerViewer(plain, { auth: { account: { deletion: async () => null }, impersonator: async () => null, bareUser: async () => user({}) } as unknown as Auth, isGranted })
 
   expect((await viewerValues(acted)).impersonator).toMatchObject({ id: 'root' })
   expect((await viewerValues(plain)).impersonator).toBeNull()
@@ -98,7 +113,7 @@ test('ctx.impersonator is the admin acting as the signed-in user, and null for a
   for (const found of [null, user({ guest: true })]) {
     const request = new Request('http://localhost/other')
 
-    registerViewer(request, { auth: { impersonator: async () => user({ id: 'root' }), bareUser: async () => found } as unknown as Auth, isGranted })
+    registerViewer(request, { auth: { account: { deletion: async () => null }, impersonator: async () => user({ id: 'root' }), bareUser: async () => found } as unknown as Auth, isGranted })
     expect((await viewerValues(request)).impersonator).toBeNull()
   }
 })

@@ -1,4 +1,5 @@
 --- server
+import DeletionBanner from '../components/deletion-banner.kay'
 import ImpersonationBanner from '../components/impersonation-banner.kay'
 import { loadViewer } from '../viewer'
 
@@ -6,4 +7,5 @@ import { loadViewer } from '../viewer'
 await loadViewer(ctx.request)
 ---
 ImpersonationBanner
+DeletionBanner
 slot

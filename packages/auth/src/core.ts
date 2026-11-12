@@ -183,6 +183,8 @@ export interface Core {
   guestMaxAge: number
   // Seconds an account registered and never verified is kept, where unverified accounts cannot sign in; for good when undefined.
   unverifiedMaxAge?: number | undefined
+  // Set with `account.deleteAfter`: the seconds `account.delete` leaves an account pending before the prune deletes it, and the app's own page the mailed link leads to; without it the deletion is immediate.
+  deletion?: { after: number, cancelPage?: string | undefined } | undefined
   onExport?: ((user: User) => unknown) | undefined
   onEvent?: ((info: AuthEventInfo) => unknown) | undefined
 
@@ -250,6 +252,7 @@ export function newUserRecord(fields: Partial<UserRecord>): UserRecord {
     bannedAt: null,
     bannedUntil: null,
     banReason: null,
+    deleteAt: null,
     data: {},
     createdAt: new Date(),
     ...fields,

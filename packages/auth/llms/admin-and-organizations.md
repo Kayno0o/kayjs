@@ -32,6 +32,7 @@ The prebuilt pages have a screen for the members, roles and invitations, and the
 - An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `role`; `banned`, `reason` when given; `unbanned`; `impersonation-started` (also mailed to the user, as the security events are) and `impersonation-ended`, `expired: true` when the 30 minutes ran out (the audit `detail` is `expired`).
 - In an organization, `organizationId`: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, with the `roles` given; `member-left`; `member-removed`. A manager's doing names them as `actor`.
 - `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `client` the app's name.
+- `account-deletion-scheduled`, `deleteAt` (a `Date`): `account.delete` marked the account pending under `account.deleteAfter`; `account-deleted` follows at the real deletion, and `account-deletion-cancelled` (mailed) if the user cancels.
 
 The audit log keeps the fields packed in a string as an entry's `detail` (`oauth:<provider>`, `<orgId> <role> <role>`).
 

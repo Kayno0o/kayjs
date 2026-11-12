@@ -41,6 +41,10 @@ slot
 - It reads `ctx.impersonator`, the admin behind the session (null for none), so a page reaching it shows the banner in the first bytes, once per request even in a layout and a page both holding one.
 - The button posts to `<prefix>/stop-impersonating` under the base and back to the admin pages (the pages' home when the admin pages are off), worded in the page's locale.
 
+### Show a pending deletion
+
+With `account.deleteAfter`, `DeletionBanner` (`@kaynooo/kayjs-auth/components/deletion-banner.kay`, no props or fence) shows `Your account will be deleted on <date>` and a button that cancels (a post to `<prefix>/cancel-deletion`), and nothing for anyone else. The prebuilt pages carry it, as do all pages with `viewer: true`; put it in a layout of your own elsewhere, once per request. It reads `ctx.deletion`, the date or null. See [Deleting an account after a grace period](passwords-and-mails.md#deleting-an-account-after-a-grace-period).
+
 ### Show them with the first bytes
 
 A page reads the user before it renders when its imports reach `SignedIn`, `SignedOut`, `UserMenu` or any template reading `ctx`, through its layouts, components and helpers however deep, so they show in the first bytes, with JavaScript off too. A page not reaching them reads no session, and no option is needed.
@@ -52,4 +56,4 @@ A page reads the user before it renders when its imports reach `SignedIn`, `Sign
 ## Reference
 
 - `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching a template reading `ctx` read the user; `true` reads it on every page.
-- `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut` and `ImpersonationBanner` take none. All four import from `@kaynooo/kayjs-auth/components/<name>.kay`.
+- `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kaynooo/kayjs-auth/components/<name>.kay`.

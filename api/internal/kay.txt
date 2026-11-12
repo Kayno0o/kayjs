@@ -1426,7 +1426,7 @@ function writeDraftEntry(root: string, config: Pick<KayConfig, "contentConfig" |
 function writeDraftMessages(root: string, config: Pick<KayConfig, "i18n">, locale: string, messages: Record<string, Message>): Promise<string[]>
 
 [./library/auth-mails] AUTH_LINK_KINDS
-const AUTH_LINK_KINDS: readonly ["verify-email", "reset-password", "magic-link", "change-email", "invitation", "account-exists"]
+const AUTH_LINK_KINDS: readonly ["verify-email", "reset-password", "magic-link", "change-email", "invitation", "account-exists", "cancel-deletion"]
 
 [./library/auth-mails] AUTH_MAIL_ENGLISH
 const AUTH_MAIL_ENGLISH: {
@@ -1482,6 +1482,13 @@ const AUTH_MAIL_ENGLISH: {
     readonly lasts: "";
     readonly ending: "If this was not you, ignore this mail: nothing changed on your account.";
   };
+  readonly 'cancel-deletion': {
+    readonly subject: "Your {site} account will be deleted on {detail}";
+    readonly lead: "Deleting the {site} account for {email} was asked. It stays open until {detail}, then it is deleted for good.";
+    readonly button: "Cancel the deletion";
+    readonly lasts: "";
+    readonly ending: "To keep it, cancel before then. If you did not ask for this, cancel it and change your password at once.";
+  };
   readonly 'new-sign-in': {
     readonly subject: "New sign-in on {site}";
     readonly lead: "Your {site} account was just signed into from a device or network it had not used before.";
@@ -1502,14 +1509,8 @@ const AUTH_MAIL_ENGLISH: {
     readonly lead: "A change of the address of your {site} account to {detail} was asked. It takes effect once that address confirms it; until then {email} still signs into it.";
     readonly ending: "If this was not you, reset your password and check your account at once.";
   };
-  readonly 'email-changed': {
-    readonly subject: "Email changed on {site}";
-    readonly lead: "Your {site} account moved from {email} to {detail}. This address no longer signs into it.";
-    readonly ending: "If this was not you, contact the site at once.";
-  };
-  readonly 'two-factor-enabled': {
-    readonly subject: "Two-factor turned on on {site}";
-    readonly lead: "Your {site} account now asks for a code from your  ...#3d87e30e (3 lines)
+  readonly 'email-changed': { ...#a0691374 (5 lines)
+  readonly 'two-factor-enabled': { ...#b6814ca9 (5 lines)
   readonly 'two-factor-disabled': { ...#465bbded (5 lines)
   readonly 'recovery-code-used': { ...#bcc21fd1 (5 lines)
   readonly 'recovery-codes-regenerated': { ...#1cb297df (5 lines)
@@ -1520,6 +1521,7 @@ const AUTH_MAIL_ENGLISH: {
   readonly 'token-created': { ...#94575c89 (5 lines)
   readonly 'signed-out-everywhere': { ...#c9455c2f (5 lines)
   readonly 'account-deleted': { ...#594d411e (5 lines)
+  readonly 'account-deletion-cancelled': { ...#e5fc2c4d (5 lines)
   readonly 'organization-handed-over': { ...#82946754 (5 lines)
   readonly 'impersonation-started': { ...#ba72e400 (6 lines)
 
@@ -1577,6 +1579,13 @@ const AUTH_MAIL_FRENCH: {
     readonly lasts: "";
     readonly ending: "Si ce n'était pas vous, ignorez ce message : rien n'a changé sur votre compte.";
   };
+  readonly 'cancel-deletion': {
+    readonly subject: "Votre compte {site} sera supprimé le {detail}";
+    readonly lead: "La suppression du compte {site} de {email} a été demandée. Il reste ouvert jusqu'au {detail}, puis il est supprimé définitivement.";
+    readonly button: "Annuler la suppression";
+    readonly lasts: "";
+    readonly ending: "Pour le garder, annulez avant cette date. Si vous n'êtes pas à l'origine de cette demande, annulez-la et changez votre mot de passe sans attendre.";
+  };
   readonly 'new-sign-in': {
     readonly subject: "Nouvelle connexion sur {site}";
     readonly lead: "Votre compte {site} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.";
@@ -1597,14 +1606,8 @@ const AUTH_MAIL_FRENCH: {
     readonly lead: "Un changement de l'adresse de votre compte {site} vers {detail} a été demandé. Il ne prend effet qu'une fois cette adresse confirmée ; d'ici là, {email} permet toujours de s'y connecter.";
     readonly ending: "Si ce n'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.";
   };
-  readonly 'email-changed': {
-    readonly subject: "Adresse modifiée sur {site}";
-    readonly lead: "Votre compte {site} est passé de {email} à {detail}. Cette adresse ne permet plus de s'y connecter.";
-    readonly ending: "Si ce n'était pas vous, contactez le site sans attendre.";
-  };
-  readonly 'two-factor-enabled': {
-    readonly subject: "Double authentification activée sur {site}";
-    readonly lead: "Votre compte {site} demande désormais un code de v ...#d0922c2f (3 lines)
+  readonly 'email-changed': { ...#8966fc04 (5 lines)
+  readonly 'two-factor-enabled': { ...#ab5a5526 (5 lines)
   readonly 'two-factor-disabled': { ...#a75012e4 (5 lines)
   readonly 'recovery-code-used': { ...#db5048ae (5 lines)
   readonly 'recovery-codes-regenerated': { ...#19ea6642 (5 lines)
@@ -1615,6 +1618,7 @@ const AUTH_MAIL_FRENCH: {
   readonly 'token-created': { ...#fecb3eed (5 lines)
   readonly 'signed-out-everywhere': { ...#e9a57f47 (5 lines)
   readonly 'account-deleted': { ...#396e5e90 (5 lines)
+  readonly 'account-deletion-cancelled': { ...#ebff15f5 (5 lines)
   readonly 'organization-handed-over': { ...#53ce3d04 (5 lines)
   readonly 'impersonation-started': { ...#7f3bea99 (6 lines)
 
@@ -1625,7 +1629,7 @@ const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "code"
 const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
 
 [./library/auth-mails] AUTH_NOTICE_KINDS
-const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-change-requested", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "account-deleted", "organization-handed-over", "impersonation-started"]
+const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-change-requested", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "account-deleted", "account-deletion-cancelled", "organization-handed-over", "impersonation-started"]
 
 [./library/auth-mails] AuthLinkKind
 type AuthLinkKind = typeof AUTH_LINK_KINDS[number]

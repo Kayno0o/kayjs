@@ -174,6 +174,7 @@ export default defineMessages({
       register: 'Créer un compte',
     },
     impersonation: { banner: 'Vous agissez comme {user}.', stop: 'Revenir à mon compte' },
+    deletion: { banner: 'Votre compte sera supprimé le {date}.', cancel: 'Annuler la suppression' },
     account: {
       title: 'Votre compte',
       nav: { label: 'Compte', profile: 'Profil', security: 'Sécurité', sessions: 'Sessions', connections: 'Comptes liés', tokens: 'Jetons', clients: 'Applications', organizations: 'Organisations', data: 'Vos données' },
@@ -282,6 +283,8 @@ export default defineMessages({
         exportIntro: 'Tout ce que nous gardons sur votre compte, dans un fichier JSON.',
         delete: 'Supprimer votre compte',
         deleteIntro: 'Votre compte et tout ce qui s’y rattache sont supprimés définitivement. C’est irréversible.',
+        deleteGraceIntro: 'Votre compte et tout ce qui s’y rattache sont supprimés définitivement dans {after}. D’ici là, vous pouvez annuler : il suffit de vous connecter pour accéder au bouton.',
+        deletePending: 'Votre compte sera supprimé le {date}.',
         deleteOrganizations: 'Ces organisations sont supprimées avec lui, car vous en êtes le seul membre : {names}.',
         deleteBlocked: 'Vous êtes le seul propriétaire de {names} : nommez d’abord un autre propriétaire.',
         confirmDelete: 'Supprimer mon compte',

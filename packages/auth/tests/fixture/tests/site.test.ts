@@ -524,6 +524,31 @@ describe('the prebuilt pages', () => {
     expect((await root.visit('/nav')).find('[data-impersonating]')).toHaveLength(0)
   })
 
+  test('DeletionBanner shows a pending deletion with the way to cancel, in either language, and nothing otherwise', async () => {
+    const ada = await signedUp('pending@example.com')
+    const { id } = (await store.users.findByEmail('pending@example.com'))!
+
+    expect((await ada.visit('/nav')).find('[data-deletion-pending]')).toHaveLength(0)
+
+    await store.users.update(id, { deleteAt: new Date('2030-03-14T10:00:00Z') })
+
+    const page = await ada.visit('/nav')
+
+    expect(page.find('[data-deletion-pending]')).toHaveLength(1)
+    expect(text(page, '[data-deletion-pending] span')).toBe('Your account will be deleted on March 14, 2030.')
+    expect(page.find('[data-deletion-pending] form').map(form => form.attributes.action)).toEqual(['/auth/cancel-deletion'])
+    expect(text(await ada.visit('/fr/nav'), '[data-deletion-pending] span')).toBe('Votre compte sera supprimé le 14 mars 2030.')
+
+    const data = await ada.visit('/auth/account/data')
+
+    expect(data.find('[data-deletion-pending]')).toHaveLength(1)
+
+    const cancelled = await ada.fetch('/auth/cancel-deletion', { method: 'POST', body: new URLSearchParams({ redirect: '/nav' }) })
+
+    expect(cancelled.status).toBe(303)
+    expect((await ada.visit('/nav')).find('[data-deletion-pending]')).toHaveLength(0)
+  })
+
   test('the data page offers neither the export nor the deletion to an admin acting as the user', async () => {
     const root = await signedUp('data-admin@example.com')
     const { id: rootId } = (await store.users.findByEmail('data-admin@example.com'))!

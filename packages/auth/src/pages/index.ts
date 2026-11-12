@@ -108,6 +108,8 @@ export interface AuthFeatures {
   organizations: { roles: string[], owner: string, manage: string, grants: Record<string, string[]> } | null
   // Whether the `audit` option keeps the audit log.
   audit: boolean
+  // The seconds `account.delete` leaves an account pending before deleting it (`account.deleteAfter`); null when it deletes at once.
+  deleteAfter: number | null
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
@@ -154,6 +156,7 @@ export function featuresOf(core: Core): AuthFeatures {
     admin: core.admin !== undefined,
     organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage, grants: grantsOf(core.organizations) } : null,
     audit: core.audit !== undefined,
+    deleteAfter: core.deletion?.after ?? null,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
     pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember, main: core.pages.main, privacy: core.pages.privacy, purpose: core.pages.purpose } : null,
   }
@@ -166,6 +169,7 @@ export function pagePaths(prefix: string) {
     twoFactor: `${prefix}/two-factor`,
     sessions: `${prefix}/account/sessions`,
     security: `${prefix}/account/security`,
+    data: `${prefix}/account/data`,
     links: {
       'verify-email': `${prefix}/verify-email`,
       'reset-password': `${prefix}/reset-password`,
@@ -256,7 +260,7 @@ function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHa
   return exported as { [PAGES_OF]?: PagesHandle | undefined }
 }
 
-const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, beforeDelete: true, guests: true, exportData: true, onEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true }
+const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, beforeDelete: true, guests: true, exportData: true, onEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true, account: true }
 
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `authCore`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `authCore({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
 export function auth<Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData>): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>

@@ -2,6 +2,7 @@ import type { Duration } from 'kay'
 import type { Access } from './access'
 import type { AuthOptions } from './auth'
 import type { AuthSessionData, Core } from './core'
+import type { AccountOptions } from './deletion'
 import type { EmailOptions } from './email'
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
@@ -103,6 +104,22 @@ function unverifiedMaxAge(email: EmailOptions | undefined): number | undefined {
     return wholeSeconds(email.unverifiedMaxAge, 'email.unverifiedMaxAge')
 
   return email.requireVerified ?? true ? DEFAULT_UNVERIFIED_MAX_AGE : undefined
+}
+
+// The grace period `account.deleteAfter` sets: a store that cannot list the accounts due is refused, as is a mail link with no page to open.
+function deletionOf(options: { account?: AccountOptions | undefined, store: AuthStore }, pages: Core['pages']): Core['deletion'] {
+  const account = options.account
+
+  if (account?.deleteAfter === undefined)
+    return undefined
+
+  if (!options.store.users.dueForDeletion)
+    throw configError('auth', 'account', '`account.deleteAfter` needs a store with `users.dueForDeletion`, as `memoryAuth` and `pgAuth` have')
+
+  if (!pages && account.cancelPage === undefined)
+    throw configError('auth', 'account', '`account.deleteAfter` mails a link to cancel the deletion: set `pages` for the prebuilt account page, or `account.cancelPage` to your own')
+
+  return { after: wholeSeconds(account.deleteAfter, 'account.deleteAfter'), cancelPage: account.cancelPage }
 }
 
 function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated' }): number {
@@ -319,6 +336,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
 
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
+    deletion: deletionOf(options, pages),
     onExport: hooked(options.exportData, user => ({ user })),
     onEvent: options.onEvent,
 

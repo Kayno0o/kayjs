@@ -107,6 +107,16 @@ export async function stopImpersonatingRoute({ auth, body, redirect, request }: 
   return redirect(afterwards(body, core), 303)
 }
 
+// The deletion banner's button: a form posting here takes the pending deletion off the signed-in user's account, then goes to `redirect`, a path of the site, else the pages' home. A post only, and a cross-site one is refused with a 403.
+export async function cancelDeletionRoute({ auth, body, redirect, request }: RouteContext, core: Core) {
+  if (auth[STATE].crossSite())
+    return crossSiteResponse(request, 'request', core.url)
+
+  await auth.account.cancelDeletion()
+
+  return redirect(afterwards(body, core), 303)
+}
+
 // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
 export async function startOAuthRoute({ auth, params: { provider = '' }, query, redirect, status }: RouteContext, core: Core, failurePage: string | undefined) {
   const started = !core.oauth.has(provider) ? undefined : await (await load.flow()).startOAuth(auth[STATE], provider, { redirect: text(query.redirect), remember: query.remember === undefined ? undefined : query.remember === '1' })

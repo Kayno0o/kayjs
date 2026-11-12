@@ -4,7 +4,7 @@ type AcceptResult<Role extends string = string> = {
 } | AuthFailed<'signed-out' | 'impersonating' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>
 
 [.] ActivityEvent
-type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
+type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked' | 'account-deletion-scheduled'
 
 [.] AdminAuditLogResult
 type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | AuthFailed<'forbidden' | 'two-factor-required'>
@@ -143,7 +143,8 @@ function auth<Role extends string = string, Prefix extends string = "/auth", con
           readonly 402: "Payment Required";
           readonly 403: "Forbidden"; ...#19244c9f (262 lines)
   post: { ...#49e81ac2 (322 lines)
-  post: { ...#b404340b (322 lines)
+  post: { ...#85ce010b (322 lines)
+  post: { ...#5a74771c (322 lines)
   get: { ...#8f997215 (322 lines)
   get: { ...#3a38f79a (322 lines)
   post: { ...#32c44ad6 (322 lines)
@@ -311,7 +312,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
       schema: {};
       standaloneSchema: {};
       macro: {};
-      macroFn: {}; ...#3b849fac (3887 lines)
+      macroFn: {}; ...#4ddeda8d (4531 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
   test: (site: OAuthSite) => { ...#d43a5614 (9 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
@@ -321,7 +322,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
   signOut(site: { ...#2b384ff2 (3 lines)
   [PAGES_OF]: PagesHandle | undefined;
   [CHECK_USER]: (input: CreateUserInput) => Promise<RegisterErrors>;
-  plugin: Elysia<"", { ...#8cb7e894 (1964 lines)
+  plugin: Elysia<"", { ...#d61b4529 (2286 lines)
   hasRole: (required: Role) => Predicate<BareUser<Record<string, unknown>>>;
   isGranted: (role: Role, user: BareUser<Record<string, unknown>>) => boolean;
   memberOf: (role?: OrgRole | undefined, memberOptions?: { ...#6ade75cc (3 lines)
@@ -355,6 +356,7 @@ interface AuthFeatures
   audit: boolean
   captcha: "proof-of-work" | CaptchaWidget | null
   codes: Record<CodedLink, CodeMode> | null
+  deleteAfter: null | number
   email: boolean
   magicLink: boolean
   oauthServer: boolean
@@ -435,6 +437,7 @@ type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElys
 
 [.] AuthOptions
 interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>
+  account?: AccountOptions | undefined
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
   audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
@@ -680,6 +683,7 @@ interface AuthStore
   delete: (id: string) => MaybePromise<boolean>;
   staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
+  dueForDeletion?: (now: Date, limit: number) => MaybePromise<UserRecord[]>;
   list: (query: {
     search?: string;
     offset: number;
@@ -924,7 +928,7 @@ const DEFAULT_LIMITS: {
 const defaultTemplates: Templates
 
 [.] DeleteAccountResult
-type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
+type DeleteAccountResult = { ok: true, deleteAt?: Date } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
 
 [.] DeleteOrganizationResult
 type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationWriteFailure>
@@ -976,6 +980,8 @@ interface EventContext extends AuthHookContext
 [.] EventFields
 interface EventFields
   account-deleted: Record<never, never>
+  account-deletion-cancelled: Record<never, never>
+  account-deletion-scheduled: { deleteAt: Date; }
   banned: { reason?: string; }
   email-change-requested: { email: string; }
   email-changed: { email: string; }
@@ -1372,6 +1378,7 @@ type OrganizationWriteFailure = OrganizationFailure | 'impersonating'
 
 [.] OwnOptions
 interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions
+  account?: AccountOptions | undefined
   admin?: AuthRequirement<NoInfer<Role>> | undefined
   allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
   audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
@@ -1807,6 +1814,7 @@ interface UserRecord
   bannedUntil: Date | null
   createdAt: Date
   data?: Record<string, unknown> | undefined
+  deleteAt?: Date | null | undefined
   email: null | string
   emailVerifiedAt: Date | null
   guest: boolean
@@ -1897,6 +1905,9 @@ function passkeyFailure(caught: unknown, errors: Record<string, string>, failed:
 
 [./browser] rememberChoice
 function rememberChoice(): boolean | undefined
+
+[./components/deletion-banner.kay] default
+component default
 
 [./components/impersonation-banner.kay] default
 component default
@@ -2088,6 +2099,7 @@ const authTables: readonly [TableDef<"kay_users", ExtractColumns<{
   banned_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   banned_until: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   ban_reason: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  delete_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   data: ColumnBuilder<Record<string, unknown>, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
   created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
 }>, {}, {}>, TableDef<"kay_identities", ExtractColumns<{
@@ -2232,6 +2244,7 @@ const AuthUsers: TableDef<"kay_users", ExtractColumns<{
   banned_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   banned_until: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   ban_reason: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  delete_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
   data: ColumnBuilder<Record<string, unknown>, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
   created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
 }>, {}, {}>

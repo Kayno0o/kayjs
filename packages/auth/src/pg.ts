@@ -24,10 +24,12 @@ export const AuthUsers = defineTable('kay_users', t => ({
   banned_at: t.timestamptz().nullable(),
   banned_until: t.timestamptz().nullable(),
   ban_reason: t.text().nullable(),
+  // When the account's grace period ends and the prune deletes it; null for an account not pending deletion, and for users stored before this column.
+  delete_at: t.timestamptz().nullable(),
   // The app's own data on the user, from the `user` option.
   data: t.jsonb<Record<string, unknown>>().notNull().default({}),
   created_at: t.timestamptz().notNull(),
-})).renamedFrom('auth_user').withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
+})).renamedFrom('auth_user').withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }, { columns: ['delete_at'] }])
 
 const userId = () => AuthUsers
 
@@ -252,6 +254,7 @@ export function pgAuth(db: Database): AuthStore {
 
         return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
       },
+      dueForDeletion: async (now, limit) => (await users.read.findMany(q => q.where({ delete_at: { lte: now } }).orderBy('delete_at', 'asc').limit(limit))).map(row => toUser(row)!),
       delete: async id => await users.write.deleteById(id) !== null,
       async list({ search, offset, limit, total: counted = true }) {
         const [rows, total] = await Promise.all([
@@ -298,10 +301,7 @@ export function pgAuth(db: Database): AuthStore {
       get: async id => toSession(await sessions.read.findById(id)),
       listByUser: async userId => (await sessions.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toSession(row)!),
       async update(id, patch) {
-        const row = withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt })
-
-        if (!isEmpty(row))
-          await sessions.write.updateById(id, row)
+        await whenFilled(withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt }), async row => sessions.write.updateById(id, row))
       },
       delete: async (userId, id) => await sessions.write.deleteOne({ id, user_id: userId }) !== null,
     },
@@ -552,7 +552,7 @@ function joinedUser(q: any) {
 /* eslint-enable ts/no-explicit-any, ts/no-unsafe-call, ts/no-unsafe-member-access, ts/no-unsafe-return */
 
 // The user columns holding a date.
-const DATE_COLUMNS = new Set(['email_verified_at', 'totp_enabled_at', 'banned_at', 'banned_until', 'created_at'])
+const DATE_COLUMNS = new Set(['email_verified_at', 'totp_enabled_at', 'banned_at', 'banned_until', 'delete_at', 'created_at'])
 
 // One user column's value as the user alone gives it: anything but null or what is typed already is converted as pg-orm converts it for SQLite.
 function decoded(column: string, value: unknown): unknown {
@@ -606,6 +606,7 @@ function toUser(row: UserRow | null): UserRecord | undefined {
       bannedAt: row.banned_at,
       bannedUntil: row.banned_until,
       banReason: row.ban_reason,
+      deleteAt: row.delete_at ?? null,
       data: row.data ?? {},
       createdAt: row.created_at,
     }
@@ -631,6 +632,7 @@ function fromUser(user: Partial<UserRecord>) {
     banned_at: user.bannedAt,
     banned_until: user.bannedUntil,
     ban_reason: user.banReason,
+    delete_at: user.deleteAt,
     data: user.data,
     created_at: user.createdAt,
   })
@@ -691,6 +693,12 @@ function toPasskey(row: InferEntity<typeof AuthPasskeys> | null): PasskeyRecord 
 // pg-orm refuses an update with nothing to set, so an empty patch skips it.
 function isEmpty(row: object): boolean {
   return Object.keys(row).length === 0
+}
+
+// Writes a patch unless it names no field.
+async function whenFilled<T extends object>(row: T, write: (row: T) => Promise<unknown>): Promise<void> {
+  if (!isEmpty(row))
+    await write(row)
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.

@@ -28,6 +28,8 @@ export interface UserRecord {
   bannedAt: Date | null
   bannedUntil: Date | null
   banReason: string | null
+  // Set while the account waits out `account.deleteAfter`: the instant the prune deletes it, unless the user cancels first. Left out or null for an account not pending deletion, and a store that holds nothing here reads as null.
+  deleteAt?: Date | null | undefined
   // What the app keeps on the user, as JSON checked against the `user` schema; `{}` when it has none, and a store that holds nothing here reads as `{}` too.
   data?: Record<string, unknown> | undefined
   createdAt: Date
@@ -240,6 +242,8 @@ export interface AuthStore {
     staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Up to `limit` users who are not guests, created before `createdBefore` with an email never verified, holding no session and no identity, oldest first; without it unverified accounts are never pruned.
     staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
+    // Up to `limit` users whose `deleteAt` is at or before `now`, earliest first; needed by the `account.deleteAfter` option, which a store without it refuses at boot.
+    dueForDeletion?: (now: Date, limit: number) => MaybePromise<UserRecord[]>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     // With `total: false` the caller does not read `total`, so a store may skip counting.
     list: (query: { search?: string, offset: number, limit: number, total?: boolean }) => MaybePromise<{ users: UserRecord[], total: number }>
