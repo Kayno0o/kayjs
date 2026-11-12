@@ -268,10 +268,20 @@ async function showLoadingLater(url: URL, flight: NonNullable<typeof inFlight.fe
     const [{ showLoading }] = await Promise.all([import('./swap-loading'), new Promise(resolve => setTimeout(resolve, delay))])
 
     if (waiting())
-      await showLoading(url, AbortSignal.any([flight.controller.signal, arrived.signal]), waiting)
+      await showLoading(url, AbortSignal.any([flight.controller.signal, arrived.signal]), waiting, { place: placeLoading, entryScript: ENTRY_SCRIPT })
   }
   catch {
     // A loading page is a nicety: the page's own swap goes on without it.
+  }
+}
+
+// The loading page morphs in as a refresh does.
+function placeLoading(next: Document): void {
+  try {
+    swapBody(next, policyOf({ intent: 'refresh' }), undefined, undefined)
+  }
+  finally {
+    inFlight.renamed.clear()
   }
 }
 
