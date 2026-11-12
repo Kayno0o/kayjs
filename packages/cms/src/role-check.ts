@@ -258,7 +258,7 @@ export async function enforceRoles(ctx: GuardContext, path: string): Promise<voi
       stamps.set(ctx.request, list)
   }
 
-  if (saving && suffix === 'rename' && scoped()) {
+  if (saving && suffix === 'rename' && (scoped() || settings().can !== undefined)) {
     const touched = await rewritten(collection, slug)
 
     if (touched === undefined)

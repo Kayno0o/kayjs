@@ -81,3 +81,11 @@ describe('slugify and the slug matcher', () => {
       expect(slug(slugify(title, { final: true })), title).toBe(slugify(title, { final: true }))
   })
 })
+
+describe('slugify dot segments', () => {
+  test('never leaves an empty folder where a path went up', () => {
+    expect(slugify('a/../b', { final: true })).toBe('a/b')
+    expect(slugify('a/./b/../../c', { final: true })).toBe('a/b/c')
+    expect(slugify('../a', { final: true })).toBe('a')
+  })
+})

@@ -23,8 +23,8 @@ export function slugify(text: string, { final = false }: { final?: boolean } = {
     .replace(LIGATURE, letter => LETTERS[letter as keyof typeof LETTERS])
     .replace(OTHER, '-')
     .replace(DASHES, '-')
-    .replace(SLASHES, '/')
     .replace(AROUND_SLASH, '/')
+    .replace(SLASHES, '/')
     .replace(LEADING, '')
 
   return final ? slug.replace(EDGES, '') : slug

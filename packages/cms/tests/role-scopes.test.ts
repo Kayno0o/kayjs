@@ -373,6 +373,20 @@ describe('a rename rewrites the entries that refer to it', () => {
   })
 })
 
+describe('a rename of an app with a can hook and no scoped role', () => {
+  test('asks it about each entry the rename rewrites', async () => {
+    configure({ guard: async () => undefined, roles: { boss: [...ALL] }, can: ({ action, collection, entry }) => !(action === 'edit' && collection === 'pages' && (entry?.data as Data | undefined)?.title === 'Locked') })
+    referrers.set('posts/mine', [{ collection: 'pages', data: { title: 'Open' } }, { collection: 'pages', data: { title: 'Locked' } }])
+
+    const boss = { id: 'u3', roles: ['boss'] }
+
+    expect(await send(boss, 'POST', '/entries/posts/mine/rename', { slug: 'new' })).toBe(403)
+
+    referrers.set('posts/mine', [{ collection: 'pages', data: { title: 'Open' } }])
+    expect(await send(boss, 'POST', '/entries/posts/mine/rename', { slug: 'new' })).toBe(200)
+  })
+})
+
 describe('bulk actions are one call per row', () => {
   test('a selection spanning both writers is refused row by row', async () => {
     configureRoles({ blogger: { own: 'author', actions: [...ALL] } })

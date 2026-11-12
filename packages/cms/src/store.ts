@@ -23,6 +23,7 @@ import { askBeforeSave, hooked, previousOf, tellOnSave } from './save-hooks'
 import { settings } from './settings'
 import { pairKey } from './translations'
 import { discardTrashed, keepDeleted } from './trash'
+import { namingFields, withFreeUniques } from './unique'
 import { scriptInBody } from './unsafe'
 import { contentVersion } from './version'
 
@@ -535,7 +536,7 @@ export function heldDate(collection: Pick<CollectionInfo, 'schema' | 'publishFie
 
 // The data a copy starts with: a draft when the collection has a draft field, else held back by its publish date; last in the order, not alongside the original.
 function copyData(collection: CollectionInfo, data: Record<string, unknown>, siblings: SourceEntry[]): Record<string, unknown> {
-  const copy = { ...data }
+  const copy = withFreeUniques(collection.schema, data, siblings, copySlug)
   const { draftField, publishField, orderField } = collection
 
   if (draftField !== undefined) {
@@ -573,10 +574,9 @@ async function duplicateEntryAnswer(ref: EntryRef, author?: Identity): Promise<A
 
   const siblings = await entries(collection.name, { locale: ref.locale })
   const slug = copySlug(ref.slug, new Set(siblings.map(entry => entry.slug)))
-  const data = copyData(collection, existing.data, siblings)
-  const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data, body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true, heldData: existing.data })
+  const outcome = await saveEntry({ collection: collection.name, slug, locale: ref.locale, data: copyData(collection, existing.data, siblings), body: existing.body }, { create: true, verb: 'duplicate', author, bodyKept: true, heldData: existing.data })
 
-  return 'issues' in outcome ? outcome : { ...outcome, slug }
+  return 'issues' in outcome ? namingFields(outcome) : { ...outcome, slug }
 }
 
 // The entries of the moved one's group in their order and the order values that change when it moves: undefined changes for an entry already at the end it moves toward.
