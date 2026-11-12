@@ -139,6 +139,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   saveEntry: 'request',
   setField: 'free',
   tagsField: 'free',
+  toEntry: 'free',
   translations: 'request',
   unique: 'free',
   untranslated: 'free',

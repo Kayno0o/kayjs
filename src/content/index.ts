@@ -692,6 +692,7 @@ function noteTranslationUrls<Data>(found: Entry<Data>, paired: Map<string, Map<s
   ;(state.entryUrls ??= new Map()).set(found.url, urls)
 }
 
+// kept: free
 export function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined, dir: string | undefined): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')

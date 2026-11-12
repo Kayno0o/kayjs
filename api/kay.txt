@@ -4062,7 +4062,7 @@ function cookieJar(): CookieJar
 interface CookieJar
   cookies: CookieMap
   header: (path?: string | undefined) => string
-  keep: (response: Response) => void
+  keep: (response: Response, from?: string | undefined) => void
   send: (handle: (request: Request) => Promise<Response> | Response, request: Request, path?: string | undefined) => Promise<Response>
 
 [./test] DialogHandler
