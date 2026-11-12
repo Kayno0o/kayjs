@@ -177,11 +177,11 @@ export const theme = persisted('theme', 'light')
 
 A cookie can hold a value your app never offers, after an old release or an edit by hand. Name the values the signal may hold, and anything else reads as the default, on the server and in the browser: `persisted('theme', 'light', { values: ['light', 'dark'] })`. The signal is then typed `'light' | 'dark'`, and a default outside them is a type error.
 
-A param kept in the URL takes `values` too: `persisted.query('tab', 'site', { values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, so it needs one.
+A param kept in the URL takes `values` too: `persisted.query('tab', 'site', { values: ['site', 'logs'] })`; a number or a boolean in `values` is compared with what the page's `query` schema reads, or, with no schema naming the param, with its text, so `?page=2` reads as `2` for `values: [1, 2, 3]`.
 
 Each storage has its own entry, taking the options that storage can use: `persisted.cookie()`, which `persisted()` is, `persisted.local()`, `persisted.session()` and `persisted.query()`.
 
-`persisted.query('q', '')` keeps a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link.
+`persisted.query('q', '')` keeps a string in the page's URL instead, as `?q=...`. A filter then survives a reload and a shared link. A param that is cleared stays cleared too: when the default is not empty, an empty string or list is written as `?q=` or `?tags=`, so a reload reads it back as empty rather than as the default.
 
 `persisted.local('draft', '')` uses localStorage. The server never sees it, so every island reading it renders the default first, then shows the kept value. `persisted.session()` does the same in sessionStorage, which lasts as long as the tab and is not shared with another one.
 

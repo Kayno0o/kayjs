@@ -216,6 +216,82 @@ describe('a memo that throws', () => {
     expect(seen).toEqual([1, 3])
   })
 
+  it('is reported once by each effect reading it, per recompute', () => {
+    const { errors, spy, set, m } = failing()
+
+    try {
+      root(() => {
+        const seen: number[] = []
+
+        effect(() => void seen.push(m()))
+        effect(() => void seen.push(m() + 1))
+        flush()
+        set(1)
+        flush()
+        expect(errors).toHaveLength(2)
+        set(2)
+        flush()
+        expect(seen).toEqual([0, 1, 20, 21])
+        expect(errors).toHaveLength(2)
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('hands out its last value without throwing once disposed', () => {
+    const { spy, set, source } = failing()
+
+    try {
+      const [m, dispose] = root(dispose => [memo(() => {
+        if (source() === 1)
+          throw new Error('boom')
+
+        return source() * 10
+      }), dispose] as const)
+
+      expect(m()).toBe(0)
+      set(1)
+      expect(() => m()).toThrow('boom')
+      dispose()
+      expect(() => m()).not.toThrow()
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('throws to an untracked read without subscribing it', () => {
+    const { spy, set, m } = failing()
+
+    try {
+      root(() => {
+        let runs = 0
+
+        effect(() => {
+          runs++
+
+          try {
+            untrack(m)
+          }
+          catch {}
+        })
+        flush()
+        set(1)
+        flush()
+        set(2)
+        flush()
+        expect(runs).toBe(1)
+        set(1)
+        expect(() => untrack(m)).toThrow('boom')
+      })
+    }
+    finally {
+      spy.mockRestore()
+    }
+  })
+
   it('runs what read it again when it recovers to the value it had before the throw', () => {
     const { spy, set, m } = failing()
 

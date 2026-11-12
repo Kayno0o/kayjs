@@ -145,8 +145,15 @@ export function readQueryLeniently(schema: unknown, url: URL): Readonly<Record<s
 // `form` is `formInput`'s: a GET form leaves an unticked checkbox out of its query, while nothing leaves a variable out of the environment on purpose, nor pads it with spaces by mistake.
 export function readFields(schema: TSchema, input: Record<string, unknown>, form = true): ReadFields {
   const filled = { ...input }
+  const required = (schema as { required?: string[] }).required ?? []
 
   for (const [name, field] of Object.entries((schema as ObjectSchema).properties ?? {})) {
+    // A blank list is the empty one, as `persisted.query` writes it, never one blank item; a blank optional field is left out, so its default fills in.
+    if (filled[name] === '' && (field as { type?: unknown }).type === 'array')
+      filled[name] = []
+    else if (form && filled[name] === '' && !required.includes(name))
+      delete filled[name]
+
     if (filled[name] === undefined && field.default !== undefined)
       filled[name] = structuredClone(field.default)
   }

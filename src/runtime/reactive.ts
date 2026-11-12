@@ -76,7 +76,7 @@ interface Computation extends Owner, Source {
   // Effects run when what they read changes; memos only when read.
   effect: 'render' | 'user' | undefined
   // What the last run of a memo threw, wrapped, until a run completes: a read throws it again rather than hand out the value before it.
-  error?: { thrown: unknown } | undefined
+  error?: [thrown: unknown] | undefined
 }
 
 // What the server's request scope, development's hot swap and an optimistic change each hook into signals, set by the function installing it, so a browser build that never calls one ships none of it.
@@ -298,7 +298,7 @@ export function setErrorReporter(report: (error: unknown, island?: string) => vo
 // Renders `fn` noting the signals it creates, the first ones taking `values` back in order; returns what reads their values now, for the next version of the island.
 export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, values: () => unknown[] } {
   const nodes: SignalNode<unknown>[] = []
-  const slot = interceptor ??= {}
+  const slot = interception()
   const outer = slot.created
   let restoring = values && [...values]
 
@@ -355,7 +355,7 @@ export function unrecorded<T>(fn: () => T): T {
 // Installed by the server: the scope of the request being rendered.
 export function setServerScope(scope: () => ServerScope | undefined): void {
   serverScope = scope
-  ;(interceptor ??= {}).values = () => scope()?.values
+  interception().values = () => scope()?.values
 }
 
 // The scope of the request rendering now, on the server.
@@ -423,7 +423,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
       track(node)
 
       if (node.error)
-        throw node.error.thrown
+        throw node.error[0]
     }
 
     return node.value as T
@@ -728,7 +728,7 @@ function run(node: Computation): void {
   const previousOwner = owner
   const previousListener = listener
   const previous = node.value
-  const failed = node.error !== undefined
+  const failed = node.error
 
   owner = node
   listener = node
@@ -740,11 +740,11 @@ function run(node: Computation): void {
 
   node.cursor = 0
 
-  let threw = false
-
   try {
     node.value = node.fn()
-    node.error = undefined
+
+    if (failed)
+      node.error = undefined
 
     // What an effect returns, when a function, is its cleanup.
     if (node.effect === 'user' && typeof node.value === 'function')
@@ -755,8 +755,7 @@ function run(node: Computation): void {
     if (node.effect)
       throw error
 
-    node.error = { thrown: error }
-    threw = true
+    node.error = [error]
   }
   finally {
     owner = previousOwner
@@ -770,7 +769,7 @@ function run(node: Computation): void {
   }
 
   // A memo whose value changed makes what read it run again.
-  if (!node.effect && node.observers && (threw || failed || node.equals === false || !(node.equals as (previous: unknown, next: unknown) => boolean)(previous, node.value)))
+  if (!node.effect && node.observers && (failed || node.error || node.equals === false || !(node.equals as (previous: unknown, next: unknown) => boolean)(previous, node.value)))
     mark(node, DIRTY, true)
 }
 

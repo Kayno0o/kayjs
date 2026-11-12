@@ -193,7 +193,7 @@
     "max-lines": 765
   },
   "src/runtime/local.ts": {
-    "max-lines": 677
+    "max-lines": 676
   },
   "src/runtime/page-swap.ts": {
     "complexity": 51

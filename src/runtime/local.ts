@@ -787,10 +787,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     if (answer === undefined)
       return false
 
-    // The writes still queued for the row.
-    const others = (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).filter(other => other.k === entry.k && other.seq !== entry.seq)
+    // Whether no other write is queued for the row, which a conflict does not ask.
+    const alone = async () => (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).every(other => other.k !== entry.k || other.seq === entry.seq)
 
     if (answer.status >= 200 && answer.status < 300) {
+      const single = await alone()
+
       outbox.delete(entry.seq!)
 
       if (entry.op === 'put' && current !== undefined) {
@@ -798,9 +800,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
         const result = answer.body === '' ? undefined : decodeServerValue(answer.body)
         const stored = typeof result === 'object' && result !== null && String((result as Record<string, unknown>)[this.options.key]) === entry.k ? result : undefined
 
-        rows.put({ ...current, base: stored ?? entry.row, ...stored !== undefined && others.length === 0 && !current.gone && { row: stored } })
+        rows.put({ ...current, base: stored ?? entry.row, ...stored !== undefined && single && !current.gone && { row: stored } })
       }
-      else if (entry.op === 'remove' && others.length === 0) {
+      else if (entry.op === 'remove' && single) {
         rows.delete([this.c, entry.k])
       }
       else if (entry.op === 'remove' && current !== undefined) {
@@ -822,10 +824,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     outbox.delete(entry.seq!)
 
     // A write to the row still queued made the row as it is and stands, the server settling it; else back to what the server last gave, or gone for a row it never knew.
-    if (others.length === 0 && current?.base !== undefined)
-      rows.put({ ...current, row: current.base, gone: false })
-    else if (others.length === 0)
-      rows.delete([this.c, entry.k])
+    if (await alone())
+      current?.base !== undefined ? rows.put({ ...current, row: current.base, gone: false }) : rows.delete([this.c, entry.k])
 
     issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, actionFailed(answer.status)), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, createdAt: new Date() })
     await this.trim(issues)

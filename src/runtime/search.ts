@@ -272,7 +272,7 @@ export function wordHits(text: string, plain: string[]): [number, number][] {
   const from: number[] = []
 
   for (let i = 0; i < text.length; i++) {
-    const char = fold(text[i]!).replaceAll('ς', 'σ')
+    const char = fold(text[i]!)
 
     folded += char
     // Counted in UTF-16 units, as string indices are.
@@ -282,7 +282,7 @@ export function wordHits(text: string, plain: string[]): [number, number][] {
   const hits: [number, number][] = []
   const bare = new Set(terms.flatMap(singulars))
 
-  for (const word of folded.matchAll(WORD)) {
+  for (const word of folded.replaceAll('ς', 'σ').matchAll(WORD)) {
     const length = matched(word[0], terms, bare)
 
     if (length !== undefined)
