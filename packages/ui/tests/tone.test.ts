@@ -7,6 +7,7 @@ const TONES = new Set(['neutral', 'accent', 'success', 'warning', 'danger', 'inf
 const TONE_LITERAL = /'(?:neutral|accent|success|warning|danger|info|muted)'/
 // A prop or field declared as `tone?: ...`, `tones?: ...` or `cells: ...`, whose type may run over several lines.
 const TONE_FIELD = /^\s*(?:tones?|cells)\??:(.*)$/
+const ONE_VALUE = /^\s*'[a-z]+',$/
 const STRING = /'[^']*'|"[^"]*"|`[^`]*`/g
 const RECIPE_TONE = /\btone: \{/
 // The part names of a tone group that colours several parts, as Stat's `{ value: 'text-accent' }`.
@@ -33,7 +34,8 @@ test('a component takes the exported Tone, not a union of its own', async () => 
       for (let next = at + 1; (/[|&]\s*$/).test(lines[next - 1]!) || (/^\s*[|&]/).test(lines[next] ?? ''); next++)
         type += lines[next]
 
-      if (TONE_LITERAL.test(type))
+      // `tone: 'danger',` sets a value in an object, never a type of one word.
+      if (TONE_LITERAL.test(type) && !ONE_VALUE.test(type))
         own.push(`${file}:${at + 1}`)
     }
   }
