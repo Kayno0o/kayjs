@@ -93,7 +93,15 @@ export function unrebaseCss(css: string, base: string): string {
 
 // A redirect to a path of the site goes under the mount point, whoever made it: a page, a guard, an action or a route the app registered after `pages()`; an action's `x-kay-redirect`, which a call or the swap reads in place of `location`, goes under it too.
 export function rebaseRedirects(app: Elysia, base: string): void {
-  app.mapResponse({ as: 'scoped' }, ({ responseValue }) => {
+  app.mapResponse({ as: 'scoped' }, ({ responseValue, set }) => {
+    // A handler setting `set.headers.location` sends the redirect Elysia builds from it, which goes under the mount point as a returned `Response` does.
+    for (const name of Object.keys(set.headers)) {
+      const value = set.headers[name]
+
+      if (REDIRECT_HEADERS.includes(name.toLowerCase()) && typeof value === 'string')
+        set.headers[name] = joinBase(base, value)
+    }
+
     if (!(responseValue instanceof Response))
       return undefined
 

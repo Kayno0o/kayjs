@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { joinBase, withBase, withoutBase } from '../src/runtime/base'
-import { rebaseHtml } from '../src/server/base'
+import { rebaseHtml, rebaseRedirects } from '../src/server/base'
 import { pages } from './shared-pages'
 
 // Apart from tests/static.test.ts, and not to run beside tests/i18n-links.test.ts in one process: `pages()` on the static fixture's routes puts the checkout's `.kay` loader in the process, and a process serves one project, so a test site of a copy fails there with the way out.
@@ -71,5 +71,41 @@ describe('base on a server', () => {
     // No seo.description, no description.
     expect(manifest).not.toHaveProperty('description')
     await expect(pages({ root: 'tests/fixtures/static', prebuilt: false, base: 'repo' })).rejects.toThrow('base is repo, which is no path such as /docs')
+  })
+})
+
+describe('a redirect under a base, whoever writes it', () => {
+  it('puts a Response, redirect() and set.headers.location under it, once each', async () => {
+    const app = new Elysia()
+
+    rebaseRedirects(app, '/app')
+    app.get('/response', () => new Response(null, { status: 302, headers: { location: '/about' } }))
+      .get('/set', ({ set }) => {
+        set.status = 302
+        set.headers.location = '/about'
+
+        return ''
+      })
+      .get('/set-cased', ({ set }) => {
+        set.status = 302
+        set.headers.Location = '/about?a=1#top'
+
+        return 'moved'
+      })
+      .get('/outside', ({ set }) => {
+        set.status = 302
+        set.headers.location = 'https://other.example/about'
+
+        return ''
+      })
+      .get('/redirect', ({ redirect }) => redirect('/about'))
+
+    const location = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers.get('location')
+
+    expect(await location('/response')).toBe('/app/about')
+    expect(await location('/set')).toBe('/app/about')
+    expect(await location('/set-cased')).toBe('/app/about?a=1#top')
+    expect(await location('/outside')).toBe('https://other.example/about')
+    expect(await location('/redirect')).toBe('/app/about')
   })
 })
