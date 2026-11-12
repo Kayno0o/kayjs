@@ -20,8 +20,7 @@ const { prefix } = settings()
 const logo = adminLogo(look.logo)
 // kay marks a link current on its own page alone, so Content stays marked on the collection, entry and new-entry screens below it.
 // Who is signed in, when the guard let the request in: the sign-in screen, which no guard covers, shows no one.
-const member = await memberOf(ctx)
-const denied = await denials(ctx)
+const [member, denied] = await Promise.all([memberOf(ctx), denials(ctx)])
 const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
 // The app's own pages and its toasts and tooltips are outside this chain, so the admin renders them itself.
 ---

@@ -68,13 +68,16 @@ Layout(preheader="Your account is ready")
   Paragraph Welcome, {name}. Confirm your address to start.
   Button(href={url}) Confirm my address`
 
-const registry = await highlightCode(REGISTRY, 'toml', { highlight })
-const create = await highlightCode(CREATE, 'bash', { highlight })
-const sample = await highlightCode(SAMPLE, 'kay', { highlight })
-const auth = await highlightCode(AUTH, 'kay', { highlight })
-const mail = await highlightCode(MAIL, 'kay', { highlight })
-const componentCount = (await components.all()).length
-const { groups } = await navigation()
+const [registry, create, sample, auth, mail, allComponents, { groups }] = await Promise.all([
+  highlightCode(REGISTRY, 'toml', { highlight }),
+  highlightCode(CREATE, 'bash', { highlight }),
+  highlightCode(SAMPLE, 'kay', { highlight }),
+  highlightCode(AUTH, 'kay', { highlight }),
+  highlightCode(MAIL, 'kay', { highlight }),
+  components.all(),
+  navigation(),
+])
+const componentCount = allComponents.length
 const features = [
   { title: 'One file per component', text: 'TypeScript fences, then an indented template. No JSX, no closing tags.', href: '/essentials/templates' },
   { title: 'HTML first', text: 'Pages render to plain HTML on the server. Only interactive components ship JavaScript.', href: '/essentials/islands' },

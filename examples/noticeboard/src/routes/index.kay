@@ -24,8 +24,7 @@ export const post = action(s.Object({
   return { id: notice.id }
 })
 
-const user = await ctx.locals.auth.user()
-const notices = await latestNotices()
+const [user, notices] = await Promise.all([ctx.locals.auth.user(), latestNotices()])
 --- script
 import Card from '@kaynooo/kayjs-ui/card.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'

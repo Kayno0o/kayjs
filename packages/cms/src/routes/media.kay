@@ -17,8 +17,7 @@ export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optio
 const { prefix } = settings()
 const url = ctx.url
 const search = ctx.query.q ?? ''
-const scan = await libraryUploads({ page: ctx.query.page, q: search })
-const denied = await denials(ctx)
+const [scan, denied] = await Promise.all([libraryUploads({ page: ctx.query.page, q: search }), denials(ctx)])
 ---
 head
   title {adminTitle(wording('cms.admin.media', 'Media'))}

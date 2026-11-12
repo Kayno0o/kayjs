@@ -39,8 +39,7 @@ export const resend = action(async (ctx) => {
 
 const auth = ctx.locals.auth
 const token = ctx.url.searchParams.get('token') ?? verify.failed()?.values.token
-const user = await auth.user()
-const pending = await auth.email.pendingCode()
+const [user, pending] = await Promise.all([auth.user(), auth.email.pendingCode()])
 const refused = verify.failed()?.data?.error
 const codeError = code.failed()?.data?.error
 const resendError = resend.failed()?.data?.error

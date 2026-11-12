@@ -12,8 +12,7 @@ import { screenPath } from '../paths'
 import { settings } from '../settings'
 
 const { prefix } = settings()
-const scan = await unusedUploads()
-const denied = await denials(ctx)
+const [scan, denied] = await Promise.all([unusedUploads(), denials(ctx)])
 ---
 head
   title {adminTitle(wording('cms.admin.uploads', 'Unused uploads'))}
