@@ -1,5 +1,5 @@
 import type { DateFormatOptions, MessageValue, NumberFormatOptions, Plural } from './i18n'
-import { formatDate as formatDateIn, formatNumber as formatNumberIn, setTimeZone } from './i18n'
+import { formatDate as formatDateIn, formatNumber as formatNumberIn } from './i18n'
 import { sizeText as sizeIn } from './size-text'
 
 // What the server writes for a page's islands and checked forms: the locale and the messages they use. Kept small, as every island of a library reaches it, and free of `pageData`, which a lazy chunk reading it would keep in the eager entry; `kay/i18n` reads the same scripts for `t`.
@@ -61,9 +61,6 @@ function load(): void {
     locale ||= payload.locale ?? ''
     zone ??= payload.timeZone
 
-    if (payload.timeZone !== undefined)
-      setTimeZone(payload.timeZone)
-
     for (const [key, message] of Object.entries(payload.messages))
       messages.set(key, message)
   }
@@ -120,7 +117,15 @@ export function wording(key: string, english: string, params: Record<string, Mes
 
 // A date as the page's locale writes it, in the site's `timeZone`: what `kay/i18n`'s `formatDate` does, without the rest of that module, for the components of a library every page reaches.
 export function formatDate(value: Date | number, options?: DateFormatOptions): string {
-  return formatDateIn(pageLocale(), value, options)
+  const here = pageLocale()
+
+  if (zone === undefined)
+    return formatDateIn(here, value, options)
+
+  // The site's zone goes in as given, so the options keep the default `medium` date they have when they name nothing but a locale.
+  const { locale, ...rest } = options ?? {}
+
+  return formatDateIn(locale ?? here, value, { timeZone: zone, ...Object.keys(rest).length === 0 ? { dateStyle: 'medium' } : rest })
 }
 
 // A number as the page's locale writes it, as `kay/i18n`'s `formatNumber` does it, without the rest of that module.
