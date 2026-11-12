@@ -506,7 +506,7 @@ It then runs the kay it installed. Each minor you skipped may have replaced a fo
 
 Later releases drop the lints of old minors together with the forms they rewrite, so the latest kay cannot rewrite those. An app that may still hold such a form goes through the minor before each of those releases first: an app on 1.70 moving to 1.77 installs 1.73, rewrites, installs 1.76, rewrites, then installs the latest. If an install on the way fails, `package.json` and the lockfile go back to the last version that installed, and the command says so.
 
-Packages the app shares with kay are raised too. When a dependency of your `package.json`, `elysia` for instance, is also one of kay's own and your range or installed copy is below the version kay's range starts at, the command raises it to that version (keeping your `~` or `^`), installs again and says so. Left alone, the app and kay would each install their own copy, and their types would no longer match.
+Packages the app shares with kay are raised too. When a dependency of your `package.json`, `elysia` for instance, is also one of kay's own and your range or installed copy is below the version kay's range starts at, the command raises it to that version (keeping your `~` or `^`), installs again and says so. An app already on the latest kay gets this too, and `--dry-run` lists what it would raise. Left alone, the app and kay would each install their own copy, and their types would no longer match.
 
 When the project is a git working tree with uncommitted changes to tracked files, `kay upgrade` warns that the rewrite will mix with them and goes on: commit or stash first to review the upgrade alone.
 

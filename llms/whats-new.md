@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `kay upgrade` raises a dependency the app shares with kay, `elysia` first, to the version kay's range starts at when the app's range or installed copy is below it, so the app and kay install one copy and `kay check` no longer fails on Elysia's types ([kay upgrade](check-and-tools.md)).
+- `kay upgrade` raises a dependency the app shares with kay, `elysia` first, to the version kay's range starts at when the app's range or installed copy is below it, so the app and kay install one copy (an app already on the latest kay too, `--dry-run` listing it) and `kay check` no longer fails on Elysia's types ([kay upgrade](check-and-tools.md)).
 
 ## 1.102.0
 

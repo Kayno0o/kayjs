@@ -224,7 +224,37 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     return 1
   }
 
+  // Raises what the installed kay shares with the app and installs it, or only says so on a dry run; false when that install failed, with package.json and the lockfile put back to `settled`.
+  const raiseAndInstall = async (settled: Settled): Promise<boolean> => {
+    const raised = await raiseShared(root, manifest, settled.source, !dryRun)
+
+    if (raised.length === 0)
+      return true
+
+    moved(raised.map(({ change }) => change))
+
+    if (dryRun) {
+      for (const { change, held } of raised)
+        say('would raise', `${change.name} to ${change.spec}, which the installed kay depends on (the app held ${held})`, true)
+
+      return true
+    }
+
+    step('raised', raised.map(({ change, held }) => `${change.name} to ${change.spec}, which kay ${latestKay} depends on (the app held ${held})`).join(', '))
+
+    if (await deps.install(root, raised.map(({ change }) => change)))
+      return true
+
+    await restore(manifest, settled)
+    printFailure('upgrade', `the install of ${raised.map(({ change }) => change.name).join(', ')} failed, so package.json and the lockfile are back as they were; raise them by hand to what kay asks for, then run \`bun install\``, format)
+
+    return false
+  }
+
   if (phases.every(phase => phase.changes.length === 0)) {
+    if (!await raiseAndInstall({ source: original, locks: await readLocks(root) }))
+      return finish(1)
+
     say('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`, true)
 
     return finish(0)
@@ -282,19 +312,8 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     settled = { source: phase.source, locks: await readLocks(root) }
   }
 
-  const raised = await raiseShared(root, manifest, settled.source)
-
-  if (raised.length > 0) {
-    moved(raised.map(({ change }) => change))
-    step('raised', raised.map(({ change, held }) => `${change.name} to ${change.spec}, which kay ${latestKay} depends on (the app held ${held})`).join(', '))
-
-    if (!await deps.install(root, raised.map(({ change }) => change))) {
-      await restore(manifest, settled)
-      printFailure('upgrade', `the install of ${raised.map(({ change }) => change.name).join(', ')} failed, so package.json and the lockfile are back at kay ${latestKay}; raise them by hand to what kay asks for, then run \`bun install\``, format)
-
-      return 1
-    }
-  }
+  if (!await raiseAndInstall(settled))
+    return finish(1)
 
   step('checking', 'what is left')
 
@@ -310,7 +329,13 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   return finish(clean ? 0 : 1)
 }
 
-async function restore(manifest: string, settled: { source: string, locks: { path: string, content: Uint8Array | undefined }[] }): Promise<void> {
+// package.json and the lockfiles as an install last left them.
+interface Settled {
+  source: string
+  locks: { path: string, content: Uint8Array | undefined }[]
+}
+
+async function restore(manifest: string, settled: Settled): Promise<void> {
   await Bun.write(manifest, settled.source)
 
   for (const { path, content } of settled.locks) {
@@ -323,7 +348,7 @@ async function restore(manifest: string, settled: { source: string, locks: { pat
 
 // A package the app and the installed kay both depend on is installed once only when the app's range and its locked version reach kay's: below it the app keeps its copy and kay gets a second one, whose types do not match the app's (Elysia's `~cookieConfig` is missing).
 // Every package of kay's `dependencies` that the app lists with a plain range is raised to the version kay's range starts at, keeping the app's `~` or `^`, and written in place; `source` is the manifest as the phases left it.
-async function raiseShared(root: string, manifest: string, source: string): Promise<{ change: DependencyChange, held: string }[]> {
+async function raiseShared(root: string, manifest: string, source: string, write = true): Promise<{ change: DependencyChange, held: string }[]> {
   let kayRanges: Record<string, string>
 
   try {
@@ -354,7 +379,7 @@ async function raiseShared(root: string, manifest: string, source: string): Prom
     }
   }
 
-  if (raised.length > 0)
+  if (write && raised.length > 0)
     await Bun.write(manifest, written)
 
   return raised

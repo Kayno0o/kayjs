@@ -238,6 +238,35 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('raises a low elysia of an app already on the latest kay, or lists it under --dry-run writing nothing', async () => {
+    const floor = (/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]
+    const latest = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    const manifest = MANIFEST.replace(kayDependencies.elysia, '^1.4.0')
+    const dry = await project(manifest)
+    const root = await project(manifest)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      const would = fakes(latest)
+
+      expect(await upgradeProject(dry, would.deps, { dryRun: true })).toBe(0)
+      expect(log.mock.calls.map(call => call.join(' ')).join('\n')).toContain(`would raise elysia to ^${floor}`)
+      expect(await Bun.file(join(dry, 'package.json')).text()).toBe(manifest)
+      expect(would.calls.installs).toEqual([])
+
+      const { deps, calls } = fakes(latest)
+
+      expect(await upgradeProject(root, deps)).toBe(0)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(manifest.replace('^1.4.0', `^${floor}`))
+      expect(calls.installs).toEqual([[{ name: 'elysia', spec: `^${floor}`, section: 'dependencies' }]])
+    }
+    finally {
+      log.mockRestore()
+      await rm(dry, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('puts package.json back when the install of a raised dependency fails', async () => {
     const root = await project(MANIFEST.replace(kayDependencies.elysia, '^1.4.0'))
     const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
