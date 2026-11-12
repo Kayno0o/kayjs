@@ -408,8 +408,11 @@ export interface ServerIslands {
 
 let islands: ServerIslands | undefined
 
-// Calls a component under an owner of its own, so what it provides reaches only what it renders.
+// Calls a component under an owner of its own, so what it provides reaches only what it renders. A tag held as text names an element, whichever value holds it; anything else that is no function throws.
 export function component<P>(fn: (props: P) => unknown, props: P): unknown {
+  if (typeof fn === 'string')
+    return dynamic(fn, props as object)
+
   return islands ? throughServerIslands(islands, fn, props) : scope(() => fn(props))
 }
 

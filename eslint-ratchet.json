@@ -103,7 +103,7 @@
     "complexity": 57
   },
   "src/compiler/html.ts": {
-    "max-lines": 754,
+    "max-lines": 752,
     "max-lines-per-function": 301,
     "complexity": 82
   },

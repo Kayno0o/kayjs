@@ -8,7 +8,7 @@ import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
-import { contentOf, fixedAttributes } from './items'
+import { contentOf } from './items'
 import { PROPS } from './names'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
 import { bindEvent } from './validate'
@@ -342,9 +342,9 @@ export abstract class TemplateWriter {
     return defaults
   }
 
-  // The image defaults as a props object leading an element's sources, so a spread carrying its own wins; on the server, behind the attributes the compiler fixes on the element, its scope's among them, which a plain element writes in its tag and a spread cannot drop.
-  protected leadingImageDefaults(element: ElementNode, server = false): void {
-    const defaults = [...(server ? fixedAttributes(element) : []), ...this.imageDefaults(element)]
+  // The image defaults as a props object leading an element's sources, so a spread carrying its own wins.
+  protected leadingImageDefaults(element: ElementNode): void {
+    const defaults = this.imageDefaults(element)
 
     if (defaults.length > 0)
       this.b.add(`{ ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }, `)

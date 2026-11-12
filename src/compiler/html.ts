@@ -8,7 +8,7 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { addFieldDescribed, addInvalidAttribute } from './field-described'
-import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
+import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { addStyleArguments, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
 import { addGroupChecked, BEHAVIOUR, checkedContent, describedValue, fieldAriaOf, groupValue, staticAttributeText } from './plan'
@@ -928,8 +928,8 @@ export class HtmlTemplate extends TemplateWriter {
       emit()
   }
 
-  private honeypotField(element: ElementNode): void {
-    this.b.add('KayFormProtection((').addSource(actionOf(element, this.src)!.expression).add(this.options.hydratable ? '), true)' : '))')
+  private honeypotField(element: ElementNode): CodeBuilder {
+    return this.b.add('KayFormProtection((').addSource(actionOf(element, this.src)!.expression).add(this.options.hydratable ? '), true)' : '))')
   }
 
   // An element with a spread renders through `element`, which reads every attribute the spread brings at render time.
@@ -939,9 +939,10 @@ export class HtmlTemplate extends TemplateWriter {
 
     b.add(`${helperName('element')}(${JSON.stringify(element.name)}, `)
     this.spreadOver(element, () => {
-      this.leadingImageDefaults(element, true)
+      this.leadingImageDefaults(element)
       this.sources(element, false)
       this.formDefaults(element)
+      b.add(fixedSource(element))
     })
 
     if (children.length > 0) {
@@ -953,10 +954,7 @@ export class HtmlTemplate extends TemplateWriter {
       if (action)
         b.add(`${helperName('formScope')}((`).addSource(action.expression).add('), () => ')
 
-      this.honeypot(element, () => {
-        this.honeypotField(element)
-        b.add(' + ')
-      })
+      this.honeypot(element, () => this.honeypotField(element).add(' + '))
       this.markup(children, true)
 
       if (action)

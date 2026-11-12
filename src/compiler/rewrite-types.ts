@@ -29,6 +29,8 @@ export interface RewriteInput {
   sites: Sites
   // Code only read by the type checker, where a row, an alias or a signal the template reads is its value rather than an accessor to it, so TypeScript narrows it; its assignments are still reported.
   values: boolean
+  // The browser code is being made, where a component tag that can hold text opens as `KayDynamic`.
+  dom?: boolean | undefined
   // Where the template begins in the source, past which a signal's name reads its value.
   templateStart: number
   // The signals and memos the component imports from its own modules, by local name.

@@ -69,6 +69,43 @@ describe('a tag held in a value as text', () => {
     expect(await inBrowser(source, props)).toBe('ILJ')
   })
 
+  it('keeps a held component with server="defer" a server island on the server, whichever value holds it', () => {
+    const sources = [
+      '---\nconst { Example } = props<{ Example: () => string }>()\n---\nExample(server="defer")',
+      '---\nimport { pick } from \'./pick\'\nconst Example = pick(\'x\')\n---\nExample(server="defer")',
+      '---\nimport { demo } from \'./demo\'\nconst { component: Example } = demo(\'x\')\n---\nExample(server="defer")',
+      '---\nconst { items } = props<{ items: (() => string)[] }>()\n---\nfor Item of items\n  Item(server="defer")',
+    ]
+
+    for (const source of sources) {
+      const html = compileKay(source, 'comp.kay', { output: 'html', component: true, page: false } as never).tsx
+
+      expect(html, source).toContain('KayServerIsland(')
+      expect(html, source).not.toContain('KayDynamic(')
+    }
+  })
+
+  it('costs the browser nothing for a component value, and loads the element code only for one that can be text', () => {
+    const dom = (source: string) => compileKay(source, 'comp.kay', { output: 'dom', component: true, page: false } as never).tsx
+    const held = (type: string) => `---\nconst { Held } = props<{ Held: ${type} }>()\n---\nHeld(class="x")`
+
+    expect(dom(held('() => string'))).not.toContain('KayDynamic(')
+
+    expect(dom('---\nimport { pick } from \'./pick\'\nconst Held = pick()\n---\nHeld')).not.toContain('KayDynamic(')
+    expect(dom(held('string'))).toContain('KayDynamic(')
+    expect(dom(held('string | (() => string)'))).toContain('KayDynamic(')
+    expect(dom(`---\ntype Props = { Held: 'a' | 'b' }\nconst { Held } = props<Props>()\n---\nHeld`)).toContain('KayDynamic(')
+  })
+
+  it('throws for a held component that is missing, on both targets', async () => {
+    const source = '---\nconst { Held } = props<{ Held: () => string }>()\n---\nHeld'
+
+    for (const missing of [undefined, null]) {
+      await expect(onServer(source, { Held: missing })).rejects.toThrow()
+      await expect(inBrowser(source, { Held: missing })).rejects.toThrow()
+    }
+  })
+
   it('refuses a held tag that names no safe element, on both targets', async () => {
     const source = '---\nconst { Tag } = props<{ Tag: string }>()\n---\nTag hi'
 

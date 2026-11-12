@@ -29,7 +29,7 @@
 - A name the browser refuses to set, such as `@click`, is written by the server only.
 - A handler given as a function still attaches.
 - A spread sets `innerHTML` only when its value is a `SafeHtml`, which `sanitizeHtml`, `trustHtml` and an icon import return, and drops any other value, with a warning in development: `svg({...icon})` draws, `div({...record})` ignores a `record.innerHTML` that is a plain string.
-- A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does. It cannot be `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link` in any case: write those in the template.
+- A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does. It cannot be `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link` in any case: write those in the template. In an island, a prop holds one when its type names `string`, and a script `const` when it is written as a string, so a component value costs the browser nothing more; a loop item or a template `const` always does.
 - Events are camelCase handlers: `onClick={save}`, `onInput={e => name = e.currentTarget.value}`.
 - A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
 - A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.

@@ -228,13 +228,34 @@ function scopeSelector(selector: string, attribute: string): string {
 }
 
 // `selector` as one selector per entry of its first `:global(a, b)` list, and again for each list after it, so every entry is global on its own: `:global(.a, .b) .c` is `:global(.a) .c, :global(.b) .c`.
+// A list inside another pseudo-class, as `:not(:global(.a, .b))`, is that pseudo-class's own list and stays.
 function globalLists(selector: string): string[] {
-  for (let i = selector.indexOf(GLOBAL); i !== -1; i = selector.indexOf(GLOBAL, i + 1)) {
-    const end = closing(selector, i + GLOBAL.length - 1, '(', ')')
-    const entries = pieces(selector.slice(i + GLOBAL.length, end), ',').filter(entry => entry !== ',')
+  let depth = 0
 
-    if (entries.length > 1)
-      return entries.flatMap(entry => globalLists(`${selector.slice(0, i)}${GLOBAL}${entry.trim()}${selector.slice(end)}`))
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i]!
+
+    if (char === '\\') {
+      i++
+    }
+    else if (char === '"' || char === '\'') {
+      i = stringEnd(selector, i)
+    }
+    else if (depth === 0 && selector.startsWith(GLOBAL, i)) {
+      const end = closing(selector, i + GLOBAL.length - 1, '(', ')')
+      const entries = pieces(selector.slice(i + GLOBAL.length, end), ',').filter(entry => entry !== ',')
+
+      if (entries.length > 1)
+        return entries.flatMap(entry => globalLists(`${selector.slice(0, i)}${GLOBAL}${entry.trim()}${selector.slice(end)}`))
+
+      i = end
+    }
+    else if (char === '(' || char === '[') {
+      depth++
+    }
+    else if (char === ')' || char === ']') {
+      depth = Math.max(depth - 1, 0)
+    }
   }
 
   return [selector]

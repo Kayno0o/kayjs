@@ -46,6 +46,9 @@ describe('scopeCss', () => {
     expect(scopeCss(':global(.a, .b):hover { x: y }', ATTR)).toBe('.a:hover, .b:hover { x: y }')
     expect(scopeCss(':global(.a, .b) .c, .d { x: y }', ATTR)).toBe(`.a .c[${ATTR}], .b .c[${ATTR}], .d[${ATTR}] { x: y }`)
     expect(scopeCss(':global(.a, .b) :global(.c, .d) { x: y }', ATTR)).toBe('.a .c, .a .d, .b .c, .b .d { x: y }')
+    expect(scopeCss('.c:not(:global(.a, .b)) { x: y }', ATTR)).toBe(`.c:not(.a, .b)[${ATTR}] { x: y }`)
+    expect(scopeCss('.c:where(:global(.a, .b)), .c:has(:global(.a, .b)) { x: y }', ATTR)).toBe(`.c:where(.a, .b)[${ATTR}], .c:has(.a, .b)[${ATTR}] { x: y }`)
+    expect(scopeCss(':global(.a, .b) .c:not(:global(.d, .e)) { x: y }', ATTR)).toBe(`.a .c:not(.d, .e)[${ATTR}], .b .c:not(.d, .e)[${ATTR}] { x: y }`)
     expect(scopeCss('.x :global(a:is(.p, .q), [title="a,b"]) { x: y }', ATTR)).toBe(`.x[${ATTR}] a:is(.p, .q), .x[${ATTR}] [title="a,b"] { x: y }`)
   })
 
@@ -156,6 +159,21 @@ describe('the style fence', () => {
 
       expect(server, element).toContain(`{ "${attribute}": "" }`)
     }
+  })
+
+  it('renders the scope attribute beside a merged class and a spread that tries to drop it', async () => {
+    const written = '---\nconst { rest } = props<any>()\n--- style\n.a { x: y }\n---\ndiv.a({...rest}) x\n'
+    const tsx = compileKay(written, 'comp.kay', { output: 'html', component: true, page: false } as never).tsx.replace(/export default KayIsland\("comp.kay", (\w+)\)/, 'export default $1')
+    const attribute = (/data-k-[a-z0-9]+/).exec(tsx)![0]
+    const file = join(root, 'spread-scope.ts')
+
+    await Bun.write(file, tsx)
+
+    const page = (await import(file) as { default: (props: object) => { t: string } }).default
+    const html = page({ rest: { class: 'extra', [attribute]: undefined } }).t
+
+    expect(html).toContain(` ${attribute}`)
+    expect(html).toContain('class="a extra"')
   })
 
   it('marks the elements of the island output alike', () => {

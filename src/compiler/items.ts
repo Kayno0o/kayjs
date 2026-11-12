@@ -237,7 +237,9 @@ export function addRowItem(b: CodeBuilder, node: ForNode): void {
     b.add(node.row)
 }
 
-// The attributes the compiler fixes on an element, each with no value.
-export function fixedAttributes(element: ElementNode): [string, string][] {
-  return (element.fixed ?? '').split(' ').filter(name => name !== '').map(name => [name, ''])
+// The attributes the compiler fixes on an element, its scope's among them, as a props object of no values to follow a spread's sources, so none can drop them; empty when there are none.
+export function fixedSource(element: ElementNode): string {
+  const names = (element.fixed ?? '').split(' ').filter(name => name !== '')
+
+  return names.length === 0 ? '' : `, { ${names.map(name => `${JSON.stringify(name)}: ""`).join(', ')} }`
 }

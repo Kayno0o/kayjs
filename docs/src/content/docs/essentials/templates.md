@@ -334,7 +334,7 @@ svg.size-4({...ICONS[key]})
 
 A component held in a value is drawn by its capitalised name as the tag. The value can be a prop, a `const` in the script, a server value or a loop item. Type it `Component<Props>` from `kay`. To pick one by a key, look it up in a record of components. A `match` does the same when each case passes different props.
 
-A tag held in a value as text names an element, in any case, but never `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link`: those throw, so write them in the template.
+A tag held in a value as text names an element, in any case, but never `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link`: those throw, so write them in the template. In an island, a prop holds one when its type names `string`, and a script `const` when it is written as a string; a loop item or a template `const` always does.
 
 ## Functions and rendered values
 
