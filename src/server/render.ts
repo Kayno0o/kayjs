@@ -215,7 +215,7 @@ export interface Rendering {
   loads?: Pick<LoadedRoute, 'files' | 'modules' | 'timings'> | undefined
   guards?: DevRequest['guards'] | undefined
   prerender?: DevRequest['prerender']
-  slow?: DevRequest['slow']
+  slow?: Pick<DevRequest, 'slow' | 'slowLayout'>
 }
 
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }

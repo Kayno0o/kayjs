@@ -115,6 +115,9 @@ export function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     const timing = tool.make('section', 'group')
     const { slow } = request
     const slowNote = slow === undefined ? undefined : `The loads took ${formatMs(slow.took)}, over the ${formatMs(slow.budget)} of observe.loadBudget; the slowest is ${slow.file} at ${formatMs(slow.ms)}. The page waits for every load before it sends anything: start what the first paint does not need unawaited and read it in an await block, or cache it.`
+    const { slowLayout } = request
+    const layoutNote = slowLayout === undefined ? undefined : `The load of the layout ${slowLayout.file} took ${formatMs(slowLayout.ms)}, longer than the ${formatMs(slowLayout.pageMs)} of the page's own loads, and the page waits for it. Start it unawaited and stream it with an await block, or cache it.`
+    const notes = [slowNote, layoutNote].filter(note => note !== undefined)
     const scaled = (total?: number, phases: ServerPhases = {}) => {
       const longest = Math.max(total ?? 0, ...Object.values(phases), ...request.loads.map(load => load.ms ?? 0))
       const grid = tool.make('div', 'timing')
@@ -148,7 +151,7 @@ export function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
         grid.append(tool.make('span', 'note', 'Whole request'), bar(total, 'bars total'), tool.make('span', 'v', formatMs(total)))
 
       timing.hidden = request.loads.length === 0 && total === undefined
-      timing.replaceChildren(tool.make('h3', 'heading', 'Time on the server'), grid, ...slowNote === undefined ? [] : [tool.make('p', 'note', slowNote)])
+      timing.replaceChildren(tool.make('h3', 'heading', 'Time on the server'), grid, ...notes.map(note => tool.make('p', 'note', note)))
     }
     // Read off the page once the guards pass, so a request one refused says nothing of it.
     const refusedByGuard = request.guards.some(guard => guard.outcome !== 'passed' && guard.outcome !== 'did not run')
@@ -157,10 +160,10 @@ export function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     const path = tool.make('span', 'path', `${win.location.pathname}${win.location.search}`)
 
     line.append(tool.make('span', 'method', 'GET'), path, status)
-    tab.count(request.status >= 400 || slow !== undefined ? 1 : 0, request.status >= 400 ? 'error' : 'warn')
+    tab.count(request.status >= 400 ? 1 : notes.length, request.status >= 400 ? 'error' : 'warn')
 
-    if (slowNote !== undefined)
-      console.warn(`kay: ${slowNote}`)
+    for (const note of notes)
+      console.warn(`kay: ${note}`)
 
     fact('Route', request.route === undefined ? tool.make('span', 'note', 'none matched') : tool.make('span', 'mono', request.route))
     chips.append(...params.map(([name, value]) => tool.make('span', 'chip', `${name} = ${JSON.stringify(value)}`)))

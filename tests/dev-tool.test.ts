@@ -1082,6 +1082,27 @@ describe('the dev tool', () => {
     fetching.mockRestore()
   })
 
+  it('warns in the Request tab and the console of a layout whose load outlasts the page\'s', async () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const fetching = spyOn(window, 'fetch').mockImplementation((async () => new Response(null, { status: 404 })) as unknown as typeof window.fetch)
+    const script = document.createElement('script')
+
+    script.type = 'application/json'
+    script.id = 'kay-dev-request'
+    script.textContent = JSON.stringify({ page: 'src/routes/index.kay', layouts: ['src/routes/_layout.kay'], params: {}, id: 'layout', guards: [], locale: 'en', status: 200, loads: [], slowLayout: { file: 'src/routes/_layout.kay', ms: 500, pageMs: 20, budget: 300 } })
+    document.head.append(script)
+    tool = startDevTool(document, loadTab)
+    await turn()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
+    await turn()
+
+    expect(shadow().querySelector('#kay-dev-request p.note')?.textContent).toContain('The load of the layout src/routes/_layout.kay took 500 ms, longer than the 20 ms of the page\'s own loads')
+    expect(shadow().querySelector('#kay-dev-tab-request .count')?.textContent).toBe('1')
+    expect(warned).toHaveBeenCalledWith(expect.stringContaining('stream it with an await block'))
+    warned.mockRestore()
+    fetching.mockRestore()
+  })
+
   it('warns in the Request tab and the console when the loads passed the budget, naming the slowest', async () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const fetching = spyOn(window, 'fetch').mockImplementation((async () => new Response(null, { status: 404 })) as unknown as typeof window.fetch)

@@ -22,21 +22,21 @@ describe('the load budget of a page in development', () => {
   it('warns past 300 ms by default, naming the slowest load, and records it for the dev tool', () => {
     const rendering = run([20, 420, 90], 430)
 
-    expect(rendering.slow).toMatchObject({ ms: 420, took: 430, budget: 300 })
-    expect(rendering.slow!.file).toEndWith('routes/index.kay')
+    expect(rendering.slow?.slow).toMatchObject({ ms: 420, took: 430, budget: 300 })
+    expect(rendering.slow!.slow!.file).toEndWith('routes/index.kay')
     expect(warned).toHaveBeenCalledTimes(1)
     expect(String(warned.mock.calls[0]![0])).toMatch(/took 430 ms, over the 300 ms of `observe.loadBudget`; the slowest, `load-1` \(.*index\.kay\), took 420 ms/)
   })
 
   it('stays quiet at or under the budget', () => {
-    expect(run([20, 250, 90], 300).slow).toBeUndefined()
+    expect(run([20, 250, 90], 300).slow?.slow).toBeUndefined()
     expect(warned).not.toHaveBeenCalled()
   })
 
   it('takes the budget the config sets, and none for false', () => {
-    expect(run([20, 250, 90], 260, '200ms').slow).toMatchObject({ budget: 200, file: expect.stringMatching(/index\.kay$/) })
-    expect(run([20, 250, 90], 260, '500ms').slow).toBeUndefined()
-    expect(run([20, 4000, 90], 4100, false).slow).toBeUndefined()
+    expect(run([20, 250, 90], 260, '200ms').slow?.slow).toMatchObject({ budget: 200, file: expect.stringMatching(/index\.kay$/) })
+    expect(run([20, 250, 90], 260, '500ms').slow?.slow).toBeUndefined()
+    expect(run([20, 4000, 90], 4100, false).slow?.slow).toBeUndefined()
     expect(warned).toHaveBeenCalledTimes(1)
   })
 
@@ -65,6 +65,23 @@ describe('the load budget through a dev render', () => {
     expect(block.slow).toMatchObject({ file: 'tests/fixtures/timeouts/src/routes/slow.kay', budget: 300 })
     expect(block.slow!.ms).toBeGreaterThan(300)
     expect(warned.mock.calls.some(call => String(call[0]).includes('observe.loadBudget') && String(call[0]).includes('slow.kay'))).toBe(true)
+  })
+
+  it('warns of a layout whose load outlasts the page\'s own, naming its file and both times', async () => {
+    const site = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, security: false, dev: true })
+    const html = await (await site.handle(new Request('http://localhost/layered', { headers: { accept: 'text/html' } }))).text()
+    const { slowLayout } = JSON.parse((/id="kay-dev-request">([^<]*)</).exec(html)![1]!.replaceAll('\\u003c', '<')) as { slowLayout?: { file: string, ms: number, pageMs: number, budget: number } }
+
+    expect(slowLayout).toMatchObject({ file: 'tests/fixtures/timeouts/src/routes/layered/_layout.kay', budget: 300 })
+    expect(slowLayout!.ms).toBeGreaterThan(300)
+    expect(slowLayout!.pageMs).toBeLessThan(slowLayout!.ms)
+    expect(warned.mock.calls.some(call => String(call[0]).includes('the load of the layout') && String(call[0]).includes('_layout.kay') && String(call[0]).includes('stream it with an `await` block'))).toBe(true)
+  })
+
+  it('stays quiet when the page\'s own load is the slow one', async () => {
+    const html = await render({ loadBudget: '300ms' })
+
+    expect(html).not.toContain('slowLayout')
   })
 
   it('stays quiet under a larger budget and with false', async () => {

@@ -1,0 +1,4 @@
+--- server
+await Bun.sleep(20)
+---
+p page
