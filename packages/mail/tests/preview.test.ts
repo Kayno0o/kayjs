@@ -138,7 +138,7 @@ describe('the development outbox page', () => {
     expect(desktop).not.toContain('class="phone"')
     expect(phone).toContain('<iframe class="phone"')
     expect(phone).toContain(`<a href="/_kay/mail/${small.id}?view=phone" aria-current="page">Phone</a>`)
-    expect(desktop).toMatch(/<th>Size<\/th><td>[\d.]+ KB, html [\d.]+ KB<\/td>/)
+    expect(desktop).toMatch(/<th>Size<\/th><td>[\d.]+ (?:byte|kB|MB), html [\d.]+ (?:byte|kB|MB)<\/td>/)
 
     await mail.send({ to: 'ada@example.com', subject: 'Big', html: `<p>${'x'.repeat(110 * 1024)}</p>` })
     expect(await (await get(mail, `/_kay/mail/${outbox.last()!.id}`)).text()).toContain('Gmail clips it')

@@ -76,7 +76,7 @@ export default function mailDevTool(tool: DevTool): void {
     const head = tool.make('div', '', '')
     const toggle = tool.make('button', 'link', mail.subject)
     const open = tool.make('a', 'link', 'Open')
-    const to = tool.make('div', 'note', `${new Date(mail.sentAt).toLocaleTimeString('en-GB')} to ${mail.to.map(shown).join(', ')}`)
+    const to = tool.make('div', 'note', `${tool.time(mail.sentAt)} to ${mail.to.map(shown).join(', ')}`)
     const preview = tool.make('div')
     const relayed = mail.relayed === undefined ? undefined : tool.make('div', mail.relayed.error === undefined ? 'note' : 'error', mail.relayed.error === undefined ? `Delivered to ${mail.relayed.to}` : `Not delivered to ${mail.relayed.to}: ${mail.relayed.error}`)
 

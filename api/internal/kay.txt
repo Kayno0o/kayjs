@@ -1328,6 +1328,9 @@ function setSite(origin: string | undefined, trailingSlash?: "always" | "ignore"
 [./library] sha256
 function sha256(text: string, { encoding, length, key }?: Sha256Options): string
 
+[./library] siteLocales
+function siteLocales(): readonly string[]
+
 [./library] sitePaths
 function sitePaths(): string[]
 

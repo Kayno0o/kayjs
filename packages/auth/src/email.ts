@@ -43,7 +43,7 @@ export interface EmailOptions {
   links?: Partial<Record<LinkType, string>> | undefined
   // Over kayjs-auth's own templates in every language.
   templates?: Partial<Templates> | undefined
-  // The languages mails are written in, the first for a user whose language is none of them: `['en', 'fr']`. English only by default; kayjs-auth writes English and French, `translations` any other.
+  // The languages mails are written in, the first for a user whose language is none of them: `['en', 'fr']`. The site's `i18n.locales` by default, English where it has none; kayjs-auth writes English and French, `translations` any other.
   locales?: string[] | undefined
   // Templates by language, over `templates`: `{ de: germanTemplates }`.
   translations?: Record<string, Partial<Templates>> | undefined

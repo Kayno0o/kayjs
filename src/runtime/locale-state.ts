@@ -27,10 +27,17 @@ export function localeState(): LocaleState | undefined {
 }
 
 let siteLocale = 'en'
+let siteLocaleList: readonly string[] | undefined
 
-// The site's default locale, installed once its locales are known, which the formatters use where no request runs, as a job or an alert does.
-export function setSiteLocale(locale: string): void {
+// The site's default locale, installed once its locales are known, which the formatters use where no request runs, as a job or an alert does; `all` is every locale it is served in, the default first.
+export function setSiteLocale(locale: string, all?: readonly string[]): void {
   siteLocale = locale
+  siteLocaleList = all
+}
+
+// Every locale the site is served in, the default first: only the default one where the site names no others, or before the server has set up.
+export function siteLocales(): readonly string[] {
+  return siteLocaleList ?? [siteLocale]
 }
 
 export function siteDefaultLocale(): string {

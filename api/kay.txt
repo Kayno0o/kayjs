@@ -2232,7 +2232,7 @@ interface DevTabOptions
   summary?: (count: number) => string
 
 [./dev-tool] DevTool
-type DevTool = Pick<Tool, 'make' | 'icon' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>
+type DevTool = Pick<Tool, 'make' | 'icon' | 'time' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>
 
 [./edit] DraftEntry
 interface DraftEntry

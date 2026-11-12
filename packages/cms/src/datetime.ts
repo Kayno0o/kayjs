@@ -1,5 +1,6 @@
 import type { CollectionInfo } from './kay/contract'
 import { effect, onCleanup, onMount, signal } from 'kay'
+import { formatDate } from 'kay/i18n'
 
 const LOCAL_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 const MINUTE = 16
@@ -163,7 +164,7 @@ export function useGoesLive(at: () => number | undefined): () => string | undefi
 export function sinceText(at: number): string {
   const date = new Date(at)
 
-  return `${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+  return `${formatDate(date, { day: 'numeric', month: 'short' })} ${formatDate(date, { hour: '2-digit', minute: '2-digit' })}`
 }
 
 // The day an entry was last edited, in the editor's zone and the page's language once the browser says them; the UTC day as `2026-10-21` where neither is known, as the server renders it.
@@ -172,7 +173,7 @@ export function editedDay(time: number, zone?: string, lang?: string): string {
     return new Date(time).toISOString().slice(0, 10)
 
   try {
-    return new Intl.DateTimeFormat(lang === '' ? undefined : lang, { dateStyle: 'medium', timeZone: zone }).format(time)
+    return formatDate(time, { locale: lang === '' ? undefined : lang, dateStyle: 'medium', timeZone: zone })
   }
   catch {
     return new Date(time).toISOString().slice(0, 10)
@@ -187,7 +188,7 @@ export function editedMoment(time: number, zone?: string, lang?: string): string
     return utc()
 
   try {
-    return new Intl.DateTimeFormat(lang === '' ? undefined : lang, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(time)
+    return formatDate(time, { locale: lang === '' ? undefined : lang, dateStyle: 'medium', timeStyle: 'short', timeZone: zone })
   }
   catch {
     return utc()

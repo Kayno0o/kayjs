@@ -4,6 +4,7 @@ import type { Address, Delivery, Mail, MailAttachment, MailMessage, ViewContent 
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { formatBytes, formatDate } from 'kay/i18n'
 import { escapeHtml as escape, eventStream, isEmail, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
@@ -86,9 +87,8 @@ function page(title: string, body: string, status = 200, script = ''): Response 
   return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${escape(title)}</title><style>${STYLE}</style></head><body><main>${body}</main>${script}</body></html>`, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': PAGE_POLICY } })
 }
 
-function kilobytes(bytes: number): string {
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
+// The preview pages are English whatever the app's locales, as their `lang` says.
+const sizeText = (bytes: number): string => formatBytes(bytes, { locale: 'en' })
 
 function listPage(clearing: boolean): Response {
   const mails = outbox.mails.toReversed()
@@ -101,16 +101,16 @@ function listPage(clearing: boolean): Response {
   const bar = clearing
     ? `<form class="confirm" method="post" action="${PREVIEW_PATH}/clear"><p>Clear the ${count} in the outbox? Their pages go with them.</p><div class="bar"><button type="submit">Clear ${count}</button><a href="${PREVIEW_PATH}">Cancel</a></div></form>`
     : `<div class="bar"><span>${count}, newest first</span><a href="${PREVIEW_PATH}?clear">Clear the outbox</a><a href="${SAMPLES_PATH}">Mail samples</a></div>`
-  const rows = mails.map(mail => `<tr><td>${escape(mail.sentAt.toLocaleTimeString('en-GB'))}</td><td>${shown(mail.to)}</td><td><a href="${PREVIEW_PATH}/${mail.id}">${escape(mail.subject)}</a></td></tr>`)
+  const rows = mails.map(mail => `<tr><td>${escape(formatDate(mail.sentAt, { locale: 'en-GB', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}</td><td>${shown(mail.to)}</td><td><a href="${PREVIEW_PATH}/${mail.id}">${escape(mail.subject)}</a></td></tr>`)
 
   return page('Outbox', `<h1>Outbox</h1>${bar}<table><thead><tr><th>Sent</th><th>To</th><th>Subject</th></tr></thead><tbody>${rows.join('')}</tbody></table>`, 200, live)
 }
 
 function sizeOf(mail: Mail): string {
   const htmlBytes = mail.html === undefined ? 0 : Buffer.byteLength(mail.html)
-  const clipped = htmlBytes > GMAIL_CLIP_BYTES ? ` <span class="warning">Gmail clips it: its html passes ${kilobytes(GMAIL_CLIP_BYTES)}</span>` : ''
+  const clipped = htmlBytes > GMAIL_CLIP_BYTES ? ` <span class="warning">Gmail clips it: its html passes ${sizeText(GMAIL_CLIP_BYTES)}</span>` : ''
 
-  return `${kilobytes(htmlBytes + Buffer.byteLength(mail.text))}, html ${kilobytes(htmlBytes)}${clipped}`
+  return `${sizeText(htmlBytes + Buffer.byteLength(mail.text))}, html ${sizeText(htmlBytes)}${clipped}`
 }
 
 // The mail's html in a frame at desktop or phone width, as `view` links to each, then its text.

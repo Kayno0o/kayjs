@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { direction, formatDate, formatList, formatNumber, formatRelativeTime } from '../src/runtime/i18n.server'
-import { runInLocale, setSiteLocale } from '../src/runtime/locale-state'
+import { runInLocale, setSiteLocale, siteLocales } from '../src/runtime/locale-state'
 
 afterEach(() => {
   setSiteLocale('en')
@@ -58,5 +58,15 @@ describe('the formatters outside a request', () => {
     expect(formatDate(date, { locale: 'fr' })).toBe('5 janv. 2024')
     expect(formatDate(date, {})).toBe(new Intl.DateTimeFormat('en', {}).format(date))
     expect(formatRelativeTime(-2, 'day', { locale: 'fr', numeric: 'always' })).toBe('il y a 2 jours')
+  })
+})
+
+describe('the site\'s locales outside a request', () => {
+  it('list the default one alone until the server says them all', () => {
+    expect(siteLocales()).toEqual(['en'])
+
+    setSiteLocale('fr', ['fr', 'en'])
+
+    expect(siteLocales()).toEqual(['fr', 'en'])
   })
 })

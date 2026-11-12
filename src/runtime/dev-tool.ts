@@ -25,6 +25,7 @@ import { startTabOrder } from './dev-tool-tab-order'
 import { addLazyTabs, tabMaker } from './dev-tool-tabs'
 import { watchVitals } from './dev-tool-vitals'
 import { startPlacement } from './dev-tool-window'
+import { formatDate } from './i18n'
 
 // The names a tab module or a library writes its types against.
 export type { DevIconName } from './dev-tool-icons'
@@ -78,6 +79,8 @@ export interface DevTool {
   root: ShadowRoot
   make: <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => HTMLElementTagNameMap[K]
   tab: (options: DevTabOptions) => DevTab
+  // A moment as the time of day a log line starts with, `14:05:03` in 24 hours whatever the page's locale, in the site's time zone, or the browser's.
+  time: (at: Date | number | string) => string
   // A button of its own on the bar, with an icon by name from kay's set before its text.
   button: (text: string, label: string, icon?: DevIconName) => HTMLButtonElement
   icon: (name: DevIconName) => SVGSVGElement
@@ -280,6 +283,7 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
     tab,
     button,
     icon: name => iconOf(doc, name),
+    time: at => formatDate('en-GB', new Date(at), { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     kit: makeKit(() => tool, listening.signal, missing, vitals, swapLog),
     outline,
     hideOutline,

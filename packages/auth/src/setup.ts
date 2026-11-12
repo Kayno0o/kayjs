@@ -3,6 +3,7 @@ import type { Access } from './access'
 import type { AuthOptions } from './auth'
 import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
+
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
 import { asConfigError, configError, configuredSite, decide, dispatch, durationSeconds, kv } from 'kay/library'
@@ -15,7 +16,7 @@ import { guardOf } from './guards'
 import { deriveKeys } from './keys'
 import { resolveLimits } from './limits'
 import { log } from './log'
-import { localeTemplates } from './mail'
+import { mailLanguages } from './mail'
 import { createOAuthClient } from './oauth/client'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { organizationsCore } from './organizationsCore'
@@ -188,7 +189,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   const oauthApps = Object.entries(options.oauth ?? {})
   const { origin, name } = siteOptions(options)
   const given = origin?.replace(TRAILING_SLASH, '')
-  const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
+  const languages = options.email && mailLanguages(options.email)
   const pages = pagesOf(options.pages)
   const passkeyOptions = options.passkeys === false ? undefined : options.passkeys
   const paths = pages && pagePaths(pages.prefix)
@@ -288,8 +289,12 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
       maxAge: tokenLifetimes(options.email.maxAge),
       links: emailLinks(options.email.links, paths?.links),
       requireVerified: options.email.requireVerified ?? true,
-      locales,
-      templates: localeTemplates(locales, options.email.templates, options.email.translations),
+      get locales() {
+        return languages!.locales()
+      },
+      get templates() {
+        return languages!.templates()
+      },
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
     },
     oauthServer: oauthServerOf(options, pages),

@@ -1,3 +1,5 @@
+import { formatDate } from 'kay/i18n'
+
 // A date range's two bounds as `YYYY-MM-DD`, each open when empty.
 export type DateRange = [string | null, string | null]
 
@@ -124,35 +126,19 @@ export function weekdays(locale: string, firstDay: number): { short: string, lon
   })
 }
 
-const formatters = new Map<string, Intl.DateTimeFormat>()
-const FORMATTER_CAP = 200
-
-// A formatter is slow to build and a calendar asks for the same few dozens of times, so each locale and options pair builds one; a locale the runtime rejects is drawn in English. The cache is emptied past a cap, so a user-controlled locale string cannot grow it without limit.
-function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
-  const key = `${locale}|${JSON.stringify(options)}`
-  let found = formatters.get(key)
-
-  if (!found) {
-    try {
-      found = new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' })
-    }
-    catch {
-      found = new Intl.DateTimeFormat('en', { ...options, timeZone: 'UTC' })
-    }
-
-    if (formatters.size >= FORMATTER_CAP)
-      formatters.clear()
-
-    formatters.set(key, found)
-  }
-
-  return found
-}
-
+// A day written in the locale, on the UTC calendar the ISO date names; a locale the runtime rejects is drawn in English.
 function format(iso: string, locale: string, options: Intl.DateTimeFormatOptions): string {
   const date = utc(iso)
 
-  return date ? formatter(locale, options).format(date) : iso
+  if (!date)
+    return iso
+
+  try {
+    return formatDate(date, { ...options, locale, timeZone: 'UTC' })
+  }
+  catch {
+    return formatDate(date, { ...options, locale: 'en', timeZone: 'UTC' })
+  }
 }
 
 // Today on the viewer's own calendar.

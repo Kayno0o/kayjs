@@ -345,7 +345,7 @@ const projects = new Map<string, Promise<I18n>>()
 
 export function serveLocales(root: string, i18n: I18n): void {
   projects.set(resolve(root), Promise.resolve(i18n))
-  setSiteLocale(i18n.settings.defaultLocale)
+  setSiteLocale(i18n.settings.defaultLocale, i18n.settings.locales)
 }
 
 // The state `renderToString` runs in outside a request, or for another locale than the request's, in the site's default locale unless given one; its page is the root.

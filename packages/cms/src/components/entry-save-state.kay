@@ -1,11 +1,12 @@
 ---
 import type { SavedState } from '../editor/live'
+import { formatDate } from 'kay/i18n'
 import { wording } from 'kay/words'
 
 // Where an entry stands, kept on screen and read out as it changes: saving, edits not saved yet, or the time of the last save, with a link to the public page when the site shows the save only once it has rebuilt.
 const { changed, saving, saved, url } = props<{ changed: boolean, saving: boolean, saved: SavedState | undefined, url?: string | undefined }>()
 
-const time = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+const time = (at: number) => formatDate(at, { hour: '2-digit', minute: '2-digit' })
 ---
 p.kcms-save-state(role="status" aria-live="polite")
   if saving

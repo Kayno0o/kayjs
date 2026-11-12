@@ -367,12 +367,21 @@ export function textDirection(locale: string): Direction {
   })
 }
 
+// Past this many formatters a cache starts over, so a locale or options a visitor chooses cannot grow it without limit.
+const CACHE_CAP = 200
+
 // Building a formatter costs far more than using one, and a site formats with few options.
 function cached<Value>(cache: Map<string, Value>, key: string, make: () => Value): Value {
   let value = cache.get(key)
 
-  if (value === undefined)
-    cache.set(key, value = make())
+  if (value === undefined) {
+    value = make()
+
+    if (cache.size >= CACHE_CAP)
+      cache.clear()
+
+    cache.set(key, value)
+  }
 
   return value
 }

@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { ByteSize } from 'kay/library'
 import type { FieldSize } from './field-look'
 import { byteCount, listen, recipe, signal, uid } from 'kay'
-import { wording } from 'kay/words'
+import { sizeText, wording } from 'kay/words'
 import { acceptsFile } from './accept'
 import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
 import { linkChoice } from './choice-link'
@@ -90,15 +90,6 @@ function sizeLimit(): number {
 
   return bytes
 }
-
-// A file's size for a list, in the unit that keeps it short.
-function sizeText(bytes: number): string {
-  if (bytes < 1024)
-    return `${bytes} B`
-
-  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 
 function open() {
   input?.click()

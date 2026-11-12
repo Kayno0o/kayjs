@@ -1,8 +1,8 @@
 import type { Duration } from 'kay'
 import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthMailWording, AuthNoticeKind } from 'kay/library/auth-mails'
-import type { EmailCore } from './email'
+import type { EmailCore, EmailOptions } from './email'
 import { within } from '@kaynooo/utils/promise'
-import { configError, durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
+import { configError, durationWords, escapeHtml as escape, siteLocales, trackDetached } from 'kay/library'
 import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { language, pickLocale } from './locale'
 import { log } from './log'
@@ -202,4 +202,24 @@ export function writing(email: EmailCore, wanted: readonly (string | null | unde
 // Each of `locales` with kayjs-auth's templates in its language, `templates` over them and its translation over both.
 export function localeTemplates(locales: readonly string[], templates: Partial<Templates> = {}, translations: Record<string, Partial<Templates>> = {}): Record<string, Templates> {
   return Object.fromEntries(locales.map(locale => [locale, { ...builtInTemplates[language(locale)] ?? defaultTemplates, ...templates, ...translations[locale] }]))
+}
+
+// The languages mails are written in and their templates: `locales` as given, else the site's own, which a server knows once it set up, so an auth made while the app's modules load asks again at each use; the templates are built again only when the languages change.
+export function mailLanguages(email: Pick<EmailOptions, 'locales' | 'templates' | 'translations'>): { locales: () => string[], templates: () => Record<string, Templates> } {
+  const given = email.locales !== undefined && email.locales.length > 0 ? [...email.locales] : undefined
+  let built: { key: string, templates: Record<string, Templates> } | undefined
+  const locales = (): string[] => given ?? [...siteLocales()]
+
+  return {
+    locales,
+    templates: () => {
+      const now = locales()
+      const key = now.join('\n')
+
+      if (built?.key !== key)
+        built = { key, templates: localeTemplates(now, email.templates, email.translations) }
+
+      return built.templates
+    },
+  }
 }

@@ -75,7 +75,7 @@ export default function aiDevTool(tool: DevTool): void {
       const pill = tool.make('span', `pill ${TONES[ask.outcome]}`, ask.outcome)
 
       head.append(pill, ' ', tool.make('span', 'mono', `${ask.model} ${ask.tokens} tokens ${ask.ms} ms`))
-      item.append(head, tool.make('div', 'note', `${new Date(ask.at).toLocaleTimeString('en-GB')} ${ask.prompt}`), ...ask.error === undefined ? [] : [tool.make('div', 'error', ask.error)])
+      item.append(head, tool.make('div', 'note', `${tool.time(ask.at)} ${ask.prompt}`), ...ask.error === undefined ? [] : [tool.make('div', 'error', ask.error)])
 
       return item
     })
