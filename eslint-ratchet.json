@@ -133,7 +133,7 @@
     "max-lines-per-function": 214
   },
   "src/content/markdown.ts": {
-    "max-lines": 625
+    "max-lines": 616
   },
   "src/dev/index.ts": {
     "max-lines-per-function": 251

@@ -473,3 +473,11 @@ describe('a blocks list', () => {
     expect(optional.kind === 'list' && optional.blocks?.length).toBe(3)
   })
 })
+
+describe('humanize beyond a-z', () => {
+  it('keeps the accented letters of a key', () => {
+    expect(humanize('prénom')).toBe('Prénom')
+    expect(humanize('à_propos')).toBe('À propos')
+    expect(humanize('タイトル')).toBe('タイトル')
+  })
+})

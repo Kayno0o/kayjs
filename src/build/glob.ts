@@ -1,7 +1,7 @@
 import type { ObjectExpression, PropertyKey } from 'oxc-parser'
 import type { Node } from '../compiler/estree'
 import { existsSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { parseProgram } from '../compiler/estree'
 import { eachDescendant } from '../compiler/walk'
@@ -18,6 +18,7 @@ interface GlobCall {
 
 export const GLOB_CALL = 'import.meta.glob'
 const GLOB_MAGIC = /[*?[\]{}()!]/
+const GLOB_SPECIAL = /[*?[\]{}()!\\]/g
 const RELATIVE = /^\.\.?\//
 const NEGATED = /^!/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
@@ -33,15 +34,16 @@ const USAGE = 'import.meta.glob(\'./demos/*.kay\', { eager: true, import: \'defa
 export function globFiles(patterns: string[], importer: string, root: string): Map<string, string> {
   const from = dirname(importer)
   const icons = iconMatches(patterns, root)
-  const absolute = (pattern: string) => RELATIVE.test(pattern) ? resolve(from, pattern) : join(root, pattern)
-  const excluded = patterns.filter(pattern => pattern.startsWith('!') && !pattern.startsWith(`!${ICONS}`)).map(pattern => new Bun.Glob(absolute(pattern.slice(1))))
+  const anchorOf = (pattern: string) => RELATIVE.test(pattern) ? from : root
+  // The folder a pattern starts from is a path, not a pattern: a project in `my[app]` is matched as written.
+  const excluded = patterns.filter(pattern => pattern.startsWith('!') && !pattern.startsWith(`!${ICONS}`)).map(pattern => new Bun.Glob(join(anchorOf(pattern.slice(1)).replace(GLOB_SPECIAL, '\\$&'), pattern.slice(1))))
   const files = new Map<string, string>()
 
   for (const pattern of patterns.filter(pattern => !pattern.startsWith('!') && !pattern.startsWith(ICONS))) {
-    const full = absolute(pattern)
-    const segments = full.split(sep)
-    const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
-    const base = magic === -1 ? dirname(full) : segments.slice(0, magic).join(sep) || sep
+    const parts = pattern.split('/')
+    const magic = parts.findIndex(part => GLOB_MAGIC.test(part))
+    const head = magic === -1 ? parts.slice(0, -1) : parts.slice(0, magic)
+    const base = join(anchorOf(pattern), ...head)
 
     GLOBBED.add(base)
 
@@ -51,7 +53,7 @@ export function globFiles(patterns: string[], importer: string, root: string): M
 
     const searchesModules = pattern.includes('node_modules')
 
-    for (const found of new Bun.Glob(relative(base, full)).scanSync({ cwd: base, absolute: true, onlyFiles: true })) {
+    for (const found of new Bun.Glob(parts.slice(head.length).join('/')).scanSync({ cwd: base, absolute: true, onlyFiles: true })) {
       if (found === importer || (!searchesModules && relative(base, found).split(sep).includes('node_modules')) || excluded.some(glob => glob.match(found)))
         continue
 

@@ -458,7 +458,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
   // Whether the end date passed, the only reason that makes the entry's URL gone for good rather than not found: a draft, or an entry not yet published, may come back.
   const ended = (entry: Entry<Data> | undefined) => entry !== undefined && !(draft !== undefined && isDraft(draft, entry)) && over(entry) && !notYet(entry)
-  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && heldBack(options, entry, entry.data) && !sharedDraft(exportNameOf(name), entry.slug, entry.locale)
+  const hidden = (entry: Entry<Data>) => (draft !== undefined || publishAt !== undefined || unpublishAt !== undefined) && !contentMode().dev && !previewing() && heldBack(options, entry) && !sharedDraft(exportNameOf(name), entry.slug, entry.locale)
   const blockItem = (data: unknown, path: string[]) => isBlockItem(options.schema, data, path)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
@@ -692,7 +692,7 @@ function noteTranslationUrls<Data>(found: Entry<Data>, paired: Map<string, Map<s
   ;(state.entryUrls ??= new Map()).set(found.url, urls)
 }
 
-function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined, dir: string | undefined): Entry<Data> {
+export function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined, dir: string | undefined): Entry<Data> {
   const segments = entry.segments ?? []
   const split = entry.slug.indexOf('/')
   const words = entry.words ?? 0

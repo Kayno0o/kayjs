@@ -6,6 +6,7 @@ import { buildClient } from '../src/build/client'
 import { expandGlobs, globFiles } from '../src/build/glob'
 import { kay } from '../src/build/plugin'
 import { registerLoader } from '../src/server/loader'
+import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/glob')
@@ -82,5 +83,19 @@ describe('import.meta.glob', () => {
     expect(() => expandGlobs('const dir = \'demos\'\nimport.meta.glob(`./${dir}/*.ts`)\n', importer, FIXTURE, 'ts')).toThrow(`kay: import.meta.glob in ${importer} takes its patterns as strings written in the call, as the build reads them before the module runs: import.meta.glob('./demos/*.kay', { eager: true, import: 'default' })`)
     expect(() => expandGlobs('import.meta.glob(\'demos/*.ts\')\n', importer, FIXTURE, 'ts')).toThrow('takes patterns starting with ./, ../ or / for the project\'s root')
     expect(() => expandGlobs('import.meta.glob(\'./demos/*.ts\', { query: \'?raw\' })\n', importer, FIXTURE, 'ts')).toThrow('takes `eager` and `import` as options written in the call')
+  })
+})
+
+describe('globFiles in a project path with glob characters', () => {
+  it.each(['plain', 'my[app]', 'a{b,c}', 'x*y', 'p(q)!'])('matches the project path as written: %s', async (name) => {
+    const root = join(await scratchDir('glob-chars-'), name)
+
+    await Bun.write(join(root, 'src/main.ts'), '')
+    await Bun.write(join(root, 'src/demos/a.kay'), '')
+    await Bun.write(join(root, 'src/demos/draft.kay'), '')
+
+    expect([...globFiles(['./demos/*.kay'], join(root, 'src/main.ts'), root).keys()]).toEqual(['./demos/a.kay', './demos/draft.kay'])
+    expect([...globFiles(['/src/demos/*.kay'], join(root, 'src/main.ts'), root).keys()]).toEqual(['/src/demos/a.kay', '/src/demos/draft.kay'])
+    expect([...globFiles(['./demos/*.kay', '!./demos/draft.kay'], join(root, 'src/main.ts'), root).keys()]).toEqual(['./demos/a.kay'])
   })
 })

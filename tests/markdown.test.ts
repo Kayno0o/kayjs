@@ -5,6 +5,7 @@ import { Window } from 'happy-dom'
 import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { renderMarkdown } from '../src/content'
+import { compileMarkdown } from '../src/content/markdown'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
 import { markdownHtml as islandMarkdown } from '../src/runtime/markdown-render.client'
 import { markdownHtml } from '../src/runtime/markdown.server'
@@ -248,5 +249,25 @@ describe('task list checkboxes', () => {
     markdownHtml('- [ ] a <b>'.repeat(5000))
     markdownHtml('- [ ] a\n\n'.repeat(3000))
     expect(performance.now() - started).toBeLessThan(3000)
+  })
+})
+
+describe('heading ids', () => {
+  const idsOf = async (markdown: string) => (await compileMarkdown(markdown, 1, { headingLinks: true })).headings.map(heading => heading.id)
+
+  it('keep the letters of an accented or CJK title, and are never empty', async () => {
+    expect(await idsOf('## Été & Café\n\n## 日本語 の 見出し\n\n## 🙂\n\n## --')).toEqual(['été-café', '日本語-の-見出し', 'heading', 'heading-1'])
+  })
+
+  it('are unique in the page, the first keeping the id it has always had', async () => {
+    const compiled = await compileMarkdown('## A\n\n## Été\n\n## A\n\n## A 1\n\n## été', 1, { headingLinks: true })
+    const html = compiled.segments.join('')
+
+    expect(compiled.headings.map(heading => heading.id)).toEqual(['a', 'été', 'a-1', 'a-1-1', 'été-1'])
+    expect(html).toContain('<h2 id="a-1-1"><a href="#a-1-1">A 1</a></h2>')
+  })
+
+  it('stay Bun\'s for an ASCII title', async () => {
+    expect(await idsOf('# Hello, World! 2\n\n## a_b--c\n\n## `code` x\n\n## Hello, World! 2')).toEqual(['hello-world-2', 'ab-c', 'code-x', 'hello-world-2-1'])
   })
 })

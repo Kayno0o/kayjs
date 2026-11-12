@@ -9,9 +9,10 @@ import { t } from 'elysia'
 import { collection } from '../src/content'
 import { entryHead, entryModified } from '../src/content/entry-head'
 import { descriptionOf } from '../src/content/excerpt'
-import { bodiesFile, contentPlace, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import { heldBack } from '../src/content/held-back'
+import { bodiesFile, contentPlace, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { gitSpawns } from '../src/content/modified'
-import { writeContentManifests } from '../src/content/server'
+import { slugsOf, writeContentManifests } from '../src/content/server'
 import { html } from '../src/runtime/html'
 import { setPreviewScope } from '../src/runtime/preview'
 import { testEntry } from '../src/test'
@@ -322,5 +323,64 @@ describe('testEntry', () => {
 
     expect(entry).toMatchObject({ slug: 'hi', data: { title: 'T' }, excerpt: 'Lead.', body: '', html: '', headings: [], words: 0, readingTime: 0, file: 'hi.md' })
     expect(testEntry({}).slug).toBe('entry')
+  })
+})
+
+describe('a description of emoji', () => {
+  it('is cut between characters, never inside a surrogate pair', () => {
+    for (const lead of ['', 'x']) {
+      const description = descriptionOf(lead + '😀'.repeat(200))!
+
+      expect(description.isWellFormed()).toBe(true)
+      expect(description.length).toBeLessThanOrEqual(160)
+    }
+  })
+})
+
+describe('collections whose folders overlap', () => {
+  const files = { 'content/blog/a.md': post('Hello') }
+
+  it('each give a slug relative to their own folder, whichever loads first', async () => {
+    for (const order of [['content', 'content/blog'], ['content/blog', 'content']] as const) {
+      await inProject(files, async () => {
+        const slugs: Record<string, string[]> = {}
+
+        for (const dir of order)
+          slugs[dir] = (await loadEntries(dir, { live: true })).map(entry => entry.slug)
+
+        expect(slugs).toEqual({ 'content': ['blog/a'], 'content/blog': ['a'] })
+      })
+    }
+  })
+})
+
+describe('a draft function', () => {
+  it('reads the entry\'s excerpt, body and html, as the app does', async () => {
+    const seen: string[] = []
+    const entry = Object.defineProperties({ slug: 'a', data: { title: 'T' } }, { excerpt: { get: () => 'WIP: x' }, body: { get: () => 'WIP body' }, html: { get: () => '<p>WIP</p>' } }) as unknown as Parameters<typeof heldBack>[1]
+    const draft = (e: { excerpt: string, body: string, html: string }) => {
+      seen.push(e.excerpt, e.body, e.html)
+
+      return e.excerpt.startsWith('WIP')
+    }
+
+    expect(heldBack({ draft }, entry)).toBe(true)
+    expect(seen).toEqual(['WIP: x', 'WIP body', '<p>WIP</p>'])
+  })
+
+  it('holds back a draft whose excerpt says so, in production and in the build\'s listing of slugs', async () => {
+    await inProject({ 'p/a.md': post('WIP: later'), 'p/b.md': post('Done') }, async (root) => {
+      const posts = collection('p', { schema, draft: entry => entry.excerpt.startsWith('WIP') })
+
+      try {
+        setContentMode({ dev: false, prebuilt: false })
+        expect((await posts.all()).map(entry => entry.slug)).toEqual(['b'])
+      }
+      finally {
+        setContentMode({ dev: false, prebuilt: false })
+      }
+
+      expect([...(await slugsOf(root, posts))!]).toEqual([['a', true], ['b', false]])
+    })
   })
 })

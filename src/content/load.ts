@@ -286,6 +286,7 @@ async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>
   const absolute = collectionFolder(dir)
   const cacheDir = projectCache(root, 'content')
   const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${compilerFingerprint()}:${await markdownSalt(root, markdown)}`).toString(36)
+  const folder = relative(root, sourcePath(absolute)).split(sep).join('/')
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
@@ -300,7 +301,8 @@ async function compileDirectory(dir: string, markdown: Omit<LoadOptions, 'live'>
     entries.push(...(await Promise.all(files.slice(start, start + READ_BATCH).map(async (name) => {
       const path = join(absolute, name)
       const file = relative(root, sourcePath(path)).split(sep).join('/')
-      const cacheFile = join(cacheDir, `${Bun.hash(file).toString(36)}.entry.json`)
+      // An entry's slug is relative to its collection's folder, so two collections reading one file keep one cache entry each.
+      const cacheFile = join(cacheDir, `${Bun.hash(`${folder}\0${file}`).toString(36)}.entry.json`)
 
       touchCacheFile(cacheFile)
 

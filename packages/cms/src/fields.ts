@@ -84,7 +84,7 @@ const LONG_TEXT = 120
 const LINE_FORMATS: Record<string, FieldBase['inputType']> = { email: 'email', uri: 'url', url: 'url', hostname: 'text', uuid: 'text' }
 const MIN_ROWS = 2
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
-const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
+const WORD = /\p{Lu}+(?!\p{Ll})|\p{Lu}?[\p{Ll}\p{Lo}\p{M}\p{N}]+/gu
 
 export function humanize(key: string): string {
   const words = (key.match(WORD) ?? [key]).map(word => word === word.toUpperCase() && word.length > 1 ? word : word.toLowerCase()).join(' ')

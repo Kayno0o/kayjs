@@ -190,6 +190,9 @@ function contentKey(name: string): string
 [./content] PUBLISH_TIMES
 const PUBLISH_TIMES: typeof PUBLISH_TIMES
 
+[./content] toEntry
+function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean, readingSpeed: number, imageSizes: string | undefined, dir: string | undefined): Entry<Data>
+
 [./dom] animated
 function animated(unit: Unit | null): boolean
 

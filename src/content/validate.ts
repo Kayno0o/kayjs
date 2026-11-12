@@ -72,7 +72,12 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
 
     if (check.Check(data)) {
       if (problems.length === before) {
-        decoded.push({ entry, data: check.Decode(data) })
+        const value = decodedValue(check, schema, data, entry, problems)
+
+        if (value === undefined)
+          continue
+
+        decoded.push({ entry, data: value.data })
 
         // Only an entry that proved valid holds its key, so a refused one does not turn a valid sibling away.
         if (claim !== undefined)
@@ -91,6 +96,67 @@ function readEntries(entries: RawEntry[], schema: TSchema, components: Record<st
   }
 
   return { decoded, problems }
+}
+
+// A date as written, to its day and time: the schema's check lets `2024-02-30` and `T24:00` through and Decode rolls them into the next month or day.
+const WRITTEN_DATE = /^(\d{4})-(\d\d)-(\d\d)(?:[T ](\d\d):(\d\d)(?::(\d\d)(?:\.\d+)?)?)?/i
+
+function isImpossibleDate(text: string): boolean {
+  const match = WRITTEN_DATE.exec(text)
+
+  if (match === null)
+    return false
+
+  const [year, month, day, hour = 0, minute = 0, second = 0] = match.slice(1).map(Number) as [number, number, number, number | undefined, number | undefined, number | undefined]
+  const real = new Date(Date.UTC(year, month - 1, day))
+
+  return real.getUTCMonth() !== month - 1 || real.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59
+}
+
+// The first path where a text became a date that its own text does not name: the decoded value read beside the data it came from.
+function impossibleDateAt(data: unknown, decoded: unknown, path = ''): string | undefined {
+  if (typeof data === 'string')
+    return decoded instanceof Date && isImpossibleDate(data) ? path : undefined
+
+  if (typeof data !== 'object' || data === null || typeof decoded !== 'object' || decoded === null)
+    return undefined
+
+  for (const key of Object.keys(data)) {
+    const found = impossibleDateAt((data as Record<string, unknown>)[key], (decoded as Record<string, unknown>)[key], `${path}/${key.replaceAll('~', '~0').replaceAll('/', '~1')}`)
+
+    if (found !== undefined)
+      return found
+  }
+
+  return undefined
+}
+
+// The data decoded, or nothing with the field a value that the check let through but cannot be decoded, or decodes to another day, reported as an entry the schema refuses.
+function decodedValue(check: ReturnType<typeof compiledCheck>, schema: TSchema, data: unknown, entry: RawEntry, problems: ContentProblem[]): { data: unknown } | undefined {
+  let path: string | undefined
+  let value: unknown
+
+  try {
+    value = check.Decode(data)
+    path = impossibleDateAt(data, value)
+  }
+  catch (error) {
+    const failed = (error as { path?: unknown }).path
+
+    if (typeof failed !== 'string')
+      throw error
+
+    path = failed
+  }
+
+  if (path === undefined)
+    return { data: value }
+
+  const dotted = dottedPath(path)
+
+  problems.push({ file: entry.file, line: entry.lines[fieldOf(path)] ?? 1, message: `${dotted === '' ? '' : `${dotted}: `}${entryRefusal(labelOf(schema, path, data), { schema: {}, value: 'invalid' })}` })
+
+  return undefined
 }
 
 // A localized collection pairs the entries of a locale with their translations by key, so two of one locale cannot share one: a `translationKey` field, else the slug after its locale's folder. Gives the key the entry would hold, which the caller claims once the entry proved valid, or nothing where it is refused already.

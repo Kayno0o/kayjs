@@ -12,6 +12,7 @@ const SPACES = /\s+/g
 const TRAILING_PUNCTUATION = /[\s,;:.!?-]+$/
 // What a description keeps of an excerpt: a search result shows about this much.
 const DESCRIPTION_LENGTH = 160
+const HIGH_SURROGATE = /[\uD800-\uDBFF]/
 
 // The markup with whatever sits inside a quote, a list item or a disclosure taken out, nested ones counted.
 function withoutContainers(markup: string): string {
@@ -53,7 +54,8 @@ export function descriptionOf(excerpt: string): string | undefined {
   if (excerpt.length <= DESCRIPTION_LENGTH)
     return excerpt
 
-  const cut = excerpt.slice(0, DESCRIPTION_LENGTH - 1)
+  // Never between the two halves of a character outside the BMP.
+  const cut = excerpt.slice(0, HIGH_SURROGATE.test(excerpt[DESCRIPTION_LENGTH - 2]!) ? DESCRIPTION_LENGTH - 2 : DESCRIPTION_LENGTH - 1)
   const space = cut.lastIndexOf(' ')
 
   return `${(space > 0 ? cut.slice(0, space) : cut).replace(TRAILING_PUNCTUATION, '')}…`

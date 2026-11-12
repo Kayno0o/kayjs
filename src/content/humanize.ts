@@ -1,5 +1,5 @@
 // The words of a key: `publishedAt` gives `Published at`, `seoURL` gives `Seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
-const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
+const WORD = /\p{Lu}+(?!\p{Ll})|\p{Lu}?[\p{Ll}\p{Lo}\p{M}\p{N}]+/gu
 
 // The same words the CMS labels a field with, `packages/cms/src/fields.ts`, which runs in the browser and cannot import this; `tests/entry-refusals.test.ts` holds the two together.
 export function humanize(key: string): string {

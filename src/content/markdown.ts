@@ -7,6 +7,7 @@ import { outsideLinks } from '../runtime/html'
 import { MARKDOWN_KEPT, MARKDOWN_OPTIONS, sanitizedMarkdown } from '../runtime/markdown'
 import { labelTasks } from '../runtime/markdown-task'
 import { vouch } from '../runtime/safe-html'
+import { numberedHeadings } from './heading-id'
 import { contained, FENCE_CLOSE, FENCE_OPEN, footnoted } from './markdown-extensions'
 
 export interface Heading {
@@ -301,21 +302,8 @@ async function renderedMarkdown(markdown: string, options: CompileOptions = {}):
   const bare = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
   // The transform comes first, so a loader's untrusted text is sanitized after it and a heading it shifts is read as shifted.
   const rendered = options.transform ? await options.transform(bare) : bare
-  let html = labelTasks(withImageDefaults(options.sanitize === true ? sanitizedComponents(rendered) : rendered))
-  const headings: Heading[] = []
-  let plain = ''
-  let last = 0
-
-  for (const { open, inner, end } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`)) {
-    const [, depth, id] = open
-
-    headings.push({ depth: Number(depth), id: id!, text: decode(inner.replace(TAGS, '')).trim() })
-    plain += `${html.slice(last, open.index)}<h${depth} id="${id}">${inner}</h${depth}>`
-    last = end
-  }
-
-  if (!links)
-    html = plain + html.slice(last)
+  const page = labelTasks(withImageDefaults(options.sanitize === true ? sanitizedComponents(rendered) : rendered))
+  const { html, headings } = numberedHeadings(page, elements(page, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`), links, inner => decode(inner.replace(TAGS, '')).trim())
 
   return { html: options.highlight ? await highlighted(html, options.highlight) : html, headings }
 }

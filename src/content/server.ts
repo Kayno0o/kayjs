@@ -3,8 +3,8 @@ import type { TrailingSlash } from '../config'
 import type { LocaleState } from '../runtime/locale-state'
 import type { I18n } from '../server/i18n'
 import type { ServedPaths } from '../server/served-paths'
-import type { CollectionFeed, CollectionRoute } from './claims'
 
+import type { CollectionFeed, CollectionRoute } from './claims'
 import type { Collection, Entry } from './index'
 import type { RawEntry } from './load'
 import type { Segment } from './markdown'
@@ -28,7 +28,7 @@ import { modifiedMode } from './drafts'
 import { entries, registerCollections } from './edit'
 import { defaultFeedItem, FEED_TYPES, feedDocument, feedItem, feedPaths, renderedBody, resolvedFeed } from './feed'
 import { heldBack } from './held-back'
-import { isCollection } from './index'
+import { isCollection, toEntry } from './index'
 import { bodiesFile, contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
 import { referencesIn } from './references'
@@ -224,7 +224,7 @@ export async function contentProblems(root: string, config?: string, site = true
 const KAY_PREFIX = /^kay: /
 
 // The slugs a folder collection holds, a localized one's without their locale, each with whether every entry of it is held back from production; undefined for a loader's collection, whose entries are read when the server runs, and for a folder that does not read, which its own problems report.
-async function slugsOf(root: string, collection: Collection<unknown>): Promise<Map<string, boolean> | undefined> {
+export async function slugsOf(root: string, collection: Collection<unknown>): Promise<Map<string, boolean> | undefined> {
   const { dir } = collection
 
   if (dir === undefined)
@@ -252,7 +252,7 @@ async function slugsOf(root: string, collection: Collection<unknown>): Promise<M
     for (const entry of found) {
       const slug = localized ? entry.slug.slice(entry.slug.indexOf('/') + 1) : entry.slug
 
-      held.set(slug, (held.get(slug) ?? true) && data !== undefined && heldBack(collection.options, entry, data.get(entry)))
+      held.set(slug, (held.get(slug) ?? true) && data !== undefined && heldBackRaw(collection, entry, data.get(entry)))
     }
 
     return held
@@ -271,7 +271,7 @@ async function danglingReferences(root: string, collection: Collection<unknown>,
   const found: ContentProblem[] = []
 
   for (const { entry, data } of decoded) {
-    const shown = notes !== undefined && !heldBack(collection.options, entry, data)
+    const shown = notes !== undefined && !heldBackRaw(collection, entry, data)
 
     for (const use of referencesIn(collection.options.schema, data)) {
       const target = named.find(([name]) => name === use.collection)?.[1]
@@ -457,4 +457,11 @@ export async function localizedSlugs(root: string, config?: string): Promise<Map
   }
 
   return found
+}
+
+// Whether production holds an entry back, its `draft` function reading the entry the app reads, with its `excerpt`, `body` and `html`.
+function heldBackRaw(collection: Collection<unknown>, raw: RawEntry, data: unknown): boolean {
+  const { readingSpeed, imageSizes } = markdownOf(collection.options)
+
+  return heldBack(collection.options, toEntry(raw, data, (collection.options.components ?? {}), collection.options.localized === true, readingSpeed, imageSizes, undefined))
 }

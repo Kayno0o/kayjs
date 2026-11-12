@@ -6,6 +6,7 @@ import { t } from 'elysia'
 import { humanize } from '../packages/cms/src/fields'
 import { checkContent } from '../src/check/project'
 import { loadConfig } from '../src/config-loader'
+import { humanize as humanizeLabel } from '../src/content/humanize'
 import { writeContentManifests } from '../src/content/server'
 import { ContentError, dataIssues, decodeEntries } from '../src/content/validate'
 import { runInLocale } from '../src/runtime/locale-state'
@@ -232,4 +233,36 @@ describe('kay build and kay check', () => {
       await rm(broken, { recursive: true, force: true })
     }
   }, 30_000)
+})
+
+describe('a date a schema lets through', () => {
+  const dated = t.Object({ title: t.String(), date: t.Date() })
+  const read = (date: string) => decodeEntries([{ slug: 'a', file: 'a.md', data: { title: 'x', date }, lines: { date: 3 } }], dated, {})
+
+  it.each(['2024-03-10 10:00', '2024-02-30', '2024-13-01', '2024-03-10T24:00:00Z', '2023-02-29', '2024-04-31', '2024-03-10T10:60:00Z'])('is a content problem naming the file and field: %s', (date) => {
+    expect(() => read(date)).toThrow(ContentError)
+    expect(() => read(date)).toThrow('a.md:3 date: Date is not valid')
+  })
+
+  it('decodes when it is a real day and time', () => {
+    for (const date of ['2024-02-29', '2024-03-10T10:00:00Z', '2024-03-10 10:00:00', '2024-03-10'])
+      expect((read(date)[0]!.data as { date: Date }).date).toBeInstanceOf(Date)
+  })
+
+  it('names a date nested in a list or an object by its path', () => {
+    const nested = t.Object({ events: t.Array(t.Object({ on: t.Date() })) })
+
+    expect(() => decodeEntries([{ slug: 'a', file: 'a.md', data: { events: [{ on: '2024-02-30' }] }, lines: { events: 2 } }], nested, {})).toThrow('a.md:2 events.0.on:')
+  })
+})
+
+describe('humanize', () => {
+  it('keeps the letters outside a-z of a key', () => {
+    expect(humanize('prénom')).toBe('Prénom')
+    expect(humanize('à_propos')).toBe('À propos')
+    expect(humanize('タイトル')).toBe('タイトル')
+    expect(humanizeLabel('prénom')).toBe('Prénom')
+    expect(humanizeLabel('à_propos')).toBe('À propos')
+    expect(humanizeLabel('éclairageDeLaVille')).toBe('Éclairage de la ville')
+  })
 })

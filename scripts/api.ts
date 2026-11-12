@@ -52,7 +52,7 @@ export const INTERNAL: Record<string, InternalRules> = {
     // The compile-time machinery behind the generated shadow types, named by no doc.
     names: { '.': ['carrySchema', 'BindableMark', 'IslandBrand', 'HandedPart', 'HandsPart', 'HandedSignal', 'UnresolvedParameter', 'WidenedProps', 'CheckedHref', 'CheckedHtml', 'BoundProp', 'BoundValue', 'PlainIslandProp', 'FunctionProp', 'Inferred', 'TemplateHelpers', 'TemplateValues', 'Truthy'],
       // Named by no doc: the analytics extension's paths and tracker tags, what kayjs-cms's loaders key a collection by, and the reader of a preview session.
-      './analytics': ['ANALYTICS_PATH', 'ANALYTICS_PROVIDERS', 'ANALYTICS_SCRIPT_PATH', 'CUSTOM_COLLECT_PATH', 'CUSTOM_SCRIPT_PATH', 'INTEGRITY', 'isGated', 'LazyGuard', 'NOTICE_SCRIPT_PATH', 'TRACKER_TAGS'], './content': ['COLLECTION', 'contentKey', 'PUBLISH_TIMES'], './server': ['editSessionOf'] },
+      './analytics': ['ANALYTICS_PATH', 'ANALYTICS_PROVIDERS', 'ANALYTICS_SCRIPT_PATH', 'CUSTOM_COLLECT_PATH', 'CUSTOM_SCRIPT_PATH', 'INTEGRITY', 'isGated', 'LazyGuard', 'NOTICE_SCRIPT_PATH', 'TRACKER_TAGS'], './content': ['COLLECTION', 'contentKey', 'PUBLISH_TIMES', 'toEntry'], './server': ['editSessionOf'] },
   },
   // `lib/` and `field-look` are what an ejected copy shares with the library ("for copies and not a stable API", `packages/ui/llms/setup.md`), as are the toaster's hold and the markdown editor's action list.
   ui: { entries: [/^\.\/lib\//, /^\.\/field-look$/], names: { '.': ['holdToasts', 'TOOLBAR_ACTIONS'] } },
