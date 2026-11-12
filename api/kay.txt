@@ -248,6 +248,9 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
   status: (code: number) => void
   url: URL
 
+[.] CheckedComputedHtml
+type CheckedComputedHtml<Markup> = [UnsafeComputedHtml<Markup>] extends [never] ? unknown : CheckedHtml<string>
+
 [.] Component
 type Component<Props = object> = (props: Props) => JSX.Element
 

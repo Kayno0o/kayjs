@@ -373,4 +373,9 @@ export type SafeHtml = string & { readonly [SAFE_HTML]: true }
 // What innerHTML would render as markup without anyone saying it may: a computed string, a template literal with values in it, as opposed to markup written out or made safe.
 type UnsafeHtml<Markup> = Markup extends SafeHtml | null | undefined ? never : Record<never, never> extends Record<Markup & string, 1> ? Markup : never
 
+// The same for an expression the runtime checks: a string-literal type is no markup written out there, so any string not made safe is unsafe.
+type UnsafeComputedHtml<Markup> = Markup extends SafeHtml | null | undefined ? never : [Markup & string] extends [never] ? never : Markup
+
+export type CheckedComputedHtml<Markup> = [UnsafeComputedHtml<Markup>] extends [never] ? unknown : CheckedHtml<string>
+
 export type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : { kayError: 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made' }

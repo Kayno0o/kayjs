@@ -3619,6 +3619,41 @@ describe.concurrent('kay check, markup', () => {
     }
   })
 
+  it('reports innerHTML and srcdoc bound to a literal-typed name, as the runtime drops it, and keeps SafeHtml and markup written out', async () => {
+    const page = [
+      '---',
+      'import type { SafeHtml } from \'kay\'',
+      'import { trustHtml } from \'kay\'',
+      '',
+      'const modules = [{ section: \'a\', desc: \'one <b>bold</b>\' }] as const',
+      'const lit = \'<b>x</b>\'',
+      'const { safe } = props<{ safe?: SafeHtml }>()',
+      '---',
+      'for m of modules key={m.section}',
+      '  p(innerHTML={m.desc})',
+      'div(innerHTML={lit})',
+      'iframe(srcdoc={lit} title="x")',
+      'div(innerHTML={safe})',
+      'div(innerHTML={trustHtml(lit)})',
+      'div(innerHTML={lit as SafeHtml})',
+      'div(innerHTML={\'<b>hi</b>\'})',
+      'div(innerHTML="<b>hi</b>")',
+      '',
+    ].join('\n')
+    const root = await scratchProject({ 'src/card.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
+        [10, 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made'],
+        [11, 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made'],
+        [12, 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('scopes a name a block rebinds to that block, and takes a destructuring key for no binding', async () => {
     const page = [
       '---',

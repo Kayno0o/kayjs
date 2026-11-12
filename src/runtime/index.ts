@@ -6,7 +6,7 @@ export { announce } from './announce'
 export type { ErrorShape } from './api-error'
 export { localPath, withBase } from './base'
 export { byteCount } from './byte-count'
-export type { ApiRoutesOf, AwaitProps, Bindable, BindableMark, BoundProp, BoundValue, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HandedPart, HandedSignal, HandsPart, HydrateWhen, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, PartClass, PlainIslandProp, Redirect, Register, RouteParams, SafeHtml, ServerOfModule, TemplateHelpers, Truthy, UnkeyedRows, Unmatched, UnresolvedParameter } from './checks'
+export type { ApiRoutesOf, AwaitProps, Bindable, BindableMark, BoundProp, BoundValue, CheckedComputedHtml, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HandedPart, HandedSignal, HandsPart, HydrateWhen, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, PartClass, PlainIslandProp, Redirect, Register, RouteParams, SafeHtml, ServerOfModule, TemplateHelpers, Truthy, UnkeyedRows, Unmatched, UnresolvedParameter } from './checks'
 // The names `kay` exports. What this file defines itself is in `core.ts`, so a build imports the module holding a name rather than this one, which an entry importing it would take every name's module along with.
 export * from './core'
 export type { DescribeOptions } from './described'

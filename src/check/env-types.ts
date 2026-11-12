@@ -160,7 +160,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, UnkeyedRows, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedComputedHtml, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, UnkeyedRows, Unmatched, UnresolvedParameter } from \'kay\'',
     // Imported so kay.config.ts is typed with the app, whatever else names it.
     ...config === undefined ? [] : [`import type {} from ${importSpecifier(config)}`],
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
@@ -175,6 +175,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     'declare global {',
     '  function KayHref<const Href extends string>(href: Href & CheckedHref<Href>): string',
     '  function KayHtml<const Markup>(markup: Markup & CheckedHtml<Markup>): Markup',
+    '  function KayComputedHtml<const Markup>(markup: Markup & CheckedComputedHtml<Markup>): Markup',
     '  function KayField<Target extends string | Action<never, unknown>>(target: Target, name: FieldName<Target>): string',
     '  function KayFormError<Target extends string | Action<never, unknown>>(target: Target, field?: FieldName<Target>): null',
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',

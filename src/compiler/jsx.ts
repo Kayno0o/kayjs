@@ -9,7 +9,7 @@ import { addMergedClass, addShorthandClass, quoteAttribute } from './jsx-class'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
 import { PROPS } from './names'
-import { bindingOf, classMergeOf, fieldNameOf, shapeOf, staticAttributeText } from './plan'
+import { bindingOf, checksMarkup, classMergeOf, fieldNameOf, shapeOf, staticAttributeText } from './plan'
 import { bindEvent, bindProblem } from './validate'
 
 // A subject holding a call, which TypeScript does not narrow in a `switch`.
@@ -851,8 +851,9 @@ export class JsxTemplate {
 
     if (!element.component && attribute.kind === 'expression' && MARKUP_ATTRIBUTES.has(name)) {
       const own = this.options.ownMarkup(this.src.slice(attribute.expression.start, attribute.expression.end).trim(), attribute.expression.start)
+      // The runtime's own rule picks the wrapper: only markup written out or imported as text may keep a literal type, any other expression is checked as a plain string.
 
-      this.attributeName(attribute).add('={KayHtml((').addSource(attribute.expression).add(own ? ') as import("kay").SafeHtml)}' : '))}')
+      this.attributeName(attribute).add(`={${checksMarkup(this.src, attribute.expression, this.options.ownMarkup) ? 'KayComputedHtml' : 'KayHtml'}((`).addSource(attribute.expression).add(own ? ') as import("kay").SafeHtml)}' : '))}')
 
       return true
     }
