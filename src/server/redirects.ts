@@ -38,7 +38,7 @@ export function redirectTarget(target: Redirects[string]): string {
 
 // The status a redirect answers with: its `status`, else a 308. A `status` that is none of 301, 302, 307, 308 and 410, or the dropped `permanent` option, is refused.
 export function redirectStatus(from: string, target: Redirects[string]): RedirectStatus {
-  if (typeof target !== 'string' && 'permanent' in target)
+  if (typeof target !== 'string' && (target as { permanent?: unknown }).permanent !== undefined)
     throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent, which kay dropped in 1.100; write status: 307 for permanent: false and nothing for permanent: true`)
 
   const status: RedirectStatus | undefined = typeof target === 'string' ? undefined : target.status
@@ -52,7 +52,7 @@ export function redirectStatus(from: string, target: Redirects[string]): Redirec
   return status
 }
 
-// What `_redirects` for a static host says: the status the config names, else 301 for a permanent redirect and 302 for the rest, as those hosts answer.
+// What `_redirects` for a static host says: the status the config names, else 301 for the default 308 and 302 for the rest, as those hosts answer.
 export function hostedStatus(from: string, target: Redirects[string]): RedirectStatus {
   const status = redirectStatus(from, target)
 
