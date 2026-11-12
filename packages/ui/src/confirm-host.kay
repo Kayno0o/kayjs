@@ -21,6 +21,10 @@ const idle = signal(true)
 effect(() => {
   const head = questions()[0]
 
+  // Its dialog goes with the ownership, and a close event that may never come must not keep the host shut.
+  if (!owns())
+    idle = true
+
   if (owns() && idle() && current() === undefined && head !== undefined)
     current = head
 })
