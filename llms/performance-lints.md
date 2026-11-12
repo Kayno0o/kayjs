@@ -1,5 +1,11 @@
 # Performance lints
 
+## Common tasks
+
+- Give every `img` a `width` and `height`, or import the image so kay reads its size (`unsized-image`).
+- Load independent data together: `const [a, b] = await Promise.all([loadA(), loadB()])`, a guard such as `await requireUser()` kept in its own statement first (`serial-awaits`).
+- Import an image over 256 KiB from `src/` rather than serving it from `public/`, so kay sends it resized as WebP (`large-public-image`).
+
 ## Reference
 
 - The `performance` group reads what makes a page shift as it loads or load more than it shows; each lint is set in `lints` like any other ([Lints and warnings](lints.md)).
