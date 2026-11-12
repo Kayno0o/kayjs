@@ -534,6 +534,13 @@ describe('kay upgrade', () => {
 })
 
 // An app with its kay and kayjs-ui ranges pinned at `from`.
+// The range of kay among the packages an install moves.
+function kaySpec(changes: DependencyChange[]): string {
+  const { spec } = changes.find(change => change.name === 'kay')!
+
+  return spec.slice(spec.lastIndexOf('~'))
+}
+
 function appOn(from: string): string {
   return `{
   "dependencies": { "@kaynooo/kayjs-ui": "~${from}" },
@@ -595,8 +602,8 @@ describe('kay upgrade across removed deprecations', () => {
     try {
       await quietly(async () => upgradeProject(from173, a.deps))
       await quietly(async () => upgradeProject(from175, b.deps))
-      expect(a.calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.76.0', '~1.77.0'])
-      expect(b.calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.77.0'])
+      expect(a.calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.76.0', '~1.77.0'])
+      expect(b.calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.77.0'])
     }
     finally {
       await rm(from173, { recursive: true, force: true })
@@ -610,7 +617,7 @@ describe('kay upgrade across removed deprecations', () => {
 
     try {
       await quietly(async () => upgradeProject(root, deps))
-      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.4'])
+      expect(calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.73.4'])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -717,7 +724,7 @@ describe('kay upgrade across removed deprecations', () => {
 
       const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
 
-      expect(printed).toContain('1.76.0')
+      expect(printed).toContain('no kay from 1.74 to 1.76 installs')
       expect(printed).not.toContain('nothing left')
     }
     finally {
@@ -758,17 +765,18 @@ describe('kay upgrade across removed deprecations', () => {
     deps.install = async (_dir, changes) => {
       calls.installs.push(changes)
 
-      return changes[0]!.spec !== '~1.73.0'
+      return kaySpec(changes) !== '~1.73.0'
     }
 
     try {
       expect(await upgradeProject(root, deps)).toBe(0)
-      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.0', '~1.72.0', '~1.76.0', '~1.77.0'])
+      expect(calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.73.0', '~1.72.0', '~1.76.0', '~1.77.0'])
       expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.0'))
 
       const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
 
       expect(printed).toContain('kay 1.73.0 does not install, so kay 1.72.0 rewrites what 1.71 deprecated')
+      expect(printed.match(/moved/g)).toHaveLength(3)
     }
     finally {
       log.mockRestore()
@@ -786,21 +794,103 @@ describe('kay upgrade across removed deprecations', () => {
     deps.install = async (_dir, changes) => {
       calls.installs.push(changes)
 
-      return !['~1.73.0', '~1.72.0', '~1.71.0'].includes(changes[0]!.spec)
+      return !['~1.73.0', '~1.72.0', '~1.71.0'].includes(kaySpec(changes))
     }
 
     try {
       expect(await upgradeProject(root, deps)).toBe(1)
-      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.0', '~1.72.0', '~1.71.0', '~1.76.0', '~1.77.0'])
+      expect(calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.73.0', '~1.72.0', '~1.71.0', '~1.76.0', '~1.77.0'])
       expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.0'))
 
       const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
 
       expect(printed).toContain('no kay from 1.71 to 1.73 installs')
+
       expect(printed).toContain('what 1.71 deprecated')
       expect(printed).toContain('llms/upgrading.md')
       expect(printed).toContain('1.74.0')
       expect(printed).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stops with the install\'s failure, without trying fallbacks, when the stop is in the registry and its install fails anyway', async () => {
+    const root = await project(appOn('1.70.0'), { 'bun.lock': 'old lock\n' })
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    deps.install = async (_dir, changes) => {
+      calls.installs.push(changes)
+
+      return false
+    }
+    deps.pruned = async () => false
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(calls.installs).toHaveLength(1)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.70.0'))
+      expect([...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')).not.toContain('skipped')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('says what a partial fallback leaves for you and exits 1', async () => {
+    const root = await project(appOn('1.54.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.61.0', '@kaynooo/kayjs-ui': '1.61.0' }, ['1.55'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (_dir, changes) => {
+      calls.installs.push(changes)
+
+      return !['~1.59.0', '~1.58.0', '~1.57.0', '~1.56.0'].includes(kaySpec(changes))
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.59.0', '~1.58.0', '~1.57.0', '~1.56.0', '~1.55.0', '~1.61.0'])
+
+      const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('kay 1.59.0 does not install, so kay 1.55.0 rewrites what 1.55 deprecated; what 1.56 deprecated is left for you')
+      expect(printed).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('records only the attempts that landed in the json document', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (_dir, changes) => {
+      calls.installs.push(changes)
+
+      return kaySpec(changes) !== '~1.73.0'
+    }
+
+    try {
+      await upgradeProject(root, deps, { format: 'json' })
+
+      const document = JSON.parse(String(log.mock.calls.at(-1)![0])) as { changed: DependencyChange[], steps: { verb: string, rest: string }[] }
+
+      expect(document.changed.map(change => change.spec.slice(change.spec.lastIndexOf('~')))).toEqual(['~1.77.0', '~1.77.0'])
+      expect(document.steps.filter(step => step.verb === 'moved').map(step => step.rest)).toHaveLength(3)
     }
     finally {
       log.mockRestore()
@@ -830,7 +920,7 @@ describe('kay upgrade across removed deprecations', () => {
 
     try {
       await quietly(async () => upgradeProject(root, deps))
-      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.72.0', '~1.73.4'])
+      expect(calls.installs.map(changes => kaySpec(changes))).toEqual(['~1.72.0', '~1.73.4'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

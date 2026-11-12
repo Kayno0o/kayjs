@@ -15,6 +15,8 @@ export interface UpgradeDeps {
   install: (root: string, changes: DependencyChange[]) => Promise<boolean>
   // Runs the project's own kay, the one just installed, so the fixes of the minor moved to are the ones applied; answers its exit code and, when `capture`, its stdout.
   kay: (root: string, args: string[], capture: boolean, env?: Record<string, string>) => Promise<{ code: number, stdout: string }>
+  // Whether a failed install of `changes` was the registry no longer serving a version, theirs or one they pin, which an older minor can stand in for; false for a network failure or a broken dependency of the app. Not set, every failure counts as one.
+  pruned?: (root: string, changes: DependencyChange[]) => Promise<boolean>
   // Whether a git working tree holds uncommitted changes to files it tracks, which the rewrite would mix with its own; false outside a repository.
   uncommitted?: (root: string) => Promise<boolean>
 }
@@ -73,6 +75,33 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
         console.error('kay upgrade: `bun update bun` failed; kay refuses to run on the old npm `bun` until it is updated')
 
       return true
+    },
+    pruned: async (root, changes) => {
+      const served = async (spec: string): Promise<boolean> => (await run([bun, 'info', spec, 'version'], root, true)).code === 0
+
+      for (const { spec } of changes) {
+        const wanted = spec.replace('npm:', '').replace('~', '')
+
+        if (!await served(wanted))
+          return true
+
+        const { code, stdout } = await run([bun, 'info', wanted, 'dependencies', '--json'], root, true)
+
+        if (code !== 0)
+          continue
+
+        try {
+          for (const [name, range] of Object.entries(JSON.parse(stdout) as Record<string, string>)) {
+            if (SEMVER.test(range) && !await served(`${name}@${range}`))
+              return true
+          }
+        }
+        catch {
+          // An answer that is not a dependency list: no pin is claimed missing.
+        }
+      }
+
+      return false
     },
     kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env, logTo),
     uncommitted: async (root) => {
@@ -287,15 +316,24 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   // Installs a phase; when it does not, package.json and the lockfile go back to what the last phase that landed left.
   const attempt = async (phase: Phase): Promise<boolean> => {
     await Bun.write(manifest, phase.source)
-    moved(phase.changes)
-    step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
-    if (await deps.install(root, phase.changes) && existsSync(join(root, 'node_modules/kay/src/cli.ts')))
+    if (await deps.install(root, phase.changes) && existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
+      moved(phase.changes)
+      step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
+
       return true
+    }
 
     await restore(manifest, settled)
 
     return false
+  }
+  // How a phase went: a stone whose install failed because the registry no longer serves a version is `pruned`, any other failure `failed`.
+  const tryPhase = async (tried: Phase): Promise<Outcome> => {
+    if (await attempt(tried))
+      return 'installed'
+
+    return tried.stone && await deps.pruned?.(root, tried.changes) !== false ? 'pruned' : 'failed'
   }
   // The phases left to run from the text the last landed phase wrote, on the stones given.
   const replan = (stones: string[]): Phase[] => {
@@ -311,24 +349,24 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     if (phase.changes.length === 0)
       continue
 
-    let installed = await attempt(phase)
+    let outcome = await tryPhase(phase)
 
-    if (!installed && phase.stone) {
-      const stood = await standIn(phase.version, behind, queue.slice(index + 1).filter(({ stone }) => stone).map(({ version }) => version), replan, attempt, (verb, rest) => say(verb, rest, true))
+    if (outcome === 'pruned') {
+      const stood = await standIn(phase.version, behind, queue.slice(index + 1).filter(({ stone }) => stone).map(({ version }) => version), replan, tryPhase, (verb, rest) => say(verb, rest, true))
 
       queue = [...queue.slice(0, index), ...stood.phases]
       leftOnTheWay ||= stood.left
-      installed = stood.installed
+      outcome = stood.outcome
       phase = queue[index]!
 
-      if (!installed) {
+      if (outcome === 'pruned') {
         index--
 
         continue
       }
     }
 
-    if (!installed) {
+    if (outcome === 'failed') {
       printFailure('upgrade', behind === from
         ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
         : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, format)
@@ -534,7 +572,7 @@ export function stoneFallbacks(stone: string, behind: string, table: typeof DEPR
   for (let candidate = minor - 1; candidate >= lowest; candidate--)
     minors.push(`${major}.${candidate}.0`)
 
-  return { minors, sinces: held.map(({ since }) => since), removedIn: `${major}.${minor + 1}` }
+  return { minors, sinces: held.map(({ since }) => since).sort((a, b) => minorOf(a)![1] - minorOf(b)![1]), removedIn: `${major}.${minor + 1}` }
 }
 
 // A stone the registry no longer installs: the closest older minor that still holds its lints stands in, saying which; when none installs, the stone is skipped, saying which forms the app keeps and where to read how to change them. The phases to run from the stone on, whether one installed and whether a form is left.
@@ -543,27 +581,35 @@ async function standIn(
   behind: string,
   later: string[],
   replan: (stones: string[]) => Phase[],
-  attempt: (phase: Phase) => Promise<boolean>,
+  attempt: (phase: Phase) => Promise<Outcome>,
   say: (verb: string, rest: string) => void,
-): Promise<{ phases: Phase[], installed: boolean, left: boolean }> {
+): Promise<{ phases: Phase[], outcome: Outcome, left: boolean }> {
   const { minors, sinces, removedIn } = stoneFallbacks(stone, behind)
 
   for (const minor of minors) {
     const phases = replan([minor, ...later])
+    const outcome = await attempt(phases[0]!)
 
-    if (!await attempt(phases[0]!))
+    // An install that fails for another reason than a missing version is not a reason to try another minor.
+    if (outcome === 'failed')
+      return { phases, outcome, left: false }
+
+    if (outcome === 'pruned')
       continue
 
     const lost = sinces.filter(since => minorAfter(minorOf(since)!, minorOf(minor)!))
 
     say('fell back', `kay ${stone} does not install, so kay ${minor} rewrites what ${sinces.filter(since => !lost.includes(since)).join(', ')} deprecated${lost.length === 0 ? '' : `; what ${lost.join(', ')} deprecated is left for you, see the upgrading sections below`}`)
 
-    return { phases, installed: true, left: lost.length > 0 }
+    return { phases, outcome, left: lost.length > 0 }
   }
 
-  say('skipped', `no kay from ${(minors.at(-1) ?? stone).replace(PATCH, '')} to ${stone.replace(PATCH, '')} installs, so what ${sinces.join(', ')} deprecated is left for you: read the sections ${sinces[0]}.0 to ${removedIn}.0 of llms/upgrading.md (llms/upgrading-archive.md for older ones), then run \`kay check\``)
+  const oldest = (minors.at(-1) ?? stone).replace(PATCH, '')
+  const newest = stone.replace(PATCH, '')
 
-  return { phases: replan(later), installed: false, left: true }
+  say('skipped', `no kay ${oldest === newest ? oldest : `from ${oldest} to ${newest}`} installs, so what ${sinces.join(', ')} deprecated is left for you: read the sections ${sinces[0]}.0 to ${removedIn}.0 of llms/upgrading.md (llms/upgrading-archive.md for older ones), then run \`kay check\``)
+
+  return { phases: replan(later), outcome: 'pruned', left: true }
 }
 
 // The phases from the app's ranges to the latest ones, the ranges of each written over the text of the one before; the name of a dependency whose entry cannot be found in the text when one cannot.
@@ -598,6 +644,8 @@ function planPhases(original: string, found: KayDependency[], latest: Map<KayDep
 
   return phases
 }
+
+type Outcome = 'installed' | 'pruned' | 'failed'
 
 interface KayDependency extends DependencyChange {
   // What `bun info` is asked: the package behind an alias.
