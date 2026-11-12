@@ -12,6 +12,8 @@ const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi
 const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ', ...Object.fromEntries(Object.entries({ copy: 169, reg: 174, trade: 8482, hellip: 8230, mdash: 8212, ndash: 8211, lsquo: 8216, rsquo: 8217, ldquo: 8220, rdquo: 8221, laquo: 171, raquo: 187, middot: 183, bull: 8226, euro: 8364 }).map(([name, code]) => [name, String.fromCodePoint(code)])) }
 const ENTITY = new RegExp(`&(#x[0-9a-f]+|#\\d+|${Object.keys(NAMED).join('|')});`, 'gi')
 const LAST_CODE_POINT = 0x10FFFF
+const REPLACEMENT = '\uFFFD'
+const WHOLE_NUMBER = /^\s*(-?\d+)\s*$/
 const NBSP = /\xA0/g
 const TRAILING_SPACES = /[ \t]+\n/g
 // Kept before a list item, which nests it.
@@ -88,7 +90,7 @@ export function htmlToText(html: string): string {
       if (closing)
         lists.pop()
       else
-        lists.push({ ordered: tag === 'ol', index: 0 })
+        lists.push({ ordered: tag === 'ol', index: tag === 'ol' ? startOf(attributes!) - 1 : 0 })
 
       text += '\n\n'
     }
@@ -163,11 +165,19 @@ function withAddress(text: string, start: number, href: string): string {
   return label === address || label === href ? text : `${text} (${address})`
 }
 
+// Where an ordered list starts counting, per its `start` attribute.
+function startOf(attributes: string): number {
+  const start = WHOLE_NUMBER.exec(attribute(attributes, 'start') ?? '')?.[1]
+
+  return start === undefined ? 1 : Number(start)
+}
+
 function hidden(attributes: string): boolean {
   return attribute(attributes, 'aria-hidden') === 'true' || DISPLAY_NONE.test(attribute(attributes, 'style') ?? '') || BOOLEAN_HIDDEN.test(attributes.replace(QUOTED, '""'))
 }
 
 // Text with the entities of html written out as their characters.
+// A NUL, written or typed, reads as the replacement character, as in a browser, and never meets the `\0<n>\0` placeholder of a kept block.
 export function decode(text: string): string {
   return text.replace(ENTITY, (entity, code: string) => {
     if (!code.startsWith('#'))
@@ -175,8 +185,8 @@ export function decode(text: string): string {
 
     const point = code[1] === 'x' || code[1] === 'X' ? Number.parseInt(code.slice(2), 16) : Number(code.slice(1))
 
-    return point <= LAST_CODE_POINT ? String.fromCodePoint(point) : entity
-  })
+    return point === 0 ? REPLACEMENT : point <= LAST_CODE_POINT ? String.fromCodePoint(point) : entity
+  }).replaceAll('\0', REPLACEMENT)
 }
 
 function tidy(text: string): string {

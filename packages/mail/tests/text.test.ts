@@ -39,3 +39,18 @@ describe('htmlToText', () => {
     expect(htmlToText('<table><tr><th>Item</th><th>Price</th></tr><tr><td>Tea</td><td>3 €</td></tr></table>')).toBe('Item Price\nTea 3 €')
   })
 })
+
+describe('htmlToText, ordered lists and references', () => {
+  it('starts an ordered list at its start attribute', () => {
+    expect(htmlToText('<ol start="3"><li>c</li><li>d</li></ol>')).toBe('3. c\n4. d')
+    expect(htmlToText('<ol start="0"><li>a</li></ol>')).toBe('0. a')
+    expect(htmlToText('<ol start="x"><li>a</li></ol>')).toBe('1. a')
+  })
+
+  it('reads a NUL reference as the replacement character, never as a placeholder', () => {
+    expect(htmlToText('<p>Price &#0;1&#0; ok</p>')).toBe('Price �1� ok')
+    expect(htmlToText('<pre>a &#0;1&#0; b</pre>')).toBe('a �1� b')
+    expect(htmlToText('<p>&#x0;</p>')).toBe('�')
+    expect(htmlToText(`<pre>a \0${'1'}\0 b</pre>`)).toBe('a �1� b')
+  })
+})
