@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { effect, signal } from 'kay'
+import { effect, onCleanup, onMount, signal } from 'kay'
 import { claim } from './claim'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -25,26 +25,46 @@ effect(() => {
     current = head
 })
 
-function close(question: Asked, answered: boolean) {
+// A button closes the dialog, whose close event then frees the next question: opening it sooner would let that event cancel the next one.
+function pick(question: Asked, answered: boolean) {
   if (current() !== question)
     return
 
   current = undefined
   idle = false
   answer(question, answered)
-
-  // A tick for the dialog to close before the next question opens it again.
-  setTimeout(() => {
-    idle = true
-  }, 0)
 }
+
+// The dialog closed by itself (Escape, a click outside) or after `pick`.
+function closed() {
+  if (!idle()) {
+    idle = true
+
+    return
+  }
+
+  const question = current()
+
+  if (question !== undefined) {
+    current = undefined
+    answer(question, false)
+  }
+}
+
+// A host that goes with a question open leaves nobody to answer it.
+onMount(() => onCleanup(() => {
+  const question = current()
+
+  if (question !== undefined)
+    answer(question, false)
+}))
 
 const words = () => confirmWords(current()?.tone ?? 'neutral', { title: current()?.title, confirmLabel: current()?.confirmLabel, cancelLabel: current()?.cancelLabel })
 ---
 if owns()
-  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onOpenChange={() => current() && close(current()!, false)})
+  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onOpenChange={closed})
     @footer
       // The safe button takes the focus, so a stray Enter cancels.
-      Button(label={words().cancel} autofocus onClick={() => current() && close(current()!, false)})
-      Button(label={words().confirm} tone={words().look} onClick={() => current() && close(current()!, true)})
+      Button(label={words().cancel} autofocus onClick={() => current() && pick(current()!, false)})
+      Button(label={words().confirm} tone={words().look} onClick={() => current() && pick(current()!, true)})
     p#kui-confirm-message(part="message") {current()?.message}

@@ -102,7 +102,8 @@ function cancelled(event: Event) {
 // A click on the backdrop, which the browser leaves alone while the close is guarded.
 // The keydown comes first and stops the browser's own close, which a second Escape with no click or key between would otherwise take for an uncancellable request.
 function pressed(event: KeyboardEvent) {
-  if (event.key === 'Escape')
+  // An Escape an inner control used, such as to close its own list, is not a request to close this.
+  if (event.key === 'Escape' && !event.defaultPrevented && !event.isComposing)
     cancelled(event)
 }
 
