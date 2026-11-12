@@ -238,7 +238,11 @@ button(onClick={() => game.coins += 5}) Earn {game.coins}
 p {game.miners[0].ore}
 ```
 
-Writing the value a property already holds does nothing, and `batch` runs the readers once after several writes. Objects and arrays are tracked at any depth. A `Map`, a `Set`, a `Date` or a class instance is not, so keep that state in objects and arrays. `snapshot(game)` gives a plain deep copy to save or send.
+Writing the value a property already holds does nothing, and `batch` runs the readers once after several writes. Objects and arrays are tracked at any depth. A `Map`, a `Set`, a `Date` or a class instance is not, and a dev build warns when a store holds one.
+
+For a collection, use `reactiveMap()` or `reactiveSet()` from `kay`. They are a real `Map` and `Set` whose reads are tracked, so `picked.has(id)` re-runs only when that id is added or removed, and `picked.add(id)` or `prices.set(id, 3)` needs no copy. They also work inside a store, and a page that does not import them pays nothing.
+
+A `Date`'s setters notify nothing, so assign a new `Date` instead. `snapshot(game)` gives a plain deep copy to save or send, with a reactive collection copied to a plain `Map` or `Set`.
 
 A store made while an island renders keeps its state when `kay dev` swaps the island's code, as a signal does. Reading a key that does not exist, such as the id of an entity that is gone, leaves nothing behind once the reader is disposed. An `undoable` optimistic change does not cover store writes, as a store changes in place and is not rolled back.
 

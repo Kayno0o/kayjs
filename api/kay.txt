@@ -975,6 +975,12 @@ interface RateWindow
   count: number
   resetAt: number
 
+[.] reactiveMap
+function reactiveMap<K, V>(entries?: Iterable<readonly [K, V]> | null | undefined): Map<K, V>
+
+[.] reactiveSet
+function reactiveSet<T>(values?: Iterable<T> | null | undefined): Set<T>
+
 [.] recipe
 function recipe<const Variants extends VariantTable = Record<never, never>>(config: RecipeConfig<Variants>): Recipe<Variants>
 

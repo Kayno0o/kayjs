@@ -1,4 +1,5 @@
 import { kept, ownDep, tracking, untrack } from './reactive'
+import { warnOnce } from './warn-once'
 
 // A dependency on one key or on an object's set of keys: it notifies on every write and holds nothing.
 interface Dep {
@@ -8,7 +9,7 @@ interface Dep {
 }
 
 interface Meta {
-  keys: Map<string, Dep>
+  keys: Map<unknown, Dep>
   shape: Dep | undefined
 }
 
@@ -18,7 +19,7 @@ const raws = new WeakMap<object, object>()
 const metas = new WeakMap<object, Meta>()
 const mutators = new Map<string, (this: unknown[], ...args: unknown[]) => unknown>()
 
-function plain(value: unknown): value is object {
+export function plain(value: unknown): value is object {
   if (typeof value !== 'object' || value === null)
     return false
 
@@ -30,7 +31,7 @@ function plain(value: unknown): value is object {
   return proto === Object.prototype || proto === null
 }
 
-const unwrap = <T>(value: T): T => (typeof value === 'object' && value !== null ? raws.get(value) as T | undefined : undefined) ?? value
+export const unwrap = <T>(value: T): T => (typeof value === 'object' && value !== null ? raws.get(value) as T | undefined : undefined) ?? value
 
 // Deps that lost their last observer, checked once the current run ends: a computation re-reading its sources in another order leaves one for a moment and takes it back.
 let idle: (() => void)[] = []
@@ -44,14 +45,14 @@ function sweep(): void {
     drop()
 }
 
-// `key` undefined is the object's key set. An unobserved dep leaves `meta` so an id read once and gone does not stay in the map for the life of the store.
-function dep(meta: Meta, key: string | undefined): Dep {
+// `shape` is the object's key set. An unobserved dep leaves `meta` so an id read once and gone does not stay in the map for the life of the store.
+function dep(meta: Meta, key: unknown, shape = false): Dep {
   const made: Dep = ownDep(() => {
     idle.push(() => {
       if (made.observers() > 0)
         return
 
-      if (key === undefined) {
+      if (shape) {
         if (meta.shape === made)
           meta.shape = undefined
       }
@@ -84,7 +85,7 @@ function metaOf(target: object): Meta {
 }
 
 // Subscribes the running computation to `key`, made only when something is listening so a write with no reader costs nothing.
-function trackKey(target: object, key: string): void {
+export function trackKey(target: object, key: unknown): void {
   if (!tracking())
     return
 
@@ -97,21 +98,21 @@ function trackKey(target: object, key: string): void {
   one.read()
 }
 
-function trackShape(target: object): void {
+export function trackShape(target: object): void {
   if (!tracking())
     return
 
   const meta = metaOf(target)
 
-  meta.shape ??= dep(meta, undefined)
+  meta.shape ??= dep(meta, undefined, true)
   meta.shape.read()
 }
 
-function touch(target: object, key: string): void {
+export function touch(target: object, key: unknown): void {
   metas.get(target)?.keys.get(key)?.write()
 }
 
-function touchShape(target: object): void {
+export function touchShape(target: object): void {
   metas.get(target)?.shape?.write()
 }
 
@@ -147,8 +148,12 @@ const handler: ProxyHandler<object> = {
 
     const value: unknown = Reflect.get(target, key, receiver)
 
-    if (!own || !plain(value))
+    if (!own || !plain(value)) {
+      if (process.env.NODE_ENV !== 'production' && own)
+        warnUntracked(value, `\`${key}\``)
+
       return value
+    }
 
     // A frozen property must read back as it is, which a proxy could not.
     const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
@@ -221,7 +226,7 @@ const handler: ProxyHandler<object> = {
   },
 }
 
-function wrap<T extends object>(target: T): T {
+export function wrap<T extends object>(target: T): T {
   let proxy = proxies.get(target)
 
   if (!proxy) {
@@ -234,10 +239,30 @@ function wrap<T extends object>(target: T): T {
 }
 
 // State mutated in place that a read tracks per property: `game.coins += 1` re-runs what read `game.coins` and nothing else.
-// Plain objects and arrays are tracked, deeply; a Map, a Set, a Date or a class instance is kept as written and is not.
+// How a collection that tracks its reads gives a plain copy of itself to `snapshot`, given the function that copies what it holds and the one that records the copy before it is filled, for a cycle.
+export const SNAPSHOT = Symbol('snapshot')
+
+// Development only: what a store keeps as written and does not track, named with what to use in its place.
+function warnUntracked(value: unknown, where: string): void {
+  if (typeof value !== 'object' || value === null || SNAPSHOT in value)
+    return
+
+  if (value instanceof Map || value instanceof Set)
+    warnOnce(`store() holds a ${value instanceof Map ? 'Map' : 'Set'} at ${where}, which it does not track: a write to it notifies nothing. Use ${value instanceof Map ? 'reactiveMap' : 'reactiveSet'}() from 'kay' for one that does.`)
+  else if (value instanceof Date)
+    warnOnce(`store() holds a Date at ${where}, which it does not track: \`setHours\` and the other setters notify nothing. Assign a new Date to update readers.`)
+}
+
+// Plain objects and arrays are tracked, deeply; a Map, a Set, a Date or a class instance is kept as written and is not (`reactiveMap` and `reactiveSet` are the tracked collections).
 // kept: free
 export function store<T extends object>(value: T): T {
-  return plain(value) ? wrap(kept(unwrap(value))) : value
+  if (plain(value))
+    return wrap(kept(unwrap(value)))
+
+  if (process.env.NODE_ENV !== 'production')
+    warnUntracked(value, 'the top level')
+
+  return value
 }
 
 // A plain deep copy of a store, or of any plain value, with no proxy in it and nothing tracked by reading it: what to save or send.
@@ -248,6 +273,13 @@ export function snapshot<T>(value: T): T {
 
 function copy(value: unknown, seen: Map<object, unknown>): unknown {
   const source = unwrap(value)
+  const own = (source as { [SNAPSHOT]?: (copier: (item: unknown) => unknown, register: (made: unknown) => void) => unknown } | null | undefined)?.[SNAPSHOT]
+
+  if (own) {
+    return seen.has(source as object)
+      ? seen.get(source as object)
+      : own.call(source, item => copy(item, seen), made => seen.set(source as object, made))
+  }
 
   if (!plain(source))
     return source

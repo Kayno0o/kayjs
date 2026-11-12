@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { batch, flush, root, signal } from '../src/runtime'
 import { recordSignals, renderEffect } from '../src/runtime/reactive'
+import { reactiveSet } from '../src/runtime/reactive-collections'
 import { snapshot, store, trackedCount } from '../src/runtime/store'
 
 // Runs `read` now and again whenever what it read changed, counting its runs; `stop` ends it.
@@ -231,6 +232,37 @@ describe('store', () => {
     expect(game.fn).toBe(fn)
     expect(game.when.getTime()).toBe(0)
     expect(game.set.has(1)).toBe(true)
+  })
+
+  it('warns once in development for what it does not track, naming the collections to use', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    store(new Date(0))
+    store(new Map())
+    store(new (class Tank {})())
+    void store({ deadline: new Date(1), seen: new Set() }).deadline
+    void store({ stock: new Map() }).stock
+    void store({ seen: new Set() }).seen
+    expect(warn.mock.calls.map(call => String(call[0]))).toEqual([
+      expect.stringContaining('holds a Date at the top level'),
+      expect.stringContaining('holds a Map at the top level'),
+      expect.stringContaining('holds a Date at `deadline`'),
+      expect.stringContaining('Use reactiveMap()'),
+      expect.stringContaining('Use reactiveSet()'),
+    ])
+    warn.mockRestore()
+  })
+
+  it('keeps a reactive collection held in a store as it is, and tracked', () => {
+    const picked = reactiveSet<number>()
+    const game = store({ picked })
+    const watcher = watching(() => game.picked.has(1))
+
+    expect(game.picked).toBe(picked)
+    game.picked.add(1)
+    flush()
+    expect(watcher.seen).toEqual([false, true])
+    watcher.stop()
   })
 
   it('hands a store to a child, whose reads track it too', () => {
