@@ -46,7 +46,7 @@ export function textTone(settings: MailSettings, tone: Tone | undefined, base: '
   return { className: 'km-muted', color: settings.muted }
 }
 
-// A link's own attributes, `rel="noopener"` added to one opening a new tab. `target` is passed only when written, as a template's `target={expr}`, even `undefined`, stops kay opening a link that leaves the site in a new tab.
+// A link's own attributes, `rel="noopener noreferrer"` added to one opening a new tab. `target` is passed only when written, as a template's `target={expr}`, even `undefined`, stops kay opening a link that leaves the site in a new tab.
 export function linkAttributes<T extends { target?: unknown, rel?: unknown }>(attributes: T): T {
-  return attributes.target === '_blank' && attributes.rel === undefined ? { ...attributes, rel: 'noopener' } : attributes
+  return attributes.target === '_blank' && attributes.rel === undefined ? { ...attributes, rel: 'noopener noreferrer' } : attributes
 }

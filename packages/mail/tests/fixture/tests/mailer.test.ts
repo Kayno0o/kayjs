@@ -159,7 +159,7 @@ describe('rendering', () => {
       expect(danger).toContain('display:block;text-align:center')
       expect(danger).toContain('target="_blank"')
       expect(danger).toContain('id="go"')
-      expect(danger).toContain('rel="noopener"')
+      expect(danger).toContain('rel="noopener noreferrer"')
       expect(danger).toEndWith('font-size:20px" class="km-button-danger">')
       expect(neutral).toContain('background:#f4f4f2;color:#1a1a1a;border:1px solid #e5e5e0')
       expect(neutral).toContain('class="km-button-neutral"')
