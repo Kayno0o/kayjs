@@ -19,6 +19,7 @@
     "tests/kept-image.test.ts": 449,
     "tests/kept-pages.test.ts": 406,
     "tests/scope.test.ts": 266,
+    "tests/mount-imports.test.ts": 246,
     "tests/dev-start.test.ts": 177,
     "tests/markdown.test.ts": 153,
     "tests/test-site-close.test.ts": 131

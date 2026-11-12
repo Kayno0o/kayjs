@@ -354,7 +354,7 @@ describe('a package whose package.json cannot be read', () => {
 
 // kay installed as an app has it: its files sit under `node_modules`, where the checkout's own fixtures symlink it out. The project runs its own `bun test`, so the `kay` its store module and its test import is the installed one, as in an app.
 describe('kay installed under node_modules', () => {
-  const checkout = process.cwd()
+  const checkout = resolve(import.meta.dir, '..')
   const files: Record<string, string> = {
     'bunfig.toml': '[test]\npreload = ["kay/test/preload"]\n',
     'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nexport default defineConfig({ requireGuards: false })\n',
@@ -403,4 +403,19 @@ describe('kay installed under node_modules', () => {
       expect(code, out + err).toBe(0)
     }, 120_000)
   }
+})
+
+describe('a kay library under node_modules', () => {
+  it('exposes the names a library file re-exports with export *', async () => {
+    const at = await project({
+      'node_modules/kayjs-x/package.json': '{"name":"kayjs-x","type":"module","exports":{".":"./index.ts"}}\n',
+      'node_modules/kayjs-x/index.ts': 'export * from \'./plain\'\n',
+      'node_modules/kayjs-x/plain.ts': 'export const word = \'hello\'\n',
+      'page.kay': '---\nimport { word } from \'kayjs-x\'\n---\np.word {word}\n',
+    })
+    const { root, unmount } = await mountComponent(await componentAt(at('page.kay')))
+
+    expect(root.querySelector('.word')!.textContent).toBe('hello')
+    unmount()
+  })
 })

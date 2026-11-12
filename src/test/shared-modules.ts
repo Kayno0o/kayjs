@@ -8,7 +8,7 @@ const KAY_SOURCE = resolve(import.meta.dir, '..') + sep
 const SCANNED = new Map<string, 'ts' | 'tsx' | 'js' | 'jsx'>([['.ts', 'ts'], ['.mts', 'ts'], ['.tsx', 'tsx'], ['.js', 'js'], ['.mjs', 'js'], ['.cjs', 'js'], ['.jsx', 'jsx']])
 const KAY_SPECIFIER = /^kay(?:\/|$)/
 const KAY_LIBRARY = /^(?:@kaynooo\/)?kayjs-/
-const LIBRARY_FOLDER = /[\\/]node_modules[\\/](?:@kaynooo[\\/])?kayjs-/
+const LIBRARY_FOLDER = /^(?:@kaynooo[\\/])?kayjs-/
 // The names `mountComponent` defines for the bundle: a file of kay reading one is built for the app's settings, so the bundle keeps its own copy of it.
 const DEFINED = /\bKAY_(?:FRENCH|I18N)\b/
 // A file of kay reading the page keeps it per mount: what it holds of the document it first met, a listener or the tab's visibility, restarts as it does on a page load. The reactive core and the modules built on it alone are what the test and the bundle share.
@@ -119,7 +119,10 @@ function inLibrary(path: string): boolean {
 
 // A package of the app's dependencies, whose own files are not walked; kay's libraries are, as they import kay, and so is kay, wherever it is installed: the folder this file loads from is the kay the test imports, under `node_modules` or not.
 function isDependency(resolved: string): boolean {
-  return resolved.includes(NODE_MODULES) && !LIBRARY_FOLDER.test(resolved) && !resolved.startsWith(KAY_SOURCE)
+  const at = resolved.lastIndexOf(NODE_MODULES)
+
+  // A library is the package folder right after the last `node_modules`, so a kay nested inside one is not taken for it.
+  return at !== -1 && !LIBRARY_FOLDER.test(resolved.slice(at + NODE_MODULES.length)) && !resolved.startsWith(KAY_SOURCE)
 }
 
 function versionOf(path: string): string {
