@@ -16,7 +16,7 @@ import { appStore, configError } from 'kay/library'
 import { session } from 'kay/server'
 import { log } from './log'
 import { memoryAuth } from './memoryStore'
-import { discordProvider, githubProvider, gitlabProvider, googleProvider, microsoftProvider } from './oauth/providers'
+import { discordProvider, facebookProvider, githubProvider, gitlabProvider, googleProvider, linkedinProvider, microsoftProvider, slackProvider, twitchProvider, xProvider } from './oauth/providers'
 
 /** What a provider preset takes beside its credentials, which the environment supplies when they are left out. */
 export interface PresetApp extends ProviderOptions {
@@ -26,6 +26,8 @@ export interface PresetApp extends ProviderOptions {
   clientSecret?: string | undefined
   label?: string | undefined
   keepTokens?: boolean | undefined
+  // The Graph API version of the `facebook` preset.
+  version?: string | undefined
 }
 
 // The providers `oauth: { github: true }` names, each over its preset.
@@ -35,6 +37,11 @@ const PRESETS = {
   google: googleProvider,
   microsoft: microsoftProvider,
   gitlab: gitlabProvider,
+  linkedin: linkedinProvider,
+  facebook: facebookProvider,
+  twitch: twitchProvider,
+  slack: slackProvider,
+  x: xProvider,
 } as unknown as Record<string, (options: ProviderOptions) => OAuthApp['provider']>
 
 /** The hooks an app keeps in `src/auth.ts` as `export const hooks`, or hands to `auth({ hooks })`. */
@@ -59,7 +66,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   pages?: false | Pick<AuthPagesConfig, 'profile' | 'remember' | 'main'> | undefined
   // The session cookie's name, `kay_session` by default; kay names it `__Host-` first over https unless `forwardAuth` shares it under a domain.
   cookie?: string | undefined
-  // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
+  // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft, gitlab, linkedin, facebook, twitch, slack or x), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
   oauth?: Record<string, true | PresetApp | OAuthApp> | undefined
   // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.sqlite` (SQLite; `data/auth.db` where it exists).
   store?: StoreOption | undefined

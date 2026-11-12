@@ -43,7 +43,7 @@ export default defineConfig({
 - `AUTH_DATABASE_URL` names a Postgres or SQLite database of kayjs-auth's own and wins over the app's. A `pgData` given a connection rather than a URL names no database, so give `AUTH_DATABASE_URL` or `store` there.
 - To use your app's pg-orm database, give `store: async () => pgAuth((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
-- `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
+- `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft, gitlab, linkedin, facebook, twitch, slack and x (`X_CLIENT_ID`, `X_CLIENT_SECRET`). An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
 - Hooks such as `onSignUp` and `beforeDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
 - The prebuilt pages are on under `prefix` (`/auth`), and `home` (`/`) is where sign-ins and sign-outs go. `pages: false` leaves them out.
 
@@ -684,11 +684,15 @@ authCore({
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
 
-A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
+A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, Twitch, X, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
 
 Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
 
 Every preset takes `scopes` and `params`, extra parameters for the authorize URL. A provider a server can host takes its base `url`: `githubProvider({ url: 'https://git.example.com' })` for GitHub Enterprise Server, `gitlabProvider({ url })`, `discordProvider({ url })`. A trailing slash is dropped and a path kept, and production refuses an `http://` one.
+
+LinkedIn (`linkedinProvider`), Slack (`slackProvider`), Twitch (`twitchProvider`), Facebook (`facebookProvider`) and X (`xProvider`) are presets too. LinkedIn, Slack and Twitch sign in through OpenID Connect, and Twitch only puts the email and the username in the ID token when asked, which the preset does.
+
+Facebook uses the Graph API at `v27.0` unless you pass `version`. X gives no email, so a user who signs in with X signs up without one, and its token endpoint wants the credentials as an HTTP Basic header, which the preset sets. Any other OpenID Connect provider works with `oidcProvider({ issuer, name })` given as the entry's `provider`, with its own `clientId` and `clientSecret`.
 
 A site whose `site` is https refuses a provider on plain http in every environment, and the endpoints a provider's discovery document names too.
 
@@ -915,6 +919,7 @@ Topics of the kayjs-auth reference the sections above do not link:
 - [Sessions and guards](/llms/kayjs-auth-sessions-and-guards)
 - [Grouped methods](/llms/kayjs-auth-grouped-methods)
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](/llms/kayjs-auth-oauth-passkeys-two-factor)
+- [OAuth provider presets](/llms/kayjs-auth-oauth-providers)
 - [Passwords, guests, mailed links and security mails](/llms/kayjs-auth-passwords-and-mails)
 - [The signed-in user in templates](/llms/kayjs-auth-signed-in-components)
 - [The OAuth server for MCP clients, bearer tokens and forward auth](/llms/kayjs-auth-oauth-server-and-tokens)

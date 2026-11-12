@@ -18,6 +18,12 @@ interface AuthorizeUrlOptions {
   extraParams?: Record<string, string>
 }
 
+// A form body with the headers its credentials ride in.
+interface Credentialed {
+  body: URLSearchParams
+  headers: Record<string, string>
+}
+
 /** Caps a provider response body embedded in an error so tokens/PII don't leak into logs. */
 function redactBody(text: string): string {
   return text.length > 200 ? `${text.slice(0, 200)}...` : text
@@ -84,15 +90,19 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     return url
   }
 
-  const withCredentials = async (body: URLSearchParams): Promise<URLSearchParams> => {
+  // The app's credentials as the provider wants them: in the body, or as a Basic header (RFC 6749 form-encodes each part first) with no `client_id` in the body.
+  const withCredentials = async (body: URLSearchParams): Promise<Credentialed> => {
     const secret = provider.clientSecret ? await provider.clientSecret(config.clientId) : config.clientSecret
+
+    if (provider.clientAuth === 'basic' && secret !== undefined)
+      return { body, headers: { Authorization: `Basic ${btoa(`${encodeURIComponent(config.clientId)}:${encodeURIComponent(secret)}`)}` } }
 
     body.set('client_id', config.clientId)
 
     if (secret !== undefined)
       body.set('client_secret', secret)
 
-    return body
+    return { body, headers: {} }
   }
 
   const userInfo = async (accessToken: string, userUrl: string | undefined): Promise<Record<string, unknown>> => {
@@ -210,10 +220,11 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
       if (url === undefined)
         return false
 
+      const { body, headers } = await withCredentials(new URLSearchParams({ token }))
       const { res, text } = await askProvider(provider.name, 'token revocation', url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-        body: await withCredentials(new URLSearchParams({ token })),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', ...headers },
+        body,
       })
 
       if (!res.ok)
@@ -286,12 +297,13 @@ function tokensFrom<Raw, User>(provider: OAuthProvider<Raw, User>, raw: unknown)
   }
 }
 
-async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, body: URLSearchParams): Promise<unknown> {
+async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, { body, headers }: Credentialed): Promise<unknown> {
   const { res, text } = await askProvider(name, 'token request', tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Accept': 'application/json',
+      ...headers,
     },
     body,
   })

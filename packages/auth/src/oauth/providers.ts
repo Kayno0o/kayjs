@@ -291,6 +291,121 @@ export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAu
   }
 }
 
+/** LinkedIn sign-in through OpenID Connect (the "Sign In with LinkedIn using OpenID Connect" product of the LinkedIn app). LinkedIn gives `email` only with the `email` scope and only when it has one, and has no usernames. */
+export function linkedinProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdClaims> {
+  return {
+    name: 'linkedin',
+    label: 'LinkedIn',
+    authorizeUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+    tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+    userUrl: 'https://api.linkedin.com/v2/userinfo',
+    openId: { issuer: 'https://www.linkedin.com', jwksUrl: 'https://www.linkedin.com/oauth/openid/jwks', algorithms: opts.algorithms ?? ['RS256'] },
+    scopes: opts.scopes ?? OPENID_SCOPES,
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
+    parseTokens: parseStandardTokens,
+    normalizeUser: claims => ({ ...openIdUser(claims), username: '' }),
+  }
+}
+
+/** Sign in with Slack (OpenID Connect). `scopes` are `openid`, `email` and `profile` by default; `team` in `params` (`{ team: 'T0123' }`) signs the user into that workspace. The user's `sub` is their Slack user id. */
+export function slackProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdClaims> {
+  return {
+    name: 'slack',
+    label: 'Slack',
+    authorizeUrl: 'https://slack.com/openid/connect/authorize',
+    tokenUrl: 'https://slack.com/api/openid.connect.token',
+    userUrl: 'https://slack.com/api/openid.connect.userInfo',
+    openId: { issuer: 'https://slack.com', jwksUrl: 'https://slack.com/openid/connect/keys', algorithms: opts.algorithms ?? ['RS256'] },
+    scopes: opts.scopes ?? OPENID_SCOPES,
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
+    parseTokens: parseStandardTokens,
+    // Slack has no usernames: `name` is the display name.
+    normalizeUser: claims => ({ ...openIdUser(claims), username: '' }),
+  }
+}
+
+// What Twitch puts in the ID token only when asked: its claims are not there by scope alone.
+const TWITCH_CLAIMS = JSON.stringify({ id_token: { email: null, email_verified: null, picture: null, preferred_username: null } })
+
+/** Twitch sign-in through OpenID Connect. Twitch puts `email`, `email_verified`, `picture` and `preferred_username` in the ID token only when the authorize URL's `claims` parameter asks for them, which the preset does; the email also needs the `user:read:email` scope, both on by default, and Twitch sends it only when verified. */
+export function twitchProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdClaims> {
+  return {
+    name: 'twitch',
+    label: 'Twitch',
+    authorizeUrl: 'https://id.twitch.tv/oauth2/authorize',
+    tokenUrl: 'https://id.twitch.tv/oauth2/token',
+    revokeUrl: 'https://id.twitch.tv/oauth2/revoke',
+    openId: { issuer: 'https://id.twitch.tv/oauth2', jwksUrl: 'https://id.twitch.tv/oauth2/keys', algorithms: opts.algorithms ?? ['RS256'] },
+    scopes: opts.scopes ?? ['openid', 'user:read:email'],
+    authorizeParams: { claims: TWITCH_CLAIMS, ...opts.params },
+    parseTokens: parseStandardTokens,
+    normalizeUser: openIdUser,
+  }
+}
+
+interface XRawUser {
+  data?: { id?: string, name?: string, username?: string, profile_image_url?: string }
+}
+
+/** Sign in with X: OAuth 2.0 with PKCE, the user read off `users/me`. X gives no email through this flow, so a user signs up without one and `email` stays null. A confidential client is authenticated with an HTTP Basic header, which the preset sets. Default scopes are `users.read` and `tweet.read`; add `offline.access` for a refresh token, as X's access tokens last two hours. */
+export function xProvider(opts: ProviderOptions = {}): OAuthProvider<XRawUser> {
+  const api = providerUrl(opts.url, 'https://api.x.com', 'the X url')
+
+  return {
+    name: 'x',
+    label: 'X',
+    authorizeUrl: 'https://x.com/i/oauth2/authorize',
+    tokenUrl: `${api}/2/oauth2/token`,
+    revokeUrl: `${api}/2/oauth2/revoke`,
+    userUrl: `${api}/2/users/me?user.fields=profile_image_url`,
+    clientAuth: 'basic',
+    scopes: opts.scopes ?? ['users.read', 'tweet.read'],
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
+    parseTokens: parseStandardTokens,
+    normalizeUser: ({ data }) => ({
+      providerId: typeof data?.id === 'string' ? data.id : '',
+      username: data?.username ?? '',
+      displayName: data?.name,
+      avatar: data?.profile_image_url ?? null,
+      email: null,
+    }),
+  }
+}
+
+interface FacebookRawUser {
+  id: string
+  name?: string
+  email?: string
+  picture?: { data?: { url?: string } }
+}
+
+// The Graph API version in the URLs, as Meta's login docs show it today; Meta retires old ones, so an app can name another.
+const FACEBOOK_VERSION = 'v27.0'
+
+/** Facebook Login: OAuth 2.0 on the Graph API. Scopes are `public_profile` and `email`, and Facebook gives no email for an account with no valid address. `version` is the Graph API version in the endpoints, `v27.0` by default. Facebook has no usernames. */
+export function facebookProvider(opts: Pick<ProviderOptions, 'scopes' | 'params'> & { version?: string } = {}): OAuthProvider<FacebookRawUser> {
+  const version = opts.version ?? FACEBOOK_VERSION
+
+  return {
+    name: 'facebook',
+    label: 'Facebook',
+    authorizeUrl: `https://www.facebook.com/${version}/dialog/oauth`,
+    tokenUrl: `https://graph.facebook.com/${version}/oauth/access_token`,
+    userUrl: `https://graph.facebook.com/${version}/me?fields=id,name,email,picture.type(large)`,
+    scopes: opts.scopes ?? ['public_profile', 'email'],
+    scopeSeparator: ',',
+    ...opts.params === undefined ? {} : { authorizeParams: opts.params },
+    parseTokens: parseStandardTokens,
+    normalizeUser: raw => ({
+      providerId: typeof raw.id === 'string' ? raw.id : '',
+      username: '',
+      displayName: raw.name,
+      avatar: raw.picture?.data?.url ?? null,
+      email: raw.email ?? null,
+    }),
+  }
+}
+
 /** Sign in with Apple. Its client secret is a JWT signed with the app's key from the Apple developer account: `teamId`, the key's `keyId`, and `privateKey`, the `.p8` file's PEM text. The app's `clientId` is its Services ID, and it needs no `clientSecret`. */
 export function appleProvider(opts: Pick<ProviderOptions, 'scopes' | 'params'> & { teamId: string, keyId: string, privateKey: string }): OAuthProvider<OpenIdClaims> {
   let key: Promise<CryptoKey> | undefined

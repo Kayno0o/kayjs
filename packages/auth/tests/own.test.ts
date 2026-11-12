@@ -124,6 +124,12 @@ describe('OAuth by convention', () => {
     expect(Object.keys((extension.env as unknown as { properties: object }).properties)).toEqual(['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'])
   })
 
+  test('linkedin, facebook, twitch, slack and x are presets whose variables kay env lists', () => {
+    const env = auth({ store: memoryAuth(), oauth: { linkedin: true, facebook: true, twitch: true, slack: true, x: true } }).env as unknown as { properties: object }
+
+    expect(Object.keys(env.properties)).toEqual(['LINKEDIN', 'FACEBOOK', 'TWITCH', 'SLACK', 'X'].flatMap(name => [`${name}_CLIENT_ID`, `${name}_CLIENT_SECRET`]))
+  })
+
   test('a missing variable stops the server naming both', async () => {
     await expect(served({ oauth: { github: true } })).rejects.toThrow('GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET')
   })

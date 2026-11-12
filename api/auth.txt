@@ -1020,6 +1020,9 @@ interface EventFields
 [.] ExportResult
 type ExportResult = { ok: true, data: DataExport } | AuthFailed<'signed-out' | 'limited' | 'impersonating' | 'stale'>
 
+[.] facebookProvider
+function facebookProvider(opts?: Pick<ProviderOptions, "params" | "scopes"> & { version?: string; }): OAuthProvider<FacebookRawUser, OAuthUser>
+
 [.] frenchTemplates
 const frenchTemplates: Templates
 
@@ -1121,6 +1124,9 @@ type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegist
 
 [.] LimitsOption
 type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
+
+[.] linkedinProvider
+function linkedinProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
 
 [.] LinkProviderResult
 type LinkProviderResult = { ok: true, url: string } | AuthFailed<ProofFailure | 'not-found' | 'unavailable'>
@@ -1263,6 +1269,7 @@ interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoints
   authHeaders?: (accessToken: string) => Record<string, string>
   authorizeParams?: Record<string, string>
   authorizeUrl?: string | undefined
+  clientAuth?: "basic" | "body"
   clientSecret?: (clientId: string) => Promise<string>
   completeUser?: (raw: Raw, token: { accessToken: string; scope: string | undefined; }) => Promise<Raw>
   discover?: () => Promise<OAuthEndpoints>
@@ -1520,6 +1527,7 @@ interface PresetApp extends ProviderOptions
   params?: Record<string, string>
   scopes?: string[]
   url?: string
+  version?: string | undefined
 
 [.] Principal
 type Principal<P> = P | null
@@ -1725,6 +1733,9 @@ interface SignInOptions
   redirect?: string | undefined
   remember?: boolean | undefined
 
+[.] slackProvider
+function slackProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
+
 [.] StoredCredential
 interface StoredCredential
   accessToken?: null | string | undefined
@@ -1773,6 +1784,9 @@ function turnstile(secret: string): (token: string, action: CaptchaAction, conte
 
 [.] turnstileWidget
 function turnstileWidget(siteKey: string): CaptchaWidget
+
+[.] twitchProvider
+function twitchProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
 
 [.] TwoFactorResult
 type TwoFactorResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited'>
@@ -1861,6 +1875,9 @@ function wsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T
 interface WsSender
   close: () => void
   send: (msg: string) => void
+
+[.] xProvider
+function xProvider(opts?: ProviderOptions): OAuthProvider<XRawUser, OAuthUser>
 
 [./add] default
 function default(project: Project): {

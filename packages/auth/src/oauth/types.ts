@@ -54,6 +54,8 @@ export interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoin
   authorizeParams?: Record<string, string>
   /** A client secret made per request, such as Apple's signed JWT, over the app's `clientSecret`. */
   clientSecret?: (clientId: string) => Promise<string>
+  /** How the app's credentials reach the token and revocation endpoints: in the form body (`'body'`, the default), or as an HTTP Basic header (`'basic'`), which X asks of a confidential client. */
+  clientAuth?: 'body' | 'basic'
   /** How scopes are joined in the authorize URL (default `' '`). */
   scopeSeparator?: string
   /** Forces token-response parsing; when unset the response `content-type` decides. */
