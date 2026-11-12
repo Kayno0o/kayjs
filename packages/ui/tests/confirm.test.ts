@@ -67,7 +67,6 @@ it('asks before a dialog drops typed text, which only a confirm drops', async ()
   // The focus goes back into the form before the next Escape, as it does for a reader.
   await page.waitUntil(() => document.querySelector('dialog[role=alertdialog][open]') === null && document.activeElement?.id === 'field')
   expect(await page.evaluate(() => document.querySelector('#form[open]') !== null)).toBe(true)
-  await Bun.sleep(100)
   await page.press('Escape')
   await page.waitUntil(shown)
   await page.click('dialog[role=alertdialog] [data-part=footer] button:last-child')
@@ -85,4 +84,21 @@ it('asks before a side panel drops typed text, in the words the app gave', async
   expect(await page.evaluate(() => document.querySelector('dialog[role=alertdialog] p')!.textContent)).toBe('Lose it?')
   await page.click('dialog[role=alertdialog] [data-part=footer] button:last-child')
   await page.waitUntil(() => document.querySelector('#side[open]') === null)
+}, 120_000)
+
+it('settles the open question and the queued ones with false when the only host goes', async () => {
+  const bare = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
+
+  try {
+    await using page = await bare.open('/confirm-unmount')
+
+    await page.click('#ask')
+    await page.waitUntil(() => document.querySelector('dialog[role=alertdialog][open]') !== null)
+    // The modal covers the button, as it would a real one, so the app's code unmounts the host.
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('#unmount')!.click())
+    await page.waitUntil(() => document.querySelector('#answers')!.textContent === 'one:false,two:false')
+  }
+  finally {
+    await bare.close()
+  }
 }, 120_000)

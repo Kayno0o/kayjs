@@ -1,0 +1,6 @@
+---
+import Unmount from '../components/confirm-unmount.kay'
+import '../app.css'
+---
+main
+  Unmount

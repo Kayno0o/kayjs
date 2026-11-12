@@ -1,0 +1,19 @@
+---
+import { signal } from 'kay'
+import ConfirmHost from '@kaynooo/kayjs-ui/confirm-host.kay'
+import { confirm } from '@kaynooo/kayjs-ui/lib/confirm'
+
+const hosted = signal(true)
+const answers = signal<string[]>([])
+
+async function ask(message: string) {
+  const answer = await confirm({ message })
+
+  answers = [...answers(), `${message}:${answer}`]
+}
+---
+output#answers {answers().join(',')}
+button#ask(onClick={() => { void ask('one'); void ask('two') }}) Ask
+button#unmount(onClick={() => hosted = false}) Unmount
+if hosted()
+  ConfirmHost

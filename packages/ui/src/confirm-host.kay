@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
-import { effect, onCleanup, onMount, signal } from 'kay'
-import { claim } from './claim'
+import { effect, onCleanup, onMount, signal, untrack } from 'kay'
+import { claim, claimed } from './claim'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import { answer, confirmWords, questions } from './confirm'
@@ -55,18 +55,36 @@ function closed() {
   }
 }
 
-// A host that goes with a question open leaves nobody to answer it.
+// Escape answers at the keypress: waiting for the close event leaves a moment in which the question is still pending though its dialog is gone, and an Escape in that moment would be lost.
+function pressed(event: KeyboardEvent) {
+  const question = current()
+
+  if (event.key !== 'Escape' || question === undefined)
+    return
+
+  event.preventDefault()
+  pick(question, false)
+}
+
+// A host that goes leaves nobody to answer the open question and those queued, unless another host takes over.
 onMount(() => onCleanup(() => {
   const question = current()
 
   if (question !== undefined)
     answer(question, false)
+
+  queueMicrotask(() => {
+    if (!claimed('confirms')) {
+      for (const queued of untrack(questions))
+        answer(queued, false)
+    }
+  })
 }))
 
 const words = () => confirmWords(current()?.tone ?? 'neutral', { title: current()?.title, confirmLabel: current()?.confirmLabel, cancelLabel: current()?.cancelLabel })
 ---
 if owns()
-  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onOpenChange={closed})
+  Dialog({...rest} open={current() !== undefined} title={words().title} size="sm" role="alertdialog" aria-describedby="kui-confirm-message" part="root" onKeyDown={event => { rest.onKeyDown?.(event); pressed(event) }} onOpenChange={closed})
     @footer
       // The safe button takes the focus, so a stray Enter cancels.
       Button(label={words().cancel} autofocus onClick={() => current() && pick(current()!, false)})
