@@ -112,6 +112,8 @@ function report(fence: ParsedFence, run: Step[]): Diagnostic {
   return {
     ...span,
     code: 'serial-awaits',
+    // The code compiles, so the file's type errors still count.
+    checkOnly: true,
     message: `${names.map(name => `\`${name}\``).join(', ')} are awaited one after the other, though none reads another`,
     note: 'each `await` waits for the one before it, so the page takes the sum of their times where `Promise.all` takes the longest',
     help: 'write them as one `await Promise.all([...])`, keeping a guard (`await requireUser()`, anything that redirects or throws) in its own statement before it, or start the ones the first paint does not need unawaited and read them in an `await` block',

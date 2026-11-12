@@ -2411,10 +2411,11 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).filter(d => d.code !== 'external-redirect').map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
+        [22, '`kept`, `never`, `later`, `none` are awaited one after the other, though none reads another'],
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
         [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
-        [23, 'A duration is positive, such as \'5m\', not 0s'],
+        [23,'A duration is positive, such as \'5m\', not 0s'],
         [25, 'A duration is positive, such as \'5m\', not 0m'],
       ])
     }
