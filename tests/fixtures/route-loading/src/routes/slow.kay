@@ -1,0 +1,8 @@
+--- server
+import { gate } from '../gates'
+
+const value = await gate('slow')
+---
+head
+  title Slow
+h1 Slow {value}

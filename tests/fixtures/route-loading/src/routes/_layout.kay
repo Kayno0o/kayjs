@@ -1,0 +1,12 @@
+--- script
+import Counter from '../components/counter.kay'
+---
+nav
+  a.home(href="/") Home
+  a.slow(href="/slow") Slow
+  a.fast(href="/fast") Fast
+  a.stats(href="/admin/stats") Stats
+  a.boom(href="/boom") Boom
+  Counter(label="Count")
+main
+  slot

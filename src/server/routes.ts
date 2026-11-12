@@ -34,6 +34,10 @@ export function styleChains(routes: Route[]): string[][] {
   for (const route of routes) {
     chains.push(routeChain(route).files)
 
+    // The loading page renders inside the route's own layouts, not those of its directory.
+    if (route.special.loading)
+      chains.push([...route.layouts, route.special.loading.file])
+
     for (const special of [route.special, ...route.guards.map(guard => guard.special)]) {
       for (const page of specialFiles(special)) {
         if (page !== undefined)
@@ -130,6 +134,8 @@ export interface SpecialPages {
   error?: SpecialPage | undefined
   // The pages of one status, which take it before `error`.
   statuses?: Partial<Record<number, SpecialPage>> | undefined
+  // The nearest `_loading.kay`: what a soft navigation to the page shows, inside the page's layouts, until its response arrives.
+  loading?: SpecialPage | undefined
   // The routes directory's own `_card.kay`, which draws the share card in place of kay's fixed layout; only the fallback holds it, as no URL asks for it.
   card?: SpecialPage | undefined
 }
@@ -146,6 +152,7 @@ const LAYOUT = '_layout.kay'
 const ACTIONS = '_actions.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
+const LOADING = '_loading.kay'
 const CARD = '_card.kay'
 const GUARD = '_guard.ts'
 // What Elysia reads as a parameter, a wildcard or breaks the code it generates on, in a static segment.
@@ -691,13 +698,14 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
   return {
     notFound: special.notFound && { ...special.notFound, layouts: [] },
     error: special.error && { ...special.error, layouts: [] },
+    loading: special.loading && { ...special.loading, layouts: [] },
     ...special.statuses && { statuses: Object.fromEntries(Object.entries(special.statuses).map(([status, page]) => [status, page && { ...page, layouts: [] }])) },
   }
 }
 
-// Every page a failure may render: the 404 page, the error page and the status pages.
+// Every special page a request may render: the 404 page, the error page, the loading page and the status pages.
 export function specialFiles(special: SpecialPages): (SpecialPage | undefined)[] {
-  return [special.notFound, special.error, ...Object.values(special.statuses ?? {})]
+  return [special.notFound, special.error, special.loading, ...Object.values(special.statuses ?? {})]
 }
 
 // The special pages for a directory of the URL tree, `''` for the root, `/account` below it.
@@ -733,7 +741,7 @@ function specialPagesIn(trees: RouteMount[], at: string, read: LayoutsRead): Spe
     return page === undefined ? [] : [[status, page]]
   }))
 
-  return { notFound: nearest(NOT_FOUND), error: nearest(ERROR), ...Object.keys(statuses).length > 0 && { statuses } }
+  return { notFound: nearest(NOT_FOUND), error: nearest(ERROR), loading: nearest(LOADING), ...Object.keys(statuses).length > 0 && { statuses } }
 }
 
 // The app's routes, then each library's laid over them, as the lookups above walk them.

@@ -1,0 +1,5 @@
+head
+  title Home
+h1 Home
+input.field
+a.filter(href="/?q=a") Filter

@@ -16,7 +16,7 @@ import { pageRoutes } from '../runtime/counters'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { requestedLoads } from '../runtime/load-scope'
 import { localeState, runInLocale } from '../runtime/locale-state'
-import { LOADS_HEADER } from '../runtime/swap'
+import { LOADING_HEADER, LOADS_HEADER } from '../runtime/swap'
 import { decodedRoute } from './api-params'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, filesUnder } from './compress'
@@ -25,6 +25,7 @@ import { DCZ_SUFFIX } from './dictionary'
 import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { stillKept } from './kept-pages'
+import { answerLoading } from './loading-page'
 import { answeringPage } from './log'
 import { pageRequested } from './not-found'
 import { hookedResponse, hookedServed } from './page-hook'
@@ -133,6 +134,10 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
       ? async () => renderPage(route, context, params, client, renderOptions)
       : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeOf(), pageFile, pageSizes)
     const render = async () => answeringLoads(context.request, rendered)
+
+    // The page's loading page, wanted past any prerendered or cached copy.
+    if (context.request.headers.has(LOADING_HEADER))
+      return answerLoading(route, async loading => renderPage(loading, context, params, client, renderOptions))
 
     const preview = previewRequested(context.request)
 

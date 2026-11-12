@@ -26,6 +26,8 @@ export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 const STREAMED_TEMPLATE = 'template[data-kay-await]'
 // `BUILD_META` of `./swap` written out, as importing it would have the islands' entry export it to this chunk.
 const BUILD_TAG = 'meta[name="kay-build"]'
+// `LOADING_META` of `./swap` written out for the same reason.
+const LOADING_TAG = 'meta[name="kay-loading"]'
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   if (swap.intent === 'refresh' && inFlight.asked) {
@@ -152,7 +154,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   const navigating = swap.intent !== 'refresh'
 
   if (navigating)
-    began(url, swap.link)
+    began(url, swap, flight, isCurrent)
 
   try {
     let page: FetchedPage
@@ -247,9 +249,34 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   }
 }
 
+// An app with a `_loading.kay` shows it once a move to another path has waited the delay its meta holds, if the page has not come by then and no other swap took over.
+async function showLoadingLater(url: URL, flight: NonNullable<typeof inFlight.fetch>, isCurrent: () => boolean): Promise<void> {
+  const delay = Number(document.querySelector<HTMLMetaElement>(LOADING_TAG)?.content)
+
+  // The page shown, not the address, which a traversal has moved already.
+  if (!(delay >= 0) || url.pathname === new URL(navigation.shown || location.href).pathname)
+    return
+
+  const waiting = () => isCurrent() && inFlight.fetch === flight
+
+  try {
+    // The code loads while the delay runs.
+    const [{ showLoading }] = await Promise.all([import('./swap-loading'), new Promise(resolve => setTimeout(resolve, delay))])
+
+    if (waiting())
+      await showLoading(url, flight.controller.signal, waiting)
+  }
+  catch {
+    // A loading page is a nicety: the page's own swap goes on without it.
+  }
+}
+
 // Tells the app a swap to another page began: the `loading` state and `kay:navigate-start` on `document`, and the link followed marked pending.
-function began(url: URL, link: Element | undefined): void {
-  markPending(link)
+function began(url: URL, swap: Swap, flight: NonNullable<typeof inFlight.fetch>, isCurrent: () => boolean): void {
+  if (swap.intent !== 'query')
+    void showLoadingLater(url, flight, isCurrent)
+
+  markPending(swap.link)
   navigation.phase?.('loading', url)
   document.dispatchEvent(new CustomEvent('kay:navigate-start', { detail: { url: url.href } }))
 }

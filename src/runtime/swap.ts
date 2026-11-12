@@ -10,6 +10,10 @@ export const FAILURE_HEADER = 'x-kay-failure'
 export const PAGE_HEADER = 'x-kay-page'
 // Names the page loads a refresh asks the server to send again, by the bindings of the page's fence, comma separated; the server runs every load all the same and leaves the elements reading none of them as placeholders. Without it the page renders whole.
 export const LOADS_HEADER = 'x-kay-loads'
+// Asks for a route's loading page (its `_loading.kay` inside its layouts) in place of the page, and marks the response that is one, so a cached page is never taken for it.
+export const LOADING_HEADER = 'x-kay-loading'
+// The meta a page carries when the app has a `_loading.kay`, holding how long in milliseconds a navigation waits before showing it.
+export const LOADING_META = 'kay-loading'
 // What a load name is: the binding of a top-level `const name = await ...`.
 export const LOAD_NAME = /^[\w$]{1,64}$/
 // Carries the solution to an action's `proofOfWork` challenge, and the fresh challenge a post refused for lacking one gets back.

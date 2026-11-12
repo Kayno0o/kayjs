@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const { label } = props<{ label: string }>()
+const count = signal(0)
+---
+button.counter(type="button" onClick={() => count = count() + 1}) {label} {count()}

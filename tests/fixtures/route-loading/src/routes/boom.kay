@@ -1,0 +1,6 @@
+--- server
+import { gate } from '../gates'
+
+const value = await gate('boom')
+---
+h1 Boom {value}

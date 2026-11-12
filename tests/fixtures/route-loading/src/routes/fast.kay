@@ -1,0 +1,8 @@
+--- server
+import { gate } from '../gates'
+
+gate('fast')
+---
+head
+  title Fast
+h1 Fast

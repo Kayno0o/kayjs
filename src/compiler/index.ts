@@ -123,7 +123,7 @@ const CARD_PAGE = '_card.kay'
 const LAYOUT = '_layout.kay'
 
 // Rendered by the server around or instead of a page, never inside an island.
-export const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE, CARD_PAGE, ...STATUS_PAGE_FILES])
+export const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE, '_loading.kay', CARD_PAGE, ...STATUS_PAGE_FILES])
 
 // `_error.kay` and the status pages, whose `ctx` carries the error they render.
 function isErrorPage(name: string): boolean {

@@ -31,6 +31,7 @@ import { appServesManifest } from './favicon'
 import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { linkSchemes } from './link-schemes'
+import { withLoadingDelay } from './loading-page'
 import { adoptLocalNotFound } from './not-found'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
@@ -235,7 +236,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     followEntryFiles(i18n.settings, collections)
   }
 
-  const renderOptions: RenderOptions = { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }
+  const renderOptions: RenderOptions = withLoadingDelay({ ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }, routes, exporting)
 
   if (cards.template && cardPage) {
     cards.template.render = async ({ locale, ...card }) => {

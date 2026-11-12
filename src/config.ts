@@ -209,6 +209,8 @@ export interface ClientConfig {
   saveData?: boolean | undefined
   // The longest the browser waits for a page it swaps in place, a string such as '10s' (the default): past it the browser loads the page itself, which shows its own progress or error. A page streaming `await` blocks is shown with their pending branches once its first part is in, and this is then the longest the stream may go without a byte before the blocks still pending are left as they are; the server keeps a stream alive every 5 s, so keep it above that.
   pageTimeout?: Duration | undefined
+  // How long a link or `navigate()` to another page waits before the page's `_loading.kay` shows in place of the one left, a string such as '200ms' (the default): a page answering sooner never flashes it. Only read on an app with a `_loading.kay`.
+  loadingDelay?: Duration | undefined
 }
 
 // A problem an app's own check reports; `level` is `'error'` unless it says `'warning'`, `file` is relative to the project and defaults to kay.config.ts, and `line` and `column` default to 1.
