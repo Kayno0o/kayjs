@@ -198,9 +198,6 @@
   "src/runtime/page-swap.ts": {
     "complexity": 51
   },
-  "src/runtime/reactive.ts": {
-    "max-lines": 606
-  },
   "src/runtime/swap-kept.ts": {
     "complexity": 46
   },

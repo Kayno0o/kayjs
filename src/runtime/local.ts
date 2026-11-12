@@ -787,10 +787,11 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     if (answer === undefined)
       return false
 
+    // The writes still queued for the row.
+    const others = (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).filter(other => other.k === entry.k && other.seq !== entry.seq)
+
     if (answer.status >= 200 && answer.status < 300) {
       outbox.delete(entry.seq!)
-
-      const others = (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).filter(other => other.k === entry.k && other.seq !== entry.seq)
 
       if (entry.op === 'put' && current !== undefined) {
         // An action answering with the row it stored, server-set fields included, has it taken as the server's.
@@ -820,12 +821,10 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     outbox.delete(entry.seq!)
 
-    const later = (await request(outbox.index('c').getAll(IDBKeyRange.only(this.c))) as Entry[]).some(other => other.k === entry.k && other.seq !== entry.seq)
-
     // A write to the row still queued made the row as it is and stands, the server settling it; else back to what the server last gave, or gone for a row it never knew.
-    if (!later && current?.base !== undefined)
+    if (others.length === 0 && current?.base !== undefined)
       rows.put({ ...current, row: current.base, gone: false })
-    else if (!later)
+    else if (others.length === 0)
       rows.delete([this.c, entry.k])
 
     issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, actionFailed(answer.status)), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, createdAt: new Date() })

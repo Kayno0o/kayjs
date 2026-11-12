@@ -25,7 +25,10 @@ function spreading(tag: string, first: Props) {
   document.body.append(element)
   root(() => spread(element, () => [props()]))
 
-  return { element, change: (next: Props) => { setProps(next); flush() } }
+  return { element, change: (next: Props) => {
+    setProps(next)
+    flush()
+  } }
 }
 
 describe('a spread class that goes and comes back', () => {
@@ -60,7 +63,9 @@ describe('a spread class that goes and comes back', () => {
 describe('a spread handler that is withdrawn', () => {
   it('stops firing once it is undefined, dropped, or no longer a function', () => {
     let clicks = 0
-    const handler = () => { clicks++ }
+    const handler = () => {
+      clicks++
+    }
     const { element, change } = spreading('button', { onClick: handler })
 
     element.click()

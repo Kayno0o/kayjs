@@ -9,7 +9,7 @@ beforeAll(() => {
   GlobalRegistrator.register({ url: 'http://localhost/b' })
   document.head.innerHTML = '<title>B</title>'
   document.body.innerHTML = '<p>B</p>'
-  navigation.hooks = { hydrate() {}, dispose() {} } as never
+  navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
   navigation.shown = 'http://localhost/b'
   globalThis.fetch = (async (input: RequestInfo | URL) => new Response(page(new URL(String(input), 'http://localhost').pathname), { headers: { 'content-type': 'text/html' } })) as never
 })

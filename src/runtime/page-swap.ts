@@ -139,7 +139,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   void holding()
 
   // Another page only than the one shown (a traversal has moved the address already): the same one with another query, or a form sending it back to itself, is not left.
-  if (url.pathname !== new URL(navigation.shown || location.href).pathname)
+  if (url.pathname !== shownPath())
     navigation.visits = (navigation.visits ?? 0) + 1
 
   const isCurrent = () => token === navigation.current
@@ -249,12 +249,17 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   }
 }
 
+// The path of the page shown, not of the address, which a traversal has moved already.
+function shownPath(): string {
+  return new URL(navigation.shown || location.href).pathname
+}
+
 // An app with a `_loading.kay` shows it once a move to another path has waited the delay its meta holds, if the page has not come by then and no other swap took over.
 async function showLoadingLater(url: URL, flight: NonNullable<typeof inFlight.fetch>, isCurrent: () => boolean): Promise<void> {
   const delay = Number(document.querySelector<HTMLMetaElement>(LOADING_TAG)?.content)
 
   // The page shown, not the address, which a traversal has moved already.
-  if (!(delay >= 0) || url.pathname === new URL(navigation.shown || location.href).pathname)
+  if (!(delay >= 0) || url.pathname === shownPath())
     return
 
   const waiting = () => isCurrent() && inFlight.fetch === flight
