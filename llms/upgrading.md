@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.100.0
 
+### The `permanent` of a redirect 1.96 deprecated is gone
+
+`deprecated-redirect-permanent` goes with it: run `kay upgrade` on 1.99 first. A redirect with `permanent` fails with `redirect-invalid` where it was a 308 or 307: `permanent: false` is `status: 307`, and `permanent: true` is dropped, as 308 is the default. A static export lists `status: 307` as 307 in `_redirects`.
+
 ### Errors kay raises while serving are `KayError`s
 
 A refused redirect, a live value or action result that cannot reach the browser, and an API answer kay cannot send throw a `KayError` with a `code` (`redirect-target-invalid`, `live-value-invalid`, `api-answer-invalid`) where they threw a `TypeError`, and a response failing its schema is a `KayError` coded `response-schema-mismatch`, Elysia's error as its `cause`. No lint can find a check on the error's class: an app testing `instanceof TypeError` on one of them tests `error.code` instead.
@@ -127,10 +131,6 @@ A run whose input, events no wait named and kept results (their text) pass 2,000
 ChipGroup, FileDrop, RowsField and the group a FormField marks, and `markInvalid` on any `role="group"`, set `data-invalid` where they set `aria-invalid="true"`, as ARIA 1.2 allows `aria-invalid` on a radio group but not on a plain group. `focusInvalid` finds both, and a `data-invalid` group with no focusable self focuses its first control. An app's CSS or test reading `[aria-invalid]` on one of those groups reads `[data-invalid]` now; a field and a radiogroup (RadioGroup, Segmented, Rating) keep `aria-invalid`. The message still reaches a screen reader through the group's `aria-describedby`.
 
 ## 1.96.0
-
-### `permanent` of a redirect is deprecated
-
-`redirects` in `kay.config.ts` names every answer with `status`, which now takes 410 too. `permanent` still works for three minors, and `kay upgrade` rewrites it (`deprecated-redirect-permanent`): `permanent: false` is `status: 307`, `permanent: true` is dropped, as 308 is the default, and so is a `permanent` beside an agreeing `status`. A static export lists `permanent: false` as 302 in `_redirects` and `status: 307` as 307.
 
 ### An `Entry` has `excerpt`, `body` and `html`
 

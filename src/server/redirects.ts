@@ -5,10 +5,9 @@ import { noteRedirect } from './dev-notes'
 import { requestUrl } from './request-url'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless `status` says otherwise: 307 for a move that may be undone, or the 301 or 302 that older clients and some crawlers expect, which let a browser turn a POST into a GET where 307 and 308 do not. `{ status: 410 }` answers `Gone` for a path that ended, with no target.
-// `permanent` is the old spelling of 307 and 308, which the `deprecated-redirect-permanent` lint moves to `status`.
 export type Redirects = Record<string, string | RedirectOptions>
 
-export type RedirectOptions = { to: string, status?: Exclude<RedirectStatus, 410>, permanent?: boolean } | { status: 410, to?: string, permanent?: undefined }
+export type RedirectOptions = { to: string, status?: Exclude<RedirectStatus, 410> } | { status: 410, to?: string }
 
 // What a path answers with: a redirect's status, or 410 for a path that is gone for good.
 export type RedirectStatus = 301 | 302 | 307 | 308 | 410
@@ -31,28 +30,24 @@ export interface Redirect {
 }
 
 const STATUSES = new Set<unknown>([301, 302, 307, 308, 410])
-const PERMANENT = new Set<unknown>([301, 308])
 
 // Where a redirect goes, empty for a path that is gone.
 export function redirectTarget(target: Redirects[string]): string {
   return typeof target === 'string' ? target : target.to ?? ''
 }
 
-// The status a redirect answers with: its `status`, else a 308 or, with `permanent: false`, a 307. A `status` that is none of 301, 302, 307, 308 and 410, or that contradicts `permanent`, is refused.
+// The status a redirect answers with: its `status`, else a 308. A `status` that is none of 301, 302, 307, 308 and 410, or the dropped `permanent` option, is refused.
 export function redirectStatus(from: string, target: Redirects[string]): RedirectStatus {
-  const { permanent, status }: { permanent?: boolean | undefined, status?: RedirectStatus | undefined } = typeof target === 'string' ? {} : target
+  if (typeof target !== 'string' && 'permanent' in target)
+    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent, which kay dropped in 1.100; write status: 307 for permanent: false and nothing for permanent: true`)
+
+  const status: RedirectStatus | undefined = typeof target === 'string' ? undefined : target.status
 
   if (status === undefined)
-    return permanent === false ? 307 : 308
+    return 308
 
   if (!STATUSES.has(status))
     throw new KayError('redirect-invalid', `kay: the redirect from ${from} has status ${String(status)}; it answers 301, 302, 307, 308 or 410`)
-
-  if (status === 410 && permanent !== undefined)
-    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent and status 410; a path that is gone has no target to be permanent about, so drop permanent`)
-
-  if (permanent !== undefined && permanent !== PERMANENT.has(status))
-    throw new KayError('redirect-invalid', `kay: the redirect from ${from} has permanent: ${String(permanent)} and status ${String(status)}, which disagree; set one of them`)
 
   return status
 }

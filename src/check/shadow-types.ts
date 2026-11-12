@@ -53,7 +53,6 @@ import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
-import { redirectPermanent } from './redirect-permanent'
 import { removedUiTokens } from './removed-ui-tokens'
 import { scheduleTz } from './schedule-tz'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
@@ -162,7 +161,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
-  ({ root, options }) => redirectPermanent(root, options),
   async ({ root, options }) => uiHotkey(root, options),
   async ({ root, options }) => uiItems(root, options),
   async ({ root, options }) => uiItemKeys(root, options),

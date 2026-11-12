@@ -224,23 +224,23 @@ describe('requestIdHeader', () => {
 
 describe('redirects with a status', () => {
   it('answer 301 or 302 when asked, and keep 308 and 307 otherwise', async () => {
-    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', permanent: false }, '/e': { to: '/contact', permanent: true, status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
+    const app = await pages({ root: 'tests/fixtures/production', prebuilt: false, redirects: { '/a': { to: '/contact', status: 301 }, '/b': { to: '/contact', status: 302 }, '/c': '/contact', '/d': { to: '/contact', status: 307 }, '/e': { to: '/contact', status: 301 }, '/f/*': { to: '/contact?x=*', status: 302 } } })
     const statusOf = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).status
 
     expect(await Promise.all(['/a', '/b', '/c', '/d', '/e', '/f/1'].map(statusOf))).toEqual([301, 302, 308, 307, 301, 302])
   })
 
-  it('refuses a status kay does not answer with, or one contradicting permanent', () => {
+  it('refuses a status kay does not answer with, and the dropped permanent', () => {
     expect(() => readRedirects({ '/a': { to: '/b', status: 303 as never } })).toThrow('the redirect from /a has status 303')
-    expect(() => readRedirects({ '/a': { to: '/b', permanent: false, status: 301 } })).toThrow('has permanent: false and status 301, which disagree')
-    expect(() => readRedirects({ '/a': { to: '/b', permanent: true, status: 307 } })).toThrow('which disagree')
+    expect(() => readRedirects({ '/a': { to: '/b', permanent: false } as never })).toThrow('which kay dropped in 1.100')
+    expect(() => readRedirects({ '/a': { to: '/b', permanent: true, status: 307 } as never })).toThrow('which kay dropped in 1.100')
   })
 
   it('are listed by kay routes and written to _redirects as named, else as 301 and 302', () => {
     expect(hostedStatus('/a', { to: '/b', status: 302 })).toBe(302)
     expect(hostedStatus('/a', { to: '/b', status: 308 })).toBe(308)
     expect(hostedStatus('/a', '/b')).toBe(301)
-    expect(hostedStatus('/a', { to: '/b', permanent: false })).toBe(302)
+    expect(hostedStatus('/a', { to: '/b' })).toBe(301)
   })
 })
 

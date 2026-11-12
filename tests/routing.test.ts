@@ -148,7 +148,6 @@ describe('redirects', () => {
   it('refuse a 410 that has a target, and a redirect with none', () => {
     expect(() => readRedirects({ '/a': { status: 410, to: '/b' } })).toThrow('has status 410 and goes to /b')
     expect(() => readRedirects({ '/a': { to: '' } })).toThrow('the redirect from /a has no target')
-    expect(() => readRedirects({ '/a': { status: 410, permanent: true } as never })).toThrow('has permanent and status 410')
     expect(readRedirects({ '/a/:id': { status: 410 } })[0]).toMatchObject({ to: '', status: 410 })
   })
 

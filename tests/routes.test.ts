@@ -19,7 +19,7 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', appFiles: { words: \'src/words.ts\' }, api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
+      'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', status: 307 }, \'/gone\': { to: \'/\', status: 301 }, \'/retired\': { status: 410 } } }\n',
     ]
 
     await Promise.all([

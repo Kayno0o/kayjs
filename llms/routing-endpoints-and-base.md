@@ -42,7 +42,7 @@ export async function POST({ request, query }: EndpointContext) {
 
 ### Redirects
 
-`redirects` in kay.config.ts sends old paths elsewhere with a 308, or the `status` it names: 301 or 302 for older clients and crawlers that expect them, 307 for a move that may be undone. `{ status: 410 }`, with no `to`, answers `Gone` for a path that ended, and `kay check` reports a 410 that has a `to`. `permanent` is deprecated since 1.96 (`deprecated-redirect-permanent`, `kay upgrade` writes `status: 307` for `permanent: false` and drops `permanent: true`). A static export lists a 410 in `_redirects` as `/old /old 410`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and writes no page for it:
+`redirects` in kay.config.ts sends old paths elsewhere with a 308, or the `status` it names: 301 or 302 for older clients and crawlers that expect them, 307 for a move that may be undone. `{ status: 410 }`, with no `to`, answers `Gone` for a path that ended, and `kay check` reports a 410 that has a `to`. A static export lists a 410 in `_redirects` as `/old /old 410`, for a host that answers a 4xx status there (Netlify does, Cloudflare Pages takes redirects only), and writes no page for it:
 
 ```ts
 export default defineConfig({
