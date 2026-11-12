@@ -63,3 +63,22 @@ describe('deprecated-cms-test-helpers', () => {
     }
   })
 })
+
+describe('deprecated-cms-test-helpers edge cases', () => {
+  it('drops an import left empty and leaves parenthesised arguments with no fix', async () => {
+    const a = 'import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\nimport { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\n\ncmsSignOut(site)\ncmsTest(site)\n'
+    const b = 'import { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\n\ncmsSignOut((site))\n'
+    const root = await project({ 'tests/a.test.ts': a, 'tests/b.test.ts': b })
+
+    try {
+      const found = await cmsTestHelpers(root, {})
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\n\ncmsTest(site).signOut()\ncmsTest(site)\n')
+      expect(await Bun.file(join(root, 'tests/b.test.ts')).text()).toBe(b)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

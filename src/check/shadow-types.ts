@@ -42,12 +42,12 @@ import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { eventNames } from './event-names'
 import { filterOptions } from './filter-options'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-import { unguardedRoutes, unguardedTools } from './guards'
 import { infiniteListOptions } from './infinite-list-options'
 
+import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
+
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
