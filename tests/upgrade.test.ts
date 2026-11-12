@@ -844,6 +844,47 @@ describe('kay upgrade across removed deprecations', () => {
     }
   })
 
+  it('reads a failed lookup as a pruned version only while the registry still answers for kay', async () => {
+    const change = { name: 'kay', spec: 'npm:@kaynooo/kayjs@~1.73.0', section: 'devDependencies' }
+    const answering = (up: boolean, served: string[]): NonNullable<Parameters<typeof registryDepsFor>[2]> => async (args) => {
+      const spec = args[2]!
+
+      return { code: served.includes(spec) || (up && spec === '@kaynooo/kayjs') ? 0 : 1, stdout: args[3] === 'dependencies' ? '{}' : '1.0.0' }
+    }
+
+    expect(await registryDepsFor('bun', 'inherit', answering(true, [])).pruned!('.', [change])).toBe(true)
+    expect(await registryDepsFor('bun', 'inherit', answering(false, [])).pruned!('.', [change])).toBe(false)
+    expect(await registryDepsFor('bun', 'inherit', answering(true, ['@kaynooo/kayjs@1.73.0'])).pruned!('.', [change])).toBe(false)
+
+    // Through the upgrade: an outage stops with the restore, a missing version falls back.
+    for (const [up, expected] of [[false, 1], [true, 0]] as const) {
+      const root = await project(appOn('1.70.0'), { 'bun.lock': 'old lock\n' })
+      const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+      const log = spyOn(console, 'log').mockImplementation(() => undefined)
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+      deps.install = async (_dir, changes) => {
+        calls.installs.push(changes)
+
+        return kaySpec(changes) !== '~1.73.0'
+      }
+      deps.pruned = registryDepsFor('bun', 'inherit', answering(up, ['@kaynooo/kayjs@1.72.0', '@kaynooo/kayjs@1.76.0', '@kaynooo/kayjs@1.77.0', '@kaynooo/kayjs-ui@1.72.0', '@kaynooo/kayjs-ui@1.76.0', '@kaynooo/kayjs-ui@1.77.0'])).pruned!
+
+      try {
+        expect(await upgradeProject(root, deps)).toBe(expected)
+        expect(calls.installs.length).toBe(up ? 4 : 1)
+
+        if (!up)
+          expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.70.0'))
+      }
+      finally {
+        log.mockRestore()
+        error.mockRestore()
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('says what a partial fallback leaves for you and exits 1', async () => {
     const root = await project(appOn('1.54.0'))
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.61.0', '@kaynooo/kayjs-ui': '1.61.0' }, ['1.55'])

@@ -45,7 +45,8 @@ const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // `bun install` alone can read a hand-edited range as no change and keep the old package in node_modules, so a package still at another version is added again, in the section it was in.
 // `logTo` is where the output of the commands it runs goes: this process's stdout, or a file descriptor such as 2 when stdout holds a document.
-export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inherit'): UpgradeDeps {
+// `runner` is how it runs a command, replaced in a test.
+export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inherit', runner: typeof run = run): UpgradeDeps {
   return {
     latest: async (name, root) => {
       const { code, stdout } = await run([bun, 'info', name, 'version'], root, true)
@@ -77,23 +78,32 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
       return true
     },
     pruned: async (root, changes) => {
-      const served = async (spec: string): Promise<boolean> => (await run([bun, 'info', spec, 'version'], root, true)).code === 0
+      // A failed lookup is a missing version only when kay's own package still answers: a network error, an outage or a refused login fails both, and says nothing of the version.
+      const lookup = async (spec: string): Promise<'served' | 'missing' | 'unknown'> => {
+        if ((await runner([bun, 'info', spec, 'version'], root, true)).code === 0)
+          return 'served'
+
+        return (await runner([bun, 'info', KAY_PACKAGE, 'version'], root, true)).code === 0 ? 'missing' : 'unknown'
+      }
 
       for (const { spec } of changes) {
         const wanted = spec.replace('npm:', '').replace('~', '')
+        const own = await lookup(wanted)
 
-        if (!await served(wanted))
-          return true
+        if (own !== 'served')
+          return own === 'missing'
 
-        const { code, stdout } = await run([bun, 'info', wanted, 'dependencies', '--json'], root, true)
+        const { code, stdout } = await runner([bun, 'info', wanted, 'dependencies', '--json'], root, true)
 
         if (code !== 0)
           continue
 
         try {
           for (const [name, range] of Object.entries(JSON.parse(stdout) as Record<string, string>)) {
-            if (SEMVER.test(range) && !await served(`${name}@${range}`))
-              return true
+            const pinned = SEMVER.test(range) ? await lookup(`${name}@${range}`) : 'served'
+
+            if (pinned !== 'served')
+              return pinned === 'missing'
           }
         }
         catch {
