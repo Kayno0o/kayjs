@@ -145,13 +145,13 @@ async function createProjectFiles(variant: 'app' | 'postgres'): Promise<Record<s
   }
 }
 
-// The default server preset, scaffolded and installed once: `kay new` checks it as written, then `kay build --compile` adds pages of its own and builds it.
+// The server preset with the accent picker, which is opt-in, scaffolded and installed once: `kay new` checks it as written, then `kay build --compile` adds pages of its own and builds it.
 let serverPreset: Promise<{ dir: string, files: string[] }> | undefined
 
 async function scaffoldServerPreset(): Promise<{ dir: string, files: string[] }> {
   serverPreset ??= (async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
-    const files = await createProject(dir, { kay: '^1.0.0' })
+    const files = await createProject(dir, { kay: '^1.0.0', features: [...PRESETS.server.features, 'accents'] })
 
     await installKay(dir)
 
@@ -581,14 +581,19 @@ describe('kay command line', () => {
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
       expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
-      expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
+      const lean = await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)
+
+      expect(lean.code).toBe(0)
+      expect(Bun.stripANSI(lean.stdout)).toContain('Add the CI workflow and the container later with kay add ci and kay add docker.')
+      expect(Bun.stripANSI((await kay(['new', 'noci', '--kay', '^1.0.0', '--without', 'ci'], dir)).stdout)).toContain('Add the CI workflow later with kay add ci.')
+      expect(Bun.stripANSI((await kay(['new', 'full', '--kay', '^1.0.0'], dir)).stdout)).not.toContain('kay add')
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
       expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, postgres, ws, ai, mail, cms, ui\n', code: 1 })
       expect(await kay(['new', 'both', '--with', 'docker', '--without', 'ci,docker'], dir)).toEqual({ stdout: '', stderr: 'kay new: docker is in both --with and --without\n', code: 1 })
       expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server: add --with server, or drop it with --without auth\n', code: 1 })
-      expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind: add --with tailwind, or drop it with --without accents\n', code: 1 })
-      expect((await readdir(dir)).sort()).toEqual(['lean', 'styled'])
+      expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--with', 'accents', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind: add --with tailwind, or drop it with --without accents\n', code: 1 })
+      expect((await readdir(dir)).sort()).toEqual(['full', 'lean', 'noci', 'styled'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -791,9 +796,8 @@ describe('kay new', () => {
       expect(html).toContain('<link rel="canonical" href="https://pages.example/me/my-site/">')
       expect(html).toContain('<title>Home | my-site</title>')
       expect(html).toContain('<a class="skip-link" href="#main-content">')
-      expect(html).toContain('<style>:root { --accent: var(--accent-peach); }</style>')
-      // Every accent the picker offers, though only the picker reads them.
-      expect(stylesheet.match(/--accent-[a-z]+:#/g)).toHaveLength(14)
+      // The accent picker is opt-in, so the page carries one accent and none of the picker's.
+      expect(html).not.toContain('--accent-peach')
       expect(stylesheet).toContain('.text-accent')
       expect(await Bun.file(join(dir, 'dist/404.html')).exists()).toBe(true)
     }
@@ -870,7 +874,7 @@ describe('kay new', () => {
   })
 
   it('sizes the accent picker popover to its seven swatches', async () => {
-    const files = await projectFiles('/x/app', new Set<Feature>(PRESETS.app.features), '^1.0.0')
+    const files = await projectFiles('/x/app', new Set<Feature>([...PRESETS.app.features, 'accents']), '^1.0.0')
 
     expect(files['src/components/accent-picker.kay']).toContain('grid w-max grid-cols-7')
   })
@@ -958,7 +962,7 @@ describe('kay new', () => {
         expect({ code, passed: report.includes('2 pass'), ...code === 0 && report.includes('2 pass') ? {} : { report, output } }).toEqual({ code: 0, passed: true })
       }
 
-      expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay', 'src/components/online.kay'])
+      expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual(['src/components/counter.kay', 'src/components/online.kay'])
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })

@@ -37,7 +37,7 @@ Run in a terminal, `kay new` asks for a preset, then for each [feature](/referen
 | `site` | A static site: `bun run build` writes plain files for any host |
 | `app` | The server plus kayjs-auth sign-in, register and account pages (its users in SQLite) and a websocket island |
 
-`--with` and `--without` change a preset's features. The accent picker needs Tailwind, so drop both together: `--without tailwind,accents`.
+`--with` and `--without` change a preset's features. The accent picker is in no preset: add it with `--with accents` (it needs Tailwind and the starter pages), or later with `kay add accents`. A project made without `ci` or `docker` gets them later with `kay add ci` and `kay add docker`.
 
 ## Scripts
 

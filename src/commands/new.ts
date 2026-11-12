@@ -8,6 +8,16 @@ import { EDITORS, findEditors, installEditor, printSetups } from '../editors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, libraryFeature, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 
+const ADDABLE = { ci: 'the CI workflow', docker: 'the container' } as const
+
+// A project left without the workflow or the container is told how to add them later.
+function printMissing(features: readonly Feature[], quiet: boolean): void {
+  const missing = (['ci', 'docker'] as const).filter(feature => !features.includes(feature))
+
+  if (!quiet && missing.length > 0)
+    console.log(`\n  Add ${missing.map(feature => ADDABLE[feature]).join(' and ')} later with ${colors.cyan(missing.map(feature => `kay add ${feature}`).join(' and '))}.`)
+}
+
 export const scaffold: Command = {
   usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--editor helix,zed|none] [--forge forgejo|github] [--agents none] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
   options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'agents': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
@@ -117,6 +127,8 @@ export const scaffold: Command = {
         for (const note of notes)
           console.log(`\n  ${note}`)
       }
+
+      printMissing(features, values.quiet === true)
 
       // With Postgres, the database runs in the container its compose.dev.yaml describes, with kayjs-auth's first migration generated and applied before the first start; SQLite is a file kayjs-auth creates itself.
       if (values.quiet !== true)

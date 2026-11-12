@@ -28,7 +28,7 @@ export type { Feature, Host }
 
 export type Preset = 'blank' | 'server' | 'site' | 'app'
 
-const SITE: readonly Feature[] = ['starter', 'tailwind', 'accents', 'eslint', 'tests', 'ci', 'docker']
+const SITE: readonly Feature[] = ['starter', 'tailwind', 'eslint', 'tests', 'ci', 'docker']
 
 export const PRESETS: Record<Preset, { description: string, features: readonly Feature[] }> = {
   blank: { description: 'one bare page and nothing else', features: [] },

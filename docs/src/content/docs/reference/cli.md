@@ -90,7 +90,7 @@ Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports 
 | `server` | An Elysia server, run in production as one executable; without it, a static site built to `dist` | server, app |
 | `starter` | A header, a skip link, a 404 page, and a home page greeting from the server with a counter island | server, site, app |
 | `tailwind` | Tailwind over the Catppuccin Mocha palette; without it, the markup carries no classes | server, site, app |
-| `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | server, site, app |
+| `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | none |
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
 | `tests` | `kay test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, formatting, linting, testing and building the server, or publishing the static site to Pages | server, site, app |
@@ -99,7 +99,7 @@ Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports 
 | `postgres` | kayjs-auth's users in Postgres instead of SQLite, with a compose stack for development; run `bun run db:generate` for the first migration; `kay add` plans kayjs-auth too | none |
 | `ws` | An API module over a websocket, with an island counting the visitors online; needs `server` | app |
 
-`blank` has none of them. In the terminal, checking a feature checks what it needs. With options, a feature missing what it needs is refused with the flag to add:
+`blank` has none of them. `kay new` suggests `kay add ci` and `kay add docker` when you leave either out. In the terminal, checking a feature checks what it needs. With options, a feature missing what it needs is refused with the flag to add:
 
 ```text
 kay: accents needs tailwind: add --with tailwind, or drop it with --without accents
