@@ -3158,7 +3158,7 @@ component default
   emptyLabel?: string | undefined
   entries: readonly TimelineEntry<Key>[]
   label: string
-  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntryBase<Key> & { label: string; text?: string | undefined; } & { label: string; }) => unknown) | undefined
   selected?: Key | undefined
 
 [./toaster.kay] default

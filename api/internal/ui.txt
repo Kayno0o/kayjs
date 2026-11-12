@@ -2979,6 +2979,12 @@ function thresholdTone(thresholds: Threshold[] | undefined, value: number): Tone
 [./lib/timeline] entryLabel
 function entryLabel(entry: TimelineEntry<number | string>): string
 
+[./lib/timeline] labelledEntry
+function labelledEntry<Key extends string | number>(entry: TimelineEntry<Key>): TimelineEntryBase<Key> & { label: string; text?: string | undefined; } & { label: string; }
+
+[./lib/timeline] LabelledTimelineEntry
+type LabelledTimelineEntry<Key extends string | number = string> = TimelineEntry<Key> & { label: string }
+
 [./lib/timeline] TimelineEntry
 type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({
   label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined

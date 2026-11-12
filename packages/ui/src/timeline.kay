@@ -1,7 +1,7 @@
 --- <Key extends string | number>
 import type { JSX, Snippet } from 'kay'
-import type { TimelineEntry } from './timeline'
-import { entryLabel } from './timeline'
+import type { LabelledTimelineEntry, TimelineEntry } from './timeline'
+import { entryLabel, labelledEntry } from './timeline'
 import { tabOf } from './outside'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
@@ -26,7 +26,7 @@ const { entries, selected, onSelectedChange, label, emptyLabel, empty, ...rest }
   selected?: Key | undefined
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
   // The shape `selected` takes first, so `onSelectedChange={picked.set}` round-trips.
-  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  onSelectedChange?: ((key: Key | undefined, entry: LabelledTimelineEntry<Key>) => unknown) | undefined
   // Names the list for screen readers.
   label: string
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
@@ -51,7 +51,7 @@ function pick(entry: TimelineEntry<Key>) {
   const next = picked() === entry.key ? undefined : entry.key
 
   picked = next
-  onSelectedChange?.(next, entry)
+  onSelectedChange?.(next, labelledEntry(entry))
 }
 ---
 if entries.length === 0
