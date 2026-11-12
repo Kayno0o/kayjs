@@ -56,6 +56,17 @@ describe('the test cookie jar', () => {
     expect(jar.header('/a')).toBe('c=1')
   })
 
+  it('scopes a cookie set with no Path to the directory of the request', () => {
+    const jar = cookieJar()
+
+    jar.keep(response('a=1', 'b=2; Path=/'), '/admin/login')
+    jar.keep(response('c=3'), '/top')
+
+    expect(jar.header('/admin/x')).toBe('a=1; b=2; c=3')
+    expect(jar.header('/other')).toBe('b=2; c=3')
+    expect(jar.header('/administrator')).toBe('b=2; c=3')
+  })
+
   it('sends a cookie a test wrote itself to every path', () => {
     const jar = cookieJar()
 

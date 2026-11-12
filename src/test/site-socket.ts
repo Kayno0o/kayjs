@@ -56,7 +56,7 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
           throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
         }
 
-        jar.keep(response)
+        jar.keep(response, new URL(url, 'http://localhost').pathname)
 
         const error = await refusalOf(response.clone())
 
