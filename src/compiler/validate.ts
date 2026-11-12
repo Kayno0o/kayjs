@@ -26,7 +26,6 @@ const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
-// A part's name, which becomes a key of the component's `class` type.
 // A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
 const CLASS_MEMBER = /^(?:class|'class'|"class")\??\s*:/
 const MEMBER_START = /[\s{;,]/
