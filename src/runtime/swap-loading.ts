@@ -1,6 +1,6 @@
 import { pageKey } from './navigation'
-import { LOADING_HEADER, NAVIGATE_HEADER } from './swap'
-import { inFlight, policyOf } from './swap-flight'
+import { LOADING_HEADER, NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
+import { ENTRY_SCRIPT, inFlight, policyOf } from './swap-flight'
 import { swapBody } from './swap-kept'
 
 // Puts the loading page of `url`, which the server renders from the nearest `_loading.kay` inside the layouts of the page, in place of the one left, while the page itself is still on its way.
@@ -10,7 +10,8 @@ export async function showLoading(url: URL, signal: AbortSignal, waiting: () => 
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', [LOADING_HEADER]: '1' }, cache: 'no-store', redirect: 'manual', signal })
 
   // A route with no loading page answers 204, a guard's refusal or a redirect something else: none is shown.
-  if (response.status !== 200 || !response.headers.has(LOADING_HEADER))
+  // A page loaded in full has no use for one shown first.
+  if (response.status !== 200 || !response.headers.has(LOADING_HEADER) || response.headers.has(RELOAD_HEADER))
     return
 
   const html = await response.text()
@@ -20,9 +21,15 @@ export async function showLoading(url: URL, signal: AbortSignal, waiting: () => 
 
   const next = new DOMParser().parseFromString(html, 'text/html')
 
-  // Another locale is a fresh start, which the page itself loads in full.
-  if (next.documentElement.lang !== document.documentElement.lang)
+  // Another locale or build is a fresh start, which the page itself loads in full, and streamed blocks are the page swap's to place.
+  if (next.documentElement.lang !== document.documentElement.lang || entryOf(next) !== entryOf(document) || next.querySelector('template[data-kay-await]') !== null)
     return
+
+  // An island the page left keeps living only if the next body holds its placeholder, which the loading page does not, so it would be lost for the page that follows.
+  for (const live of document.body.querySelectorAll<HTMLElement>('[data-persist]')) {
+    if (next.body.querySelector(`[data-persist="${CSS.escape(live.dataset.persist!)}"]`) === null)
+      return
+  }
 
   try {
     swapBody(next, policyOf({ intent: 'refresh' }), undefined, undefined)
@@ -30,4 +37,8 @@ export async function showLoading(url: URL, signal: AbortSignal, waiting: () => 
   finally {
     inFlight.renamed.clear()
   }
+}
+
+function entryOf(page: Document): string | null | undefined {
+  return page.querySelector(ENTRY_SCRIPT)?.getAttribute('src')
 }
