@@ -806,7 +806,7 @@ describe('brace-in-attribute', () => {
   })
 
   it('leaves an escaped brace, JSON, an object, doubled braces, an expression attribute and element text alone', () => {
-    expect(lints(`${head}a(title="Hello \\{name} \\{ x}" data-x='{"a":1}' x-data="{ open: false }" y="{open: false}" w="{{name}}" z={name}) {name}\n`)).toEqual([])
+    expect(lints(`${head}a(href="/x" title="Hello \\{name} \\{ x}" data-x='{"a":1}' x-data="{ open: false }" y="{open: false}" w="{{name}}" z={name}) {name}\n`)).toEqual([])
   })
 
   it('offers the safe fix only for a name the file declares', () => {

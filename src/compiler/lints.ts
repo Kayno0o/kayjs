@@ -1,7 +1,7 @@
 import type { AllowRules } from './allow-comments'
 import type { Diagnostic, ElementNode, ForNode, KayFile, Node, TextChunk } from './ast'
 import type { Scope } from './template-scopes'
-import { accessibilityLints } from './a11y'
+import { accessibilityLints, MARKUP_LINTS } from './a11y'
 import { allowComments, honoured, refusedComments } from './allow-comments'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { DEPRECATED_LINTS } from './deprecated-lints'
@@ -238,13 +238,6 @@ export const LINTS = {
     wrong: 'label\n  input(type="radio" name="plan" value="free")\n  | Free\nlabel\n  input(type="radio" name="plan" value="pro")\n  | Pro',
     right: 'fieldset\n  legend Plan\n  label\n    input(type="radio" name="plan" value="free")\n    | Free\n  label\n    input(type="radio" name="plan" value="pro")\n    | Pro',
   },
-  'redundant-alt': {
-    level: 'warn',
-    group: 'a11y',
-    summary: 'Alt text saying it is an image, `image of`, `picture of` or `photo of`, or a filename: a screen reader already announces an image as one, and a filename says nothing of what it shows.',
-    wrong: 'img(src="/team.jpg" alt="Photo of the team")',
-    right: 'img(src="/team.jpg" alt="The team at the 2025 offsite")',
-  },
   'section-not-a-link': {
     level: 'warn',
     group: 'a11y',
@@ -273,6 +266,7 @@ export const LINTS = {
     wrong: 'button(onMouseOver={show}) Details',
     right: 'button(onMouseOver={show} onFocus={show}) Details',
   },
+
   'missing-autocomplete': {
     level: 'warn',
     group: 'forms',
@@ -470,6 +464,7 @@ export const LINTS = {
     right: '---\nimport { effect, signal } from \'kay\'\n\nconst open = signal(false)\n\neffect(() => console.log(open()))\n---\nbutton(onClick={() => open.set(true)}) Log',
   },
   ...I18N_LINTS,
+  ...MARKUP_LINTS,
   'hidden-tool': {
     level: 'warn',
     group: 'code',

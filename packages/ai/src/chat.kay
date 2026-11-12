@@ -840,6 +840,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
               if reasoned() && turn.reasoning
                 details(part="reasoning" open={turn.reasoningOpen})
                   summary {reasoningLabel}
+                  // kay-allow interactive-tabindex
                   p(part="reasoningText" tabindex="0") {turn.reasoning}
               if turn.calls && turn.calls.length > 0
                 Calls(calls={turn.calls} block={callBlock} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})

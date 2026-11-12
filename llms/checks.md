@@ -85,6 +85,10 @@ kay lint --cache
   - Nothing the keyboard reaches under `aria-hidden="true"`, `tabindex="-1"` taking a field out of reach (`hidden-focusable`).
   - No `tabindex` above 0 (`positive-tabindex`).
   - No `autofocus` outside a `dialog` or an element with `tabindex="-1"` (`autofocus`).
+  - A heading with something to read (`empty-heading`), one `h1` per template, the branches of an `if` or a `match` apart (`multiple-h1`), and no `accesskey` (`no-access-key`).
+  - An `a` going somewhere: an `href` that is not empty, `#` or `javascript:`, unless it has a handler, a `role` or a `name` (`anchor-is-valid`).
+  - No `role` an element already has, `role="list"` on a list kept for Safari (`redundant-role`), and no `aria-*` its role does not take, on the roles ARIA's tables settle (`unsupported-aria`).
+  - A key handler, on the element or around it, where `onClick` sits on one the keyboard reaches through a `tabindex` (`click-without-key`), and no `tabindex="0"` on a `p`, heading, list, `img` or table part (`interactive-tabindex`).
   - No `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one (`link-as-button`).
   - No control inside a link or a button (`nested-control`).
   - No id two elements of a template share, elements in different branches of an `if` or a `match` or blocks of an `await` excepted, nor one written out inside a `for`, or inside a `snippet` called more than once (`duplicate-id`).

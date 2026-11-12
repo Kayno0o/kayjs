@@ -15,6 +15,7 @@ main
   a.hash(href="#top") Hash
   a.mail(href="mailto:me@other.example") Mail
   a.tel(href="tel:+33123456789") Tel
+  // kay-allow anchor-is-valid
   a.script(href="javascript:void(0)") Script
   a.slashes(href="//evil.example/x") Slashes
   a.backslash(href="/\evil.example/x") Backslash

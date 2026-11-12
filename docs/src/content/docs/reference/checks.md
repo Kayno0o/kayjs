@@ -63,6 +63,14 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `missing-label` | warn | a11y | A form field with no label |
 | `skipped-heading` | warn | a11y | An `h3` right after an `h1` |
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog` |
+| `empty-heading` | warn | a11y | An `h1` to `h6` with nothing to read |
+| `anchor-is-valid` | warn | a11y | An `a` with no `href`, or an empty, `#` or `javascript:` one, and no handler |
+| `redundant-role` | warn | a11y | A `role` the element already has, `button(role="button")` |
+| `unsupported-aria` | warn | a11y | An `aria-*` attribute the role does not take, `aria-checked` on a `button` |
+| `multiple-h1` | warn | a11y | A second `h1` in one template |
+| `no-access-key` | warn | a11y | An `accesskey` |
+| `click-without-key` | warn | a11y | An `onClick` on an element the keyboard reaches, with no key handler on it or around it |
+| `interactive-tabindex` | warn | a11y | `tabindex="0"` on a `p`, a heading, a list or an `img` |
 | `dangling-label` | warn | a11y | A `label(for)` pointing at no id |
 | `missing-captions` | warn | a11y | A `video` with no captions |
 | `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, a `dialog` or `aria-modal` (not `"false"`) backdrop excepted |

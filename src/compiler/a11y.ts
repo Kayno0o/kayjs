@@ -1,4 +1,5 @@
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
+import { elementHasContent as contentOf, markupLints, reader } from './a11y-markup'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, ARIA_STATE_VALUES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
 import { childBlocks, nodeExpressions, sectionOf, visitNodes } from './ast'
 
@@ -13,8 +14,7 @@ const UI_IMPORT = /^import\b[^\n]*['"]@kaynooo\/kayjs-ui\/[^'"\n]*['"];?[ \t]*$/
 const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kaynooo\/kayjs-ui\/tooltip\.kay['"]/m
 const WHITESPACE_CHAR = /\s/
 const TOOLTIP_NAME = /\bTooltip\b/
-// What gives an element content a screen reader reads, besides text.
-const CONTENT_ATTRIBUTES = ['innerHTML', 'textContent', 'innerText']
+
 // Elements the keyboard reaches unless disabled, besides a link with an `href` and an input that is not hidden.
 const FOCUSABLE = new Set(['button', 'select', 'textarea', 'summary', 'iframe'])
 // What HTML forbids inside a link or a button, besides a link and an input that is not hidden.
@@ -172,9 +172,16 @@ function maskLiterals(code: string): string {
   return result
 }
 
-// What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
+export { MARKUP_LINTS } from './a11y-markup'
+
 export function accessibilityLints(file: KayFile): Diagnostic[] {
+  return [...elementLints(file), ...markupLints(file)]
+}
+
+// What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
+function elementLints(file: KayFile): Diagnostic[] {
   const { source } = file
+  const read = reader(source)
   const found: Diagnostic[] = []
   const labelled = new Set<string>()
   const labels: { element: ElementNode, target: string }[] = []
@@ -189,16 +196,8 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   let dynamicIds = false
   let blocks = 0
   let heading: { level: number, name: string } | undefined
-  const text = (span: { start: number, end: number }) => source.slice(span.start, span.end)
-  const named = (element: ElementNode) => element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread')
-  const attribute = (element: ElementNode, name: string) => named(element).find(candidate => text(candidate.name).toLowerCase() === name.toLowerCase())
-  const has = (element: ElementNode, name: string) => attribute(element, name) !== undefined
-  const staticValue = (element: ElementNode, name: string) => {
-    const found = attribute(element, name)
-
-    return found?.kind === 'static' ? found.text : undefined
-  }
-  const spread = (element: ElementNode) => element.attributes.some(attribute => attribute.kind === 'spread')
+  const { text, named, attribute, has, staticValue, spread } = read
+  const elementHasContent = (element: ElementNode) => contentOf(element, read)
   const hidden = (element: ElementNode) => has(element, 'hidden') || staticValue(element, 'aria-hidden') === 'true'
   const at = (element: ElementNode) => element.tag.end > element.tag.start ? element.tag : element
   const lint = (element: ElementNode | { start: number, end: number }, code: string, message: string, details: Omit<Diagnostic, 'start' | 'end' | 'message' | 'code'>) => {
@@ -318,30 +317,6 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     || (element.name === 'input' && staticValue(element, 'type')?.toLowerCase() !== 'hidden')
     || INTERACTIVE.has(element.name)
     || (tabindex(element) ?? -1) >= 0
-
-  // Whether what an element holds gives a screen reader something to read: text, a value, or something that may render either.
-  function hasContent(nodes: Node[]): boolean {
-    return nodes.some((node) => {
-      if (node.kind === 'text')
-        return node.parts.some(part => part.kind === 'expression' || (part.kind === 'chunk' ? part.text.trim() !== '' : elementHasContent(part)))
-
-      if (node.kind === 'element')
-        return elementHasContent(node)
-
-      // A block may render anything.
-      return true
-    })
-  }
-
-  function elementHasContent(element: ElementNode): boolean {
-    if (element.component || element.name === 'slot' || NAMING.some(name => has(element, name)) || CONTENT_ATTRIBUTES.some(name => has(element, name)))
-      return true
-
-    if (element.name === 'img')
-      return has(element, 'alt') && staticValue(element, 'alt') !== ''
-
-    return hasContent(element.children)
-  }
 
   // Whether a template holds an element called `name`, or something that may render one: a component, a slot or a block.
   function mayHold(nodes: Node[], name: string): boolean {

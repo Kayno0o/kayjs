@@ -96,6 +96,14 @@ kay check --only seo
 | `hidden-focusable` | deny | a11y | An element the keyboard reaches on or inside `aria-hidden="true"`. |
 | `positive-tabindex` | deny | a11y | A `tabindex` above 0. |
 | `link-as-button` | deny | a11y | An `a` with `onClick` and no `href`, `href="#"` or a `javascript:` one. |
+| `empty-heading` | warn | a11y | An `h1` to `h6` with nothing for a screen reader to read. |
+| `anchor-is-valid` | warn | a11y | An `a` with no `href`, or an empty, `#` or `javascript:` one, and no handler. |
+| `redundant-role` | warn | a11y | A `role` the element already has, such as `button(role="button")`; `role="list"` on a list stays. |
+| `unsupported-aria` | warn | a11y | An `aria-*` attribute the element's role does not take, such as `aria-checked` on a `button`. |
+| `multiple-h1` | warn | a11y | A second `h1` in one template, branches of an `if` or `match` apart. |
+| `no-access-key` | warn | a11y | An `accesskey`. |
+| `click-without-key` | warn | a11y | An `onClick` on an element the keyboard reaches that no `onKeyDown`, `onKeyUp` or `onKeyPress` answers, on it or around it. |
+| `interactive-tabindex` | warn | a11y | A `tabindex="0"` on a `p`, a heading, a list, an `img` or a table part. |
 | `nested-control` | deny | a11y | A link, button or field inside a link or a button. |
 | `duplicate-id` | deny | a11y | An id two elements of a template share, or one written out inside a `for` or a `snippet` called more than once. |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define. |

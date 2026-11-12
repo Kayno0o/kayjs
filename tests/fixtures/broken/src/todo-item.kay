@@ -5,4 +5,5 @@ const { todo } = props<{ todo: Todo }>()
 ---
 li
   span {todo.titel}
+  // kay-allow anchor-is-valid
   a(hreff="/x") link

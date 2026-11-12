@@ -16,5 +16,5 @@ const moons = [
       @right
         span {moon.radius} km
       @actions
-        a(href="#") Edit
+        a(href={`/moons/${moon.name.toLowerCase()}`}) Edit
       | {moon.name}

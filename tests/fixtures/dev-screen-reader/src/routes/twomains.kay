@@ -3,4 +3,5 @@ head
 main
   h1 First
 main
+  // kay-allow multiple-h1
   h1 Second
