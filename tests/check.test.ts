@@ -2415,7 +2415,7 @@ describe.concurrent('kay check, edge cases', () => {
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [18, 'A redirect target starting with // or a backslash is read by a browser as another site; use a full https:// URL'],
         [19, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
-        [23,'A duration is positive, such as \'5m\', not 0s'],
+        [23, 'A duration is positive, such as \'5m\', not 0s'],
         [25, 'A duration is positive, such as \'5m\', not 0m'],
       ])
     }
