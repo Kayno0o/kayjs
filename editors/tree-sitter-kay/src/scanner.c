@@ -174,9 +174,12 @@ static bool scan_balanced(TSLexer *lexer, int32_t closer) {
 
 typedef enum { CUT_NONE, CUT_AS, CUT_THEN, CUT_KEY } Cut;
 
-// A word and what may follow it decide a cut: ` as name` ends a condition, ` then name` an await and ` key={` a for.
+// A word and what may follow it decide a cut: ` then name` (or the older ` as name`) ends a condition, ` then name` an await and ` key={` a for.
 static bool cut_follows(TSLexer *lexer, Cut cut, const char *word, int length) {
-  if (cut == CUT_AS && !(length == 2 && strncmp(word, "as", 2) == 0)) return false;
+  bool as_word = length == 2 && strncmp(word, "as", 2) == 0;
+  bool then_word = length == 4 && strncmp(word, "then", 4) == 0;
+
+  if (cut == CUT_AS && !as_word && !then_word) return false;
   if (cut == CUT_THEN && !(length == 4 && strncmp(word, "then", 4) == 0)) return false;
   if (cut == CUT_KEY) return length == 3 && strncmp(word, "key", 3) == 0 && lexer->lookahead == '=';
 
@@ -184,7 +187,7 @@ static bool cut_follows(TSLexer *lexer, Cut cut, const char *word, int length) {
 
   if (at_line_end(lexer)) return cut == CUT_THEN;
   if (!is_identifier_start(lexer->lookahead)) return false;
-  if (cut == CUT_AS && !(lexer->lookahead >= 'a' && lexer->lookahead <= 'z') && lexer->lookahead != '_' && lexer->lookahead != '$') return false;
+  if (cut == CUT_AS && as_word && !(lexer->lookahead >= 'a' && lexer->lookahead <= 'z') && lexer->lookahead != '_' && lexer->lookahead != '$') return false;
 
   while (is_word(lexer->lookahead) || lexer->lookahead == '$') advance(lexer);
   while (is_space(lexer->lookahead)) advance(lexer);

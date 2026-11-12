@@ -324,7 +324,7 @@
       }
     },
     "if": {
-      "match": "^[ \\t]*(else[ \\t]+if|if)[ \\t]+(.*?)(?:[ \\t]+(as|then)[ \\t]+([a-z_$][\\w$]*))?[ \\t]*$",
+      "match": "^[ \\t]*(else[ \\t]+if|if)[ \\t]+(.*?)(?:[ \\t]+(as(?=[ \\t]+[a-z_$])|then)[ \\t]+([\\p{L}_$][\\p{L}\\p{M}\\p{N}_$]*))?[ \\t]*$",
       "captures": {
         "1": {
           "name": "keyword.control.conditional.kay"

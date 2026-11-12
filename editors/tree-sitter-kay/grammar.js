@@ -118,7 +118,7 @@ module.exports = grammar({
     if_line: $ => seq(
       choice('if', seq('else', 'if')),
       $.condition,
-      optional(seq('as', $.identifier)),
+      optional(seq(choice('then', 'as'), $.identifier)),
       $._line_end,
     ),
     else_line: $ => seq('else', $._line_end),
