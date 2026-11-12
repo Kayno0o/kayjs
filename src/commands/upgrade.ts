@@ -234,29 +234,16 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     return 1
   }
 
-  const latestKay = await deps.latest(KAY_PACKAGE, root)
+  const latest = await latestVersions(root, kay, found, deps)
 
-  if (latestKay === undefined || !SEMVER.test(latestKay)) {
-    printFailure('upgrade', `the registry gave no version of ${KAY_PACKAGE}`, format)
+  if (typeof latest === 'string') {
+    printFailure('upgrade', `the registry gave no version of ${latest}`, format)
 
     return 1
   }
 
+  const latestKay = latest.get(kay)!
   const from = kay.version
-  const latest = new Map<KayDependency, string>()
-
-  for (const dependency of found) {
-    const target = dependency === kay ? latestKay : await deps.latest(dependency.registry, root)
-
-    if (target === undefined || !SEMVER.test(target)) {
-      printFailure('upgrade', `the registry gave no version of ${dependency.registry}`, format)
-
-      return 1
-    }
-
-    latest.set(dependency, target)
-  }
-
   const phases = planPhases(original, found, latest, steppingStones(from, latestKay))
 
   if (typeof phases === 'string') {
@@ -411,6 +398,22 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
   return finish(clean ? 0 : 1)
+}
+
+// The registry's latest version of kay, then of each other kay package the app lists; the registry name of the first one it gave none for.
+async function latestVersions(root: string, kay: KayDependency, found: KayDependency[], deps: UpgradeDeps): Promise<Map<KayDependency, string> | string> {
+  const latest = new Map<KayDependency, string>()
+
+  for (const dependency of [kay, ...found.filter(one => one !== kay)]) {
+    const target = await deps.latest(dependency.registry, root)
+
+    if (target === undefined || !SEMVER.test(target))
+      return dependency.registry
+
+    latest.set(dependency, target)
+  }
+
+  return latest
 }
 
 // package.json and the lockfiles as an install last left them.
