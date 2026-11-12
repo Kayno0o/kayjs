@@ -283,7 +283,11 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
     tab,
     button,
     icon: name => iconOf(doc, name),
-    time: at => formatDate('en-GB', new Date(at), { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    time: (at) => {
+      const date = new Date(at)
+
+      return Number.isNaN(date.getTime()) ? String(at) : formatDate('en-GB', date, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    },
     kit: makeKit(() => tool, listening.signal, missing, vitals, swapLog),
     outline,
     hideOutline,

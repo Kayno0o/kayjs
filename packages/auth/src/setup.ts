@@ -3,7 +3,6 @@ import type { Access } from './access'
 import type { AuthOptions } from './auth'
 import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
-
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
 import { asConfigError, configError, configuredSite, decide, dispatch, durationSeconds, kv } from 'kay/library'

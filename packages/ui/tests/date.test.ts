@@ -59,6 +59,7 @@ describe('dates', () => {
 
   test('names a month and a day in the locale, a locale the runtime rejects drawn in English, and a bad date as written', () => {
     expect(monthTitle('2026-10-21', 'en')).toBe('October 2026')
+    expect(monthTitle('2026-10-21', 'not a locale')).toBe('October 2026')
     expect(monthTitle('2026-10-21', 'fr')).toBe('octobre 2026')
     expect(monthTitle('2026-10-21', 'fr')).toBe('octobre 2026')
     expect(dayName('2026-10-21', 'en')).toBe('Wednesday, October 21, 2026')
