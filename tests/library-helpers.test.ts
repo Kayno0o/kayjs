@@ -99,6 +99,10 @@ describe('kay/library', () => {
   it('reads an Accept-Language header most wanted first, leaving out *, refused and malformed tags', () => {
     expect(acceptedLocales('fr-CA;q=0.8, en;q=0.9, *;q=0.5, de;q=0, x_bad, pt-BR')).toEqual(['pt-BR', 'en', 'fr-CA'])
     expect(acceptedLocales('')).toEqual([])
+    // A parameter name is case-insensitive.
+    expect(acceptedLocales('fr;Q=0, en')).toEqual(['en'])
+    expect(acceptedLocales('fr;Q=0.2, en;Q=0.9')).toEqual(['en', 'fr'])
+    expect(matchLocale(['en', 'fr'], acceptedLocales('fr;Q=0, en'))).toBe('en')
     expect(acceptedLocales('en-u-ca-gregory, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')).toEqual(['en-u-ca-gregory'])
     expect(matchLocale(['fr', 'en'], ['en-u-ca-gregory'])).toBe('en')
     expect(matchLocale(['en', 'fr'], ['de', 'FR-ca'])).toBe('fr')

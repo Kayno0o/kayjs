@@ -1,7 +1,7 @@
 // A BCP 47 tag such as `fr` or `pt-BR`.
 export const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{1,8})*$/i
 const LOCALE_MAX_LENGTH = 35
-const QUALITY = /;\s*q=([\d.]+)/
+const QUALITY = /;\s*q=([\d.]+)/i
 
 export function validLocale(tag: string): boolean {
   return tag.length <= LOCALE_MAX_LENGTH && LOCALE_TAG.test(tag)
