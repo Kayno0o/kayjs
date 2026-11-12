@@ -240,8 +240,10 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         .onError(({ request, error, code, set }) => {
           const span = recordOf(request)?.apiSpan
 
+          const mismatch = isResponseMismatch(error, code)
+
           // A response failing its own schema is the route's mistake, not the caller's: reported here, before the module's own `onError` may answer it.
-          if (isResponseMismatch(error, code))
+          if (mismatch)
             reportServerError(mismatchOf(error), request, options.onError)
 
           // Input refused before the guards ran gets the headers too, so the calling page can read why.
@@ -249,7 +251,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
             withCors(cors, request, set.headers)
 
           if (span)
-            failed(span, isResponseMismatch(error, code) ? mismatchOf(error) : error)
+            failed(span, mismatch ? mismatchOf(error) : error)
         })
         // Before the module's own `onError`, so no custom answer to refused input reaches a caller the guards refuse.
         .onError(async (context) => {

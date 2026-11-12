@@ -5,7 +5,7 @@ import process from 'node:process'
 import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
-import { KayError } from '../compiler/errors'
+import { errorCodeOf } from '../compiler/errors'
 import { setLogSink } from '../runtime/log'
 import { requestId } from './protection'
 import { recordOf } from './request-record'
@@ -180,7 +180,7 @@ function thrown(error: unknown): NonNullable<MessageEntry['error']> {
   if (error.name === 'KayCompileError')
     return { name: error.name, message: error.message, stack: error.message.trimStart() }
 
-  const code = error instanceof KayError ? error.code : undefined
+  const code = errorCodeOf(error)
 
   return { name: error.name, message: error.message, ...code !== undefined && { code }, ...error.stack !== undefined && error.stack !== '' && { stack: describeThrown(error) } }
 }

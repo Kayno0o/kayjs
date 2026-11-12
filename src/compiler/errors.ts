@@ -373,7 +373,7 @@ export const ERRORS = {
   },
   'live-value-invalid': {
     group: 'runtime',
-    summary: 'A live value set to something that cannot reach the browser, with the reason in the message.',
+    summary: 'A live value, or the result of an action or loader, that cannot reach the browser, with the reason in the message.',
     fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
   },
   'session-too-big': {

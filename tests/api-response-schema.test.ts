@@ -155,7 +155,10 @@ describe('the code of a response that fails its own schema', () => {
       const served = await pages({ requireGuards: false, dirs: { routes: ROUTES, api: join(dir, 'api') }, observe: { onError: ({ error, code }) => void events.push({ error, code }), log: entry => void entries.push(entry), tracer }, prebuilt: true })
 
       expect((await served.handle(new Request('http://localhost/api/items/wrong'))).status).toBe(500)
-      await Bun.sleep(10)
+
+      for (let wait = 0; wait < 50 && events.length === 0; wait++)
+        await Bun.sleep(10)
+
       expect(events.map(({ code }) => code)).toEqual(['response-schema-mismatch'])
       expect(events[0]!.error).toBeInstanceOf(KayError)
       expect(entries.flatMap(entry => entry.type === 'message' && entry.error ? [entry.error.code] : [])).toEqual(['response-schema-mismatch'])

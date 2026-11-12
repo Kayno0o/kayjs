@@ -1,3 +1,4 @@
+import type { LogEntry } from '../src/server/log'
 import { describe, expect, it } from 'bun:test'
 import { fixPath } from '../src/commands/fix-path'
 import { explainError, KayError } from '../src/compiler/errors'
@@ -6,6 +7,7 @@ import { IslandPropsError } from '../src/runtime/island.server'
 import { PrivateAddressError } from '../src/server/address'
 import { DatabaseOwnedError } from '../src/server/app-identity'
 import { StreamRefusedError } from '../src/server/event-stream'
+import { logMessage, tapLogs } from '../src/server/log'
 import { TimeoutError } from '../src/server/pg-poll'
 import { GiveUpError } from '../src/server/queue'
 import { RequestTimeoutError } from '../src/server/request-timeout'
@@ -62,6 +64,21 @@ describe('the errors a request raises', () => {
 
     for (const code of codes)
       expect(explainError(code)).toContain('llms/errors.md')
+  })
+
+  it('put the code of a KayError on its log entry, and none for a plain error', () => {
+    const entries: LogEntry[] = []
+    const stop = tapLogs(entry => void entries.push(entry))
+
+    try {
+      logMessage('error', '', new KayError('store-closed', 'closed'), undefined, 'test')
+      logMessage('error', '', Object.assign(new Error('plain'), { code: 'ENOENT' }), undefined, 'test')
+    }
+    finally {
+      stop()
+    }
+
+    expect(entries.map(entry => entry.type === 'message' ? entry.error?.code : 'request')).toEqual(['store-closed', undefined])
   })
 
   it('name the code of a refused redirect', () => {

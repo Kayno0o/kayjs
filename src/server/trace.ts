@@ -1,5 +1,5 @@
 import type { SpanIds, TraceContext } from './trace-context'
-import { KayError } from '../compiler/errors'
+import { errorCodeOf } from '../compiler/errors'
 import { logMessage } from './log'
 import { requestRecord } from './request-record'
 import { Denied, NotFound, Redirect } from './signals'
@@ -107,8 +107,10 @@ export function failed(span: Span, error: unknown): void {
 
   span.recordException(error instanceof Error ? error : String(error))
 
-  if (error instanceof KayError)
-    span.setAttribute('kay.error.code', error.code)
+  const code = errorCodeOf(error)
+
+  if (code !== undefined)
+    span.setAttribute('kay.error.code', code)
 
   span.setStatus({ code: ERROR_STATUS, message: error instanceof Error ? error.message : String(error) })
 }

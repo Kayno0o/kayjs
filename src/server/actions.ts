@@ -18,6 +18,7 @@ import type { DocumentedAction } from './openapi'
 import type { Unmatched } from './page-routes'
 import type { ToolOutputs } from './tool-outputs'
 import { relative } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, protectionFields } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
@@ -766,7 +767,7 @@ function encodeOrExplain(value: unknown, what: string): string {
   catch (error) {
     const reason = unsendable(error)
 
-    throw reason === undefined ? error : new TypeError(`kay: ${what} cannot reach the browser: ${reason}`)
+    throw reason === undefined ? error : new KayError('live-value-invalid', `kay: ${what} cannot reach the browser: ${reason}`)
   }
 }
 

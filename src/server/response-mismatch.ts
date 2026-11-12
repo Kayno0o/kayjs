@@ -12,6 +12,9 @@ export function mismatchOf(error: unknown): KayError {
 
   const reported = new KayError('response-schema-mismatch', elysia.message, { cause: elysia, status: 500 })
 
+  // Reported where Elysia raised it, under the name it had.
+  Object.assign(reported, { stack: elysia.stack, name: elysia.name })
+
   mismatches.set(elysia, reported)
 
   return reported
