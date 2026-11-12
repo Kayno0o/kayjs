@@ -106,8 +106,13 @@ const guarded = () => edited() && modal && !autosave && !dirty && discard !== fa
 
 function closed() {
   edited = false
-  if (followsHref(closeHref, onOpenChange))
+  if (followsHref(closeHref, onOpenChange)) {
+    // A client-side navigation may keep this instance, so an own state is reset too.
+    if (open === undefined)
+      inner = false
+
     leave(closeHref, onOpenChange)
+  }
   else
     change(false)
 }
