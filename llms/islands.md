@@ -206,6 +206,28 @@ if still()
 
 The server and the island's first render read the fallback, `false` unless given as the second argument, `mediaQuery(query, true)`, or the only one, `reducedMotion(true)`; the browser's answer replaces it once mounted, so hydrating changes nothing, and a change while the page is open reaches the island.
 
+### Follow the connection, the tab and the scroll
+
+`online()` and `pageVisible()` from `kay` are values that follow whether the browser has a connection and whether the tab is shown, while the island lives; `inView()` says whether an element shows in the viewport:
+
+```kay
+---
+import { inView, online, pageVisible } from 'kay'
+
+const connected = online()
+const shown = pageVisible()
+const banner = inView({ margin: '200px', once: true })
+---
+if !connected()
+  p You are offline
+.banner(ref={banner.ref} class:lit={banner.visible()}) Hello
+```
+
+- `online(fallback = true)` and `pageVisible(fallback = true)` read the fallback on the server and in the island's first render, then the browser's answer (`navigator.onLine`, `!document.hidden`) once mounted. `navigator.onLine` is the browser's word: a connection reaching no server can still read online.
+- `inView(options)` returns `{ ref, visible }`, `visible()` being `false` on the server and until the browser reports. Options: `threshold` (0 to 1, or a list), `margin` (CSS margins around the viewport), `root` (a scrolling element) and `once` (stop watching and stay `true` after the first time in view).
+- `inView`'s `ref` takes several elements, `visible()` being `true` while any is in view, and lets go of one removed by an `if`.
+- `throttled(source, delay)` is the twin of `debounced`: a memo giving `source`'s value at most once per `delay`, the first change at once and the last one when the wait ends, so `watch(throttled(scrollTop, '200ms'), save)` saves while the page moves, not on every pixel. It keeps its first value on the server and drops its timer with the island.
+
 ## Reference
 
 ### Islands

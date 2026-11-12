@@ -149,6 +149,38 @@ export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
   return settled
 }
 
+// `source`'s value at most once per `delay`: the first change shows at once, and a change inside the wait shows when it ends, with the last value `source` took: `watch(throttled(scrollTop, '200ms'), save)` saves a scroll position while it moves, not on every pixel.
+// The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
+// kept: free
+export function throttled<T>(source: () => T, delay: Duration): Memo<T> {
+  const wait = durationMs(delay)
+  const [settled, write] = createSignal(untrack(source))
+  let last = Number.NEGATIVE_INFINITY
+
+  createEffect(() => {
+    const next = source()
+
+    // The effect's first run, and a value back to the one shown, change nothing and use none of the wait.
+    if (Object.is(next, untrack(settled)))
+      return
+
+    const left = last + wait - Date.now()
+    const show = () => {
+      last = Date.now()
+      write(next)
+    }
+
+    if (left <= 0)
+      return show()
+
+    const timer = setTimeout(show, left)
+
+    onCleanup(() => clearTimeout(timer))
+  }, 'throttled', source)
+
+  return settled
+}
+
 // The events `listen` types its handler by, per kind of target.
 type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? DocumentEventMap : T extends HTMLElement ? HTMLElementEventMap : T extends MediaQueryList ? MediaQueryListEventMap : Record<string, Event>
 

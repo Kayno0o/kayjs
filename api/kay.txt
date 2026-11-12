@@ -337,7 +337,7 @@ function elementSize(): ElementSize
 [.] ElementSize
 interface ElementSize
   height: () => number
-  ref: (element: Element) => void
+  ref: (element: Element) => () => void
   width: () => number
 
 [.] EndpointBody
@@ -499,6 +499,21 @@ const installPrompt: { available: () => boolean; install(): Promise<InstallResul
 
 [.] InstallResult
 type InstallResult = | { ok: true, outcome: 'accepted', error?: undefined } | { ok: false, outcome: 'dismissed' | 'unavailable', error: ErrorShape }
+
+[.] inView
+function inView(options?: InViewOptions): InView
+
+[.] InView
+interface InView
+  ref: (element: Element) => () => void
+  visible: () => boolean
+
+[.] InViewOptions
+interface InViewOptions
+  margin?: string
+  once?: boolean
+  root?: Element | null
+  threshold?: number | number[]
 
 [.] isEmail
 function isEmail(input: unknown): input is string
@@ -731,6 +746,9 @@ type Once = <T>(key: string, load: () => T) => Promise<Awaited<T>>
 [.] onCleanup
 function onCleanup(fn: () => void): void
 
+[.] online
+function online(fallback?: boolean): () => boolean
+
 [.] onMount
 function onMount(fn: () => void): void
 
@@ -794,6 +812,9 @@ interface PageSettings
   sitemap?: boolean | object
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
+[.] pageVisible
+function pageVisible(fallback?: boolean): () => boolean
 
 [.] PartClass
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
@@ -1336,6 +1357,9 @@ type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Fin
 
 [.] TemplateContext
 type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
+
+[.] throttled
+function throttled<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`): Memo<T>
 
 [.] TrackedApi
 interface TrackedApi<Module, Path> extends Source<LoadStatus>

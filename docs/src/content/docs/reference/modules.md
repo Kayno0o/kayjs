@@ -25,7 +25,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `live` | A value the server changes and every page showing it follows. See [Live and realtime](/guides/live-and-realtime#values-the-server-changes) |
 | `presence` | Who else has a room or a page open, as `others()` and `count()` that follow joins and leaves. See [Live and realtime](/guides/live-and-realtime#who-else-is-here) |
 | `jobs`, `QueuedJob` | The waiting and running jobs of a queue declared with `live`, followed as they change. See [Background jobs](/guides/background-jobs#show-a-queues-jobs-on-a-page) |
-| `watch`, `debounced` | Code running on a change only, handed the value before, and a value once it stops changing |
+| `watch`, `debounced`, `throttled` | Code running on a change only, handed the value before, a value once it stops changing, and one that changes at most once per delay |
 | `every` | A timer running while an island lives, and while a condition holds |
 | `durationMs` | The milliseconds a duration written with its unit stands for, `durationMs('3s')` being 3000, for a timer of your own. A bare number throws |
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
@@ -33,6 +33,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `followLog` | Keeps a scrolling list at its bottom while the reader is there. See [Islands](/essentials/islands#following-a-log) |
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
 | `mediaQuery`, `reducedMotion` | Whether a media query, or reduced motion, matches, following a change while an island lives. See [Islands](/essentials/islands#following-a-media-query) |
+| `online`, `pageVisible`, `inView` | Whether the browser has a connection, whether the tab is shown, and whether an element shows in the viewport, following a change while an island lives. See [Islands](/essentials/islands#following-the-connection-the-tab-and-the-scroll) |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |

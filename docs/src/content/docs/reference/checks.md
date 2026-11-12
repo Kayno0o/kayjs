@@ -105,7 +105,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `island-marker` | deny | islands | `--- island` on a page, layout or special page, which are never islands |
 | `island-prop` | deny | islands | A component that is not an island passing one a value its type says cannot be sent: a function, a block with parameters, a symbol or an object holding one; `--- island` on the component is the fix, which `--fix` leaves for you to apply |
 | `hydration-mismatch` | deny | islands | An island reading the clock, `Math.random()` or a locale-less `Intl` or `toLocale*String` while it renders, which the server and the browser compute apart; allow a deliberate read with `// kay-allow hydration-mismatch` |
-| `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a timer, a promise callback or after an `await` (nothing stops them), or in an inline handler (each event adds one); call them in the component script or inside `root()`; a named or conditional handler is not seen |
+| `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `throttled`, `onMount` or `onCleanup` called in a timer, a promise callback or after an `await` (nothing stops them), or in an inline handler (each event adds one); call them in the component script or inside `root()`; a named or conditional handler is not seen |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |

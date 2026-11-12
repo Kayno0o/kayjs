@@ -27,7 +27,7 @@ const LIVE_WRITES = new Set(['set', 'delete'])
 const LIVE_STATE = new Set(['status', 'pending', 'error', 'retry'])
 
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
-const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo' }
+const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo' }
 // The compound assignments that write only when the value changes.
 const LOGICAL = new Set(['||', '&&', '??'])
 // The signals the modules of `kay` export.

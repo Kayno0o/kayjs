@@ -545,7 +545,7 @@ const column = elementSize()
   svg(width={column.width()} height={column.height()})
 ```
 
-`width()` and `height()` read the element's content box in pixels and change as it is resized. They are 0 on the server and until the browser has measured the element. An element that appears later, inside an `if` for instance, is measured as soon as it does.
+`width()` and `height()` read the element's content box in pixels and change as it is resized. They are 0 on the server and until the browser has measured the element. An element that appears later, inside an `if` for instance, is measured as soon as it does, and one an `if` removes is let go. With several elements on the same `ref`, the last one still there is the one read.
 
 <ReadMore href="/llms/islands-state-to-ids#element-size">Keeping the element too, and what the values are before the first measure.</ReadMore>
 
@@ -564,6 +564,26 @@ if still()
 ```
 
 The server renders the fallback, `false` unless you pass another, as in `mediaQuery('(max-width: 40rem)', true)`. The island starts from it too and takes the browser's answer once mounted.
+
+## Following the connection, the tab and the scroll
+
+`online()` is whether the browser has a connection, and `pageVisible()` whether the tab is shown. Both follow a change while the island lives. The server renders `true` for each, which you change with the argument, as in `online(false)`.
+
+`inView()` returns `{ ref, visible }`: give `ref` to an element and `visible()` is `true` while it shows in the viewport, `false` on the server and until the browser reports. Its options are `threshold`, `margin` (CSS margins around the viewport), `root` and `once`, which stops watching after the first time the element shows.
+
+```kay
+---
+import { inView, online } from 'kay'
+
+const connected = online()
+const banner = inView({ once: true })
+---
+if !connected()
+  p You are offline
+.banner(ref={banner.ref} class:lit={banner.visible()}) Hello
+```
+
+`throttled(source, delay)` is `debounced`'s twin: it gives `source`'s value at most once per `delay`, the first change at once and the last one when the wait ends. `watch(throttled(scrollTop, '200ms'), save)` saves while the visitor scrolls, not on every pixel.
 
 ## A page kay does not serve
 

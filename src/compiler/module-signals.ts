@@ -7,10 +7,10 @@ export type SignalKind = 'signal' | 'memo' | 'live'
 // The signals and memos of each module a component imports, by the specifier it imports them with.
 export type ImportedSignals = Record<string, Record<string, SignalKind>>
 
-export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', live: 'live' }
+export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo', live: 'live' }
 const NAMES_KAY = /["']kay["']/
 
-// The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam`, `memo`, `debounced` or `live`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
+// The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam`, `memo`, `debounced`, `throttled` or `live`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
 export function moduleSignals(source: string, jsx = false): Record<string, SignalKind> {
   const ast = NAMES_KAY.test(source) ? parseModule(source, jsx) : undefined
 

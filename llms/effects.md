@@ -91,6 +91,7 @@ p {seconds()}s on the page, last key {key()}
 - What the callback registers with `onCleanup` before an `await` runs at its next run: a flag set there drops a slower answer to an older value.
 - `debounced(source, delay)` from `kay` is a memo giving `source`'s value once it has stopped changing for `delay`, a duration, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks up as the user pauses, with no `setTimeout` kept by hand.
 - `debounced` drops its pending value with the island; on the server it keeps its first value. A `debounced` is read by calling it, as a memo is.
+- `throttled(source, delay)` from `kay` is its twin for a value that must keep up while it changes: it gives `source`'s value at most once per `delay`, the first change at once and the last one when the wait ends; it is read by calling it, keeps its first value on the server and drops its timer with the island.
 - `watch` and `debounced` run nothing while the server renders an island, as `effect` does; at a module's top level they run in the server's process too, as `effect` does there.
 - `listen(window, 'keydown', event => ...)` from `kay` listens to an event of `window`, `document` or any other target while the island lives, the handler typed by the target's events and the fourth argument passed to `addEventListener`.
 - `listen` never runs on the server, where the compiler keeps `window` unread, so a `.ts` module writes `listen(() => window, ...)`.

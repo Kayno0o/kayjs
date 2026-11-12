@@ -8,14 +8,14 @@ import { importedFromKay } from './rewrite-reads'
 import { walkScope } from './walk'
 
 // What lives until its owner goes: a call with none, or one made when the owner is long done, is never stopped, and `onCleanup` drops its function.
-const OWNED = new Set(['effect', 'watch', 'every', 'listen', 'debounced', 'onMount', 'onCleanup'])
+const OWNED = new Set(['effect', 'watch', 'every', 'listen', 'debounced', 'throttled', 'onMount', 'onCleanup'])
 // A function passed to these runs with an owner of its own.
 const OWNING = new Set(['root'])
 const LATER_CALLS = new Set(['setTimeout', 'setInterval', 'queueMicrotask', 'requestAnimationFrame', 'requestIdleCallback'])
 const PROMISE_METHODS = new Set(['then', 'catch', 'finally'])
-const WORD = /\b(?:effect|watch|every|listen|debounced|onMount|onCleanup)\b/
+const WORD = /\b(?:effect|watch|every|listen|debounced|throttled|onMount|onCleanup)\b/
 
-// `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` and `onCleanup` called in a handler, a timer or a promise callback, or after an `await`: the component's owner is not there to stop them, so each call adds one that lives until the page goes.
+// `effect`, `watch`, `every`, `listen`, `debounced`, `throttled`, `onMount` and `onCleanup` called in a handler, a timer or a promise callback, or after an `await`: the component's owner is not there to stop them, so each call adds one that lives until the page goes.
 export function unownedEffects(file: KayFile, serverNames: string[]): Diagnostic[] {
   const { source } = file
   const expressions = templateExpressions(file)
