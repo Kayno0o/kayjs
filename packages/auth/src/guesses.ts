@@ -2,6 +2,7 @@ import type { LimitSet } from './limits'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
+import { limitRefused } from 'kay/library'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
 import { forget, reached, spend, tally, windowOf } from './limits'
@@ -81,8 +82,12 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
   if (await spend(rates, `two-factor:${state.client}`, limits.twoFactor))
     return true
 
-  const { count: guesses, beside } = await tally(rates, `two-factor:${record.id}`, limits.twoFactorAccount)
+  const key = `two-factor:${record.id}`
+  const { count: guesses, beside, over } = await tally(rates, key, limits.twoFactorAccount)
   const { max } = limits.twoFactorAccount[0]
+
+  if (over)
+    limitRefused('kayjs-auth', over.limit, { key, wait: over.wait })
 
   if (guesses <= max)
     return beside

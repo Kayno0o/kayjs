@@ -121,6 +121,14 @@ describe('a limit object shared with an action', () => {
     expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
   })
 
+  it('leaves a copy\'s hit and enforce counting in the original', async () => {
+    const limit = rateLimit('shared-methods', { max: 1, window: '1m', store: memoryRates() })
+    const copy = { ...limit, max: 5 }
+
+    expect(await copy.hit('account')).toBeUndefined()
+    expect(await limit.hit('account')).toBeGreaterThan(0)
+  })
+
   it('counts a shared object on a page limit with a guard, and tells onLimit', async () => {
     const seenHere: RateLimitRefusal[] = []
     const limit = rateLimit('shared-page', { max: 1, window: '1m', store: memoryRates(), onLimit: refusal => void seenHere.push(refusal) })

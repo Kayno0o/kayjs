@@ -266,7 +266,7 @@ export default guard(async (ctx) => {
 
 The object `rateLimit()` returns is a limit like any other, so `protect: { rateLimit: visits }` on an action, `api({ rateLimit: visits })` or a page's `rateLimit` takes it and counts in the same counter: one client, one allowance across the guard, the action and the API.
 
-- A copy of the object, `{ ...visits, max: 5 }`, is a limit of its own and counts apart.
+- A copy of the object, `{ ...visits, max: 5 }`, is a limit of its own and counts apart when an action or route takes it; its `hit` and `enforce` are still the original's and count in it.
 - A guard calling `enforce` on the object an action also takes counts a post twice, once in each.
 - On a layout's `page.rateLimit` the shared object counts every page under the layout together, where a plain options object counts each route apart.
 - kayjs-auth and kayjs-ai take `onLimit` but not this object, as they count under keys of their own.

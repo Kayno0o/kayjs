@@ -44,7 +44,7 @@ An API route or module sets its own with `api({ rateLimit })` or the route's `de
 
 ### Share one limit between an action, a guard and an API route
 
-The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: visits }`, `api({ rateLimit: visits })` or `page.rateLimit` and they count in the guard's counter, so one client has one allowance across all of them. An options object keeps counting apart, as before, and so does a copy of the object (`{ ...visits, max: 5 }` is a limit of its own).
+The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: visits }`, `api({ rateLimit: visits })` or `page.rateLimit` and they count in the guard's counter, so one client has one allowance across all of them. An options object keeps counting apart, as before, and so does a copy of the object when it is given to an action or route (`{ ...visits, max: 5 }` is a limit of its own there), while the copy's `hit` and `enforce` are the original's and still count in it.
 
 - A guard calling `visits.enforce(ctx)` on the same object as an action behind it counts a post twice: once in the guard, once in the action.
 - On a layout's `page.rateLimit` a shared object counts every page under the layout together, where a plain options object counts each route apart.

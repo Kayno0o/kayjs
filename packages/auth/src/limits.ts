@@ -96,19 +96,21 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
 }
 
 // Counts one attempt against each limit of the bucket and answers whether any was over.
+// The attempt is refused once whatever the number of limits it is over: the one with the longest wait is told to `onLimit`.
 export async function spend(rates: AuthLimiters, key: string, limits: LimitSet): Promise<boolean> {
-  let over = false
+  let worst: { limit: AuthRateLimit, wait: number } | undefined
 
   for (const [index, limit] of limits.entries()) {
     const wait = await rates(limit).enforce(apart(key, index))
 
-    if (wait !== undefined) {
-      over = true
-      limitRefused('kayjs-auth', limit, { key, wait })
-    }
+    if (wait !== undefined && (!worst || wait > worst.wait))
+      worst = { limit, wait }
   }
 
-  return over
+  if (worst)
+    limitRefused('kayjs-auth', worst.limit, { key, wait: worst.wait })
+
+  return worst !== undefined
 }
 
 // The attempts counted under `key` in the first limit's open window, none once it ended.
@@ -116,10 +118,11 @@ export async function counted(rates: AuthLimiters, key: string, limits: LimitSet
   return (await rates(limits[0]).peek(key))?.count ?? 0
 }
 
-// Counts one attempt without refusing it, in each limit of the bucket: the first's window, which the caller compares to `max`, and whether any of the others is over.
-export async function tally(rates: AuthLimiters, key: string, limits: LimitSet): Promise<RateWindow & { beside: boolean }> {
+// Counts one attempt without refusing it, in each limit of the bucket: the first's window, which the caller compares to `max`, whether any of the others is over, and the one with the longest wait it is over, for the caller to tell `onLimit` if it refuses.
+export async function tally(rates: AuthLimiters, key: string, limits: LimitSet): Promise<RateWindow & { beside: boolean, over: { limit: AuthRateLimit, wait: number } | undefined }> {
   const first = await rates(limits[0]).hit(key)
   let beside = false
+  let over = first.count > limits[0].max ? { limit: limits[0], wait: secondsTo(first.resetAt) } : undefined
 
   for (const [index, limit] of limits.entries()) {
     if (index === 0)
@@ -129,11 +132,13 @@ export async function tally(rates: AuthLimiters, key: string, limits: LimitSet):
 
     if (window.count > limit.max) {
       beside = true
-      limitRefused('kayjs-auth', limit, { key, wait: secondsTo(window.resetAt) })
+
+      if (!over || secondsTo(window.resetAt) > over.wait)
+        over = { limit, wait: secondsTo(window.resetAt) }
     }
   }
 
-  return { ...first, beside }
+  return { ...first, beside, over }
 }
 
 // Forgets the count under `key` in each limit of the bucket.
@@ -147,7 +152,7 @@ function apart(key: string, index: number): string {
   return index === 0 ? key : `#${index}:${key}`
 }
 
-// Whether the count under `key` has reached `max` in any limit of the bucket.
+// Whether the count under `key` has reached `max` in any limit of the bucket, told once to `onLimit` for the first. Called only where the request is refused for it, after a `spend` that did not refuse.
 export async function reached(rates: AuthLimiters, key: string, limits: LimitSet): Promise<boolean> {
   for (const [index, limit] of limits.entries()) {
     const window = await rates(limit).peek(apart(key, index))
