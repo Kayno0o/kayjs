@@ -118,6 +118,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unused-selector` | warn | code | A rule in a `--- style` fence whose last compound no element of the template can have |
 | `unreachable-selector` | deny | code | A rule in a `--- style` fence ending on `:root`, `html` or `body`, which the scope attribute never matches; `:global(...)` is the offered fix, which `--fix` leaves |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height`, unless its classes or `style` reserve the box, as `aspect-video w-full` |
+| `serial-awaits` | warn | performance | Two or more consecutive `const x = await ...` statements in a `--- server` fence that read none of each other's names, so each waits for the one before; the editor offers one `Promise.all` as an unsafe fix, which `--fix` leaves, as a guard must stay first |
 | `large-public-image` | warn | performance | An `img`, a CSS `url()` or `image-set()` string, a social card `meta`, `seo.image`, or a Markdown image, HTML `img` or frontmatter `image:` using a public image over 256 KiB, as a path or an address under `site` |
 | `missing-site` | warn | seo | `seo` with no `site`, on a static export |
 | `missing-description` | warn | seo | No `seo.description` |

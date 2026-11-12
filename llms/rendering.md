@@ -1,5 +1,7 @@
 # Caching and streaming
 
+A page sends nothing until every `await` of its `--- server` fence (and its layouts' loads) has settled, so a slow load is a click that waits as long. The rule: await in the fence only what the first paint needs, start the rest unawaited so an `await` block streams it, and cache what every request shares. Independent awaits written one after the other add their times; `serial-awaits` finds them and the editor offers one `Promise.all` (not applied by `--fix`: keep a guard such as `await requireUser()` in its own statement first). In development kay warns, in the console and the dev tool's Request tab, when a page's loads pass `observe.loadBudget` (`'300ms'` by default, `false` for none), naming the slowest load.
+
 ## Common tasks
 
 ### Cache what a load fetches

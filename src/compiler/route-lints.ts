@@ -1,7 +1,9 @@
 import type { Lint } from './lints'
+import { SERIAL_AWAITS_LINTS } from './serial-awaits'
 
-// The lints of the files under `src/routes` and of the content entries, with the other lints in `LINTS`.
+// The lints of the files under `src/routes`, of the content entries and of a page's server fence, with the other lints in `LINTS`.
 export const ROUTE_LINTS = {
+  ...SERIAL_AWAITS_LINTS,
   'unguarded-route': {
     level: 'deny',
     group: 'security',

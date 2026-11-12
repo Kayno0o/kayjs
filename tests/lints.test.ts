@@ -1269,6 +1269,68 @@ describe('unreturned-fail', () => {
   })
 })
 
+describe('serial-awaits', () => {
+  const page = (fence: string) => `--- server\n${fence}\n---\np x`
+  const found = (fence: string) => lints(page(fence)).filter(d => d.code === 'serial-awaits')
+
+  it('reports consecutive independent awaits, with a fix writing one Promise.all', () => {
+    const fence = 'const posts = await loadPosts()\nconst tags = await loadTags(1)\nconst user = await loadUser()'
+
+    expect(found(fence)).toEqual([{ code: 'serial-awaits', severity: 'warning', at: fence }])
+    expect(fixed(page(fence))).toEqual([page('const [posts, tags, user] = await Promise.all([\n  loadPosts(),\n  loadTags(1),\n  loadUser(),\n])')])
+  })
+
+  it('offers the fix as a suggestion, never a safe one, so a guard await is not started beside the next', () => {
+    const fixes = compileKay(page('const a = await one()\nconst b = await two()'), 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'serial-awaits').flatMap(d => d.fixes ?? [])
+
+    expect(fixes.map(fix => fix.safe)).toEqual([false])
+  })
+
+  it('keeps the statements around the run and fixes each run on its own', () => {
+    const fence = 'import { a, b, c, d } from \'./data\'\nconst x = await a()\nconst y = await b()\nconst z = x + y\nconst p = await c()\nconst q = await d()'
+
+    expect(found(fence)).toHaveLength(2)
+    expect(fixed(page(fence)).every(text => text.includes('const z = x + y') && text.includes('import { a, b, c, d }'))).toBe(true)
+  })
+
+  it('splits a run where an await reads an earlier binding', () => {
+    expect(found('const user = await loadUser()\nconst posts = await loadPosts(user.id)')).toEqual([])
+    expect(found('const a = await one()\nconst b = await two()\nconst c = await three(a)')).toHaveLength(1)
+    expect(fixed(page('const a = await one()\nconst b = await two()\nconst c = await three(a)'))).toEqual([page('const [a, b] = await Promise.all([\n  one(),\n  two(),\n])\nconst c = await three(a)')])
+    expect(found('const a = await one()\nconst b = await two(() => a)')).toEqual([])
+    expect(found('const a = await one()\nconst b = await two({ a })')).toEqual([])
+    expect(found('const a = await one()\nconst b = await two(`${a}`)')).toEqual([])
+  })
+
+  it('leaves a single await, a let, a pattern, an annotation, a try and other statements between alone', () => {
+    expect(found('const a = await one()')).toEqual([])
+    expect(found('let a = await one()\nlet b = await two()')).toEqual([])
+    expect(found('const { a } = await one()\nconst { b } = await two()')).toEqual([])
+    expect(found('const [a] = await one()\nconst [b] = await two()')).toEqual([])
+    expect(found('const a: number = await one()\nconst b: number = await two()')).toEqual([])
+    expect(found('const a = (await one()) as number\nconst b = (await two()) as number')).toEqual([])
+    expect(found('const a = await one()\nconst b = two()\nconst c = await three()')).toEqual([])
+    expect(found('const a = await one()\nsetup()\nconst b = await two()')).toEqual([])
+    expect(found('try {\n  const a = await one()\n  const b = await two()\n}\ncatch {}')).toEqual([])
+    expect(found('const a = await one(), b = await two()')).toEqual([])
+    expect(found('const a = await one()\nawait audit()\nconst b = await two()')).toEqual([])
+    expect(found('const a = await one()\n// the second must run after the first\nconst b = await two()')).toEqual([])
+    expect(found('export const a = await one()\nexport const b = await two()')).toEqual([])
+  })
+
+  it('reads only a server fence, and a nested await of the expression stays inside it', () => {
+    expect(lints('---\nconst a = await one()\nconst b = await two()\n---\np x').filter(d => d.code === 'serial-awaits')).toEqual([])
+    expect(fixed(page('const a = await one()\nconst b = await two(await three())'))).toEqual([page('const [a, b] = await Promise.all([\n  one(),\n  two(await three()),\n])')])
+  })
+
+  it('is allowed by a comment and by the lint level', () => {
+    const fence = '// kay-allow serial-awaits\nconst a = await one()\nconst b = await two()'
+
+    expect(found(fence)).toEqual([])
+    expect(lints(page('const a = await one()\nconst b = await two()'), { lints: { 'serial-awaits': 'allow' } }).filter(d => d.code === 'serial-awaits')).toEqual([])
+  })
+})
+
 describe('invalid-nesting', () => {
   const nesting = (source: string) => lints(source).filter(d => d.code === 'invalid-nesting').map(d => d.at)
 

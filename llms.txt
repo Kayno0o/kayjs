@@ -80,17 +80,18 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Island sources](llms/island-sources.md): status, error, retry, hooks
 - [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Local collections](llms/local-collections.md): `local()`, offline rows
-- [Rooms](llms/rooms.md): groups of websocket connections, shared state, a snapshot on join
+- [Rooms](llms/rooms.md): websocket groups, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
 - [Testing requests and sockets](llms/testing-requests-jobs-sockets.md): requests, jobs, sockets
 - [Test databases and setup](llms/testing-setup.md): `kay/test/preload`, a database per file, seeds
 - [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
-- [Lints and warnings](llms/lints.md): every lint at its default level, allowing one, its fix
-- [SEO lints](llms/seo-lints.md): the `seo` group and what each lint reads
+- [Lints and warnings](llms/lints.md): each lint's level and fix, allowing one
+- [SEO lints](llms/seo-lints.md): its group
+- [Performance lints](llms/performance-lints.md): its group
 - [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
 - [Errors](llms/errors.md): error codes and fixes, `Result`
-- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, migrating from Astro
+- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, from Astro
 - [kay new and kay add](llms/project-new-and-add.md): presets, features, `kay generate`
 - [The dev server](llms/dev-server.md): `kay dev` and its error page
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists

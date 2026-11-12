@@ -4,6 +4,12 @@ order: 7
 description: Keep slow loads in memory, and stream slow parts of a page in after the rest.
 ---
 
+A page sends nothing until every `await` in its `--- server` fence, and in its layouts, has finished. If one of them is slow, every click on a link to that page waits as long. So wait in the fence only for what the first paint needs. Start the rest without `await` and let an `await` block in the template stream it in, and cache whatever every visitor shares.
+
+Two awaits written one after the other add up, even when the second does not use the first. Writing `const [posts, tags] = await Promise.all([loadPosts(), loadTags()])` takes the longer of the two instead, and the `serial-awaits` check finds such pairs and offers that rewrite in the editor. `kay check --fix` does not apply it, because a guard such as `await requireUser()` has to finish before the loads start.
+
+While you work in `kay dev`, a page whose loads take longer than 300 ms is reported in the terminal, the browser console and the Request tab of the dev tool, with the slowest load named. Change the limit with `observe: { loadBudget: '500ms' }` in `kay.config.ts`, or turn it off with `false`.
+
 Each tool fits a different slow part.
 
 

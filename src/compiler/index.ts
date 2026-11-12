@@ -26,6 +26,7 @@ import { patternNames } from './pattern-names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
+import { serialAwaits } from './serial-awaits'
 import { STATUS_PAGE_FILES } from './status-pages'
 import { outerReads, templateWords } from './template-reads'
 import { ISLAND_TWIN } from './twin'
@@ -328,7 +329,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...ignoredIslandExport(script, island !== undefined))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...ignoredIslandExport(script, island !== undefined))
   }
 
   if (checked && pin !== undefined)
