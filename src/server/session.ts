@@ -406,7 +406,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     const cookie = this.cookie(sealWith(this.config.keys[0]!, stringify(sealed), name), this.own.browser ? undefined : maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
-      throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
+      throw new KayError('session-too-big', `kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
 
     await this.tell(this.ended, { id: this.id })
 

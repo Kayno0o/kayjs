@@ -19,7 +19,7 @@ kay explain template-syntax
 - `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's.
 - The codes are stable names, one for a group of messages with one cause.
 - No level applies to them, and no `// kay-allow` comment reaches them.
-- Errors kay raises while serving a request, other than the classes of the `runtime` group below, and the app's own code, carry none.
+- Every error kay raises while serving a request is a `KayError` of the `runtime` group, so it carries a code, and the app's own code carries none. The code is `error.code`, `LogEntry.error.code` of its log line, the `kay.error.code` attribute of its span and `code` in the `observe.onError` event, which leaves it out for an error that is no `KayError`.
 - Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`): `code` is the registered name, `kind` tells apart what one code covers (the code itself when it covers one cause), `status` is the HTTP status it stands for (`undefined` when none), `cause` the error underneath, and `name` the class's, so `instanceof` of each class still works.
 - A message opens with `kay: ` when it names a setting (a `configError`, which every library throws for an option it refuses at boot, ending on the library, the option and where it is documented), with `kayjs-<library>: ` when a library refuses a call of the developer's, and with nothing when the app shows it to a visitor or an editor (a `SaveConflictError`, a `RedirectRefusedError`).
 - A function throws for a wrong setup or a programming mistake (a `configError` at boot, a `KayError` subclass) and for an infrastructure failure the app cannot act on per call (a provider down, a store unreachable). It returns a Result for what a visitor or another caller did and the app branches on: a sign-in, a save, `list.confirm`, a tracked call, `webPush.enable()`.
@@ -96,6 +96,14 @@ kay explain template-syntax
 | `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `config-refused` | runtime | A `kay.config.ts` that does not load, the process that found out having printed why. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `database-owned` | runtime | A boot on a database that belongs to another app. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `response-schema-mismatch` | runtime | An API route whose answer fails its response schema: the route's own mistake, answered 500 and reported with Elysia's error as its `cause`. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `api-answer-invalid` | runtime | An API route that answered a class instance or a Map, which would reach the client as `[object Object]`. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `redirect-target-invalid` | runtime | A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `live-value-invalid` | runtime | A live value set to something that cannot reach the browser, with the reason in the message. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `session-too-big` | runtime | A session held in its cookie that grew past what a browser keeps; give `session()` a store. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `outside-request` | runtime | A call that reads the request being answered (the locale, an MCP tool's request) made outside one. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `hook-timeout` | runtime | A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `store-closed` | runtime | A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](../packages/ai/llms/testing-and-errors.md#errors) |
 | `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](../packages/auth/llms/hardening-and-testing.md#errors) |
 | `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](../packages/cms/llms/options.md#errors) |
@@ -122,5 +130,7 @@ Each extends `KayError`, so its `code`, `kind`, `status` and `name` are set and 
 | `DatabaseOwnedError` | `database-owned` | A boot on a database that belongs to another app. |
 | `TimeoutError` | `poll-timeout` | A database call a store gave up on after its time limit. |
 | `MarkdownError` | `markdown-invalid` | Markdown an entry holds that kay cannot read, with the `line`. |
+
+A request can also raise a `KayError` with no class of its own, told by its code: `response-schema-mismatch` (an API answer failing its `response` schema, 500), `api-answer-invalid`, `redirect-target-invalid`, `live-value-invalid`, `session-too-big`, `outside-request`, `hook-timeout` and `store-closed`.
 
 The libraries list their own classes in an `Errors` table of their `llms/`: [kayjs-ai](../packages/ai/llms/testing-and-errors.md#errors), [kayjs-auth](../packages/auth/llms/hardening-and-testing.md#errors), [kayjs-cms](../packages/cms/llms/options.md#errors), [kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#errors) and [kayjs-ui](../packages/ui/llms/setup.md#errors).

@@ -10,6 +10,7 @@ import { TimeoutError } from '../src/server/pg-poll'
 import { GiveUpError } from '../src/server/queue'
 import { RequestTimeoutError } from '../src/server/request-timeout'
 import { RedirectRefusedError } from '../src/server/runtime-redirects'
+import { Redirect } from '../src/server/signals'
 
 describe('the runtime error classes', () => {
   const classes = [
@@ -52,5 +53,18 @@ describe('the runtime error classes', () => {
     expect(explainError('ai-error', file => `at ${file}`)).toContain('at packages/ai/llms/testing-and-errors.md')
     expect(fixPath('packages/nope/llms/a.md')).toBe('node_modules/@kaynooo/kayjs-nope/llms/a.md')
     expect(fixPath('llms/errors.md')).toBe('llms/errors.md')
+  })
+})
+
+describe('the errors a request raises', () => {
+  it('carry a registered code that kay explain prints', () => {
+    const codes = ['response-schema-mismatch', 'api-answer-invalid', 'redirect-target-invalid', 'live-value-invalid', 'session-too-big', 'outside-request', 'hook-timeout', 'store-closed'] as const
+
+    for (const code of codes)
+      expect(explainError(code)).toContain('llms/errors.md')
+  })
+
+  it('name the code of a refused redirect', () => {
+    expect(() => new Redirect('//evil.example', 302)).toThrow(expect.objectContaining({ code: 'redirect-target-invalid' }))
   })
 })

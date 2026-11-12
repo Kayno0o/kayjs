@@ -1,4 +1,5 @@
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
+import { KayError } from '../compiler/errors'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -148,7 +149,7 @@ export function sqliteKv(path: string): KvStore {
 
   const file = () => {
     if (closed)
-      throw new Error('kay: the kv store was closed')
+      throw new KayError('store-closed', 'kay: the kv store was closed')
 
     return opened ??= openKv(path)
   }

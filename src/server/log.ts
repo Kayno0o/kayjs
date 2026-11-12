@@ -5,6 +5,7 @@ import process from 'node:process'
 import { version } from '../../package.json'
 import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
+import { KayError } from '../compiler/errors'
 import { setLogSink } from '../runtime/log'
 import { requestId } from './protection'
 import { recordOf } from './request-record'
@@ -37,7 +38,8 @@ export interface MessageEntry {
   // The request being answered when it was logged.
   request?: { method: string, path: string, id: string, trace?: string }
   // What was thrown, its stack mapped to `.kay` lines.
-  error?: { name: string, message: string, stack?: string }
+  // `code` is the registered name of a `KayError`, which `kay explain` prints.
+  error?: { name: string, message: string, code?: string, stack?: string }
 }
 
 export type LogEntry = RequestEntry | MessageEntry
@@ -178,7 +180,9 @@ function thrown(error: unknown): NonNullable<MessageEntry['error']> {
   if (error.name === 'KayCompileError')
     return { name: error.name, message: error.message, stack: error.message.trimStart() }
 
-  return { name: error.name, message: error.message, ...error.stack !== undefined && error.stack !== '' && { stack: describeThrown(error) } }
+  const code = error instanceof KayError ? error.code : undefined
+
+  return { name: error.name, message: error.message, ...code !== undefined && { code }, ...error.stack !== undefined && error.stack !== '' && { stack: describeThrown(error) } }
 }
 
 // The request kay is answering in this async context, a page or an action, until its answer is made; an API route's handler runs in Elysia's call, outside it.

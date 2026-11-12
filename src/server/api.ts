@@ -41,6 +41,7 @@ import { recordOf, requestRecord } from './request-record'
 import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { requestUrl } from './request-url'
+import { mismatchOf } from './response-mismatch'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
@@ -241,14 +242,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           // A response failing its own schema is the route's mistake, not the caller's: reported here, before the module's own `onError` may answer it.
           if (isResponseMismatch(error, code))
-            reportServerError(error, request, options.onError)
+            reportServerError(mismatchOf(error), request, options.onError)
 
           // Input refused before the guards ran gets the headers too, so the calling page can read why.
           if (cors)
             withCors(cors, request, set.headers)
 
           if (span)
-            failed(span, error)
+            failed(span, isResponseMismatch(error, code) ? mismatchOf(error) : error)
         })
         // Before the module's own `onError`, so no custom answer to refused input reaches a caller the guards refuse.
         .onError(async (context) => {
@@ -588,7 +589,7 @@ function reportThrown({ request, error, code, set }: { request: Request, error: 
   if (!mismatch && !isUncaught(error, code))
     return undefined
 
-  reportServerError(error, request, options.onError)
+  reportServerError(mismatch ? mismatchOf(error) : error, request, options.onError)
 
   if (options.dev) {
     if (!mismatch)
@@ -616,7 +617,7 @@ function sendable(value: unknown): unknown {
   if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || (value).toString !== Object.prototype.toString || sentAsIs(value))
     return value
 
-  throw new TypeError(`kay: an API route answered a ${value.constructor?.name ?? 'value'}, which would reach the client as "${Object.prototype.toString.call(value)}": answer a plain object or array, or a Response`)
+  throw new KayError('api-answer-invalid', `kay: an API route answered a ${value.constructor?.name ?? 'value'}, which would reach the client as "${Object.prototype.toString.call(value)}": answer a plain object or array, or a Response`)
 }
 
 // Bodies Elysia or `Response` send as they are, though they write as `[object ...]`.

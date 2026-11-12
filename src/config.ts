@@ -186,7 +186,8 @@ export interface ObserveConfig {
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
   // An error a hook of kay or a library threw comes with its `source`, such as `'cms.onSave'`; it is undefined for any other.
-  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined }) => void | Promise<void>) | undefined
+  // `code` is the registered name of a `KayError` (`kay explain <code>`), undefined for any other error.
+  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined, code?: string | undefined }) => void | Promise<void>) | undefined
 }
 
 export interface ClientConfig {

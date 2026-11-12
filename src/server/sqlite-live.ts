@@ -1,5 +1,6 @@
 import type { LiveStore } from '../runtime/live-value'
 import { existsSync } from 'node:fs'
+import { KayError } from '../compiler/errors'
 import { PURGE_STALE_MS } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
 import { pollLoop } from '../runtime/poll-backoff'
@@ -75,7 +76,7 @@ export function sqliteLive(path: string): LiveStore {
   const polls: ReturnType<typeof pollLoop>[] = []
   const open = (create: boolean) => {
     if (closed)
-      throw new Error('kay: the live values store was closed')
+      throw new KayError('store-closed', 'kay: the live values store was closed')
 
     if (opened === undefined && (create || existsSync(path)))
       opened = openLive(path)

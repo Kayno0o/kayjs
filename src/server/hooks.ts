@@ -1,5 +1,6 @@
 import type { ErrorShape } from '../runtime/api-error'
 import { within } from '@kaynooo/utils/promise'
+import { KayError } from '../compiler/errors'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { thrownRefusal } from '../runtime/refuse'
@@ -143,7 +144,7 @@ export async function decide<E extends object, C extends object>(source: string,
       const done = await within(Promise.resolve(hook({ ...event, ...change, context })), HOOK_TIMEOUT_MS, LATE)
 
       if (done === LATE)
-        throw new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms`)
+        throw new KayError('hook-timeout', `${source} did not finish in ${HOOK_TIMEOUT_MS} ms`)
 
       answer = done
     }

@@ -1,5 +1,6 @@
 import type { RequestContext } from '../runtime'
 import type { ErrorData } from '../runtime/core'
+import { KayError } from '../compiler/errors'
 import { leavesSite } from '../runtime/base'
 import { localizedLink } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
@@ -39,16 +40,16 @@ export class Redirect {
 
   constructor(location: string, readonly status: number) {
     if (CONTROL.test(location))
-      throw new TypeError(`kay: the redirect to ${JSON.stringify(location)} holds a line break or another control character`)
+      throw new KayError('redirect-target-invalid', `kay: the redirect to ${JSON.stringify(location)} holds a line break or another control character`)
 
     if (OTHER_SCHEME.test(location.trimStart()))
-      throw new TypeError(`kay: a redirect goes to a path or an http(s) URL, not to ${JSON.stringify(location)}`)
+      throw new KayError('redirect-target-invalid', `kay: a redirect goes to a path or an http(s) URL, not to ${JSON.stringify(location)}`)
 
     // A path starting with a slash or a backslash is of this site, so one a browser, a proxy or a second decoding would read as another host (`//evil.example`, `/\\evil.example`, `/%2F/evil.example`) is refused; a full URL names its host and is allowed.
     const path = location.trimStart()
 
     if (!isOwnHost(location) && (path.startsWith('\\') || (path.startsWith('/') && leavesSite(path))))
-      throw new TypeError(`kay: the redirect to ${JSON.stringify(location)} is a path which a browser reads as another site; redirect to a full https:// URL for another site, and pass a ?next= param through localPath()`)
+      throw new KayError('redirect-target-invalid', `kay: the redirect to ${JSON.stringify(location)} is a path which a browser reads as another site; redirect to a full https:// URL for another site, and pass a ?next= param through localPath()`)
 
     // A page of the site goes to in the locale of the page that redirects, as any link of it is.
     const state = localeState()

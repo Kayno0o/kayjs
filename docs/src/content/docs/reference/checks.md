@@ -160,7 +160,9 @@ In `--format json` the code is the `code` field. It is `null` for what kay did n
 
 `kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's. The codes are stable names, one for a group of messages with one cause.
 
-No level applies to an error and no `// kay-allow` comment reaches it. The classes kay and its libraries throw for an app to catch (`AiError`, `SaveConflictError`, `GiveUpError` and the rest) extend `KayError` and carry a code of the `runtime` and `library` groups. Their `kind` tells apart what one code covers, their `status` is the HTTP status they stand for, and `instanceof` of each class still works. Other errors kay raises while serving a request, and the app's own code, carry no code.
+No level applies to an error and no `// kay-allow` comment reaches it. The classes kay and its libraries throw for an app to catch (`AiError`, `SaveConflictError`, `GiveUpError` and the rest) extend `KayError` and carry a code of the `runtime` and `library` groups. Their `kind` tells apart what one code covers, their `status` is the HTTP status they stand for, and `instanceof` of each class still works.
+
+Every error kay raises while serving a request carries one too: `error.code`, `code` on the `error` of its log entry, the `kay.error.code` attribute of its span and `code` in the `observe.onError` event. The app's own code carries none.
 
 A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` when a library refuses a call, and with nothing when the app shows it to a visitor.
 
@@ -233,6 +235,14 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors](/reference/checks) |
 | `config-refused` | runtime | A `kay.config.ts` that does not load, the process that found out having printed why. | [Errors](/reference/checks) |
 | `database-owned` | runtime | A boot on a database that belongs to another app. | [Errors](/reference/checks) |
+| `response-schema-mismatch` | runtime | An API route whose answer fails its response schema: the route's own mistake, answered 500 and reported with Elysia's error as its `cause`. | [Errors](/reference/checks) |
+| `api-answer-invalid` | runtime | An API route that answered a class instance or a Map, which would reach the client as `[object Object]`. | [Errors](/reference/checks) |
+| `redirect-target-invalid` | runtime | A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site. | [Errors](/reference/checks) |
+| `live-value-invalid` | runtime | A live value set to something that cannot reach the browser, with the reason in the message. | [Errors](/reference/checks) |
+| `session-too-big` | runtime | A session held in its cookie that grew past what a browser keeps; give `session()` a store. | [Errors](/reference/checks) |
+| `outside-request` | runtime | A call that reads the request being answered (the locale, an MCP tool's request) made outside one. | [Errors](/reference/checks) |
+| `hook-timeout` | runtime | A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused. | [Errors](/reference/checks) |
+| `store-closed` | runtime | A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed. | [Errors](/reference/checks) |
 | `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](/libraries/kayjs-ai) |
 | `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](/libraries/kayjs-auth) |
 | `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](/libraries/kayjs-cms) |

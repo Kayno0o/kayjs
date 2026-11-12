@@ -1,5 +1,6 @@
 import type { ObserveConfig } from '../config'
 import { within } from '@kaynooo/utils/promise'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
@@ -47,7 +48,7 @@ export function reportServerError(error: unknown, request: Request, onError: Obs
 
 async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<ObserveConfig['onError']>, source?: string): Promise<void> {
   try {
-    await onError({ error, request, ...source !== undefined && { source } })
+    await onError({ error, request, ...source !== undefined && { source }, ...error instanceof KayError && { code: error.code } })
   }
   // A failing reporter is logged, never left to crash the process as an unhandled rejection.
   catch (failure) {

@@ -1,6 +1,7 @@
 import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
+import { KayError } from '../compiler/errors'
 import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, onSite, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState, siteDefaultLocale } from './locale-state'
@@ -14,7 +15,7 @@ function current(name: string): LocaleState {
   const state = localeState()
 
   if (!state)
-    throw new Error(`kay: ${name} reads the request's locale, so it runs while a page, an action or a guard does`)
+    throw new KayError('outside-request', `kay: ${name} reads the request's locale, so it runs while a page, an action or a guard does`)
 
   return state
 }

@@ -7,7 +7,7 @@ export const ERROR_GROUPS = {
   build: 'What stops `kay build`: the browser bundle, workers, icons, libraries, the executable and the config.',
   content: 'A collection that does not load: its entries, its Markdown, its loader and what the editor and the helpers are asked.',
   export: 'A page, endpoint or API module a static export cannot hold, and the directory it writes to.',
-  runtime: 'What kay refuses while the server runs: an address that is not public, a redirect an editor may not add, a job given up on, a database call that took too long.',
+  runtime: 'What kay refuses while the server runs: an address that is not public, a redirect an editor may not add, a job given up on, a database call that took too long, and what a request raises while it is answered.',
   library: 'What a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai, kayjs-ui) throws for the app to catch, with the kinds it tells apart in the library\'s own error table.',
 } as const
 
@@ -354,6 +354,46 @@ export const ERRORS = {
   'database-owned': {
     group: 'runtime',
     summary: 'A boot on a database that belongs to another app.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'response-schema-mismatch': {
+    group: 'runtime',
+    summary: 'An API route whose answer fails its response schema: the route\'s own mistake, answered 500 and reported with Elysia\'s error as its `cause`.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'api-answer-invalid': {
+    group: 'runtime',
+    summary: 'An API route that answered a class instance or a Map, which would reach the client as `[object Object]`.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'redirect-target-invalid': {
+    group: 'runtime',
+    summary: 'A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'live-value-invalid': {
+    group: 'runtime',
+    summary: 'A live value set to something that cannot reach the browser, with the reason in the message.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'session-too-big': {
+    group: 'runtime',
+    summary: 'A session held in its cookie that grew past what a browser keeps; give `session()` a store.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'outside-request': {
+    group: 'runtime',
+    summary: 'A call that reads the request being answered (the locale, an MCP tool\'s request) made outside one.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'hook-timeout': {
+    group: 'runtime',
+    summary: 'A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'store-closed': {
+    group: 'runtime',
+    summary: 'A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed.',
     fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
   },
   'ai-error': {

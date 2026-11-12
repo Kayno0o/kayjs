@@ -4,6 +4,7 @@ import type { StoreBase } from '../runtime/store-base'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { t } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -337,7 +338,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): R
   let closed = false
   const open = (): RoomStore => {
     if (closed)
-      throw new Error('kay: the rooms store was closed')
+      throw new KayError('store-closed', 'kay: the rooms store was closed')
 
     return opened ??= openRooms(path, askedMs)
   }

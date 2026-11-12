@@ -1,5 +1,6 @@
 import type { Invalidatable, SyncCacheStore } from './cache'
 import { existsSync } from 'node:fs'
+import { KayError } from '../compiler/errors'
 import { onReload } from '../server/reload'
 import { invalidatePage } from '../server/stale-pages'
 import { invalidate as invalidateKey, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from './cache'
@@ -73,7 +74,7 @@ export function sqliteCache(path: string): SyncCacheStore {
   let poll: ReturnType<typeof pollLoop> | undefined
   const open = (create: boolean) => {
     if (closed)
-      throw new Error('kay: the cache store was closed')
+      throw new KayError('store-closed', 'kay: the cache store was closed')
 
     if (opened === undefined && (create || existsSync(path)))
       opened = openCache(path)

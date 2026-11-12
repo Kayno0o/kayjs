@@ -3063,7 +3063,7 @@ function memorySessions(): DeletableSessionStore
 
 [./server] MessageEntry
 interface MessageEntry
-  error?: { name: string; message: string; stack?: string; }
+  error?: { name: string; message: string; code?: string; stack?: string; }
   from: string
   level: LogLevel
   message: string

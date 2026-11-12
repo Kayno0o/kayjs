@@ -1,5 +1,6 @@
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
+import { KayError } from '../compiler/errors'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -185,7 +186,7 @@ export function sqliteNotifications(path: string): NotificationStore {
   let closed = false
   const open = (): NotificationStore => {
     if (closed)
-      throw new Error('kay: the notifications store was closed')
+      throw new KayError('store-closed', 'kay: the notifications store was closed')
 
     return opened ??= openNotifications(path)
   }

@@ -9,6 +9,7 @@ import type { LoadedGuard } from './guards'
 import type { Operation, ToolText } from './openapi'
 import type { ToolOutputs } from './tool-outputs'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { KayError } from '../compiler/errors'
 import { INVALID_REQUEST, McpServer, PARSE_ERROR } from '../mcp/protocol'
 import { joinBase } from '../runtime/base'
 import { configuredSite } from '../runtime/site'
@@ -706,7 +707,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
       const app = ((request && recordOf(request)?.app) ?? fallbackApp)?.deref()
 
       if (!request || !app)
-        throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)
+        throw new KayError('outside-request', `kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)
 
       if (unadmittedCrossSite(request))
         return refusal('Cross-site request refused')

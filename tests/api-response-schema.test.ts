@@ -1,6 +1,10 @@
+import type { LogEntry } from '../src/server/log'
+import type { Tracer } from '../src/server/trace'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { KayError } from '../src/compiler/errors'
+import { setTracer } from '../src/server/trace'
 import { pages } from './shared-pages'
 
 const ROUTES = 'tests/fixtures/bare/src/routes'
@@ -133,6 +137,32 @@ describe('a response that fails its own schema', () => {
       expect(reported).toHaveLength(1)
     }
     finally {
+      logged.mockRestore()
+    }
+  })
+})
+
+describe('the code of a response that fails its own schema', () => {
+  it('is on the log entry, the span as kay.error.code and the onError event', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const entries: LogEntry[] = []
+    const events: { code?: string | undefined, error: unknown }[] = []
+    const attributes: Record<string, unknown> = {}
+    const span = { setAttribute: (key: string, value: unknown) => void (attributes[key] = value), setStatus: () => undefined, recordException: () => undefined, end: () => undefined }
+    const tracer = { startSpan: () => span, startActiveSpan: (_name: string, _options: unknown, ...rest: unknown[]) => (rest.at(-1) as (made: typeof span) => unknown)(span) } as unknown as Tracer
+
+    try {
+      const served = await pages({ requireGuards: false, dirs: { routes: ROUTES, api: join(dir, 'api') }, observe: { onError: ({ error, code }) => void events.push({ error, code }), log: entry => void entries.push(entry), tracer }, prebuilt: true })
+
+      expect((await served.handle(new Request('http://localhost/api/items/wrong'))).status).toBe(500)
+      await Bun.sleep(10)
+      expect(events.map(({ code }) => code)).toEqual(['response-schema-mismatch'])
+      expect(events[0]!.error).toBeInstanceOf(KayError)
+      expect(entries.flatMap(entry => entry.type === 'message' && entry.error ? [entry.error.code] : [])).toEqual(['response-schema-mismatch'])
+      expect(attributes['kay.error.code']).toBe('response-schema-mismatch')
+    }
+    finally {
+      setTracer(undefined)
       logged.mockRestore()
     }
   })

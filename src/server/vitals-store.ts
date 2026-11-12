@@ -1,4 +1,5 @@
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
+import { KayError } from '../compiler/errors'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { inMemory } from './memory-mark'
@@ -120,7 +121,7 @@ export function sqliteVitals(path: string): VitalsStore {
   let closed = false
   const open = (): VitalsStore => {
     if (closed)
-      throw new Error('kay: the vitals store was closed')
+      throw new KayError('store-closed', 'kay: the vitals store was closed')
 
     return opened ??= openVitals(path)
   }

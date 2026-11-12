@@ -3,6 +3,7 @@ import type { LiveConfig } from '../config'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { KayError } from '../compiler/errors'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
@@ -374,7 +375,7 @@ function checkSendable(label: string, value: unknown): void {
   catch (error) {
     const reason = unsendable(error)
 
-    throw new TypeError(`kay: the live value ${label} was set to something that cannot reach the browser${reason === undefined ? '' : `: ${reason}`}`, { cause: error })
+    throw new KayError('live-value-invalid', `kay: the live value ${label} was set to something that cannot reach the browser${reason === undefined ? '' : `: ${reason}`}`, { cause: error })
   }
 }
 
