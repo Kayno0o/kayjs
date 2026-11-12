@@ -1667,14 +1667,15 @@ component default
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   modal?: boolean | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
-  onOpenChange: (open: boolean) => unknown
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   onSave?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
-  open: boolean
+  open?: boolean | undefined
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   savingLabel?: string | undefined
   size?: OverlaySize | undefined
   submitLabel: string
   title: Element
+  trigger?: ((attributes: { onClick: () => void; 'aria-haspopup': "dialog"; }) => Element) | undefined
   validate?: FormValidation
 
 [./form-field.kay] default

@@ -55,6 +55,18 @@ FormDialog(
 
 The dialog calls `action` with the form's data. `onSave` hears what the action returned. Give each control the `name` of its field in the action's schema. When the action refuses a field, its message shows on the [FormField](/ui/form-field) with that `name` and the dialog stays open. `onSave` receives what the action returned, then the dialog closes.
 
+## Open state
+
+Give `open` and the page drives the dialog: it sets `open` back to false in `onOpenChange`. Leave `open` out and the dialog keeps its own state, opened by a `@trigger` block that spreads the attributes it is handed, with `onOpenChange` still called on every open and close.
+
+```kay
+FormDialog(title="Rename" action={rename} submitLabel="Rename")
+  @trigger(attributes)
+    button({...attributes}) Rename
+  FormField(label="Title" name="title")
+    input.kui-field-input(name="title")
+```
+
 ## Checking as you type
 
 `validate="submit"` checks the fields against the action's schema when the form is sent, and `validate="blur"` also as each field loses focus; a refused field shows its message and nothing is called. See [Form](/ui/form#checking-as-you-type) for what it checks.

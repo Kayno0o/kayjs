@@ -34,6 +34,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
     input.kui-field-input(name="title" value={title()})
 ```
 
+- `open` and `onOpenChange` are optional: with `open` given the app drives the dialog and learns of a close through `onOpenChange`; without it the dialog keeps its own state, a `@trigger(attributes)` block opening it (`button({...attributes})`), and `onOpenChange` still hears `true` and `false`. `failureLabel` defaults to `ui.formDialog.failure`.
 - FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.
 - When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open. That is the `formIssues` context of kayjs-ui, which FormDialog, SaveForm and Form provide in an island and a FormField reads: a form of your own that calls an action by hand does `formIssues.provide(() => ({ title: 'Too short' }))` to show messages the same way.
 - A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failureLabel`, `Could not save.` by default.

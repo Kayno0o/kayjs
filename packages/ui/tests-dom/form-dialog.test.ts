@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import FormDialogOwn from '../tests/fixture/src/components/form-dialog-own.kay'
 import FormDialogComponent from '../tests/fixture/src/components/form-dialog.kay'
 import { click, clobber } from './dom'
 
@@ -227,5 +228,39 @@ describe('FormDialog', () => {
 
     expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
+  })
+
+  test('keeps its own open state with no open or onOpenChange: the trigger opens it, Cancel and a save close it', async () => {
+    const heard: boolean[] = []
+
+    mounted = await mountComponent(FormDialogOwn, {})
+
+    const root = mounted.root
+    const dialog = () => root.querySelector<HTMLDialogElement>('dialog')?.open === true
+    const cancel = () => click([...root.querySelectorAll('button')].find(button => button.textContent === 'Cancel') ?? null)
+
+    expect(dialog()).toBe(false)
+
+    click(root.querySelector('#open'))
+    await settle()
+    expect(dialog()).toBe(true)
+
+    cancel()
+    await settle()
+    expect(dialog()).toBe(false)
+
+    click(root.querySelector('#open'))
+    await settle()
+    submit(root)
+    await settle()
+    expect(dialog()).toBe(false)
+    mounted.unmount()
+
+    mounted = await mountComponent(FormDialogOwn, { onOpenChange: (open: boolean) => heard.push(open) })
+    click(mounted.root.querySelector('#open'))
+    await settle()
+    click([...mounted.root.querySelectorAll('button')].find(button => button.textContent === 'Cancel') ?? null)
+    await settle()
+    expect(heard).toEqual([true, false])
   })
 })

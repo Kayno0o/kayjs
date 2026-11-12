@@ -1,0 +1,13 @@
+---
+import type { Action } from 'kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+
+// A FormDialog that leaves `open` and `onOpenChange` out: its trigger opens it, and it keeps its own state.
+const { onOpenChange } = props<{ onOpenChange?: ((open: boolean) => unknown) | undefined }>()
+
+const save = Object.assign(async () => 'ok', { pending: () => false, url: '/_kay/action/form/own' }) as unknown as Action<never, string>
+---
+FormDialog(title="Own" action={save} submitLabel="Save" onOpenChange={onOpenChange})
+  @trigger(attributes)
+    button#open({...attributes}) Open
+  input(name="name" value="Ada")

@@ -12,9 +12,11 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, label, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, validate = false, onFocusOut, refused, onSave, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, autosave, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
-  // Shows the dialog; the parent sets it back to false in `onOpenChange`.
-  open: boolean
+const { open, trigger, title, label, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, validate = false, onFocusOut, refused, onSave, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, autosave, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
+  // Shows the dialog when the app sets it, and learns of a close through `onOpenChange` to set it back to false; left out, the component keeps it itself, opened by `trigger`.
+  open?: boolean | undefined
+  // Renders what opens the dialog when `open` is left to the component: `@trigger(attributes)`, then `button({...attributes})`.
+  trigger?: Snippet<[attributes: { 'onClick': () => void, 'aria-haspopup': 'dialog' }]> | undefined
   // The heading, a string or a `@title` block, as a Dialog's.
   title: string | Snippet
   // The dialog's name for screen readers when it differs from the visible title, as a Dialog's.
@@ -56,14 +58,29 @@ const { open, title, label, heading, action, submitLabel, savingLabel = wording(
   // Typing does not lock the close, as a Dialog's `autosave`; the dialog is still locked while the action runs.
   autosave?: boolean | undefined
   closeLabel?: string | undefined
-  // Called with `false` however the dialog closes, saved or not.
-  onOpenChange: (open: boolean) => unknown
+  // Called with `true` when `trigger` opens it and with `false` however the dialog closes, saved or not.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 
 const formId = id ?? uid()
 const issues = signal<Record<string, string>>({})
 const checking = signal(false)
 let form: HTMLFormElement | undefined
+// The state of a dialog the app leaves to the component: `open` wins when given.
+const inner = signal(false)
+const isOpen = () => open ?? inner()
+
+function setOpen(next: boolean) {
+  if (isOpen() === next)
+    return
+
+  if (open === undefined)
+    inner = next
+
+  onOpenChange?.(next)
+}
+
+const opener = { 'onClick': () => setOpen(true), 'aria-haspopup': 'dialog' } as const
 
 formIssues.provide(issues)
 
@@ -73,7 +90,7 @@ if (validate !== false)
 
 // However the dialog closed, its messages are cleared, so the next open starts afresh.
 effect(() => {
-  if (!open) {
+  if (!isOpen()) {
     issues = {}
 
     // The dialog drops the content of its own on closing, but the fields a static page gave it stay from one opening to the next, so the messages are taken off them now.
@@ -104,7 +121,7 @@ async function submit(event: SubmitEvent) {
     onSave?.(done.result)
   }
   finally {
-    onOpenChange(false)
+    setOpen(false)
   }
 }
 
@@ -127,12 +144,14 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog({...rest} open={open} title={title} label={label} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} autosave={autosave} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
+if trigger
+  | {trigger(opener)}
+Dialog({...rest} open={isOpen()} title={title} label={label} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} autosave={autosave} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && setOpen(false)})
   @footer
     div(part="footer")
       | {extra}
       div(part="actions")
-        Button(label={cancelLabel} disabled={action.pending()} onClick={() => onOpenChange(false)})
+        Button(label={cancelLabel} disabled={action.pending()} onClick={() => setOpen(false)})
         Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} tone="accent" busy={action.pending()} disabled={action.pending()})
   form(part="form" id={formId} ref={element => form = element} onSubmit={submit} onFocusOut={validate === 'blur' || onFocusOut ? leave : undefined} onKeyDown={submitOnCtrlEnter})
     slot
