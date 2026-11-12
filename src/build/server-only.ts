@@ -7,6 +7,7 @@ import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { parseProgram } from '../compiler/estree'
+import { TS_EXPRESSIONS } from '../compiler/estree-shapes'
 import { parseKay } from '../compiler/parser'
 import { eachDescendant, walkScope } from '../compiler/walk'
 import { readCacheEntry, writeCacheEntry } from './cache'
@@ -14,8 +15,6 @@ import { KAY_FILE } from './files'
 
 // Globals a server has and a browser has not: reading one in a chunk the page loads throws as the chunk evaluates, before anything of it runs.
 const SERVER_ONLY = new Set(['process', 'Bun'])
-// TypeScript nodes wrapping a value rather than spelling a type or declaring a name.
-const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 // Worth parsing a source for at all.
 const MENTIONED = /\b(?:process|Bun)\b/
 // The one read the client build replaces with a literal, so it reaches no chunk.
@@ -119,7 +118,7 @@ export function loadTimeReads(source: string, path: string, names: ReadonlySet<s
         if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => (parent.node.type.startsWith('TS') && !TS_EXPRESSIONS.has(parent.node.type)) || (parent.node.type === 'PropertyDefinition' && !parent.node.static)) !== null)
           return
 
-        if (names.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, name))
+        if (names.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, guardedBy(names, name)))
           found.push({ name, start: start + path.node.start })
       },
     })
@@ -128,10 +127,16 @@ export function loadTimeReads(source: string, path: string, names: ReadonlySet<s
   return found
 }
 
-const WORD = /[\w$]+/g
+const mentionPatterns = new WeakMap<ReadonlySet<string>, RegExp>()
 
+// Whether the text holds any of the names as a word, in one pass of one pattern.
 function mentionsAny(text: string, names: ReadonlySet<string>): boolean {
-  return Array.from(text.matchAll(WORD)).some(match => names.has(match[0]))
+  let pattern = mentionPatterns.get(names)
+
+  if (!pattern)
+    mentionPatterns.set(names, pattern = new RegExp(String.raw`(?<![\w$])(?:${[...names].join('|')})(?![\w$])`))
+
+  return pattern.test(text)
 }
 
 function namesIn(program: Program): Set<string> {
@@ -146,7 +151,7 @@ function namesIn(program: Program): Set<string> {
         return
 
       // A chunk carrying a polyfill of its own binds the name, and so does any local called `process`.
-      if (path.scope.hasBinding(name, true) || defined(path) || guarded(path, name))
+      if (path.scope.hasBinding(name, true) || defined(path) || guarded(path, guardedBy(SERVER_ONLY, name)))
         return
 
       found.add(name)
@@ -207,7 +212,7 @@ function property(node: NodeOfType<'MemberExpression'>): string | undefined {
 }
 
 // Whether a `typeof` of the same name, or a `try` catching what the read throws, stands between the read and the code around it: the shapes a module takes to run on either side.
-function guarded(path: Path<NodeOfType<'Identifier'>>, name: string): boolean {
+function guarded(path: Path<NodeOfType<'Identifier'>>, name: Asked): boolean {
   if (path.parentPath?.node.type === 'UnaryExpression' && path.parentPath.node.operator === 'typeof')
     return true
 
@@ -227,7 +232,7 @@ function guarded(path: Path<NodeOfType<'Identifier'>>, name: string): boolean {
 }
 
 // A branch a guard chose: either side of an `if` or a `?:` asking about the name, the right of an `&&` or `||`, and the body of a loop.
-function branchGuarded(parent: Path, child: Path, name: string, scope: Scope): boolean {
+function branchGuarded(parent: Path, child: Path, name: Asked, scope: Scope): boolean {
   const { node } = parent
 
   if (node.type === 'IfStatement' || node.type === 'ConditionalExpression')
@@ -248,7 +253,7 @@ function caught(parent: Path, child: Path): boolean {
 }
 
 // `if (typeof process === 'undefined') return`, after which the block runs only where it exists.
-function exitsEarlier(parent: Path, child: Path, name: string): boolean {
+function exitsEarlier(parent: Path, child: Path, name: Asked): boolean {
   const body = parent.node.type === 'BlockStatement' || parent.node.type === 'Program' ? parent.node.body : undefined
 
   if (body === undefined)
@@ -269,7 +274,7 @@ function exits(node: Statement): boolean {
 }
 
 // Whether a test asks whether the name exists, itself or through a flag it was stored in once.
-function asks(test: Node, name: string, scope: Scope): boolean {
+function asks(test: Node, name: Asked, scope: Scope): boolean {
   if (asksTypeof(test, name))
     return true
 
@@ -298,18 +303,25 @@ function references(node: Node): Set<string> {
   return names
 }
 
-// The name the first `typeof` of the node asks about, which must be the one at hand: a guard on another global says nothing about this one.
-function asksTypeof(node: Node, name: string): boolean {
-  let askedOf: string | undefined
+// Whether a `typeof` in the node asks about a name that guards the one at hand.
+function asksTypeof(node: Node, name: Asked): boolean {
+  let asked = false
   const ask = (found: Node) => {
-    if (found.type === 'UnaryExpression' && found.operator === 'typeof' && found.argument.type === 'Identifier')
-      askedOf ??= found.argument.name
+    if (found.type === 'UnaryExpression' && found.operator === 'typeof' && found.argument.type === 'Identifier' && name(found.argument.name))
+      asked = true
   }
 
   ask(node)
   eachDescendant(node, ask)
 
-  return askedOf === name
+  return asked
+}
+
+// Whether a `typeof` of a name vouches for a read: the same name for `process` and `Bun`, and for the browser's, any browser name, as `typeof window` is how a module asks whether it has a DOM at all.
+type Asked = (asked: string) => boolean
+
+function guardedBy(names: ReadonlySet<string>, name: string): Asked {
+  return names === SERVER_ONLY ? asked => asked === name : asked => asked === name || names.has(asked)
 }
 
 // Refuses a client build whose chunks read a server-only global: such a chunk throws as the browser evaluates it, so every island in it stays dead.

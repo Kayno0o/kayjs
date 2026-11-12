@@ -435,7 +435,7 @@ onMount(() => {
 p Window is {width()}px wide
 ```
 
-`kay check` reports a read of one of them while the component renders, and `kay check --fix` moves a call such as `localStorage.setItem(...)` into `effect` for you. It also reports a module of your app that reads one as it loads when a page imports it (`browser-global-at-load`). A server render that still fails on one names the global, the component and the line reading it, in development and in production logs.
+`kay check` reports a read of one of them while the component renders, and `kay check --fix` moves a call such as `localStorage.setItem(...)` into `effect` for you. It also reports a module of your app that reads one as it loads when a page imports it (the `browser-global-at-load` lint). A server render that still fails on one names the global, the component and the line reading it, in development and in production logs.
 
 A component that cannot render on the server at all, such as one wrapping a map library, starts its script fence with `--- client`. It renders in the browser only.
 

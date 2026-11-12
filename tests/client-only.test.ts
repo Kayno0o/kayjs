@@ -297,7 +297,7 @@ describe('browser-only globals read while rendering', () => {
 
     expect(reads(source)).toEqual([
       { text: 'window', message: '`window` exists only in the browser', fixes: [client(source)] },
-      { text: 'localStorage', message: '`localStorage` exists only in the browser', fixes: [source.replace('localStorage.setItem(\'seen\', \'1\')', 'effect(() => localStorage.setItem(\'seen\', \'1\'))'), client(source)] },
+      { text: 'localStorage', message: '`localStorage` exists only in the browser', fixes: [source.replace('localStorage.setItem(\'seen\', \'1\')', 'effect(() => localStorage.setItem(\'seen\', \'1\'))').replace('memo, signal', 'memo, signal, effect'), client(source)] },
       { text: 'document', message: '`document` exists only in the browser', fixes: [client(source)] },
       { text: 'devicePixelRatio', message: '`devicePixelRatio` exists only in the browser', fixes: [client(source)] },
       { text: 'sessionStorage', message: '`sessionStorage` exists only in the browser', fixes: [client(source)] },
@@ -316,6 +316,11 @@ describe('browser-only globals read while rendering', () => {
     expect(safe('later(window.innerWidth)')).toEqual([false])
     expect(safe('await window.fetchLater()')).toEqual([false])
     expect(safe('const width = window.innerWidth')).toEqual([])
+  })
+
+  it('brings `effect` in with the wrap, once, and not when the script has it', () => {
+    expect(reads('---\nlocalStorage.clear()\n---\np x\n')[0]!.fixes![0]).toBe('---\nimport { effect } from \'kay\'\n\neffect(() => localStorage.clear())\n---\np x\n')
+    expect(reads('---\nimport { effect } from \'kay\'\n\nlocalStorage.clear()\n---\np x\n')[0]!.fixes![0]).toBe('---\nimport { effect } from \'kay\'\n\neffect(() => localStorage.clear())\n---\np x\n')
   })
 
   it('follows a read through functions nested several levels, only while each one runs as the component renders', () => {

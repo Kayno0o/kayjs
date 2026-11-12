@@ -102,6 +102,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
 | `once-read-prop` | warn | code | A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a browser script, so it keeps its first value |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |
+| `browser-global-at-load` | deny | code | A module a page imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; read it in a function or after a `typeof window` check |
 | `unmounted-jobs` | warn | code | A `src/jobs.ts` that no plugin and no `src/server.ts` imports, so its queues run nowhere; jobs live in `src/plugins/jobs.ts` |
 | `unused-status-page` | warn | code | A status page (`_401`, `_403`, `_429`, `_503`) in a directory with no route, so no page renders it |
 | `removed-ui-token` | warn | code | A kayjs-ui theme token or utility under its old `kui-` name, such as `--color-kui-canvas` or `bg-kui-surface2`, which stopped working in 1.75: a utility builds nothing and a `var()` of it resolves to nothing. `kay check --fix` rewrites it to the app's own name where one stands for it, and the report says where to set the rest: a `--kui-border-*` knob and a `kui-` utility with no new form are reported without a fix. Names quoted in a comment are not reported |
@@ -207,7 +208,6 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `allow-refused` | compile | A `// kay-allow` or `// kay-allow-file` comment that `lints.comments` refuses: no ` -- reason`, or any `kay-allow-file`. It allows nothing. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node or Bun built-in a browser build refuses, such as `async_hooks` or `bun:sqlite`; `kay check` reports it too. | [Browser-only components](/essentials/islands) |
-| `browser-global-at-load` | build | A module a server render imports reading `window`, `document` or another browser-only name as it loads, so the page throws on the server; `kay check` reports it at the read. | [Browser globals on the server](/essentials/islands) |
 | `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, so the island dies as it loads; `kay check` reports it too. | [Browser globals on the server](/essentials/islands) |
 | `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](/guides/content) |
 | `worker-build` | build | A worker that fails to build, or starts itself again through other workers. | [Wasm and workers](/essentials/styling-and-assets) |

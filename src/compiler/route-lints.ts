@@ -36,4 +36,12 @@ export const ROUTE_LINTS = {
     wrong: 'author: ada (in an entry shown, while authors/ada.md has `draft: true`)',
     right: 'publish authors/ada.md, or point the reference at a shown entry',
   },
+  'browser-global-at-load': {
+    level: 'deny',
+    group: 'code',
+    typed: true,
+    summary: 'A module of the project that a page, a layout or a component rendering on the server imports, reading `window`, `document` or another browser-only name as it loads, so the page throws as the server evaluates the module. Reported at the read, naming the component reaching it, by `kay check` and `kay build`. A read inside a function, after a `typeof` check of `window` or of any browser name, in a `try` with a `catch`, or after an early `return` on one passes; so does a package, whose load is probed.',
+    wrong: '// src/lib/width.ts, imported by a page\nexport const width = window.innerWidth',
+    right: '// src/lib/width.ts, imported by a page\nexport const width = typeof window === \'undefined\' ? 0 : window.innerWidth',
+  },
 } as const satisfies Record<string, Lint>

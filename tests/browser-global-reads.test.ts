@@ -26,7 +26,9 @@ describe('a module a server render reaches that reads a browser global as it loa
     const root = await project(files)
     const components = new Map(await Promise.all(Object.keys(files).filter(file => file.endsWith('.kay')).map(async file => [join(root, file), files[file]!] as const)))
 
-    return (await browserGlobalAtLoad(root, components)).map(diagnostic => `${diagnostic.file.slice(root.length + 1)}:${diagnostic.line} ${diagnostic.message.slice(0, diagnostic.message.indexOf(','))}`)
+    const reads = await browserGlobalAtLoad(root, components, join(root, 'src/routes'))
+
+    return reads.map(({ file, source, diagnostic }) => `${file.slice(root.length + 1)}:${source.slice(0, diagnostic.start).split('\n').length} ${diagnostic.message.slice(0, diagnostic.message.indexOf(','))}`)
   }
   const page = { 'src/routes/index.kay': '---\nimport { width } from \'../lib/width\'\n---\np {width}\n' }
 
@@ -36,10 +38,11 @@ describe('a module a server render reaches that reads a browser global as it loa
   })
 
   it('reports it for an island the server renders too, and names the component reaching the module', async () => {
-    const root = await project({ 'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { width } from \'../lib/width\'\n\nconst count = signal(width)\n---\nbutton(onClick={() => count++}) {count()}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' })
-    const [read] = await browserGlobalAtLoad(root, new Map([[join(root, 'src/components/counter.kay'), await Bun.file(join(root, 'src/components/counter.kay')).text()]]))
+    const files = { 'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n', 'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { width } from \'../lib/width\'\n\nconst count = signal(width)\n---\nbutton(onClick={() => count++}) {count()}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' }
+    const root = await project(files)
+    const [read] = await browserGlobalAtLoad(root, new Map(Object.entries(files).filter(([file]) => file.endsWith('.kay')).map(([file, source]) => [join(root, file), source])), join(root, 'src/routes'))
 
-    expect(read?.message).toBe('`window` exists only in the browser, and this module reads it as it loads, which src/components/counter.kay reaches on the server')
+    expect(read?.diagnostic.message).toBe('`window` exists only in the browser, and this module reads it as it loads, which src/components/counter.kay reaches on the server')
   })
 
   it('passes typeof guards, early exits, a try, reads inside functions, dynamic imports and shadowed names', async () => {
@@ -52,11 +55,25 @@ describe('a module a server render reaches that reads a browser global as it loa
       'const window = { innerWidth: 1 }\nexport const g = window.innerWidth',
       'export const h = async () => (await import(\'./client-only\')).x',
       'export const i = [1].map(() => 1)\nexport type T = Window',
+      'if (typeof window !== \'undefined\') {\n  localStorage.setItem(\'a\', \'b\')\n  document.title = \'x\'\n}',
+      'export const j = typeof window === \'undefined\' ? \'\' : document.title',
+      'export const k = typeof window !== \'undefined\' && localStorage.getItem(\'a\')',
+      'if (typeof window === \'undefined\')\n  throw new Error(\'browser only\')\nexport const l = document.title',
+      'export let m = 0\nif (typeof window !== \'undefined\' && typeof document !== \'undefined\')\n  m = document.title.length',
+      'const isBrowser = typeof window !== \'undefined\'\nexport let n = 0\nif (isBrowser)\n  n = document.title.length',
       'export interface Navigation { parts: string[] }\nexport type Screen = { x: number }\nexport enum Location { A }',
     ]
 
     for (const body of guarded)
       expect(await found({ ...page, 'src/lib/width.ts': `export const width = 1\n${body}\n`, 'src/lib/client-only.ts': 'export const x = window.name\n' }), body).toEqual([])
+  })
+
+  it('leaves a component only a `--- client` one renders, and one no page renders', async () => {
+    const marker = { 'src/components/marker.kay': '---\nimport { width } from \'../lib/width\'\n---\np {width}\n', 'src/lib/width.ts': 'export const width = window.innerWidth\n' }
+
+    expect(await found({ 'src/routes/index.kay': '--- client\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual([])
+    expect(await found({ 'src/routes/index.kay': 'p hi\n', ...marker })).toEqual([])
+    expect(await found({ 'src/routes/index.kay': '---\nimport Marker from \'../components/marker.kay\'\n---\nMarker\n', ...marker })).toEqual(['src/lib/width.ts:1 `window` exists only in the browser'])
   })
 
   it('leaves a module no page imports, and one only a `--- client` component imports', async () => {

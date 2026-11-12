@@ -3,9 +3,12 @@ import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
 import { visitNodes } from './ast'
 import { isPlainProperty, parseProgram } from './estree'
+import { TS_EXPRESSIONS } from './estree-shapes'
 import { browserGlobals } from './host'
+import { importEdits } from './import-edits'
 import { parameterNames } from './items'
 import { importedFromKay } from './rewrite-reads'
+import { analyzeScript } from './script'
 import { walkScope } from './walk'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
@@ -34,8 +37,6 @@ const EVENT_HANDLER = /^on[A-Z]/
 // A function passed to one of these runs before the call returns, so as the render runs.
 const RENDER_CALLS = new Set(['memo', 'untrack', 'batch'])
 const ARRAY_CALLBACKS = new Set(['map', 'flatMap', 'filter', 'find', 'findIndex', 'findLast', 'findLastIndex', 'some', 'every', 'reduce', 'reduceRight', 'forEach', 'sort', 'toSorted'])
-// TypeScript nodes wrapping a value rather than spelling a type.
-const TS_EXPRESSIONS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 const FENCE_OPENING = '---'
 const SCRIPT_LABEL = /[ \t]+script\b/y
 const AWAIT = /\bawait\b/
@@ -421,7 +422,12 @@ function effectFix(file: KayFile, code: string, read: Read, toSource: (generated
 
   const expression = code.slice(statement.expression.start, statement.expression.end)
 
-  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }], ...onlyTouchesGlobal(statement.expression, read.name) && !AWAIT.test(expression) && { safe: true } }]
+  const imports = analyzeScript(file.source, file.script, [], file.module).imports
+  // The fix leaves a valid file, so it brings `effect` in itself unless the script has it.
+  const imported = imports.some(binding => binding.source === 'kay' && binding.imported === 'effect' && binding.local === 'effect' && !binding.typeOnly)
+  const importing = imported ? [] : importEdits(file, file.script, imports, new Map([['kay', ['effect']]]))
+
+  return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }, ...importing], ...onlyTouchesGlobal(statement.expression, read.name) && !AWAIT.test(expression) && { safe: true } }]
 }
 
 // A call on the global or an assignment to a member of it (`localStorage.setItem(...)`, `document.title = ...`) leaves nothing for the rest of the script to read, so moving it into an effect changes only that it stops running on the server.

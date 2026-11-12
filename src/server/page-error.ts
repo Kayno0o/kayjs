@@ -1,11 +1,10 @@
 import type { PageError } from '../runtime'
 import type { RequestContext } from './render'
 import { browserOnlyHint, mappedStack } from '../build/sourcemap'
+import { browserGlobalMissing } from '../compiler/globals'
 import { recordOf } from './request-record'
 import { RequestTimeoutError } from './request-timeout'
 import { Denied, NotFound } from './signals'
-
-const named = new WeakSet<Error>()
 
 export function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   if (error instanceof NotFound)
@@ -25,18 +24,23 @@ export function calmDeadline(ctx: RequestContext): void {
   Object.defineProperty(ctx, 'signal', { get: () => request.signal, configurable: true })
 }
 
-// A server render failing on a browser-only global says which one, the component and line reading it and the ways out in the error's own message, so the log, `onError` and the development page all carry it, whatever the mode; only a failure pays for the source maps it reads.
+// A server render failing on a browser-only global says which one, the component and line reading it and the ways out in the error's own message, so the log, `onError` and the development page all carry it, whatever the mode.
+// Only a ReferenceError for such a name pays for the source maps; the original wording stays in `stack`.
 export function nameBrowserRead(error: unknown): void {
-  if (!(error instanceof Error) || named.has(error))
+  if (!(error instanceof Error) || browserGlobalMissing(error) === undefined)
     return
 
   const stack = mappedStack(error)
   const hint = stack === undefined ? undefined : browserOnlyHint(error, stack)
 
-  if (hint !== undefined && hint !== '') {
-    named.add(error)
+  if (hint === undefined || hint === '')
+    return
+
+  try {
     error.message = hint
   }
+  // A frozen error keeps its message: the log still prepends the hint to its stack.
+  catch {}
 }
 
 export function describeError(error: unknown, dev = false): PageError {
