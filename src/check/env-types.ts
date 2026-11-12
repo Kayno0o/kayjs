@@ -161,7 +161,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, Unmatched, UnresolvedParameter } from \'kay\'',
+    'import type { Action, ApiRoutesOf, BoundProp, BoundValue, CheckedHref, CheckedHtml, ContextOfModule, ExtensionServersOf, FieldName, FunctionProp, HandedSignal, HandsPart, IslandProp, PlainIslandProp, LocalsOf, PublicFieldsOfModule, ServerOfModule, Signal, Truthy, UnkeyedRows, Unmatched, UnresolvedParameter } from \'kay\'',
     // Imported so kay.config.ts is typed with the app, whatever else names it.
     ...config === undefined ? [] : [`import type {} from ${importSpecifier(config)}`],
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
@@ -184,6 +184,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayHandsPart<Component>(component: Component): <Name extends string>(name: Name & HandsPart<Component, Name>) => Record<never, never>',
     '  function KayBound<Component>(component: Component): <Key extends string, Value>(key: Key & BoundProp<Component, Key>, value: Value, write: (value: BoundValue<Component, Key>) => unknown) => Value',
     '  function KayList<Each extends Iterable<any> | null | undefined | false>(each: Each): Each',
+    '  function KayKeyed<Each extends Iterable<any> | null | undefined | false>(each: Each & UnkeyedRows<Each>): Each',
     '  function KayRow<Item>(each: Iterable<Item> | null | undefined | false): Item',
     '  function KayTruthy<Value>(value: Value): Truthy<Value>',
     '  function KayUnmatched<Rest>(rest: Rest & Unmatched<Rest>): void',

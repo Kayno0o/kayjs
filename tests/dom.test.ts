@@ -773,8 +773,7 @@ describe('loops', () => {
     }
   })
 
-  const mountPlain = site({
-    'main.kay': `---
+  const plainPage = (key: string) => `---
 import { signal } from 'kay'
 
 interface Row { text: string }
@@ -783,27 +782,71 @@ const rows = signal<Row[]>([{ text: 'a' }, { text: 'b' }, { text: 'c' }, { text:
 ;(globalThis as { rows?: typeof rows }).rows = rows
 ---
 ul
-  for row, at of rows()
+  for row, at of rows()${key}
     li
       input(value={row.text} onInput={event => rows.set(rows().map((other, index) => index === at ? { ...other, text: event.currentTarget.value } : other))})
-`,
-  })
+`
 
-  const plainRows = async () => {
-    const mounted = await mountPlain()
+  // Rows with no key: matched by the object itself. Rows written `key={at}`: matched by position.
+  const mountPlain = site({ 'main.kay': plainPage('') })
+  const mountPositional = site({ 'main.kay': plainPage(' key={at}') })
+
+  const plainRows = async (mount = mountPlain) => {
+    const mounted = await mount()
     const rows = (globalThis as unknown as { rows: { (): { text: string }[], set: (next: { text: string }[]) => void } }).rows
     const inputs = () => [...mounted.root.querySelectorAll('input')]
 
     return { ...mounted, rows, inputs, values: () => inputs().map(input => input.value) }
   }
 
-  it('keep the nodes and the focus of rows of plain objects edited immutably, whether one is edited, removed or inserted', async () => {
+  it('match rows of plain objects with no key by the object, so a copy is a new row and the same objects keep their nodes', async () => {
     const { rows, inputs, values, dispose } = await plainRows()
 
     try {
       const [a, b, c, d] = inputs()
 
-      // A row typed in is a copy, and stays the same input, focused.
+      // A row typed in is a copy: a new input, where the old one goes.
+      a!.value = 'aa'
+      a!.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+      expect(inputs()).toHaveLength(4)
+      expect(inputs()[0]).not.toBe(a!)
+      expect(inputs().slice(1)).toEqual([b!, c!, d!])
+      expect(values()).toEqual(['aa', 'b', 'c', 'b'])
+
+      // The same objects keep their nodes whatever is removed, inserted or reordered around them.
+      const [first, second, third, fourth] = rows()
+
+      rows.set([fourth!, { text: 'x' }, second!, third!])
+      await settle()
+      expect(inputs()[0]).toBe(d)
+      expect(inputs().slice(2)).toEqual([b!, c!])
+      expect(values()).toEqual(['b', 'x', 'b', 'c'])
+
+      rows.set([third!, first!])
+      await settle()
+      expect(inputs()).toEqual([c!, inputs()[1]!])
+      expect(values()).toEqual(['c', 'aa'])
+
+      // Every row a copy: every row new, none paired by position.
+      const before = inputs()
+
+      rows.set(rows().map(row => ({ ...row })))
+      await settle()
+      expect(inputs().some(input => before.includes(input))).toBe(false)
+      expect(values()).toEqual(['c', 'aa'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('match rows by position, keeping nodes and focus through edits, only when the key is written as the index', async () => {
+    const { rows, inputs, values, dispose } = await plainRows(mountPositional)
+
+    try {
+      const [a, b, c, d] = inputs()
+
       a!.focus()
       a!.value = 'aa'
       a!.dispatchEvent(new Event('input', { bubbles: true }))
@@ -812,80 +855,11 @@ ul
       expect(document.activeElement).toBe(a!)
       expect(values()).toEqual(['aa', 'b', 'c', 'b'])
 
-      // The same for the last row, and one in the middle.
-      for (const input of [d!, c!]) {
-        input.value += '!'
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-        await settle()
-      }
-
-      expect(inputs()).toEqual([a!, b!, c!, d!])
-      expect(values()).toEqual(['aa', 'b', 'c!', 'b!'])
-
-      // A middle row removed, the focused one after it keeps its caret.
-      c!.focus()
-      c!.setSelectionRange(1, 1)
+      // A row removed in the middle: the rows after it shift one place, so the last node goes.
       rows.set(rows().filter((_, index) => index !== 1))
       await settle()
-      expect(inputs()).toEqual([a!, c!, d!])
-      expect(document.activeElement).toBe(c!)
-      expect(c!.selectionStart).toBe(1)
-
-      // The index a copy is edited at follows the removal.
-      d!.value = 'dd'
-      d!.dispatchEvent(new Event('input', { bubbles: true }))
-      await settle()
-      expect(inputs()).toEqual([a!, c!, d!])
-      expect(values()).toEqual(['aa', 'c!', 'dd'])
-
-      // Removing the first and the last in one update.
-      rows.set(rows().slice(1, -1))
-      await settle()
-      expect(inputs()).toEqual([c!])
-      expect(values()).toEqual(['c!'])
-
-      // Inserted in the middle and at both ends, equal rows included.
-      rows.set([{ text: 'x' }, rows()[0]!, { text: 'x' }, { text: 'x' }])
-      await settle()
-      expect(inputs()).toHaveLength(4)
-      expect(inputs()[1]).toBe(c)
-      expect(values()).toEqual(['x', 'c!', 'x', 'x'])
-    }
-    finally {
-      await dispose()
-    }
-  })
-
-  it('pair copies with the rows left in their place, one edit and one removal at once, a reorder, and a list copied whole', async () => {
-    const { rows, inputs, values, dispose } = await plainRows()
-
-    try {
-      const [a, , c, d] = inputs()
-
-      // Row 1 removed and row 3 edited in the same update: each in its own gap.
-      rows.set([rows()[0]!, rows()[2]!, { text: 'D' }])
-      await settle()
-      expect(inputs()).toEqual([a!, c!, d!])
-      expect(values()).toEqual(['a', 'c', 'D'])
-
-      // Reordered rows are still matched by themselves.
-      const [first, second, third] = rows()
-
-      rows.set([third!, first!, second!])
-      await settle()
-      expect(inputs()).toEqual([d!, a!, c!])
-
-      // Every row a copy: matched by position.
-      rows.set(rows().map(row => ({ ...row, text: `${row.text}!` })))
-      await settle()
-      expect(inputs()).toEqual([d!, a!, c!])
-      expect(values()).toEqual(['D!', 'a!', 'c!'])
-
-      // The first row replaced by a new object.
-      rows.set([{ text: 'new' }, ...rows().slice(1)])
-      await settle()
-      expect(inputs()).toEqual([d!, a!, c!])
-      expect(values()).toEqual(['new', 'a!', 'c!'])
+      expect(inputs()).toEqual([a!, b!, c!])
+      expect(values()).toEqual(['aa', 'c', 'b'])
     }
     finally {
       await dispose()
@@ -910,7 +884,7 @@ ul.ids
 `,
   })
 
-  it('pair copies around rows that draw nothing, and never pair rows matched by an id', async () => {
+  it('draw a copy of a row with no id as a new row, around rows that draw nothing, and match rows with an id by it alone', async () => {
     const { root, dispose } = await mountGaps()
     const { rows, ids } = (globalThis as unknown as { gaps: { rows: { (): { text: string }[], set: (next: { text: string }[]) => void }, ids: { (): { id: number, text: string }[], set: (next: { id: number, text: string }[]) => void } } }).gaps
     const items = (selector: string) => [...root.querySelectorAll(selector)]
@@ -918,17 +892,11 @@ ul.ids
     try {
       const [a, c] = items('.plain li')
 
-      rows.set([{ text: 'A' }, rows()[1]!, { text: 'C' }])
+      rows.set([{ text: 'A' }, rows()[1]!, rows()[2]!])
       await settle()
-      expect(items('.plain li')).toEqual([a!, c!])
-      expect(items('.plain li').map(item => item.textContent)).toEqual(['A', 'C'])
-
-      // The row that draws nothing is shown by an edit: a new item in its place.
-      rows.set([rows()[0]!, { text: 'b' }, rows()[2]!])
-      await settle()
-      expect(items('.plain li').map(item => item.textContent)).toEqual(['A', 'b', 'C'])
-      expect(items('.plain li')[0]).toBe(a)
-      expect(items('.plain li')[2]).toBe(c)
+      expect(items('.plain li').map(item => item.textContent)).toEqual(['A', 'c'])
+      expect(items('.plain li')[0]).not.toBe(a!)
+      expect(items('.plain li')[1]).toBe(c)
 
       // Rows with an id are matched by it alone: a new id is a new node.
       const [one, two] = items('.ids li')

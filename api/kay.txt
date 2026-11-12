@@ -1433,6 +1433,11 @@ function uid(): string
 [.] UiEntry
 type UiEntry = Omit<RecipeConfig<VariantTable>, 'defaults'>
 
+[.] UnkeyedRows
+type UnkeyedRows<Each> = [Exclude<Each, null | undefined | false>] extends [Iterable<infer Item>] ? 0 extends 1 & Item ? unknown : [Item] extends [never] ? unknown : [Item] extends [readonly unknown[] | ((...args: never[]) => unknown)] ? unknown : [Item] extends [object] ? 'id' extends keyof Item ? unknown : {
+  kayLint: 'unkeyed-rows'
+} : unknown : unknown
+
 [.] Unmatched
 type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : IncompleteMatch<Rest>
 

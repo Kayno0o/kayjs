@@ -59,6 +59,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unbounded-string` | warn | forms | A string field of an action named like a short value (`name`, `email`, `title`...) with no `maxLength` of its own, which takes the default bound of 10,000 characters, unless an `enum`, `const` or anchored bounded `pattern` bounds it |
 | `invalid-nesting` | warn | islands | Markup HTML forbids or the parser rewrites, so the server and an island may disagree: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, a heading in a heading, an `option` outside a `select`, an `li` outside a list, a non-`li` straight in one |
 | `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |
+| `unkeyed-rows` | warn | islands | A `for` of an island with no `key` over rows of an object type with no `id` |
 | `incomplete-match` | warn | code | A `match` with no `else` that leaves members of a union out |
 | `missing-label` | warn | a11y | A form field with no label |
 | `skipped-heading` | warn | a11y | An `h3` right after an `h1` |

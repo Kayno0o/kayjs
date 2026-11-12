@@ -4,9 +4,11 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
+import { positionalKeyFix } from '../src/check/loop-index-fix'
 import { compileKay, onceReadChecks } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
+import { unkeyedRows } from '../src/compiler/loop-lints'
 
 function lints(source: string, options: CompileOptions = {}) {
   return compileKay(source, 'list.kay', { check: true, ...options }).diagnostics.map(d => ({ code: d.code, severity: d.severity, at: source.slice(d.start, d.end) }))
@@ -168,7 +170,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'island-prop', 'hydration-mismatch', 'unowned-effect'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'island-prop', 'hydration-mismatch', 'unowned-effect', 'unkeyed-rows'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
@@ -584,6 +586,31 @@ describe('positional-key', () => {
     expect(lints(`${ROWS}for todo, i of todos key={i}\n  p {todo.title}\n`)).toEqual([])
     expect(lints(`${ROWS}for todo, i of todos key={todo.id}\n  p {i} {todo.id}\n`)).toEqual([])
     expect(lints(`${ROWS}for todo, i of todos key={i}\n  p {other.todo.id} {todo.title}\n`)).toEqual([])
+  })
+})
+
+describe('unkeyed-rows', () => {
+  const apply = (source: string, at: string) => {
+    const [fix] = positionalKeyFix(source, { start: source.indexOf(at), end: source.indexOf(at) + at.length })!
+
+    return fix!.edits.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+  }
+
+  it('is a type lint worded for rows with no id, and its fix is offered, not safe', () => {
+    expect(unkeyedRows('Argument of type X is not assignable to parameter of type X & { kayLint: "unkeyed-rows" }')).toMatchObject({ code: 'unkeyed-rows', message: 'These rows have no `id` and no `key`, so a copy of an item is a new row' })
+    expect(positionalKeyFix('for row of rows()\n  p x\n', { start: 11, end: 17 })![0]!.safe).toBe(false)
+  })
+
+  it('writes the key as the loop\'s index, adding one the loop has not, and picking a name no item holds', () => {
+    expect(apply('for row of rows()\n  p {row.text}\n', 'rows()')).toBe('for row, i of rows() key={i}\n  p {row.text}\n')
+    expect(apply('for row, at of rows()\n  p {at}\n', 'rows()')).toBe('for row, at of rows() key={at}\n  p {at}\n')
+    expect(apply('for i of rows()\n  p {i.text}\n', 'rows()')).toBe('for i, index of rows() key={index}\n  p {i.text}\n')
+  })
+
+  it('offers no fix to a loop that has a key already, or where no loop starts', () => {
+    expect(positionalKeyFix('for row of rows() key={row.slug}\n  p x\n', { start: 11, end: 17 })).toBeUndefined()
+    expect(positionalKeyFix('p x\n', { start: 0, end: 1 })).toBeUndefined()
+    expect(positionalKeyFix('p x\n', undefined)).toBeUndefined()
   })
 })
 

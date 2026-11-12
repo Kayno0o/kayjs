@@ -22,3 +22,24 @@ export function loopIndexFix(source: string, span: Span | undefined): Fix[] | un
 
   return last.fixes.get(span.start)
 }
+
+// The fix an `unkeyed-rows` lint offers on the list of a `for` at `span`: `key={i}`, with the index added to the loop when it has none.
+export function positionalKeyFix(source: string, span: Span | undefined): Fix[] | undefined {
+  if (span === undefined)
+    return undefined
+
+  let found: Fix[] | undefined
+
+  visitNodes(parseKay(source).template, (node) => {
+    if (node.kind !== 'for' || node.each.start !== span.start || node.key)
+      return
+
+    const unused = source.slice(node.item.start, node.item.end) === 'i' ? 'index' : 'i'
+    const index = node.index ? source.slice(node.index.start, node.index.end) : unused
+    const edits = [...node.index ? [] : [{ start: node.item.end, end: node.item.end, text: `, ${index}` }], { start: node.each.end, end: node.each.end, text: ` key={${index}}` }]
+
+    found = [{ title: `Match the rows by position, \`key={${index}}\``, edits, safe: false }]
+  })
+
+  return found
+}

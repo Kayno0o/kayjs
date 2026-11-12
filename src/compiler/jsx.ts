@@ -457,7 +457,8 @@ export class JsxTemplate {
     const positional = rowKeying(node, this.src).kind === 'positional'
 
     b.wrap(node, () => {
-      b.add('{(() => { const kayEach = KayList(')
+      // A loop of an island with no key matches its rows by `id` or the item itself, which `KayKeyed` has the type check report for rows with no `id`.
+      b.add(`{(() => { const kayEach = ${node.key || staticLoop ? 'KayList' : 'KayKeyed'}(`)
 
       b.addSource(node.each)
 

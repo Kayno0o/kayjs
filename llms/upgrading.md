@@ -15,6 +15,10 @@ The path must be one of the module's routes and its params are required, so `kay
 
 `persisted(name, value, { storage: 'local' })` is `persisted.local(name, value)`, `{ storage: 'query' }` is `persisted.query(name, value)` (with `values` and `history` as options), and `{ storage: 'cookie' }` or none is `persisted(name, value)` or `persisted.cookie(name, value)`; `persisted.session()` is new. Each entry takes only the options its storage can use. The old form works until 1.104, and `kay upgrade` rewrites it (`deprecated-persisted-storage`); a call whose `storage` is not a literal, or that is read through another name than the `persisted` import, is changed by hand.
 
+### A `for` with no key matches rows by `id` or the object, never by position
+
+Rows of objects with no `id` used to be paired with the row left in their place when an edit, a removal or an insertion replaced them with copies, and a list of fresh objects reused the rows by position. Now a `for` with no `key` matches a row by `item.id` when it has one and by the item itself otherwise, so a copy of an object with no `id` is a new row: it redraws its markup and loses its fields and focus, as the row of a new object always did. `unkeyed-rows` reports such a `for` in an island, where the rows are matched again (`kay check`, a warning), and offers `key={i}`, which matches by position as a list of copies was matched before, without applying it; an `id` on the rows, or a `key` naming them such as `key={row.slug}`, keeps their nodes across copies and across a removal. No lint can tell a list of copies from a list of the same objects, so `kay upgrade` leaves it.
+
 ### kayjs-auth on Postgres gains a `delete_at` column
 
 `kay_users` has a nullable `delete_at` column and its index, written on every new user whether `account.deleteAfter` is set or not. `db.sync()` adds them; an app that ships migrations generates one before deploying (`bunx pg-orm generate`, then `bunx pg-orm apply`), or sign-up fails with `column "delete_at" of relation "kay_users" does not exist`.

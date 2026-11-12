@@ -4069,7 +4069,7 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
+  it('warns of an island\'s for over objects with no id and no key, and offers the key written as a position', async () => {
     const list = '---\nimport { signal } from \'kay\'\n\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts = []; todos = []; tags = [] }}) Clear\n'
     const root = await scratchProject({
       'src/components/list.kay': list,
@@ -4078,7 +4078,12 @@ describe.concurrent('kay check, unused code', () => {
     })
 
     try {
-      expect(await check(root)).toEqual([])
+      const found = await check(root)
+
+      // Only the two loops over objects with no `id`, not the one over todos with an `id`, the tags, a keyed loop or the page's.
+      expect(found.map(d => [basename(d.file), d.line, d.code])).toEqual([['list.kay', 9, 'unkeyed-rows'], ['list.kay', 11, 'unkeyed-rows']])
+      expect(found[0]!.fixes?.[0]?.edits.map(edit => edit.text)).toEqual([', i', ' key={i}'])
+      expect((await check(root, { lints: { 'unkeyed-rows': 'allow' } }))).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

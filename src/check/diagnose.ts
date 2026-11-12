@@ -12,12 +12,13 @@ import { libraryOf, packageRoot } from '../build/libraries'
 import { ROUTE_FILES } from '../compiler'
 import { islandFence } from '../compiler/island-marker'
 import { typeLint } from '../compiler/lints'
+import { unkeyedRows } from '../compiler/loop-lints'
 import { WRITABLE } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
 import { unknownNameHelp } from './export-homes'
-import { loopIndexFix } from './loop-index-fix'
+import { loopIndexFix, positionalKeyFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
 import { templateHint } from './template-hints'
 
@@ -127,13 +128,13 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
   const span = sourceSpan(shadow, diagnostic.start, diagnostic.end, 'loose')
   const offset = span?.start ?? 0
-  const lint = typeLint(diagnostic.message, propBefore(shadow.source, span) ?? blockName(diagnostic.message, shadow.source, span))
+  const lint = typeLint(diagnostic.message, propBefore(shadow.source, span) ?? blockName(diagnostic.message, shadow.source, span)) ?? unkeyedRows(diagnostic.message)
 
   // A lint the types find, as `uncalled-signal`.
   if (lint) {
     const level = levelAt(lint.code, offset)
 
-    const offered = level === 'allow' ? undefined : unsendableFix(lint, shadow)
+    const offered = level === 'allow' ? undefined : unsendableFix(lint, shadow) ?? (lint.code === 'unkeyed-rows' ? { fixes: positionalKeyFix(shadow.source, span) } : undefined)
 
     return level === 'allow' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
   }

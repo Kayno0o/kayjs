@@ -162,7 +162,7 @@ A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: 
 
 A row that moves keeps its focus, its playing video and its loaded iframe in a browser that has `Element.moveBefore`.
 
-Rows of plain objects with no `id`, edited immutably, need no key. Avoid `key={index}` for them, because it matches rows by position.
+Rows are matched by `id`, else by the object itself: a copy of an object with no `id`, as `{ ...row, text }` makes, is a new row, which redraws its markup and loses its fields and focus. Give such rows an `id`, or a `key` that names them, `key={row.slug}`. `key={index}` matches rows by position, so a row removed before others hands them the wrong state, and `kay check` warns when rows with an `id` are keyed that way.
 
 <ReadMore href="/llms/templates">How rows are matched without a key, and when to give them an `id`.</ReadMore>
 

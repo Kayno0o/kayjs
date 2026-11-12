@@ -185,6 +185,9 @@ type Finite<Member> = Member extends string | number ? Record<never, never> exte
 // What a `match` with no `else` leaves out: `Rest` is the subject narrowed by its `when` lines, and a member of a finite union (literals, enum members, booleans, `null`, `undefined`) left in it is a value the template renders nothing for. `kay check` reports it as the `incomplete-match` lint.
 export type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : IncompleteMatch<Rest>
 
+// The rows of a `for` with no `key`, matched by their `id` or else by the item itself: an object with no `id` is a new row whenever it is a new object, so a list rebuilt from copies redraws every row. `kay check` reports it as the `unkeyed-rows` lint, in an island's loops only.
+export type UnkeyedRows<Each> = [Exclude<Each, null | undefined | false>] extends [Iterable<infer Item>] ? 0 extends 1 & Item ? unknown : [Item] extends [never] ? unknown : [Item] extends [readonly unknown[] | ((...args: never[]) => unknown)] ? unknown : [Item] extends [object] ? 'id' extends keyof Item ? unknown : { kayLint: 'unkeyed-rows' } : unknown : unknown
+
 // A named type, so the type checker's message keeps its name when it shortens the members of a long union.
 export interface IncompleteMatch<Missing> { kayLint: 'incomplete-match', kayMissing: Missing }
 
