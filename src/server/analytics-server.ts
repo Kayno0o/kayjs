@@ -189,7 +189,7 @@ const PROVIDERS = {
       query.set('cip', visit.address)
     }
 
-    return { method: 'GET', url: `${options.url!.replace(TRAILING_SLASH, '')}/matomo.php?${query}`, headers: {} }
+    return { method: 'GET', url: `${options.url.replace(TRAILING_SLASH, '')}/matomo.php?${query}`, headers: {} }
   },
 }
 
