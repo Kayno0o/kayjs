@@ -5,7 +5,7 @@
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template and the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it: `count = 0`, `count += step` and `count++` compile to `.set`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
+- A signal or memo is read by calling it, `count()`, in the template and the script; a bare name in the template is the error `uncalled-signal`, fixed by `kay check --fix`. Assigning writes it: `count = 0`, `count += step`, `count++`. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>` and assigns it, the parent passing `bind:open={open}`.
 - A `for` matches its rows across renders by `item.id`, else by the item itself; `for post of posts key={post.slug}` names another key.
 - An `await` block streams any promise: `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
@@ -14,16 +14,16 @@
 - Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'`; a bare number is a type error; `durationMs` gives milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - `kay dev` writes the server errors to `.kay/dev/errors.json`: read it.
-- Pug features that do not exist, each reported with a replacement: `- code` lines, `#{}`, `!{}`, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`.
+- Pug features that do not exist, each reported with a replacement: `- code`, `#{}`, `!{}`, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`.
 
 ## Libraries
 
 Each library ships its `llms.txt` and `llms/`: open the one a task needs.
 
 - [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys
-- [kayjs-ui](packages/ui/llms.txt): components styled by one theme: buttons, dialogs, toasts, tables, forms, charts
+- [kayjs-ui](packages/ui/llms.txt): components styled by one theme: dialogs, toasts, tables, forms, charts
 - [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, queued sending
-- [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collection screens, history, uploads
+- [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collections, history, uploads
 - [kayjs-ai](packages/ai/llms.txt): `ask()` over Anthropic or an OpenAI-compatible server, streamed replies, tools, limits
 
 ## Docs
@@ -31,16 +31,16 @@ Each library ships its `llms.txt` and `llms/`: open the one a task needs.
 To build a site, read [Build a site](llms/site.md) first, then the topics below; `kay docs <words>` prints the matching section.
 
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
-- [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS
+- [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog
 - [Components](llms/components.md): fences, props, signals, memos, generics, `import.meta.glob`
 - [Effects](llms/effects.md): `effect`, `watch`, `every`, `listen`
-- [Component libraries and extensions](llms/component-libraries.md): shipping components, pages, tabs and commands
-- [Library conventions](llms/component-library-conventions.md): naming and files
+- [Component libraries and extensions](llms/component-libraries.md): shipping components, pages, commands
+- [Library conventions](llms/component-library-conventions.md): naming, files
 - [Template lines](llms/templates.md): lines, bindings, `if`/`for`/`await`/`try`
-- [Elements, slots, snippets](llms/templates-elements-slots-snippets.md): attributes, slots
-- [Request values](llms/request-values.md): `ctx.user` in a template, no fence
-- [Head and site metadata](llms/head.md): `head` in templates, site-wide SEO defaults and social cards
-- [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): robots.txt, manifest, offline, search
+- [Elements, slots, snippets](llms/templates-elements-slots-snippets.md): attributes
+- [Request values](llms/request-values.md): `ctx.user` in a template
+- [Head and site metadata](llms/head.md): `head`, site-wide SEO defaults, social cards
+- [Sitemap, favicon, offline, search and fonts](llms/sitemap-search-fonts.md): robots.txt, manifest, offline
 - [Styles and assets](llms/styles-and-assets.md): component styles, Tailwind, `public/`
 - [Imported files and workers](llms/imported-files.md): images, fonts, wasm and workers
 - [Images and icons](llms/images.md): imported and responsive images, share cards, icons
@@ -48,70 +48,89 @@ To build a site, read [Build a site](llms/site.md) first, then the topics below;
 - [Islands](llms/islands.md): props, hydration
 - [Islands: state to ids](llms/islands-state-to-ids.md): shared state, transitions, context
 - [Browser-only code](llms/browser-only.md): browser globals on the server, server globals in the browser
-- [Navigation and pages kay does not serve](llms/navigation.md): in-place navigation, islands kept across pages
+- [Navigation](llms/navigation.md): in-place navigation, islands kept across pages
 - [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onNavigate`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
-- [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`, `rewrite`
+- [Special pages and error reporting](llms/routing-special-pages.md): `_error.kay`, status pages, `observe.onError`
+- [Endpoints, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`/`POST`, `redirects`
 - [Prerendering and static export](llms/prerendering.md): `prerender`
 - [Server islands](llms/server-islands.md): `defer`
 - [CDN caching](llms/cdn-caching.md): `ttl`
 - [Content collections](llms/content.md): collections against a schema, entries as pages
-- [Content: Markdown to caching](llms/content-markdown-to-caching.md): Markdown, pagination, feeds, caching
+- [Content: Markdown to caching](llms/content-markdown-to-caching.md): Markdown, pagination, feeds
 - [Loaded collections](llms/content-cms.md): CMS or database loaders
-- [Preview mode](llms/content-preview.md): drafts, share links, editing
-- [Edit mode and the CMS editor](llms/content-edit.md): edit markers, the editor
+- [Preview mode](llms/content-preview.md): drafts, share links
+- [Edit mode](llms/content-edit.md): edit markers, the CMS editor
 - [Locales](llms/locales.md): locale prefixes, typed messages, formatting
-- [Texts of kay](llms/locales-texts.md): the `kay.*` keys
+- [Texts of kay](llms/locales-texts.md): `kay.*` keys
 - [Caching and streaming](llms/rendering.md): caching, streaming with `await`, `renderToString`
 - [Actions](llms/actions.md): form posts typed by a schema: errors, files, redirects
-- [Refused fields](llms/actions-refused-fields.md): refilled forms, `aria-invalid`
-- [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`, streaming, optimistic changes
-- [Schemas](llms/schemas.md): one schema for the server, its type read by islands
-- [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, honeypot, proof of work
-- [Rate limits](llms/rate-limits.md): `rateLimit` on actions, guards and API routes, keys, stores
-- [Stored files](llms/files.md): uploads on disk or in S3, links, resizing, progress
-- [Stores](llms/stores.md): every store's contract, ping, close
-- [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions, `_guard.ts` guards
+- [Refused fields](llms/actions-refused-fields.md): refilled forms
+- [Calling actions from islands](llms/actions-from-islands.md): `pending()`, `track()`
+- [Schemas](llms/schemas.md): one schema for server and islands
+- [Protecting actions](llms/action-protection.md): cross-site posts, honeypot, proof of work
+- [Rate limits](llms/rate-limits.md): `rateLimit` on actions, guards and API routes
+- [Stored files](llms/files.md): uploads on disk or in S3, links, resizing
+- [Stores](llms/stores.md): each store's contract
+- [Locals and sessions](llms/server.md): `ctx.locals`, cookie sessions
 - [Guards](llms/guards.md): `_guard.ts`, `once`, public routes
-- [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
+- [Environment variables](llms/environment.md): a typed `defineEnv`
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI
-- [MCP](llms/mcp.md): tools, key, instructions
-- [Calling API routes from islands](llms/api-from-islands.md): typed route reads, server-sent events
-- [Island sources](llms/island-sources.md): status, error, retry, hooks
-- [Live values, cached values and presence](llms/live-values.md): `live()`, presence, websockets
+- [MCP](llms/mcp.md): tools
+- [Calling API routes from islands](llms/api-from-islands.md): typed reads, server-sent events
+- [Island sources](llms/island-sources.md): status, error, retry
+- [Live values and presence](llms/live-values.md): `live()`, presence, websockets
 - [Local collections](llms/local-collections.md): `local()`, offline rows
 - [Rooms](llms/rooms.md): websocket groups, shared state, a snapshot on join
 - [Testing](llms/testing.md): `kay/test`, pages and actions in `bun test`
 - [Testing requests and sockets](llms/testing-requests-jobs-sockets.md): requests, jobs, sockets
-- [Test databases and setup](llms/testing-setup.md): `kay/test/preload`, a database per file, seeds
-- [Testing in a browser](llms/testing-browser.md): `site.open`, headless Chrome
+- [Test databases and setup](llms/testing-setup.md): `kay/test/preload`, seeds
+- [Testing in a browser](llms/testing-browser.md): `site.open`
 - [Checks and lints](llms/checks.md): what `kay check` verifies, ESLint on `.kay` files
-- [Lints and warnings](llms/lints.md): each lint's level and fix, allowing one
-- [SEO lints](llms/seo-lints.md): the `seo` group
-- [Performance lints](llms/performance-lints.md): images, serial awaits
-- [Deprecated lints](llms/deprecated-lints.md): old forms and their fixes
-- [Errors](llms/errors.md): error codes and fixes
+- [Lints and warnings](llms/lints.md): levels, groups, fixes, allowing one
+- [Accessibility lints](llms/a11y-lints.md): `a11y`
+- [Code lints](llms/code-lints.md): `code`
+- [Island and form lints](llms/island-and-form-lints.md): `islands`, `forms`
+- [Security and i18n lints](llms/security-and-i18n-lints.md): `security`, `i18n`
+- [SEO lints](llms/seo-lints.md): `seo`
+- [Performance lints](llms/performance-lints.md): `performance`
+- [Deprecated lints](llms/deprecated-lints.md): old forms and fixes
+- [Errors](llms/errors.md): codes and fixes
 - [Thrown errors](llms/errors-runtime.md): `Result`
-- [Project setup and scaffolding](llms/project.md): `kay.config.ts`, tsconfig, editor, from Astro
-- [kay new and kay add](llms/project-new-and-add.md): presets, features, `kay generate`
-- [The dev server](llms/dev-server.md): `kay dev` and its error page
-- [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
+- [Project setup](llms/project.md): `kay.config.ts`, tsconfig, editor, from Astro
+- [kay new and kay add](llms/project-new-and-add.md): presets, `kay generate`
+- [The dev server](llms/dev-server.md): `kay dev`
+- [The dev tool](llms/dev-tool.md): its tabs
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, static export, `kay start`
-- [Check, inspect and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `fmt`
+- [Check and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `fmt`
 - [Accessibility audit](llms/a11y-audit.md): `kay a11y`
-- [Compiling a component](llms/compiler-api.md): `kay/compiler` for a tool
-- [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`, `docs`
+- [Compiling a component](llms/compiler-api.md): `kay/compiler`
+- [Editor and agent commands](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`, `docs`
 - [Running in production](llms/production.md): logs, health checks, shutdown, cron, jobs
 - [Tracing](llms/tracing.md): spans
-- [Several workers](llms/workers.md): `--workers`, what the processes share
-- [Hooks](llms/hooks.md): `onX` and `beforeX`, `refuse()`, how a library builds them
+- [Several workers](llms/workers.md): `--workers`
+- [Hooks](llms/hooks.md): `onX`, `beforeX`, `refuse()`
 - [Queues](llms/queues.md): jobs and workflows that survive a restart
 - [Proxies and security headers](llms/proxy-and-security.md): headers, CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
-- [Upgrading, older releases](llms/upgrading-archive.md): the minors before 1.98
+- [Upgrading, older](llms/upgrading-archive.md): the minors before 1.97
+>>>>>>> 2aa80e9 (docs: split the lint table by group and routing's special pages out, so llms files have room)
+=======
+- [Upgrading, older](llms/upgrading-archive.md): the minors before 1.98
+=======
+- [Upgrading, older](llms/upgrading-archive.md): the minors before 1.97
+>>>>>>> 2aa80e9 (docs: split the lint table by group and routing's special pages out, so llms files have room)
 - [What's new](llms/whats-new.md): what each recent release adds
-- [What's new, older releases](llms/whats-new-archive.md): the releases before 1.101
-- [Privacy and personal data](llms/privacy.md): what kay keeps, how long, erasing a person
+- [What's new, older](llms/whats-new-archive.md): the releases before 1.99
+- [Privacy and personal data](llms/privacy.md): what kay keeps, erasing a person
+>>>>>>> 2aa80e9 (docs: split the lint table by group and routing's special pages out, so llms files have room)
+=======
+- [What's new, older](llms/whats-new-archive.md): the releases before 1.101
+- [Privacy and personal data](llms/privacy.md): what kay keeps, erasing a person
+=======
+- [What's new, older](llms/whats-new-archive.md): the releases before 1.99
+- [Privacy and personal data](llms/privacy.md): what kay keeps, erasing a person
+>>>>>>> 2aa80e9 (docs: split the lint table by group and routing's special pages out, so llms files have room)
 - [Events and names](llms/events.md): DOM events, cookie and key rules
 - [Notifications](llms/notifications.md): `notify()`, the Bell
 - [Analytics and Web Vitals](llms/analytics.md): visits and load times, consent
