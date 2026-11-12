@@ -1,6 +1,8 @@
+import { chmod } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
 import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
-import { BLOCKING, exitCode, SECRET_UNSET } from '../scripts/release-apps'
+import { BLOCKING, dispatchWorkflow, exitCode, NO_CLIENT, SECRET_UNSET, teaToken } from '../scripts/release-apps'
+import { scratchDir } from './scratch'
 
 interface Step {
   name?: string
@@ -117,5 +119,57 @@ describe('release wait', () => {
 
     expect(workflow).toContain(SECRET_UNSET)
     expect(typeof BLOCKING).toBe('boolean')
+  })
+})
+
+describe('the Apps workflow dispatch', () => {
+  const CONFIG = 'logins:\n  - name: other\n    url: https://other.example\n    token: nope\n  - name: home\n    url: https://git.example.test\n    token: secret-token\n    default: true\n'
+
+  // A PATH of stub clients that record their argv, stdin and token; a stub is only a file in the folder.
+  async function stubs(names: string[], exit = 0) {
+    const dir = await scratchDir('dispatch')
+
+    for (const name of names) {
+      await Bun.write(`${dir}/${name}`, `#!/bin/sh\necho "${name} $*" >> "${dir}/calls"\n/bin/cat >> "${dir}/calls"\necho "token=$GITEA_TOKEN host=$GITEA_CLI_HOST" >> "${dir}/calls"\necho "bad secret-token" >&2\nexit ${exit}\n`)
+      await chmod(`${dir}/${name}`, 0o755)
+    }
+
+    await Bun.write(`${dir}/config.yml`, CONFIG)
+
+    return dir
+  }
+
+  const options = (dir: string) => ({ path: dir, config: `${dir}/config.yml`, origin: 'git@git.example.test:o/r.git' })
+
+  it('picks the login of origin\'s host', () => {
+    expect(teaToken(CONFIG, 'git.example.test')).toEqual({ url: 'https://git.example.test', token: 'secret-token' })
+    expect(teaToken(CONFIG, 'missing.test')).toBeUndefined()
+  })
+
+  it('uses tea when it is on PATH', async () => {
+    const dir = await stubs(['tea', 'gt'])
+    const result = await dispatchWorkflow('apps.yml', options(dir))
+
+    expect(result.ok).toBe(true)
+    expect(await Bun.file(`${dir}/calls`).text()).toStartWith('tea api -X POST repos/{owner}/{repo}/actions/workflows/apps.yml/dispatches -d {"ref":"main"}')
+  })
+
+  it('uses gt with the token of tea\'s config, never printed', async () => {
+    const dir = await stubs(['gt'], 1)
+    const result = await dispatchWorkflow('apps.yml', options(dir))
+    const calls = await Bun.file(`${dir}/calls`).text()
+
+    expect(result.ok).toBe(false)
+    expect(calls).toContain('gt api -X POST repos/{owner}/{repo}/actions/workflows/apps.yml/dispatches --input -')
+    expect(calls).toContain('{"ref":"main"}')
+    expect(calls).toContain('token=secret-token host=https://git.example.test')
+    expect(result.error).not.toContain('secret-token')
+    expect(result.error).toContain('bad ***')
+  })
+
+  it('fails clearly with neither client', async () => {
+    const dir = await stubs([])
+
+    expect(await dispatchWorkflow('apps.yml', options(dir))).toEqual({ ok: false, error: NO_CLIENT })
   })
 })

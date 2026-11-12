@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import process from 'node:process'
 import { $ } from 'bun'
 
@@ -13,6 +14,88 @@ export const SECRET_UNSET = 'KAY_APPS_TOKEN is not set'
 
 // The exit code for a finished run: 0 for a pass, and for a red run only once the apps are meant to block a release.
 export const exitCode = (status: string, blocking: boolean) => status === 'success' || !blocking ? 0 : 1
+
+const URL_ORIGIN = /^[a-z+]+:\/\//i
+const SSH_HOST = /@([^:/]+)[:/]/
+const unquote = (value: string) => value.replace(/^['"]|['"]$/g, '')
+
+export const NO_CLIENT = 'neither tea nor gt is on PATH'
+
+// The login of tea's config on `host`, read line by line: a login starts at a `- ` entry and its keys are indented under it.
+export function teaToken(config: string, host: string): { url: string, token: string } | undefined {
+  const logins: Record<string, string>[] = []
+  let current: Record<string, string> | undefined
+
+  for (const line of config.split('\n')) {
+    const starts = line.trimStart().startsWith('- ')
+    const entry = starts ? line.trimStart().slice(2) : line
+    const colon = entry.indexOf(':')
+
+    if (colon < 1)
+      continue
+
+    if (starts) {
+      current = {}
+      logins.push(current)
+    }
+
+    if (current !== undefined)
+      current[entry.slice(0, colon).trim()] = unquote(entry.slice(colon + 1).trim())
+  }
+
+  for (const login of logins) {
+    const { url = '', token = '' } = login
+
+    if (token !== '' && URL.canParse(url) && new URL(url).hostname.toLowerCase() === host.toLowerCase())
+      return { url, token }
+  }
+
+  return undefined
+}
+
+// Dispatches the workflow on main through `tea`, or through `gt` (gitea-cli, which replaces tea on Arch) with the token of tea's config for origin's host, as ft does; the token never reaches an output.
+export async function dispatchWorkflow(workflow: string, options: { path?: string, config?: string, origin?: string } = {}): Promise<{ ok: boolean, error: string }> {
+  const path = options.path ?? process.env.PATH ?? ''
+  const endpoint = `repos/{owner}/{repo}/actions/workflows/${workflow}/dispatches`
+  const body = JSON.stringify({ ref: 'main' })
+  const env: Record<string, string | undefined> = { ...process.env, PATH: path }
+  let command: string[]
+  let token: string | undefined
+
+  const tea = Bun.which('tea', { PATH: path })
+  const gt = Bun.which('gt', { PATH: path })
+
+  if (tea !== null) {
+    command = [tea, 'api', '-X', 'POST', endpoint, '-d', body]
+  }
+  else if (gt !== null) {
+    command = [gt, 'api', '-X', 'POST', endpoint, '--input', '-']
+    token = env.GITEA_TOKEN
+
+    if (token === undefined || token === '') {
+      const origin = options.origin ?? (await $`git remote get-url origin`.quiet().nothrow().text()).trim()
+      const host = URL_ORIGIN.test(origin) ? new URL(origin).hostname : SSH_HOST.exec(origin)?.[1]
+      const file = Bun.file(options.config ?? `${homedir()}/.config/tea/config.yml`)
+      const login = host !== undefined && await file.exists() ? teaToken(await file.text(), host) : undefined
+
+      if (login === undefined)
+        return { ok: false, error: 'no login of ~/.config/tea/config.yml matches origin\'s host, and GITEA_TOKEN is not set' }
+
+      token = login.token
+      env.GITEA_TOKEN = login.token
+      env.GITEA_CLI_HOST = login.url
+    }
+  }
+  else {
+    return { ok: false, error: NO_CLIENT }
+  }
+
+  const proc = Bun.spawn(command, { env, stdin: new Blob([body]), stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+  const scrub = (text: string) => token === undefined || token === '' ? text : text.replaceAll(token, '***')
+
+  return { ok: code === 0, error: scrub(stderr.trim() || stdout.trim() || `exit ${code}`) }
+}
 
 interface Run {
   id: number
@@ -55,10 +138,10 @@ async function main() {
   if (run === undefined) {
     ignored = new Set((await runs()).map(candidate => candidate.id))
     console.log(`dispatching ${WORKFLOW} on ${sha.slice(0, 7)}`)
-    const dispatched = await $`tea api -X POST ${`repos/{owner}/{repo}/actions/workflows/${WORKFLOW}/dispatches`} -d ${JSON.stringify({ ref: 'main' })}`.quiet().nothrow()
+    const dispatched = await dispatchWorkflow(WORKFLOW)
 
-    if (dispatched.exitCode !== 0) {
-      console.error(`dispatching ${WORKFLOW} failed: ${dispatched.stderr.toString().trim()}`)
+    if (!dispatched.ok) {
+      console.error(`dispatching ${WORKFLOW} failed: ${dispatched.error}`)
       process.exit(exitCode('failure', BLOCKING))
     }
   }
