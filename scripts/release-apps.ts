@@ -61,6 +61,7 @@ export async function dispatchWorkflow(workflow: string, options: { path?: strin
   const env: Record<string, string | undefined> = { ...process.env, PATH: path }
   let command: string[]
   let token: string | undefined
+  let note = ''
 
   const tea = Bun.which('tea', { PATH: path })
   const gt = Bun.which('gt', { PATH: path })
@@ -78,12 +79,15 @@ export async function dispatchWorkflow(workflow: string, options: { path?: strin
       const file = Bun.file(options.config ?? `${homedir()}/.config/tea/config.yml`)
       const login = host !== undefined && await file.exists() ? teaToken(await file.text(), host) : undefined
 
-      if (login === undefined)
-        return { ok: false, error: 'no login of ~/.config/tea/config.yml matches origin\'s host, and GITEA_TOKEN is not set' }
-
-      token = login.token
-      env.GITEA_TOKEN = login.token
-      env.GITEA_CLI_HOST = login.url
+      // With no login of tea's to borrow, gt picks the instance with its own stored login.
+      if (login === undefined) {
+        note = ` (no tea login for origin host ${host ?? `of "${origin}"`}, so gt used its own login)`
+      }
+      else {
+        token = login.token
+        env.GITEA_TOKEN = login.token
+        env.GITEA_CLI_HOST = login.url
+      }
     }
   }
   else {
@@ -94,7 +98,7 @@ export async function dispatchWorkflow(workflow: string, options: { path?: strin
   const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   const scrub = (text: string) => token === undefined || token === '' ? text : text.replaceAll(token, '***')
 
-  return { ok: code === 0, error: scrub(stderr.trim() || stdout.trim() || `exit ${code}`) }
+  return { ok: code === 0, error: scrub(stderr.trim() || stdout.trim() || `exit ${code}`) + (code === 0 ? '' : note) }
 }
 
 interface Run {

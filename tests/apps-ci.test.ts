@@ -167,6 +167,32 @@ describe('the Apps workflow dispatch', () => {
     expect(result.error).toContain('bad ***')
   })
 
+  it('reads a git@alias: origin, and keeps the token out of argv', async () => {
+    const dir = await stubs(['gt'])
+
+    await dispatchWorkflow('apps.yml', { ...options(dir), origin: 'git@git.example.test:o/r.git' })
+
+    const calls = await Bun.file(`${dir}/calls`).text()
+
+    expect(calls).toContain('token=secret-token')
+    expect(calls.slice(0, calls.indexOf('\n'))).not.toContain('secret-token')
+
+    const alias = await stubs(['gt'], 1)
+    const result = await dispatchWorkflow('apps.yml', { ...options(alias), origin: 'git@unknown-alias:o/r.git' })
+
+    expect(result.error).toContain('unknown-alias')
+  })
+
+  it('runs gt without the env token when tea has no matching login or config', async () => {
+    const dir = await stubs(['gt'], 1)
+    const result = await dispatchWorkflow('apps.yml', { path: dir, config: `${dir}/missing.yml`, origin: 'git@git.example.test:o/r.git' })
+    const calls = await Bun.file(`${dir}/calls`).text()
+
+    expect(calls).toContain('token= host=')
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('git.example.test')
+  })
+
   it('fails clearly with neither client', async () => {
     const dir = await stubs([])
 
