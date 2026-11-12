@@ -88,7 +88,7 @@
     "complexity": 44
   },
   "src/compiler/a11y.ts": {
-    "max-lines-per-function": 399,
+    "max-lines-per-function": 398,
     "complexity": 115
   },
   "src/compiler/ast.ts": {

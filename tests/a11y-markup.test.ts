@@ -13,7 +13,7 @@ describe('markup a11y lints', () => {
   })
 
   it('reports an anchor with no destination, leaving a link, a role, a name, a handler, a spread and a component', () => {
-    expect(found('a Read\na(href="#") b\na(href="") c\na(href="javascript:void(0)") d\na(href="/x") e\na(href={url}) f\na(role="link" aria-disabled="true") g\na(name="top") h\na(onClick={go}) i\na({...rest}) j\nLink k\n')).toEqual(['anchor-is-valid a', 'anchor-is-valid #', 'anchor-is-valid ', 'anchor-is-valid javascript:void(0)'])
+    expect(found('a Read\na(href="#") b\na(href="") c\na(href="javascript:void(0)") d\na(href="/x") e\na(href={url}) f\na(role="link" aria-disabled="true") g\na(name="top") h\nsvg\n  a(xlink:href="/x")\n    text x\na(onClick={go}) i\na({...rest}) j\nLink k\n')).toEqual(['anchor-is-valid a', 'anchor-is-valid #', 'anchor-is-valid ', 'anchor-is-valid javascript:void(0)'])
   })
 
   it('reports a role the element already has, keeping the list roles that restore a list in Safari', () => {
@@ -32,12 +32,18 @@ describe('markup a11y lints', () => {
     expect(found('h1 A\nh1(aria-hidden="true") B\nh1({...rest}) C\nHeading\n')).toEqual([])
   })
 
+  it('counts h1s of match branches apart and skips hidden markup', () => {
+    expect(found('match kind\n  when "a"\n    h1 A\n  else\n    h1 B\n')).toEqual([])
+    expect(found('div(hidden)\n  p(tabindex="0") x\n  a x\n  button(role="button" aria-checked="true") y\n')).toEqual([])
+    expect(found('main(role="main") a\ntextarea(role="textbox" aria-label="x")\ndialog(role="dialog") b\n')).toEqual(['redundant-role role', 'redundant-role role', 'redundant-role role'])
+  })
+
   it('reports an accesskey, whatever its value', () => {
     expect(found('button(accesskey="s") a\ninput(accesskey={key} aria-label="x")\nbutton b\n')).toEqual(['no-access-key accesskey', 'no-access-key accesskey'])
   })
 
   it('reports a reachable click with no key handler, leaving native controls, key handlers, backdrops and what no keyboard reaches', () => {
-    expect(found('div(role="button" tabindex="0" onClick={a}) a\nspan(tabindex="0" onClick={a}) b\ndiv(role="button" tabindex="0" onClick={a} onKeyDown|enter={a}) c\nbutton(onClick={a}) d\na(href="/x" onClick={a}) e\ndiv(role="dialog" tabindex="-1" onClick={a}) f\ndiv(tabindex="0" aria-modal="true" onClick={a}) g\ndiv(onClick={a}) h\ndiv(tabindex="-1" onClick={a}) i\nsummary(onClick={a}) j\na(role="button" tabindex="0" onClick={a}) k\nli(role="option" onClick={a}) m\nul(role="tree" onKeyDown={a})\n  li(role="treeitem" tabindex="0" onClick={a}) l\n')).toEqual(['click-without-key onClick', 'click-without-key onClick', 'click-without-key onClick'])
+    expect(found('div(role="button" tabindex="0" onClick={a}) a\nspan(tabindex="0" onClick={a}) b\ndiv(role="button" tabindex="0" onClick={a} onKeyDown|enter={a}) c\nbutton(onClick={a}) d\na(href="/x" onClick={a}) e\ndiv(role="dialog" tabindex="-1" onClick={a}) f\ndiv(tabindex="0" aria-modal="true" onClick={a}) g\ndiv(onClick={a}) h\ndiv(tabindex="-1" onClick={a}) i\nsummary(onClick={a}) j\na(role="button" tabindex="0" onClick={a}) k\nli(role="option" onClick={a}) m\nTree\n  li(role="treeitem" tabindex="0" onClick={a}) n\nul(role="tree" onKeyDown={a})\n  li(role="treeitem" tabindex="0" onClick={a}) l\n')).toEqual(['click-without-key onClick', 'click-without-key onClick', 'click-without-key onClick'])
   })
 
   it('reports tabindex 0 on an element read rather than operated, leaving a scroll region, a role, a handler and -1', () => {

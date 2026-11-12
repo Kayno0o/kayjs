@@ -286,7 +286,7 @@ export function markupLints(file: KayFile): Diagnostic[] {
     if (element.name === 'a' && !has(element, 'role') && !named(element).some(candidate => EVENT.test(text(candidate.name)))) {
       const target = attribute(element, 'href')
 
-      if (!target && !has(element, 'name'))
+      if (!target && !has(element, 'name') && !has(element, 'xlink:href'))
         lint(at(element), 'anchor-is-valid', 'This `a` has no `href`', { note: 'a link with no destination takes no keyboard and a screen reader does not list it among the links', help: 'give it the `href` it goes to, or make it a `button` when it acts' })
       else if (target?.kind === 'static' && !href(target.text))
         lint(target.value, 'anchor-is-valid', `\`href="${target.text}"\` goes nowhere`, { note: 'a link to nowhere moves the page to its top or does nothing, and tells a screen reader a destination exists', help: 'give it the page it goes to, or make it a `button` when it acts' })
@@ -315,7 +315,7 @@ export function markupLints(file: KayFile): Diagnostic[] {
         if (!node.component && !spread(node))
           check(node, walk)
 
-        visit(node.children, KEY_EVENTS.some(name => has(node, name)) ? { ...walk, keys: true } : walk)
+        visit(node.children, node.component || spread(node) || KEY_EVENTS.some(name => has(node, name)) ? { ...walk, keys: true } : walk)
 
         continue
       }

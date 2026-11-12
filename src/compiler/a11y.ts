@@ -1,5 +1,5 @@
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
-import { elementHasContent as contentOf, markupLints, reader } from './a11y-markup'
+import { elementHasContent, markupLints, reader } from './a11y-markup'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, ARIA_STATE_VALUES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
 import { childBlocks, nodeExpressions, sectionOf, visitNodes } from './ast'
 
@@ -197,7 +197,7 @@ function elementLints(file: KayFile): Diagnostic[] {
   let blocks = 0
   let heading: { level: number, name: string } | undefined
   const { text, named, attribute, has, staticValue, spread } = read
-  const elementHasContent = (element: ElementNode) => contentOf(element, read)
+
   const hidden = (element: ElementNode) => has(element, 'hidden') || staticValue(element, 'aria-hidden') === 'true'
   const at = (element: ElementNode) => element.tag.end > element.tag.start ? element.tag : element
   const lint = (element: ElementNode | { start: number, end: number }, code: string, message: string, details: Omit<Diagnostic, 'start' | 'end' | 'message' | 'code'>) => {
@@ -492,7 +492,7 @@ function elementLints(file: KayFile): Diagnostic[] {
     if (delay && Number(delay[1]) > 0)
       lint(element, 'meta-refresh', 'This `meta` reloads or leaves the page after a delay', { note: 'the page changes under a visitor still reading it, with no way to stop it', help: 'redirect on the server, or let the visitor follow a link' })
 
-    if ((element.name === 'button' || (element.name === 'a' && has(element, 'href'))) && !elementHasContent(element))
+    if ((element.name === 'button' || (element.name === 'a' && has(element, 'href'))) && !elementHasContent(element, read))
       lint(element, 'empty-control', `This \`${element.name}\` has nothing for a screen reader to announce`, { note: 'an icon alone is hidden from screen readers, so the control reads as nameless', help: 'give it text, or name it with `aria-label`' })
 
     checkAria(element)
