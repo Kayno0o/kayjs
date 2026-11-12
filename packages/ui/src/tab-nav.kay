@@ -6,20 +6,23 @@ import { effect, recipe, withQuery } from 'kay'
 import Icon from './icon.kay'
 import { tabOf } from './outside'
 import { currentTab, keptHref } from './tab-nav'
+import { stepIndex } from './cycle'
 
 // 'kui-tab-nav' stays as the component's name for an app's CSS.
 const look = recipe({
   parts: {
-    root: 'kui-tab-nav flex gap-1 overflow-x-auto border-b border-border pb-px',
-    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent inline-flex items-center gap-1 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted',
+    root: 'kui-tab-nav group/tab-nav flex gap-1 overflow-x-auto border-b border-border pb-px data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-e data-[orientation=vertical]:pb-0',
+    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent inline-flex items-center gap-1 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted group-data-[orientation=vertical]/tab-nav:-me-px group-data-[orientation=vertical]/tab-nav:mb-0 group-data-[orientation=vertical]/tab-nav:border-b-0 group-data-[orientation=vertical]/tab-nav:border-e-2',
     icon: 'size-3.5 shrink-0',
     badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
   },
 })
 
-const { links, current, keep = [], tabs, param, paramDefault, label, tab, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { links, current, keep = [], tabs, param, paramDefault, label, orientation = 'horizontal', tab, onKeyDown, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   // Names the navigation for screen readers.
   label: string
+  // `'vertical'` stacks the tabs in a column, and ArrowUp and ArrowDown move the focus between the links in place of ArrowLeft and ArrowRight; the arrows only move the focus, a link being opened by Enter.
+  orientation?: 'horizontal' | 'vertical' | undefined
   // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the link or tab as written. The icon and the badge it names are still drawn around it.
   tab?: Snippet<[tab: TabEntry]> | undefined
 } & (
@@ -63,6 +66,30 @@ const items = (): { key: string, to: string, entry: TabEntry & Pick<TabLink, 'ne
   return tabs.map(entry => ({ key: String(entry.value), to: pick(entry.value), entry, on: String(entry.value) === String(shown) && !entry.disabled, scrolls: false }))
 }
 
+const MOVES = {
+  horizontal: { ArrowRight: 1, ArrowLeft: -1 },
+  vertical: { ArrowDown: 1, ArrowUp: -1 },
+} as const
+
+// The arrows along the bar move the focus from link to link, wrapping; the links all stay in the page's tab order, as links do.
+function keyDown(event: KeyboardEvent) {
+  onKeyDown?.(event as Parameters<NonNullable<typeof onKeyDown>>[0])
+
+  const delta = (MOVES[orientation] as Partial<Record<string, number>>)[event.key]
+
+  if (event.defaultPrevented || delta === undefined || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !nav)
+    return
+
+  const found = [...nav.querySelectorAll<HTMLElement>('a')]
+  const at = found.indexOf(event.target as HTMLElement)
+
+  if (found.length === 0 || at === -1)
+    return
+
+  event.preventDefault()
+  found[stepIndex(at, delta, found.length)]!.focus()
+}
+
 // A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen, again when the links arrive after the first render. Only the bar scrolls: `scrollIntoView` would also move the page to it.
 effect(() => {
   items()
@@ -75,7 +102,10 @@ effect(() => {
   const bar = nav.getBoundingClientRect()
   const box = link.getBoundingClientRect()
 
-  nav.scrollLeft += box.left - bar.left - (bar.width - box.width) / 2
+  if (orientation === 'vertical')
+    nav.scrollTop += box.top - bar.top - (bar.height - box.height) / 2
+  else
+    nav.scrollLeft += box.left - bar.left - (bar.width - box.width) / 2
 })
 ---
 // The inside of a tab, the same on a link and on a disabled text.
@@ -91,7 +121,7 @@ snippet inside(item: { entry: TabEntry })
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll` on the link), except a link to a `#section`, which scrolls to it.
 // With no tabs there is no empty landmark.
 if items().length > 0
-  nav(part="root" {...rest} ref={element => nav = element} aria-label={label})
+  nav(part="root" {...rest} ref={element => nav = element} aria-label={label} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} onKeyDown={keyDown})
     for item of items() key={item.key}
       if item.entry.disabled
         span(part="link" aria-disabled="true")

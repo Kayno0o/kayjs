@@ -4,11 +4,11 @@ import type { Duration } from 'kay'
 import { signal } from 'kay'
 
 // The test reads back each turn, and sets how often the carousel turns on its own; `#jump` passes it another slide, as a parent would.
-const { onIndexChange, autoplay } = props<{ onIndexChange: (index: number) => void, autoplay?: Duration }>()
+const { onIndexChange, autoplay, loop, perView, count = 3 } = props<{ onIndexChange: (index: number) => void, autoplay?: Duration, loop?: boolean, perView?: number, count?: number }>()
 
-const slides = ['a', 'b', 'c'].map(name => ({ src: `/${name}.png`, alt: name }))
+const slides = ['a', 'b', 'c', 'd', 'e'].slice(0, count).map(name => ({ src: `/${name}.png`, alt: name }))
 const index = signal(0)
 ---
-Carousel#carousel(slides={slides} index={index()} autoplay={autoplay} onIndexChange={onIndexChange})
+Carousel#carousel(slides={slides} index={index()} autoplay={autoplay} loop={loop} perView={perView} onIndexChange={onIndexChange})
 button#outside(type="button") Outside
 button#jump(type="button" onClick={() => index = 2}) Jump

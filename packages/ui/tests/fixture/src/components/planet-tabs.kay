@@ -2,11 +2,11 @@
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 
 // What the test reads back: each tab shown.
-const { onChange, value = 'venus', disabledFirst = false } = props<{ onChange?: (value: string) => void, value?: string, disabledFirst?: boolean }>()
+const { onChange, value = 'venus', disabledFirst = false, orientation, activation, lazy } = props<{ onChange?: (value: string) => void, value?: string, disabledFirst?: boolean, orientation?: 'horizontal' | 'vertical', activation?: 'auto' | 'manual', lazy?: boolean }>()
 
 // kay-allow once-read-prop: a fixture mounted with props it does not change
 const tabs = [{ value: 'mars', label: 'Mars', disabled: disabledFirst }, { value: 'venus', label: 'Venus', disabled: disabledFirst && value === 'venus' }, { value: 'earth', label: 'Earth' }] as const
 ---
-Tabs#tabs(tabs={tabs} value={value} label="Planets" onChange={onChange})
+Tabs#tabs(tabs={tabs} value={value} label="Planets" orientation={orientation} activation={activation} lazy={lazy} onChange={onChange})
   @panel(planet)
     input(name={planet} value={planet})

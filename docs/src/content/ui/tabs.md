@@ -12,6 +12,30 @@ Every panel is drawn once and hidden while its tab is not shown, so what it hold
 
 <Demo name="tabs/state" />
 
+## Vertical tabs
+
+`orientation="vertical"` stacks the tabs in a column beside the panels. The list says so to screen readers, and ArrowUp and ArrowDown move between the tabs in place of ArrowLeft and ArrowRight.
+
+```kay
+Tabs(tabs={sections} value="details" orientation="vertical" label="Product")
+  @panel(tab)
+    ProductPanel(tab={tab})
+```
+
+## Choosing a tab by hand
+
+With `activation="manual"` the arrows, Home and End only move the focus, and Enter or Space shows the focused tab, for panels that are costly to switch to. `onChange` runs when a tab is shown, not as the focus moves.
+
+## Lazy panels
+
+`lazy` draws a panel when its tab is first shown and keeps it from then on, so a heavy panel, or one that fetches its data, costs nothing until it is read. Until then the panel is empty, and find in page does not see inside it.
+
+```kay
+Tabs(tabs={sections} value="details" lazy label="Product")
+  @panel(tab)
+    ProductPanel(tab={tab})
+```
+
 ## Following the selected tab
 
 `value` is the tab shown, and tabs whose parent passes another follow it. `onChange` reports each switch, so the rest of the page can follow it.

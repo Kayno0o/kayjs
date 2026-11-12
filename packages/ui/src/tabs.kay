@@ -8,32 +8,35 @@ import type { OptionsSource } from './options-source'
 import { wording } from 'kay/words'
 import Icon from './icon.kay'
 
-// The keys that move between tabs, as the tabs pattern has them: the arrows wrap, Home and End go to either end.
-const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
-  ArrowRight: (index, count) => stepIndex(index, 1, count),
-  ArrowLeft: (index, count) => stepIndex(index, -1, count),
+// The keys that move between tabs, as the tabs pattern has them: the arrows along the list wrap, Home and End go to either end.
+const ENDS: Partial<Record<string, (index: number, count: number) => number>> = {
   Home: () => 0,
   End: (_, count) => count - 1,
 }
+
+const ALONG = {
+  horizontal: { next: 'ArrowRight', previous: 'ArrowLeft' },
+  vertical: { next: 'ArrowDown', previous: 'ArrowUp' },
+} as const
 
 const FLIPPED: Partial<Record<string, string>> = { ArrowLeft: 'ArrowRight', ArrowRight: 'ArrowLeft' }
 
 // 'kui-tabs' stays as the component's name for an app's CSS. In-page tabs look like TabNav's, the shown one marked by aria-selected rather than aria-current.
 const look = recipe({
   parts: {
-    root: 'kui-tabs flex flex-col',
-    list: 'flex gap-1 overflow-x-auto border-b border-border pb-px',
-    tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent',
+    root: 'kui-tabs group/tabs flex flex-col data-[orientation=vertical]:flex-row',
+    list: 'flex gap-1 overflow-x-auto border-b border-border pb-px data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-x-visible data-[orientation=vertical]:overflow-y-auto data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-e data-[orientation=vertical]:pb-0',
+    tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent group-data-[orientation=vertical]/tabs:-me-px group-data-[orientation=vertical]/tabs:mb-0 group-data-[orientation=vertical]/tabs:border-b-0 group-data-[orientation=vertical]/tabs:border-e-2',
     icon: 'size-3.5 shrink-0',
     badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
     status: 'm-0 pt-2 text-xs text-muted',
     retry: 'cursor-pointer self-start text-xs text-accent underline',
     // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.
-    panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&[hidden]]:p-0',
+    panel: 'pt-4 group-data-[orientation=vertical]/tabs:min-w-0 group-data-[orientation=vertical]/tabs:flex-1 group-data-[orientation=vertical]/tabs:pt-0 group-data-[orientation=vertical]/tabs:ps-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&[hidden]]:p-0',
   },
 })
 
-const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), onLoad, onError, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
   tabs: OptionsSource<{ value: Value } & NavItem>
@@ -45,6 +48,12 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Names the tab list for screen readers.
   label: string
+  // `'vertical'` stacks the tabs in a column beside the panels, and ArrowUp and ArrowDown move between them in place of ArrowLeft and ArrowRight, with `aria-orientation` on the list.
+  orientation?: 'horizontal' | 'vertical' | undefined
+  // `'manual'` has the arrows, Home and End move the focus only, and Enter or Space shows the focused tab; `'auto'` (the default) shows a tab as the focus lands on it.
+  activation?: 'auto' | 'manual' | undefined
+  // Draws a panel on the first showing of its tab and keeps it from then on, so a heavy panel, or one that fetches, costs nothing until read. The panel is empty until then.
+  lazy?: boolean | undefined
   // Gets the tab shown as a second argument.
   onChange?: ((value: Value, tab: { value: Value } & NavItem) => unknown) | undefined
   // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the tab. The icon and the badge it names are still drawn around it; `label` is still the string the data holds.
@@ -74,6 +83,7 @@ const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const shown = signal<string>(value ?? '')
 const kept = param === undefined ? undefined : persisted(param, paramDefault ?? '', { storage: 'query' })
+const opened = signal<readonly string[]>([])
 let list: HTMLElement | undefined
 
 effect(() => {
@@ -90,6 +100,21 @@ const active = () => {
   return tabs().some(tab => tab.value === wanted && !tab.disabled) ? wanted : tabs().find(tab => !tab.disabled)?.value
 }
 
+// Once a tab has been shown, its panel stays drawn under `lazy`.
+effect(() => {
+  const now = active()
+
+  if (!lazy || now === undefined)
+    return
+
+  untrack(() => {
+    if (!opened().includes(now))
+      opened = [...opened(), now]
+  })
+})
+
+const drawn = (tabValue: string) => !lazy || tabValue === active() || opened().includes(tabValue)
+
 function show(next: Value) {
   // Picking the tab a fallback shows still writes it, so a stale value gives way to the pick.
   if (next === asked() && next === active())
@@ -103,11 +128,12 @@ function show(next: Value) {
   onChange?.(next, tabs().find(entry => entry.value === next)!)
 }
 
-// Moving with the keys shows the tab it lands on, and focus goes with it: only the shown tab is in the page's tab order.
+// Moving with the keys focuses the tab it lands on, and shows it unless `activation` is manual: only the shown tab is in the page's tab order.
 function keyDown(event: KeyboardEvent) {
   // Under a right-to-left direction the arrows point the other way along the list.
-  const key = list && getComputedStyle(list).direction === 'rtl' ? FLIPPED[event.key] ?? event.key : event.key
-  const move = MOVES[key]
+  const key = orientation === 'horizontal' && list && getComputedStyle(list).direction === 'rtl' ? FLIPPED[event.key] ?? event.key : event.key
+  const along = ALONG[orientation]
+  const move = ENDS[key] ?? (key === along.next ? (index: number, count: number) => stepIndex(index, 1, count) : key === along.previous ? (index: number, count: number) => stepIndex(index, -1, count) : undefined)
 
   // A chord is the browser's, such as Alt with an arrow going back a page.
   if (!move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
@@ -120,10 +146,12 @@ function keyDown(event: KeyboardEvent) {
   if (all.length === 0)
     return
 
-  let next = move(all.findIndex(tab => tab.value === active()), all.length)
+  // The move starts from the tab holding the focus, which a manual activation leaves apart from the shown one.
+  const focused = [...(list?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])].indexOf(event.target as HTMLElement)
+  let next = move(focused === -1 ? all.findIndex(tab => tab.value === active()) : focused, all.length)
 
   // The arrows go on past a disabled tab, Home and End to the nearest one that is not, every tab being checked at most once.
-  const step = key === 'ArrowLeft' || key === 'End' ? -1 : 1
+  const step = key === along.previous || key === 'End' ? -1 : 1
 
   for (let tried = 0; all[next]?.disabled && tried < all.length; tried++)
     next = stepIndex(next, step, all.length)
@@ -131,12 +159,14 @@ function keyDown(event: KeyboardEvent) {
   if (all[next]?.disabled)
     return
 
-  show(all[next]!.value)
+  if (activation === 'auto')
+    show(all[next]!.value)
+
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 ---
-div(part="root" {...rest} aria-busy={source.loading() ? 'true' : undefined})
-  div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
+div(part="root" {...rest} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={source.loading() ? 'true' : undefined})
+  div(part="list" ref={element => list = element} role="tablist" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} onKeyDown={keyDown})
     for entry, index of tabs() key={entry.value}
       button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === entry.value ? 'true' : 'false'} tabindex={active() === entry.value ? 0 : -1} disabled={entry.disabled} onClick={() => show(entry.value)})
         if entry.icon
@@ -156,4 +186,5 @@ div(part="root" {...rest} aria-busy={source.loading() ? 'true' : undefined})
   for entry, index of tabs() key={entry.value}
     div(part="panel" ref={element => element.addEventListener('beforematch', () => show(entry.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={active() === entry.value ? 0 : undefined} hidden={active() === entry.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
-      | {untrack(() => panel(entry.value))}
+      if drawn(entry.value)
+        | {untrack(() => panel(entry.value))}

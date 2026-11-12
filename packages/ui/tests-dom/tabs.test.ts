@@ -175,3 +175,100 @@ test('flips the arrows under a right-to-left direction', async () => {
 
   expect(shown()).toEqual(['Venus'])
 })
+
+async function configured(props: Record<string, unknown>) {
+  mounted = await mountComponent(PlanetTabs, { onChange: (value: string) => changes.push(value), ...props })
+
+  const { root } = mounted
+  const tabList = root.querySelector<HTMLElement>('[role="tablist"]')!
+  const shown = () => [...root.querySelectorAll('[role="tab"]')].filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent)
+  const drawn = () => [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')].map(panel => panel.querySelector('input')?.name ?? null)
+
+  return { root, tabList, shown, drawn }
+}
+
+test('a vertical list moves with ArrowUp and ArrowDown, leaves ArrowLeft and ArrowRight alone, and says so to screen readers', async () => {
+  const { root, tabList, shown } = await configured({ orientation: 'vertical' })
+
+  expect([tabList.getAttribute('aria-orientation'), root.querySelector('#tabs')?.getAttribute('data-orientation')]).toEqual(['vertical', 'vertical'])
+
+  root.querySelectorAll<HTMLElement>('[role="tab"]')[1]!.focus()
+
+  expect(key('ArrowRight').defaultPrevented).toBe(false)
+
+  key('ArrowDown')
+  await settle()
+
+  expect([shown(), document.activeElement?.textContent]).toEqual([['Earth'], 'Earth'])
+
+  key('ArrowDown')
+  await settle()
+
+  expect(shown()).toEqual(['Mars'])
+
+  key('ArrowUp')
+  await settle()
+
+  expect([shown(), changes]).toEqual([['Earth'], ['earth', 'mars', 'earth']])
+})
+
+test('a horizontal list leaves ArrowUp and ArrowDown to the page and carries no orientation', async () => {
+  const { root, tabList } = await configured({})
+
+  root.querySelectorAll<HTMLElement>('[role="tab"]')[1]!.focus()
+
+  expect(key('ArrowDown').defaultPrevented).toBe(false)
+  expect([tabList.getAttribute('aria-orientation'), tabList.getAttribute('data-orientation')]).toEqual([null, null])
+})
+
+test('manual activation moves the focus with the arrows and shows the tab on Enter or a click only', async () => {
+  const { root, shown } = await configured({ activation: 'manual' })
+  const all = () => root.querySelectorAll<HTMLElement>('[role="tab"]')
+
+  all()[1]!.focus()
+  key('ArrowRight')
+  await settle()
+
+  expect([shown(), document.activeElement?.textContent, changes]).toEqual([['Venus'], 'Earth', []])
+
+  key('ArrowRight')
+  await settle()
+
+  expect([shown(), document.activeElement?.textContent]).toEqual([['Venus'], 'Mars'])
+
+  key('End')
+  await settle()
+
+  expect([shown(), document.activeElement?.textContent, changes]).toEqual([['Venus'], 'Earth', []])
+
+  // A button's Enter and Space are its click.
+  click(document.activeElement)
+  await settle()
+
+  expect([shown(), changes]).toEqual([['Earth'], ['earth']])
+})
+
+test('lazy panels are drawn on the first showing of their tab and kept after it', async () => {
+  const { root, drawn } = await configured({ lazy: true })
+
+  expect(drawn()).toEqual([null, 'venus', null])
+
+  click(root.querySelectorAll('[role="tab"]')[2]!)
+  await settle()
+
+  expect(drawn()).toEqual([null, 'venus', 'earth'])
+
+  root.querySelector<HTMLInputElement>('input[name="earth"]')!.value = 'typed'
+  click(root.querySelectorAll('[role="tab"]')[0]!)
+  await settle()
+  click(root.querySelectorAll('[role="tab"]')[2]!)
+  await settle()
+
+  expect([drawn(), root.querySelector<HTMLInputElement>('input[name="earth"]')?.value]).toEqual([['mars', 'venus', 'earth'], 'typed'])
+})
+
+test('panels are all drawn at the start without lazy', async () => {
+  const { drawn } = await configured({})
+
+  expect(drawn()).toEqual(['mars', 'venus', 'earth'])
+})

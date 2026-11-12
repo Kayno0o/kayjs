@@ -1035,7 +1035,7 @@ component default
       root?: string | undefined;
     };
   };
-}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
+}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; perView?: number | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
   | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: string | undefined | {
   root?: string | undefined;
   empty?: string | undefined;
@@ -1055,7 +1055,7 @@ component default
       root?: string | undefined;
     };
   };
-}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
+}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; loop?: boolean | undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; perView?: number | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
 
 [./checkbox.kay] default
 component default
@@ -2850,7 +2850,7 @@ component default
   };
   badge?: string | undefined;
   link?: string | undefined;
-}; current: URL | string; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
+}; current: URL | string; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; orientation?: "horizontal" | "vertical" | undefined; param?: undefined; paramDefault?: undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
   | { class?: string | undefined | {
   root?: string | undefined;
   icon?: string | undefined | {
@@ -2858,7 +2858,7 @@ component default
   };
   badge?: string | undefined;
   link?: string | undefined;
-}; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: number | string | undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: number | string; } & NavItem)[] }
+}; current?: undefined; keep?: undefined; label: string; links?: undefined; orientation?: "horizontal" | "vertical" | undefined; param: string; paramDefault?: number | string | undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: number | string; } & NavItem)[] }
 
 [./table.kay] default
 component default
@@ -2991,7 +2991,7 @@ component default
 
 [./tabs.kay] default
 component default
-  | { class?: string | undefined | {
+  | { activation?: "auto" | "manual" | undefined; class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3002,8 +3002,8 @@ component default
   status?: string | undefined;
   retry?: string | undefined;
   panel?: string | undefined;
-}; failureLabel?: string | undefined; label: string; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value: Value }
-  | { class?: string | undefined | {
+}; failureLabel?: string | undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value: Value }
+  | { activation?: "auto" | "manual" | undefined; class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
@@ -3014,7 +3014,7 @@ component default
   status?: string | undefined;
   retry?: string | undefined;
   panel?: string | undefined;
-}; failureLabel?: string | undefined; label: string; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value?: undefined }
+}; failureLabel?: string | undefined; label: string; lazy?: boolean | undefined; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; orientation?: "horizontal" | "vertical" | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value?: undefined }
 
 [./text-input.kay] default
 component default

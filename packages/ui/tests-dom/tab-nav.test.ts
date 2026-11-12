@@ -64,3 +64,35 @@ test('centres the current tab once links that arrive after the first render are 
     mounted.unmount()
   }
 })
+
+test('a vertical bar moves the focus with ArrowUp and ArrowDown, wrapping, and leaves ArrowLeft and ArrowRight', async () => {
+  const mounted = await mountComponent(Tabs)
+
+  try {
+    const bar = mounted.root.querySelector<HTMLElement>('#vertical')!
+    const links = [...bar.querySelectorAll<HTMLElement>('a')]
+    const press = (name: string) => {
+      const event = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true })
+
+      document.activeElement!.dispatchEvent(event)
+
+      return event
+    }
+
+    expect(bar.getAttribute('data-orientation')).toBe('vertical')
+
+    links[0]!.focus()
+
+    expect(press('ArrowRight').defaultPrevented).toBe(false)
+    expect(press('ArrowDown').defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(links[1] ?? null)
+
+    press('ArrowUp')
+    press('ArrowUp')
+
+    expect(document.activeElement).toBe(links.at(-1) ?? null)
+  }
+  finally {
+    mounted.unmount()
+  }
+})

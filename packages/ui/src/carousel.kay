@@ -1,4 +1,4 @@
---- <Slide extends { src: string, alt: string, href?: string | undefined, newTab?: NewTab | undefined }>
+--- <Slide extends { src?: string | undefined, alt?: string | undefined, key?: string | number | undefined, href?: string | undefined, newTab?: NewTab | undefined }>
 import type { Duration, JSX, Snippet } from 'kay'
 import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
@@ -14,9 +14,10 @@ const look = recipe({
   parts: {
     root: 'kui-carousel flex flex-col gap-3',
     empty: 'text-xs text-muted',
-    viewport: 'relative w-full overflow-hidden bg-surface',
-    // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
-    slide: 'absolute inset-0 transition-transform duration-[calc(700ms*var(--motion-scale))] ease-in-out motion-reduce:transition-none',
+    // A vertical drag still scrolls the page, a horizontal one is the swipe.
+    viewport: 'relative w-full touch-pan-y select-none overflow-hidden bg-surface',
+    // Every slide sits over the viewport, a `perView`th of its width, moved a slide's width aside per place it stands from the first one shown.
+    slide: 'absolute inset-y-0 left-0 w-[calc(100%/var(--per-view,1))] transition-transform duration-[calc(700ms*var(--motion-scale))] ease-in-out motion-reduce:transition-none',
     link: 'block size-full',
     image: 'size-full object-cover',
     controls: 'flex items-center justify-center gap-4',
@@ -28,17 +29,22 @@ const look = recipe({
   },
 })
 
-const { slides: given, slide, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), emptyLabel = wording('ui.carousel.empty', 'No slides.'), empty, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides: given, slide, list, index = 0, onIndexChange, loop = true, perView = 1, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), emptyLabel = wording('ui.carousel.empty', 'No slides.'), empty, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   // The slides to draw. Left out when `list` holds them: one of the two is required.
   // A slide with an `href` makes the picture a link to that address, as a promo banner needs: middle-click and a new tab work, and an address off the site opens in one.
   slides?: readonly Slide[] | undefined
-  // Draws each slide's content in place of its picture and link: `@slide(slide, index)`, given the slide as written and its place. `src` and `alt` stay the default, and the slide keeps its group, its label and the sliding.
+  // Draws each slide's content in place of its picture and link: `@slide(slide, index)`, given the slide as written and its place. `src` and `alt` stay the default, and the slide keeps its group, its label and the sliding. With a `@slide` block a slide needs no `src` or `alt`, and a `key` of its own tells it apart; without one they are what is drawn (the types do not tell the two cases apart, so a slide with neither draws an empty picture).
   slide?: Snippet<[slide: Slide, index: number]> | undefined
   // Slides loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last slides, and a failed page shows LoadMore's alert with its retry under the controls.
   list?: InfiniteList<Slide> | undefined
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
+  // Called with the index of the first slide shown, on each turn: a button, a dot, an arrow key, a swipe or the autoplay.
   onIndexChange?: ((index: number) => unknown) | undefined
+  // Whether the slides go round: past the last one comes the first, and the other way. `false` stops at either end, with the button of that side disabled.
+  loop?: boolean | undefined
+  // How many slides are in view at once, each a share of the width; a turn moves one slide, and a dot stands for each place the first one can be. A whole number from 1.
+  perView?: number | undefined
   // Moves to the next slide this often, `'5s'`, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion.
   autoplay?: Duration | undefined
   // The slides' aspect ratio, as CSS writes it.
@@ -75,7 +81,7 @@ effect(() => shown = index)
 
 // The next page loads once the reader is on the last slides.
 effect(() => {
-  if (list && active() >= all().length - 2)
+  if (list && active() + view() >= all().length - 1)
     void untrack(() => list.more())
 })
 
@@ -105,7 +111,15 @@ effect(() => {
     every(interval, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
 })
 
-const active = () => stepIndex(shown(), 0, all().length)
+const view = () => Math.max(1, Math.floor(perView))
+// The first place the slide shown can stand at: the last slide when it loops, else the one leaving `perView` slides in view.
+const last = () => loop ? Math.max(0, all().length - 1) : Math.max(0, all().length - view())
+const active = () => loop ? stepIndex(shown(), 0, all().length) : Math.min(Math.max(shown(), 0), last())
+// With several in view a looping carousel wraps around the slides, so the ones in view are never followed by a gap.
+const circular = () => loop && view() > 1 && all().length > view()
+const offset = (position: number) => circular() ? stepIndex(position - active() + 1, 0, all().length) - 1 : position - active()
+const inView = (position: number) => offset(position) >= 0 && offset(position) < view()
+const places = () => Array.from({ length: loop ? all().length : last() + 1 }, (_, place) => place)
 // A paged list is empty once it has ended with nothing, not while its first page loads.
 const none = () => all().length === 0 && (list === undefined || (list.ended() && !list.failed() && !list.pending()))
 
@@ -115,38 +129,91 @@ function go(next: number) {
 }
 
 function step(delta: number) {
-  go(stepIndex(active(), delta, all().length))
+  const next = loop ? stepIndex(active(), delta, all().length) : Math.min(Math.max(active() + delta, 0), last())
+
+  if (next !== active())
+    go(next)
+}
+
+// A field or a control of a slide's own keeps its arrows.
+const EDITABLE = 'input, textarea, select, [contenteditable]'
+
+function keyDown(event: KeyboardEvent) {
+  const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+
+  if (delta === 0 || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || (event.target as Element).closest(EDITABLE) || all().length <= view())
+    return
+
+  event.preventDefault()
+  step(delta)
+}
+
+// How far a pointer travels along the slides to count as a swipe, and how much further along than across.
+const SWIPE_PX = 40
+const SWIPE_AXIS = 1.5
+let pressed: { id: number, x: number, y: number } | undefined
+
+function pressDown(event: PointerEvent) {
+  if (!event.isPrimary || event.button !== 0 || (event.target as Element).closest(EDITABLE))
+    return
+
+  pressed = { id: event.pointerId, x: event.clientX, y: event.clientY }
+}
+
+function pressUp(event: PointerEvent) {
+  const start = pressed
+
+  pressed = undefined
+
+  if (!start || start.id !== event.pointerId || all().length <= view())
+    return
+
+  const across = event.clientX - start.x
+
+  if (Math.abs(across) < SWIPE_PX || Math.abs(across) < Math.abs(event.clientY - start.y) * SWIPE_AXIS)
+    return
+
+  // What follows the swipe is not a click on the link or the control under the pointer.
+  const target = event.currentTarget as HTMLElement
+  const stop = (click: Event) => {
+    click.preventDefault()
+    click.stopPropagation()
+  }
+
+  target.addEventListener('click', stop, { capture: true, once: true })
+  setTimeout(() => target.removeEventListener('click', stop, { capture: true }), 0)
+  step(across < 0 ? 1 : -1)
 }
 
 function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(all().length))
 }
 ---
-section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
+section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onKeyDown={keyDown} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
   if none() && (empty || emptyLabel !== '')
     div(part="empty" role="status")
       if empty
         | {empty}
       else
         | {emptyLabel}
-  div(part="viewport" hidden={none()} style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
-    for entry, position of all() key={entry.src}
-      div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
+  div(part="viewport" hidden={none()} style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'} onPointerDown={pressDown} onPointerUp={pressUp} onPointerCancel={() => pressed = undefined})
+    for entry, position of all() key={entry.key ?? entry.src ?? position}
+      div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={inView(position) ? undefined : 'true'} inert={!inView(position)} style={`--per-view: ${view()}; transform: translateX(${offset(position) * 100}%)`})
         if slide
           slot slide(entry, position)
         else if entry.href !== undefined
           a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)})
             // kay-allow unsized-image
-            img(part="image" src={entry.src} alt={entry.alt} loading={position === 0 ? 'eager' : 'lazy'})
+            img(part="image" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
         else
           // kay-allow unsized-image
-          img(part="image" src={entry.src} alt={entry.alt} loading={position === 0 ? 'eager' : 'lazy'})
-  if all().length > 1
+          img(part="image" src={entry.src} alt={entry.alt} loading={position < view() ? 'eager' : 'lazy'})
+  if all().length > view()
     div(part="controls")
-      IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
-      for entry, position of all() key={entry.src}
+      IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" disabled={!loop && active() === 0} onClick={() => step(-1)})
+      for position of places() key={position}
         button(part="dot" type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
-      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" disabled={!loop && active() === last()} onClick={() => step(1)})
       if autoplay
         IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" part="pause" onClick={() => paused = !paused()})
   if list && list.failed()
