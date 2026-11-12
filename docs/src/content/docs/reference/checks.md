@@ -168,7 +168,9 @@ A template that does not compile, a build that stops, a collection that does not
 
 In `--format json` the code is the `code` field. It is `null` for what kay did not raise, such as a type error TypeScript names by number.
 
-`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's. The codes are stable names, one for a group of messages with one cause.
+`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's. The codes are stable names, one for a group of messages with one cause. Lints and errors share one namespace, so `kay explain` answers either.
+
+An error whose case has one right answer carries a quick fix, which `kay check --fix` applies and the editor offers: `onclick` or `on:click` written `onClick`, a repeated static `class` merged, a valueless `class` removed, and a `part`, `field` or `style:` value written as a string expression or as text. `kay explain <code>` says when a code has one.
 
 No level applies to an error and no `// kay-allow` comment reaches it. The classes kay and its libraries throw for an app to catch (`AiError`, `SaveConflictError`, `GiveUpError` and the rest) extend `KayError` and carry a code of the `runtime` and `library` groups. Their `kind` tells apart what one code covers, their `status` is the HTTP status they stand for, and `instanceof` of each class still works.
 
@@ -182,7 +184,19 @@ A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` w
 | `missing-peer` | command | A command that needs `typescript7` or `axe-core`, which the app did not install: the message names the `bun add -d` line to run. | [kay doctor](/reference/cli#kay-doctor) |
 | `extension-command` | command | A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default. | [Extensions](/guides/component-libraries) |
 | `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](/essentials/templates) |
-| `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](/essentials/templates) |
+| `head-invalid` | compile | A `head` block written twice, nested, given attributes or holding no head tag; an `html` tag outside it. | [Head](/essentials/head-and-seo) |
+| `slot-invalid` | compile | A `slot` or `@name` block used wrongly: a name the layout reads or lacks, a block twice, with parameters or in an island. | [Slots](/essentials/templates) |
+| `duplicate-attribute` | compile | An attribute set twice: `#id` and `id`, two `class`, a prop passed again. Two static `class` have a quick fix. | [Elements](/essentials/templates) |
+| `attribute-invalid` | compile | An attribute kay refuses: `class` with no value, `hydrate="media(...)"` with no query, a bad `transition`, `style:` or event modifier. A `style:` written as text has a quick fix. | [Elements](/essentials/templates) |
+| `attribute-ineffective` | compile | An attribute that does nothing there: `lang` on `<html>`, or an island option inside an island. | [Elements](/essentials/templates) |
+| `element-invalid` | compile | An expression in the text of a `style` or `script` inside `svg` or `math`. | [Elements](/essentials/templates) |
+| `part-invalid` | compile | A `part` that is no static name, several names off a component call, a repeated name or `root` not first. A string expression or a repeated name has a quick fix. | [Let a parent fill a part of a component](/essentials/templates) |
+| `form-misuse` | compile | A `field`, `pending` or `error` outside a form posting to an action, a `field` that is no text, or `field` with `name`. A string expression has a quick fix. | [Forms](/essentials/forms-and-actions) |
+| `server-island-invalid` | compile | A `server` used wrongly: in an island, with a value but "defer", or with a bad `noscript` or `@failed`. | [Server islands](/essentials/islands) |
+| `fallback-invalid` | compile | An `@failed` or `@fallback` block holding something interactive, an action form or a name of the component's script. | [Server islands](/essentials/islands) |
+| `bind-misuse` | compile | A `bind:` that cannot bind: no expression, an unsupported property or element, a handler for the same event, or no signal or `Bindable` prop. | [Bind an input to a signal](/essentials/templates) |
+| `event-name` | compile | An event written `onclick` or `on:click`, which attaches nothing. It has a quick fix. | [Events](/essentials/templates) |
+| `name-clash` | compile | A template `const` or snippet named like a name already declared. | [Name a value used several times](/essentials/templates) |
 | `fence-invalid` | compile | A fence that breaks a rule of kay: a fence never closed or declared twice, a `--- server` fence in a component (only a page or a layout has one), props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings, a `guards` or `layouts` in it that is no literal `true` or `false`. | [File layout](/essentials/components) |
 | `fence-syntax` | compile | Code in a fence that does not parse, or code the template generates that does not. | [File layout](/essentials/components) |
 | `page-settings-invalid` | compile | A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`. | [Page settings](/essentials/routing) |

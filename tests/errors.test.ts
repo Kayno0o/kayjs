@@ -6,8 +6,9 @@ import { describe, expect, it } from 'bun:test'
 import { KayCompileError, transformKay } from '../src/build/transform'
 import { failureProblem } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
+import { diagnosticInfo, explainDiagnostic, isDiagnosticCode } from '../src/compiler/diagnostics'
 import { buildFailure, ERROR_GROUPS, errorCodeOf, errorList, ERRORS, explainError, isErrorCode, KayError, raisedMark } from '../src/compiler/errors'
-import { LINTS } from '../src/compiler/lints'
+import { explainLint, LINTS } from '../src/compiler/lints'
 import { MarkdownError } from '../src/content/markdown'
 import { ContentError } from '../src/content/validate'
 import { ExportError } from '../src/server/prerender'
@@ -113,7 +114,7 @@ describe('compile errors', () => {
 
   it('name the group of messages they belong to', () => {
     expect(codes('div\n    p\n  span\n')).toContain('template-syntax')
-    expect(codes('head\n  title A\nhead\n  title B\n')).toContain('template-invalid')
+    expect(codes('head\n  title A\nhead\n  title B\n')).toContain('head-invalid')
     expect(codes('---\nconst { a } = props<{ a: string }>()\nconst { b } = props<{ b: string }>()\n---\np {a}\n')).toContain('fence-invalid')
     expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
@@ -205,6 +206,72 @@ describe('a failed build', () => {
     raise('inert-editor', text)
 
     expect(errorCodeOf(buildFailure([{ message: text }], 'failed', raisedMark()))).toBeUndefined()
+  })
+})
+
+describe('template errors', () => {
+  const found = (source: string, filename = 'src/a.kay') => compileKay(source, filename, { check: true }).diagnostics
+  const codes = (source: string, filename?: string) => found(source, filename).map(diagnostic => diagnostic.code)
+  // What `kay check --fix` leaves: every safe fix of the first error that has one, its edits applied from the end.
+  const fixed = (source: string): string => {
+    const edits = found(source).flatMap(diagnostic => diagnostic.fixes?.find(fix => fix.safe)?.edits ?? [])
+
+    return edits.toSorted((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+  }
+
+  it('give each problem its own code, none the old catch-all', () => {
+    const island = (call: string) => codes(`---\nimport Card from './card.kay'\nconst x = 1\n---\n${call}\n`, 'src/routes/index.kay')
+
+    expect(codes('div#a(id="b")')).toContain('duplicate-attribute')
+    expect(codes('div(class="a" class="b")')).toContain('duplicate-attribute')
+    expect(codes('div.a(class)')).toContain('attribute-invalid')
+    expect(codes('div(style:color)')).toContain('attribute-invalid')
+    expect(codes('div(onclick={go})')).toContain('event-name')
+    expect(codes('div(part={a + b})')).toContain('part-invalid')
+    expect(codes('input(field="a")')).toContain('form-misuse')
+    expect(island('Card(server="x")')).toContain('server-island-invalid')
+    expect(codes('input(bind:nope={a})')).toContain('bind-misuse')
+    expect(codes('slot(a="b")')).toContain('slot-invalid')
+    expect(codes('div\n  head\n    title A\n')).toContain('head-invalid')
+    expect(codes('svg\n  style {name}\n')).toContain('element-invalid')
+    expect(codes('const Card = 1\np {Card}', 'card.kay')).toContain('name-clash')
+    expect(island('Card(server)\n  @failed\n    p x')).toContain('server-island-invalid')
+    expect(codes('---\n---\np.real\n@failed\n  button(onClick={() => {}}) Go\n', 'src/components/card.kay')).toContain('fallback-invalid')
+    expect(found('p x').map(diagnostic => diagnostic.code)).not.toContain('template-invalid')
+    expect(isErrorCode('template-invalid')).toBe(false)
+  })
+
+  it('fix an event written lowercase or with a colon, a class written twice, a part or a field written as an expression', () => {
+    expect(fixed('button(onclick={go}) Go')).toBe('button(onClick={go}) Go')
+    expect(fixed('button(on:click={go}) Go')).toBe('button(onClick={go}) Go')
+    expect(fixed('div(class="a b" class="c") x')).toBe('div(class="a b c") x')
+    expect(fixed('div(class="a"\n  id="x"\n  class="c") x')).toBe('div(class="a c"\n  id="x") x')
+    expect(fixed('div.a(class) x')).toBe('div.a() x')
+    expect(fixed('div(part={\'head\'}) x')).toBe('div(part="head") x')
+    expect(fixed('div(style:color="red") x')).toBe('div(style:color={"red"}) x')
+  })
+
+  it('leave an error without one right answer alone', () => {
+    expect(fixed('div(class="a" class={b}) x')).toBe('div(class="a" class={b}) x')
+    expect(fixed('div(part={a + b}) x')).toBe('div(part={a + b}) x')
+    expect(fixed('div(style:color="re\'d") x')).toBe('div(style:color="re\'d") x')
+  })
+
+  it('name a quick fix only where one is made', () => {
+    expect(Object.entries(ERRORS).filter(([, error]) => 'quickFix' in error).map(([name]) => name).toSorted()).toEqual(['attribute-invalid', 'duplicate-attribute', 'event-name', 'form-misuse', 'part-invalid'])
+    expect(explainError('event-name')).toContain('`kay check --fix`')
+    expect(explainError('name-clash')).not.toContain('`kay check --fix`')
+  })
+})
+
+describe('one registry for errors and lints', () => {
+  it('answers any code with its kind, group and level, and keeps the two apart', () => {
+    expect(diagnosticInfo('missing-alt')).toMatchObject({ kind: 'lint', group: 'a11y', level: 'deny' })
+    expect(diagnosticInfo('event-name')).toMatchObject({ kind: 'error', group: 'compile', level: undefined, quickFix: true })
+    expect(diagnosticInfo('nope')).toBeUndefined()
+    expect(Object.keys(LINTS).concat(Object.keys(ERRORS)).every(code => isDiagnosticCode(code))).toBe(true)
+    expect(explainDiagnostic('missing-alt')).toBe(explainLint('missing-alt'))
+    expect(explainDiagnostic('event-name')).toBe(explainError('event-name'))
   })
 })
 

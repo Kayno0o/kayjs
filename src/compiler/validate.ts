@@ -1,5 +1,6 @@
 import type { Attribute, Details, Diagnostic, ElementNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span } from './ast'
 import type { GenerateOptions } from './codegen'
+import type { ErrorName } from './errors'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
@@ -10,6 +11,7 @@ import { deprecatedAiProps } from './deprecated-ai-props'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
+import { AttributeFixes, FIELD_NAME, PART_NAME_LIST } from './validate-fixes'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -182,6 +184,7 @@ class Validator {
   // The `html` tags of the `head` block, the only place one sets attributes.
   private readonly rootTags = new Set<Node>()
   private readonly src: string
+  private readonly fixes: AttributeFixes
   private readonly forms: Map<Node, Span>
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
@@ -193,6 +196,7 @@ class Validator {
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
+    this.fixes = new AttributeFixes(file.source)
     this.forms = templateFacts(file).forms
   }
 
@@ -205,13 +209,13 @@ class Validator {
 
     if (server && this.options.includeServer !== false) {
       for (const [binding, first] of sharedImports(script, server).conflicts)
-        this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way`, { related: [{ ...first.span, label: 'first imported here' }], help: 'import it once' })
+        this.error('fence-invalid', binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way`, { related: [{ ...first.span, label: 'first imported here' }], help: 'import it once' })
     }
 
     const query = server?.page?.settings.get(QUERY)?.key
 
     if (query && this.options.special)
-      this.error(query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
+      this.error('fence-invalid', query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
     if ((this.options.island !== undefined || this.options.insideIsland === true) && kayCtxImport(script.imports) !== undefined)
       this.ctxInIsland()
@@ -219,10 +223,10 @@ class Validator {
     const head = this.head(this.file.template)
 
     if (this.file.typeParameters && server)
-      this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
+      this.error('fence-invalid', this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
 
     if (this.options.pageFile === true && script.recipeSpan)
-      this.error(script.recipeSpan, 'A page or a layout takes no variants', { note: 'a recipe types the props of a component, which a page does not have', help: 'move the recipe to a component' })
+      this.error('fence-invalid', script.recipeSpan, 'A page or a layout takes no variants', { note: 'a recipe types the props of a component, which a page does not have', help: 'move the recipe to a component' })
 
     const parts = this.options.pageFile === true ? undefined : templateFacts(this.file, script.recipe).parts
 
@@ -231,20 +235,20 @@ class Validator {
       const taken: Span | undefined = script.props?.bindings.find(binding => binding.key === 'class')?.local ?? (type && declaresClass(this.text(type)) ? type : undefined)
 
       if (taken)
-        this.error(taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
+        this.error('fence-invalid', taken, 'A component with parts takes `class` from its parts', { note: 'its `class` prop is a string for the root or an object with an entry per part, which a plain `class={className}` would render as the words of the part names', help: 'delete the `class` prop: the compiler types it and merges each entry onto its part' })
 
       if (parts.root === 'none' && script.recipeRoot === true && script.recipeSpan)
-        this.error(script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })
+        this.error('fence-invalid', script.recipeSpan, 'The recipe styles the root, which the template has no part for', { note: 'the template has no single top element and none is marked `part="root"`, so the root classes would go nowhere', help: 'mark the element that is the root with `part="root"`' })
     }
 
     if (server && script.props)
-      this.error(script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
+      this.error('fence-invalid', script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
 
     const tags = head?.children.filter((child) => {
       const problem = headTagProblem(child) ?? this.islandHeadProblem(child)
 
       if (problem)
-        this.error(...problem)
+        this.error('head-invalid', ...problem)
 
       return problem === undefined
     })
@@ -270,7 +274,7 @@ class Validator {
   private rootAttributes(tag: ElementNode): void {
     for (const attribute of tag.attributes) {
       if (attribute.kind !== 'spread' && this.text(attribute.name).toLowerCase() === 'dir')
-        this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's language`, { help: 'set `lang` on the page, or in kay.config.ts' })
+        this.error('attribute-ineffective', attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's language`, { help: 'set `lang` on the page, or in kay.config.ts' })
     }
   }
 
@@ -283,7 +287,7 @@ class Validator {
     })
 
     if (found)
-      this.error(found, '`ctx` is read on the server, which an island, rendering in the browser too, cannot', { help: 'read it in the page or a static component and pass the value in as a prop' })
+      this.error('fence-invalid', found, '`ctx` is read on the server, which an island, rendering in the browser too, cannot', { help: 'read it in the page or a static component and pass the value in as a prop' })
   }
 
   // An island renders in the browser too, where it keeps the title alone in step with what it reads.
@@ -303,9 +307,9 @@ class Validator {
         continue
 
       if (head)
-        this.error(node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
+        this.error('head-invalid', node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
       else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
-        this.error(node, 'A `head` block takes no attributes')
+        this.error('head-invalid', node, 'A `head` block takes no attributes')
 
       head ??= node
     }
@@ -332,9 +336,9 @@ class Validator {
       const name = this.text(node.outlet.name)
 
       if (name === 'children')
-        this.error(node.outlet.name, '`slot children` is the layout\'s default slot', { help: 'write `slot` alone for the page, or give the named slot another name' })
+        this.error('slot-invalid', node.outlet.name, '`slot children` is the layout\'s default slot', { help: 'write `slot` alone for the page, or give the named slot another name' })
       else if (data.has(name))
-        this.error(node.outlet.name, `The slot \`${name}\` has the name of the layout's server data`, { note: 'the slot would replace the data in the layout, which could no longer read it', help: 'rename the slot or the data' })
+        this.error('slot-invalid', node.outlet.name, `The slot \`${name}\` has the name of the layout's server data`, { note: 'the slot would replace the data in the layout, which could no longer read it', help: 'rename the slot or the data' })
     })
   }
 
@@ -354,18 +358,18 @@ class Validator {
       const name = this.text(node.name)
 
       if (this.options.island !== undefined)
-        this.error(node.name, `\`@${name}\` cannot sit in a ${kind} that is an island`, { note: 'the block renders once on the server, in the layout, so nothing in it would hydrate', help: 'move what is interactive into a component the block renders' })
+        this.error('slot-invalid', node.name, `\`@${name}\` cannot sit in a ${kind} that is an island`, { note: 'the block renders once on the server, in the layout, so nothing in it would hydrate', help: 'move what is interactive into a component the block renders' })
 
       if (node.params)
-        this.error(node.params, `\`@${name}\` fills a slot, which takes no parameters`, { help: `write \`@${name}\` alone` })
+        this.error('slot-invalid', node.params, `\`@${name}\` fills a slot, which takes no parameters`, { help: `write \`@${name}\` alone` })
 
       if (seen.has(name))
-        this.error(node.name, `\`@${name}\` is written twice in this ${kind}`, { help: 'a slot takes one block' })
+        this.error('slot-invalid', node.name, `\`@${name}\` is written twice in this ${kind}`, { help: 'a slot takes one block' })
 
       seen.add(name)
 
       if (above !== undefined && this.options.check === true && !above.includes(name))
-        this.error(node.name, `No layout above this ${kind} has a \`slot ${name}\``, { note: above.length > 0 ? `the slots of its layouts: ${above.map(slot => `\`${slot}\``).join(', ')}` : 'none of its layouts declares a named slot', help: `write \`slot ${name}\` in the layout that renders it` })
+        this.error('slot-invalid', node.name, `No layout above this ${kind} has a \`slot ${name}\``, { note: above.length > 0 ? `the slots of its layouts: ${above.map(slot => `\`${slot}\``).join(', ')}` : 'none of its layouts declares a named slot', help: `write \`slot ${name}\` in the layout that renders it` })
 
       this.nodes(node.children)
     }
@@ -408,19 +412,19 @@ class Validator {
 
           break
         case 'slot':
-          this.error(node, `\`@${this.text(node.name)}\` must sit directly under a component, to pass it as that component's \`${this.text(node.name)}\` prop`)
+          this.error('slot-invalid', node, `\`@${this.text(node.name)}\` must sit directly under a component, to pass it as that component's \`${this.text(node.name)}\` prop`)
 
           break
         case 'pending':
           if (!this.forms.has(node))
-            this.error(node, '`pending` shows while a form posts to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
+            this.error('form-misuse', node, '`pending` shows while a form posts to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
 
           this.nodes(node.children)
 
           break
         case 'error':
           if (!this.forms.has(node))
-            this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
+            this.error('form-misuse', node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
 
           break
         case 'snippet':
@@ -459,17 +463,17 @@ class Validator {
       this.accessibility(element)
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
-      this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
+      this.error('element-invalid', element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
 
     if (isHead(element))
-      this.error(element, 'A `head` block sits at the top level of a template')
+      this.error('head-invalid', element, 'A `head` block sits at the top level of a template')
 
     if (element.name === 'html' && !element.component && !this.rootTags.has(element))
-      this.error(element.tag, 'An `html` tag sets the attributes of `<html>` from the `head` block only', { note: 'kay writes `<html>` around every page', help: 'move it into the template\'s top-level `head` block' })
+      this.error('head-invalid', element.tag, 'An `html` tag sets the attributes of `<html>` from the `head` block only', { note: 'kay writes `<html>` around every page', help: 'move it into the template\'s top-level `head` block' })
 
     if (isSlot(element)) {
       if (element.attributes.length > 0 || element.classes.length > 0 || element.id)
-        this.error(element, '`slot` takes no attributes', { note: '`slot` marks where a layout or wrapper renders its children, and `slot name` its `name` block prop' })
+        this.error('slot-invalid', element, '`slot` takes no attributes', { note: '`slot` marks where a layout or wrapper renders its children, and `slot name` its `name` block prop' })
 
       this.nodes(element.children)
 
@@ -499,7 +503,7 @@ class Validator {
       const earlier = passed.get(name)
 
       if (earlier !== undefined)
-        this.error(slot.name, `\`${name}\` is passed twice`, { label: 'passed again here', related: [earlier] })
+        this.error('duplicate-attribute', slot.name, `\`${name}\` is passed twice`, { label: 'passed again here', related: [earlier] })
 
       passed.set(name, { ...slot.name, label: `passed by this \`@${name}\`` })
       this.nodes(slot.children)
@@ -522,19 +526,19 @@ class Validator {
     const ids = named('id')
 
     if (element.id && ids.length > 0)
-      this.error(element.id, 'The id is set twice', { label: 'set by `#id`', related: ids.map(attribute => ({ ...attribute.name, label: 'and by this attribute' })) })
+      this.error('duplicate-attribute', element.id, 'The id is set twice', { label: 'set by `#id`', related: ids.map(attribute => ({ ...attribute.name, label: 'and by this attribute' })) })
 
     const classAttributes = named('class')
     const classAttribute = classAttributes[0]
 
     if (classAttributes.length > 1)
-      this.error(classAttributes[1]!.name, 'An element takes one `class` attribute', { related: [{ ...classAttribute!.name, label: 'the first one' }], help: 'put several classes in one: `class="a b"`' })
+      this.error('duplicate-attribute', classAttributes[1]!.name, 'An element takes one `class` attribute', { related: [{ ...classAttribute!.name, label: 'the first one' }], help: 'put several classes in one: `class="a b"`', ...this.fixes.mergedClasses(classAttribute!, classAttributes[1]!) })
 
     // The shorthand or a spread merges the `class` attribute in, which takes a value then.
     const merged = element.classes.length > 0 || element.attributes.some(attribute => attribute.kind === 'spread')
 
     if (merged && classAttribute?.kind === 'boolean')
-      this.error(classAttribute.name, '`class` needs a value')
+      this.error('attribute-invalid', classAttribute.name, '`class` needs a value', { help: 'delete it, the classes the element has are merged in', fixes: [this.fixes.removal('Delete `class`', classAttribute)] })
 
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread' || (merged && attribute === classAttribute) || attribute === serverIsland?.noscript)
@@ -543,10 +547,10 @@ class Validator {
       const name = this.text(attribute.name)
 
       if (element.component && (this.options.island !== undefined || this.options.insideIsland) && ISLAND_OPTIONS.has(name))
-        this.error(attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
+        this.error('attribute-ineffective', attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
       if (element.component && name === 'hydrate' && attribute.kind === 'static' && attribute.text.startsWith('media(') && !MEDIA_HYDRATE.test(attribute.text))
-        this.error(attribute.name, '`hydrate="media(...)"` needs a media query', { help: 'write the query in the brackets: `hydrate="media(max-width: 40rem)"`' })
+        this.error('attribute-invalid', attribute.name, '`hydrate="media(...)"` needs a media query', { help: 'write the query in the brackets: `hydrate="media(max-width: 40rem)"`' })
 
       if (attribute === serverIsland?.attribute)
         this.serverIsland(serverIsland, failedBlockOf(element, this.src))
@@ -562,33 +566,33 @@ class Validator {
     const named = element.attributes.find((other): other is NamedAttribute => other.kind !== 'spread' && this.text(other.name) === 'name')
 
     if (!this.forms.has(element))
-      this.error(attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
+      this.error('form-misuse', attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
     else if (attribute.kind !== 'static')
-      this.error(attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render' })
+      this.error('form-misuse', attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render', ...this.fixes.writtenText(attribute, 'field', FIELD_NAME) })
     else if (named)
-      this.error(attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
+      this.error('form-misuse', attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
   }
 
   private serverIsland({ attribute, mode, noscript }: ServerIslandMark, failed: SlotNode | undefined): void {
     if (this.options.island !== undefined || this.options.insideIsland) {
-      this.error(attribute.name, SERVER_IN_ISLAND, { note: 'an island renders in the browser too, as a whole' })
+      this.error('server-island-invalid', attribute.name, SERVER_IN_ISLAND, { note: 'an island renders in the browser too, as a whole' })
     }
     else if (mode === undefined) {
-      this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
+      this.error('server-island-invalid', attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
     }
     else if (noscript && mode !== 'defer') {
-      this.error(noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
+      this.error('server-island-invalid', noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
     }
     else if (noscript?.kind === 'boolean') {
-      this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
+      this.error('server-island-invalid', noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
     }
     else if (mode !== 'defer' && failed) {
-      this.error(failed.name, '`@failed` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
+      this.error('server-island-invalid', failed.name, '`@failed` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
     }
     else if (failed) {
       visitNodes(failed.children, (node) => {
         if (node.kind === 'element' && serverIslandOf(node, this.src) !== undefined)
-          this.error(node.tag, '`@failed` holds a server island', { note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help: 'render it outside the block, or leave it out' })
+          this.error('server-island-invalid', node.tag, '`@failed` holds a server island', { note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help: 'render it outside the block, or leave it out' })
       })
     }
   }
@@ -601,26 +605,26 @@ class Validator {
       return
 
     if (!element.component)
-      this.error(attribute.name, 'Only a component call names several parts: `part="root spinner"`', { note: 'the first is the part the call is, the others are parts of this component whose entries it hands on to the called one', help: 'name one part on an element' })
+      this.error('part-invalid', attribute.name, 'Only a component call names several parts: `part="root spinner"`', { note: 'the first is the part the call is, the others are parts of this component whose entries it hands on to the called one', help: 'name one part on an element' })
     else if (new Set(names).size !== names.length)
-      this.error(attribute.name, 'A part is named once on a call', { help: 'delete the repeated name' })
+      this.error('part-invalid', attribute.name, 'A part is named once on a call', { help: 'delete the repeated name', fixes: [{ title: 'Delete the repeated name', safe: true, edits: [{ ...attribute.value, text: [...new Set(names)].join(' ') }] }] })
     else if (names.slice(1).includes('root'))
-      this.error(attribute.name, '`root` is the first name of a call that hands parts on, or is not handed', { help: 'write `part="root spinner"`, the root first' })
+      this.error('part-invalid', attribute.name, '`root` is the first name of a call that hands parts on, or is not handed', { help: 'write `part="root spinner"`, the root first' })
     else if (this.options.pageFile === true)
-      this.error(attribute.name, 'A page or a layout has no parts to hand on', { note: 'only a component takes `class` entries per part, which a call hands on to the component it calls', help: 'move the call into a component, or name one part' })
+      this.error('part-invalid', attribute.name, 'A page or a layout has no parts to hand on', { note: 'only a component takes `class` entries per part, which a call hands on to the component it calls', help: 'move the call into a component, or name one part' })
   }
 
   private attribute(element: ElementNode, attribute: NamedAttribute, name: string): void {
     if (name === 'part' && (attribute.kind !== 'static' || !attribute.text.trim().split(WHITESPACE).every(part => PART_NAME.test(part))))
-      this.error(attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes' })
+      this.error('part-invalid', attribute.name, '`part` names a part with a string: `part="head"`', { note: 'the `class` type of the component is built from the names at compile time', help: 'write a name of letters, digits and dashes', ...this.fixes.writtenText(attribute, 'part', PART_NAME_LIST) })
     else if (name === 'part' && attribute.kind === 'static')
       this.severalParts(element, attribute)
 
     if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
       if (element.component)
-        this.error(attribute.name, `\`${name}\` animates an element, not a component`, { help: 'set it on the element the component renders, which a prop can carry' })
+        this.error('attribute-invalid', attribute.name, `\`${name}\` animates an element, not a component`, { help: 'set it on the element the component renders, which a prop can carry' })
       else if (name !== 'transition' && !TRANSITION_PARTS.has(name.slice(TRANSITION_PART.length)))
-        this.error(attribute.name, `\`${name}\` is no phase of a transition`, { help: 'use `transition:enter`, `transition:enter-from` or `transition:enter-to`, or the same for `leave`' })
+        this.error('attribute-invalid', attribute.name, `\`${name}\` is no phase of a transition`, { help: 'use `transition:enter`, `transition:enter-from` or `transition:enter-to`, or the same for `leave`' })
     }
 
     if (!element.component && attribute.kind === 'expression')
@@ -636,7 +640,7 @@ class Validator {
       return
 
     if (attribute.kind !== 'expression') {
-      this.error(attribute.name, element.component ? '`bind:` needs a signal or a `Bindable` prop' : '`bind:` needs a signal', { help: element.component ? '`bind:open={open}`' : '`bind:value={name}`' })
+      this.error('bind-misuse', attribute.name, element.component ? '`bind:` needs a signal or a `Bindable` prop' : '`bind:` needs a signal', { help: element.component ? '`bind:open={open}`' : '`bind:value={name}`' })
 
       return
     }
@@ -651,7 +655,7 @@ class Validator {
     const problem = bindProblem(element, property, this.staticType(element))
 
     if (problem) {
-      this.error(attribute.name, ...problem)
+      this.error('bind-misuse', attribute.name, ...problem)
 
       return
     }
@@ -660,29 +664,29 @@ class Validator {
     const handler = element.attributes.find(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event) as NamedAttribute | undefined
 
     if (handler)
-      this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
+      this.error('bind-misuse', attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
   }
 
   // `style:color={color()}` sets one property of an element's `style`.
   private styleProp(element: ElementNode, attribute: NamedAttribute, name: string): void {
     if (element.component)
-      this.error(attribute.name, '`style:` sets a property of an element, not of a component', { help: 'pass the value as a prop and set it on the element the component renders' })
+      this.error('attribute-invalid', attribute.name, '`style:` sets a property of an element, not of a component', { help: 'pass the value as a prop and set it on the element the component renders' })
     else if (attribute.kind !== 'expression')
-      this.error(attribute.name, `\`${name}\` takes an expression`, { help: `\`${name}={value}\`, or write the property in \`style\`` })
+      this.error('attribute-invalid', attribute.name, `\`${name}\` takes an expression`, { help: `\`${name}={value}\`, or write the property in \`style\``, ...this.fixes.asExpression(attribute) })
     else if (!STYLE_PROPERTY.test(name.slice(STYLE_PROP.length)))
-      this.error(attribute.name, `\`${name}\` names no CSS property`, { help: 'write it as CSS does: `style:background-color={color}`, or a custom property `style:--gap={gap}`' })
+      this.error('attribute-invalid', attribute.name, `\`${name}\` names no CSS property`, { help: 'write it as CSS does: `style:background-color={color}`, or a custom property `style:--gap={gap}`' })
   }
 
   // `onSubmit|preventDefault={save}` calls the event method first; a handler of an element is the only thing that takes one.
   private modifiers(element: ElementNode, attribute: Extract<NamedAttribute, { kind: 'expression' }>, name: string): void {
     if (element.component || !EVENT_NAME.test(name)) {
-      this.error(attribute.modifiers!, 'a modifier belongs to an event handler of an element', { help: '`form(onSubmit|preventDefault={save})`' })
+      this.error('attribute-invalid', attribute.modifiers!, 'a modifier belongs to an event handler of an element', { help: '`form(onSubmit|preventDefault={save})`' })
 
       return
     }
 
     for (const { message, help } of modifierProblems(modifiersOf(attribute, this.src), name, element.attributes.some(candidate => candidate.kind === 'spread')))
-      this.error(attribute.modifiers!, message, { help })
+      this.error('attribute-invalid', attribute.modifiers!, message, { help })
   }
 
   // `bind:open={open}` on a component hands it the signal `open` or a `Bindable` prop of the component, named whole or as a member of one.
@@ -691,11 +695,11 @@ class Validator {
     const [root, ...members] = expression.split('.')
 
     if (name === 'bind:')
-      this.error(attribute.name, '`bind:` names the prop it binds', { help: '`bind:open={open}`' })
+      this.error('bind-misuse', attribute.name, '`bind:` names the prop it binds', { help: '`bind:open={open}`' })
     else if (this.restName !== undefined && members.length > 0 && root!.trim() === this.restName)
-      this.error(attribute.expression, `\`${expression.trim()}\` is a value, so \`${name}\` has nothing to write`, { help: `spread \`...${this.restName}\` to hand the prop on, or name the prop` })
+      this.error('bind-misuse', attribute.expression, `\`${expression.trim()}\` is a value, so \`${name}\` has nothing to write`, { help: `spread \`...${this.restName}\` to hand the prop on, or name the prop` })
     else if (!BOUND_NAME.test(expression))
-      this.error(attribute.expression, `\`${name}\` needs a signal or a \`Bindable\` prop`, { help: 'name the signal, or the prop of this component, that it writes' })
+      this.error('bind-misuse', attribute.expression, `\`${name}\` needs a signal or a \`Bindable\` prop`, { help: 'name the signal, or the prop of this component, that it writes' })
   }
 
   // `onclick` and `on:click` attach nothing, and the component would not become an island either.
@@ -707,7 +711,7 @@ class Validator {
 
     const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
 
-    this.error(attribute.name, `\`${written}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [attribute.shorthand ? { ...attribute.shorthand, text: `${camel}={${written}}` } : { ...attribute.name, text: camel }], safe: true }] })
+    this.error('event-name', attribute.name, `\`${written}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [attribute.shorthand ? { ...attribute.shorthand, text: `${camel}={${written}}` } : { ...attribute.name, text: camel }], safe: true }] })
   }
 
   // Type checking only, so a page still runs while it is fixed. A spread may carry what is missing, so an element with one is left alone.
@@ -825,8 +829,8 @@ class Validator {
     return this.src.slice(span.start, span.end)
   }
 
-  private error(span: Span, message: string, details?: Details): void {
-    this.diagnostics.push({ start: span.start, end: span.end, message, ...details })
+  private error(code: ErrorName, span: Span, message: string, details?: Details): void {
+    this.diagnostics.push({ start: span.start, end: span.end, code, message, ...details })
   }
 
   private lint(span: Span, code: LintName, message: string, details?: Details): void {

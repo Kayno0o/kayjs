@@ -91,7 +91,7 @@ export class KayCompileError extends Error {
 
   constructor(readonly diagnostics: FileDiagnostic[]) {
     super(`\n${diagnostics.map(diagnostic => formatDiagnostic(diagnostic.source, relative(process.cwd(), diagnostic.file), diagnostic)).join('\n\n')}`)
-    this.code = diagnostics.map(diagnostic => diagnostic.code).find(isErrorCode) ?? 'template-invalid'
+    this.code = diagnostics.map(diagnostic => diagnostic.code).find(isErrorCode) ?? 'template-syntax'
   }
 }
 

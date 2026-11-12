@@ -18,6 +18,8 @@ export interface ErrorCode {
   summary: string
   // The `llms/` file and the heading of the section that covers the fix.
   fix: { file: string, heading: string }
+  // `kay check --fix` rewrites the cases that have one right answer.
+  quickFix?: true
 }
 
 export const ERRORS = {
@@ -41,10 +43,75 @@ export const ERRORS = {
     summary: 'A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`.',
     fix: { file: 'llms/templates.md', heading: 'Template lines' },
   },
-  'template-invalid': {
+  'head-invalid': {
     group: 'compile',
-    summary: 'A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase.',
+    summary: 'A `head` block written twice, nested, given attributes or holding no head tag; an `html` tag outside it.',
+    fix: { file: 'llms/head.md', heading: 'Head' },
+  },
+  'slot-invalid': {
+    group: 'compile',
+    summary: 'A `slot` or `@name` block used wrongly: a name the layout reads or lacks, a block twice, with parameters or in an island.',
+    fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Slots' },
+  },
+  'duplicate-attribute': {
+    group: 'compile',
+    summary: 'An attribute set twice: `#id` and `id`, two `class`, a prop passed again. Two static `class` have a quick fix.',
     fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
+    quickFix: true,
+  },
+  'attribute-invalid': {
+    group: 'compile',
+    summary: 'An attribute kay refuses: `class` with no value, `hydrate="media(...)"` with no query, a bad `transition`, `style:` or event modifier. A `style:` written as text has a quick fix.',
+    fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
+    quickFix: true,
+  },
+  'attribute-ineffective': {
+    group: 'compile',
+    summary: 'An attribute that does nothing there: `lang` on `<html>`, or an island option inside an island.',
+    fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
+  },
+  'element-invalid': {
+    group: 'compile',
+    summary: 'An expression in the text of a `style` or `script` inside `svg` or `math`.',
+    fix: { file: 'llms/templates-elements-slots-snippets.md', heading: 'Elements' },
+  },
+  'part-invalid': {
+    group: 'compile',
+    summary: 'A `part` that is no static name, several names off a component call, a repeated name or `root` not first. A string expression or a repeated name has a quick fix.',
+    fix: { file: 'llms/templates.md', heading: 'Let a parent fill a part of a component' },
+    quickFix: true,
+  },
+  'form-misuse': {
+    group: 'compile',
+    summary: 'A `field`, `pending` or `error` outside a form posting to an action, a `field` that is no text, or `field` with `name`. A string expression has a quick fix.',
+    fix: { file: 'llms/actions.md', heading: 'Forms' },
+    quickFix: true,
+  },
+  'server-island-invalid': {
+    group: 'compile',
+    summary: 'A `server` used wrongly: in an island, with a value but "defer", or with a bad `noscript` or `@failed`.',
+    fix: { file: 'llms/server-islands.md', heading: 'Server islands' },
+  },
+  'fallback-invalid': {
+    group: 'compile',
+    summary: 'An `@failed` or `@fallback` block holding something interactive, an action form or a name of the component\'s script.',
+    fix: { file: 'llms/server-islands.md', heading: 'Server islands' },
+  },
+  'bind-misuse': {
+    group: 'compile',
+    summary: 'A `bind:` that cannot bind: no expression, an unsupported property or element, a handler for the same event, or no signal or `Bindable` prop.',
+    fix: { file: 'llms/templates.md', heading: 'Bind an input to a signal' },
+  },
+  'event-name': {
+    group: 'compile',
+    summary: 'An event written `onclick` or `on:click`, which attaches nothing. It has a quick fix.',
+    fix: { file: 'llms/events.md', heading: 'Events' },
+    quickFix: true,
+  },
+  'name-clash': {
+    group: 'compile',
+    summary: 'A template `const` or snippet named like a name already declared.',
+    fix: { file: 'llms/templates.md', heading: 'Name a value used several times' },
   },
   'fence-invalid': {
     group: 'compile',
@@ -63,7 +130,7 @@ export const ERRORS = {
   },
   'signal-misuse': {
     group: 'compile',
-    summary: 'A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal.',
+    summary: 'A signal or memo written the wrong way: a memo assigned, a `bind:` to a name holding no signal.',
     fix: { file: 'llms/components.md', heading: 'Signals' },
   },
   'client-route-fence': {
@@ -309,92 +376,92 @@ export const ERRORS = {
   'private-address': {
     group: 'runtime',
     summary: 'A host that answered with an address that is not public, which a download of kay refuses to fetch.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'redirect-refused': {
     group: 'runtime',
     summary: 'A runtime redirect an editor asked for that kay refuses, worded for the editor.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'job-give-up': {
     group: 'runtime',
     summary: 'A workflow run whose steps changed under it, which gives up at once instead of retrying.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'poll-timeout': {
     group: 'runtime',
     summary: 'A database call a store gave up on after its time limit.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'request-timeout': {
     group: 'runtime',
     summary: 'A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'island-props-invalid': {
     group: 'runtime',
     summary: 'An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'stream-refused': {
     group: 'runtime',
     summary: 'A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'csp-violation': {
     group: 'runtime',
     summary: 'A violation of the site\'s content security policy as a browser reported it to kay\'s report route.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'config-refused': {
     group: 'runtime',
     summary: 'A `kay.config.ts` that does not load, the process that found out having printed why.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'database-owned': {
     group: 'runtime',
     summary: 'A boot on a database that belongs to another app.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'response-schema-mismatch': {
     group: 'runtime',
     summary: 'An API route whose answer fails its response schema: the route\'s own mistake, answered 500 and reported with Elysia\'s error as its `cause`.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'api-answer-invalid': {
     group: 'runtime',
     summary: 'An API route that answered a class instance or a Map, which would reach the client as `[object Object]`.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'redirect-target-invalid': {
     group: 'runtime',
     summary: 'A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'live-value-invalid': {
     group: 'runtime',
     summary: 'A live value, or the result of an action or loader, that cannot reach the browser, with the reason in the message.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'session-too-big': {
     group: 'runtime',
     summary: 'A session held in its cookie that grew past what a browser keeps; give `session()` a store.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'outside-request': {
     group: 'runtime',
     summary: 'A call that reads the request being answered (the locale, an MCP tool\'s request) made outside one.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'hook-timeout': {
     group: 'runtime',
     summary: 'A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'store-closed': {
     group: 'runtime',
     summary: 'A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed.',
-    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+    fix: { file: 'llms/errors-runtime.md', heading: 'Errors raised while running' },
   },
   'ai-error': {
     group: 'library',
@@ -529,6 +596,7 @@ export function explainError(name: ErrorName, where: (file: string) => string = 
     `${name}: an error of ${error.group}`,
     error.summary,
     `The fix is written in ${where(error.fix.file)}, in the section "${error.fix.heading}".`,
+    ...error.quickFix === true ? ['`kay check --fix` applies it when the case has one right answer, and the editor offers it as a quick fix.'] : [],
   ].join('\n\n')
 }
 

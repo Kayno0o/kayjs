@@ -300,7 +300,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(script.diagnostics, 'fence-invalid'),
     ...coded(server?.diagnostics ?? [], 'fence-invalid'),
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
-    ...coded(validate(file, script, server, generateOptions), 'template-invalid'),
+    ...validate(file, script, server, generateOptions),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
     ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(rawCause.span, cause)] : [], 'static-pin'),
   ]
@@ -318,7 +318,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     diagnostics.push(...coded(browserReads(file, island !== undefined, serverData, routeFile), 'browser-only-read'))
 
   if (checked)
-    diagnostics.push(...coded(unownedEffects(file, serverData), 'template-invalid'))
+    diagnostics.push(...unownedEffects(file, serverData))
 
   // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
@@ -453,7 +453,7 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
     }
 
     // Where the refusal points: the node found in the block, else the block's name.
-    const refused = (span: Span | undefined, message: string, help: string) => file.diagnostics.push({ ...span === undefined ? block.name : placed(span), code: 'template-invalid', message, note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help })
+    const refused = (span: Span | undefined, message: string, help: string) => file.diagnostics.push({ ...span === undefined ? block.name : placed(span), code: 'fallback-invalid', message, note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help })
     let island: Span | undefined
     let handler: Span | undefined
     let action: Span | undefined
@@ -480,7 +480,7 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
     const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
     const start = at < 0 ? block.name.start : block.start + at
 
-    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'template-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
+    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'fallback-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
   }
 
   return { code: compiled.tsx.replace(FALLBACK_COMPONENT, which === 'failed' ? 'function KayFailed(' : 'function KayFallback('), classes: compiled.classes }

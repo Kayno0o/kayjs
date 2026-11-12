@@ -539,7 +539,7 @@ class RewriteFinder {
       if (!loopItem && (hidden || name === this.input.component)) {
         const declared = hidden && this.input.map.isExact(hidden.identifier.start) ? this.input.map.toSource(hidden.identifier.start) : undefined
 
-        this.diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: `a ${noun} would hide it from the lines after it`, help: `give the ${noun} a name of its own`, related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
+        this.diagnostics.push({ start: source, end: source + name.length, code: 'name-clash', message: `\`${name}\` is already declared`, note: `a ${noun} would hide it from the lines after it`, help: `give the ${noun} a name of its own`, related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
       }
 
       const readOnly = loopItem ? rowReadOnly(name) : { message: `\`${name}\` is a ${noun}, which cannot be reassigned`, help: 'keep a value that changes in a signal of the script' }

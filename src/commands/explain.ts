@@ -1,9 +1,10 @@
-import type { ErrorCode, ErrorGroup } from '../compiler/errors'
-import type { Lint, LintGroup } from '../compiler/lints'
+import type { ErrorCode, ErrorGroup, ErrorName } from '../compiler/errors'
+import type { Lint, LintGroup, LintName } from '../compiler/lints'
 import type { Command } from './command'
 import process from 'node:process'
-import { ERROR_GROUPS, errorList, ERRORS, explainError, isErrorCode, isErrorGroup } from '../compiler/errors'
-import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
+import { diagnosticInfo, explainDiagnostic, isDiagnosticCode } from '../compiler/diagnostics'
+import { ERROR_GROUPS, errorList, ERRORS, isErrorGroup } from '../compiler/errors'
+import { isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { docFiles, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { explainIsland } from './explain-island'
@@ -40,25 +41,18 @@ export const explain: Command = {
       return 0
     }
 
-    if (isErrorCode(name)) {
-      if (format === 'json')
-        printDocument({ name, ...ERRORS[name] as ErrorCode })
-      else
-        console.log(explainError(name, fixPath))
+    const info = diagnosticInfo(name)
 
-      return 0
-    }
-
-    if (!isLint(name)) {
+    if (info === undefined || !isDiagnosticCode(name)) {
       printFailure('explain', `\`${name}\` is no lint, error or group; \`kay explain\` lists them${docsHint(name)}`, format)
 
       return 1
     }
 
     if (format === 'json')
-      printDocument({ name, ...LINTS[name] as Lint })
+      printDocument({ name, ...(info.kind === 'error' ? ERRORS[name as ErrorName] : LINTS[name as LintName]) })
     else
-      console.log(explainLint(name))
+      console.log(explainDiagnostic(name, fixPath))
 
     return 0
   },

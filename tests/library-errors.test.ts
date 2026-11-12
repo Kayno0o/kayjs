@@ -63,7 +63,7 @@ describe('the errors a request raises', () => {
     const codes = ['response-schema-mismatch', 'api-answer-invalid', 'redirect-target-invalid', 'live-value-invalid', 'session-too-big', 'outside-request', 'hook-timeout', 'store-closed'] as const
 
     for (const code of codes)
-      expect(explainError(code)).toContain('llms/errors.md')
+      expect(explainError(code)).toContain('llms/errors-runtime.md')
   })
 
   it('put the code of a KayError on its log entry, and none for a plain error', () => {

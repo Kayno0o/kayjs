@@ -16,16 +16,11 @@ kay explain template-syntax
 
 - A compile, build, content or export error that is no lint carries a code too, printed in brackets, `error[template-syntax]`, or after the failure, `kay explain <code> says where the fix is written`.
 - `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` for what kay did not raise at compile, build, content or export time, such as a type error TypeScript names by number.
-- `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's.
+- `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's. Lints and errors share one namespace, so the one command explains either, and no code is both.
+- A compile error whose case has one right answer carries a quick fix that `kay check --fix` applies and the editor offers: an event written `onclick` or `on:click`, a repeated static `class`, a valueless `class` on an element with `.shorthand` classes, a `part`, `field` or `style:` value written as a string expression or as text. `kay explain <code>` says when a code has one.
 - The codes are stable names, one for a group of messages with one cause.
 - No level applies to them, and no `// kay-allow` comment reaches them.
-- The errors kay raises while serving a request that an app handles (a response failing its schema, an API answer kay cannot send, a refused redirect, a result that cannot reach the browser, a closed store, a request timeout, a CSP report) are `KayError`s of the `runtime` group and carry a code; the argument checks of helpers such as `webPush.send`, `rooms` and `signed`, and the app's own code, are plain errors with none. The code is `error.code`, `LogEntry.error.code` of its log line, the `kay.error.code` attribute of its span and `code` in the `observe.onError` event, which leaves it out for an error that is no `KayError`.
-- Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`): `code` is the registered name, `kind` tells apart what one code covers (the code itself when it covers one cause), `status` is the HTTP status it stands for (`undefined` when none), `cause` the error underneath, and `name` the class's, so `instanceof` of each class still works.
-- A message opens with `kay: ` when it names a setting (a `configError`, which every library throws for an option it refuses at boot, ending on the library, the option and where it is documented), with `kayjs-<library>: ` when a library refuses a call of the developer's, and with nothing when the app shows it to a visitor or an editor (a `SaveConflictError`, a `RedirectRefusedError`).
-- A function throws for a wrong setup or a programming mistake (a `configError` at boot, a `KayError` subclass) and for an infrastructure failure the app cannot act on per call (a provider down, a store unreachable). It returns a Result for what a visitor or another caller did and the app branches on: a sign-in, a save, `list.confirm`, a tracked call, `webPush.enable()`.
-- A Result discriminates on `ok`. A failure is `{ ok: false, error }`, `error` one `ErrorShape` (`status`, `message`, `errors` by field, `data`) in kay, in cms and in auth, where `error.code` is also the kind the app branches on (`'signed-out'`, `'limited'`...); a tracked call keeps those fields flat on the result too. `errors` by field comes only from a call that refused its input, next to `error`. One result is an exception: `ApiResult` of `site.api()` in tests mirrors a Response (`ok`, `status`, `headers`, `body`) and has no `error`. `showDraft` of `kay/edit` and `saveEntry`, `saveEntries` and `removeEntry` of `kay/content` resolve `{ ok: true }` or `{ ok: false, error, issues }`.
-- `WaitResult`, `SaveOutcome` and `CallResult` keep the field they had before `ok` (`timedOut`, `saved` and `issues`, the flat failure) as plain API, none deprecated; `show()` of `installPrompt` and `subscribe()` of `webPush` answer the bare string they always did, beside `install()` and `enable()`. A result an app builds by hand, such as a test fake of one of these, needs `ok` and `error` now.
-- Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too).
+- What a function throws and what it returns as a `Result`, the fields of a `KayError`, and the errors raised while serving a request are in [Errors raised while running](errors-runtime.md).
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
@@ -33,7 +28,19 @@ kay explain template-syntax
 | `missing-peer` | command | A command that needs `typescript7` or `axe-core`, which the app did not install: the message names the `bun add -d` line to run. | [Peer packages](checks.md#peer-packages) |
 | `extension-command` | command | A command an extension adds to `kay` whose module does not load or does not export a `KayCommand` by default. | [Extensions](component-libraries.md#extensions) |
 | `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](templates.md#template-lines) |
-| `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](templates-elements-slots-snippets.md#elements) |
+| `head-invalid` | compile | A `head` block written twice, nested, given attributes or holding no head tag; an `html` tag outside it. | [Head](head.md#head) |
+| `slot-invalid` | compile | A `slot` or `@name` block used wrongly: a name the layout reads or lacks, a block twice, with parameters or in an island. | [Slots](templates-elements-slots-snippets.md#slots) |
+| `duplicate-attribute` | compile | An attribute set twice: `#id` and `id`, two `class`, a prop passed again. Two static `class` have a quick fix. | [Elements](templates-elements-slots-snippets.md#elements) |
+| `attribute-invalid` | compile | An attribute kay refuses: `class` with no value, `hydrate="media(...)"` with no query, a bad `transition`, `style:` or event modifier. A `style:` written as text has a quick fix. | [Elements](templates-elements-slots-snippets.md#elements) |
+| `attribute-ineffective` | compile | An attribute that does nothing there: `lang` on `<html>`, or an island option inside an island. | [Elements](templates-elements-slots-snippets.md#elements) |
+| `element-invalid` | compile | An expression in the text of a `style` or `script` inside `svg` or `math`. | [Elements](templates-elements-slots-snippets.md#elements) |
+| `part-invalid` | compile | A `part` that is no static name, several names off a component call, a repeated name or `root` not first. A string expression or a repeated name has a quick fix. | [Let a parent fill a part of a component](templates.md#let-a-parent-fill-a-part-of-a-component) |
+| `form-misuse` | compile | A `field`, `pending` or `error` outside a form posting to an action, a `field` that is no text, or `field` with `name`. A string expression has a quick fix. | [Forms](actions.md#forms) |
+| `server-island-invalid` | compile | A `server` used wrongly: in an island, with a value but "defer", or with a bad `noscript` or `@failed`. | [Server islands](server-islands.md#server-islands) |
+| `fallback-invalid` | compile | An `@failed` or `@fallback` block holding something interactive, an action form or a name of the component's script. | [Server islands](server-islands.md#server-islands) |
+| `bind-misuse` | compile | A `bind:` that cannot bind: no expression, an unsupported property or element, a handler for the same event, or no signal or `Bindable` prop. | [Bind an input to a signal](templates.md#bind-an-input-to-a-signal) |
+| `event-name` | compile | An event written `onclick` or `on:click`, which attaches nothing. It has a quick fix. | [Events](events.md#events) |
+| `name-clash` | compile | A template `const` or snippet named like a name already declared. | [Name a value used several times](templates.md#name-a-value-used-several-times) |
 | `fence-invalid` | compile | A fence that breaks a rule of kay: a fence never closed or declared twice, a `--- server` fence in a component (only a page or a layout has one), props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings, a `guards` or `layouts` in it that is no literal `true` or `false`. | [File layout](components.md#file-layout) |
 | `fence-syntax` | compile | Code in a fence that does not parse, or code the template generates that does not. | [File layout](components.md#file-layout) |
 | `page-settings-invalid` | compile | A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`, or a `guards` or `layouts` that an endpoint or an API module sets to anything but a literal `true` or `false`. | [Page settings](routing.md#page-settings) |
@@ -86,24 +93,24 @@ kay explain template-syntax
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](prerendering.md#prerendering) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](api-routes.md#api-modules) |
 | `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](project.md#commands) |
-| `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `job-give-up` | runtime | A workflow run whose steps changed under it, which gives up at once instead of retrying. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `request-timeout` | runtime | A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `island-props-invalid` | runtime | An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `stream-refused` | runtime | A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `config-refused` | runtime | A `kay.config.ts` that does not load, the process that found out having printed why. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `database-owned` | runtime | A boot on a database that belongs to another app. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `response-schema-mismatch` | runtime | An API route whose answer fails its response schema: the route's own mistake, answered 500 and reported with Elysia's error as its `cause`. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `api-answer-invalid` | runtime | An API route that answered a class instance or a Map, which would reach the client as `[object Object]`. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `redirect-target-invalid` | runtime | A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `live-value-invalid` | runtime | A live value, or the result of an action or loader, that cannot reach the browser, with the reason in the message. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `session-too-big` | runtime | A session held in its cookie that grew past what a browser keeps; give `session()` a store. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `outside-request` | runtime | A call that reads the request being answered (the locale, an MCP tool's request) made outside one. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `hook-timeout` | runtime | A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `store-closed` | runtime | A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `job-give-up` | runtime | A workflow run whose steps changed under it, which gives up at once instead of retrying. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `request-timeout` | runtime | A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `island-props-invalid` | runtime | An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `stream-refused` | runtime | A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `config-refused` | runtime | A `kay.config.ts` that does not load, the process that found out having printed why. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `database-owned` | runtime | A boot on a database that belongs to another app. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `response-schema-mismatch` | runtime | An API route whose answer fails its response schema: the route's own mistake, answered 500 and reported with Elysia's error as its `cause`. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `api-answer-invalid` | runtime | An API route that answered a class instance or a Map, which would reach the client as `[object Object]`. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `redirect-target-invalid` | runtime | A `ctx.redirect()` or `redirect()` to a target kay refuses: a control character, a scheme that is not http(s), or a path a browser reads as another site. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `live-value-invalid` | runtime | A live value, or the result of an action or loader, that cannot reach the browser, with the reason in the message. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `session-too-big` | runtime | A session held in its cookie that grew past what a browser keeps; give `session()` a store. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `outside-request` | runtime | A call that reads the request being answered (the locale, an MCP tool's request) made outside one. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `hook-timeout` | runtime | A check hook of kay or a library (`onSave` and the like) that did not finish within 10 s, so the change it guards is refused. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
+| `store-closed` | runtime | A call on a store (kv, rooms, notifications, vitals, push subscriptions, live values, cache) after it was closed. | [Errors raised while running](errors-runtime.md#errors-raised-while-running) |
 | `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](../packages/ai/llms/testing-and-errors.md#errors) |
 | `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](../packages/auth/llms/hardening-and-testing.md#errors) |
 | `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](../packages/cms/llms/options.md#errors) |
@@ -112,25 +119,3 @@ kay explain template-syntax
 | `unread-referrers` | library | A kayjs-cms reference lookup where a collection failed to read, so the entries naming the target are not all known. | [Errors](../packages/cms/llms/options.md#errors) |
 | `mail-not-configured` | library | A send by an `optional` kayjs-mail mailer whose environment lacks what it needs. | [Errors](../packages/mail/llms/contact-form-and-testing.md#errors) |
 | `upstream-invalid` | library | A record under `.upstream/` that the kayjs-ui commands cannot use. | [Errors](../packages/ui/llms/setup.md#errors) |
-
-### Errors raised while running
-
-Each extends `KayError`, so its `code`, `kind`, `status` and `name` are set and `error instanceof KayError` holds.
-
-| Class | `code` | Thrown for |
-| --- | --- | --- |
-| `PrivateAddressError` | `private-address` | A host that answers with an address that is not public, which a download of kay refuses. |
-| `RedirectRefusedError` (`kay/library`) | `redirect-refused` | A runtime redirect an editor asked for that kay refuses, its message worded for the editor. |
-| `GiveUpError` | `job-give-up` | A workflow run whose steps changed under it: the job is kept as failed at once, with no retry. |
-| `RequestTimeoutError` | `request-timeout` | A request past its `timeout`, `status` 504. |
-| `IslandPropsError` | `island-props-invalid` | An island given a prop that cannot reach the browser. |
-| `StreamRefusedError` | `stream-refused` | A stream source that cannot serve after all. |
-| `CspViolationError` | `csp-violation` | A violation a browser reported to kay's report route. |
-| `ConfigRefusedError` | `config-refused` | A `kay.config.ts` that does not load under `kay dev`. |
-| `DatabaseOwnedError` | `database-owned` | A boot on a database that belongs to another app. |
-| `TimeoutError` | `poll-timeout` | A database call a store gave up on after its time limit. |
-| `MarkdownError` | `markdown-invalid` | Markdown an entry holds that kay cannot read, with the `line`. |
-
-A request can also raise a `KayError` with no class of its own, told by its code: `response-schema-mismatch` (an API answer failing its `response` schema, 500), `api-answer-invalid`, `redirect-target-invalid`, `live-value-invalid`, `session-too-big`, `outside-request`, `hook-timeout` and `store-closed`.
-
-The libraries list their own classes in an `Errors` table of their `llms/`: [kayjs-ai](../packages/ai/llms/testing-and-errors.md#errors), [kayjs-auth](../packages/auth/llms/hardening-and-testing.md#errors), [kayjs-cms](../packages/cms/llms/options.md#errors), [kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#errors) and [kayjs-ui](../packages/ui/llms/setup.md#errors).
