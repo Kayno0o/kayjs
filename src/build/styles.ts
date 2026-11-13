@@ -103,7 +103,14 @@ async function writeRecipeStylesheet(root: string, path: string, source: string,
 export async function writeRecipeStylesheets(root: string, files: string[]): Promise<void> {
   const reference = tailwindEntry(root, true)
 
-  await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async file => writeRecipeStylesheet(root, file, await Bun.file(file).text(), async () => reference)))
+  await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async (file) => {
+    try {
+      await writeRecipeStylesheet(root, file, await Bun.file(file).text(), async () => reference)
+    }
+    catch {
+      // A file deleted since the listing is no recipe to write.
+    }
+  }))
 }
 
 // A module importing each of these files for what it brings along.

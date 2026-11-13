@@ -6,7 +6,7 @@ import { parseKay } from '../compiler/parser'
 import { scopeHash } from '../compiler/scoped-style'
 import { recipeCall, recipeNames } from '../compiler/script-recipe'
 import { keyName } from '../compiler/script-shared'
-import { tailwindDesign } from '../format/tailwind'
+import { tailwindDesign, usesTailwind } from '../format/tailwind'
 import { isUtility } from './class-table'
 import { throughLinks } from './links'
 import { configReferences } from './references'
@@ -97,7 +97,8 @@ export function liftRecipes(source: string, moduleId: string, utility: (token: s
   const calls = recipeNames(program.body)
   const edits: Edit[] = []
   const rules: string[] = []
-  const prefix = scopeHash(moduleId).slice(0, 6)
+  // The hash's last digits are the evenly spread ones.
+  const prefix = scopeHash(moduleId).slice(-6)
 
   for (const statement of program.body) {
     if (statement.type !== 'VariableDeclaration')
@@ -115,7 +116,11 @@ export function liftRecipes(source: string, moduleId: string, utility: (token: s
         const name = `k${prefix}${rules.length.toString(36)}`
 
         rules.push(`  .${name} { @apply ${lifted.join(' ')}; }`)
-        edits.push({ start: script.start + node.start, end: script.start + node.end, text: JSON.stringify([...tokens.filter(token => !lifted.includes(token)), name].join(' ')) })
+        const start = script.start + node.start
+        const end = script.start + node.end
+
+        // The newlines of a template literal stay after it, so no later line of the source moves.
+        edits.push({ start, end, text: JSON.stringify([...tokens.filter(token => !lifted.includes(token)), name].join(' ')) + '\n'.repeat(source.slice(start, end).split('\n').length - 1) })
       }
     }
   }
@@ -137,18 +142,30 @@ export interface RecipeLifter {
   lift: (source: string, file: string) => Lifted | undefined
 }
 
-const lifters = new WeakMap<Design, RecipeLifter>()
+// A design system can serve several roots, and a module's name comes from its path in its own.
+const lifters = new WeakMap<Design, Map<string, RecipeLifter>>()
 let lastId = 0
 
 // The lifter of an app's Tailwind, kept while its design system stands; none when the app has no Tailwind or its design system does not load.
 // A test run keeps the classes as written, which its assertions read and its sites often serve with no stylesheet; a test of the lift sets `KAY_RECIPE_CLASSES`.
 export async function recipeLifter(root: string): Promise<RecipeLifter | undefined> {
-  const design = (await tailwindDesign(root, await configReferences(root)))?.design
-
-  if (design === undefined || (process.env.NODE_ENV === 'test' && process.env.KAY_RECIPE_CLASSES === undefined))
+  if (process.env.NODE_ENV === 'test' && process.env.KAY_RECIPE_CLASSES !== '1')
     return undefined
 
-  let known = lifters.get(design)
+  if (!await usesTailwind(root))
+    return undefined
+
+  const design = (await tailwindDesign(root, await configReferences(root)))?.design
+
+  if (design === undefined)
+    return undefined
+
+  let byRoot = lifters.get(design)
+
+  if (byRoot === undefined)
+    lifters.set(design, byRoot = new Map<string, RecipeLifter>())
+
+  let known = byRoot.get(root)
 
   if (known === undefined) {
     // The build, the compile and the source reads each lift the same text, so the last result of a file is kept.
@@ -169,7 +186,7 @@ export async function recipeLifter(root: string): Promise<RecipeLifter | undefin
         return result
       },
     }
-    lifters.set(design, known)
+    byRoot.set(root, known)
   }
 
   return known

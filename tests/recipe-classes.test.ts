@@ -29,6 +29,14 @@ describe('liftRecipes', () => {
     expect(lifted?.rules).toContain('{ @apply bg-red-600 text-white; }')
   })
 
+  it('keeps the line of everything after a template literal it replaced', () => {
+    const source = wrap('{ parts: { root: `inline-flex\n  items-center`, icon: \'size-3\' } }').replace('span(part="root")', 'span(part="root")\n')
+    const lifted = liftRecipes(source, 'src/tag.kay', utility)
+
+    expect(lifted?.source.split('\n').length).toBe(source.split('\n').length)
+    expect(lifted?.source.split('\n').findIndex(line => line.startsWith('span'))).toBe(source.split('\n').findIndex(line => line.startsWith('span')))
+  })
+
   it('writes the base before the variants, whatever order the config is written in', () => {
     const lifted = liftRecipes(wrap('{ variants: { tone: { danger: \'bg-red-600 text-white\' } }, parts: \'inline-flex items-center\' }'), 'src/tag.kay', utility)
     const rules = lifted?.rules ?? ''
@@ -259,6 +267,40 @@ describe('the Cases of a lifted recipe', () => {
 
     expect(rules(css).size).toBeGreaterThan(0)
     expect(rules(css)).toEqual(rules(production.css))
+  }, 180_000)
+
+  it('writes the rule of a recipe a library holds, under the name its component carries', async () => {
+    const copy = await project()
+    // Inside the project: Bun's runtime plugins are global, so one answering for the first site of the file would name a module outside this one's root.
+    const library = join(copy, 'node_modules/tag-lib')
+
+    await Bun.write(join(copy, 'package.json'), '{ "name": "app", "private": true, "dependencies": { "tag-lib": "1.0.0" } }\n')
+    await Bun.write(join(library, 'package.json'), '{ "name": "tag-lib", "version": "1.0.0", "type": "module", "peerDependencies": { "kay": "*" }, "exports": { "./*.kay": "./src/*.kay" } }\n')
+    await Bun.write(join(library, 'src/badge.kay'), '---\nimport { recipe } from \'kay\'\n\nconst look = recipe({ parts: \'inline-block rounded-full\' })\n---\nspan(part="root") badge\n')
+    await edit(join(copy, 'src/routes/index.kay'), text => text.replace('import Tag', 'import Badge from \'tag-lib/badge.kay\'\nimport Tag').replace('\nLiveTag', '\nLiveTag\nBadge'))
+
+    const { html, css } = await page(copy)
+    const name = html.match(/<span[^>]*class="(k[\da-z]{7})"[^>]*>badge/)?.[1]
+
+    expect(name).toBeDefined()
+    expect(css).toMatch(new RegExp(`\\.${name} \\{\\s+display: inline-block`))
+  }, 120_000)
+
+  it('writes the names and rules of an edited recipe under kay dev', async () => {
+    const copy = await project()
+    const tag = join(copy, 'src/components/tag.kay')
+    const dev = devBuilder(copy, { plugins: [tailwind] })
+    const rules = async () => (await Promise.all((await Array.fromAsync(new Bun.Glob('**/*.css').scan(clientDir(copy)))).map(async file => Bun.file(join(clientDir(copy), file)).text()))).join('\n')
+
+    expect((await dev(null)).failed).toBe(false)
+    expect(await rules()).not.toContain('text-transform: uppercase')
+
+    await dev([])
+    await Bun.sleep(20)
+    await edit(tag, text => text.replace('kui-tag group inline-flex', 'kui-tag group inline-flex uppercase'))
+    await dev(['src/components/tag.kay'])
+
+    expect(await rules()).toContain('text-transform: uppercase')
   }, 180_000)
 
   it('leaves an app without Tailwind as written', async () => {
