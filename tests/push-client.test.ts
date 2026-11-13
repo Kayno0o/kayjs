@@ -394,7 +394,7 @@ describe('installPrompt', () => {
     expect(await module.installPrompt.show()).toBe('unavailable')
   })
 
-  it('announces an offer as kay:install on the document with an object detail, and on the window as before', async () => {
+  it('announces an offer as kay:install on the document with an object detail, and no longer on the window', async () => {
     const heard: string[] = []
     const onDocument = (event: Event) => heard.push(`document ${JSON.stringify((event as CustomEvent).detail)}`)
     const onWindow = () => heard.push('window')
@@ -407,7 +407,7 @@ describe('installPrompt', () => {
     window.dispatchEvent(offer)
     document.removeEventListener('kay:install', onDocument)
     window.removeEventListener('kay:install', onWindow)
-    expect(heard).toEqual(['document {"available":true}', 'window'])
+    expect(heard).toEqual(['document {"available":true}'])
     await module.installPrompt.show()
   })
 
