@@ -19,4 +19,4 @@ function like(index: number) {
 .max-w-xl
   AudioPlayer(src={SILENCE} chapters={chapters})
     @actions(chapter, index)
-      IconButton(icon="star" label={`Like ${chapter.title}`} size="sm" variant="ghost" aria-pressed={liked().includes(index)} onClick={() => like(index)})
+      IconButton(icon="star" label={`Like ${chapter.label}`} size="sm" variant="ghost" aria-pressed={liked().includes(index)} onClick={() => like(index)})

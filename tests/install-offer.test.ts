@@ -43,8 +43,8 @@ describe('the install offer kept from the first moment', () => {
     listeners.get(OFFER)!(offer)
     expect(offer.defaultPrevented).toBe(true)
     expect(scope.$kayInstall).toBe(offer)
-    // `kay:install` on the document with an object detail, and on the window as before 1.99.
-    expect(announced).toEqual(['document kay:install {"available":true}', 'window kay:install'])
+    // `kay:install` on the document with an object detail, and no longer on the window, which 1.103 dropped.
+    expect(announced).toEqual(['document kay:install {"available":true}'])
   })
 
   it('is on no other page: a counter island, an island using webPush alone', async () => {
