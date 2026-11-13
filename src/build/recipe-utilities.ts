@@ -105,6 +105,11 @@ function* candidates(text: string): Generator<string, void, undefined> {
 // The words of each file that are among the lifted utilities, kept with the file's stamp and the lifter that read its components.
 const fileWords = new Map<string, { stamp: string, key: string, found: string[] }>()
 
+// The files whose words are kept.
+export function keptWordFiles(): string[] {
+  return [...fileWords.keys()]
+}
+
 function wordsIn(file: string, universe: ReadonlySet<string>, key: string): string[] {
   const stamp = fileStamp(file)
 
@@ -164,6 +169,11 @@ export async function recipeOnlyUtilities(root: string, lifter: RecipeLifter | u
   }
   catch {
     return new Set()
+  }
+
+  for (const kept of fileWords.keys()) {
+    if (!files.has(kept))
+      fileWords.delete(kept)
   }
 
   for (const name of [...sources.inline, ...named])
