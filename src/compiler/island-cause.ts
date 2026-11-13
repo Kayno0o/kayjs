@@ -13,10 +13,26 @@ export interface IslandCause {
   line: number
   // The `kay` value's module, as `kay`.
   source?: string | undefined
+  // The props the component's `island` export says make a use interactive, each with whether it is on when left out: a use turning none on renders no island.
+  interactive?: Readonly<Record<string, boolean>> | undefined
 }
 
 // The sentence of `kay build`, the lints and the lens.
 export function describeCause(cause: IslandCause): string {
+  return cause.interactive === undefined ? causeText(cause) : `${causeText(cause)}, unless a use ${staticUse(cause.interactive)}`
+}
+
+// What a use does to ship no island, from the props its component lists.
+function staticUse(interactive: Readonly<Record<string, boolean>>): string {
+  const names = Object.entries(interactive)
+  const off = names.filter(([, on]) => !on).map(([name]) => `\`${name}\``)
+  const on = names.filter(([, on]) => on).map(([name]) => `\`${name}={false}\``)
+  const parts = [...off.length === 0 ? [] : [`leaves out ${off.join(', ')}`], ...on.length === 0 ? [] : [`writes ${on.join(', ')}`]]
+
+  return `${parts.join(' and ')} and passes no function or \`hydrate\` renders as markup with no script`
+}
+
+function causeText(cause: IslandCause): string {
   switch (cause.kind) {
     case 'client':
       return 'a `--- client` fence'
@@ -41,4 +57,4 @@ export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
 }
 
 // The rule, as `kay explain island` says it.
-export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `--- island`.'
+export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `--- island`. A component whose `export const island` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'

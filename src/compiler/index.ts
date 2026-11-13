@@ -16,7 +16,7 @@ import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
-import { ignoredIslandExport, islandMessages } from './island-arguments'
+import { ignoredIslandExport, interactiveProps, islandMessages } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
@@ -148,6 +148,13 @@ function liveCause(file: KayFile, script: ScriptAnalysis, live: string | undefin
 }
 
 // A cause found in the expanded source, in the file: its span, and its line counted in what the author wrote.
+// The cause with the props the component's `island` export lists as making a use interactive, when it lists some.
+function withInteractive(cause: IslandCause | undefined, script: ScriptAnalysis): IslandCause | undefined {
+  const interactive = interactiveProps(script)
+
+  return cause !== undefined && interactive !== undefined ? { ...cause, interactive } : cause
+}
+
 function realCause(cause: IslandCause | undefined, expansion: Expansion | undefined, original: string): IslandCause | undefined {
   if (cause === undefined || expansion === undefined)
     return cause
@@ -281,7 +288,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const pin = file.pin
   const rawCause = island === undefined ? undefined : islandCause(file, script) ?? liveCause(file, script, live)
-  const cause = realCause(rawCause, expansion, original)
+  const cause = withInteractive(realCause(rawCause, expansion, original), script)
   const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && pageFile, pageFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })

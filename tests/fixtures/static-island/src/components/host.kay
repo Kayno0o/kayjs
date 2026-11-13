@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+import Panel from './panel.kay'
+
+const open = signal(true)
+---
+button(onClick={() => open = !open()}) Toggle
+if open()
+  Panel(items={['x', 'y']} sortable={false})

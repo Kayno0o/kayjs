@@ -1,0 +1,6 @@
+---
+import Field from '../components/field.kay'
+import Panel from '../components/panel.kay'
+---
+Panel(items={['a']} sortable={false})
+Field

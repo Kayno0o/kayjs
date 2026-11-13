@@ -1,0 +1,6 @@
+---
+import Panel from '../components/panel.kay'
+---
+h1 both
+Panel(items={['one']} sortable={false})
+Panel(items={['two']})

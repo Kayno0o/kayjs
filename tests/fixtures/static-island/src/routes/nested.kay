@@ -1,0 +1,5 @@
+---
+import Host from '../components/host.kay'
+---
+h1 nested
+Host

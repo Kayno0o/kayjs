@@ -1,0 +1,5 @@
+---
+import Panel from '../components/panel.kay'
+---
+h1 spread
+Panel({...{ selectable: true, sortable: false }} items={['b', 'a']})

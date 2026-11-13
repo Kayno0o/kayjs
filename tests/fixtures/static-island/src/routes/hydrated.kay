@@ -1,0 +1,5 @@
+---
+import Panel from '../components/panel.kay'
+---
+h1 hydrated
+Panel(items={['b', 'a']} sortable={false} hydrate="idle")

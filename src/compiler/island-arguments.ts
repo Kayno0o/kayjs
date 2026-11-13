@@ -49,6 +49,31 @@ export function exportedHydrate(script: ScriptAnalysis): string | undefined {
   return undefined
 }
 
+// The `interactive` of the exported `island`, `{ prop: whether it is on when a use leaves it out }`, read where it is written as an object of booleans.
+export function interactiveProps(script: ScriptAnalysis): Record<string, boolean> | undefined {
+  for (const statement of script.moduleFence?.ast.body ?? []) {
+    const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations.find(each => each.id.type === 'Identifier' && each.id.name === 'island') : undefined
+    const init = declaration?.init?.type === 'TSAsExpression' ? declaration.init.expression : declaration?.init
+    const property = init?.type === 'ObjectExpression' ? init.properties.find(each => each.type === 'Property' && each.key.type === 'Identifier' && each.key.name === 'interactive') : undefined
+    const given = property?.type === 'Property' ? property.value : undefined
+    const value = given?.type === 'TSAsExpression' ? given.expression : given
+
+    if (value?.type !== 'ObjectExpression')
+      continue
+
+    const props: Record<string, boolean> = {}
+
+    for (const each of value.properties) {
+      if (each.type === 'Property' && each.key.type === 'Identifier' && each.value.type === 'Literal' && typeof each.value.value === 'boolean')
+        props[each.key.name] = each.value.value
+    }
+
+    return props
+  }
+
+  return undefined
+}
+
 // Whether the `--- module` fence has `export const island = { hydrate, persist }`: what the component asks of every parent that uses it.
 export function exportsIslandOptions(script: ScriptAnalysis): boolean {
   return islandExport(script)?.form === 'const'

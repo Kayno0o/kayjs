@@ -109,6 +109,15 @@ describe('kay explain island', () => {
     return root
   }
 
+  it('says that a component listing its interactive props is an island only in a use that turns one on', async () => {
+    const root = await project({ 'src/components/part.kay': '--- module\nexport const island = { interactive: { sortable: true, selectable: false } } as const\n--- island\nconst { sortable = true, selectable = false } = props<{ sortable?: boolean, selectable?: boolean }>()\n---\nbutton(onClick={() => 1}) {sortable}{selectable}\n' })
+    const one = await kay(['explain', 'island', 'src/components/part.kay'], root)
+
+    expect(one.stdout).toContain('unless a use leaves out `selectable` and writes `sortable={false}`')
+    expect(one.stdout).toContain('renders as markup with no script')
+    expect(one.stdout).toContain('lists `interactive` props')
+  })
+
   it('says the role of a file, its cause and the rule, and lists every island without a file', async () => {
     const root = await project()
     const one = await kay(['explain', 'island', 'src/components/button.kay'], root)

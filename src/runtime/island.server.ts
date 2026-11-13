@@ -1,5 +1,5 @@
 import type { KayErrorOptions } from '../compiler/errors'
-import type { IslandComponent, IslandOptions } from './checks'
+import type { IslandAsks, IslandComponent, IslandOptions } from './checks'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
 import { KayError } from '../compiler/errors'
@@ -143,13 +143,17 @@ function isWaiting(when: string | undefined, id: string): boolean {
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
 // `cause` is only passed under `kay dev`, which writes it as the `data-why` the dev tool's Islands tab shows, so production markup is the same with or without it.
-export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string, ownFallback?: () => JSX.Element, asks?: IslandOptions): IslandComponent<P> {
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string, ownFallback?: () => JSX.Element, asks?: IslandAsks): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate ?? asks?.hydrate
     const persist = persistKey(props.persist ?? asks?.persist, id)
     const browserOnly = client || when === 'client'
     const waits = isWaiting(when, id)
     const own = 'hydrate' in props || 'persist' in props || USE_FALLBACK in props ? omit(props, 'hydrate', 'persist', USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P : props
+
+    // A use asking for nothing the browser does renders as markup, with no island and no script for the page.
+    if (staysPlain(depth, client, lives, props, asks))
+      return staticUse(component!, own)
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
     const state = localeState()
@@ -214,6 +218,36 @@ export function island<P extends object>(id: string, component: ((props: P) => J
   }
 
   return carryFailed(component, render) as IslandComponent<P>
+}
+
+// Whether a use of an island that follows no live value, whose `export const island` lists the props that make it interactive, turns none of them on: no listed prop has a value (or a default) that is on, the use asks for no hydration of its own, and none of its props is a function, which an island refuses to send and the use is told of as before.
+function staysPlain(depth: number, client: boolean, lives: readonly unknown[], props: object, asks: IslandAsks | undefined): boolean {
+  const wants = asks?.interactive
+
+  if (depth > 0 || client || lives.length > 0 || wants === undefined || asks?.hydrate !== undefined || asks?.persist !== undefined)
+    return false
+
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(props))) {
+    if (key === 'hydrate' || key === 'persist' || key === USE_FALLBACK)
+      return false
+
+    if (!descriptor.get && typeof descriptor.value === 'function' && !isAction(descriptor.value))
+      return false
+  }
+
+  return Object.entries(wants).every(([key, on]) => {
+    const value = (props as Record<string, unknown>)[key]
+
+    return value === undefined ? !on : !value
+  })
+}
+
+// The markup of an island rendered by a page that needs none of it: detached as the island's own render is, so it reads and draws the same, but with no slot around it and nothing noted for the page's script.
+function staticUse<P extends object>(component: (props: P) => JSX.Element, props: P): JSX.Element {
+  const prefix = islandPrefix()
+  const { result: html } = withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component(props)))), true)))
+
+  return renderedHtml(html)
 }
 
 // A component's own `@failed` block, which a use deferring it as a server island reads off the function it calls.

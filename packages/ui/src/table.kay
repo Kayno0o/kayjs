@@ -1,3 +1,6 @@
+--- module
+// What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script.
+export const island = { interactive: { sortable: true, filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, sortParam: false, list: false } } as const
 --- <Row, Key extends RowKey<Row>>
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'

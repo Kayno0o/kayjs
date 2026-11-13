@@ -46,6 +46,13 @@ export interface IslandOptions {
   fallback?: JSX.Element | undefined
 }
 
+// What a component's `export const island` asks of its parents: `hydrate` and `persist` as an `IslandOptions` does, and `interactive`, the props that make a use of it an island, each with the value it has when a use leaves it out. A use whose props turn none of them on, and that hands the island no function, renders as plain markup that ships no JavaScript.
+export interface IslandAsks {
+  hydrate?: HydrateWhen | undefined
+  persist?: boolean | string | undefined
+  interactive?: Readonly<Record<string, boolean>> | undefined
+}
+
 export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
 
 // Augmented by the `.kay/types/kay-env.d.ts` that `kay check` writes with every page route, public file and API module, and by the app with `locals: LocalsOf<typeof auth>` and `app: typeof app`.

@@ -1,0 +1,15 @@
+--- module
+export const island = { interactive: { sortable: true, selectable: false } } as const
+--- island
+import { signal } from 'kay'
+
+const { items, sortable = true, selectable = false } = props<{ items: string[], sortable?: boolean, selectable?: boolean }>()
+const sorted = signal(false)
+const shown = () => sorted() ? [...items].sort() : items
+---
+section.panel
+  if sortable
+    button(onClick={() => sorted = !sorted()}) Sort
+  ul
+    for item of shown() key={item}
+      li {item}{selectable ? ' (selectable)' : ''}

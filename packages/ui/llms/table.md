@@ -35,6 +35,8 @@ Nothing is declared. kay reads the props at each `<Table>` call of the project's
 
 A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less.
 
+A Table drawn by a page, or a server component, with `sortable={false}` and none of those props, and no function prop, is plain markup: no island, and no script for the page. Sorting is on by default, so a Table that sorts is an island. The static Table does not measure whether it scrolls, so a wide one is not a keyboard stop; give it `hydrate="idle"` to keep that.
+
 A call with a spread (`Table({...props})`), or a Table read anywhere but as a tag (`const T = Table`, passed as a value), asks for every feature.
 
 The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.

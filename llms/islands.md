@@ -79,6 +79,8 @@ Comments(postId={postId} hydrate="visible")
 
 A component that wants one of these wherever it is used, a launcher kept across pages for one, exports `island` from a `--- module` fence; a parent's own `hydrate` or `persist` wins. Only `export const island = ...` in an island's module fence is read, and `kay check` reports any other form of the export, or one on a component that is no island:
 
+A component can also list the props that make a use of it an island: `export const island = { interactive: { sortable: true, selectable: false } } as const`, each prop with whether it is on when a use leaves it out. A page or a server component whose use turns none of them on, passes no function and writes no `hydrate` or `persist`, gets the component as plain markup: no island, and no script for the page when nothing else on it needs one. A use inside an island is part of that island as before, and the use is decided by the props it is given, so a spread counts. `kay explain island` names the props.
+
 ```kay
 --- module
 export const island = { persist: true, hydrate: 'idle' } as const

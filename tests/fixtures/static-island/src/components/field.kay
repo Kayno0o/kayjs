@@ -1,0 +1,8 @@
+---
+import { signal, uid } from 'kay'
+
+const id = uid()
+const text = signal('')
+---
+label(for={id}) Name
+input(id={id} value={text()} onInput={event => text = event.currentTarget.value})
