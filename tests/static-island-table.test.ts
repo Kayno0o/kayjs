@@ -15,7 +15,7 @@ afterAll(async () => {
 const PAGE = (table: string) => `---\nimport Table from '@kaynooo/kayjs-ui/table.kay'\n\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst ROWS = [{ id: 1, name: 'Ada' }]\n---\n${table}\n`
 
 describe('a Table drawn by a page', () => {
-  it('is no island with `sortable={false}` and nothing interactive, and one with any feature or by default', async () => {
+  it('is no island with nothing interactive, sorting or not, and one with any feature', async () => {
     const root = resolve(await fixtureCopy('ui-list'))
 
     dirs.push(root)
@@ -32,25 +32,28 @@ describe('a Table drawn by a page', () => {
 
     expect(plain).toContain('Ada')
     expect(slots(plain)).toBe(0)
+    expect(slots(await page('sorted'))).toBe(0)
 
     // The scroll box is a keyboard stop that screen readers name, as the browser would make it of a table that scrolls.
     expect(plain).toMatch(/<div[^>]*tabindex="0"[^>]*>/)
     expect(plain).toMatch(/<div[^>]*role="region"[^>]*aria-label="People"|<div[^>]*aria-label="People"[^>]*role="region"/)
 
-    for (const name of ['sorted', 'selected', 'paged'])
+    for (const name of ['selected', 'paged'])
       expect(slots(await page(name)), name).toBe(1)
   }, 120_000)
 })
 
 describe('the Table', () => {
-  it('lists every feature it declares with `uses` among the props that make it interactive, and sorting', async () => {
+  it('lists every feature it declares with `uses` among the props that make it interactive, but `sortParam`', async () => {
     const file = resolve('packages/ui/src/table.kay')
     const source = await Bun.file(file).text()
     const listed = Object.keys(JSON.parse(source.match(/interactive: (\{[^}]*\})/)![1]!.replace(/(\w+):/g, '"$1":')) as Record<string, boolean>)
 
-    expect(listed).toContain('sortable')
+    // Sorting is script-free in a plain Table, its headers links that keep the sort in the URL under `sortParam`.
+    expect(listed).not.toContain('sortable')
+    expect(listed).not.toContain('sortParam')
 
     for (const name of await usesNames(source, file))
-      expect(listed, name).toContain(name)
+      expect(name === 'sortParam' || listed.includes(name), name).toBe(true)
   })
 })

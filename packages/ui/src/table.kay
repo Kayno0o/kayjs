@@ -1,12 +1,12 @@
 --- module
-// What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script.
-export const island = { plain: true, interactive: { sortable: true, filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, sortParam: false, list: false } } as const
+// What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script. Sorting is not one: a plain Table's sortable headers are links that put the sort in the URL (`sortParam`, `sort` by default) and the server sorts the rows.
+export const island = { plain: true, interactive: { filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, list: false } } as const
 --- <Row, Key extends RowKey<Row>>
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid, withQuery } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
@@ -42,7 +42,7 @@ const look = recipe({
     foot: '@max-[30rem]/table:block',
     footRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     footCell: 'border-t border-border px-3 py-2 text-sm text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:empty:hidden',
-    sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
+    sortButton: 'group/sort inline-flex cursor-pointer no-underline items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
     row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:z-1 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:[tr:not(:hover,[aria-selected=true])>&]:bg-surface data-[sticky]:[tr:is(:hover,[aria-selected=true])>&]:bg-hover data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
@@ -252,14 +252,17 @@ const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded)
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 // The sort kept in the address is read when the table is made.
-const keptKey = uses('sortParam') && sortParam !== undefined ? persisted.query(sortParam, '') : undefined
-const directionParam = uses('sortParam') && sortParam !== undefined ? sortParam === 'sort' ? 'direction' : `${sortParam}Direction` : undefined
+// A Table drawn as plain markup has no script to sort with, so it keeps its sort in the URL under `sort` unless `sortParam` names another, and its headers link to it.
+// kay-allow once-read-prop: the sort's param is chosen when the table is made
+const sortKey = uses('sortParam') ? sortParam ?? (plain && sortable ? 'sort' : undefined) : undefined
+const keptKey = sortKey === undefined ? undefined : persisted.query(sortKey, '')
+const directionParam = sortKey === undefined ? undefined : sortKey === 'sort' ? 'direction' : `${sortKey}Direction`
 const keptDirection = directionParam === undefined ? undefined : persisted.query(directionParam, '')
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
 // The search box and the extra fields, decided when the table is made.
-const search = uses('filter') || uses('fields') || uses('filterParam') ? tableFilter({ filterParam, fields, reserved: [sortParam, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]] }) : undefined
+const search = uses('filter') || uses('fields') || uses('filterParam') ? tableFilter({ filterParam, fields, reserved: [sortKey, directionParam, ...pageSize === undefined ? [] : [pageParam, limitParam]] }) : undefined
 // A table over a list searches on the server, so a `filterParam` alone shows the box.
 const searching = () => filter !== undefined || (list !== undefined && filterParam !== undefined)
 const fielded = () => (search?.extra.length ?? 0) > 0
@@ -377,6 +380,19 @@ function toggle(column: Column<Row>) {
   onSort?.(next)
 }
 
+// The address of the page sorted as a click on the header would, the other params kept; a page rendered once at build time has no request to read, so its link holds the sort alone.
+function sortHref(column: Column<Row>) {
+  const next = nextSort(current(), column)
+  const changes = { [sortKey!]: next.key, [directionParam!]: next.direction }
+
+  try {
+    return withQuery(changes)
+  }
+  catch {
+    return `?${new URLSearchParams(changes)}`
+  }
+}
+
 function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   if (!sorting(column))
     return undefined
@@ -438,7 +454,15 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             span(part="selectText") {selectAllLabel}
         for column of shownColumns() key={column.key}
           th(part="headCell" class={column.class} style={columnStyle(column)} scope="col" data-align={column.align ?? 'start'} data-sticky={column.sticky} aria-sort={ariaSort(column)})
-            if column.sortValue
+            if column.sortValue && plain && keptKey
+              a(part="sortButton" href={sortHref(column)} rel="nofollow" data-direction={sorting(column) ? current()?.direction : undefined})
+                if header
+                  | {header(column)}
+                else
+                  | {column.header}
+                if sorting(column)
+                  Icon(icon="chevron" part="sortIcon")
+            else if column.sortValue
               button(part="sortButton" type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
                 if header
                   | {header(column)}
