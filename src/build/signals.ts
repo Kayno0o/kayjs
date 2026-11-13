@@ -9,7 +9,7 @@ import { fences } from './libraries'
 const KAY_FILE = /\.kay$/
 const KAY_MODULE = /^kay(?:\/|$)/
 // A module's signals with the stamp of every file they were read from, the module and each one it re-exports from.
-const scanned = new Map<string, { stamps: Map<string, string | undefined>, signals: Record<string, SignalKind> }>()
+const scanned = new Map<string, { stamps: Map<string, string | undefined>, misses: Miss[], signals: Record<string, SignalKind> }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -111,13 +111,13 @@ function signalsOf(path: string): Record<string, SignalKind> {
   try {
     const known = scanned.get(path)
 
-    if (known && [...known.stamps].every(([file, stamp]) => stampOf(file) === stamp))
+    if (known && [...known.stamps].every(([file, stamp]) => stampOf(file) === stamp) && known.misses.every(miss => resolveFrom(miss.specifier, miss.from) === undefined))
       return known.signals
 
-    const stamps = new Map<string, string | undefined>()
-    const signals = collect(path, { stamps, done: new Map(), cuts: 0 }, [])
+    const scan: Scan = { stamps: new Map(), misses: [], done: new Map(), cuts: 0 }
+    const signals = Object.fromEntries(Object.entries(collect(path, scan, [])).map(([name, entry]) => [name, entry.kind]))
 
-    scanned.set(path, { stamps, signals })
+    scanned.set(path, { stamps: scan.stamps, misses: scan.misses, signals })
 
     return signals
   }
@@ -129,12 +129,22 @@ function signalsOf(path: string): Record<string, SignalKind> {
 // One scan of a module: the stamps of the files it read, what each finished module exported, and how many times a cycle cut a read short, a module read under a cut being incomplete and so not kept.
 interface Scan {
   stamps: Map<string, string | undefined>
-  done: Map<string, Record<string, SignalKind>>
+  // The specifiers that named no file, which a file created later would answer.
+  misses: Miss[]
+  done: Map<string, Exports>
   cuts: number
 }
 
+interface Miss {
+  specifier: string
+  from: string
+}
+
+// Each signal a module exports, with the module and name it is made by, so two re-exports of one name tell the same signal from two.
+type Exports = Record<string, { kind: SignalKind, origin: string }>
+
 // The signals a module exports, those it hands on from another included; `trail` is the modules being read, so a cycle of re-exports ends.
-function collect(path: string, scan: Scan, trail: string[]): Record<string, SignalKind> {
+function collect(path: string, scan: Scan, trail: string[]): Exports {
   const kept = scan.done.get(path)
 
   if (kept)
@@ -156,22 +166,41 @@ function collect(path: string, scan: Scan, trail: string[]): Record<string, Sign
   const cuts = scan.cuts
   const text = readFileSync(path, 'utf8')
 
-  if (KAY_FILE.test(path))
-    return kindsOf(path, text)
+  const own = (kinds: Record<string, SignalKind>): Exports => Object.fromEntries(Object.entries(kinds).map(([name, kind]) => [name, { kind, origin: `${path}#${name}` }]))
 
-  const { signals, links } = scanModule(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
+  if (KAY_FILE.test(path))
+    return own(kindsOf(path, text))
+
+  const parsed = scanModule(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
+  const { links } = parsed
+  const signals = own(parsed.signals)
   const next = [...trail, path]
-  const from = (specifier: string) => {
+  const from = (specifier: string): Exports => {
     const target = scannable(specifier, path)
+
+    if (target === undefined && resolveFrom(specifier, path) === undefined && !KAY_MODULE.test(specifier))
+      scan.misses.push({ specifier, from: path })
 
     return target === undefined ? {} : collect(target, scan, next)
   }
 
+  // A name the module exports itself shadows a star's, and one two stars give from different places is ambiguous, so it is no export at all.
+  const starred = new Map<string, Exports[string] | undefined>()
+
   for (const specifier of links.stars) {
-    for (const [name, kind] of Object.entries(from(specifier))) {
-      if (name !== 'default' && !Object.hasOwn(signals, name))
-        signals[name] = kind
+    for (const [name, entry] of Object.entries(from(specifier))) {
+      if (name === 'default' || links.own.has(name))
+        continue
+
+      const before = starred.get(name)
+
+      starred.set(name, starred.has(name) && before?.origin !== entry.origin ? undefined : entry)
     }
+  }
+
+  for (const [name, entry] of starred) {
+    if (entry)
+      signals[name] = entry
   }
 
   for (const { exported, source, imported } of links.names) {

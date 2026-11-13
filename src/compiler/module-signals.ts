@@ -25,7 +25,7 @@ export function moduleSignals(source: string, jsx = false): Record<string, Signa
 export function scanModule(source: string, jsx = false): { signals: Record<string, SignalKind>, links: ModuleLinks } {
   const ast = NAMES_KAY.test(source) || EXPORT.test(source) ? parseModule(source, jsx) : undefined
 
-  return { signals: ast && NAMES_KAY.test(source) ? signalsIn(ast) : {}, links: ast ? linksIn(ast) : { stars: [], names: [] } }
+  return { signals: ast && NAMES_KAY.test(source) ? signalsIn(ast) : {}, links: ast ? linksIn(ast) : { stars: [], own: new Set(), names: [] } }
 }
 
 function parseModule(source: string, jsx: boolean): Program | undefined {
@@ -138,11 +138,13 @@ function nameOf(node: Node): string {
 // What a module hands on from another: the names `export { a as b } from`, `export * from`, or an import it exports (`import { a } from`, then `export { a }` or `export const b = a`) take from the module they come from, for the build to look their kind up there.
 export interface ModuleLinks {
   stars: string[]
+  // Every name the module exports itself, which shadows the same name of a star re-export.
+  own: Set<string>
   names: { exported: string, source: string, imported: string }[]
 }
 
 function linksIn(ast: Program): ModuleLinks {
-  const links: ModuleLinks = { stars: [], names: [] }
+  const links: ModuleLinks = { stars: [], own: new Set(), names: [] }
   const imports = new Map<string, { source: string, imported: string }>()
 
   for (const statement of ast.body) {
@@ -167,9 +169,23 @@ function linksIn(ast: Program): ModuleLinks {
 }
 
 function linkNamed(statement: NodeOfType<'ExportNamedDeclaration'>, imports: Map<string, { source: string, imported: string }>, links: ModuleLinks): void {
+  const declared = statement.declaration
+
+  if (declared?.type === 'VariableDeclaration') {
+    for (const { id } of declared.declarations) {
+      if (id.type === 'Identifier')
+        links.own.add(id.name)
+    }
+  }
+  else if (declared && 'id' in declared && declared.id?.type === 'Identifier') {
+    links.own.add(declared.id.name)
+  }
+
   for (const specifier of statement.specifiers) {
     if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type')
       continue
+
+    links.own.add(nameOf(specifier.exported))
 
     const local = specifier.local.type === 'Identifier' ? imports.get(specifier.local.name) : undefined
     const from = statement.source ? { source: statement.source.value, imported: nameOf(specifier.local) } : local

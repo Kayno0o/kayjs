@@ -143,6 +143,44 @@ describe('the signals a module exports', () => {
     expect(signals('./lib/top')).toEqual({ './lib/top': { a: 'persisted', b: 'persisted', room: 'live', ra: 'persisted', rb: 'persisted' } })
   })
 
+  it('let a name a module exports itself shadow every star of it, a signal or not', async () => {
+    const { signals } = await project({
+      'lib/history.ts': MADE,
+      'lib/shadow.ts': 'export * from \'./history\'\nexport const history = () => 1\n',
+      'lib/function.ts': 'export * from \'./history\'\nexport function history() {}\n',
+      'lib/named.ts': 'import { signal } from \'kay\'\n\nexport * from \'./history\'\nexport { other as history }\nconst other = signal(0)\n',
+    })
+
+    expect(signals('./lib/shadow')).toEqual({})
+    expect(signals('./lib/function')).toEqual({})
+    expect(signals('./lib/named')).toEqual({ './lib/named': { history: 'signal' } })
+  })
+
+  it('leave out a name two stars give from different places, and keep one both give from the same place', async () => {
+    const { signals } = await project({
+      'lib/one.ts': MADE,
+      'lib/two.ts': MADE,
+      'lib/again.ts': 'export * from \'./one\'\n',
+      'lib/clash.ts': 'export * from \'./one\'\nexport * from \'./two\'\n',
+      'lib/same.ts': 'export * from \'./one\'\nexport * from \'./again\'\n',
+    })
+
+    expect(signals('./lib/clash')).toEqual({})
+    expect(signals('./lib/same')).toEqual({ './lib/same': { history: 'persisted' } })
+  })
+
+  it('look again once a module a re-export names, which did not exist, is created', async () => {
+    const { dir, signals } = await project({
+      'lib/named.ts': 'export { history } from \'./later\'\nexport * from \'./missing\'\n',
+    })
+
+    expect(signals('./lib/named')).toEqual({})
+    await Bun.write(join(dir, 'lib/later.ts'), MADE)
+    expect(signals('./lib/named')).toEqual({ './lib/named': { history: 'persisted' } })
+    await Bun.write(join(dir, 'lib/missing.ts'), MADE.replace('history', 'more'))
+    expect(signals('./lib/named')).toEqual({ './lib/named': { history: 'persisted', more: 'persisted' } })
+  })
+
   it('end a cycle of re-exports', async () => {
     const { signals } = await project({
       'lib/a.ts': 'export * from \'./b\'\nexport { history } from \'./b\'\n',
