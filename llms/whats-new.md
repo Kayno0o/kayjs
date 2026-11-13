@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: a Table drawn by a page with `sortable={false}` and no feature (`selectable`, `pageSize`, `filter` and the rest) ships no island and no script, through the new `interactive` list of an `export const island`, [documented with islands](./islands.md) and in [the Table](../packages/ui/llms/table.md#what-a-page-ships).
 - kayjs-ui: a Table in an island ships only the features the project's call sites write (`selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter`, `pageSize` and the rest), one variant shared by every island, with nothing to declare; a spread or a Table read as a value keeps them all ([Table](../packages/ui/llms/table.md#what-a-page-ships)).
 - kayjs-ui: a BarChart, LineChart or ScatterChart in an island ships only the features the project's call sites write (`marks`, `onMark`, `href`, `onSelect`, `tooltip`), 4 to 8 KB less when none is written ([what a page ships](../packages/ui/llms/table.md#what-a-page-ships)).
+- A recipe's utility classes reach the browser as one short class per string, its rule in the `utilities.recipe` layer: smaller HTML, and no recipe classes in the island JS (kayjs-ui list page: 3.4 KB gzip less). An app `class` still wins ([styles](styles-and-assets.md)).
 
 ## 1.102.1
 
@@ -16,7 +17,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay upgrade` no longer stops on a stepping stone the registry has pruned: it installs the closest older minor that still holds the lints the stone is there for and says which, and when none installs it names the forms left unfixed and the `llms/upgrading.md` sections to read, then goes on ([kay upgrade](check-and-tools.md)).
 - kayjs-ui: the blocks and callbacks of TreeView (`@actions`, `onSelectedChange`, `onOpenChange`), AppSwitcher (`@tile`), AudioPlayer (`@actions`) and BellInbox (`@item`) hand a node, app, chapter or note whose `key` (or `label`) is always set, filled from `id` (`title`) for an item still under the old name, so no `!` or `nodeKey()` is needed (for an item still under the old name the argument is a copy, so `node === mine` is false there). Timeline's `onSelectedChange` hands the same.
 - `kay check` reports `innerHTML` bound to a name typed as a string literal, a `for` item over an `as const` array or a `const` string, as the runtime already dropped it: pass `sanitizeHtml(value)` or `trustHtml(value)`, or write the markup out ([templates](templates-elements-slots-snippets.md)).
-- A recipe's utility classes reach the browser as one short class per string, its rule in the `utilities.recipe` layer: smaller HTML, and no recipe classes in the island JS (kayjs-ui list page: 3.4 KB gzip less). An app `class` still wins ([styles](styles-and-assets.md)).
 
 ## 1.102.0
 
