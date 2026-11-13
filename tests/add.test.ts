@@ -689,6 +689,22 @@ it('adds the ui extension with no line in the layout or the stylesheet', async (
   }
 })
 
+it('adds ui to a static site as the theme import in app.css, with no ui() in the config', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await linkedProject(dir, PRESETS.site.features.filter(feature => feature !== 'ui'), ['ui'])
+    await addFeatures(dir, ['ui'], { install: false })
+
+    expect(await Bun.file(join(dir, 'src/app.css')).text()).toContain('@import \'@kayjs/ui/theme.css\'')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).not.toContain('ui(')
+    expect((await addFeatures(dir, ['ui'], { install: false })).written).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
 it('refuses ui in a project without Tailwind, naming the command that adds both', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 

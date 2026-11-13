@@ -67,7 +67,25 @@ interface AccordionItem
   open?: boolean | undefined
 
 [./lib/add] default
-const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+function default(project: Project): {
+  description: string;
+  edits: {
+    file: string;
+    find: RegExp;
+    replace: string;
+    done: string;
+  }[];
+  notes: string[];
+  extension?: never;
+} | {
+  description: string;
+  extension: {
+    import: string;
+    expression: string;
+  };
+  notes: string[];
+  edits?: never;
+}
 
 [./lib/added-icons] addedIcons
 const addedIcons: Record<AddedSlot, IconProps>

@@ -7,7 +7,7 @@ description: A set of kay components styled by one theme you restyle from your o
 
 ## Install
 
-In a kay project with Tailwind, `kay add ui` does the install and lists `ui()` in `kay.config.ts`, which brings the theme, a `Toaster` and a `TooltipHost` to every page: nothing else is wired. Otherwise:
+In a kay project with Tailwind, `kay add ui` does the install and lists `ui()` in `kay.config.ts` (a static site gets the theme import in `app.css` instead), which brings the theme, a `Toaster` and a `TooltipHost` to every page: nothing else is wired. Otherwise:
 
 ```sh
 bun add @kayjs/ui @iconify-json/tabler
