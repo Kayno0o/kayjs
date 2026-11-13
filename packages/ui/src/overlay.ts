@@ -95,13 +95,13 @@ function focusFirst(dialog: HTMLDialogElement): void {
 // A body whose code loads when the dialog first opens arrives after the focus went to the dialog itself: the first control it draws takes the focus, unless the visitor moved it meanwhile.
 function focusWhenFilled(dialog: HTMLDialogElement): void {
   const watch = new MutationObserver(() => {
-    if (!dialog.open || document.activeElement !== dialog || dialog.querySelector('[autofocus]')) {
+    if (!dialog.open || document.activeElement !== dialog) {
       watch.disconnect()
 
       return
     }
 
-    const first = dialog.querySelector<HTMLElement>(`[data-part="body"] :is(${FOCUSABLE})`)
+    const first = dialog.querySelector<HTMLElement>('[autofocus]') ?? dialog.querySelector<HTMLElement>(`[data-part="body"] :is(${FOCUSABLE})`)
 
     if (first) {
       first.focus()
