@@ -13,9 +13,6 @@
   "bugs": {
     "url": "https://github.com/Kayno0o/kayjs/issues"
   },
-  "publishConfig": {
-    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-  },
   "exports": {
     "./add": "./src/add.ts",
     "./pg": "./src/pg.ts",

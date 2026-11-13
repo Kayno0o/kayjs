@@ -20,9 +20,6 @@
     "./src/runtime/{client,i18n.client,i18n-links,live-cache,page-errors,work-worker}.ts",
     "./{tests,bench,examples,.kay,node_modules/.cache}/**"
   ],
-  "publishConfig": {
-    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-  },
   "browser": {
     "./src/compiler/host.ts": "./src/compiler/host.browser.ts"
   },
