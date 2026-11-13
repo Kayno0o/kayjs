@@ -107,6 +107,7 @@ describe('the dev tool\'s database endpoints', () => {
     expect(overview).toMatchObject({ configured: false, databases: [], tables: [] })
     expect(overview.searched.join(' ')).toContain('DATABASE_URL')
     expect(overview.searched.join(' ')).toContain('data')
+    expect(await (await get(site, '/_kay/dev/offered')).json()).toMatchObject({ data: false })
     expect((await get(site, '/_kay/dev/data/rows?table=public.users')).status).toBe(404)
     expect((await query(site, 'select 1')).status).toBe(404)
 
@@ -183,6 +184,7 @@ describe('the dev tool\'s database endpoints', () => {
       expect(overview.databases.map(({ id }) => id)).toEqual(['sqlite:data/auth.db', 'sqlite:data/other.sqlite'])
       expect(overview.database).toBe('sqlite:data/auth.db')
       expect(overview.tables.map(({ name }) => name)).toEqual(['big', 'loose', 'users'])
+      expect(await (await get(site, '/_kay/dev/offered')).json()).toMatchObject({ data: true })
       expect(overview.tables.find(({ name }) => name === 'users')!.columns.map(({ name, primary }) => [name, primary])).toEqual([['id', true], ['name', false], ['bio', false], ['avatar', false]])
     })
 

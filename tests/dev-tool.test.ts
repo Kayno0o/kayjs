@@ -441,6 +441,46 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.ui.max')).toBeNull()
   })
 
+  it('takes Data and Jobs out of the rail on an app without them and Not found with no log, showing the first tab instead and skipping them by arrow keys', async () => {
+    let answer: (offered: Response) => void = () => undefined
+    const offered = new Promise<Response>((resolve) => {
+      answer = resolve
+    })
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      if (url === '/_kay/dev/offered')
+        return offered
+
+      return url === '/_kay/dev/not-found' ? Response.json({ file: 'data/not-found.sqlite', recorded: false, missing: [] }) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+    const listed = () => [...shadow().querySelectorAll<HTMLButtonElement>('[role=tab]')].filter(tab => tab.hidden === false).map(tab => tab.id.replace('kay-dev-tab-', ''))
+
+    try {
+      tool = startDevTool(document, loadTab)
+      const other = tool.tab({ id: 'other', label: 'Other' })
+
+      await turn()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-data')!.click()
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-data')!.hidden).toBe(false)
+
+      answer(Response.json({ data: false, jobs: true }))
+      await eventually(() => expect(listed()).toEqual(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'jobs', 'styles', 'other']))
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-data')!.hidden).toBe(true)
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-problems')!.hidden).toBe(false)
+
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-routes')!.focus()
+      key({ key: 'ArrowDown' }, shadow().activeElement!)
+      expect(shadow().activeElement?.id).toBe('kay-dev-tab-jobs')
+
+      other.offer(false)
+      expect(listed().at(-1)).toBe('styles')
+      other.offer(true)
+      expect(listed().at(-1)).toBe('other')
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
   it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab for the browser tab and its dock for the browser', async () => {
     tool = startDevTool(document, loadTab)
     await turn()
@@ -1287,6 +1327,7 @@ describe('the dev tool', () => {
       recorded = false
       document.dispatchEvent(new CustomEvent('kay:dev-built', { detail: { changed: 'kay.config.ts', ms: 1 } }))
       await eventually(() => expect(shadow().querySelector('#kay-dev-not-found .empty')?.textContent).toContain('kay dev records none'))
+      expect(shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-not-found')!.hidden).toBe(true)
     }
     finally {
       fetching.mockRestore()
@@ -1909,7 +1950,7 @@ describe('the dev tool', () => {
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
       // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
-      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/footprint', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
+      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/footprint', '/_kay/dev/offered', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
       expect(weights().slice(1, -1)).toEqual([
         size(files['/_kay/_layout-1.css']!),
         size(files['/_kay/entry-abc12345.js']!),

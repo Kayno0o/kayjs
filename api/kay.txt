@@ -2292,6 +2292,7 @@ type DevIconName = keyof typeof ICONS
 [./dev-tool] DevTab
 interface DevTab
   count: (count: number, tone?: "error" | "warn" | undefined, note?: string | undefined) => void
+  offer: (offered: boolean) => void
   panel: HTMLElement
 
 [./dev-tool] DevTabOptions

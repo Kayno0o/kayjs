@@ -55,6 +55,7 @@ export const DEV_NOT_FOUND = '/_kay/dev/not-found'
 export const DEV_DATA = '/_kay/dev/data'
 export const DEV_DATA_ROWS = '/_kay/dev/data/rows'
 export const DEV_DATA_QUERY = '/_kay/dev/data/query'
+export const DEV_OFFERED = '/_kay/dev/offered'
 export const DEV_JOBS = '/_kay/dev/jobs'
 export const DEV_JOBS_RETRY = '/_kay/dev/jobs/retry'
 export const DEV_JOBS_DELETE = '/_kay/dev/jobs/delete'
@@ -672,6 +673,7 @@ export interface DevRequest {
   // The page in each locale of a site with `i18n` that serves more than one, where a language switcher links to: the locale and the address, under the base.
   locales?: { locale: string, href: string }[] | undefined
 }
+
 
 // What the server recorded of one response, for the Request tab to ask for once the page is in view.
 export interface DevResponse {

@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kay and its libraries are published under the `@kayjs` npm org: `@kayjs/kay`, `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`, on npm and on the Forgejo registry, so no registry setup is needed for them; `kay upgrade` moves an app from `@kaynooo/kayjs*` and `deprecated-package-names` rewrites its imports, see [Upgrading](upgrading.md) and [Project setup](project.md#project-setup).
+- The dev tool reads better in a narrow drawer: response headers stack the name over the value, an island's signal types no longer wrap per letter, the Request tab's files sit in one column, and the Not found, Data and Jobs tabs leave the list on an app with no log, database or queue; a library's tab does the same with `offer(false)` ([the dev tool](dev-tool.md#a-tab-for-a-library)).
 - kayjs-ui: a Table drawn by a page sorts with no script: its sortable headers become links carrying the sort in the URL (`sortParam` names it, `sort` by default) and the server sorts the rows, so a plain Table ships no island and no JS unless a feature such as `selectable` or `pageSize` is written ([the Table](../packages/ui/llms/table.md#what-a-page-ships)).
 
 ## 1.103.0

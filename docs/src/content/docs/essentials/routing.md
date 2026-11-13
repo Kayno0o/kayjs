@@ -324,7 +324,7 @@ kay not-found
 
 The list starts with the most hit. A path asked for twice also gets a suggestion: the same page in another case or locale, a page with the same slug elsewhere, or a near typo. To turn one into a redirect, run `kay not-found --redirect /old`, or add `--to /new` when there is no suggestion. kay adds the line to `redirects` in `kay.config.ts`.
 
-In `kay dev`, the dev tool's Not found tab shows the same list from the file a production run left, with a field for the target and an Add redirect button on each path. It writes the same line to `kay.config.ts`. `kay dev` counts nothing itself, so the tab is empty until that file exists.
+In `kay dev`, the dev tool's Not found tab shows the same list from the file a production run left, with a field for the target and an Add redirect button on each path. It writes the same line to `kay.config.ts`. `kay dev` counts nothing itself, so the tab stays out of the dev tool until that file exists.
 
 A redirect in `kay.config.ts` needs a deploy. To add one to the running site instead, run `kay not-found --redirect /old --runtime`. kay writes it to the same file, and the server answers it from the next request with a 307, which browsers do not keep, so removing it undoes it for everyone. The config's redirects and your pages always win over it, and it is only looked up for a path that would have been a 404, which includes a file of `public/` you deleted while the site runs.
 

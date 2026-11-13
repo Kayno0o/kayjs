@@ -22,7 +22,7 @@ import { buildShell, COPY_TAB } from './dev-tool-shell'
 import { STYLE } from './dev-tool-style'
 import { watchSwaps } from './dev-tool-swaps'
 import { startTabOrder } from './dev-tool-tab-order'
-import { addLazyTabs, tabMaker } from './dev-tool-tabs'
+import { addLazyTabs, shownTab, tabMaker } from './dev-tool-tabs'
 import { watchVitals } from './dev-tool-vitals'
 import { startPlacement } from './dev-tool-window'
 import { formatDate } from './i18n'
@@ -49,6 +49,8 @@ export interface DevTab {
   panel: HTMLElement
   // The count beside the tab's name and on the bar, `error` or `warn` coloring both; `note` is what the bar says instead of `summary`'s, and shows even at zero.
   count: (count: number, tone?: 'error' | 'warn', note?: string) => void
+  // Takes the tab out of the list while `false`, for a tab with nothing to show for this app (no database, no queue), and puts it back with `true`; the drawer shows the first tab meanwhile.
+  offer: (offered: boolean) => void
 }
 
 export interface DevKit {
@@ -169,7 +171,7 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
   }
   const { place, dragged } = startPlacement({ doc, win, state, layout, saveLayout, shell, pageSheet })
   const render = () => {
-    const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
+    const current = shownTab(tabs, state)
 
     drawer.hidden = !state.open
     mark.setAttribute('aria-expanded', String(state.open))
@@ -201,11 +203,11 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
     render()
 
     if (focus)
-      (tabs.find(tab => tab.options.id === state.tab) ?? tabs[0])?.button.focus()
+      shownTab(tabs, state)?.button.focus()
   }
 
   copyTab.onclick = async () => {
-    const current = tabs.find(tab => tab.options.id === state.tab) ?? tabs[0]
+    const current = shownTab(tabs, state)
 
     if (current !== undefined)
       await copied(copyTab, panelMarkdown(current.panel, `${current.options.label}, ${win.location.href}`), COPY_TAB, 'clipboard-copy')

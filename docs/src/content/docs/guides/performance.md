@@ -93,7 +93,7 @@ The tab lists only what the running server serves. The CSP reports route shows w
 
 ## Data
 
-The Data tab shows the rows of your databases, Postgres or SQLite. It reads the Postgres database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and the SQLite files your app opened or keeps in `data/` (`data/auth.db` of the `app` preset, the files of mail, cms and ai). With more than one, a select above the tables switches between them. With none, it says where it looked.
+The Data tab shows the rows of your databases, Postgres or SQLite. It reads the Postgres database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and the SQLite files your app opened or keeps in `data/` (`data/auth.db` of the `app` preset, the files of mail, cms and ai). With more than one, a select above the tables switches between them. An app with none has no Data tab.
 
 Pick a table to read its rows, 50 at a time, in the order of its primary key. Long values are cut and a binary column shows its first bytes and its size, so a big table stays light in the browser. `NULL` is shown apart from the text "NULL".
 
@@ -105,7 +105,7 @@ The tab and what it asks of the server exist under `kay dev` only. A production 
 
 ## Jobs
 
-The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed.
+The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. An app with no queue and no maintenance task has no Jobs tab.
 
 A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs. A [workflow](/guides/background-jobs/#workflows) run shows its state and last steps, with Send for the event it waits for and Cancel in place of Delete.
 

@@ -73,6 +73,8 @@ export default function notFoundTab(tool: DevTool, tab: DevTab): () => void {
         return
 
       tab.count(listed.missing.length)
+      // With no log the tab could only say there is none, so it leaves the list until a production run writes one.
+      tab.offer(listed.recorded)
       bar.element.hidden = listed.missing.length === 0
 
       if (!listed.recorded)

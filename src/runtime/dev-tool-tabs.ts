@@ -1,4 +1,5 @@
 import type { DevRequest } from '../server/dev'
+import type { DevOffered } from '../server/dev-offered'
 import type { DevTab, DevTabOptions, DevTool, LoadTab } from './dev-tool'
 import type { DevState } from './dev-tool-layout'
 import type { Shell } from './dev-tool-shell'
@@ -20,6 +21,7 @@ const I18N_TAB_URL = '/_kay/dev/tab/i18n.js'
 const NETWORK_TAB_URL = '/_kay/dev/tab/network.js'
 const IMAGES_TAB_URL = '/_kay/dev/tab/images.js'
 const PERFORMANCE_TAB_URL = '/_kay/dev/tab/performance.js'
+const OFFERED_URL = '/_kay/dev/offered'
 
 // The tabs kay makes itself; those a library adds sit under a line.
 const CORE_TABS = new Set(['problems', 'request', 'network', 'head', 'screen-reader', 'env', 'images', 'performance', 'routes', 'i18n', 'islands', 'not-found', 'data', 'jobs', 'styles'])
@@ -42,6 +44,11 @@ interface TabParts {
   render: () => void
 }
 
+// The tab the drawer shows: the one last opened, or the first listed while that one is out of the list.
+export function shownTab(tabs: TabEntry[], state: DevState): TabEntry | undefined {
+  return tabs.find(tab => tab.options.id === state.tab && tab.button.hidden === false) ?? tabs.find(tab => tab.button.hidden === false)
+}
+
 export function tabMaker({ doc, make, shell, state, tabs, openTab, closeDrawer, render }: TabParts): DevTool['tab'] {
   const { drawer, bar, tabList, rule, content, status } = shell
 
@@ -55,6 +62,7 @@ export function tabMaker({ doc, make, shell, state, tabs, openTab, closeDrawer, 
     // The tabs of kay come first, then a line, then those of libraries, each in the order they were made.
     const firstLibrary = tabs.findIndex(other => !CORE_TABS.has(other.options.id))
     const at = library || firstLibrary < 0 ? tabs.length : firstLibrary
+    let shownBadge = false
 
     button.type = 'button'
     button.id = `kay-dev-tab-${options.id}`
@@ -94,11 +102,20 @@ export function tabMaker({ doc, make, shell, state, tabs, openTab, closeDrawer, 
         count.hidden = value === 0
         count.textContent = String(value)
         count.className = tone === undefined ? 'count pill' : `count pill ${tone}`
-        badge.hidden = note === undefined && (value === 0 || options.summary === undefined)
+        shownBadge = note !== undefined || (value !== 0 && options.summary !== undefined)
+        badge.hidden = button.hidden !== false || !shownBadge
         badge.replaceChildren(pill({ make, icon: name => iconOf(doc, name) }, text, tone, tone === undefined ? undefined : TONE_ICONS[tone]))
 
         if (options.announce === true)
           status.textContent = value === 0 && note === undefined ? '' : text
+      },
+      offer: (offered) => {
+        if (button.hidden !== offered)
+          return
+
+        button.hidden = !offered
+        badge.hidden = !offered || !shownBadge
+        render()
       },
     }
   }
@@ -118,14 +135,34 @@ export function addLazyTabs(tool: DevTool, doc: Document, load: LoadTab): void {
     lazyTab(tool, { id: 'i18n', label: 'i18n', icon: 'languages' }, I18N_TAB_URL, load, true)
 
   lazyTab(tool, { id: 'not-found', label: 'Not found', icon: 'circle-x' }, NOT_FOUND_TAB_URL, load, true)
-  lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL, load)
-  lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL, load)
+  const data = lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL, load)
+  const jobs = lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL, load)
+
   lazyTab(tool, { id: 'styles', label: 'Styles', icon: 'palette' }, STYLES_TAB_URL, load)
+  void offerUsed(tool, doc, { data, jobs })
+}
+
+// Takes Data and Jobs out of the list on an app with no database, queue or maintenance task, where they could only say so; a failed answer leaves both in.
+async function offerUsed(tool: DevTool, doc: Document, tabs: Record<keyof DevOffered, DevTab>): Promise<void> {
+  try {
+    const response = await tool.kit.ownFetch(doc.defaultView!, OFFERED_URL, { cache: 'no-store' })
+
+    if (!response.ok || tool.kit.signal.aborted)
+      return
+
+    const offered = await response.json() as DevOffered
+
+    tabs.data.offer(offered.data)
+    tabs.jobs.offer(offered.jobs)
+  }
+  catch {
+    // The server went away or answered something else: both tabs stay, each saying what it found when opened.
+  }
 }
 
 // A tab whose code is a module of its own, fetched the first time the tab opens so the tool carries none of it until then; a module that fails to load says so in the panel and is tried again at the next open.
 // A tab with `early` shows a badge from the page itself, so its module is fetched at once and sets the badge as it runs, the panel read again if it is open by then.
-function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'icon' | 'hidden'>, url: string, load: LoadTab, early = false): void {
+function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'icon' | 'hidden'>, url: string, load: LoadTab, early = false): DevTab {
   let refresh: (() => void) | undefined
   let loading = false
   let open: () => void = () => undefined
@@ -163,4 +200,6 @@ function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'i
 
   if (early)
     open()
+
+  return tab
 }

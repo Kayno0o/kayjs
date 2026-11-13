@@ -43,7 +43,7 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { imageLimits, remoteLimits, timeoutMs } from './config-limits'
 import { cookieDefaults, defaultCookies, secureCookies } from './cookies'
-import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OFFERED, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
 import { serveEndpoints } from './endpoints'
@@ -465,6 +465,7 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   const redirected = Object.keys(options.redirects ?? {})
 
   const { devData, devQuery, devRows } = await import('./dev-data')
+  const { devOffered } = await import('./dev-offered')
 
   const { devUi, devUiWrite } = await import('./dev-ui')
 
@@ -480,6 +481,7 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   app.get(DEV_DATA, async ({ request }) => devData(request, root))
   app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request, root))
   app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request, root))
+  app.get(DEV_OFFERED, () => Response.json(devOffered(root)))
   app.get(DEV_NOT_FOUND, async () => Response.json(await devNotFound(root, redirected)))
   app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
   app.get(DEV_ROUTES, () => {

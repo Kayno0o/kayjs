@@ -103,11 +103,10 @@ export function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     const params = Object.entries(request.params)
     const chips = tool.make('span', 'chips')
     const chain = tool.make('ul', 'chain')
-    const step = (kind: string, file: HTMLElement, depth: number, outcome?: HTMLElement) => {
+    const step = (kind: string, file: HTMLElement, outcome?: HTMLElement) => {
       const item = tool.make('li')
       const where = tool.make('span', 'd')
 
-      where.style.setProperty('--depth', String(depth))
       where.append(file)
       item.append(tool.make('span', 'k', kind), where, outcome ?? tool.make('span'))
       chain.append(filterable(item, `${kind} ${file.textContent} ${outcome?.textContent ?? ''}`))
@@ -173,12 +172,12 @@ export function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     fact('Rendered', refusedByGuard ? 'not known, a guard refused the request' : rendered)
 
     for (const guard of request.guards)
-      step('Guard', positionButton(tool, guard.file), 0, pill(tool, guard.outcome, guardTone(guard.outcome)))
+      step('Guard', positionButton(tool, guard.file), pill(tool, guard.outcome, guardTone(guard.outcome)))
 
-    for (const [depth, layout] of request.layouts.entries())
-      step('Layout', positionButton(tool, layout), depth)
+    for (const layout of request.layouts)
+      step('Layout', positionButton(tool, layout))
 
-    step('Page', positionButton(tool, request.page), request.layouts.length)
+    step('Page', positionButton(tool, request.page))
     scaled()
     content.replaceChildren(line, section('Matched', facts), section('Files, outermost first', chain), timing, bar.empty)
     bar.apply(content)

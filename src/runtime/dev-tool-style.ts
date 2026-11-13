@@ -81,7 +81,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   .title .words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.panel { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px 16px; display: grid; align-content: start; gap: 16px; }
+.panel { flex: 1; min-width: 0; overflow: auto; padding: 12px 14px 16px; display: grid; align-content: start; gap: 16px; container: panel / inline-size; }
 .panel > * { min-width: 0; }
 .group { display: grid; gap: 8px; }
 .group[data-filtered] { display: none; }
@@ -118,12 +118,12 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .problem .dismiss { grid-row: 1; grid-column: 3; width: 24px; height: 24px; margin: -3px -2px 0 0; }
 .list { display: grid; gap: 8px; }
 .reqline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); }
-.reqline .path { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.reqline .path { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
 .method { font: 700 10.5px/18px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; padding: 0 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-hi); }
 .chain { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .chain li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 0; }
 .chain .k { color: var(--sub); font-size: 12px; }
-.chain .d { padding-left: calc(var(--depth, 0) * 14px); display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.chain .d { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .chain .d::before { content: ''; width: 8px; height: 8px; border: 1.5px solid var(--accent); border-radius: 2px; flex: none; }
 .timing { display: grid; grid-template-columns: minmax(0, max-content) minmax(3rem, 1fr) 4.2rem; align-items: center; gap: 6px 12px; }
 .bars { height: 8px; border-radius: 4px; background: var(--mantle); overflow: hidden; }
@@ -134,6 +134,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .headers td, .kv td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 .headers td:first-child, .kv td:first-child { color: var(--sub); white-space: nowrap; padding-right: 14px; width: 1%; }
 .headers .directive { display: block; }
+@container panel (max-width: 34rem) {
+  .headers tr, .kv tr { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .headers td, .kv td, .headers td:first-child, .kv td:first-child { width: auto; padding: 0; border-top: 0; white-space: normal; }
+}
 .previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr)); gap: 10px; }
 .preview { display: grid; gap: 4px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); min-width: 0; }
 .preview .cap { font: 650 10.5px system-ui, sans-serif; letter-spacing: .07em; text-transform: uppercase; color: var(--sub); margin-bottom: 4px; }
@@ -215,8 +219,8 @@ td .copy { margin-left: 4px; }
 textarea.query { width: 100%; min-height: 4.5rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--text); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
 .signals { width: 100%; border-collapse: collapse; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .signals td { padding: 3px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-.signals td:first-child { color: var(--sub); width: 2.5rem; }
-.signals td:last-child { color: var(--sub); text-align: right; padding-left: 10px; }
+.signals td:first-child { color: var(--sub); width: 2.5rem; white-space: nowrap; }
+.signals td:last-child { color: var(--sub); text-align: right; padding-left: 10px; width: 1%; white-space: nowrap; }
 .outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 3px; background: var(--accent-soft); }
 .tab-order { position: fixed; inset: 0; z-index: 2147483645; pointer-events: none; }
 .tab-order svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }

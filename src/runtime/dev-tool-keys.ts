@@ -18,14 +18,15 @@ interface KeyParts {
 export function startKeys({ win, host, root, tabList, state, tabs, openTab, closeDrawer }: KeyParts): () => void {
   // Up and Down, Home and End move between the tabs, as a vertical tab list's do.
   tabList.onkeydown = (event) => {
-    const index = tabs.findIndex(tab => tab.button === root.activeElement)
-    const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: tabs.length - 1 }[event.key]
+    const listed = tabs.filter(tab => tab.button.hidden === false)
+    const index = listed.findIndex(tab => tab.button === root.activeElement)
+    const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: listed.length - 1 }[event.key]
 
     if (index < 0 || next === undefined)
       return
 
     event.preventDefault()
-    openTab(tabs[(next + tabs.length) % tabs.length]!.options.id, true)
+    openTab(listed[(next + listed.length) % listed.length]!.options.id, true)
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
