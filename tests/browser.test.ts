@@ -130,6 +130,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(costly.errors).toEqual([])
   })
 
+  it('sends the very first action call of a page when it is made from pagehide', async () => {
+    const shorts = () => ((globalThis as { keptByPagehide?: string[] }).keptByPagehide ?? []).filter(text => text === 'short').length
+    const before = shorts()
+
+    await using saver = await site.open('/keepalive')
+
+    // No call yet: the posting code was fetched at idle, off the first load.
+    await Bun.sleep(1000)
+    await saver.evaluate(() => {
+      location.assign('/')
+    })
+    await saver.waitUntil(() => location.pathname === '/')
+    await Bun.sleep(300)
+    expect(shorts()).toBe(before + 1)
+  })
+
   it('sends an action call made from pagehide with keepalive, and a body over 64 KB as a plain post', async () => {
     const kept = () => (globalThis as { keptByPagehide?: string[] }).keptByPagehide ?? []
 

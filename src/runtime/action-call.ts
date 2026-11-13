@@ -152,6 +152,8 @@ export function setRequestOutcome(read: () => Outcome | null | undefined): void 
 export function actionStub(url: string): Action<unknown, unknown> {
   const { call, reads } = callable(() => url)
 
+  warmCode()
+
   return Object.defineProperties(call, {
     ...reads,
     url: { value: url, enumerable: true },
@@ -458,6 +460,28 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
 }
 
 // A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
+let warming = false
+
+// An island holding an action caller loads the posting code once the browser is idle, so a call made as the page goes away (`pagehide`, which cannot wait for a chunk) finds it in; it stays out of the first load. A failure is left for the call itself to report.
+function warmCode(): void {
+  if (warming || typeof window === 'undefined')
+    return
+
+  warming = true
+
+  const load = async () => {
+    try {
+      await postCode()
+    }
+    catch {}
+  }
+
+  if (typeof requestIdleCallback === 'function')
+    requestIdleCallback(() => void load())
+  else
+    setTimeout(() => void load(), 200)
+}
+
 function postingCode(): typeof import('./action-post') | Promise<typeof import('./action-post')> {
   return posting ?? postCode()
 }
