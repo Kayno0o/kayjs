@@ -53,6 +53,7 @@ import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
+import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 
@@ -149,6 +150,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options, served }) => largePublicImages(options, root, served),
   async ({ options, served }) => untypedSockets(options, served),
   async ({ root, options }) => removedUiTokens(root, options),
+  async ({ root, options }) => textSizeColour(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),

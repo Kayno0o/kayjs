@@ -6,6 +6,14 @@ import { SERIAL_AWAITS_LINTS } from './serial-awaits'
 export const ROUTE_LINTS = {
   ...SERIAL_AWAITS_LINTS,
   ...LOOP_LINTS,
+  'text-size-colour': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A theme colour named like one of Tailwind\'s text sizes (`--color-base`, `--color-lg`, `--color-2xl`) in the project\'s CSS, while a file uses that `text-` utility: `text-base` is the font size and the text colour at once, so the text takes the colour, the page background where `base` is the ground, and disappears. Every use of the utility is reported. Rename the colour (`--color-background`, kayjs-ui\'s name for the ground) or write the size as `text-[1rem]`.',
+    wrong: '@theme { --color-base: #1e1e2e; }\nbutton.text-base Pick',
+    right: '@theme { --color-background: #1e1e2e; }\nbutton.text-base Pick',
+  },
   'unguarded-route': {
     level: 'deny',
     group: 'security',

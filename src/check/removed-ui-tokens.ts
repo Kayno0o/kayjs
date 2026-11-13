@@ -70,12 +70,12 @@ export async function removedUiTokens(root: string, options: CheckOptions): Prom
   return found
 }
 
-function blank(text: string): string {
+export function blank(text: string): string {
   return text.replace(/[^\n]/g, ' ')
 }
 
 // A `.kay` file or src/ui.ts with its `//` and `/* */` comments blanked, quoted strings left alone so a URL in one is not a comment. Prose in a template holds apostrophes and stray backticks, so an apostrophe after a word character (`don't`) opens nothing, a quote ends at its line, and a backtick runs on to its twin or to the next blank line; the code of a `${ }` inside one is read like any other.
-function blankComments(source: string): string {
+export function blankComments(source: string): string {
   let out = ''
   let index = 0
   let quote = ''
