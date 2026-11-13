@@ -195,12 +195,12 @@ test('Toaster is an island rendering a status region, an alert region and an emp
 })
 
 describe('Table on the server', () => {
-  test('renders sorted from a static page, its sortable headers buttons and the rest text, stacked when narrow unless it scrolls', async () => {
+  test('renders sorted from a static page, its sortable headers links and the rest text, stacked when narrow unless it scrolls', async () => {
     const head = (await find('/table', '#static th[scope="col"]')).map(found => [found.text, attr(found, 'aria-sort')])
 
     expect((await find('/table', '#static [data-part="cellBody"]')).map(cell => cell.text)).toEqual(['Earth', '1', 'Mars', '2', 'Venus', '0'])
     expect(head).toEqual([['Name', 'ascending'], ['Moons', null]])
-    expect((await find('/table', '#static th button')).map(button => button.text)).toEqual(['Name'])
+    expect((await find('/table', '#static th a')).map(link => [link.text, attr(link, 'href')])).toEqual([['Name', '/table?sort=name&direction=desc']])
 
     // Stacked, each cell is labelled by its header; scrolling, the table keeps its header row alone.
     expect((await attributes('/table', '#static .kui-table-wrap, #scrolling .kui-table-wrap', ['data-narrow']))).toEqual([{ 'data-narrow': 'stack' }, { 'data-narrow': 'scroll' }])
