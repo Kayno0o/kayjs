@@ -13,6 +13,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
+import { isPageFile } from '../build/page-dirs'
 import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { browserRole, onceReadChecks } from '../compiler'
@@ -148,7 +149,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   // Following the imports of every component is worth it only when the browser has a component to start from, an island, and some module or component names the entry or a server-only global.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
   const mentioned = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text))
-  const roles = new Map([...componentTexts].map(([file, text]) => [file, browserRole(text, file, importedSignals(file, text))] as const))
+  const roles = new Map([...componentTexts].map(([file, text]) => [file, browserRole(text, file, importedSignals(file, text), isPageFile(file, [projectPaths(root, options).routes]))] as const))
   const named = mentioned && [...roles.values()].some(role => role !== undefined)
   const api = apiTrees(root, options)
   const islands = [...roles].filter(([, role]) => role === 'island').map(([file]) => file)

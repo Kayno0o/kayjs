@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
 import { findKayFiles, inWalkScope, realPath } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
+import { isPageFile, mountedPageDirs } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, stopProbes, writeShadowTypes } from '../check'
 import { servedLocales } from '../check/diagnose'
@@ -465,7 +466,7 @@ export class KayLanguageServer implements LspHost {
 
     const path = filePath(uri)
     const project = this.projectAt(projectRootOf(path, this.root))
-    const route = path.startsWith(`${project.routesDir}${sep}`)
+    const route = isPageFile(path, mountedPageDirs(project.routesDir, project.mounts))
 
     return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source), reveal: this.reveal === undefined ? undefined : { command: this.reveal, uri } })
   }

@@ -1,7 +1,12 @@
 import type { Diagnostic } from '../src/compiler/ast'
 import { describe, expect, it } from 'bun:test'
+import { join } from 'node:path'
+import { isPageFile } from '../src/build/page-dirs'
+import { analyzeKayCached, transformKay } from '../src/build/transform'
+import { compileShadow } from '../src/check/shadow'
 import { browserRole, compileKay, rendersAsIsland } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
+import { scratchDir } from './scratch'
 
 const part = 'src/components/part.kay'
 const slice = (source: string, span: { start: number, end: number }) => source.slice(span.start, span.end)
@@ -206,6 +211,45 @@ describe('a page of the routes directory', () => {
     expect(codes('--- island\nconst a = 1\n---\np {a}\n', 'src/components/c.kay', undefined)).toEqual([])
     expect(codes('--- static\nconst a = 1\n---\np {a}\n', route, true)).toEqual([])
     expect(codes('---\nconst a = 1\n---\np {a}\n', route, true)).toEqual([])
+  })
+})
+
+describe('a plain page', () => {
+  const pinned = '--- island\nconst a = 1\n---\np {a}\n'
+  const live = '---\nimport { visitors } from \'./live\'\n---\np {visitors()}\n'
+  const signals = { './live': { visitors: 'live' as const } }
+
+  it('is no island by its pin, and a partial or a component is', () => {
+    expect(compileKay(pinned, 'src/routes/p.kay', { page: true }).island).toBeUndefined()
+    expect(compileKay(pinned, 'src/routes/_partial.kay').island).toBeDefined()
+    expect(compileKay(pinned, 'src/components/c.kay', { page: false }).island).toBeDefined()
+    expect(rendersAsIsland(pinned, undefined, true)).toBe(false)
+    expect(rendersAsIsland(pinned)).toBe(true)
+    expect(browserRole(pinned, 'src/routes/p.kay', undefined, true)).toBeUndefined()
+    expect(browserRole(pinned, 'src/routes/_partial.kay')).toBe('island')
+  })
+
+  it('is still an island by a live import, and by a package that is client-only', () => {
+    expect(compileKay(live, 'src/routes/p.kay', { page: true, importedSignals: signals }).island).toBeDefined()
+    expect(compileKay('p x\n', 'src/routes/p.kay', { page: true, clientOnly: true }).island).toBeDefined()
+  })
+
+  it('gets one answer from the build, the analysis, the shadow and the predicate', async () => {
+    const root = await scratchDir('page-role')
+    const routesDir = join(root, 'src/routes')
+    const cache = join(root, '.kay/cache')
+    const roleOf = async (name: string) => {
+      const file = join(routesDir, name)
+      const page = isPageFile(file, [routesDir])
+      const built = /KayIsland\(/.test(transformKay(pinned, file, { target: 'ssr', root, hydratable: true }))
+      const analysis = await analyzeKayCached(pinned, file, root, cache, true, undefined, false, page)
+      const shadow = compileShadow(root, file, pinned, { routesDir, mounts: [] })
+
+      return { page, built, analysed: analysis.island !== undefined, marker: [analysis.diagnostics, shadow.diagnostics].map(found => found.some(diagnostic => diagnostic.code === 'island-marker')) }
+    }
+
+    expect(await roleOf('p.kay')).toEqual({ page: true, built: false, analysed: false, marker: [true, true] })
+    expect(await roleOf('_partial.kay')).toEqual({ page: false, built: true, analysed: true, marker: [false, false] })
   })
 })
 

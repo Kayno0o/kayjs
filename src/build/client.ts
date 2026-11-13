@@ -35,6 +35,7 @@ import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
+import { isPageFile, pageDirs as pageDirsOf } from './page-dirs'
 import { throughLinks } from './links'
 import { kay } from './plugin'
 import { unusedLibraryClasses } from './prune'
@@ -339,7 +340,8 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routes = projectPaths(root, options).routes
   const pageDirs = [routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
   const isComponent = (file: string): boolean => file.startsWith(dirname(routes) + sep) && !pageDirs.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file) && !file.startsWith(KAY_SOURCE)
-  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, isComponent(file))))
+  const pages = pageDirsOf(root, options)
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, isComponent(file), isPageFile(file, pages))))
 
   // What the files gone held, kept no longer.
   keepAnalyses(new Set(files))

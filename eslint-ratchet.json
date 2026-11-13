@@ -108,7 +108,7 @@
     "complexity": 82
   },
   "src/compiler/index.ts": {
-    "complexity": 103
+    "complexity": 102
   },
   "src/compiler/jsx.ts": {
     "max-lines": 681

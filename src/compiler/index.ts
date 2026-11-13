@@ -175,9 +175,9 @@ function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
 interface Role {
   // A `--- client` component or an interactive one, an island whatever its file.
   always: boolean
-  // A `--- island` fence: an island unless the file is a route file.
+  // A `--- island` fence: an island unless the file is a page, a layout or a special page, which is never one by its pin.
   pinned: boolean
-  // It imports a live value, which makes a component that is not a route file an island.
+  // It imports a live value, which makes a file that is not a layout, a special page or one with a server fence an island.
   live: boolean
   server: boolean
 }
@@ -190,9 +190,9 @@ export async function inAnalysisScope<T>(run: () => Promise<T>): Promise<T> {
   return roles.getStore() ? run() : roles.run(new Map(), run)
 }
 
-function roleOf(original: string, imported: ImportedSignals | undefined): Role {
+function roleOf(original: string, imported: ImportedSignals | undefined, page: boolean): Role {
   const kept = roles.getStore()
-  const key = JSON.stringify(imported)
+  const key = JSON.stringify([imported, page])
   const known = kept?.get(original)?.get(key)
 
   if (known)
@@ -203,7 +203,7 @@ function roleOf(original: string, imported: ImportedSignals | undefined): Role {
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), file.module)
   const always = file.client !== undefined || isInteractive(file, script)
-  const pinned = file.pin?.kind === 'island'
+  const pinned = file.pin?.kind === 'island' && !page
   const role = { always, pinned, live: liveImport(script, imported) !== undefined, server: file.server !== undefined }
 
   if (kept) {
@@ -217,16 +217,17 @@ function roleOf(original: string, imported: ImportedSignals | undefined): Role {
 }
 
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
-export function rendersAsIsland(original: string, imported?: ImportedSignals): boolean {
-  const { always, live, pinned, server } = roleOf(original, imported)
+// `page` says the file is a page of the routes directory (`isPageFile`), which its `--- island` fence does not make an island.
+export function rendersAsIsland(original: string, imported?: ImportedSignals, page = false): boolean {
+  const { always, live, pinned, server } = roleOf(original, imported, page)
 
   return always || (!server && (live || pinned))
 }
 
 // Whether a component is an island, as `compileKay` decides it.
-// A file with a server fence, a layout and a special page are islands only by their own handlers or `client`, never by a package's live value.
-export function browserRole(original: string, filename: string, imported?: ImportedSignals): 'island' | undefined {
-  const { always, live, pinned, server } = roleOf(original, imported)
+// A file with a server fence, a layout and a special page are islands only by their own handlers or `client`, never by a package's live value or a pin; a page's pin makes it none either.
+export function browserRole(original: string, filename: string, imported?: ImportedSignals, page = false): 'island' | undefined {
+  const { always, live, pinned, server } = roleOf(original, imported, page)
   const routeFile = server || ROUTE_FILES.has(basename(filename))
 
   return always || (!routeFile && (live || pinned)) ? 'island' : undefined
@@ -264,22 +265,24 @@ export function compileKay(original: string, filename: string, options: CompileO
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
   // Pages, layouts and special pages render on the server: a package they import never switches them.
-  const routeFile = file.server !== undefined || options.page === true || ROUTE_FILES.has(basename(filename))
+  const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
+  // A page without a server fence is still a page: it takes the fence checks, and its pin pins nothing, but a live import or an interactive script keeps making it an island.
+  const pageFile = routeFile || options.page === true
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
   const fallback = client ? takeBlock(file, filename, options, script, scope) : undefined
   // A component's own `@failed`, for a use deferring it as a server island: its function joins this module, the helpers and imports it needs being this module's.
-  const failed = !client && !routeFile ? takeBlock(file, filename, options, script, scope, 'failed') : undefined
+  const failed = !client && !routeFile && options.page !== true ? takeBlock(file, filename, options, script, scope, 'failed') : undefined
   const failedAt = failed?.code.search(FAILED_FUNCTION) ?? -1
   const failedCode = failed && options.output === 'html' && failedAt >= 0 ? failed.code.slice(failedAt) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
-  const pinned = file.pin?.kind === 'island' && !routeFile
+  const pinned = file.pin?.kind === 'island' && !pageFile
   const island = client || pinned || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const pin = file.pin
   const rawCause = island === undefined ? undefined : islandCause(file, script) ?? liveCause(file, script, live)
   const cause = realCause(rawCause, expansion, original)
-  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && routeFile, pageFile: routeFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && pageFile, pageFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
@@ -334,7 +337,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   }
 
   if (checked && pin !== undefined)
-    diagnostics.push(...markerMismatch(pin, routeFile))
+    diagnostics.push(...markerMismatch(pin, pageFile))
 
   if (file.client && file.module)
     diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
@@ -343,7 +346,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     diagnostics.push({ ...file.serverFence!, code: 'fence-invalid', message: 'A component has no `--- server` fence', note: 'only a page or a layout runs on the server for each request, and a component would take its values as required props', help: 'compute the value in the page or layout and pass it as a prop, or read it in an action' })
   }
 
-  if (file.client && routeFile)
+  if (file.client && pageFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []

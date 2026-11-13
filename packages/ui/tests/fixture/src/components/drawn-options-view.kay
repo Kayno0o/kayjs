@@ -1,0 +1,27 @@
+--- island
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+const plans = [{ value: 'free', label: 'Free', description: 'For trying' }, { value: 'pro', label: 'Pro', description: 'For teams' }]
+const tags = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]
+---
+main
+  article#radio
+    RadioGroup(options={plans} value="pro" label="Plan" name="plan")
+      @option(plan)
+        b.title {plan.label}
+        i.price 9
+  article#chips
+    ChipGroup(options={tags} value={['a']} label="Tags" name="tag")
+      @option(tag)
+        b.dot {tag.value}
+  article#segmented
+    Segmented(options={tags} value="a" label="Tag" name="one")
+      @option(tag)
+        b.dot {tag.value}
+  article#multi
+    MultiSelect(options={tags} value={['a']} label="Tags" name="multi")
+      @option(tag)
+        b.dot {tag.value}

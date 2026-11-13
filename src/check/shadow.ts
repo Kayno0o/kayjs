@@ -8,6 +8,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'n
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { packageContextModule } from '../build/manifests'
+import { mountedPageDirs, isPageFile } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
 import { uiEntryOf } from '../build/ui'
 import { compileKay } from '../compiler'
@@ -124,7 +125,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slots = outerSlots(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, typeHash, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, outerGuards: guardTypes(file, source, routesDir, mounts, moved ? shadowDir : dirname(file)), check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
+  const { tsx, map, bodyLines, moduleLines, typeHash, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, outerGuards: guardTypes(file, source, routesDir, mounts, moved ? shadowDir : dirname(file)), check: true, page: isPageFile(file, mountedPageDirs(routesDir, mounts)), component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 

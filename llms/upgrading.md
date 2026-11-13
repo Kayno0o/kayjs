@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.103.0
+
+### A page with `--- island` or `--- client` is refused
+
+A page without a `--- server` fence is checked as one with it: `--- island` on it is `island-marker` and `--- client` is `client-route-fence`, both failing `kay check`, and its `--- island` pins nothing, so it no longer hydrates. Move what needs the browser into a component of its own, written `--- island` (or `--- client`), and render it from the page. No `kay upgrade` fix exists, as the fix moves code into a new file.
+
 ## 1.102.0
 
 ### The `analytics()` option names 1.98 deprecated are gone

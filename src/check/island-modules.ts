@@ -4,6 +4,7 @@ import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { resolveFrom, scoped, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
+import { isPageFile } from '../build/page-dirs'
 import { isBuiltinSpecifier } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { buildFiles } from '../build/source-files'
@@ -94,7 +95,7 @@ export async function browserModules(root: string, routesDir: string, extensions
 
   await Promise.all(built.files.filter(file => !sources.has(file)).map(async file => sources.set(file, await Bun.file(file).text())))
 
-  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!)))
+  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!), isPageFile(file, [routesDir])))
   const files = [...own.keys()]
   const islandOnly = await islandOnlyComponents(root, routesDir, files, sources)
   const project = realpathSync(root) + sep

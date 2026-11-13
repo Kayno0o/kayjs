@@ -5,8 +5,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { ClassTable } from '../runtime/class-table'
 import type { CacheSlot } from './cache'
-import { existsSync, realpathSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
@@ -19,6 +18,7 @@ import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache
 import { compilerFingerprint } from './fingerprint'
 import { throughLinks } from './links'
 import { namedRefresh } from './named-refresh'
+import { isPageFile, realpathOrSelf } from './page-dirs'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
 import { embeddedMap, hasSourceMapOf, registerSourceMap } from './sourcemap'
@@ -159,11 +159,11 @@ export async function embeddedMapCached(source: string, filename: string, code: 
 }
 
 // The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `component` says the file sits outside the routes, so a root `@block` in it is refused though nothing here checks types. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
-export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels, component = false): Promise<Analysis> {
+export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels, component = false, page = false): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
   const signals = importedSignals(filename, source)
   const kind = check ? 'analysis-check' : 'analysis'
-  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${component}\0${source}`
+  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${component}\0${page}\0${source}`
   const slot = `${kind}\0${filename}`
   const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const last = analyzed.get(slot)
@@ -181,7 +181,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined, component })
+  const { island, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : page ? true : undefined, component })
   const analysis = { island, cause, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
@@ -230,37 +230,6 @@ async function pruneEntries(cacheDir: string, entries: RegExp): Promise<number> 
   return pruneCache(cacheDir, entries, name => live.has(name.slice(0, name.indexOf('-'))))
 }
 
-// The real path of each page directory, worked out once as a compile asks for every file.
-const realDirs = new Map<string, string>()
-
-// Whether the file sits under one of the directories, compared by real path as a linked routes directory or file names them.
-function inPages(file: string, dirs: readonly string[]): boolean {
-  const real = realpathOrSelf(file)
-
-  return dirs.some((dir) => {
-    let found = realDirs.get(dir)
-
-    if (found === undefined) {
-      found = realpathOrSelf(dir)
-
-      // A directory not there yet is looked for again.
-      if (found !== dir || existsSync(dir))
-        realDirs.set(dir, found)
-    }
-
-    return real.startsWith(found + sep)
-  })
-}
-
-function realpathOrSelf(file: string): string {
-  try {
-    return realpathSync(file)
-  }
-  catch {
-    return file
-  }
-}
-
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.
 export function cacheEntry(cacheDir: string, filename: string, kind: string, inputs: string): CacheSlot {
   return {
@@ -277,7 +246,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
   // A page of the routes directory, whose root `@failed` fills a layout outlet rather than being a component's own block.
-  const page = inPages(file, options.pages ?? [projectPaths(root).routes]) ? true : undefined
+  const page = isPageFile(file, options.pages ?? [projectPaths(root).routes]) ? true : undefined
   const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, namedRefresh: server && namedRefresh(file, root), ui: uiEntryOf(options.root ?? process.cwd(), file) })
 
   if (diagnostics.length > 0)

@@ -4,10 +4,12 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { findKayFiles } from '../build/files'
+import { isPageFile } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { formatDiagnostic } from '../compiler/frame'
 import { CAUSE_KINDS, describeCause, ISLAND_RULE } from '../compiler/island-cause'
+import { projectPaths } from '../project'
 import { printDocument, printFailure, projectRoot } from './command'
 
 type Role = 'island' | 'static'
@@ -34,7 +36,7 @@ async function explained(root: string, files: string[]): Promise<{ found: Explai
 
   for (const file of files) {
     const source = await readFile(file, 'utf8')
-    const { island, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source) })
+    const { island, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source), page: isPageFile(file, [projectPaths(root).routes]) ? true : undefined })
     const error = diagnostics.find(diagnostic => diagnostic.severity !== 'warning')
 
     if (error !== undefined) {
