@@ -42,11 +42,17 @@ function importsMarker(source: string, file: string): boolean {
   }
 }
 
-// `text` with each marker call outside comments and strings replaced by what `answer` says of its feature.
+// What a `/` after one of these opens is a regular expression, not a division.
+const BEFORE_REGEX = /[(,=:[!&|?{};]/
+
+// `text` with each marker call outside comments, strings and regular expressions replaced by what `answer` says of its feature. The code in a template literal's `${}` counts.
 function replaceCalls(text: string, answer: (feature: string) => string): string {
   let out = ''
   let quote = ''
   let at = 0
+  // The brace depth of each `${` open in a template literal.
+  const holes: number[] = []
+  let last = ''
 
   while (at < text.length) {
     const char = text[at]!
@@ -54,19 +60,28 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
     if (quote !== '') {
       out += char
 
-      if (char === '\\' && at + 1 < text.length)
+      if (char === '\\' && at + 1 < text.length) {
         out += text[++at]!
-      else if (char === quote || (char === '\n' && quote !== '`'))
+      }
+      else if (quote === '`' && char === '$' && text[at + 1] === '{') {
+        out += '{'
+        at++
+        holes.push(0)
         quote = ''
+      }
+      else if (char === quote || (char === '\n' && quote !== '`')) {
+        quote = ''
+      }
 
       at++
 
       continue
     }
 
-    if (char === '/' && text[at + 1] === '/') {
-      const end = text.indexOf('\n', at)
-      const next = end === -1 ? text.length : end
+    if (char === '/' && (text[at + 1] === '/' || text[at + 1] === '*')) {
+      const block = text[at + 1] === '*'
+      const end = text.indexOf(block ? '*/' : '\n', at + 2)
+      const next = end === -1 ? text.length : end + (block ? 2 : 0)
 
       out += text.slice(at, next)
       at = next
@@ -74,12 +89,24 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
       continue
     }
 
-    if (char === '/' && text[at + 1] === '*') {
-      const end = text.indexOf('*/', at + 2)
-      const next = end === -1 ? text.length : end + 2
+    if (char === '/' && (last === '' || BEFORE_REGEX.test(last))) {
+      let end = at + 1
+      let inClass = false
 
-      out += text.slice(at, next)
-      at = next
+      while (end < text.length && text[end] !== '\n' && (inClass || text[end] !== '/')) {
+        if (text[end] === '\\')
+          end++
+        else if (text[end] === '[')
+          inClass = true
+        else if (text[end] === ']')
+          inClass = false
+
+        end++
+      }
+
+      out += text.slice(at, end + 1)
+      at = end + 1
+      last = '/'
 
       continue
     }
@@ -92,6 +119,19 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
       continue
     }
 
+    if (holes.length > 0 && (char === '{' || char === '}')) {
+      if (char === '{') {
+        holes[holes.length - 1]!++
+      }
+      else if (holes[holes.length - 1] === 0) {
+        holes.pop()
+        quote = '`'
+      }
+      else {
+        holes[holes.length - 1]!--
+      }
+    }
+
     if (char === 'u' && !IDENTIFIER_CHAR.test(text[at - 1] ?? '')) {
       USES_CALL.lastIndex = at
 
@@ -100,6 +140,7 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
       if (call !== null) {
         out += answer(call[1]!)
         at += call[0].length
+        last = ')'
 
         continue
       }
@@ -107,6 +148,9 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
 
     out += char
     at++
+
+    if (char.trim() !== '')
+      last = char
   }
 
   return out
@@ -396,6 +440,24 @@ export class VariantIndex {
     }
   }
 
+  private usedOf(path: string, features: string[]): string[] {
+    const props = this.union.get(path) ?? new Set<string>()
+
+    return (props === ANY ? features : features.filter(feature => props.has(feature))).sort()
+  }
+
+  // An island entry that is a component with features, as the variant the project's call sites need; any other file as it is.
+  async entry(path: string): Promise<string> {
+    const features = await declaredFeatures(path)
+
+    if (features.length === 0)
+      return path
+
+    await this.scanned()
+
+    return `${path}?uses=${this.usedOf(path, features).join('.')}`
+  }
+
   // The imports of the compiled `code` of `file` that name a component with features, pointed at the one variant the project's call sites need: `import Table from './table.kay'` as `./table.kay?uses=pageSize`. `source` is the file's own, for one the scan did not meet.
   async variantImports(code: string, file: string, source: string): Promise<string> {
     const candidates = await candidatesOf(code, file)
@@ -409,8 +471,7 @@ export class VariantIndex {
     let result = code
 
     for (const { specifier, path, features } of candidates) {
-      const props = this.union.get(path) ?? new Set<string>()
-      const used = (props === ANY ? features : features.filter(feature => props.has(feature))).sort()
+      const used = this.usedOf(path, features)
 
       result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('.')}${quote}`)
     }

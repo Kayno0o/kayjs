@@ -52,7 +52,7 @@ import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
-import { kayFiles, variantFile } from './variants'
+import { kayFiles, variantFile, VariantIndex } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
   minify?: boolean | undefined
@@ -508,7 +508,10 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   const trees = apiTrees(root, options)
   const api = apiStubs(trees)
   // A page names its islands' chunks in their markup, so a production boot holds no loader of its own; development swaps islands in through the registry.
-  const registry = options.hot ? [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n') : ''
+  // An island that is a component with features is built as the variant the project's call sites need.
+  const variants = new VariantIndex(root)
+  const entries = new Map(await Promise.all([...islands].map(async ([id, file]) => [id, await variants.entry(file)] as const)))
+  const registry = options.hot ? [...entries].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n') : ''
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`, after `$kayHydrate.dispose` took the islands it replaces.
   const publicEnv = options.publicEnv ? `${options.base ?? ''}${PUBLIC_ENV_PATH}` : undefined
@@ -549,7 +552,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
   // Without the registry in the boot, each island is an entry point of its own.
-  const islandFiles = options.hot ? [] : [...islands.values()]
+  const islandFiles = options.hot ? [] : [...entries.values()]
   const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.client?.navigation, trees, islandFiles])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
@@ -838,7 +841,9 @@ function islandPath(root: string, input: string): string {
 
 // Bun names entry points relative to the working directory, not the root: from a library holding a test app, its layout and the app's share a path.
 function entryFile(root: string, entryPoint: string, files: Set<string>): string | undefined {
-  return [resolve(entryPoint), throughLinks(root, resolve(entryPoint))].find(file => files.has(file))
+  const point = resolve(variantFile(entryPoint))
+
+  return [point, throughLinks(root, point)].find(file => files.has(file))
 }
 
 function assetUrl(output: string): string {

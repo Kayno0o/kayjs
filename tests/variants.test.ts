@@ -70,6 +70,12 @@ describe('specializedSource around else and the text', () => {
     expect(specializedSource(text, new Set()).split('\n')).toEqual(['/* one', ' uses(\'x\') */', 'const a = `', 'uses(\'x\')`', 'const b = false', '---', ''])
   })
 
+  it('reads a call in a template literal hole, and skips a regular expression holding a quote', () => {
+    const text = 'const a = `x ${uses(\'x\') ? `${uses(\'y\')}` : 1} uses(\'x\')`\nconst b = /it\'s uses(\'x\')/.test(s) && uses(\'x\')\nconst c = a / 2 + uses(\'y\')\n---\n'
+
+    expect(specializedSource(text, new Set(['x']))).toBe('const a = `x ${true ? `${false}` : 1} uses(\'x\')`\nconst b = /it\'s uses(\'x\')/.test(s) && true\nconst c = a / 2 + false\n---\n')
+  })
+
   it('leaves the file of an app whose own uses is not the marker', async () => {
     const dir = await scratchDir('variants-')
     const file = join(dir, 'own.kay')

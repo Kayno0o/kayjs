@@ -2,6 +2,8 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
+import { loadConfig } from '../src/config-loader'
+import { clientOptionsOf } from '../src/project'
 import { fixtureCopy } from './scratch'
 
 const dirs: string[] = []
@@ -96,5 +98,23 @@ describe('a component with features', () => {
     }
 
     expect(bodies.size).toBe(1)
+  }, 120_000)
+
+  it('is the variant a page needs when the page draws it itself, as its own island', async () => {
+    const root = resolve(await fixtureCopy('ui-list'))
+
+    dirs.push(root)
+    // The app depends on the library, which is how kay finds its components.
+    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'direct', dependencies: { 'kay': '*', '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
+    await Bun.write(join(root, 'src/routes/direct.kay'), '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n\nconst COLUMNS = [{ key: \'name\', header: \'Name\' }]\nconst ROWS = [{ id: 1, name: \'a\' }]\n---\nTable(columns={COLUMNS} rows={ROWS} rowKey="id" selectable)\n')
+
+    const client = await buildClient(root, clientOptionsOf(await loadConfig(root), { dev: false, underKayDev: false }))
+    const id = Object.keys(client.islands).find(name => name.endsWith('/table.kay'))!
+    const text = (await Promise.all(client.islands[id]!.map(async chunk => Bun.file(join(client.dir, chunk.slice('/_kay/'.length))).text()))).join('\n')
+
+    expect(text).toContain(SELECT)
+    // No call site of the project writes these.
+    expect(text).not.toContain(EXPORT)
+    expect(text).not.toContain(EXPAND)
   }, 120_000)
 })
