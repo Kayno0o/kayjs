@@ -161,7 +161,11 @@ section
 
 Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6`. The recipe reaches the same parts `class` does, and in an island a variant changed at runtime swaps its classes.
 
-In an app with Tailwind, the build lifts a recipe's utility classes into one short class per string, with its rule in the `utilities.recipe` cascade layer, so the page and the island ship the short name instead of the utilities. The layer beats `components` (theme.css and skins) and loses to Tailwind's own utilities, so a `class` the app passes still wins. Names that are not utilities, such as `kui-card` or `group`, stay as written. A variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats an app's. A utility the build cannot lift, one that is quoted, holds a `;` or comes from an `as const` value, stays in `utilities` and beats the lifted variants.
+In an app with Tailwind, the build lifts a recipe's utility classes into one short class per string, with its rule in the `utilities.recipe` cascade layer, so the page and the island ship the short name instead of the utilities. The layer beats `components` (theme.css and skins) and loses to Tailwind's own utilities, so a `class` the app passes still wins. Names that are not utilities, such as `kui-card` or `group`, stay as written.
+
+Lifting changes two things. A variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats an app's.
+
+A utility the build cannot lift, one that is quoted, holds a `;` or comes from an `as const` value, stays in `utilities` and beats the lifted variants.
 
 A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props, signals or any name the script declares. `kay check` reports one that does, a recipe that shares its `const` or sits in a `--- server` fence, and root classes in a template with no `part="root"`.
 
