@@ -19,7 +19,7 @@ const { icons, turn, actions, call, source, empty, footer, note, openLabel, clos
   // Opens and closes the panel when the app sets it, such as an "Ask the assistant" button elsewhere on the page, or to close it after a navigation; left out, the button and Escape work on their own. `onOpenChange(open)` is called when the visitor opens or closes it, so the app's state follows.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
-  // The address fragment that opens the panel, on load and when it changes to it, so a plain `<a href="#chat">` opens it; `#chat` by default, `false` for none. A window `kai-chat-open` event opens it too.
+  // The address fragment that opens the panel, on load and when it changes to it, so a plain `<a href="#chat">` opens it; `#chat` by default, `false` for none. A `kai:chat-open` event on the document opens it too.
   hash?: string | false | undefined
   // The tab's session storage key the conversation is kept under, so a reload finds it; none by default, as the next visitor to use the tab would read it. A site with sign-in gives one per visitor.
   remember?: string | undefined

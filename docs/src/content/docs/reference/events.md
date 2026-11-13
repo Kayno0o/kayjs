@@ -23,7 +23,7 @@ document.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: 'Hello
 | `kai:chat-open`, `kai:chat-send`, `kai:chat-draft` | you send them to a `ChatLauncher` | `{}`, `{ text }`, `{ text }` |
 | `kui:hold-defaults` | a SaveForm saved, on the form | `{ adopt }` |
 
-Until 1.98 some of these had dashed names on `window`: `kay-renew`, `kay-dev-built`, `kay-dev-types` and the chat's `kai-chat-open`, `kai-chat-send` and `kai-chat-draft`, with no `detail` or a bare string. They are still fired, and the chat still hears them, until 1.103. `kay check` reports a listener or a dispatch of them in a script, and `kay upgrade` writes the new form where nothing else changes.
+Before 1.99 some of these had dashed names on `window`: `kay-renew`, `kay-dev-built`, `kay-dev-types` and the chat's `kai-chat-open`, `kai-chat-send` and `kai-chat-draft`, with no `detail` or a bare string. 1.103 dropped them: nothing fires or hears them now, so a listener or a dispatch under the old name does nothing until it is written `<lib>:<verb>` on `document`.
 
 ## Cookies and storage keys
 

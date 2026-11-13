@@ -1,5 +1,10 @@
 [.] AccordionItem
-type AccordionItem = AccordionItemBase & Keyed & Labelled
+interface AccordionItem
+  disabled?: boolean | undefined
+  key: string
+  label: string
+  meta?: string | undefined
+  open?: boolean | undefined
 
 [.] ActionSource
 type ActionSource<Row, Target extends Action<never, unknown>> = {
@@ -22,11 +27,11 @@ interface AttemptOptions<Data = unknown>
   success?: string | undefined
 
 [.] AudioChapter
-type AudioChapter = AudioChapterBase & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string
-})
+interface AudioChapter
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  start: number
 
 [.] AudioCue
 interface AudioCue
@@ -229,7 +234,6 @@ interface MediaItem
   preview: string
   src?: string
   thumb: string
-  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string
 
 [.] MenuAction
 interface MenuAction extends MenuItemBase
@@ -528,11 +532,14 @@ interface StepItem<Key extends string = string>
   state?: "error" | "skipped" | undefined
 
 [.] SwitcherApp
-type SwitcherApp = SwitcherAppBase & ({
-  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id?: string | undefined
-} | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id: string
-})
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  key: string
+  label: string
+  newTab?: NewTab | undefined
+  rel?: string | undefined
 
 [.] themeMode
 function themeMode(cookie?: string): Signal<ThemeMode>
@@ -541,11 +548,15 @@ function themeMode(cookie?: string): Signal<ThemeMode>
 type ThemeMode = 'light' | 'dark' | 'system'
 
 [.] TimelineEntry
-type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string
-})
+interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  label: string
+  newTab?: NewTab | undefined
+  pickable?: boolean | undefined
+  time: string
+  tone?: Tone | undefined
 
 [.] toast
 const toast: {
@@ -750,12 +761,12 @@ component default
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
   style?: string | undefined
-  tile?: ((app: SwitcherAppBase & { key: string; id?: string | undefined; } & { key: string; }) => Element) | undefined
+  tile?: ((app: SwitcherApp) => Element) | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
 
 [./audio-player.kay] default
 component default
-  actions?: ((chapter: AudioChapterBase & { label: string; title?: string | undefined; } & { label: string; }, index: number) => Element) | undefined
+  actions?: ((chapter: AudioChapter, index: number) => Element) | undefined
   artist?: string | undefined
   artwork?: string | undefined
   chapters?: readonly AudioChapter[] | undefined
@@ -3179,7 +3190,7 @@ component default
   emptyLabel?: string | undefined
   entries: readonly TimelineEntry<Key>[]
   label: string
-  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntryBase<Key> & { label: string; text?: string | undefined; } & { label: string; }) => unknown) | undefined
+  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
   selected?: Key | undefined
 
 [./toaster.kay] default

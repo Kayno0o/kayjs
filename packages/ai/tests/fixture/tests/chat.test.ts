@@ -433,9 +433,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.value('textarea')).toBe('Drafted')
   })
 
-  test('a kai-chat-send event sends its text as the next message, keeping the draft, and is ignored for blank text and while a reply is under way', async () => {
+  test('a kai:chat-send event sends its text as the next message, keeping the draft, and is ignored for blank text and while a reply is under way', async () => {
     const send = (page: Awaited<ReturnType<typeof site.open>>, detail: unknown) => page.evaluate((detail) => {
-      document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai-chat-send', { detail }))
+      document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: detail } }))
     }, detail)
     const page = await site.open('/assistant')
 
@@ -710,32 +710,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Go on')
   })
 
-  test('waitingLabel words the wait, thinkingLabel is its old name, and waitingLabel wins when both are written', async () => {
-    for (const [path, words] of [['/waiting-new', 'Hold on'], ['/waiting-old', 'Hold on'], ['/waiting-both', 'Hold on']] as const) {
-      const page = await site.open(path)
+  test('waitingLabel words the wait', async () => {
+    const page = await site.open('/waiting-new')
 
-      await page.fill('textarea', 'Go')
-      await page.press('Enter')
-      await page.waitFor('[data-pending] .kai-chat-thinking')
+    await page.fill('textarea', 'Go')
+    await page.press('Enter')
+    await page.waitFor('[data-pending] .kai-chat-thinking')
 
-      expect(await page.text('[data-pending] .kai-chat-thinking')).toBe(words)
-      await page.click('.kai-chat-form button')
-      await replied(page)
-    }
-  })
-
-  test('showReasoning hides the thinking, reasoning is its old name, and showReasoning wins when both are written', async () => {
-    for (const [path, shown] of [['/helper-private-old', 0], ['/helper-shown-both', 1]] as const) {
-      const page = await site.open(path)
-
-      fakeAi.reply({ reasoning: 'Private thoughts', text: 'Plain answer' })
-      await page.fill('textarea', 'Why')
-      await page.press('Enter')
-      await replied(page)
-      await page.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'Plain answer' })
-
-      expect(await page.count('.kai-chat-reasoning')).toBe(shown)
-    }
+    expect(await page.text('[data-pending] .kai-chat-thinking')).toBe('Hold on')
+    await page.click('.kai-chat-form button')
+    await replied(page)
   })
 
   test('the chat has no accessibility violation, its log and field named', async () => {

@@ -322,7 +322,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: Schema
   const plan = (current: AiMessage[], system: string | undefined) => {
     const attached = current.some(message => message.attachments !== undefined)
     // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
-    const request: ProviderRequest = { messages: attached ? [] : current as ProviderMessage[], system, model, maxTokens, temperature: options.temperature, reasoning: options.effort ?? options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
+    const request: ProviderRequest = { messages: attached ? [] : current as ProviderMessage[], system, model, maxTokens, temperature: options.temperature, reasoning: options.effort, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
     const messageChars = current.reduce((sum, message) => sum + message.content.length + estimatedChars(message) + toolChars(message as ProviderMessage), 0)
     const asker = { request: answering, visitor: options.key, chars: messageChars + (system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
     // Every step may use `maxTokens`, which is what the budget holds for a tool loop while it runs.
@@ -343,7 +343,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: Schema
 
         looping.maxTokens = maxTokens * maxSteps
 
-        return guarded(() => via(signal, request => converse(sturdy, request, offered, maxSteps, answering, signal, options.approval ?? options.confirm)), looping, signal)
+        return guarded(() => via(signal, request => converse(sturdy, request, offered, maxSteps, answering, signal, options.approval)), looping, signal)
       },
     }
   }

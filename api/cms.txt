@@ -319,7 +319,6 @@ interface FormLayout
   body?: undefined | { label?: string | undefined; hint?: string | undefined; }
   exclude?: string[] | undefined
   fields?: (string | string[])[] | undefined
-  /** @deprecated The old name of `exclude`, which wins when both are given. Removed in 1.103.0; `deprecated-filter-options` rewrites it. */ hide?: string[] | undefined
   previewClass?: string | undefined
   toolbar?: ToolbarAction[] | boolean | undefined
 

@@ -2,7 +2,6 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal, uid, untrack } from 'kay'
 import type { AccordionItem } from './accordion'
-import { itemKey, itemLabel } from './accordion'
 import { stepIndex } from './cycle'
 import CollapsibleSection from './collapsible-section.kay'
 
@@ -42,7 +41,7 @@ const asked = () => value === undefined ? undefined : new Set(typeof value === '
 let root: HTMLElement | undefined
 
 // The sections open: the app's `value` when given, else the flagged items, and the reader's clicks from then on.
-const flagged = () => new Set(items.filter((item, index) => multiple ? item.open === true : index === firstOpen()).map(itemKey))
+const flagged = () => new Set(items.filter((item, index) => multiple ? item.open === true : index === firstOpen()).map(item => item.key))
 const opened = signal<ReadonlySet<string>>(asked() ?? flagged())
 // Whether the reader has toggled a section, after which the flags no longer decide.
 let touched = false
@@ -107,6 +106,6 @@ function keyDown(event: KeyboardEvent) {
 ---
 // Native details sharing a `name` close one another without script; the keys need an island.
 div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown} onClick={refuseDisabled})
-  for item of items key={itemKey(item)}
-    CollapsibleSection(title={untrack(() => title?.(itemKey(item))) ?? itemLabel(item)} meta={untrack(() => meta?.(itemKey(item))) ?? item.meta} level={level} name={multiple ? undefined : group} open={opened().has(itemKey(item))} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(itemKey(item), now)})
-      | {untrack(() => panel(itemKey(item)))}
+  for item of items key={item.key}
+    CollapsibleSection(title={untrack(() => title?.(item.key)) ?? item.label} meta={untrack(() => meta?.(item.key)) ?? item.meta} level={level} name={multiple ? undefined : group} open={opened().has(item.key)} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(item.key, now)})
+      | {untrack(() => panel(item.key))}

@@ -33,14 +33,11 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
-import { aiOptions } from './ai-options'
-import { awaitConsent } from './await-consent'
 import { cmsTestHelpers } from './cms-test-helpers'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-import { eventNames } from './event-names'
-import { filterOptions } from './filter-options'
+
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { infiniteListOptions } from './infinite-list-options'
@@ -60,7 +57,7 @@ import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
-import { uiItemKeys, uiItems } from './ui-items'
+import { uiItemKeys } from './ui-items'
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
 
@@ -159,15 +156,13 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
-  async ({ root, options }) => uiItems(root, options),
+
   async ({ root, options }) => uiItemKeys(root, options),
   async ({ root, options }) => persistedStorage(root, options),
-  async ({ root, options }) => awaitConsent(root, options),
-  async ({ root, options }) => aiOptions(root, options),
-  async ({ root, options }) => filterOptions(root, options),
+
   async ({ root, options }) => infiniteListOptions(root, options),
   async ({ root, options }) => cmsTestHelpers(root, options),
-  async ({ root, options }) => eventNames(root, options),
+
   async ({ root, options }) => schemaType(root, options),
 ]
 

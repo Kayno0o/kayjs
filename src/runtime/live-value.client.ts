@@ -12,7 +12,7 @@ import { decodeServerValue } from './wire'
 const RENEW_RETRY_MS = 60_000
 // How long a page that no longer holds live values waits before asking again after a refusal: the proof it has will not be taken again.
 const GONE_RETRY_MS = 5 * 60_000
-// Fired on the document when the page asks for new proofs, for the deferred islands that hold live values to fetch themselves again; `kay-renew` on the window is the old name, dispatched too until 1.103.
+// Fired on the document when the page asks for new proofs, for the deferred islands that hold live values to fetch themselves again.
 const RENEW_EVENT = 'kay:renew'
 // How long a browser waits after the values it reads change before it opens, moves or closes its connection, so the islands of a page and a swap share one.
 const SETTLE_MS = 30
@@ -171,7 +171,6 @@ function settle(): void {
 async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed' | 'gone' | 'failed'> {
   // The deferred islands holding live values fetch themselves again, as their proofs are theirs.
   document.dispatchEvent(new CustomEvent(RENEW_EVENT, { detail: {} }))
-  dispatchEvent(new Event('kay-renew'))
 
   try {
     const response = await fetch(location.href, { headers: { accept: 'text/html' }, cache: 'no-store', signal })

@@ -11,6 +11,26 @@ A page without a `--- server` fence is checked as one with it: `--- island` on i
 ### `TSchema` is `Schema`
 
 `TSchema` from `kay/library` is `Schema`, kay's own name for what `s` builds, so your signatures do not name TypeBox. The old name works until 1.106, and `kay upgrade` rewrites the import and its uses (`deprecated-schema-type`). `Static` and every schema option are unchanged, and an Elysia `t.Object(...)` is still accepted as a `Schema`.
+### The 1.99 DOM event names are gone
+
+`deprecated-event-names` goes with them: run `kay upgrade` on 1.102 first. `kay-renew`, `kay-dev-built`, `kay-dev-types`, `kay:install` on the window, `kai-chat-open`, `kai-chat-send`, `kai-chat-draft`, `kai-chat-new` and `kui-hold-defaults` are no longer fired or heard, so a listener or a dispatch under one does nothing: write `kay:renew`, `kay:dev-built`, `kay:dev-types`, `kay:install`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft`, `kai:chat-new` and `kui:hold-defaults` on `document`, the chat's with `{ text }` as `detail`. [Events](events.md) lists them.
+
+### `consent` of `analytics()` and `vitals()` is `awaitConsent`
+
+`deprecated-await-consent` goes with it: run `kay upgrade` on 1.102 first. `analytics({ consent })` and `vitals({ consent })` throw at boot naming `awaitConsent`.
+
+### kayjs-ai: `effort`, `approval`, `showReasoning` and `waitingLabel`
+
+`deprecated-ai-options` and `deprecated-ai-props` go with them: run `kay upgrade` on 1.102 first. `ask(messages, { reasoning })` and `{ confirm }` fail `kay check` (they are not options of `AskOptions`) and are ignored at run time, so a call loses its effort and its approval step: write `effort` and `approval`. Chat and ChatLauncher no longer read `reasoning` and `thinkingLabel`: write `showReasoning` and `waitingLabel`.
+
+### kayjs-cms: `form.hide` is `exclude`
+
+`deprecated-filter-options` goes with it: run `kay upgrade` on 1.102 first. A collection's `form: { hide }` throws at boot, listing the options a form layout takes: write `exclude`.
+
+### kayjs-ui items: `label`, `key`, `href`
+
+`deprecated-ui-items` goes with it: run `kay upgrade` on 1.102 first. A Timeline entry's `text` is `label`, an Accordion item's `value` and `title` are `key` and `label`, a MediaGallery item's `title` is `label`, an AppSwitcher app's `id` is `key`, and an AudioChapter's `title` and `url` are `label` and `href`: the old names fail `kay check` and draw nothing. The helper types `LabelledTimelineEntry`, `KeyedSwitcherApp` and `LabelledChapter` are gone, as their blocks and callbacks hand the item itself.
+
 ### A recipe's utilities are lifted into a layer
 
 In an app with Tailwind, a recipe's utility classes become one short class per string, with its rule in the `utilities.recipe` layer ([styles](styles-and-assets.md)). Two things an app can see change: a variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats the app's. Nothing to change unless a page relied on the old order; add the utility to the app's `class`.
@@ -108,29 +128,9 @@ A TreeNode's `id` is `key`, and a Bell or BellInbox item's `id`, `title` and `ur
 
 ## 1.99.0
 
-### DOM events are `<lib>:<verb>` on `document`
-
-`kay-renew`, `kay-dev-built` and `kay-dev-types` (on the window, a string `detail` for the last two), `kay:install` (on the window), the chat's `kai-chat-open`, `kai-chat-send` and `kai-chat-draft` (on the window, the text as `detail`) and `kui-hold-defaults` (on the form, an array as `detail`) are now `kay:renew`, `kay:dev-built`, `kay:dev-types`, `kay:install`, `kai:chat-open`, `kai:chat-send`, `kai:chat-draft` and `kui:hold-defaults`, fired on `document` (the last bubbling from its form) with an object `detail`: `{ text }` for the chat's, `{ problems }` for `kay:dev-types`, a parsed object for `kay:dev-built`, `{ available }` for `kay:install`, `{ adopt }` for `kui:hold-defaults`. The old names still fire, on their old target with their old `detail`, and the chat still hears its old ones, for three minors; `kay upgrade` rewrites a listener of `kay-renew` or `kay:install` and a dispatch of the chat's events it can read (`deprecated-event-names`), and reports the rest. [Events](events.md) lists them all.
-
 ### Storage keys are `<lib>:<name>`
 
 `kay-reloaded`, `kay-push-posted`, `kay-push-refused`, `kay_editor-refused`, `kay-dev`, `kay-dev-layout`, `kai-chat-conversation:<url>` and `kcms-editor` are `kay:reloaded`, `kay:push-posted`, `kay:push-refused`, `kay:editor-refused`, `kay:dev`, `kay:dev-layout`, `kai:chat-conversation:<url>` and `kcms:editor`. The push record, the chat's shown conversation and the editor's layout move from the old key the first time they are read; the others start again. An app reading one of these keys by name reads the new one.
-
-### `consent` of `analytics()` and `vitals()` is `awaitConsent`
-
-The option that waits for the visitor's yes is `awaitConsent`, so `consent` means one thing everywhere: the visitor's answer (the `consent` signal of `kay/analytics`, the checkbox of kayjs-mail's contact form and kayjs-ui's SubscribeForm). `analytics({ consent: true })`, `consent: { notice: false }` and `vitals({ consent: false })` become `awaitConsent`. The old name still works for three minors, `awaitConsent` winning when both are given, and `kay upgrade` renames it (`deprecated-await-consent`); an options object built outside the call is not found by the lint but is still read.
-
-### kayjs-ai: `effort`, `approval`, `showReasoning` and `waitingLabel`
-
-`ask(messages, { reasoning })` is `effort`: `reasoning` meant how much a model thinks there and whether Chat shows what it thought there. `ask(messages, { confirm })` is `approval`, the word Chat's `approvalLabel` and the call's `approval` already use. Chat and ChatLauncher take `showReasoning` in place of `reasoning`, and `waitingLabel` in place of `thinkingLabel`, what the chat says while it waits for the first words, so it no longer reads as `reasoningLabel`, which names the folded thinking. The old names still work for three minors, the new ones winning when both are given, and `kay upgrade` renames them (`deprecated-ai-options` for `ask()`, `deprecated-ai-props` for the two components). A custom provider still reads `request.reasoning`, the effort `ask` settled, and the stream piece `{ reasoning }` keeps its name.
-
-### kayjs-cms: `form.hide` is `exclude`
-
-A list of what to leave out is `exclude` and a list of what to keep `include`, in every library, as `analytics({ exclude })` has it. The form layout of a collection, `cms({ collections: { posts: { form: { hide: ['sku'] } } } })`, takes `exclude` in place of `hide`. The old name still works for three minors, `exclude` winning when both are given, and `kay upgrade` renames it (`deprecated-filter-options`). The names that are not lists of what to include or leave out stay: `allow` of kayjs-auth (a hook that admits a sign-in, as `authorize` does), `denied` of kayjs-cms (a record of reasons by action), and `except` and `to` of `rooms.publish` (one member or connection).
-
-### kayjs-ui items: `label`, `key`, `href`
-
-The items of a Timeline, Accordion, MediaGallery, AppSwitcher and AudioPlayer take the names every list item has: a Timeline entry's `text` is `label`, an Accordion item's `value` and `title` are `key` and `label` (`@panel(key)` receives the key), a MediaGallery item's `title` is `label`, an AppSwitcher app's `id` is `key`, and an AudioChapter's `title` and `url` are `label` and `href`. The old names work until 1.103, the new ones winning when both are given. `kay upgrade` rewrites a literal array, or one bound to a `const` of the page's script (`deprecated-ui-items`); an item built elsewhere, or read as `entry.text`, is changed by hand.
 
 ### RowsField's `@cell` block gets `index` as a function
 

@@ -57,10 +57,6 @@ describe('reasoning on Anthropic', () => {
     return bodyOf(server)
   }
 
-  it('still reads reasoning, the old name of effort, and lets effort win when both are given', async () => {
-    expect((await sent({ reasoning: 'high' } as never)).output_config).toEqual({ effort: 'high' })
-    expect((await sent({ effort: 'low', reasoning: 'high' } as never)).output_config).toEqual({ effort: 'low' })
-  })
 
   it('sends no thinking setting unless reasoning is given', async () => {
     expect('thinking' in await sent({})).toBe(false)

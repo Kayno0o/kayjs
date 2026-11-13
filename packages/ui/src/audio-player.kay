@@ -1,8 +1,8 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import type { AudioChapter, AudioCue, LabelledChapter } from './audio'
+import type { AudioChapter, AudioCue } from './audio'
 import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
-import { chapterAt, chapterHref, chapterLabel, clock, cueAt, cuesByChapter, labelledChapter, lockScreen, previousStart } from './audio'
+import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
 
@@ -76,7 +76,7 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   // What the browser loads before the first play; the audio's length is known with `metadata`, a stream's may not be.
   preload?: 'none' | 'metadata' | 'auto' | undefined
   // Fills a chapter's row after its link: `@actions(chapter, index)`.
-  actions?: Snippet<[chapter: LabelledChapter, index: number]> | undefined
+  actions?: Snippet<[chapter: AudioChapter, index: number]> | undefined
   playLabel?: string | undefined
   pauseLabel?: string | undefined
   previousLabel?: string | undefined
@@ -327,7 +327,7 @@ effect(() => {
     return
 
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: chapter ? chapterLabel(chapter) : title ?? '',
+    title: chapter ? chapter.label : title ?? '',
     artist: artist ?? '',
     album: chapter ? title ?? '' : '',
     artwork: artwork ? [{ src: artwork }] : [],
@@ -363,26 +363,26 @@ div(part="root" {...rest})
             li(part="mark" style={placed(entry.chapter.start)})
       input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
   if chapters[current()]
-    p(part="now") {chapterLabel(chapters[current()]!)}
+    p(part="now") {chapters[current()]!.label}
   if chapters.length > 0
     ol(part="chapters" aria-label={chaptersLabel})
       for chapter, index of chapters key={index}
         li(part="chapter")
           button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
             span(part="start") {clock(chapter.start)}
-            span(part="title") {chapterLabel(chapter)}
-          if chapterHref(chapter) then href
-            IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapterLabel(chapter))} variant="ghost" size="sm")
+            span(part="title") {chapter.label}
+          if chapter.href then href
+            IconButton(href={href} {...tabOf(href, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapter.label)} variant="ghost" size="sm")
           if actions
             span(part="actions")
-              | {actions(labelledChapter(chapter), index)}
+              | {actions(chapter, index)}
   if cues.length > 0
     CollapsibleSection(title={transcriptLabel} open={false} onToggle={event => { if (event.currentTarget.open) follow() }})
       div(part="transcript" ref={watch} onPointerDown={event => { if (event.target === event.currentTarget) scrolledByHand() }} onKeyDown={between})
         for group of groups() key={group.chapter}
           div(part="group")
             if chapters[group.chapter]
-              p(part="groupTitle") {chapterLabel(chapters[group.chapter]!)}
+              p(part="groupTitle") {chapters[group.chapter]!.label}
             p(part="cues")
               for cue, offset of group.cues key={offset}
                 button(part="cue" type="button" data-index={group.first + offset} tabindex={group.first + offset === stop() ? '0' : '-1'} onFocus={() => focused = group.first + offset} aria-current={group.first + offset === cueNow() ? 'true' : undefined} onClick={() => void seek(cue.start, true)}) {`${cue.text} `}

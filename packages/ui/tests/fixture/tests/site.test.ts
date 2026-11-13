@@ -1621,10 +1621,10 @@ describe('a FormField showing its own issue marks its control in the server rend
   })
 })
 
-describe('blocks of lists under the names before 1.100 and 1.103', () => {
+describe('blocks of a tree under the names before 1.100', () => {
   test('hand the app the new name, filled from the old one', async () => {
     const text = async (selector: string) => (await find('/keyed-blocks', selector)).map(found => found.text)
 
-    expect([await text('.node'), await text('.app'), await text('.chapter')]).toEqual([['root'], ['atlas'], ['Intro']])
+    expect(await text('.node')).toEqual(['root'])
   })
 })

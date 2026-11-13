@@ -70,10 +70,7 @@ function checkToolbar(where: string, value: unknown): boolean | ToolbarAction[] 
 }
 
 function checkForm(where: string, value: unknown): FormLayout {
-  const { fields, exclude: given, hide: old, body, toolbar, previewClass } = plain(where, value, ['fields', 'exclude', 'hide', 'body', 'toolbar', 'previewClass'])
-  // `hide` is the old name of `exclude`, which wins when both are given.
-  const key = given === undefined && old !== undefined ? 'hide' : 'exclude'
-  const exclude = given ?? old
+  const { fields, exclude, body, toolbar, previewClass } = plain(where, value, ['fields', 'exclude', 'body', 'toolbar', 'previewClass'])
 
   if (previewClass !== undefined && (typeof previewClass !== 'string' || previewClass.trim() === ''))
     throw configError('cms', 'layout', `\`${where}.previewClass\` takes the classes of the site's Markdown, such as "prose", got ${JSON.stringify(previewClass)}`)
@@ -82,11 +79,11 @@ function checkForm(where: string, value: unknown): FormLayout {
     throw configError('cms', 'layout', `\`${where}.fields\` takes a list of field names, or of lists of them for a row, got ${JSON.stringify(fields)}`)
 
   const rows = (fields as unknown[] | undefined)?.map((row, index) => rowOf(`${where}.fields[${index}]`, row))
-  const hidden = exclude === undefined ? undefined : strings(`${where}.${key}`, exclude)
+  const hidden = exclude === undefined ? undefined : strings(`${where}.exclude`, exclude)
   const placed = rows?.flat() ?? []
 
   distinct(`${where}.fields`, placed)
-  distinct(`${where}.${key}`, hidden ?? [])
+  distinct(`${where}.exclude`, hidden ?? [])
 
   for (const name of placed) {
     if (hidden?.includes(name))

@@ -59,13 +59,12 @@ const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-inval
 function acceptsFile(accept: string | undefined, file: Pick<File, "name" | "type">): boolean
 
 [./lib/accordion] AccordionItem
-type AccordionItem = AccordionItemBase & Keyed & Labelled
-
-[./lib/accordion] itemKey
-function itemKey(item: AccordionItem): string
-
-[./lib/accordion] itemLabel
-function itemLabel(item: AccordionItem): string
+interface AccordionItem
+  disabled?: boolean | undefined
+  key: string
+  label: string
+  meta?: string | undefined
+  open?: boolean | undefined
 
 [./lib/add] default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
@@ -76,28 +75,22 @@ const addedIcons: Record<AddedSlot, IconProps>
 [./lib/announce] announce
 function announce(text: string, within?: Element | null): void
 
-[./lib/app-switcher] appKey
-function appKey(app: SwitcherApp): string
-
-[./lib/app-switcher] keyedApp
-function keyedApp(app: SwitcherApp): SwitcherAppBase & { key: string; id?: string | undefined; } & { key: string; }
-
-[./lib/app-switcher] KeyedSwitcherApp
-type KeyedSwitcherApp = SwitcherApp & { key: string }
-
 [./lib/app-switcher] SwitcherApp
-type SwitcherApp = SwitcherAppBase & ({
-  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id?: string | undefined
-} | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id: string
-})
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  key: string
+  label: string
+  newTab?: NewTab | undefined
+  rel?: string | undefined
 
 [./lib/audio] AudioChapter
-type AudioChapter = AudioChapterBase & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string
-})
+interface AudioChapter
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  start: number
 
 [./lib/audio] AudioCue
 interface AudioCue
@@ -108,12 +101,6 @@ interface AudioCue
 [./lib/audio] chapterAt
 function chapterAt(chapters: readonly AudioChapter[], seconds: number): number
 
-[./lib/audio] chapterHref
-function chapterHref(chapter: AudioChapter): string | undefined
-
-[./lib/audio] chapterLabel
-function chapterLabel(chapter: AudioChapter): string
-
 [./lib/audio] clock
 function clock(seconds: number): string
 
@@ -122,12 +109,6 @@ function cueAt(cues: readonly AudioCue[], seconds: number): number
 
 [./lib/audio] cuesByChapter
 function cuesByChapter(chapters: readonly AudioChapter[], cues: readonly AudioCue[]): { chapter: number; first: number; cues: AudioCue[]; }[]
-
-[./lib/audio] labelledChapter
-function labelledChapter(chapter: AudioChapter): AudioChapterBase & { label: string; title?: string | undefined; } & { label: string; }
-
-[./lib/audio] LabelledChapter
-type LabelledChapter = AudioChapter & { label: string }
 
 [./lib/audio] lockScreen
 const lockScreen: { owner: object | undefined; }
@@ -1278,7 +1259,12 @@ interface IconQuery extends OptionsQuery
 function nameOf(icon: string): string
 
 [./lib/index] AccordionItem
-type AccordionItem = AccordionItemBase & Keyed & Labelled
+interface AccordionItem
+  disabled?: boolean | undefined
+  key: string
+  label: string
+  meta?: string | undefined
+  open?: boolean | undefined
 
 [./lib/index] ActionSource
 type ActionSource<Row, Target extends Action<never, unknown>> = {
@@ -1301,11 +1287,11 @@ interface AttemptOptions<Data = unknown>
   success?: string | undefined
 
 [./lib/index] AudioChapter
-type AudioChapter = AudioChapterBase & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string
-})
+interface AudioChapter
+  href?: string | undefined
+  label: string
+  newTab?: NewTab | undefined
+  start: number
 
 [./lib/index] AudioCue
 interface AudioCue
@@ -1511,7 +1497,6 @@ interface MediaItem
   preview: string
   src?: string
   thumb: string
-  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string
 
 [./lib/index] MenuAction
 interface MenuAction extends MenuItemBase
@@ -1810,11 +1795,14 @@ interface StepItem<Key extends string = string>
   state?: "error" | "skipped" | undefined
 
 [./lib/index] SwitcherApp
-type SwitcherApp = SwitcherAppBase & ({
-  key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id?: string | undefined
-} | {
-  key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ id: string
-})
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  key: string
+  label: string
+  newTab?: NewTab | undefined
+  rel?: string | undefined
 
 [./lib/index] themeMode
 function themeMode(cookie?: string): Signal<ThemeMode>
@@ -1823,11 +1811,15 @@ function themeMode(cookie?: string): Signal<ThemeMode>
 type ThemeMode = 'light' | 'dark' | 'system'
 
 [./lib/index] TimelineEntry
-type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string
-})
+interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  label: string
+  newTab?: NewTab | undefined
+  pickable?: boolean | undefined
+  time: string
+  tone?: Tone | undefined
 
 [./lib/index] toast
 const toast: {
@@ -2177,10 +2169,6 @@ interface MediaItem
   preview: string
   src?: string
   thumb: string
-  /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string
-
-[./lib/media] mediaLabel
-function mediaLabel(item: MediaItem): string | undefined
 
 [./lib/media] playSource
 function playSource(video: HTMLVideoElement, src: string): () => void
@@ -3062,21 +3050,16 @@ interface Threshold
 [./lib/threshold] thresholdTone
 function thresholdTone(thresholds: Threshold[] | undefined, value: number): Tone | undefined
 
-[./lib/timeline] entryLabel
-function entryLabel(entry: TimelineEntry<number | string>): string
-
-[./lib/timeline] labelledEntry
-function labelledEntry<Key extends string | number>(entry: TimelineEntry<Key>): TimelineEntryBase<Key> & { label: string; text?: string | undefined; } & { label: string; }
-
-[./lib/timeline] LabelledTimelineEntry
-type LabelledTimelineEntry<Key extends string | number = string> = TimelineEntry<Key> & { label: string }
-
 [./lib/timeline] TimelineEntry
-type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({
-  label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined
-} | {
-  label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string
-})
+interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  label: string
+  newTab?: NewTab | undefined
+  pickable?: boolean | undefined
+  time: string
+  tone?: Tone | undefined
 
 [./lib/toast] attempt
 function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>

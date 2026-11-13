@@ -33,7 +33,7 @@ Every variable starts `AI_`, but the vendors keep their own names (`ANTHROPIC_AP
 
 ## Events
 
-`<lib>:<verb>` on `document`, an object `detail`, as every event of the table in kay's `llms/events.md` is; the `kai-chat-*` names on the window, with the text as `detail`, are heard until 1.103.
+`<lib>:<verb>` on `document`, an object `detail`, as every event of the table in kay's `llms/events.md` is.
 
 | Event | Does | `detail` |
 | --- | --- | --- |

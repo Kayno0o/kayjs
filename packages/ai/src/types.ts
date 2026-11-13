@@ -329,8 +329,6 @@ export interface AskOptions extends AskHooks, Resilience {
   temperature?: number | undefined
   // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets adaptive thinking at that effort, its text summarized so it streams (`'none'` asks the lowest effort with thinking disabled, which a model refusing it is asked again without), and `temperature` is then left out while it thinks; a `thinking` in `body` replaces all of it.
   effort?: Reasoning | undefined
-  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */
-  reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined
   // Fields to add to the provider's request body as they are, such as `{ top_p: 0.9, seed: 7 }`, so a parameter kayjs-ai does not model needs no release. They are added to what the provider was built with in `body`, this ask's winning field by field (top level only), and a field kayjs-ai settles itself (`model`, `messages`, `stream`, the token limit, and when it sets them `tools`, the schema's output format, `temperature`, `reasoning` and `cache`) wins over them. A server refusing a field fails the reply with its own message.
@@ -353,8 +351,7 @@ export interface AskOptions extends AskHooks, Resilience {
   // Asked before each action call runs (a function tool is never asked), with its name, arguments and the request: only `true` lets it run, anything else tells the model the visitor has not confirmed it so it asks them first, and a throw fails the call like a tool that throws. A write the visitor must agree to, such as a booking, is checked here; a read answers `true`.
   // Left out, a tool not marked `tool: { readOnly: true }` is held until the visitor allows that very call (`Chat` draws an Allow button); `false` runs every action unasked.
   approval?: Confirm | false | undefined
-  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */
-  confirm?: Confirm | false | undefined
+
   // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
   maxInputChars?: number | undefined
   // The most bytes one attachment may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails the reply with a `too-long` error before the provider is called.

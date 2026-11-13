@@ -14,7 +14,7 @@ const tones: Tone[] = ['neutral', 'accent', 'success', 'warning', 'danger', 'inf
 Menu(id="menu" items={tones.map(tone => ({ label: tone, tone, onSelect: () => undefined }))} label="Tones" icon="plus")
 Sparkline#spark(values={[1, 2, 3, 4, 5, 6]} tones={tones} label="Bars")
 StatusStrip#strip(cells={tones} label="Cells")
-Timeline#timeline(entries={tones.map(tone => ({ key: tone, time: '08:00', text: tone, tone, icon: 'info' as const }))} label="Day")
+Timeline#timeline(entries={tones.map(tone => ({ key: tone, time: '08:00', label: tone, tone, icon: 'info' as const }))} label="Day")
 div#stats
   for tone of tones key={tone}
     Stat(value="1" label={tone} tone={tone})

@@ -299,7 +299,7 @@ it('keeps an open edit through a message sent from outside and the reply to it, 
   await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
   await page.fill('.kai-chat-turn[data-editing] textarea', 'uno')
   await page.evaluate(() => {
-    document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai-chat-send', { detail: 'three' }))
+    document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: 'three' } }))
   })
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'fresh roles=uauau last=three files=0' })
 

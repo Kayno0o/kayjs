@@ -32,7 +32,7 @@ ChatLauncher(action={reply} open={open()} onOpenChange={value => { open = value 
 
 ### Start a question from outside
 
-Two events with `{ text }` as `detail`: `kai:chat-send` sends it as the next message (as a voice transcript is), and `kai:chat-draft` puts it in front of what the visitor typed and moves the cursor into the field, to read and send. Both ignore blank text, and `kai:chat-send` is ignored while a reply is under way. Dispatch them on `document` when the page has a `ChatLauncher`: it opens the panel first, waits for the chat inside to load, then hands the text over. A `Chat` of its own hears them on its `.kai-chat` element. The names `kai-chat-send` and `kai-chat-draft` on the window, with the text as `detail`, are heard until 1.103.
+Two events with `{ text }` as `detail`: `kai:chat-send` sends it as the next message (as a voice transcript is), and `kai:chat-draft` puts it in front of what the visitor typed and moves the cursor into the field, to read and send. Both ignore blank text, and `kai:chat-send` is ignored while a reply is under way. Dispatch them on `document` when the page has a `ChatLauncher`: it opens the panel first, waits for the chat inside to load, then hands the text over. A `Chat` of its own hears them on its `.kai-chat` element.
 
 ```ts
 document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Tell me about this page' } }))
@@ -40,7 +40,7 @@ document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Tell
 
 ### Open the launcher from a link
 
-The launcher opens whenever the address fragment is its `hash` (`#chat` by default, written with the `#`), on load and on every change to it, and on a click on any link to that fragment (a second click, or a link to another page), so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai:chat-open` event on `document` opens it too (`kai-chat-open` on the window until 1.103). All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
+The launcher opens whenever the address fragment is its `hash` (`#chat` by default, written with the `#`), on load and on every change to it, and on a click on any link to that fragment (a second click, or a link to another page), so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai:chat-open` event on `document` opens it too. All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
 
 ```ts
 document.dispatchEvent(new CustomEvent('kai:chat-open'))

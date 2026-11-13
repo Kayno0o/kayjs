@@ -13,8 +13,7 @@ export type ToolbarAction = 'bold' | 'italic' | 'heading' | 'bulletList' | 'numb
 export interface FormLayout {
   fields?: (string | string[])[] | undefined
   exclude?: string[] | undefined
-  /** @deprecated The old name of `exclude`, which wins when both are given. Removed in 1.103.0; `deprecated-filter-options` rewrites it. */
-  hide?: string[] | undefined
+
   // The words over the Markdown body: its label (`Body` by default, translated) and a hint under it.
   body?: { label?: string | undefined, hint?: string | undefined } | undefined
   // The formatting buttons over every Markdown box of the collection, the body included: `false` for none, else the buttons to keep, in order; all by default.

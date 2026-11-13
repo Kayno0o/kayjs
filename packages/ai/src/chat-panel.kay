@@ -137,8 +137,6 @@ function relay(event: Event) {
   forward(event.type, text)
 }
 
-// `kai:chat-open|send|draft` on the document; the `kai-chat-*` names on the window are the old ones, heard until 1.103.
-const heard = () => [[document, ['kai:chat-open', 'kai:chat-send', 'kai:chat-draft']], [window, ['kai-chat-open', 'kai-chat-send', 'kai-chat-draft']]] as const
 
 effect(() => {
   disposed = false
@@ -146,22 +144,18 @@ effect(() => {
   untrack(hashMatches)
   window.addEventListener('hashchange', hashMatches)
   document.addEventListener('click', linkClicked)
-  for (const [target, names] of heard()) {
-    target.addEventListener(names[0], visitorOpens)
-    target.addEventListener(names[1], relay)
-    target.addEventListener(names[2], relay)
-  }
+  document.addEventListener('kai:chat-open', visitorOpens)
+  document.addEventListener('kai:chat-send', relay)
+  document.addEventListener('kai:chat-draft', relay)
 
   onCleanup(() => {
     disposed = true
     document.removeEventListener('click', linkClicked)
     window.removeEventListener('hashchange', hashMatches)
 
-    for (const [target, names] of heard()) {
-      target.removeEventListener(names[0], visitorOpens)
-      target.removeEventListener(names[1], relay)
-      target.removeEventListener(names[2], relay)
-    }
+    document.removeEventListener('kai:chat-open', visitorOpens)
+    document.removeEventListener('kai:chat-send', relay)
+    document.removeEventListener('kai:chat-draft', relay)
   })
 })
 

@@ -52,8 +52,7 @@ interface Common {
   // Left out, `ga4`, `fathom`, `cloudflare`, `custom` and Umami Cloud (no `url`) ask like `true`, as they are not self-hostable cookieless counters; `awaitConsent: false` counts them without asking, which shows `info` and its opt-out.
   // Left out or `false`, `plausible`, `umami`, `simpleanalytics` and `matomo` count at once and show `info`, as do the others with `awaitConsent: false`, whose own script kay then loads until the visitor opts out.
   awaitConsent?: boolean | AnalyticsConsent | undefined
-  /** @deprecated The old name of `awaitConsent`, which wins when both are given; `consent` is the visitor's answer, as in the checkbox of a form. Removed in 1.103.0; `deprecated-await-consent` rewrites it. */
-  consent?: boolean | AnalyticsConsent | undefined
+
   // The information line and opt-out kay shows where visits are counted without asking, `false` when the app informs and lets visitors object itself.
   info?: false | AnalyticsInfo | undefined
   // The app's privacy policy, a path written without the `base` (`/privacy`) or an address, linked from the notice and the information line, which already name the provider.
@@ -191,20 +190,14 @@ const MAX_CONSENT_AGE = 395 * 24 * 60 * 60
 // The providers that wait for a yes unless the app wrote `awaitConsent: false`; Umami joins them while it has no `url`.
 const ASKS_BY_DEFAULT: ReadonlySet<string> = new Set(['ga4', 'fathom', 'cloudflare', 'custom'])
 
-// Refuses the names 1.102 dropped, and puts the name before 1.99 (`consent`) under the current one, which wins when both are written.
-// `deprecated-await-consent` rewrites the old name in an app's files; an options object built elsewhere is out of its sight, so the old name is read here until it goes.
+// Refuses the names 1.102 and 1.103 dropped, naming the one that replaced each.
 function current(options: AnalyticsOptions): AnalyticsOptions {
   const copy: Record<string, unknown> = { ...options }
-  const dropped: Record<string, string> = { host: 'url', policyUrl: 'privacy', ...options.provider === 'plausible' && { domain: 'site' }, ...options.provider === 'simpleanalytics' && { hostname: 'site' } }
+  const dropped: Record<string, [string, string]> = { host: ['url', '1.102'], policyUrl: ['privacy', '1.102'], consent: ['awaitConsent', '1.103'], ...options.provider === 'plausible' && { domain: ['site', '1.102'] }, ...options.provider === 'simpleanalytics' && { hostname: ['site', '1.102'] } }
 
-  for (const [old, name] of Object.entries(dropped)) {
+  for (const [old, [name, version]] of Object.entries(dropped)) {
     if (old in copy)
-      throw new KayError('config-invalid', `kay: analytics takes ${name}, not ${old}, which 1.102 dropped`)
-  }
-
-  if (copy.consent !== undefined) {
-    copy.awaitConsent ??= copy.consent
-    delete copy.consent
+      throw new KayError('config-invalid', `kay: analytics takes ${name}, not ${old}, which ${version} dropped`)
   }
 
   return copy as unknown as AnalyticsOptions

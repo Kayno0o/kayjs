@@ -35,27 +35,6 @@ it('opens when the fragment changes to it, once, and stays shut on another one',
 it('opens on kai:chat-open on the document', async () => {
   await using page = await site.open('/linking')
 
-  await page.click('.event-new')
-  await page.waitFor('.kai-launcher-panel:not([hidden])')
-  expect(await page.text('.changes')).toBe('true')
-  expect(page.errors).toEqual([])
-}, 120_000)
-
-it('drafts and sends the text of kai:chat-draft and kai:chat-send on the document', async () => {
-  await using page = await site.open('/linking')
-
-  await page.click('.draft-new')
-  await page.waitFor('.kai-launcher-panel:not([hidden])')
-  await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('.kai-chat-form textarea')?.value === 'Drafted with the new name', { what: 'the draft' })
-  fakeAi.reply('Hello back')
-  await page.click('.send-new')
-  await page.waitFor('.kai-chat-turn[data-role=user]', { text: 'Sent with the new name' })
-  expect(page.errors).toEqual([])
-}, 120_000)
-
-it('opens on a kai-chat-open event on the window, the old name', async () => {
-  await using page = await site.open('/linking')
-
   await page.click('.event')
   await page.waitFor('.kai-launcher-panel:not([hidden])')
   expect(await page.text('.changes')).toBe('true')
@@ -110,6 +89,6 @@ it('fires one change for an event while the panel is open, and none for blank te
   await page.click('.event')
   await page.waitFor('.kai-launcher-panel:not([hidden])')
   await page.click('.event')
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: '  ' })))
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: '  ' } })))
   expect(await page.text('.changes')).toBe('true')
 }, 120_000)

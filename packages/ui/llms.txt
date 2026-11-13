@@ -34,7 +34,7 @@ The rest by topic, each file read whole with one command:
 
 ## Events
 
-`kui:hold-defaults` bubbles from a form that saved, `detail: { adopt }`, an array a control keeping its default in a signal pushes a function to; `kui-hold-defaults` on the form, `detail` the array, is fired too until 1.103. Names follow the table in kay's `llms/events.md`.
+`kui:hold-defaults` bubbles from a form that saved, `detail: { adopt }`, an array a control keeping its default in a signal pushes a function to. Names follow the table in kay's `llms/events.md`.
 
 ## A `style` on a root
 

@@ -6,11 +6,8 @@ import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 const changes = signal<boolean[]>([])
 ---
 a.link(href="#chat") Ask
-button.event(type="button" onClick={() => window.dispatchEvent(new CustomEvent('kai-chat-open'))}) Event
-button.send(type="button" onClick={() => window.dispatchEvent(new CustomEvent('kai-chat-send', { detail: 'Sent from outside' }))}) Send
-button.draft(type="button" onClick={() => window.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: 'Drafted from outside' }))}) Draft
-button.event-new(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-open', { detail: {} }))}) Event
-button.send-new(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: 'Sent with the new name' } }))}) Send
-button.draft-new(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Drafted with the new name' } }))}) Draft
+button.event(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-open', { detail: {} }))}) Event
+button.send(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-send', { detail: { text: 'Sent from outside' } }))}) Send
+button.draft(type="button" onClick={() => document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Drafted from outside' } }))}) Draft
 p.changes {changes().join(';')}
 ChatLauncher(action={reply} label="Assistant" onOpenChange={value => { changes = [...changes(), value] }})

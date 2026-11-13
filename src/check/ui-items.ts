@@ -20,25 +20,12 @@ interface ItemProp {
 
 // One deprecated lint over the items of kayjs-ui lists: the components it covers by the file they are imported from, and the minor that renamed their keys.
 interface ItemLint {
-  code: 'deprecated-ui-items' | 'deprecated-ui-item-keys'
+  code: 'deprecated-ui-item-keys'
   since: string
   components: Record<string, ItemProp>
 }
 
-// The kayjs-ui components whose item keys were renamed in 1.99, by the file they are imported from.
-const ITEMS: ItemLint = {
-  code: 'deprecated-ui-items',
-  since: '1.99',
-  components: {
-    'timeline': { prop: 'entries', renames: [['text', 'label']] },
-    'accordion': { prop: 'items', renames: [['value', 'key'], ['title', 'label']] },
-    'media-gallery': { prop: 'items', renames: [['title', 'label']] },
-    'app-switcher': { prop: 'apps', renames: [['id', 'key']] },
-    'audio-player': { prop: 'chapters', renames: [['title', 'label'], ['url', 'href']] },
-  },
-}
-
-// The ones renamed in 1.100: a tree's nodes and the notifications of a Bell.
+// The kayjs-ui components whose item keys were renamed in 1.100: a tree's nodes and the notifications of a Bell.
 const ITEM_KEYS: ItemLint = {
   code: 'deprecated-ui-item-keys',
   since: '1.100',
@@ -55,13 +42,8 @@ const KAY_FILE = /\.kay$/
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
 
-// The item keys of a kayjs-ui Timeline, Accordion, MediaGallery, AppSwitcher or AudioPlayer an app writes under the name they had before 1.99, so every item is `{ key, label, description?, href?, icon?, tone?, disabled? }`.
-// Found in a literal array given as the list, written there or bound to a `const` of the file's script; `{ text }` becomes `label: text`, and an item holding the new key already is reported with no fix.
-export async function uiItems(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return itemLint(root, options, ITEMS)
-}
-
-// The same for a TreeView's nodes, nested `children` included, and a Bell's or BellInbox's notifications, under the names they had before 1.100.
+// The item keys of a kayjs-ui TreeView's nodes, nested `children` included, and a Bell's or BellInbox's notifications an app writes under the name they had before 1.100, so every item is `{ key, label, description?, href?, icon?, tone?, disabled? }`.
+// Found in a literal array given as the list, written there or bound to a `const` of the file's script; `{ id }` becomes `key: id`, and an item holding the new key already is reported with no fix.
 export async function uiItemKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   return itemLint(root, options, ITEM_KEYS)
 }

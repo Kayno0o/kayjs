@@ -48,7 +48,7 @@ it('puts a question in the field from outside and keeps what was typed after it'
   await using page = await site.open('/drafting')
 
   await page.fill('.kai-chat-form textarea', 'mine')
-  await page.evaluate(() => document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: 'About this page' })))
+  await page.evaluate(() => document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'About this page' } })))
   await page.waitUntil(() => document.querySelector<HTMLTextAreaElement>('.kai-chat-form textarea')!.value === 'About this page\nmine', { what: 'the draft' })
   expect(page.errors).toEqual([])
 }, 120_000)

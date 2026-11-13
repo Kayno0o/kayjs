@@ -103,12 +103,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     stop = await dev(root)
     page = await browse(await origin(), { timeout: SLOW })
     await page.initScript(() => {
-      (window as unknown as { builtSays: string[], oldSays: string[] }).builtSays = []
-      ;(window as unknown as { oldSays: string[] }).oldSays = []
-      // The old name, a string detail on the window, still fires until 1.102.
-      addEventListener('kay-dev-built', (event) => {
-        ;(window as unknown as { oldSays: string[] }).oldSays.push((JSON.parse((event as CustomEvent<string>).detail) as { changed: string }).changed)
-      })
+      (window as unknown as { builtSays: string[] }).builtSays = []
       document.addEventListener('kay:dev-built', (event) => {
         const build = (event as CustomEvent<{ changed: string, reloaded?: boolean, styles?: boolean, ms: number }>).detail
 
@@ -185,7 +180,6 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.waitFor('p.static', { text: 'Welcome' })
     // The live reload script announces what reloaded the server.
     await page.waitUntil(() => (window as unknown as { builtSays: string[] }).builtSays.some(text => (/^src\/greeting\.ts: reloaded in \d+ ms$/).test(text)))
-    expect(await page.evaluate(() => (window as unknown as { oldSays: string[] }).oldSays)).toContain('src/greeting.ts')
 
     expect(await sameDocument()).toBe(true)
     expect(await page.text('.solo button.count')).toBe('Pressed 3')

@@ -180,14 +180,13 @@ describe('checkLayouts', () => {
     expect(() => checkLayouts({ posts: { icon: {} } })).toThrow('icon')
   })
 
-  test('reads hide as the old name of exclude, exclude winning when both are given', () => {
-    expect(checkLayouts({ a: { form: { hide: ['x'] } } }).get('a')).toEqual({ form: { exclude: ['x'] } })
-    expect(checkLayouts({ b: { form: { hide: ['x'], exclude: ['y'] } } }).get('b')?.form?.exclude).toEqual(['y'])
+  test('refuses hide, the old name of exclude, naming what a form takes', () => {
+    expect(() => checkLayouts({ a: { form: { hide: ['x'] } } as never })).toThrow('has no option "hide"; it takes fields, exclude')
   })
 
   test('reads a layout as given, none as none', () => {
     expect(checkLayouts(undefined).size).toBe(0)
-    expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], hide: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], exclude: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })
+    expect(checkLayouts({ products: { form: { fields: ['name', ['price', 'stock']], exclude: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } } }).get('products')).toEqual({ form: { fields: ['name', ['price', 'stock']], exclude: ['tags'] }, list: { columns: ['price'], actions: ['delete'] } })
   })
 
   test('keeps a collection named __proto__ as a collection', () => {
@@ -204,11 +203,11 @@ describe('checkLayouts', () => {
     expect(refused({ a: { form: { fields: [1] } } })).toThrow('list of field names')
     expect(refused({ a: { form: { fields: ['a', ['a']] } } })).toThrow('twice')
     expect(refused({ a: { form: { fields: ['a'], exclude: ['a'] } } })).toThrow('both shows and hides')
-    expect(refused({ a: { form: { hide: [''] } } })).toThrow('list of field names')
+    expect(refused({ a: { form: { exclude: [''] } } })).toThrow('list of field names')
     expect(refused({ a: { list: { columns: ['a', 'a'] } } })).toThrow('twice')
     expect(refused({ a: { list: { actions: ['remove'] } } })).toThrow('the row actions are')
     expect(refused({ a: { forms: {} } })).toThrow('has no option "forms"')
-    expect(refused({ a: { form: { hidden: ['x'] } } })).toThrow('it takes fields, exclude, hide')
+    expect(refused({ a: { form: { hidden: ['x'] } } })).toThrow('it takes fields, exclude, body')
     expect(refused({ a: { list: { column: ['x'] } } })).toThrow('it takes columns, actions')
   })
 })

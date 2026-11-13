@@ -2,17 +2,15 @@ import type { CheckDiagnostic, CheckOptions } from '../src/check'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { aiOptions } from '../src/check/ai-options'
-import { awaitConsent } from '../src/check/await-consent'
+
 import { cmsTestHelpers } from '../src/check/cms-test-helpers'
-import { eventNames } from '../src/check/event-names'
-import { filterOptions } from '../src/check/filter-options'
+
 import { applySafeFixes } from '../src/check/fixes'
 import { infiniteListOptions } from '../src/check/infinite-list-options'
 import { localState } from '../src/check/local-state'
 import { persistedStorage } from '../src/check/persisted-storage'
 import { schemaType } from '../src/check/schema-type'
-import { uiItemKeys, uiItems } from '../src/check/ui-items'
+import { uiItemKeys } from '../src/check/ui-items'
 import { compileKay } from '../src/compiler'
 import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
 import { scratchDir } from './scratch'
@@ -22,11 +20,7 @@ type Name = keyof typeof DEPRECATED_LINTS
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-local-state': localState,
-  'deprecated-event-names': eventNames,
-  'deprecated-await-consent': awaitConsent,
-  'deprecated-ai-options': aiOptions,
-  'deprecated-filter-options': filterOptions,
-  'deprecated-ui-items': uiItems,
+
   'deprecated-ui-item-keys': uiItemKeys,
   'deprecated-infinite-list-options': infiniteListOptions,
   'deprecated-cms-test-helpers': cmsTestHelpers,
@@ -54,7 +48,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-ai-props', 'deprecated-if-alias', 'deprecated-script-fence', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

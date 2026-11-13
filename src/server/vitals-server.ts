@@ -35,7 +35,7 @@ export function vitalsServer(options: VitalsOptions): AnyElysia {
   warnWithoutStore()
 
   // The visitor's yes is awaited when the app says so, else when its analytics notice asks for it.
-  const asking = (app: Elysia): boolean => options.awaitConsent ?? options.consent ?? siteFacts(app)?.asksConsent === true
+  const asking = (app: Elysia): boolean => options.awaitConsent ?? siteFacts(app)?.asksConsent === true
   const plugin = (app: Elysia) => app
     // The script depends on the config's consent gate, at a URL that stays, so a browser asks again on every load.
     .get(VITALS_SCRIPT_PATH, ({ request }) => revalidated(request, vitalsEtag(asking(app)), () => vitalsScript(asking(app)), { 'content-type': 'text/javascript; charset=utf-8' }))

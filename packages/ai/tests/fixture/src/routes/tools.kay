@@ -1,5 +1,5 @@
 --- server
-// kay-allow-file deprecated-ai-options -- the fixture reads the old names on purpose
+
 import { ask, tool } from '@kaynooo/kayjs-ai'
 import { action, s } from 'kay'
 import { done, heard, hooks, testing } from '../testing'
@@ -77,11 +77,6 @@ export const mixed = action(s.Object({ prompt: s.String({ maxLength: 200 }), twi
 
 // A tool loop whose every call the visitor has not confirmed.
 export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, provider: testing.provider }).progress())
-
-// The old name of `approval`, alone, and beside a different `approval`, which wins.
-export const unconfirmedOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())
-export const approvedOverOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: false, confirm: () => false, provider: testing.provider }).progress())
-export const unconfirmedOverOld = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], approval: () => false, confirm: false, provider: testing.provider }).progress())
 
 export const lookup = action(s.Object({}), () => 'found', { tool: { description: 'Looks something up', readOnly: true } })
 

@@ -139,13 +139,8 @@ describe('the script and the page', () => {
     expect(home).not.toContain('&quot;FR&quot;')
   })
 
-  it('still reads consent, the old name of awaitConsent, and lets awaitConsent win when both are given', async () => {
-    const page = async (options: Record<string, unknown>) => (await (await site(plausible(options))).handle(new Request('http://localhost/'))).text()
-
-    expect(await page({ consent: true })).toContain('data-consent')
-    expect(await page({ consent: { text: 'Count?' } })).toContain('Count?')
-    expect(await page({ consent: true, awaitConsent: false })).not.toContain('data-consent')
-    expect(await page({ consent: false, awaitConsent: true })).toContain('data-consent')
+  it('refuses consent, the name 1.103 dropped, naming awaitConsent', async () => {
+    await expect(site(plausible({ consent: true }))).rejects.toThrow('analytics takes awaitConsent, not consent, which 1.103 dropped')
   })
 
   it('marks the notice as silent when the app asks in its own UI, the gate staying', async () => {

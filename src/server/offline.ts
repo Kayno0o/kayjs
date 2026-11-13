@@ -394,8 +394,7 @@ export interface ServiceWorkerOptions {
 
 const registerScripts = new Map<string, string>()
 
-// The window event of the same name is the old form, dispatched too until 1.103.
-export const INSTALL_OFFER = `(function(){function kayInstall(){document.dispatchEvent(new CustomEvent("kay:install",{detail:{available:!!window.$kayInstall}}));dispatchEvent(new Event("kay:install"))}addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.$kayInstall=e;kayInstall()});addEventListener("appinstalled",function(){window.$kayInstall=null;kayInstall()})})();`
+export const INSTALL_OFFER = `(function(){function kayInstall(){document.dispatchEvent(new CustomEvent("kay:install",{detail:{available:!!window.$kayInstall}}))}addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.$kayInstall=e;kayInstall()});addEventListener("appinstalled",function(){window.$kayInstall=null;kayInstall()})})();`
 
 // What every page carries with `offline` or `push()` on: registers the worker once the page has loaded. With `install`, which `push()` sets, it also keeps the browser's install offer for `installPrompt` of kay, as it comes before an island hydrates (and holding it hides the browser's own prompt).
 export function registerScript(base: string, install = false): string {

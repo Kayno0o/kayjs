@@ -1,32 +1,15 @@
 import type { NewTab } from './outside'
 
-interface AudioChapterBase {
+// A chapter of the audio.
+export interface AudioChapter {
+  // What the chapter is called.
+  label: string
   // Seconds into the audio. Chapters are in time order, as the player never sorts them.
   start: number
   // A page about the chapter, opened beside it.
   href?: string | undefined
-  /** @deprecated Use `href`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */
-  url?: string | undefined
   // Opens the page in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
-}
-
-// A chapter: `label` names it, `title` being the name it had before 1.99.
-export type AudioChapter = AudioChapterBase & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ title: string })
-
-// A chapter as an `@actions(chapter)` block reads it: `label` always there.
-export type LabelledChapter = AudioChapter & { label: string }
-
-export function labelledChapter(chapter: AudioChapter): LabelledChapter {
-  return chapter.label === undefined ? { ...chapter, label: chapter.title } : chapter
-}
-
-export function chapterLabel(chapter: AudioChapter): string {
-  return chapter.label ?? chapter.title
-}
-
-export function chapterHref(chapter: AudioChapter): string | undefined {
-  return chapter.href ?? chapter.url
 }
 
 export interface AudioCue {

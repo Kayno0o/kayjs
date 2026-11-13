@@ -113,7 +113,6 @@ interface AskOptions extends AskHooks, Resilience
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
-  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ confirm?: Confirm | false | undefined
   effort?: Reasoning | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
@@ -128,7 +127,6 @@ interface AskOptions extends AskHooks, Resilience
   onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
-  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ reasoning?: Reasoning | undefined
   retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
   sources?: readonly Source[] | undefined
@@ -610,7 +608,6 @@ interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
-  /** @deprecated The old name of `approval`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ confirm?: Confirm | false | undefined
   effort?: Reasoning | undefined
   fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
@@ -625,7 +622,6 @@ interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions
   onToolCall?: Hook<AiToolCall> | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
-  /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ reasoning?: Reasoning | undefined
   retry?: RetryOptions | false | undefined
   schema: Spec
   signal?: AbortSignal | undefined
@@ -807,7 +803,6 @@ component default
   open?: boolean | undefined
   openLabel?: string | undefined
   placeholder?: string | undefined
-  reasoning?: boolean | undefined
   reasoningLabel?: string | undefined
   recordLabel?: string | undefined
   regenerate?: boolean | undefined
@@ -830,7 +825,6 @@ component default
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tableLabel?: string | undefined
-  thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined
@@ -1022,7 +1016,6 @@ component default
   onSuggestion?: ((text: string) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
   placeholder?: string | undefined
-  reasoning?: boolean | undefined
   reasoningLabel?: string | undefined
   recordLabel?: string | undefined
   regenerate?: boolean | undefined
@@ -1045,7 +1038,6 @@ component default
   stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tableLabel?: string | undefined
-  thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined

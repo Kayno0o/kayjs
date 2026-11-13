@@ -7,7 +7,7 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
-import { isPlayable, mediaLabel, playSource } from './media'
+import { isPlayable, playSource } from './media'
 import { wording } from 'kay/words'
 
 // How far a finger moves sideways before a swipe turns the gallery.
@@ -200,7 +200,7 @@ snippet captioned(item: Item, position: number)
   if caption
     slot caption(item, position)
   else
-    | {mediaLabel(item)}
+    | {item.label}
 if !current()
   // The app's id and class stay on whichever element shows.
   if empty
@@ -221,27 +221,27 @@ else
             if item.captions
               track(kind="captions" src={item.captions} default)
         else
-          button(part="zoom" type="button" aria-label={mediaLabel(item) ? `${openLabel}: ${mediaLabel(item)}` : openLabel} onClick={() => zoom(true)})
+          button(part="zoom" type="button" aria-label={item.label ? `${openLabel}: ${item.label}` : openLabel} onClick={() => zoom(true)})
             // kay-allow unsized-image
-            img(part="frame" src={item.preview} alt={mediaLabel(item) ?? ''})
+            img(part="frame" src={item.preview} alt={item.label ?? ''})
       if all().length > 1
         IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
         IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
         span(part="counter") {active() + 1} / {all().length}
-      if caption || mediaLabel(current()!)
+      if caption || current()!.label
         span(part="caption")
           | {captioned(current()!, active())}
     if all().length > 1
       div(part="strip" ref={element => strip = element})
         for item, position of all() key={item.key}
-          button(part="thumb" type="button" aria-current={position === active() ? 'true' : undefined} aria-label={mediaLabel(item) ?? named(position)} onClick={() => go(position)})
+          button(part="thumb" type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.label ?? named(position)} onClick={() => go(position)})
             // kay-allow unsized-image
             img(part="thumbImage" src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
               Icon(icon="play" part="play")
     if list && list.failed()
       LoadMore(list={list})
-    dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={mediaLabel(current()!) ?? named(active())} onClose={() => zoomed() && zoom(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+    dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={current()!.label ?? named(active())} onClose={() => zoomed() && zoom(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
           if isPlayable(item)
@@ -250,11 +250,11 @@ else
                 track(kind="captions" src={item.captions} default)
           else
             // kay-allow unsized-image
-            img(part="full" src={item.full ?? item.preview} alt={mediaLabel(item) ?? ''})
+            img(part="full" src={item.full ?? item.preview} alt={item.label ?? ''})
         if all().length > 1
           IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
           IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
-        if caption || mediaLabel(current()!)
+        if caption || current()!.label
           span(part="caption")
             | {captioned(current()!, active())}
         IconButton(icon="close" label={closeLabel} variant="ghost" part="close" onClick={() => zoom(false)})

@@ -28,10 +28,9 @@ function onServer(): boolean {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined'
 }
 
-// `kay:install` on the document tells the offer changed; the same name on the window, with no detail, is the old form, dispatched too until 1.103.
+// `kay:install` on the document tells the offer changed.
 function announce(): void {
   document.dispatchEvent(new CustomEvent('kay:install', { detail: { available: Boolean((globalThis as Installable).$kayInstall) } }))
-  dispatchEvent(new Event('kay:install'))
 }
 
 let installable: (() => boolean) | undefined

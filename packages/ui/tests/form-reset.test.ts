@@ -12,7 +12,7 @@ beforeAll(async () => {
 
 afterAll(async () => GlobalRegistrator.unregister())
 
-it('asks the controls through kui:hold-defaults, bubbling to the document with an object detail, and kui-hold-defaults on the form as before', () => {
+it('asks the controls through kui:hold-defaults, bubbling to the document with an object detail', () => {
   const form = document.createElement('form')
   const kept: string[] = []
 
@@ -22,12 +22,6 @@ it('asks the controls through kui:hold-defaults, bubbling to the document with a
 
     adopt.push(() => kept.push('control'))
   }, { once: true })
-  form.addEventListener('kui-hold-defaults', (event) => {
-    const adopt = (event as CustomEvent<(() => void)[]>).detail
-
-    expect(Array.isArray(adopt)).toBe(true)
-    adopt.push(() => kept.push('old listener'))
-  }, { once: true })
   reset.holdDefaults(form)()
-  expect(kept).toEqual(['control', 'old listener'])
+  expect(kept).toEqual(['control'])
 })

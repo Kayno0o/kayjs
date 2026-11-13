@@ -352,13 +352,8 @@ describe('the consent gate', () => {
     expect(yes.headers.get('set-cookie')).toBeNull()
   })
 
-  it('still reads consent, the old name of awaitConsent, and lets awaitConsent win when both are given, the store keeping the views of each case', async () => {
-    for (const [options, stored] of [[{ consent: true }, 0], [{ consent: true, awaitConsent: false }, 1], [{ consent: false, awaitConsent: true }, 1]] as const) {
-      const app = await site(options)
-
-      await report(app, view({ p: '/' }), visit())
-      expect((await vitalsReport())[0]?.lcp?.views ?? 0).toBe(stored)
-    }
+  it('refuses consent, the name 1.103 dropped, naming awaitConsent', async () => {
+    await expect(site({ consent: true } as Record<string, unknown>)).rejects.toThrow('vitals takes awaitConsent, not consent, which 1.103 dropped')
   })
 
   it('follows analytics({ awaitConsent }) when the site has it, whichever extension is listed first', async () => {

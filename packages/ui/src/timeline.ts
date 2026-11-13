@@ -3,9 +3,11 @@ import type { IconSlot } from './defaults'
 import type { NewTab } from './outside'
 import type { Tone } from './tone'
 
-interface TimelineEntryBase<Key extends string | number> {
+export interface TimelineEntry<Key extends string | number = string> {
   // Tells entries apart and is what `selected` and `onSelectedChange` carry.
   key: Key
+  // What the entry says.
+  label: string
   // The time or range as the app words it, such as `08:30` or `08:30 - 09:10`.
   time: string
   icon?: IconSlot | IconProps | undefined
@@ -17,19 +19,4 @@ interface TimelineEntryBase<Key extends string | number> {
   href?: string | undefined
   // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
-}
-
-// What the entry says. `text` is the name it had before 1.99, deprecated: `label` wins when both are given.
-export type TimelineEntry<Key extends string | number = string> = TimelineEntryBase<Key> & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.103, `deprecated-ui-items` finds it. */ text: string })
-
-// An entry as `onSelectedChange` hands it over: `label` always there.
-export type LabelledTimelineEntry<Key extends string | number = string> = TimelineEntry<Key> & { label: string }
-
-export function labelledEntry<Key extends string | number>(entry: TimelineEntry<Key>): LabelledTimelineEntry<Key> {
-  return entry.label === undefined ? { ...entry, label: entry.text } : entry
-}
-
-// The words of an entry, `label` or the older `text`.
-export function entryLabel(entry: TimelineEntry<string | number>): string {
-  return entry.label ?? entry.text
 }

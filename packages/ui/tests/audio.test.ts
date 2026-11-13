@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test'
 import { chapterAt, clock, cueAt, cuesByChapter, previousStart } from '../src/audio'
 
-const chapters = [{ title: 'A', start: 0 }, { title: 'B', start: 30 }, { title: 'C', start: 90 }]
+const chapters = [{ label: 'A', start: 0 }, { label: 'B', start: 30 }, { label: 'C', start: 90 }]
 const cues = [{ start: 0, end: 10, text: 'one' }, { start: 10, end: 30, text: 'two' }, { start: 30, end: 60, text: 'three' }, { start: 95, end: 100, text: 'four' }]
 
 test('the chapter playing is the last started, or none before the first', () => {
   expect([chapterAt(chapters, 0), chapterAt(chapters, 29.9), chapterAt(chapters, 30), chapterAt(chapters, 500)]).toEqual([0, 0, 1, 2])
-  expect(chapterAt([{ title: 'A', start: 5 }], 1)).toBe(-1)
+  expect(chapterAt([{ label: 'A', start: 5 }], 1)).toBe(-1)
   expect(chapterAt([], 1)).toBe(-1)
 })
 
