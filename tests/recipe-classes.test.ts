@@ -118,6 +118,11 @@ describe('an app with Tailwind', () => {
     expect(css.indexOf('@layer theme, base, components, utilities')).toBeLessThan(css.indexOf('@layer utilities.recipe'))
   })
 
+  it('generates a utility only a recipe names once, in the recipe layer', () => {
+    for (const name of ['inline-flex', 'items-center', 'gap-1', 'bg-red-600'])
+      expect(css).not.toMatch(new RegExp(`\\.${name}\\s*\\{`))
+  })
+
   it('keeps the utilities an app passes in `class`, which win by layer', () => {
     expect(html).toMatch(/class="[^"]*\bpx-6\b/)
     expect(css).toMatch(/\.px-6\s*\{/)
@@ -267,6 +272,7 @@ describe('the Cases of a lifted recipe', () => {
 
     expect(rules(css).size).toBeGreaterThan(0)
     expect(rules(css)).toEqual(rules(production.css))
+    expect(css).not.toMatch(/\.inline-flex\s*\{/)
   }, 180_000)
 
   it('writes the rule of a recipe a library holds, under the name its component carries', async () => {
@@ -284,6 +290,39 @@ describe('the Cases of a lifted recipe', () => {
 
     expect(name).toBeDefined()
     expect(css).toMatch(new RegExp(`\\.${name} \\{\\s+display: inline-block`))
+    expect(css).not.toMatch(/\.inline-block\s*\{/)
+  }, 120_000)
+
+  it('keeps the rule of a utility a recipe lifted that a file or an `@source inline` names too', async () => {
+    const copy = await project()
+
+    await Bun.write(join(copy, 'src/components/plain.kay'), 'p.gap-1 plain\n')
+    await edit(join(copy, 'src/app.css'), text => `${text}\n@source inline("items-center");\n`)
+    await edit(join(copy, 'src/routes/index.kay'), text => `${text.replace('import Tag from \'../components/tag.kay\'', 'import Tag from \'../components/tag.kay\'\nimport Plain from \'../components/plain.kay\'')}Plain\n`)
+
+    const { css } = await page(copy)
+
+    expect(css).toMatch(/\.gap-1\s*\{/)
+    expect(css).toMatch(/\.items-center\s*\{/)
+    expect(css).not.toMatch(/\.inline-flex\s*\{/)
+  }, 120_000)
+
+  it('writes the rule of a recipe in a package Bun links from its store once', async () => {
+    const copy = await project()
+    const library = join(copy, 'node_modules/.bun/recipe-lib@1.0.0/node_modules/recipe-lib')
+
+    await Bun.write(join(copy, 'package.json'), '{ "name": "app", "private": true, "dependencies": { "recipe-lib": "1.0.0" } }\n')
+    await Bun.write(join(library, 'package.json'), '{ "name": "recipe-lib", "version": "1.0.0", "type": "module", "peerDependencies": { "kay": "*" }, "exports": { "./*.kay": "./src/*.kay" } }\n')
+    await Bun.write(join(library, 'src/badge.kay'), '---\nimport { recipe } from \'kay\'\n\nconst look = recipe({ parts: \'inline-block rounded-full\' })\n---\nspan(part="root") badge\n')
+    await symlink('.bun/recipe-lib@1.0.0/node_modules/recipe-lib', join(copy, 'node_modules/recipe-lib'))
+    await edit(join(copy, 'src/routes/index.kay'), text => text.replace('import Tag', 'import Badge from \'recipe-lib/badge.kay\'\nimport Tag').replace('\nLiveTag', '\nLiveTag\nBadge'))
+
+    const { html, css } = await page(copy)
+    const name = html.match(/<span[^>]*class="(k[\da-z]{7})"[^>]*>badge/)?.[1]
+
+    expect(name).toBeDefined()
+    expect(css).toMatch(new RegExp(`\\.${name} \\{\\s+display: inline-block`))
+    expect(css).not.toMatch(/\.inline-block\s*\{/)
   }, 120_000)
 
   it('writes the names and rules of an edited recipe under kay dev', async () => {

@@ -163,6 +163,8 @@ Classes merge in the order the part's own classes, the recipe's base, its varian
 
 In an app with Tailwind, the build lifts a recipe's utility classes into one short class per string, with its rule in the `utilities.recipe` cascade layer, so the page and the island ship the short name instead of the utilities. The layer beats `components` (theme.css and skins) and loses to Tailwind's own utilities, so a `class` the app passes still wins. Names that are not utilities, such as `kui-card` or `group`, stay as written.
 
+The stylesheet keeps no second rule for a lifted utility, unless a file of your app names it too.
+
 Lifting changes two things. A variant's utility replaces the base's at every width (`md:px-4` in the base against `px-8` in a variant gives `px-8` at `md` too), and a `!` utility of the recipe beats an app's.
 
 A utility the build cannot lift, one that is quoted, holds a `;` or comes from an `as const` value, stays in `utilities` and beats the lifted variants.

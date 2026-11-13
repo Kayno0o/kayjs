@@ -27,7 +27,7 @@ import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { routeMounts } from '../server/routes'
 import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
-import { pruneNodes } from './class-rules'
+import { pruneNodes, pruneUnescaped } from './class-rules'
 import { buildClassTable, mergesAtRuntime } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
@@ -38,7 +38,7 @@ import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { isPageFile, pageDirs } from './page-dirs'
 import { kay } from './plugin'
-import { unusedLibraryClasses } from './prune'
+import { recipeOnlyUtilities, unusedLibraryClasses } from './prune'
 import { recipeLifter } from './recipe-classes'
 import { referencesOf } from './references'
 import { sizeReport } from './report'
@@ -690,6 +690,8 @@ async function bundleStyles(root: string, { pages, files, libraries, classes, sh
 
   await writeComponentStylesheets(root, files)
 
+  // Tailwind scans the raw sources, whose recipes still name the utilities they lifted: their rules are cut from its output.
+  const recipeOnly = recipeOnlyUtilities(root, await recipeLifter(root), classes)
   const since = raisedMark()
   const [build, unused] = await Promise.all([Bun.build({
     entrypoints: pages,
@@ -698,7 +700,7 @@ async function bundleStyles(root: string, { pages, files, libraries, classes, sh
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses), { root, files: referencesOf(options.extensions) })],
+    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneUnescaped(pruneNodes(nodes, await unusedClasses), await recipeOnly), { root, files: referencesOf(options.extensions) })],
   }), unusedClasses])
 
   if (!build.success)

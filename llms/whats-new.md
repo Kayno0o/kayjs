@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A component reading a `persisted` value (`local`, `session`, `cookie` or `query`) imported from a `.ts` module is an island, as one reading a `live` value is, also when the module re-exports it (`export { x } from`, `export *`) or imports it and exposes it (a `live` value or a `signal` reached that way is now found too); `kay explain island` says so: [Islands](islands.md).
 - `waitFor(selector, { text })` in a browser test matches a French page's text typed with plain spaces, where kay wrote non-breaking ones (U+00A0, U+202F), and a timeout says when an element holds the text up to its whitespace: [Browser tests](testing-browser.md).
 - kayjs-ui: `Meter(segments={[{ value: 5, tone: 'success', label: 'known' }, ...]} max={22})` draws parts of one total end to end, each a `fill` part, and screen readers hear each one ([Meter](../packages/ui/llms/basics.md)).
+- A utility a recipe lifts has one rule, in `utilities.recipe`: Tailwind no longer also writes it in `utilities` unless a file, a word of the build or an `@source inline` names it too ([styles](styles-and-assets.md)).
 
 ## 1.104.0
 

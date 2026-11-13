@@ -26,6 +26,8 @@ export interface Lifted {
   source: string
   // The stylesheet rules of the lifted classes, in the order a variant beats the base.
   rules: string
+  // The utilities that left the source, each once.
+  utilities: string[]
 }
 
 // The string a literal of a recipe's config holds, or none for any other node.
@@ -97,6 +99,7 @@ export function liftRecipes(source: string, moduleId: string, utility: (token: s
   const calls = recipeNames(program.body)
   const edits: Edit[] = []
   const rules: string[] = []
+  const utilities = new Set<string>()
   // The hash's last digits are the evenly spread ones.
   const prefix = scopeHash(moduleId).slice(-6)
 
@@ -116,6 +119,10 @@ export function liftRecipes(source: string, moduleId: string, utility: (token: s
         const name = `k${prefix}${rules.length.toString(36)}`
 
         rules.push(`  .${name} { @apply ${lifted.join(' ')}; }`)
+
+        for (const token of lifted)
+          utilities.add(token)
+
         const start = script.start + node.start
         const end = script.start + node.end
 
@@ -133,13 +140,15 @@ export function liftRecipes(source: string, moduleId: string, utility: (token: s
   for (const edit of edits.toReversed())
     changed = changed.slice(0, edit.start) + edit.text + changed.slice(edit.end)
 
-  return { source: changed, rules: `@layer utilities.recipe {\n${rules.join('\n')}\n}\n` }
+  return { source: changed, rules: `@layer utilities.recipe {\n${rules.join('\n')}\n}\n`, utilities: [...utilities] }
 }
 
 export interface RecipeLifter {
   // Changes with the design system the tokens are read through, so what was read of a source under another does not stand.
   readonly id: number
   lift: (source: string, file: string) => Lifted | undefined
+  // The utilities the sources lifted so far moved out of their classes.
+  utilities: () => Set<string>
 }
 
 // A design system can serve several roots, and a module's name comes from its path in its own.
@@ -185,6 +194,7 @@ export async function recipeLifter(root: string): Promise<RecipeLifter | undefin
 
         return result
       },
+      utilities: () => new Set([...lifted.values()].flatMap(({ result }) => result?.utilities ?? [])),
     }
     byRoot.set(root, known)
   }
