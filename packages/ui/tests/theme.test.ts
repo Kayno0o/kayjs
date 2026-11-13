@@ -60,6 +60,7 @@ const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) =
 const HOOKS = new Set(['kui-menu', 'kui-map-view', 'kui-toaster', 'kui-tooltip', 'kui-tooltip-target', 'kui-relative-time', 'kui-sparkline', 'kui-status-strip', 'kui-description-list', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy', 'kui-timeline', 'kui-audio-player'])
 
 // The source of a component of the library.
+const rangeTrackSource = await Bun.file(`${ROOT}src/range-track.ts`).text()
 const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source
 
 // The components whose look is a recipe of utilities (#1885), each with its part classes in REMOVED_UI_CLASSES; theme.css has no rule for their part classes.
@@ -521,6 +522,30 @@ describe('theme.css', () => {
 
     for (const name of ['carousel', 'toggle', 'rating'])
       expect(sourceOf(name), name).toMatch(/\b(?:bg|border|text)-input\b|color-input/)
+  })
+
+  test('draws every track so it reads on the background, a surface and a popover, in both schemes and under each skin', async () => {
+    // Meter, Progress and BarList draw `surface-strong`; Toggle's frame and the range input's track (Slider, AudioPlayer) draw `input`.
+    for (const name of ['meter', 'progress'])
+      expect(sourceOf(name), name).toMatch(/root: '[^']*\bbg-surface-strong\b/)
+
+    expect(sourceOf('bar-list')).toMatch(/track: '[^']*\bbg-surface-strong\b/)
+    expect(sourceOf('toggle')).toMatch(/track: '[^']*\bborder-input\b/)
+    expect(rangeTrackSource).toMatch(/slider-runnable-track\]:bg-input/)
+    expect(rangeTrackSource).toMatch(/moz-range-track\]:bg-input/)
+
+    const skins = await Promise.all(['brutalist', 'soft', 'space'].map(async name => withSkin(await Bun.file(`${ROOT}src/skins/${name}.css`).text())))
+
+    for (const tokens of [colourTokens, ...skins]) {
+      for (const scheme of [0, 1] as const) {
+        for (const ground of ['background', 'surface', 'popover']) {
+          const under = colour(ground, scheme, undefined, tokens)
+
+          expect(contrast(colour('surface-strong', scheme, undefined, tokens), under), `surface-strong on ${ground} (${scheme})`).toBeGreaterThanOrEqual(1.04)
+          expect(contrast(colour('input', scheme, under, tokens), under), `input on ${ground} (${scheme})`).toBeGreaterThanOrEqual(3)
+        }
+      }
+    }
   })
 
   test('defines every colour its classes paint with', () => {

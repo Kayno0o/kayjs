@@ -5,7 +5,7 @@ import { fillOf, thresholdTone } from './threshold'
 import type { Threshold } from './threshold'
 
 const look = recipe({
-  parts: { root: 'kui-meter w-full overflow-hidden bg-surface', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+  parts: { root: 'kui-meter w-full overflow-hidden bg-surface-strong', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
   variants: {
     // The bar's height: `sm`, `md` (default) or `lg`.
     size: { sm: { root: 'h-1' }, md: { root: 'h-2' }, lg: { root: 'h-3' } },

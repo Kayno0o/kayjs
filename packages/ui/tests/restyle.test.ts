@@ -451,7 +451,7 @@ describe('the display components whose recipe holds their look', () => {
     ['widget', undefined, 'p-4', undefined],
     ['widget', 'head', 'flex', 'pb-2'],
     ['widget', 'title', 'min-w-0', 'text-sm'],
-    ['meter', undefined, 'bg-surface', undefined],
+    ['meter', undefined, 'bg-surface-strong', undefined],
     ['meter', 'fill', 'rounded-full', 'bg-red-500'],
     ['skeleton', undefined, 'flex', 'opacity-60'],
     ['skeleton', 'block', 'animate-pulse', 'rounded-full'],

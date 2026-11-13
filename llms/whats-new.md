@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `kay upgrade` warns when it raises a dependency the app shares with kay across a major (a 0.x minor counts), naming the versions and the package's migration file or repository, in text and as `warnings` under `--format json` ([kay upgrade](check-and-tools.md)).
+- kayjs-ui: a Meter and a Progress draw their track `surface-strong`, so the unfilled part reads inside a Card or any `bg-surface` box; Toggle's frame, Slider's and AudioPlayer's range track already read at 3:1, and a test holds every track on the background, surface and popover in both schemes and each skin ([Setup](../packages/ui/llms/setup.md)).
 
 ## 1.104.0
 
