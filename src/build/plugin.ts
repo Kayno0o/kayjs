@@ -62,6 +62,8 @@ export interface KayPluginOptions {
   componentFiles?: boolean | undefined
   // Rewrites a project module's source before the rest of the plugin reads it: the executable's `kay.config.ts` without its build plugins.
   rewrite?: ((file: string, source: string) => string) | undefined
+  // What the build knows of the call sites of its components with features, shared by every bundle of it; one of its own, over the project's files, when unset.
+  variants?: VariantIndex | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -99,7 +101,7 @@ function variantHooks(build: Bun.PluginBuilder, load: (file: string, twin: boole
   build.onLoad({ filter: USES_QUERY, namespace: VARIANT_NAMESPACE }, async ({ path }) => {
     const features = USES_QUERY.exec(path)![1]!
 
-    return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('.').filter(Boolean)))
+    return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('-').filter(Boolean)))
   })
 }
 
@@ -247,7 +249,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       }
 
       // One index for the build: the call sites of the whole project decide a component's variant.
-      const variantIndex = new VariantIndex(root)
+      const variantIndex = options.variants ?? new VariantIndex(root)
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
       const localizing = (contents: string) => options.localeLinks === true ? withLocaleLinks(contents) : contents
 

@@ -112,6 +112,10 @@ describe('a component with features', () => {
     const id = Object.keys(client.islands).find(name => name.endsWith('/table.kay'))!
     const text = (await Promise.all(client.islands[id]!.map(async chunk => Bun.file(join(client.dir, chunk.slice('/_kay/'.length))).text()))).join('\n')
 
+    // The page's call site and the list's together name several features, which the entry's file name carries.
+    for (const chunk of client.islands[id]!)
+      expect(chunk, chunk).not.toMatch(/[?=]/)
+
     expect(text).toContain(SELECT)
     // No call site of the project writes these.
     expect(text).not.toContain(EXPORT)

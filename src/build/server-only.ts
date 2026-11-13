@@ -12,6 +12,7 @@ import { parseKay } from '../compiler/parser'
 import { eachDescendant, walkScope } from '../compiler/walk'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { KAY_FILE } from './files'
+import { variantFile } from './variants'
 
 // Globals a server has and a browser has not: reading one in a chunk the page loads throws as the chunk evaluates, before anything of it runs.
 const SERVER_ONLY = new Set(['process', 'Bun'])
@@ -343,7 +344,7 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
   const scans: Scans = {}
   // Only the modules whose code is in a chunk: a tree-shaken one is listed with none of it.
   const modulesOf = async (meta: Output) => new Map((await Promise.all(Object.entries(meta.inputs ?? {}).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(async ([input]) => {
-    const path = resolve(process.cwd(), input)
+    const path = resolve(process.cwd(), variantFile(input))
     const source = await sourceOf(path)
 
     return source === undefined ? undefined : [path.startsWith(root + sep) ? relative(root, path) : input, source] as const
@@ -476,7 +477,7 @@ export function builtinChain(root: string, inputs: BundleInputs, start: string, 
 // `inputs` is the metafile of the same build with the builtins left external, its modules named relative to where the build ran.
 export function builtinChains(root: string, inputs: BundleInputs, islands: Iterable<string>, builtins: string[]): string[] {
   const refused = new Set(builtins)
-  const keyOf = new Map(Object.keys(inputs).map(input => [resolve(process.cwd(), input), input]))
+  const keyOf = new Map(Object.keys(inputs).map(input => [resolve(process.cwd(), variantFile(input)), input]))
   const chains: string[] = []
 
   for (const island of islands) {

@@ -6,6 +6,7 @@ import { countCache, readCacheEntry, writeCacheEntry } from './cache'
 import { directImports } from './direct-imports'
 import { fileStamp, settledBefore } from './files'
 import { compilerFingerprint } from './fingerprint'
+import { variantFile } from './variants'
 
 // Bun's code splitting gives each set of entry points sharing code a chunk of its own: an entry, islands and the page swap reaching kay's runtime each in their own way leave a page loading it in four or five small files.
 // Every one of them importing one module, which reaches all of the runtime any of them uses, puts that runtime in a single chunk, the entry's own code included: a page loads it, then its islands.
@@ -183,7 +184,7 @@ async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: s
     const runtime = (readdirSync(RUNTIME_DIR, { recursive: true }) as string[]).map(file => join(RUNTIME_DIR, file))
     const inputs: Record<string, string> = {}
 
-    for (const file of [PACKAGE, ...runtime, ...found.inputs]) {
+    for (const file of [PACKAGE, ...runtime, ...found.inputs.map(variantFile)]) {
       const stamp = fileStamp(file)
 
       if (stamp === undefined)

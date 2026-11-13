@@ -110,6 +110,8 @@ export interface ClientSources {
   problems: string[]
   pages: string[]
   libraries: KayLibrary[]
+  // Every `.kay` file the build compiled: the project's and the libraries' it reaches.
+  files: string[]
   // Whether a component renders a form posting to an action: without one, no page loads the navigation-only entry.
   actionForms: boolean
   // Whether the app may hand an island an action: it declares one or uses a kay library. Without it the browser carries no code to revive one.
@@ -214,7 +216,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
     if (previous && islandsAgain)
       await increments!.stopMaps(false)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.actionForms, sources.actionProps, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.files, sources.actionForms, sources.actionProps, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const styleUses = styles ? styles.uses : previous!.styleUses
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...styleUses && { styleUses }, ...options.hot && { problems: sources.problems }, ...key !== undefined && { options: key } }
 
@@ -403,7 +405,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routesDir = projectPaths(root, options).routes
 
   // The editor gathers its stylesheet as a page does, an app's own file or not.
-  return { islands, why, classes, words, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries, actionForms, actionProps: libraries.length > 0 || await declaresActions(root, sources.slice(0, own.length)) }
+  return { islands, why, classes, words, shorthand, problems, files, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries, actionForms, actionProps: libraries.length > 0 || await declaresActions(root, sources.slice(0, own.length)) }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.
@@ -492,7 +494,7 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-async function bundleIslands(root: string, islands: Map<string, string>, actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+async function bundleIslands(root: string, islands: Map<string, string>, files: string[], actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.client?.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -509,7 +511,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   const api = apiStubs(trees)
   // A page names its islands' chunks in their markup, so a production boot holds no loader of its own; development swaps islands in through the registry.
   // An island that is a component with features is built as the variant the project's call sites need.
-  const variants = new VariantIndex(root)
+  const variants = new VariantIndex(files)
   const entries = new Map(await Promise.all([...islands].map(async ([id, file]) => [id, await variants.entry(file)] as const)))
   const registry = options.hot ? [...entries].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n') : ''
 
@@ -547,7 +549,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
   const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
+  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, variants, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 

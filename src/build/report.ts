@@ -6,6 +6,7 @@ import { describeCause } from '../compiler/island-cause'
 import { ASSET_PREFIX } from './assets'
 import { writeAtomically } from './files'
 import { ECOINDEX_VERSION, SWD_VERSION, VIEWPORT_WIDTH } from './footprint-models'
+import { variantFile } from './variants'
 
 export interface Size {
   raw: number
@@ -139,7 +140,7 @@ function heaviest(root: string, chunks: Record<string, { bytesInOutput?: number 
         continue
 
       // Named relative to the working directory, as Bun names them; kay's own runtime is shown file by file, as what an island reaches of it is what weighs.
-      const file = resolve(input)
+      const file = resolve(variantFile(input))
       const own = relative(KAY_ROOT, file)
       const path = relative(root, file).replaceAll('\\', '/')
       const pkg = PACKAGE.exec(path)?.[1]

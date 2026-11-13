@@ -76,6 +76,12 @@ describe('specializedSource around else and the text', () => {
     expect(specializedSource(text, new Set(['x']))).toBe('const a = `x ${true ? `${false}` : 1} uses(\'x\')`\nconst b = /it\'s uses(\'x\')/.test(s) && true\nconst c = a / 2 + false\n---\n')
   })
 
+  it('tells a division from a regular expression after an operator, a keyword, a string or a template', () => {
+    const text = 'const a = () => /\'/.test(s) && uses(\'x\')\nfunction f() { return /`/.test(s) && uses(\'x\') }\nconst b = \'a\' / 2 + uses(\'x\')\nconst c = `${a}/2` + uses(\'x\')\nconst d = b > /\'/.source ? uses(\'x\') : 0\n---\n'
+
+    expect(specializedSource(text, new Set(['x']))).toBe(text.replaceAll('uses(\'x\')', 'true'))
+  })
+
   it('leaves the file of an app whose own uses is not the marker', async () => {
     const dir = await scratchDir('variants-')
     const file = join(dir, 'own.kay')

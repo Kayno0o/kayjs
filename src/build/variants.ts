@@ -18,9 +18,9 @@ const USES_IF = /^([ \t]*)((?:else )?if) (.*\buses\(.*)$/
 const IDENTIFIER_CHAR = /[\w$.]/
 const BACKSLASH = /\\/g
 
-// The suffix an import of a variant carries: the features, joined by dots, the call sites of the project use.
-export const USES_QUERY = /\.kay\?uses=([\w.]*)$/
-const VARIANT_INPUT = /^kay-variant:|\?uses=[\w.]*$/g
+// The suffix an import of a variant carries: the features, joined by dashes (a dot would end the stem of the file name the bundler gives an entry), the call sites of the project use.
+export const USES_QUERY = /\.kay\?uses=([\w-]*)$/
+const VARIANT_INPUT = /^kay-variant:|\?uses=[\w-]*$/g
 
 // A path the bundler names for a variant, as the file it is made from.
 export function variantFile(input: string): string {
@@ -43,7 +43,13 @@ function importsMarker(source: string, file: string): boolean {
 }
 
 // What a `/` after one of these opens is a regular expression, not a division.
-const BEFORE_REGEX = /[(,=:[!&|?{};]/
+const BEFORE_REGEX = /[(,=:[!&|?{};<>+\-*%~^]/
+const KEYWORD_BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|case|in|of|yield|await|void|delete|throw|else|do)$/
+
+// Whether a `/` after `before` opens a regular expression, `last` being the last code character of it.
+function opensRegex(before: string, last: string): boolean {
+  return last === '' || BEFORE_REGEX.test(last) || (IDENTIFIER_CHAR.test(last) && KEYWORD_BEFORE_REGEX.test(before.trimEnd()))
+}
 
 // `text` with each marker call outside comments, strings and regular expressions replaced by what `answer` says of its feature. The code in a template literal's `${}` counts.
 function replaceCalls(text: string, answer: (feature: string) => string): string {
@@ -68,8 +74,10 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
         at++
         holes.push(0)
         quote = ''
+        last = '{'
       }
       else if (char === quote || (char === '\n' && quote !== '`')) {
+        last = quote
         quote = ''
       }
 
@@ -89,12 +97,12 @@ function replaceCalls(text: string, answer: (feature: string) => string): string
       continue
     }
 
-    if (char === '/' && (last === '' || BEFORE_REGEX.test(last))) {
+    if (char === '/' && opensRegex(out, last)) {
       let end = at + 1
       let inClass = false
 
       while (end < text.length && text[end] !== '\n' && (inClass || text[end] !== '/')) {
-        if (text[end] === '\\')
+        if (text[end] === '\\' && text[end + 1] !== '\n')
           end++
         else if (text[end] === '[')
           inClass = true
@@ -393,12 +401,13 @@ export class VariantIndex {
   private readonly indexed = new Map<string, Promise<void>>()
   private scan: Promise<void> | undefined
 
-  constructor(private readonly dir: string) {}
+  // `files` are the `.kay` files to read, or the directory to find them under.
+  constructor(private readonly files: string | readonly string[]) {}
 
   // Reads the project's files once, as the bundler asks for the first variant.
   private async scanned(): Promise<void> {
     this.scan ??= (async () => {
-      for (const file of kayFiles(this.dir))
+      for (const file of typeof this.files === 'string' ? kayFiles(this.files) : this.files)
         await this.add(file, await Bun.file(file).text())
     })()
 
@@ -455,7 +464,7 @@ export class VariantIndex {
 
     await this.scanned()
 
-    return `${path}?uses=${this.usedOf(path, features).join('.')}`
+    return `${path}?uses=${this.usedOf(path, features).join('-')}`
   }
 
   // The imports of the compiled `code` of `file` that name a component with features, pointed at the one variant the project's call sites need: `import Table from './table.kay'` as `./table.kay?uses=pageSize`. `source` is the file's own, for one the scan did not meet.
@@ -473,7 +482,7 @@ export class VariantIndex {
     for (const { specifier, path, features } of candidates) {
       const used = this.usedOf(path, features)
 
-      result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('.')}${quote}`)
+      result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('-')}${quote}`)
     }
 
     return result
