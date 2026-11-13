@@ -175,7 +175,7 @@ describe('pageRows of an ordered collection', () => {
 
   it('orders each locale apart', async () => {
     const localized = async () => [entry('a', 2, 'fr'), entry('a', 1, 'en'), entry('b', 1, 'fr')]
-    const listed = await pageRows({ ...shelf, localized: true, count: 3 }, '', 1, localized, none)
+    const listed = await pageRows({ ...shelf, localized: true, total: 3 }, '', 1, localized, none)
 
     expect(listed.rows.map(row => [row.slug, row.locale, row.move?.up, row.move?.down])).toEqual([['a', 'en', false, false], ['b', 'fr', false, true], ['a', 'fr', true, false]])
   })
@@ -191,7 +191,7 @@ describe('search', () => {
   const read = async () => stock
 
   it('ignores accents and case, in the title, the other text fields and the body', async () => {
-    const find = async (q: string) => (await pageRows({ ...shop, count: 2 }, q, 1, read, none)).rows.map(row => row.slug)
+    const find = async (q: string) => (await pageRows({ ...shop, total: 2 }, q, 1, read, none)).rows.map(row => row.slug)
 
     expect(fold('Crème BRÛLÉE')).toBe('creme brulee')
     expect(await find('CREME brulee')).toEqual(['creme'])
@@ -228,9 +228,9 @@ describe('status', () => {
 
   it('tells draft, scheduled and published apart, and filters on it', async () => {
     expect(rowsOf(shop, stock).map(statusOf)).toEqual(['scheduled', 'draft', 'published'])
-    expect((await pageRows({ ...shop, count: 3 }, '', 1, read, none, 50, { status: 'draft' })).rows.map(row => row.slug)).toEqual(['b'])
-    expect((await pageRows({ ...shop, count: 3 }, '', 1, read, none, 50, { status: 'scheduled' })).rows.map(row => row.slug)).toEqual(['a'])
-    expect((await pageRows({ ...shop, count: 3 }, 'c', 1, read, none, 50, { status: 'published' })).total).toBe(1)
+    expect((await pageRows({ ...shop, total: 3 }, '', 1, read, none, 50, { status: 'draft' })).rows.map(row => row.slug)).toEqual(['b'])
+    expect((await pageRows({ ...shop, total: 3 }, '', 1, read, none, 50, { status: 'scheduled' })).rows.map(row => row.slug)).toEqual(['a'])
+    expect((await pageRows({ ...shop, total: 3 }, 'c', 1, read, none, 50, { status: 'published' })).total).toBe(1)
   })
 
   it('reads a status param, none for anything else', () => {
@@ -242,7 +242,7 @@ describe('status', () => {
 
 describe('sort', () => {
   const priced: CollectionInfo = { ...posts, draftField: 'draft', layout: undefined, schema: { properties: { title: { type: 'string' }, price: { type: 'number' }, draft: { type: 'boolean' } } } } as CollectionInfo
-  const shop = { ...priced, layout: { list: { columns: ['price'] } }, count: 4 }
+  const shop = { ...priced, layout: { list: { columns: ['price'] } }, total: 4 }
   const stock: SourceEntry[] = [
     { slug: 'a', data: { title: 'éclair', price: 10 }, draft: false },
     { slug: 'b', data: { title: 'Brioche', price: 9 }, draft: true },
@@ -317,7 +317,7 @@ describe('sort', () => {
   it('reads nothing more than the page for a key no column has', async () => {
     const { asked, read } = reader()
 
-    await pageRows({ ...shop, count: 4 }, '', 1, read, none, 2, { sort: 'nope', direction: 'asc' })
+    await pageRows({ ...shop, total: 4 }, '', 1, read, none, 2, { sort: 'nope', direction: 'asc' })
     expect(asked).toEqual([{ offset: 0, limit: 2 }])
   })
 

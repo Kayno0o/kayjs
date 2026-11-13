@@ -10,17 +10,26 @@ interface BellItemBase {
   newTab?: NewTab | undefined
 }
 
-// A notification the `Bell` lists: what kay's `notifications.inbox` answers, and what an app's own source gives it. `key` tells it apart and is what `onRead` carries, `label` is what it says and `href` a path of the site or an http(s) URL (anything else draws the row as a button); `id`, `title` and `url` are the names they had before 1.100, deprecated: the new name wins when both are given.
-export type BellItem = BellItemBase
-  & ({ key: string, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: string | undefined } | { key?: undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id: string })
-  & ({ label: string, /** @deprecated Use `label`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ title?: string | undefined } | { label?: undefined, /** @deprecated Use `label`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ title: string })
-  & { href?: string | undefined, /** @deprecated Use `href`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ url?: string | undefined }
+// A notification an app's own source gives the `Bell`. `key` tells it apart and is what `onRead` carries, `label` is what it says and `href` a path of the site or an http(s) URL (anything else draws the row as a button).
+export interface BellItem extends BellItemBase {
+  key: string
+  label: string
+  href?: string | undefined
+}
 
-// A notification with its new names filled from the old ones, as `@item(note)` and the rows read it: what kay's `notifications.inbox` answers as `{ id, title, url }` gets `key`, `label` and `href` here, and keeps the old three.
-export function bellItem<Item extends BellItem>(item: Item): Item & { key: string, label: string, href?: string | undefined } {
-  const href = item.href ?? item.url
+// A notification as kay's `notifications.inbox` answers it, which the Bell maps to a `BellItem`.
+export interface InboxItem extends BellItemBase {
+  id: string
+  title: string
+  url?: string | undefined
+}
 
-  return { ...item, key: item.key ?? item.id, label: item.label ?? item.title, ...href !== undefined && { href } }
+// A notification with `key`, `label` and `href` as `@item(note)` and the rows read them: what kay's `notifications.inbox` answers as `{ id, title, url }` gets them filled and keeps the three it came with.
+export function bellItem<Item extends BellItem | InboxItem>(item: Item): Item & { key: string, label: string, href?: string | undefined } {
+  const note = item as Partial<BellItem & InboxItem>
+  const href = note.href ?? note.url
+
+  return { ...item, key: note.key ?? note.id!, label: note.label ?? note.title!, ...href !== undefined && { href } }
 }
 
 // The notifications of an app's own source: a list, or a function answering one, called once the Bell is in the page and again after a read.

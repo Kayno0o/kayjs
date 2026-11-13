@@ -1860,7 +1860,6 @@ function collectionInfo(name: string, { counts }?: { counts?: boolean | undefine
 interface CollectionInfo
   body?: undefined | { kind: "markdown"; }
   components: string[]
-  /** @deprecated Named `total` since 1.100, as every count of a list is. Removed in 1.104. No lint: a field an app reads cannot be found by `kay check`. */ count?: number | undefined
   defaultLocale?: string | undefined
   description?: string | undefined
   dir?: string | undefined

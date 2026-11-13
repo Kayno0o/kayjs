@@ -22,20 +22,8 @@ interface TreeNodeBase<Id extends TreeId> {
   menu?: readonly MenuEntry[] | undefined
 }
 
-// A node of a TreeView, a branch when it has children, even an empty list of them. `key` tells it apart and is what `selected`, `expanded` and the callbacks carry; `id` is the name it had before 1.100, deprecated: `key` wins when both are given.
-export type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & { key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined } & ({ key: NoInfer<Id> } | { id: NoInfer<Id> })
-
-// The identity of a node, its `key` or the older `id`.
-export function nodeKey<Id extends TreeId>(node: { key?: Id | undefined, id?: Id | undefined }): Id {
-  return (node.key ?? node.id)!
-}
-
-// A node as the app's blocks and callbacks read it: `key` always there, filled from `id` for a node written with the older name.
-export type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
-
-export function keyedNode<Id extends TreeId>(node: TreeNode<Id>): KeyedTreeNode<Id> {
-  return node.key === undefined ? { ...node, key: nodeKey(node) } : node as KeyedTreeNode<Id>
-}
+// A node of a TreeView, a branch when it has children, even an empty list of them. `key` tells it apart and is what `selected`, `expanded` and the callbacks carry.
+export type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & { key: Id }
 
 export type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)
 
@@ -61,10 +49,10 @@ export function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open
   for (const [index, node] of nodes.entries()) {
     rows.push({ node, level, position: index + 1, size: nodes.length, parent })
 
-    const below = open.has(nodeKey(node)) ? kids(node) : undefined
+    const below = open.has(node.key) ? kids(node) : undefined
 
     if (below)
-      rows.push(...treeRows(below, open, level + 1, nodeKey(node), kids))
+      rows.push(...treeRows(below, open, level + 1, node.key, kids))
   }
 
   return rows
@@ -73,13 +61,13 @@ export function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open
 // The ids of the branches holding the node, from the root down, or undefined when no node has that id.
 export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined {
   for (const node of nodes) {
-    if (nodeKey(node) === id)
+    if (node.key === id)
       return []
 
     const below = listed(node) && treePath(listed(node)!, id)
 
     if (below)
-      return [nodeKey(node), ...below]
+      return [node.key, ...below]
   }
 
   return undefined
@@ -110,7 +98,7 @@ export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], curr
 
   const found = linked.find(node => node.href === href)
 
-  return found && nodeKey(found)
+  return found && found.key
 }
 
 // What a key does on the focused row, as the ARIA tree pattern has it: the row to focus, or a branch to open or close.
@@ -118,14 +106,14 @@ export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], curr
 export type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
 
 export function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeId, key: string, open: ReadonlySet<TreeId>): TreeMove<Id> {
-  const index = rows.findIndex(row => nodeKey(row.node) === focused)
+  const index = rows.findIndex(row => row.node.key === focused)
   const row = rows[index]
 
   if (!row)
     return undefined
 
   const branch = row.node.children !== undefined
-  const at = (other: number) => rows[other] && { focus: nodeKey(rows[other].node) }
+  const at = (other: number) => rows[other] && { focus: rows[other].node.key }
 
   switch (key) {
     case 'ArrowDown':
@@ -140,13 +128,13 @@ export function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused
       if (!branch)
         return undefined
 
-      if (!open.has(nodeKey(row.node)))
-        return { open: nodeKey(row.node) }
+      if (!open.has(row.node.key))
+        return { open: row.node.key }
 
-      return rows[index + 1]?.parent === nodeKey(row.node) ? at(index + 1) : undefined
+      return rows[index + 1]?.parent === row.node.key ? at(index + 1) : undefined
     case 'ArrowLeft':
-      if (branch && open.has(nodeKey(row.node)))
-        return { close: nodeKey(row.node) }
+      if (branch && open.has(row.node.key))
+        return { close: row.node.key }
 
       return row.parent === undefined ? undefined : { focus: row.parent }
     default: {
@@ -156,7 +144,7 @@ export function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused
       const typed = key.toLocaleLowerCase()
       const next = [...rows.slice(index + 1), ...rows.slice(0, index)].find(one => one.node.label.toLocaleLowerCase().startsWith(typed))
 
-      return next && { focus: nodeKey(next.node) }
+      return next && { focus: next.node.key }
     }
   }
 }

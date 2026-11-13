@@ -3,15 +3,13 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
-import { cmsTestHelpers } from '../src/check/cms-test-helpers'
-
 import { applySafeFixes } from '../src/check/fixes'
-import { infiniteListOptions } from '../src/check/infinite-list-options'
+
 import { localState } from '../src/check/local-state'
 import { persistedStorage } from '../src/check/persisted-storage'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
-import { uiItemKeys } from '../src/check/ui-items'
+
 import { compileKay } from '../src/compiler'
 import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
 import { scratchDir } from './scratch'
@@ -22,9 +20,6 @@ type Name = keyof typeof DEPRECATED_LINTS
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-local-state': localState,
 
-  'deprecated-ui-item-keys': uiItemKeys,
-  'deprecated-infinite-list-options': infiniteListOptions,
-  'deprecated-cms-test-helpers': cmsTestHelpers,
   'deprecated-persisted-storage': persistedStorage,
   'deprecated-schema-type': schemaType,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),

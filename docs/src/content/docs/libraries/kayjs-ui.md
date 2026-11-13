@@ -156,7 +156,7 @@ A title, a heading or a tab is a string by default, and a block puts markup in i
 
 The items of every list have one shape: a `key` that tells them apart, a `label`, and, where the component draws them, a `description`, an `href`, an `icon`, a `tone` and `disabled`. A Menu entry, a Timeline entry, an Accordion item, an AppSwitcher app, an AudioPlayer chapter and a MediaGallery item all read alike.
 
-Only a field's value stays `value`: the option of a Select, Combobox or MultiSelect, which is what the form posts. The names a TreeView node (`id`) and a Bell notification (`id`, `title`, `url`) had before 1.100 still work until 1.104; `kay check --fix` rewrites them.
+Only a field's value stays `value`: the option of a Select, Combobox or MultiSelect, which is what the form posts. A TreeView node and a Bell notification take `key`, `label` and `href` as every other list does.
 
 kay's own inbox keeps answering `{ id, title, url }`, which the Bell maps. A form control's `hint`, a Toolbar's `caption` and an Accordion's `summary` are not an item's description, so they keep their names.
 

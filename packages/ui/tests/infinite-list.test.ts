@@ -37,14 +37,6 @@ describe('infiniteList', () => {
     expect(infiniteList(bans(1, 3), { limit: 3, load }).ended()).toBe(false)
   })
 
-  test('pageSize, its name before 1.100, still sets the page size, limit winning when both are given', () => {
-    const { load } = source()
-
-    expect(infiniteList(bans(1, 3), { pageSize: 3, load }).ended()).toBe(false)
-    expect(infiniteList(bans(1, 3), { pageSize: 5, load }).ended()).toBe(true)
-    expect(infiniteList(bans(1, 3), { limit: 3, pageSize: 5, load }).ended()).toBe(false)
-  })
-
   test('retry loads nothing when no page failed', async () => {
     const { asked, load } = source(bans(4, 3))
     const list = infiniteList(bans(1, 3), { limit: 3, load })

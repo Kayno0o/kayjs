@@ -33,14 +33,12 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
-import { cmsTestHelpers } from './cms-test-helpers'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-import { infiniteListOptions } from './infinite-list-options'
 
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
@@ -57,7 +55,7 @@ import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
-import { uiItemKeys } from './ui-items'
+
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
 
@@ -157,11 +155,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => localState(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
-  async ({ root, options }) => uiItemKeys(root, options),
   async ({ root, options }) => persistedStorage(root, options),
-
-  async ({ root, options }) => infiniteListOptions(root, options),
-  async ({ root, options }) => cmsTestHelpers(root, options),
 
   async ({ root, options }) => schemaType(root, options),
 ]

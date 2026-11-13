@@ -1,6 +1,6 @@
 --- <Item extends BellItem>
 import type { JSX, Snippet } from 'kay'
-import type { BellItem, BellItems, BellTriggerProps } from './bell'
+import type { BellItem, BellItems, BellTriggerProps, InboxItem } from './bell'
 import { bellItem } from './bell'
 
 import type { PopoverPlacement, PopoverTriggerProps } from './popover'
@@ -58,9 +58,9 @@ const inbox = custom ? undefined : resource(inboxApi, '/')
 const load = typeof source === 'function' ? source : undefined
 const asked = load ? resource(async () => await load()) : undefined
 
-// Every item with `key`, `label` and `href` filled from the names before 1.100, the inbox's `{ id, title, url }` included.
+// Every item with `key`, `label` and `href`, filled from the inbox's `{ id, title, url }` for an item of the inbox.
 const items = memo((): readonly (Item & ReturnType<typeof bellItem>)[] => {
-  const listed: readonly BellItem[] = !custom ? inbox?.value()?.items ?? [] : typeof source === 'function' ? asked?.value() ?? [] : source ?? []
+  const listed: readonly (BellItem | InboxItem)[] = !custom ? inbox?.value()?.items ?? [] : typeof source === 'function' ? asked?.value() ?? [] : source ?? []
 
   return listed.map(note => bellItem(note) as Item & ReturnType<typeof bellItem>)
 })

@@ -877,15 +877,6 @@ interface CmsSaveOptions
 [./test] CmsSaveOutcome
 type CmsSaveOutcome = SaveOutcome
 
-[./test] cmsSignInAs
-function cmsSignInAs(site: Pick<TestSite, "cookies" | "fetch">, role?: string | undefined): Promise<string>
-
-[./test] cmsSignInWith
-function cmsSignInWith(site: Pick<TestSite, "cookies" | "fetch" | "submit">, password: string): Promise<Visit>
-
-[./test] cmsSignOut
-function cmsSignOut(site: CookieSite): void
-
 [./test] cmsTest
 function cmsTest(site: Pick<TestSite, "cookies" | "fetch" | "submit">): CmsTest
 

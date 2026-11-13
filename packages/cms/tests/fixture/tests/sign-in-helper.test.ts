@@ -4,7 +4,7 @@ import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
 import { passwordGuard } from '../../../src/password'
-import { cmsSignInAs, cmsSignInWith, cmsSignOut, cmsTest } from '../../../src/test'
+import { cmsTest } from '../../../src/test'
 
 const ROOT = join(import.meta.dir, '..')
 
@@ -50,15 +50,4 @@ test('a wrong password is answered 401 through the form, the right one signs in'
 
   expect((await cmsTest(site).signInWith('pw-editor')).status).toBe(200)
   expect((await site.fetch('/admin')).status).toBe(200)
-})
-
-test('the names before 1.100 still sign in and out', async () => {
-  const site = await siteWith('pw-editor')
-
-  expect(await cmsSignInAs(site)).toBe('editor')
-  expect((await site.fetch('/admin')).status).toBe(200)
-
-  cmsSignOut(site)
-  expect((await site.fetch('/admin')).status).toBe(302)
-  expect((await cmsSignInWith(site, 'pw-editor')).status).toBe(200)
 })

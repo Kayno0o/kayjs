@@ -64,15 +64,6 @@ function signOut(site: CookieSite): void {
   site.cookies.delete(HINT_COOKIE)
 }
 
-// Until 1.104: `cmsTest(site).signInAs(role)`.
-export const cmsSignInAs = signIn
-
-// Until 1.104: `cmsTest(site).signInWith(password)`.
-export const cmsSignInWith = signInWith
-
-// Until 1.104: `cmsTest(site).signOut()`.
-export const cmsSignOut = signOut
-
 export type CmsSaveOutcome = SaveOutcome
 
 export interface CmsSaveOptions {

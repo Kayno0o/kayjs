@@ -3,7 +3,7 @@ import * as content from '../src/kay/content'
 import { configure } from '../src/settings'
 import * as store from '../src/store'
 
-const collection = { name: 'posts', kind: 'loaded', schema: { type: 'object', properties: { title: { type: 'string' } } }, count: 3 }
+const collection = { name: 'posts', kind: 'loaded', schema: { type: 'object', properties: { title: { type: 'string' } } }, total: 3 }
 const written = [
   { slug: 'mine', data: { title: 'Mine', author: 'u1' }, draft: false },
   { slug: 'theirs', data: { title: 'Theirs', author: 'u2' }, draft: false },

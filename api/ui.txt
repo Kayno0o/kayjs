@@ -202,9 +202,6 @@ type InfinitePage<Row> = Row[] | undefined
 [.] isExternal
 function isExternal(href: string): boolean
 
-[.] KeyedTreeNode
-type KeyedTreeNode<Id extends TreeId = string> = TreeNode<Id> & { key: Id }
-
 [.] ListFilter
 interface ListFilter
   fields: Record<string, string>
@@ -331,9 +328,6 @@ interface NavLink extends NavItem
 
 [.] NewTab
 type NewTab = boolean | 'auto'
-
-[.] nodeKey
-function nodeKey<Id extends TreeId>(node: { key?: Id | undefined; id?: Id | undefined; }): Id
 
 [.] OptionsQuery
 interface OptionsQuery
@@ -653,13 +647,7 @@ interface ToolbarTools
 type TreeId = string | number
 
 [.] TreeNode
-type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & {
-  key?: Id | undefined, /** @deprecated Use `key`, which wins when both are given. Removed in 1.104, `deprecated-ui-item-keys` finds it. */ id?: Id | undefined
-} & ({
-  key: NoInfer<Id>
-} | {
-  id: NoInfer<Id>
-})
+type TreeNode<Id extends TreeId = string> = TreeNodeBase<Id> & { key: Id }
 
 [.] ui
 function ui(): KayExtension<AnyElysia>
@@ -967,20 +955,7 @@ component default
   announce?: string | undefined;
   count?: string | undefined;
 }
-  item?: ((note: Item & BellItemBase & {
-  key: string;
-  id?: string | undefined;
-} & {
-  label: string;
-  title?: string | undefined;
-} & {
-  href?: string | undefined;
-  url?: string | undefined;
-} & {
-  key: string;
-  label: string;
-  href?: string | undefined;
-}) => Element) | undefined
+  item?: ((note: Item & ((BellItem | InboxItem) & { key: string; label: string; href?: string | undefined; })) => Element) | undefined
   items?: BellItems<Item> | undefined
   label?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -3275,7 +3250,7 @@ component default
 
 [./tree-view.kay] default
 component default
-  actions?: ((args_0: KeyedTreeNode<Id>) => Element) | undefined
+  actions?: ((args_0: TreeNode<Id>) => Element) | undefined
   class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;
@@ -3298,8 +3273,8 @@ component default
   failureLabel?: string | undefined
   label: string
   nodes: readonly TreeNode<Id>[]
-  onOpenChange?: ((id: Id, open: boolean, node: KeyedTreeNode<Id>) => unknown) | undefined
-  onSelectedChange?: ((id: Id, node: KeyedTreeNode<Id>) => unknown) | undefined
+  onOpenChange?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
+  onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   retryLabel?: string | undefined
   selected?: Id | undefined
 

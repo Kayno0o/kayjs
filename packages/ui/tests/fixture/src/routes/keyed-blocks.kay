@@ -1,5 +1,0 @@
----
-import KeyedBlocks from '../components/keyed-blocks.kay'
----
-main
-  KeyedBlocks

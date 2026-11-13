@@ -245,9 +245,9 @@ describe('the collections a CMS edits', () => {
     const articles = found.find(each => each.name === 'articles')!
 
     expect(found.map(each => each.name)).toEqual(['articles', 'news', 'notes', 'pages'])
-    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false, total: 2, count: 2 })
-    expect(found[2]).toEqual({ name: 'notes', title: 'Notes de service', description: 'What the team needs to know before opening.', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, total: 2, count: 2 })
-    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', total: 2, count: 2 })
+    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false, total: 2 })
+    expect(found[2]).toEqual({ name: 'notes', title: 'Notes de service', description: 'What the team needs to know before opening.', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, total: 2 })
+    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', total: 2 })
     expect(articles).not.toHaveProperty('title')
     expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
@@ -393,7 +393,7 @@ describe('the collections a CMS edits', () => {
       const [info, found] = await Promise.all([collectionInfo('tales'), entries('tales', { slug: 'hello' })])
 
       expect(loads).toBe(1)
-      expect(info).toMatchObject({ kind: 'loaded', total: 1, count: 1, body: { kind: 'markdown' } })
+      expect(info).toMatchObject({ kind: 'loaded', total: 1, body: { kind: 'markdown' } })
       expect(found.map(entry => entry.slug)).toEqual(['hello'])
 
       await entries('tales')
@@ -630,7 +630,7 @@ describe('the collections a CMS edits', () => {
     }, { schema: t.Object({ title: t.String() }), localized: true })
 
     await exporting([['tales', tales]], async () => {
-      expect(await collectionInfo('tales')).toMatchObject({ kind: 'loaded', total: 7, count: 7 })
+      expect(await collectionInfo('tales')).toMatchObject({ kind: 'loaded', total: 7 })
       expect(await collectionInfo('tales')).not.toHaveProperty('body')
       expect((await entries('tales', { slug: 'hello', locale: 'fr' })).map(entry => [entry.slug, entry.locale, entry.data])).toEqual([['hello', 'fr', { title: 'Salut' }]])
       expect(await entries('tales', { slug: 'hello', locale: 'en' })).toEqual([])

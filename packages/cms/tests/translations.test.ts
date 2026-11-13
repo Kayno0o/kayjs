@@ -69,13 +69,13 @@ describe('pageRows', () => {
   it('marks a row with the locales its entry lacks, across slugs', async () => {
     const all = [entry('about', 'en', { title: 'About' }), entry('a-propos', 'fr', { title: 'A propos', translationKey: 'about' }), entry('home', 'en', { title: 'Home' })]
     const translations = async () => new Map([...groupEntries(all)].map(([key, group]) => [key, new Map([...group].map(([locale, each]) => [locale, each.slug]))]))
-    const listed = await pageRows({ ...pages, count: 3 }, '', 1, async () => all, async () => undefined, undefined, { translations })
+    const listed = await pageRows({ ...pages, total: 3 }, '', 1, async () => all, async () => undefined, undefined, { translations })
 
     expect(listed.rows.map(row => [row.slug, row.missing])).toEqual([['about', ['de']], ['a-propos', ['de']], ['home', ['fr', 'de']]])
   })
 
   it('marks nothing in a collection that is not localized', async () => {
-    const listed = await pageRows({ ...pages, localized: false, count: 1 }, '', 1, async () => [entry('about', 'en', { title: 'About' })], async () => undefined)
+    const listed = await pageRows({ ...pages, localized: false, total: 1 }, '', 1, async () => [entry('about', 'en', { title: 'About' })], async () => undefined)
 
     expect(listed.rows[0]?.missing).toBeUndefined()
   })
