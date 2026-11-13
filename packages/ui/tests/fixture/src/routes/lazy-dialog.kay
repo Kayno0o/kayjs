@@ -1,0 +1,5 @@
+---
+import LazyDialog from '../components/lazy-dialog.kay'
+---
+main
+  LazyDialog

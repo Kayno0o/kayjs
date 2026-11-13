@@ -1,0 +1,10 @@
+---
+import { signal } from 'kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+const open = signal(false)
+---
+button#opener(type="button" onClick={() => open = true}) Open
+Dialog#lazy(open={open()} title="Lazy" onOpenChange={() => open = false})
+  TextInput#first(name="first" aria-label="First")

@@ -89,6 +89,28 @@ function focusFirst(dialog: HTMLDialogElement): void {
 
   dialog.tabIndex = -1
   dialog.focus()
+  focusWhenFilled(dialog)
+}
+
+// A body whose code loads when the dialog first opens arrives after the focus went to the dialog itself: the first control it draws takes the focus, unless the visitor moved it meanwhile.
+function focusWhenFilled(dialog: HTMLDialogElement): void {
+  const watch = new MutationObserver(() => {
+    if (!dialog.open || document.activeElement !== dialog) {
+      watch.disconnect()
+
+      return
+    }
+
+    const first = dialog.querySelector<HTMLElement>(`[data-part="body"] :is(${FOCUSABLE})`)
+
+    if (first) {
+      first.focus()
+      watch.disconnect()
+    }
+  })
+
+  watch.observe(dialog, { childList: true, subtree: true })
+  dialog.addEventListener('close', () => watch.disconnect(), { once: true })
 }
 
 // Opens or closes the dialog to match `shown`: a modal one with `showModal()`, one beside the page with `show()`. A dialog the server rendered open is opened again as a modal, its `open` attribute dropped without a close event.

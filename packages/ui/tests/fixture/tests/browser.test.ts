@@ -2191,3 +2191,35 @@ inBrowser('a Form checking its fields against the action\'s schema', () => {
     expect([await page.evaluate(() => document.querySelector('dialog[open]')), seen.count, page.errors]).toEqual([null, 0, []])
   }, 120_000)
 })
+
+inBrowser('a Dialog whose body loads when it first opens', () => {
+  test('focuses the first control of the body once it arrives', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/lazy-dialog')
+    // Save-Data loads the body when the dialog opens instead of ahead, so it arrives after the dialog took the focus.
+    await page.initScript(() => Object.defineProperty(navigator, 'connection', { value: { saveData: true } }))
+    await page.reload()
+    await page.click('#opener')
+    await page.waitFor('#lazy[open]')
+    await page.waitFor('#first:focus')
+    expect(page.errors).toEqual([])
+  })
+})
+
+inBrowser('a Dialog whose body fills in after it opened', () => {
+  test('moves the focus to the first control that arrives', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/late-dialog')
+    await page.click('#opener')
+    await page.waitFor('#late[open]')
+    await page.evaluate(() => {
+      const input = document.createElement('input')
+
+      input.id = 'late-field'
+      document.querySelector('#late [data-part="body"]')!.append(input)
+    })
+    await page.waitFor('#late-field:focus')
+  })
+})
