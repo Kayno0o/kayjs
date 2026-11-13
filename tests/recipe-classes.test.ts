@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises'
+import { rm, symlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -317,6 +317,26 @@ describe('the Cases of a lifted recipe', () => {
 
     expect(html).toContain('fenced')
     expect(css).toMatch(/\.note\[data-k-[\da-z]+\] \{\s+color: #639/)
+  }, 120_000)
+
+  it('writes the `--- style` fence of a library in Bun\'s isolated store once, under the name the bundler reaches it by', async () => {
+    const copy = await project()
+    const library = join(copy, 'node_modules/.bun/fence-lib@1.0.0/node_modules/fence-lib')
+
+    await Bun.write(join(copy, 'package.json'), '{ "name": "app", "private": true, "dependencies": { "fence-lib": "1.0.0" } }\n')
+    await Bun.write(join(library, 'package.json'), '{ "name": "fence-lib", "version": "1.0.0", "type": "module", "peerDependencies": { "kay": "*" }, "exports": { "./*.kay": "./src/*.kay" } }\n')
+    await Bun.write(join(library, 'src/badge.kay'), '--- style\n.badge { color: rebeccapurple }\n---\nspan.badge badge\n')
+    await symlink('.bun/fence-lib@1.0.0/node_modules/fence-lib', join(copy, 'node_modules/fence-lib'))
+    await Bun.write(join(copy, 'src/components/outer.kay'), '---\nimport Badge from \'fence-lib/badge.kay\'\n---\nBadge\n')
+    await edit(join(copy, 'src/routes/index.kay'), text => `${text.replace('import Tag from \'../components/tag.kay\'', 'import Tag from \'../components/tag.kay\'\nimport Outer from \'../components/outer.kay\'')}Outer\n`)
+    await rm(join(copy, '.kay/cache/scoped'), { recursive: true, force: true })
+
+    const { css } = await page(copy)
+    const scoped = join(copy, '.kay/cache/scoped')
+    const fences = await Promise.all((await Array.fromAsync(new Bun.Glob('*.css').scan(scoped))).map(async file => Bun.file(join(scoped, file)).text()))
+
+    expect(css).toMatch(/\.badge\[data-k-[\da-z]+\] \{\s+color: #639/)
+    expect(fences.filter(text => text.includes('.badge[data-k-'))).toHaveLength(1)
   }, 120_000)
 
   it('leaves an app without Tailwind as written', async () => {

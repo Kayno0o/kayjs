@@ -679,7 +679,7 @@ async function islandDirectives(root: string, outputs: Bun.BuildArtifact[]): Pro
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
 // The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
 // `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole and compares what the page sets with it.
-async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses, server: UnresolvedClass[] }> {
+async function bundleStyles(root: string, { pages, files, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'files' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses, server: UnresolvedClass[] }> {
   if (pages.length === 0)
     return { styles: {}, inputs: [], followed: [], unused: new Set(), server: [] }
 
@@ -688,7 +688,7 @@ async function bundleStyles(root: string, { pages, libraries, classes, shorthand
   // Read while Bun.build parses and bundles: a stylesheet waits for it only once it is loaded.
   const unusedClasses = unusedLibraryClasses(root, libraries, classes)
 
-  await writeComponentStylesheets(root, [...libraries.flatMap(library => library.files), ...await findKayFiles(root, { project: true, ownKayOnly: true })])
+  await writeComponentStylesheets(root, files)
 
   const since = raisedMark()
   const [build, unused] = await Promise.all([Bun.build({

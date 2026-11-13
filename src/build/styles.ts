@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
 import { readFileSync, statSync } from 'node:fs'
-import { rename } from 'node:fs/promises'
+import { realpath, rename } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { islandId, withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
@@ -117,13 +117,15 @@ async function writeRecipeStylesheet(root: string, path: string, source: string,
 }
 
 // Writes the stylesheets of the `--- style` fences and recipes among `files` before the bundler runs: Bun reads a folder once, so a file written into it while it bundles can fail to resolve.
+// Each is written under the file's real path, the one Bun hands the plugin, so both name and rebase it alike: a library under Bun's isolated store is reached through a link inside the root.
 export async function writeComponentStylesheets(root: string, files: string[]): Promise<void> {
   const reference = tailwindEntry(root, true)
 
-  await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async (file) => {
+  await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async (listed) => {
     try {
+      const file = await realpath(listed)
       const source = await Bun.file(file).text()
-      const { style } = parseKay(source)
+      const style = source.includes('style') ? parseKay(source).style : undefined
 
       await Promise.all([
         style && writeScopedStylesheet(root, file, source.slice(style.start, style.end), async () => reference),
@@ -131,7 +133,7 @@ export async function writeComponentStylesheets(root: string, files: string[]): 
       ])
     }
     catch (error) {
-      // A file deleted since the listing is no recipe to write.
+      // A file deleted since the listing has no stylesheet to write.
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         throw error
     }
