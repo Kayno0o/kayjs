@@ -79,9 +79,9 @@
     "jose": "^6.2.13"
   },
   "devDependencies": {
-    "@kaynooo/eslint": "^7.1.6",
     "@kayjs/mail": "workspace:~",
     "@kayjs/ui": "workspace:~",
+    "@kaynooo/eslint": "^7.1.6",
     "@kaynooo/pg-orm": "^8.1.4",
     "@types/bun": "^1.4.4",
     "elysia": "^1.4.31",
