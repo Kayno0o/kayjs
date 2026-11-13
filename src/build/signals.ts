@@ -1,14 +1,15 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { importedModules, moduleSignals } from '../compiler/module-signals'
+import { importedModules, moduleLinks, moduleSignals } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
 
 const KAY_FILE = /\.kay$/
 const KAY_MODULE = /^kay(?:\/|$)/
-const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
+// A module's signals with the stamp of every file they were read from, the module and each one it re-exports from.
+const scanned = new Map<string, { stamps: Map<string, string | undefined>, signals: Record<string, SignalKind> }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -70,9 +71,9 @@ function readImportedSignals(file: string, source: string): ImportedSignals {
   imports.set(file, { hash, specifiers })
 
   for (const specifier of specifiers) {
-    const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
+    const path = scannable(specifier, file)
 
-    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
+    if (path === undefined)
       continue
 
     const signals = signalsOf(path)
@@ -92,29 +93,78 @@ export function keepImportedSignals(files: ReadonlySet<string>): void {
   }
 }
 
-// What a module exports, read again once its stamp changes.
+// The file a specifier names when its signals are worth scanning: a script or a component, not a `kay` entry, and a package only through a relative import.
+function scannable(specifier: string, from: string): string | undefined {
+  const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, from)
+
+  return path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')) ? undefined : path
+}
+
+function stampOf(path: string): string | undefined {
+  const stats = statSync(path, { throwIfNoEntry: false })
+
+  return stats && `${stats.mtimeMs}-${stats.size}`
+}
+
+// What a module exports, read again once the stamp of it or of a module it re-exports from changes.
 function signalsOf(path: string): Record<string, SignalKind> {
   try {
-    const stats = statSync(path, { throwIfNoEntry: false })
-
-    if (!stats)
-      return {}
-
-    const stamp = `${stats.mtimeMs}-${stats.size}`
     const known = scanned.get(path)
 
-    if (known?.stamp === stamp)
+    if (known && [...known.stamps].every(([file, stamp]) => stampOf(file) === stamp))
       return known.signals
 
-    const signals = kindsOf(path, readFileSync(path, 'utf8'))
+    const stamps = new Map<string, string | undefined>()
+    const signals = collect(path, stamps, [])
 
-    scanned.set(path, { stamp, signals })
+    scanned.set(path, { stamps, signals })
 
     return signals
   }
   catch {
     return {}
   }
+}
+
+// The signals a module exports, those it hands on from another included; `trail` is the modules being read, so a cycle of re-exports ends.
+function collect(path: string, stamps: Map<string, string | undefined>, trail: string[]): Record<string, SignalKind> {
+  const stamp = stampOf(path)
+
+  stamps.set(path, stamp)
+
+  if (stamp === undefined || trail.includes(path))
+    return {}
+
+  const text = readFileSync(path, 'utf8')
+  const signals = kindsOf(path, text)
+
+  if (KAY_FILE.test(path))
+    return signals
+
+  const jsx = scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx'
+  const links = moduleLinks(text, jsx)
+  const next = [...trail, path]
+  const from = (specifier: string) => {
+    const target = scannable(specifier, path)
+
+    return target === undefined ? {} : collect(target, stamps, next)
+  }
+
+  for (const specifier of links.stars) {
+    for (const [name, kind] of Object.entries(from(specifier))) {
+      if (name !== 'default' && !Object.hasOwn(signals, name))
+        signals[name] = kind
+    }
+  }
+
+  for (const { exported, source, imported } of links.names) {
+    const kind = from(source)[imported]
+
+    if (kind)
+      signals[exported] = kind
+  }
+
+  return signals
 }
 
 function kindsOf(path: string, text: string): Record<string, SignalKind> {

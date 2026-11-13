@@ -140,18 +140,30 @@ function liveBindings(script: ScriptAnalysis, imported: ImportedSignals | undefi
   return script.imports.filter(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')
 }
 
-// The live value an island imports, at its import.
-function liveCause(file: KayFile, script: ScriptAnalysis, live: string | undefined): IslandCause | undefined {
-  const binding = script.imports.find(binding => binding.local === live)
+// The first live or persisted value a script imports, which makes its component an island: the browser holds the one, the server changes the other.
+function browserBinding(script: ScriptAnalysis, imported: ImportedSignals | undefined): { local: string, kind: 'live' | 'persisted' } | undefined {
+  for (const binding of script.imports) {
+    const kind = binding.typeOnly ? undefined : imported?.[binding.source]?.[binding.imported]
 
-  return live === undefined || binding === undefined ? undefined : { kind: 'live', name: live, span: binding.span, line: lineOf(file.source, binding.span.start) }
+    if (kind === 'live' || kind === 'persisted')
+      return { local: binding.local, kind }
+  }
+
+  return undefined
 }
 
-// The cause with the props the component's `island` export lists as making a use interactive, when it lists some: a client-only component and one following a live value are islands in every use.
+// The live or persisted value an island imports, at its import.
+function browserCause(file: KayFile, script: ScriptAnalysis, value: ReturnType<typeof browserBinding>): IslandCause | undefined {
+  const binding = script.imports.find(binding => binding.local === value?.local)
+
+  return value === undefined || binding === undefined ? undefined : { kind: value.kind, name: value.local, span: binding.span, line: lineOf(file.source, binding.span.start) }
+}
+
+// The cause with the props the component's `island` export lists as making a use interactive, when it lists some: a client-only component and one following a live or persisted value are islands in every use.
 function withInteractive(cause: IslandCause | undefined, script: ScriptAnalysis): IslandCause | undefined {
   const interactive = interactiveProps(script)
 
-  return cause !== undefined && interactive !== undefined && cause.kind !== 'client' && cause.kind !== 'live' ? { ...cause, interactive } : cause
+  return cause !== undefined && interactive !== undefined && cause.kind !== 'client' && cause.kind !== 'live' && cause.kind !== 'persisted' ? { ...cause, interactive } : cause
 }
 
 // A cause found in the expanded source, in the file: its span, and its line counted in what the author wrote.
@@ -169,10 +181,6 @@ function staticPin(span: Span, cause: IslandCause): Diagnostic {
   return { ...span, code: 'static-pin', message: `This component is pinned \`--- static\`, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or pin it `--- island`' }
 }
 
-function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
-  return liveBindings(script, imported)[0]?.local
-}
-
 // What the server fence declares for the template: its data and its exports, which the script reads as declared rather than as kay values to import.
 function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
   return server && [...server.data.map(data => data.name), ...server.exportNames]
@@ -184,7 +192,7 @@ interface Role {
   always: boolean
   // A `--- island` fence: an island unless the file is a page, a layout or a special page, which is never one by its pin.
   pinned: boolean
-  // It imports a live value, which makes a file that is not a layout, a special page or one with a server fence an island.
+  // It imports a live or persisted value, which makes a file that is not a layout, a special page or one with a server fence an island.
   live: boolean
   server: boolean
 }
@@ -211,7 +219,7 @@ function roleOf(original: string, imported: ImportedSignals | undefined, page: b
   const script = analyzeScript(source, file.script, serverNames(server), file.module)
   const always = file.client !== undefined || isInteractive(file, script)
   const pinned = file.pin?.kind === 'island' && !page
-  const role = { always, pinned, live: liveImport(script, imported) !== undefined, server: file.server !== undefined }
+  const role = { always, pinned, live: browserBinding(script, imported) !== undefined, server: file.server !== undefined }
 
   if (kept) {
     const inner = kept.get(original) ?? new Map<string, Role>()
@@ -281,13 +289,13 @@ export function compileKay(original: string, filename: string, options: CompileO
   const failed = !client && !routeFile && options.page !== true ? takeBlock(file, filename, options, script, scope, 'failed') : undefined
   const failedAt = failed?.code.search(FAILED_FUNCTION) ?? -1
   const failedCode = failed && options.output === 'html' && failedAt >= 0 ? failed.code.slice(failedAt) : undefined
-  const live = routeFile ? undefined : liveImport(script, options.importedSignals)
+  const live = routeFile ? undefined : browserBinding(script, options.importedSignals)
   const pinned = file.pin?.kind === 'island' && !pageFile
   const island = client || pinned || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const pin = file.pin
-  const rawCause = island === undefined ? undefined : islandCause(file, script) ?? liveCause(file, script, live)
+  const rawCause = island === undefined ? undefined : islandCause(file, script) ?? browserCause(file, script, live)
   const cause = withInteractive(realCause(rawCause, expansion, original), script)
   const generateOptions = { cause: options.inspect === true && cause !== undefined ? describeCause(cause) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && pageFile, pageFile, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: isErrorPage(basename(filename)), cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
@@ -295,7 +303,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
     const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
 
-    return kind ? [[binding.local, kind] as const] : []
+    return kind ? [[binding.local, kind === 'persisted' ? 'signal' : kind] as const] : []
   }))
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined

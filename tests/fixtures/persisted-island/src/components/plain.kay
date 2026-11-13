@@ -1,0 +1,4 @@
+---
+import { label } from '../lib/history'
+---
+p.plain {label}

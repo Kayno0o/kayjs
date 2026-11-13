@@ -1,0 +1,4 @@
+---
+import { past } from '../lib/reexport'
+---
+p.named {Object.keys(past()).length} done

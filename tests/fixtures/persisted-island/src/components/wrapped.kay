@@ -1,0 +1,4 @@
+---
+import { seen, kept } from '../lib/wrapped'
+---
+p.wrapped {Object.keys(seen()).length} {Object.keys(kept()).length} done

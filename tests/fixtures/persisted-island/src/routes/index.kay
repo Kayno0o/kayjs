@@ -1,0 +1,17 @@
+---
+import Direct from '../components/direct.kay'
+import Named from '../components/named.kay'
+import Star from '../components/star.kay'
+import Wrapped from '../components/wrapped.kay'
+import Session from '../components/session.kay'
+import Plain from '../components/plain.kay'
+---
+head
+  title Persisted
+h1 Persisted
+Direct
+Named
+Star
+Wrapped
+Session
+Plain

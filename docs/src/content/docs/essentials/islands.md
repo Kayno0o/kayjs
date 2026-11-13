@@ -14,7 +14,7 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, or a `--- island` or `--- client` fence line. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
+A component is an island when its own code needs the browser: an `on*` handler, a `bind:` or a `ref` in its template, a browser value of `kay` such as `signal` in its script, a `live` or `persisted` value it imports from one of your modules (even through a re-export), or a `--- island` or `--- client` fence line. The compiler decides it from the file and its imports, and nothing a component passes makes it one.
 
 The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
 

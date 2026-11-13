@@ -1,0 +1,4 @@
+---
+import { history } from '../lib/star'
+---
+p.star {Object.keys(history()).length} done

@@ -1,7 +1,7 @@
 import type { Span } from './ast'
 
 // What makes a component an island: where it sits in the file and what it is, for the editor, `kay build`, `kay explain island` and the dev tool to say the same thing.
-export type IslandCauseKind = 'client' | 'island' | 'attribute' | 'value' | 'live'
+export type IslandCauseKind = 'client' | 'island' | 'attribute' | 'value' | 'live' | 'persisted'
 
 export interface IslandCause {
   kind: IslandCauseKind
@@ -41,6 +41,8 @@ function causeText(cause: IslandCause): string {
       return `\`${cause.name}\` from ${cause.source}`
     case 'live':
       return `\`${cause.name}\`, a live value`
+    case 'persisted':
+      return `\`${cause.name}\`, a persisted value`
   }
 }
 
@@ -51,7 +53,8 @@ export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
   attribute: 'an `on*`, `bind:` or `ref` attribute: the browser handles it',
   value: 'a `kay` value of the browser, such as `signal` or `effect`, that its script uses',
   live: 'a live value its script imports: the browser follows it',
+  persisted: 'a persisted value its script imports: only the browser holds it',
 }
 
 // The rule, as `kay explain island` says it.
-export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `--- island`. A component whose `export const island` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'
+export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live or persisted value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes an island a function or a block taking parameters is an `island-prop` error, and is made an island by `--- island`. A component whose `export const island` lists `interactive` props is an island only in a use that turns one on: any other use renders as markup with no script.'

@@ -1,0 +1,4 @@
+---
+import { theme, consent, filter } from '../lib/others'
+---
+p.session {theme()} {String(consent())} {filter()}

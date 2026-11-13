@@ -127,8 +127,8 @@ function madeBy(callee: string, made: ReadonlyMap<string, SignalKind | undefined
   return Object.hasOwn(MADE, callee) ? MADE[callee] : undefined
 }
 
-function signalCategory(kind: 'signal' | 'memo' | 'live'): Category {
-  return { type: VARIABLE, modifiers: SIGNAL | (kind === 'signal' ? 0 : READONLY) }
+function signalCategory(kind: SignalKind): Category {
+  return { type: VARIABLE, modifiers: SIGNAL | (kind === 'signal' || kind === 'persisted' ? 0 : READONLY) }
 }
 
 // Marks the names a fence declares at its top level, and every read or write of them; `known` holds those of the module that the code reads without declaring, which the server fence hands the script. The categories of what the fence declares are put in `declared`.

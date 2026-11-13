@@ -1,14 +1,15 @@
-import type { Node, Program } from './estree'
+import type { Node, NodeOfType, Program } from './estree'
 import { parseProgram } from './estree'
 
-// A signal is written by assigning its name; a memo is only read; a live value is only read in the browser, the server changing it.
-export type SignalKind = 'signal' | 'memo' | 'live'
+// A signal is written by assigning its name; a memo is only read; a live value is only read in the browser, the server changing it; a persisted one is a signal the browser's storage holds, which makes a module's reader an island as a live value does.
+export type SignalKind = 'signal' | 'memo' | 'live' | 'persisted'
 
 // The signals and memos of each module a component imports, by the specifier it imports them with.
 export type ImportedSignals = Record<string, Record<string, SignalKind>>
 
 export const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo', throttled: 'memo', live: 'live' }
 const NAMES_KAY = /["']kay["']/
+const EXPORT = /\bexport\b/
 
 // The entries `persisted` carries, one per storage.
 export const PERSISTED_ENTRIES = new Set(['cookie', 'local', 'session', 'query'])
@@ -71,30 +72,110 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
 
     for (const specifier of statement.specifiers) {
       const imported = specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' ? specifier.imported : undefined
-      const kind = imported && MADE[imported.type === 'Identifier' ? imported.name : imported.value]
+      const importedName = imported ? nameOf(imported) : undefined
+      const kind = importedName === 'persisted' ? 'persisted' : MADE[importedName ?? '']
 
       if (kind)
         made.set(specifier.local.name, kind)
 
-      if (imported && (imported.type === 'Identifier' ? imported.name : imported.value) === 'persisted')
+      if (importedName === 'persisted')
         persisted.add(specifier.local.name)
     }
   }
 
+  // Every top-level `const` made by a signal call, exported or not, so an `export { name }` or an alias finds it.
+  const locals: Record<string, SignalKind> = {}
+
   for (const statement of ast.body) {
-    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : undefined
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
     if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
       continue
 
     for (const { id, init } of declaration.declarations) {
       const name = init?.type === 'CallExpression' ? madeBy(init.callee, persisted) : undefined
-      const kind = id.type === 'Identifier' && name !== undefined ? made.get(name) : undefined
+      const kind = init?.type === 'Identifier' ? locals[init.name] : made.get(name ?? '')
 
-      if (id.type === 'Identifier' && kind)
+      if (id.type !== 'Identifier' || !kind)
+        continue
+
+      locals[id.name] = kind
+
+      if (statement.type === 'ExportNamedDeclaration')
         found[id.name] = kind
     }
   }
 
+  for (const statement of ast.body) {
+    if (statement.type !== 'ExportNamedDeclaration' || statement.source || statement.exportKind === 'type')
+      continue
+
+    for (const specifier of statement.specifiers) {
+      const local = specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' && specifier.local.type === 'Identifier' ? locals[specifier.local.name] : undefined
+
+      if (local)
+        found[nameOf(specifier.exported)] = local
+    }
+  }
+
   return found
+}
+
+function nameOf(node: Node): string {
+  if (node.type === 'Identifier')
+    return node.name
+
+  return node.type === 'Literal' ? String(node.value) : ''
+}
+
+// What a module hands on from another: the names `export { a as b } from`, `export * from`, or an import it exports (`import { a } from`, then `export { a }` or `export const b = a`) take from the module they come from, for the build to look their kind up there.
+export interface ModuleLinks {
+  stars: string[]
+  names: { exported: string, source: string, imported: string }[]
+}
+
+export function moduleLinks(source: string, jsx = false): ModuleLinks {
+  const links: ModuleLinks = { stars: [], names: [] }
+  const ast = EXPORT.test(source) ? parseModule(source, jsx) : undefined
+  const imports = new Map<string, { source: string, imported: string }>()
+
+  for (const statement of ast?.body ?? []) {
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type')
+        imports.set(specifier.local.name, { source: statement.source.value, imported: nameOf(specifier.imported) })
+    }
+  }
+
+  for (const statement of ast?.body ?? []) {
+    if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type' && !statement.exported)
+      links.stars.push(statement.source.value)
+
+    if (statement.type === 'ExportNamedDeclaration' && statement.exportKind !== 'type')
+      linkNamed(statement, imports, links)
+  }
+
+  return links
+}
+
+function linkNamed(statement: NodeOfType<'ExportNamedDeclaration'>, imports: Map<string, { source: string, imported: string }>, links: ModuleLinks): void {
+  for (const specifier of statement.specifiers) {
+    if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type')
+      continue
+
+    const local = specifier.local.type === 'Identifier' ? imports.get(specifier.local.name) : undefined
+    const from = statement.source ? { source: statement.source.value, imported: nameOf(specifier.local) } : local
+
+    if (from)
+      links.names.push({ exported: nameOf(specifier.exported), ...from })
+  }
+
+  for (const { id, init } of statement.declaration?.type === 'VariableDeclaration' && statement.declaration.kind === 'const' ? statement.declaration.declarations : []) {
+    const from = id.type === 'Identifier' && init?.type === 'Identifier' ? imports.get(init.name) : undefined
+
+    if (from && id.type === 'Identifier')
+      links.names.push({ exported: id.name, ...from })
+  }
 }
