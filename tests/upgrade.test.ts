@@ -8,6 +8,7 @@ import { dependencies as kayDependencies } from '../package.json'
 import { addMissingPeers } from '../src/commands/add-peers'
 import { registryDepsFor, steppingStones, stoneFallbacks, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
+import { renamePackages } from '../src/package-names'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -220,10 +221,11 @@ describe('kay upgrade', () => {
   })
 
   it('writes the new names in the project\'s files before the installed kay runs, as its config import must resolve once the old packages are gone', async () => {
-    const root = await project(MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0'), {
+    const files = {
       'kay.config.ts': 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nexport default { extensions: [ui()] }\n',
       'src/app.css': '@import \'@kaynooo/kayjs-ui/theme.css\';\n',
-    })
+    }
+    const root = await project(MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0'), files)
     const { deps } = fakes({ '@kaynooo/kayjs': '1.103.0', '@kaynooo/kayjs-ui': '1.103.0', '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' })
     const seen: string[][] = []
     const kay = deps.kay
@@ -237,7 +239,8 @@ describe('kay upgrade', () => {
     try {
       expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
       expect(seen.length).toBeGreaterThan(0)
-      expect(seen.every(([config, css]) => config!.includes('\'@kayjs/ui/extension\'') && css!.includes('\'@kayjs/ui/theme.css\''))).toBe(true)
+      // Compared with the renamed text, not written out, so this file is not taken for a test reading the UI theme (`UI_THEME_USE`).
+      expect(seen.every(([config, css]) => config === renamePackages(files['kay.config.ts']) && css === renamePackages(files['src/app.css']))).toBe(true)
     }
     finally {
       await rm(root, { recursive: true, force: true })
