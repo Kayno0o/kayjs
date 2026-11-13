@@ -2,7 +2,7 @@ import type { Design } from '../format/tailwind'
 import type { ClassTable } from '../runtime/class-table'
 import { tailwindDesign } from '../format/tailwind'
 import { kayLog } from '../runtime/log'
-import { readText } from './files'
+import { readSource } from './files'
 import { UI_FILE } from './ui'
 
 // A class as the table sees it: the variants it applies under, and the CSS properties it sets.
@@ -323,9 +323,9 @@ export function isUtility(design: Design, word: string): boolean {
   return parse(design, [word]).get(word) != null
 }
 
-const RUNTIME_MERGE = /\bclass\s*=\s*(?!["'])|\.\.\.[\w$({[]|\bparts?\b|\brecipe\s*\(/
+const RUNTIME_MERGE = /\bclass\s*=\s*(?!["'])|\.\.\.[\w$({[]|\bparts?\b|\brecipe\b/
 
 // Whether a module may hand the browser classes to merge: a `.kay` file with a class expression, a spread, a part or a recipe, or `src/ui.ts`, which writes parts.
-export async function mergesAtRuntime(file: string): Promise<boolean> {
-  return file.endsWith('.kay') || file.endsWith(UI_FILE) ? RUNTIME_MERGE.test(await readText(file) ?? '') : false
+export function mergesAtRuntime(file: string): boolean {
+  return (file.endsWith('.kay') || file.endsWith(UI_FILE)) && RUNTIME_MERGE.test(readSource(file).text)
 }

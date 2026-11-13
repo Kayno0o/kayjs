@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir } from '../src/build/assets'
-import { buildClassTable } from '../src/build/class-table'
+import { buildClassTable, mergesAtRuntime } from '../src/build/class-table'
 import { buildClient, islandClassTableOf, readClientSources } from '../src/build/client'
 import { transformKayCached } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
@@ -70,6 +70,30 @@ async function islandChunks(): Promise<string> {
 
   return (await Promise.all(files.filter(file => file.endsWith('.js')).map(async file => Bun.file(join(client.dir, file)).text()))).join('\n')
 }
+
+describe('a module that may merge classes in the browser', () => {
+  const written = async (name: string, text: string) => {
+    const file = join(await scratchDir('class-merge-site-'), name)
+
+    await Bun.write(file, text)
+
+    return file
+  }
+
+  it.each([
+    ['a class expression', 'div(class=props.class) x\n'],
+    ['a spread', 'div({...rest}) x\n'],
+    ['a part', 'div(part="head") x\n'],
+    ['a recipe', '---\nimport { recipe as r } from \'kay\'\nconst card = r({ parts: { root: \'p-4\' } })\n---\ndiv x\n'],
+  ])('is %s', async (_name, text) => {
+    expect(mergesAtRuntime(await written('item.kay', text))).toBe(true)
+  })
+
+  it('is not one that writes literal classes, nor a script', async () => {
+    expect(mergesAtRuntime(await written('plain.kay', 'div.p-4(class="p-6") x\n'))).toBe(false)
+    expect(mergesAtRuntime(await written('item.ts', 'export const parts = [...rest]\n'))).toBe(false)
+  })
+})
 
 describe('the table of the island entry', () => {
   it('is none when no island has two classes to merge', async () => {

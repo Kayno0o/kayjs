@@ -483,18 +483,15 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
   const outside = [...renderers].filter(file => !bundled.has(realpathSync(file)))
   const ui = join(root, UI_FILE)
   // `src/ui.ts` is written into the components it restyles, none of which imports it.
-  const words = new Set([...bundled, ...existsSync(ui) ? [ui] : []].flatMap(file => fileWords(file)))
   const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
   const reachingOutside = outside.filter(file => reaching.has(realpathSync(file)))
-
-  for (const file of reachingOutside) {
-    for (const word of fileWords(file))
-      words.add(word)
-  }
+  const written = [...bundled, ...existsSync(ui) ? [ui] : [], ...reachingOutside]
 
   // The browser merges classes only where a component writes a class that is not a literal, a spread or a part; two literals side by side were resolved while compiling.
-  if (!(await Promise.all([...bundled, ...existsSync(ui) ? [ui] : [], ...reachingOutside].map(mergesAtRuntime))).some(Boolean))
+  if (!written.some(file => mergesAtRuntime(file)))
     return undefined
+
+  const words = new Set(written.flatMap(file => fileWords(file)))
 
   return buildClassTable(root, words, references)
 }
