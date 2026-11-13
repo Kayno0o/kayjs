@@ -674,7 +674,6 @@ export interface DevRequest {
   locales?: { locale: string, href: string }[] | undefined
 }
 
-
 // What the server recorded of one response, for the Request tab to ask for once the page is in view.
 export interface DevResponse {
   headers: [name: string, value: string][]
