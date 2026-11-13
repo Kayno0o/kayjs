@@ -31,13 +31,13 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
 
 A Table in an island ships only the features the project's `.kay` files write on it. With no `selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter`, `fields`, `filterParam`, `sortParam`, `list`, `pageSize`, `rowHref` or `onRowClick` at any call site, the code behind that prop stays out of the island's chunks: a table with only `filter` and `pageSize` loads about 22 KB less than one with every feature.
 
-Nothing is declared. kay reads the props at each `<Table>` call of the project's `src`, takes the union, and builds one variant of the Table that every island loads, so two islands share it.
+Nothing is declared. kay reads the props at each `<Table>` call of the project's `.kay` files (not `node_modules`), takes the union, and builds one variant of the Table that every island loads, so two islands share it.
 
 A call with a spread (`Table({...props})`), or a Table read anywhere but as a tag (`const T = Table`, passed as a value), asks for every feature.
 
 The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.
 
-Only an import written as `import Table from '@kaynooo/kayjs-ui/table.kay'` (or a relative one) is specialized. A Table used directly from a static page, as its own island, still ships every feature.
+Only an import written as `import Table from '@kaynooo/kayjs-ui/table.kay'` (or a relative one) is specialized.
 
 ## Reference
 

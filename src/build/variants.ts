@@ -8,7 +8,7 @@ import { parseExpanded } from '../compiler/markdown-block'
 // A component names the features an app may leave out with `uses('selectable')`, the `uses` it imports from kayjs-ui's marker module: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the files of the project write at their call sites. See `specializedSource`.
 const USES_CALL = /\buses\(\s*'(\w+)'\s*\)/y
 const KAY_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+\.kay)\2/gm
-const USES_IMPORT = /^import\s*\{[^}\n]*\buses\b[^}\n]*\}\s*from\s*(["'])([^"'\n]+)\1/m
+const USES_IMPORT = /^import\s*\{[^}]*\buses\b[^}]*\}\s*from\s*(["'])([^"'\n]+)\1/m
 // The marker module, by where the library keeps it: an app's own `uses` is another function.
 const MARKER_FILE = /(?:packages\/ui|@kaynooo\/kayjs-ui)\/src\/uses\.ts$/
 // A line opening a fence, whose last one precedes the template.
@@ -346,7 +346,7 @@ async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
 // What the `.kay` files of a project write of each component with features, all of them together: a component has one variant, so the chunks of two islands using a Table share it.
 export class VariantIndex {
   private readonly union = new Map<string, Set<string> | typeof ANY>()
-  private readonly indexed = new Set<string>()
+  private readonly indexed = new Map<string, Promise<void>>()
   private scan: Promise<void> | undefined
 
   constructor(private readonly dir: string) {}
@@ -361,12 +361,19 @@ export class VariantIndex {
     return this.scan
   }
 
+  // A file read once: a second ask waits for the first, so it sees the union with that file in it.
   private async add(file: string, source: string): Promise<void> {
-    if (this.indexed.has(file))
-      return
+    let done = this.indexed.get(file)
 
-    this.indexed.add(file)
+    if (done === undefined) {
+      done = this.read(file, source)
+      this.indexed.set(file, done)
+    }
 
+    return done
+  }
+
+  private async read(file: string, source: string): Promise<void> {
     const candidates = await candidatesOf(source, file)
 
     if (candidates.length === 0)
@@ -413,7 +420,7 @@ export class VariantIndex {
 }
 
 // The `.kay` files under a directory, leaving out what a project installs and builds.
-function kayFiles(dir: string): string[] {
+export function kayFiles(dir: string): string[] {
   const found: string[] = []
   let entries: Dirent[]
 

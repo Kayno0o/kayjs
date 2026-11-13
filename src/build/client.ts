@@ -52,7 +52,7 @@ import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
-import { variantFile } from './variants'
+import { kayFiles, variantFile } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
   minify?: boolean | undefined
@@ -228,7 +228,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     if (increments || stamps) {
       const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
-      const islandInputs = scripts ? realPaths(Object.values(scripts.inputs).flatMap(inputs => Object.keys(inputs).map(variantFile))) : previous!.islandInputs
+      const islandInputs = scripts ? realPaths(inputsWatched(root, scripts.inputs)) : previous!.islandInputs
 
       last = increments?.next(previous, { sources, islandInputs, styleInputs, classTable: classTableText, manifest: text }, scripts, styles, texts)
 
@@ -322,6 +322,13 @@ async function bothBundles<Islands extends Promise<unknown> | undefined, Styles 
     throw sheets.reason
 
   return [scripts.value, sheets.value]
+}
+
+// The files an island build read, as the real files they are. With a variant among them, every `.kay` file of the project too: the call sites they hold decide which features that variant has.
+function inputsWatched(root: string, inputs: ChunkInputs): string[] {
+  const read = Object.values(inputs).flatMap(each => Object.keys(each))
+
+  return [...read.map(variantFile), ...read.some(input => input.startsWith('kay-variant:')) ? kayFiles(root) : []]
 }
 
 // Compiles every component, throwing all of their errors at once. `graph` keeps what each module imports, across builds when given.

@@ -247,7 +247,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       }
 
       // One index for the build: the call sites of the whole project decide a component's variant.
-      const variantIndex = new VariantIndex(join(root, 'src'))
+      const variantIndex = new VariantIndex(root)
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
       const localizing = (contents: string) => options.localeLinks === true ? withLocaleLinks(contents) : contents
 
