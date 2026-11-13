@@ -1,0 +1,9 @@
+---
+import '../app.css'
+import LiveTag from '../components/live-tag.kay'
+import Tag from '../components/tag.kay'
+---
+Tag(class="px-6") plain
+Tag(tone="danger") danger
+Tag(class={{ icon: 'size-6' }}) icon
+LiveTag

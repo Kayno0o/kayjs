@@ -315,3 +315,8 @@ export async function buildClassTable(root: string, words: Iterable<string>, ref
 
   return Object.keys(classes).length === 0 ? undefined : { sets, classes }
 }
+
+// Whether the app's Tailwind makes CSS of a class, as a recipe's classes lift only what it knows.
+export function isUtility(design: Design, word: string): boolean {
+  return parse(design, [word]).get(word) != null
+}

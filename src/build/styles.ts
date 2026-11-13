@@ -15,6 +15,7 @@ import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerF
 import { globbedFiles } from './glob'
 import { importsOf, libraryOf } from './libraries'
 import { outOfStore, throughLinks } from './links'
+import { recipeLifter } from './recipe-classes'
 import { UI_FILE, uiEntryOf } from './ui'
 
 const ABSOLUTE_URL = /^\//
@@ -69,6 +70,16 @@ function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[
 export interface Reached {
   edges: Map<string, string[]>
   open: Set<string>
+}
+
+// Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.
+async function keepStylesheet(file: string, contents: string): Promise<void> {
+  if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents) {
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`
+
+    await Bun.write(temporary, contents)
+    await rename(temporary, file)
+  }
 }
 
 // A module importing each of these files for what it brings along.
@@ -145,15 +156,24 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
     const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
     // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
     const entry = THEME_USE.test(scoped) ? await (tailwindReference ??= tailwindEntry(root, true)) : undefined
-    const contents = entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`
 
-    // Renamed into place, so a build reading the file while another writes it meets the old text or the new, never half of it.
-    if (!(await Bun.file(file).exists()) || await Bun.file(file).text() !== contents) {
-      const temporary = `${file}.${crypto.randomUUID()}.tmp`
+    await keepStylesheet(file, entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`)
 
-      await Bun.write(temporary, contents)
-      await rename(temporary, file)
-    }
+    return importing(note(path, [file]))
+  }
+  // The rules of the classes a component's recipe lifted into the stylesheet, which the pages rendering the component carry as they carry a `--- style` fence's.
+  const recipeStylesheet = async (path: string, source: string) => {
+    const rules = source.includes('recipe(') ? (await recipeLifter(root))?.lift(source, path)?.rules : undefined
+    const entry = rules === undefined ? undefined : await (tailwindReference ??= tailwindEntry(root, true))
+
+    if (rules === undefined || entry === undefined)
+      return ''
+
+    const file = join(cacheDir(root, 'scoped'), `${scopeHash(`${islandId(throughLinks(root, path), root)}\0recipe`)}.css`)
+
+    scopedTouched = true
+    touchCacheFile(file)
+    await keepStylesheet(file, `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${rules}`)
 
     return importing(note(path, [file]))
   }
@@ -208,7 +228,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
 
         const source = await Bun.file(path).text()
         const { script, server, module, style, template } = parseKay(source)
-        const scoped = style ? await scopedStylesheet(path, source.slice(style.start, style.end)) : ''
+        const scoped = (style ? await scopedStylesheet(path, source.slice(style.start, style.end)) : '') + await recipeStylesheet(path, source)
         const styles = server ? serverStyles(source.slice(server.start, server.end), path) : ''
         const [contents, moduleContents, content] = await Promise.all([
           script ? imports(source.slice(script.start, script.end), path, 'ts') : '',

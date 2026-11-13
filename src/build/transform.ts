@@ -20,6 +20,7 @@ import { throughLinks } from './links'
 import { namedRefresh } from './named-refresh'
 import { isPageFile, realpathOrSelf } from './page-dirs'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
+import { recipeLifter } from './recipe-classes'
 import { importedSignals, keepImportedSignals } from './signals'
 import { embeddedMap, hasSourceMapOf, registerSourceMap } from './sourcemap'
 import { uiEntryOf, uiKeyOf } from './ui'
@@ -107,7 +108,9 @@ export function transformKay(source: string, filename: string, options: Transfor
 }
 
 // `transformKay` through the cache: one entry per file and target, replaced when the source or the compiler changes.
-export async function transformKayCached(source: string, filename: string, given: TransformOptions): Promise<string> {
+export async function transformKayCached(original: string, filename: string, given: TransformOptions): Promise<string> {
+  // The recipe's classes the stylesheet carries stand in the source, which every other key and read of the compile then holds.
+  const source = original.includes('recipe(') ? (await recipeLifter(given.root ?? process.cwd()))?.lift(original, filename)?.source ?? original : original
   const clientOnly = await clientOnlyIsland(source, filename, given.cacheDir)
   const classMerge = given.target === 'ssr' ? await usesTailwind(given.root ?? process.cwd()) : undefined
   const options = { ...given, ...clientOnly && { clientOnly }, classMerge }

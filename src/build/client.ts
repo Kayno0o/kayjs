@@ -29,7 +29,7 @@ import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
-import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
+import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
 import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
@@ -39,6 +39,7 @@ import { throughLinks } from './links'
 import { isPageFile, pageDirs } from './page-dirs'
 import { kay } from './plugin'
 import { unusedLibraryClasses } from './prune'
+import { recipeLifter } from './recipe-classes'
 import { referencesOf } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
@@ -181,6 +182,8 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
       increments.forgetSignatures()
       forgetSources()
     }
+
+    liftSources(await recipeLifter(root))
 
     const sources = await readClientSources(root, options, graph)
 

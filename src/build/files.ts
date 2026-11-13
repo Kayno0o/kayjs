@@ -53,12 +53,26 @@ interface SourceRead {
 
 interface KeptRead extends SourceRead {
   stamp: string
+  // The lift the text was read through, 0 for none.
+  lens: number
   // Written so recently that a second write could leave the stamp as it is, so it is read again at the next call.
   racy: boolean
   used: number
 }
 
 const reads = new Map<string, KeptRead>()
+
+// What stands in for the text of a `.kay` file while a build runs: its recipes' classes written in a stylesheet, so every reader of the build meets the classes the pages carry.
+export interface SourceLift {
+  readonly id: number
+  lift: (source: string, file: string) => { source: string } | undefined
+}
+
+let lifting: SourceLift | undefined
+
+export function liftSources(lift: SourceLift | undefined): void {
+  lifting = lift
+}
 let generation = 0
 // A write this close to a read may share its timestamps with the next write: filesystems tell times apart by a tick or, on some, by two seconds.
 const SETTLED_MS = 2000
@@ -119,15 +133,18 @@ export function readSource(file: string): SourceRead {
   const stamp = `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}`
   const known = reads.get(file)
 
-  if (known?.stamp === stamp && !known.racy) {
+  const lens = lifting?.id ?? 0
+
+  if (known?.stamp === stamp && !known.racy && known.lens === lens) {
     known.used = generation
 
     return known
   }
 
   const raw = readFileSync(file, 'utf8')
-  const text = raw.startsWith(BOM) ? raw.slice(1) : raw
-  const read = { stamp, text, hash: Bun.hash(text), racy: Date.now() - stats.mtimeMs < SETTLED_MS, used: generation }
+  const plain = raw.startsWith(BOM) ? raw.slice(1) : raw
+  const text = lifting !== undefined && KAY_FILE.test(file) ? lifting.lift(plain, file)?.source ?? plain : plain
+  const read = { stamp, text, hash: Bun.hash(text), racy: Date.now() - stats.mtimeMs < SETTLED_MS, used: generation, lens }
 
   reads.set(file, read)
 

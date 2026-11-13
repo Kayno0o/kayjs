@@ -1,0 +1,22 @@
+---
+import { recipe } from 'kay'
+
+const look = recipe({
+  parts: {
+    root: 'kui-tag group inline-flex items-center gap-1 px-2 py-1 text-sm text-gray-700 data-stamp:px-4',
+    icon: 'size-3 shrink-0 opacity-70',
+  },
+  variants: {
+    tone: {
+      neutral: 'bg-gray-100',
+      danger: 'bg-red-600 text-white',
+    },
+  },
+  defaults: { tone: 'neutral' },
+})
+
+const { tone = 'neutral', stamp = false } = props<{ stamp?: boolean | undefined }>()
+---
+span(part="root" data-tone={tone} data-stamp={stamp ? '' : undefined})
+  i(part="icon")
+  slot

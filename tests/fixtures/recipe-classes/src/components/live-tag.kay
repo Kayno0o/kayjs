@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+import Tag from './tag.kay'
+
+const count = signal(0)
+---
+button.live(onClick={() => count.set(count() + 1)})
+  Tag(class="px-6 text-red-500") {count()}

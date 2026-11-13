@@ -54,7 +54,7 @@ export function misplacedRecipe(statement: Statement, calls: ReadonlySet<string>
   return undefined
 }
 
-function recipeCall(init: Node | null | undefined, calls: ReadonlySet<string>): CallExpression | undefined {
+export function recipeCall(init: Node | null | undefined, calls: ReadonlySet<string>): CallExpression | undefined {
   let node = init
 
   while (node?.type === 'TSAsExpression' || node?.type === 'TSSatisfiesExpression' || node?.type === 'TSNonNullExpression')

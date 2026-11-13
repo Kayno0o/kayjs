@@ -161,6 +161,8 @@ section
 
 Classes merge in the order the part's own classes, the recipe's base, its variants in the order they are declared, then the caller's `class`, so `Card(compact class={{ head: 'p-6' }})` gives `p-6`. The recipe reaches the same parts `class` does, and in an island a variant changed at runtime swaps its classes.
 
+In an app with Tailwind, the build lifts a recipe's utility classes into one short class per string, with its rule in the `utilities.recipe` cascade layer, so the page and the island ship the short name instead of the utilities. The layer beats `components` (theme.css and skins) and loses to Tailwind's own utilities, so a `class` the app passes still wins. Names that are not utilities, such as `kui-card` or `group`, stay as written.
+
 A component takes one recipe, declared with `const` at the top of its script, which moves to module level: it cannot read the component's props, signals or any name the script declares. `kay check` reports one that does, a recipe that shares its `const` or sits in a `--- server` fence, and root classes in a template with no `part="root"`.
 
 ### Restyle a component from src/ui.ts
