@@ -28,6 +28,9 @@ declare const KAY_BROWSER: true | undefined
 export { OUTCOME_SCRIPT }
 
 const RETRY_DELAY_MS = 500
+const CODE_RETRIES = 2
+// Once loaded, a call is posted in the same task, as one made from `pagehide` must be: a dynamic import resolves a task later, when the page may be gone.
+let posting: typeof import('./action-post') | undefined
 
 function idempotencyKey(): string {
   return randomId()
@@ -292,7 +295,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
         let sentNow = false
 
         try {
-          answer = await (await postCode()).post(url(), input, setProgress, attemptSignal.signal, () => {
+          answer = await (await postingCode()).post(url(), input, setProgress, attemptSignal.signal, () => {
             sent = sentNow = true
             clearTimeout(timer)
             timer = limit && setTimeout(() => {
@@ -455,12 +458,14 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
 }
 
 // A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
-const CODE_RETRIES = 2
+function postingCode(): typeof import('./action-post') | Promise<typeof import('./action-post')> {
+  return posting ?? postCode()
+}
 
 async function postCode(): Promise<typeof import('./action-post')> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await import('./action-post')
+      return posting = await import('./action-post')
     }
     catch (error) {
       if (attempt >= CODE_RETRIES) {
