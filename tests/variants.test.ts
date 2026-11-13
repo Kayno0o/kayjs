@@ -64,6 +64,12 @@ describe('specializedSource around else and the text', () => {
     expect(out).toBe('const a = true\n// uses(\'x\')\nconst b = \'uses(\\\'x\\\')\'\nconst c = other.uses(\'x\')\n---\n')
   })
 
+  it('leaves a call in a comment or a template literal over several lines', () => {
+    const text = '/* one\n uses(\'x\') */\nconst a = `\nuses(\'x\')`\nconst b = uses(\'x\')\n---\n'
+
+    expect(specializedSource(text, new Set()).split('\n')).toEqual(['/* one', ' uses(\'x\') */', 'const a = `', 'uses(\'x\')`', 'const b = false', '---', ''])
+  })
+
   it('leaves the file of an app whose own uses is not the marker', async () => {
     const dir = await scratchDir('variants-')
     const file = join(dir, 'own.kay')
@@ -82,7 +88,7 @@ describe('propsWritten', () => {
   it('collects attributes, slots and children of each call site', () => {
     const written = propsWritten(`${head}Table(rows={r} selectable)\nTable(pageSize={5})\n  @footer\n    p x`, ['Table'])
 
-    expect([...written.get('Table')!].sort()).toEqual(['footer', 'pageSize', 'rows', 'selectable'])
+    expect([...written.get('Table') as Set<string>].sort()).toEqual(['footer', 'pageSize', 'rows', 'selectable'])
   })
 
   it('leaves out a component called with a spread or read as a value', () => {

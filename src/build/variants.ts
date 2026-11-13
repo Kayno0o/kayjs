@@ -234,8 +234,8 @@ export function specializedSource(source: string, present: ReadonlySet<string>, 
   // The template starts after the last fence line.
   const template = lines.findLastIndex(line => FENCE.test(line)) + 1
 
-  for (let at = 0; at < template; at++)
-    lines[at] = replaced(lines[at]!)
+  // The script as one text, so a comment or a template literal over several lines is read as one; the answers hold no newline, so the lines keep their numbers.
+  lines.splice(0, template, ...replaced(lines.slice(0, template).join('\n')).split('\n'))
 
   for (let at = template; at < lines.length; at++) {
     const hit = USES_IF.exec(lines[at]!)
