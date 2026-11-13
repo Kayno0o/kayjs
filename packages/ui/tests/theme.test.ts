@@ -530,6 +530,8 @@ describe('theme.css', () => {
       expect(sourceOf(name), name).toMatch(/root: '[^']*\bbg-surface-strong\b/)
 
     expect(sourceOf('bar-list')).toMatch(/track: '[^']*\bbg-surface-strong\b/)
+    // An empty ContributionGraph cell is the track of its ramp, whose filled cells shade translucent over it.
+    expect(sourceOf('contribution-graph')).toMatch(/cell: '[^']*\bbg-surface-strong\b/)
     expect(sourceOf('toggle')).toMatch(/track: '[^']*\bborder-input\b/)
     expect(rangeTrackSource).toMatch(/slider-runnable-track\]:bg-input/)
     expect(rangeTrackSource).toMatch(/moz-range-track\]:bg-input/)

@@ -787,7 +787,7 @@ describe('charts', () => {
     ['stacked-bars', 'legendItem', ['flex', 'items-center', 'text-muted']],
     ['stacked-bars', 'key', ['size-2', 'shrink-0']],
     ['graph', 'month', ['row-start-1', 'w-0', 'text-muted']],
-    ['graph', 'cell', ['size-3', 'bg-surface', 'hover:scale-125', 'data-today:ring-accent']],
+    ['graph', 'cell', ['size-3', 'bg-surface-strong', 'hover:scale-125', 'data-today:ring-accent']],
   ] as const)('the %s chart draws its %s part with %j', async (id, part, utilities) => {
     const found = [...(await page(id)).matchAll(new RegExp(`<[a-z]+ class="([^"]*)" data-part="${part}"`, 'g'))].map(match => match[1]!.split(' '))
 
