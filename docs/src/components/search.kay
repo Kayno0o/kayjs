@@ -1,7 +1,7 @@
 ---
-import type { PaletteEntry } from '@kaynooo/kayjs-ui'
+import type { PaletteEntry } from '@kayjs/ui'
 import type { Navigation } from '../pages'
-import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import CommandPalette from '@kayjs/ui/command-palette.kay'
 import { memo, onMount, shortcut, signal } from 'kay'
 import SearchIcon from '~icons/tabler/search'
 

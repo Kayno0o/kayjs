@@ -1,5 +1,5 @@
 ---
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
 import { onMount, signal } from 'kay'
 
 // A rolling series fed by a signal: `roll` adds a point on the right and drops the one on the left, `recolor` changes the series' colour, and nothing else calls the chart.

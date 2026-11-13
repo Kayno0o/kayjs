@@ -1,6 +1,6 @@
 --- server
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { action, localPath, s } from 'kay'
 import { overHttps } from 'kay/library'
 import { wording } from 'kay/words'

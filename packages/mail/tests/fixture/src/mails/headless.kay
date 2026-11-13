@@ -1,6 +1,6 @@
 ---
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Paragraph from '@kayjs/mail/paragraph.kay'
 ---
 Layout
   @header

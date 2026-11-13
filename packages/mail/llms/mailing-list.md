@@ -10,7 +10,7 @@
 --- server
 import { action } from 'kay'
 import { mail } from '../mail'
-import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
+import SubscribeForm from '@kayjs/mail/subscribe-form.kay'
 
 export const subscribe = action(...mail.list().form())
 ---
@@ -18,7 +18,7 @@ SubscribeForm(action={subscribe})
 ```
 
 - A post mails the address a confirmation link (valid 3 days) and lists it only once its page's button is pressed: double opt-in. Opening the link (a mail scanner or prefetch does) shows a page with one button and lists no one; the button's POST confirms. The answer is the same for a new, a pending, a confirmed or an unknown address, and a confirmed one is mailed nothing. The confirmation mail is rendered for every address but queued off the response path, so a listed and a new address answer in the same steps; a queue failure is logged, not shown.
-- `SubscribeForm` from `@kaynooo/kayjs-ui/subscribe-form.kay` is the themed one (a FormField tying the refusal to the input); kayjs-mail's own `SubscribeForm` is unstyled markup with `kmail-subscribe*` classes, the honeypot and a notice line saying what the address is used for; a form of your own is `form(action={subscribe})` with `input(field="email")` and, to keep the proof below, a hidden `wording` field naming the notice your form shows (nothing is recorded without it). Its props are `label`, `submitLabel`, `sentLabel`, `privacy` (the policy page, linked after the notice; left out, the list's own `privacy` option), `noticeText` (replaces the stock notice: say who writes, what and how often), `privacyLabel` and `wordingId` (names your notice's version).
+- `SubscribeForm` from `@kayjs/ui/subscribe-form.kay` is the themed one (a FormField tying the refusal to the input); kayjs-mail's own `SubscribeForm` is unstyled markup with `kmail-subscribe*` classes, the honeypot and a notice line saying what the address is used for; a form of your own is `form(action={subscribe})` with `input(field="email")` and, to keep the proof below, a hidden `wording` field naming the notice your form shows (nothing is recorded without it). Its props are `label`, `submitLabel`, `sentLabel`, `privacy` (the policy page, linked after the notice; left out, the list's own `privacy` option), `noticeText` (replaces the stock notice: say who writes, what and how often), `privacyLabel` and `wordingId` (names your notice's version).
 - What is kept as the proof of consent: the confirmation date, the `source` (the path of the page the form was on, from the referrer, without its query) and the `wording` (the `wordingId` the form posted, `stock` for the stock notice and `custom` for a replaced one; it is posted by the visitor's browser, so it says which notice the page claimed to show). `list.subscribers()` returns them with each address; an unsubscribe deletes the row with them.
 - Protection: the action's `rateLimit` (10 posts every 10 minutes, per IP), `minTime` 2 seconds and a `website` honeypot, replaced by `list(name, { protection, honeypot })`; 3 confirmation mails an hour per address and 300 per list, then the post still answers the same and mails nothing, so the form cannot mail-bomb anyone. A confirmation link confirms only a sign-up made before it was, so an old mail cannot confirm a later one.
 - Addresses are stored once, normalised: Unicode NFC, lower case, domain in punycode; a `+tag` stays part of it. Anything that is not one plain address (second `@`, comma list, name with angle brackets, line break, IP domain) is refused with the field's message.
@@ -54,8 +54,8 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 - Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the SQLite file shared, or Postgres:
 
 ```ts
-import { mailer } from '@kaynooo/kayjs-mail'
-import { pgLists } from '@kaynooo/kayjs-mail/pg'
+import { mailer } from '@kayjs/mail'
+import { pgLists } from '@kayjs/mail/pg'
 
 export const mail = mailer({ listStore: pgLists(db) }) // db: a Bun SQL, a pg-orm Database or a connection URL, as pgData takes
 ```

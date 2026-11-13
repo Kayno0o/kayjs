@@ -108,7 +108,7 @@ const KAY_PACKAGE = process.env.KAY_PACKAGE ?? ''
 // `INLINE_STYLES=true|false` writes `inlineStyles` into each kay copy's config, to time a site with every page's stylesheets inlined or linked rather than as kay decides.
 const INLINE_STYLES = process.env.INLINE_STYLES ?? ''
 const CHECKOUT = join(import.meta.dir, '../..')
-const PUBLISHED = '@kaynooo/kayjs'
+const PUBLISHED = '@kayjs/kay'
 // What stops the services the sites' servers need, in the order they started.
 const services: (() => Promise<void> | void)[] = []
 // Beside a kay dev copy's install: where its kay came from.

@@ -345,7 +345,7 @@ describe('a component keyed by its name', () => {
 
     expect(problem!.message).toBe('`Card` names 2 components')
     expect(problem!.help).toContain('`./card.kay`')
-    expect(problem!.help).toContain('`@kaynooo/kayjs-ui/card.kay`')
+    expect(problem!.help).toContain('`@kayjs/ui/card.kay`')
   })
 
   it('sees a second component bearing a name once it is written', async () => {

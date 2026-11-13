@@ -1,4 +1,4 @@
 ---
-import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import BarList from '@kayjs/ui/bar-list.kay'
 ---
 BarList(rows={[]} emptyLabel="No visits yet.")

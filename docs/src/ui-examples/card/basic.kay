@@ -1,5 +1,5 @@
 ---
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Card from '@kayjs/ui/card.kay'
 ---
 Card(title="Traffic")
   p 1,284 visits, up 12% on last week.

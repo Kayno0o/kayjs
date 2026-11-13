@@ -353,7 +353,7 @@ The rewritten request goes through the whole app again, guards included, and see
 A library can serve pages of its own, such as the sign-in and sign-up of kayjs-auth. List it once in `extensions`.
 
 ```ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ extensions: [auth()] })

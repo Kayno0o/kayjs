@@ -49,7 +49,7 @@ export const KAY_EXTENSION = /\.kay$/
 const COMPONENT_NAME = /^[A-Z_$][\w$]*$/i
 const WORD_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])/g
 // The package whose components a bare name reaches besides the app's own.
-const UI_LIBRARY = '@kaynooo/kayjs-ui'
+const UI_LIBRARY = '@kayjs/ui'
 // What `src/ui.ts` was last read as, by file: it is read for every component the build compiles.
 const read = new Map<string, { stamp: string, ui: UiSource | undefined }>()
 

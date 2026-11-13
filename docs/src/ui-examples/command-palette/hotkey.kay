@@ -1,7 +1,7 @@
 --- island
-import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
-import type { PaletteEntry } from '@kaynooo/kayjs-ui'
-import { toast } from '@kaynooo/kayjs-ui'
+import CommandPalette from '@kayjs/ui/command-palette.kay'
+import type { PaletteEntry } from '@kayjs/ui'
+import { toast } from '@kayjs/ui'
 
 const entries: PaletteEntry[] = [
   { label: 'Say hello', group: 'Actions', onSelect: () => toast.info('Hello') },

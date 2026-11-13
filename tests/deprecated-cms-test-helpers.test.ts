@@ -15,7 +15,7 @@ async function project(files: Record<string, string>): Promise<string> {
 
 describe('deprecated-cms-test-helpers', () => {
   it('rewrites the calls and the import of a test file', async () => {
-    const test = 'import { cmsSignInAs, cmsSignInWith, cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\n\nawait cmsSignInAs(site, \'admin\')\nawait cmsSignInAs(site)\nexpect((await cmsSignInWith(site, \'x\')).status).toBe(401)\ncmsSignOut(site)\n'
+    const test = 'import { cmsSignInAs, cmsSignInWith, cmsSignOut } from \'@kayjs/cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\n\nawait cmsSignInAs(site, \'admin\')\nawait cmsSignInAs(site)\nexpect((await cmsSignInWith(site, \'x\')).status).toBe(401)\ncmsSignOut(site)\n'
     const root = await project({ 'tests/admin.test.ts': test })
 
     try {
@@ -24,7 +24,7 @@ describe('deprecated-cms-test-helpers', () => {
       expect(found).toHaveLength(5)
       expect(found.every(one => one.code === 'deprecated-cms-test-helpers' && one.fixes?.[0]?.safe === true)).toBe(true)
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'tests/admin.test.ts')).text()).toBe('import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\n\nawait cmsTest(site).signInAs(\'admin\')\nawait cmsTest(site).signInAs()\nexpect((await cmsTest(site).signInWith(\'x\')).status).toBe(401)\ncmsTest(site).signOut()\n')
+      expect(await Bun.file(join(root, 'tests/admin.test.ts')).text()).toBe('import { cmsTest } from \'@kayjs/cms/test\'\nimport { testSite } from \'kay/test\'\n\nconst site = await testSite()\n\nawait cmsTest(site).signInAs(\'admin\')\nawait cmsTest(site).signInAs()\nexpect((await cmsTest(site).signInWith(\'x\')).status).toBe(401)\ncmsTest(site).signOut()\n')
       expect(await cmsTestHelpers(root, {})).toEqual([])
     }
     finally {
@@ -33,12 +33,12 @@ describe('deprecated-cms-test-helpers', () => {
   })
 
   it('keeps the other imports and an existing cmsTest', async () => {
-    const test = 'import { cmsSignOut, cmsTest, type CmsTest } from \'@kaynooo/kayjs-cms/test\'\n\ncmsSignOut(site)\ncmsTest(site)\n'
+    const test = 'import { cmsSignOut, cmsTest, type CmsTest } from \'@kayjs/cms/test\'\n\ncmsSignOut(site)\ncmsTest(site)\n'
     const root = await project({ 'tests/a.test.ts': test })
 
     try {
       await applySafeFixes(root, await cmsTestHelpers(root, {}))
-      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest, type CmsTest } from \'@kaynooo/kayjs-cms/test\'\n\ncmsTest(site).signOut()\ncmsTest(site)\n')
+      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest, type CmsTest } from \'@kayjs/cms/test\'\n\ncmsTest(site).signOut()\ncmsTest(site)\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -46,8 +46,8 @@ describe('deprecated-cms-test-helpers', () => {
   })
 
   it('reports with no fix an aliased import or a name read other than by calling it, and leaves other modules alone', async () => {
-    const aliased = 'import { cmsSignInAs as signIn } from \'@kaynooo/kayjs-cms/test\'\n\nsignIn(site)\n'
-    const passed = 'import { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\n\nconst out = cmsSignOut\nout(site)\ncmsSignOut(site)\n'
+    const aliased = 'import { cmsSignInAs as signIn } from \'@kayjs/cms/test\'\n\nsignIn(site)\n'
+    const passed = 'import { cmsSignOut } from \'@kayjs/cms/test\'\n\nconst out = cmsSignOut\nout(site)\ncmsSignOut(site)\n'
     const other = 'import { cmsSignInAs } from \'./mine\'\n\ncmsSignInAs(site)\n'
     const root = await project({ 'tests/aliased.test.ts': aliased, 'tests/passed.test.ts': passed, 'tests/other.test.ts': other })
 
@@ -66,15 +66,15 @@ describe('deprecated-cms-test-helpers', () => {
 
 describe('deprecated-cms-test-helpers edge cases', () => {
   it('drops an import left empty and leaves parenthesised arguments with no fix', async () => {
-    const a = 'import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\nimport { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\n\ncmsSignOut(site)\ncmsTest(site)\n'
-    const b = 'import { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\n\ncmsSignOut((site))\n'
+    const a = 'import { cmsTest } from \'@kayjs/cms/test\'\nimport { cmsSignOut } from \'@kayjs/cms/test\'\n\ncmsSignOut(site)\ncmsTest(site)\n'
+    const b = 'import { cmsSignOut } from \'@kayjs/cms/test\'\n\ncmsSignOut((site))\n'
     const root = await project({ 'tests/a.test.ts': a, 'tests/b.test.ts': b })
 
     try {
       const found = await cmsTestHelpers(root, {})
 
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\n\ncmsTest(site).signOut()\ncmsTest(site)\n')
+      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kayjs/cms/test\'\n\ncmsTest(site).signOut()\ncmsTest(site)\n')
       expect(await Bun.file(join(root, 'tests/b.test.ts')).text()).toBe(b)
     }
     finally {
@@ -85,12 +85,12 @@ describe('deprecated-cms-test-helpers edge cases', () => {
 
 describe('deprecated-cms-test-helpers safe fixes', () => {
   it('imports cmsTest once for several import statements, and drops an emptied one with its CRLF', async () => {
-    const test = 'import { cmsSignInAs } from \'@kaynooo/kayjs-cms/test\'\r\nimport { cmsSignOut } from \'@kaynooo/kayjs-cms/test\'\r\n\r\ncmsSignInAs(site)\r\ncmsSignOut(site)\r\n'
+    const test = 'import { cmsSignInAs } from \'@kayjs/cms/test\'\r\nimport { cmsSignOut } from \'@kayjs/cms/test\'\r\n\r\ncmsSignInAs(site)\r\ncmsSignOut(site)\r\n'
     const root = await project({ 'tests/a.test.ts': test })
 
     try {
       await applySafeFixes(root, await cmsTestHelpers(root, {}))
-      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kaynooo/kayjs-cms/test\'\r\n\r\ncmsTest(site).signInAs()\r\ncmsTest(site).signOut()\r\n')
+      expect(await Bun.file(join(root, 'tests/a.test.ts')).text()).toBe('import { cmsTest } from \'@kayjs/cms/test\'\r\n\r\ncmsTest(site).signInAs()\r\ncmsTest(site).signOut()\r\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

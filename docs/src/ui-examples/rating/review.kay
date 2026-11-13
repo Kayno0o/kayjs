@@ -1,5 +1,5 @@
 ---
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Rating from '@kayjs/ui/rating.kay'
 
 const reviews = [
   { name: 'Outer Wilds', score: 4.8, count: 1204 },

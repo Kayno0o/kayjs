@@ -5,7 +5,7 @@ import { action } from 'kay'
 export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 main
   form#claim(action={claim})

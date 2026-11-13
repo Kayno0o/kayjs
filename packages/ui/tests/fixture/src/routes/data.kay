@@ -1,13 +1,13 @@
 ---
-import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
-import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
-import Meter from '@kaynooo/kayjs-ui/meter.kay'
-import Progress from '@kaynooo/kayjs-ui/progress.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
-import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import BarList from '@kayjs/ui/bar-list.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
+import MediaGallery from '@kayjs/ui/media-gallery.kay'
+import Meter from '@kayjs/ui/meter.kay'
+import Progress from '@kayjs/ui/progress.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import SiteFavicon from '@kayjs/ui/site-favicon.kay'
+import Skeleton from '@kayjs/ui/skeleton.kay'
+import Stat from '@kayjs/ui/stat.kay'
 import '../app.css'
 ---
 main

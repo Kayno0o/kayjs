@@ -7,7 +7,7 @@ import type { ChatLauncherIcons } from './types'
 import Chat from './chat.kay'
 import Panel from './chat-panel.kay'
 
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import Icon from '@kayjs/ui/icon.kay'
 
 type IconValue = typeof Icon extends Component<infer Props> ? Props extends { icon: infer Value } ? Value : never : never
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never

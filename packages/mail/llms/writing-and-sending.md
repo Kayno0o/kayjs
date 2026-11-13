@@ -4,13 +4,13 @@
 
 ### Setup
 
-`kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. `send(message)` and `enqueue(message)` from `@kaynooo/kayjs-mail` use the mailer `mail()` built as the site started (they assume one running site per process: when several run, as test sites can, the latest started is used, so each of them calls its own mailer's `send`; they throw when none runs), `registeredMailer()` gives it for `list()`, `drain()` or `suppress()`; `kayjs-auth` sends through it when the app has no `src/mail.ts`.
+`kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. `send(message)` and `enqueue(message)` from `@kayjs/mail` use the mailer `mail()` built as the site started (they assume one running site per process: when several run, as test sites can, the latest started is used, so each of them calls its own mailer's `send`; they throw when none runs), `registeredMailer()` gives it for `list()`, `drain()` or `suppress()`; `kayjs-auth` sends through it when the app has no `src/mail.ts`.
 
-kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types) are peer dependencies.
+kayjs-mail is published as `@kayjs/mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types) are peer dependencies.
 
 ```ts
 // kay.config.ts
-import { mail } from '@kaynooo/kayjs-mail'
+import { mail } from '@kayjs/mail'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
@@ -20,7 +20,7 @@ A mailer with a transport, views or hooks of the app's own is written in a modul
 
 ```ts
 // src/mail.ts
-import { mailer } from '@kaynooo/kayjs-mail'
+import { mailer } from '@kayjs/mail'
 
 export const mail = mailer({ from: 'Site <contact@example.com>', transport: myTransport })
 ```
@@ -60,10 +60,10 @@ A mail is a `.kay` component like any other, rendered on the server with `render
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-mail/button.kay'
-import Heading from '@kaynooo/kayjs-mail/heading.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Button from '@kayjs/mail/button.kay'
+import Heading from '@kayjs/mail/heading.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Paragraph from '@kayjs/mail/paragraph.kay'
 
 const { name, url } = props<{ name: string, url: string }>()
 ---
@@ -89,13 +89,13 @@ Layout(preheader="Your account is ready")
 - `Row` lays `Column`s side by side, stacking them on a screen too narrow for them: `Column` takes half the card's width, or `share`, the fraction it takes, `Column(share={1 / 3})`.
 - `Fields(fields)` lays out a form's answers as label and value pairs, `fields` a list of `{ label, value?, href? }` (the `MailField` type): a long value wraps, its line breaks kept, `href` links it, a `mailto:` or `tel:` say, and a value blank or left out shows `empty`, `-` by default. The text part writes each as `Label: value`, one to a line.
 - `Quote(text)` sets a block of text a visitor wrote apart, its line breaks kept in the html and the text part alike.
-- Their colours, fonts, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `librarySettings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...mailDefaults, accent: '#0047ff' }`, `mailDefaults` and the `MailSettings` type imported from `@kaynooo/kayjs-mail`.
+- Their colours, fonts, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `librarySettings: { '@kayjs/mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...mailDefaults, accent: '#0047ff' }`, `mailDefaults` and the `MailSettings` type imported from `@kayjs/mail`.
 - Mail clients read no CSS custom properties, so rather than typing the site's palette again, the settings take it from the site's stylesheet: `cssColors(css, name)` takes the stylesheet's text, imported with `with { type: 'text' }`, which works in a server built with `kay build --compile` too, and gives a function turning a custom property into its colour, its first declaration in the stylesheet, `var()`s and their fallbacks followed, as hex, from which the dark colours derive as from any other. A property missing, no colour or seen through stops the boot naming it and the stylesheet, `name`, else `the stylesheet`. `cssColors(new URL('./styles/global.css', import.meta.url))` reads the file instead, as the server boots, which a compiled server, carrying no source file, cannot.
 
 ```ts
 // src/mail-settings.ts
-import type { MailSettings } from '@kaynooo/kayjs-mail'
-import { cssColors, mailDefaults } from '@kaynooo/kayjs-mail'
+import type { MailSettings } from '@kayjs/mail'
+import { cssColors, mailDefaults } from '@kayjs/mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
 const colour = cssColors(stylesheet, 'styles/global.css')
@@ -109,11 +109,11 @@ A contact form's mail, the visitor's answers listed and their message quoted:
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-mail/button.kay'
-import Fields from '@kaynooo/kayjs-mail/fields.kay'
-import Heading from '@kaynooo/kayjs-mail/heading.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Quote from '@kaynooo/kayjs-mail/quote.kay'
+import Button from '@kayjs/mail/button.kay'
+import Fields from '@kayjs/mail/fields.kay'
+import Heading from '@kayjs/mail/heading.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Quote from '@kayjs/mail/quote.kay'
 
 const { name, email, phone, topic, message } = props<{ name: string, email: string, phone?: string, topic: string, message: string }>()
 

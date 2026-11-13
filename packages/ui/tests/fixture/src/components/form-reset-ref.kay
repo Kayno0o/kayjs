@@ -1,14 +1,14 @@
 ---
 import { signal } from 'kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
-import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import Slider from '@kaynooo/kayjs-ui/slider.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ColorInput from '@kayjs/ui/color-input.kay'
+import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
+import IconPicker from '@kayjs/ui/icon-picker.kay'
+import Select from '@kayjs/ui/select.kay'
+import Slider from '@kayjs/ui/slider.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // The app's `ref` on each control, and a button changing the attributes they spread, which kay answers by running a ref again only when its identity changes.
 // `plain` is a spread element of the page's own: a ref kept as it is runs once, a ref swapped for another runs once more.

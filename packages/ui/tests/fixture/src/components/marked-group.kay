@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // The group's message arrives from outside as a refused post would; its first field is one the page already marked, its last one belongs to a FormField of its own.
 const issue = signal<string>()

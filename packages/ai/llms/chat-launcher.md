@@ -4,13 +4,13 @@
 
 ### Use
 
-`ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
+`ChatLauncher` (`@kayjs/ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
 
 ```kay
 --- server
 import { reply } from './reply.kay'
 --- script
-import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 ---
 slot
 ChatLauncher(action={reply} label="Ask the docs")

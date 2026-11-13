@@ -1,7 +1,7 @@
 ---
-import type { FilterField, ListFilter, SortState } from '@kaynooo/kayjs-ui'
-import { infiniteList } from '@kaynooo/kayjs-ui'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import type { FilterField, ListFilter, SortState } from '@kayjs/ui'
+import { infiniteList } from '@kayjs/ui'
+import Table from '@kayjs/ui/table.kay'
 
 const { onLoad, onSort, sort, sortParam, filterParam, fields, searchable = false } = props<{
   onLoad: (at: { offset: number, sort: SortState | undefined, filter: ListFilter }) => Promise<{ id: number, name: string, moons: number }[] | undefined>

@@ -1,4 +1,4 @@
-import { ui } from '@kaynooo/kayjs-ui/extension'
+import { ui } from '@kayjs/ui/extension'
 import tailwind from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
 

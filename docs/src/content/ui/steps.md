@@ -6,7 +6,7 @@ description: A numbered row showing where the visitor is in a multi-step form, t
 
 `Steps` is the indicator, and the step it shows lives in the URL: `?step=profile`. Each step before the current one, and each in `done`, is a link back; the others are plain text. `current` is the key of the step on screen, `url` the page's URL (`ctx.url`), whose other params every link keeps, and `param` the query param, `step` by default. Screen readers hear the current step as `aria-current="step"` and a completed one followed by `doneLabel`.
 
-Three helpers from `@kaynooo/kayjs-ui` run the flow: `currentStep(url, keys, done)` reads the step off the URL, never one ahead of the first not done; `stepHref(url, key)` builds a link to a step; `stepDraft(ctx.cookies, name, { check, request: ctx.request })` keeps the values of each step between posts.
+Three helpers from `@kayjs/ui` run the flow: `currentStep(url, keys, done)` reads the step off the URL, never one ahead of the first not done; `stepHref(url, key)` builds a link to a step; `stepDraft(ctx.cookies, name, { check, request: ctx.request })` keeps the values of each step between posts.
 
 ## A multi-step form
 
@@ -14,7 +14,7 @@ Each step posts to an action of its own, whose schema is that step's part of the
 
 ```kay
 --- server
-import { currentStep, stepDraft, stepHref } from '@kaynooo/kayjs-ui'
+import { currentStep, stepDraft, stepHref } from '@kayjs/ui'
 import { TypeCompiler } from 'elysia/type-system'
 
 const KEYS = ['account', 'profile', 'review'] as const

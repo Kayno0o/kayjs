@@ -1,6 +1,6 @@
 --- island
-import type { MenuEntry } from '@kaynooo/kayjs-ui'
-import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import type { MenuEntry } from '@kayjs/ui'
+import Menu from '@kayjs/ui/menu.kay'
 import { signal } from 'kay'
 
 const { calls } = props<{ calls: string[] }>()

@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+import Masonry from '@kayjs/ui/masonry.kay'
 
 const notes = signal([
   { id: 1, title: 'Groceries', body: 'Milk, eggs, bread, coffee, apples.' },

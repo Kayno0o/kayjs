@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
 
 const agreed = signal(false)
 ---

@@ -1,8 +1,8 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import { toast } from '@kayjs/ui'
 
 const stack = () => {
   toast.info('One', { description: 'Detail', duration: false })

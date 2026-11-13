@@ -1,8 +1,8 @@
 ---
-import { toast } from '@kaynooo/kayjs-ui'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import { toast } from '@kayjs/ui'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import Card from '@kayjs/ui/card.kay'
 import { signal } from 'kay'
 
 const { up, down } = props<{ up: number, down: number }>()

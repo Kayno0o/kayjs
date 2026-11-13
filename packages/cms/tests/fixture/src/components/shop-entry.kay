@@ -1,11 +1,11 @@
 ---
-import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
-import EntryActions from '@kaynooo/kayjs-cms/entry-actions.kay'
-import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
-import EntryHeader from '@kaynooo/kayjs-cms/entry-header.kay'
-import EntryIdentity from '@kaynooo/kayjs-cms/entry-identity.kay'
-import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
-import { cmsEntryForm } from '@kaynooo/kayjs-cms/form'
+import type { ScreenCollection, StoredEntry } from '@kayjs/cms'
+import EntryActions from '@kayjs/cms/entry-actions.kay'
+import EntryField from '@kayjs/cms/entry-field.kay'
+import EntryHeader from '@kayjs/cms/entry-header.kay'
+import EntryIdentity from '@kayjs/cms/entry-identity.kay'
+import EntryNotices from '@kayjs/cms/entry-notices.kay'
+import { cmsEntryForm } from '@kayjs/cms/form'
 
 // The app's own entry screen for the shop: the photo above the name, the price and the stock side by side, no sku.
 const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()

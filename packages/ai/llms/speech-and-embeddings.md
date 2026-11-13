@@ -5,7 +5,7 @@
 ### Write a recording down
 
 ```ts
-import { transcribe } from '@kaynooo/kayjs-ai'
+import { transcribe } from '@kayjs/ai'
 
 const text = await transcribe(recording, { language: 'fr' })
 ```
@@ -15,7 +15,7 @@ const text = await transcribe(recording, { language: 'fr' })
 ### Read a text aloud
 
 ```ts
-import { speak } from '@kaynooo/kayjs-ai'
+import { speak } from '@kayjs/ai'
 
 const audio = await speak('Your table is booked for eight', { voice: 'nova', speed: 1.1, format: 'wav' })
 
@@ -27,7 +27,7 @@ return new Response(audio)
 ### Embed texts, store and search them
 
 ```ts
-import { embed } from '@kaynooo/kayjs-ai'
+import { embed } from '@kayjs/ai'
 
 const vector = await embed('How do I reset my password?', { dimensions: 768 })
 const vectors = await embed(chunks.map(chunk => chunk.text), { dimensions: 768 })
@@ -39,7 +39,7 @@ pgvector through pg-orm keeps and searches them; the database needs the extensio
 
 ```ts
 // src/db/passage.ts
-import { embed } from '@kaynooo/kayjs-ai'
+import { embed } from '@kayjs/ai'
 import { defineTable, embedding } from '@kaynooo/pg-orm'
 
 export const Passage = defineTable('passage', f => ({
@@ -50,7 +50,7 @@ export const Passage = defineTable('passage', f => ({
 ```
 
 ```ts
-import { embed } from '@kaynooo/kayjs-ai'
+import { embed } from '@kayjs/ai'
 import { db } from './db'
 import { Passage } from './db/passage'
 
@@ -74,7 +74,7 @@ The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `sou
 ```kay
 --- server
 import { s, action } from 'kay'
-import { ask, chatMessages, embed, ground, lastChatMessage } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages, embed, ground, lastChatMessage } from '@kayjs/ai'
 import { db } from '../db'
 import { Passage } from '../db/passage'
 
@@ -119,8 +119,8 @@ Under `bun test` the fake embeds the question and the texts, so a test ranks pas
 - `aiTest()` scripts them: `model.transcript(text)`, `model.speech(blob)` and `model.embedding(vectors)` answer the next call, an `Error` makes it throw, a function of what was given answers it, and a second argument `when` picks the call it is for. `model.heard` (`{ provider, model, audio, language }`), `model.spoken` (`{ provider, model, text, voice, speed, format }`) and `model.embedded` (`{ provider, model, input, dimensions }`, `input` a list even for one text) keep every call; all are cleared between tests, as asks are.
 
 ```ts
-import { speak, transcribe } from '@kaynooo/kayjs-ai'
-import { aiTest } from '@kaynooo/kayjs-ai/test'
+import { speak, transcribe } from '@kayjs/ai'
+import { aiTest } from '@kayjs/ai/test'
 import { expect, it } from 'bun:test'
 
 const model = aiTest()

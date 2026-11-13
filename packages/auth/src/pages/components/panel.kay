@@ -1,5 +1,5 @@
 ---
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Card from '@kayjs/ui/card.kay'
 import Frame from './frame.kay'
 
 const { title, landmark = true } = props<{ title: string, landmark?: boolean }>()

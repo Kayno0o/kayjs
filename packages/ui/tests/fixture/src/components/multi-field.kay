@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
 
 const issue = signal<string>()
 const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]

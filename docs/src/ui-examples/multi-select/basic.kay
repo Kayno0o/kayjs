@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
 
 const planets = [
   { value: 'mercury', label: 'Mercury' },

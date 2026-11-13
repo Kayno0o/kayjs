@@ -1,9 +1,9 @@
 ---
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Card from '@kayjs/ui/card.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import Timeline from '@kayjs/ui/timeline.kay'
 
 const { onSelect } = props<{ onSelect: (key: string | undefined) => void }>()
 

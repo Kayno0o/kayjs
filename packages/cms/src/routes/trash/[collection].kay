@@ -1,6 +1,6 @@
 --- server
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Button from '@kayjs/ui/button.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 import { wording } from 'kay/words'
 import EntryTrash from '../../components/entry-trash.kay'
 import { denials } from '../../access'

@@ -45,7 +45,7 @@ export function packageOf(input: string): string {
   const path = relative(ROOT, resolve(ROOT, file)).replaceAll('\\', '/')
   const pkg = PACKAGE.exec(path)?.[1]
 
-  if (pkg === '@kaynooo/kayjs-ui')
+  if (pkg === '@kayjs/ui')
     return 'kayjs-ui'
 
   if (pkg !== undefined)

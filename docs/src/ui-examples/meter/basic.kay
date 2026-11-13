@@ -1,5 +1,5 @@
 ---
-import Meter from '@kaynooo/kayjs-ui/meter.kay'
+import Meter from '@kayjs/ui/meter.kay'
 ---
 .flex.max-w-sm.flex-col.gap-3
   Meter(value={35} label="Memory")

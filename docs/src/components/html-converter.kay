@@ -1,6 +1,6 @@
 ---
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
 import { signal } from 'kay'
 import { loadConverter } from '../html-to-kay'
 

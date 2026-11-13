@@ -1,11 +1,11 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Select from '@kayjs/ui/select.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 import '../app.css'
 ---
 main

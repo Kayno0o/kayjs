@@ -1,7 +1,7 @@
 ---
 import type { Action } from 'kay'
 import { signal } from 'kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
 
 // The island holding the dialog's state; the fields are the page's, handed in as its slot.
 const { claim, validate = false } = props<{ claim: Action<never, string>, validate?: 'blur' | 'submit' | false }>()

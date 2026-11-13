@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
 
 const previews = signal<{ name: string, url: string }[]>([])
 const toPreview = (file: File) => ({

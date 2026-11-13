@@ -1,4 +1,4 @@
-import { mailer, outbox } from '@kaynooo/kayjs-mail'
+import { mailer, outbox } from '@kayjs/mail'
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { AUTH_LINK_KINDS, AUTH_MAIL_SAMPLES, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { builtInTemplates } from '../src/mail'

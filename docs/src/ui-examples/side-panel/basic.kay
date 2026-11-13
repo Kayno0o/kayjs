@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import Button from '@kayjs/ui/button.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
 
 const open = signal(false)
 ---

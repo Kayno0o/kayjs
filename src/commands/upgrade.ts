@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
+import { isKayPackage, RENAMED_IN, renamePackages } from '../package-names'
 import { done, formatOption, printDocument, printFailure, projectRoot } from './command'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
@@ -28,11 +29,13 @@ export interface DependencyChange {
 }
 
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
-// A range that is a version, as `~1.45.0` or `npm:@kaynooo/kayjs@~1.45.0`: what comes before the range, and the version.
+// A range that is a version, as `~1.45.0` or `npm:@kayjs/kay@~1.45.0`: what comes before the range, and the version.
 const RANGE = /^((?:npm:@?[^@]+@)?)[~^]?(\d+\.\d+\.\d+)$/
 // What `bun add` is told to keep a package in the section it was in.
 const SECTION_FLAGS: Record<string, string[]> = { devDependencies: ['--dev'], optionalDependencies: ['--optional'] }
-const KAY_PACKAGE = '@kaynooo/kayjs'
+const KAY_PACKAGE = '@kayjs/kay'
+// Whether a dependency is kay, under its new name or the one it had before 1.104.
+const isKay = (dependency: KayDependency) => renamePackages(dependency.registry) === KAY_PACKAGE
 const SECTION_OPEN = /\s*:\s*\{/y
 const LOCKFILES = ['bun.lock', 'bun.lockb']
 const PATCH = /\.\d+$/
@@ -226,10 +229,10 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   const found = kayDependencies(packageJson)
-  const kay = found.find(dependency => dependency.registry === KAY_PACKAGE)
+  const kay = found.find(isKay)
 
   if (kay === undefined) {
-    printFailure('upgrade', 'package.json has no `kay` dependency with a full version range to move, as `npm:@kaynooo/kayjs@~1.45.0`; one written another way, a path or a workspace, is moved by hand', format)
+    printFailure('upgrade', 'package.json has no `kay` dependency with a full version range to move, as `npm:@kayjs/kay@~1.45.0`; one written another way, a path or a workspace, is moved by hand', format)
 
     return 1
   }
@@ -336,7 +339,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   const replan = (stones: string[]): Phase[] => {
     const fresh = kayDependencies(JSON.parse(settled.source) as Record<string, unknown>)
 
-    return planPhases(settled.source, fresh, new Map(fresh.map(dependency => [dependency, latest.get(found.find(({ name }) => name === dependency.name)!)!])), stones) as Phase[]
+    return planPhases(settled.source, fresh, new Map(fresh.map(dependency => [dependency, latest.get(found.find(({ name }) => renamePackages(name) === renamePackages(dependency.name))!)!])), stones) as Phase[]
   }
   let queue = phases
 
@@ -405,7 +408,8 @@ async function latestVersions(root: string, kay: KayDependency, found: KayDepend
   const latest = new Map<KayDependency, string>()
 
   for (const dependency of [kay, ...found.filter(one => one !== kay)]) {
-    const target = await deps.latest(dependency.registry, root)
+    // From 1.104 on, a package is published under its new name only, so the old name is asked when the registry serves nothing under the new one.
+    const target = await deps.latest(renamePackages(dependency.registry), root) ?? await deps.latest(dependency.registry, root)
 
     if (target === undefined || !SEMVER.test(target))
       return dependency.registry
@@ -652,7 +656,26 @@ function planPhases(original: string, found: KayDependency[], latest: Map<KayDep
       changes.push({ name: dependency.name, spec, section: dependency.section })
     }
 
-    phases.push({ version: stone ?? latest.get(found.find(dependency => dependency.registry === KAY_PACKAGE)!)!, source, changes, stone: stone !== undefined })
+    const version = stone ?? latest.get(found.find(isKay)!)!
+
+    // A version from 1.104 is installed under the new names: the text, the dependencies planned after it and the installs of this phase take them.
+    if (Bun.semver.order(version, RENAMED_IN) !== -1) {
+      source = renamePackages(source)
+
+      for (const dependency of state) {
+        dependency.name = renamePackages(dependency.name)
+        dependency.spec = renamePackages(dependency.spec)
+        dependency.prefix = renamePackages(dependency.prefix)
+        dependency.registry = renamePackages(dependency.registry)
+      }
+
+      for (const change of changes) {
+        change.name = renamePackages(change.name)
+        change.spec = renamePackages(change.spec)
+      }
+    }
+
+    phases.push({ version, source, changes, stone: stone !== undefined })
   }
 
   return phases
@@ -686,7 +709,7 @@ function kayDependencies(packageJson: Record<string, unknown>): KayDependency[] 
       const [, prefix = '', version = ''] = range
       const registry = prefix === '' ? name : prefix.slice('npm:'.length, -1)
 
-      if (registry === KAY_PACKAGE || registry.startsWith(`${KAY_PACKAGE}-`))
+      if (isKayPackage(renamePackages(registry)))
         found.push({ name, spec: spec as string, section, registry, prefix, version })
     }
   }

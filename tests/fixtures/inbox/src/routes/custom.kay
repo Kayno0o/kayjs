@@ -1,5 +1,5 @@
 ---
-import Bell from '@kaynooo/kayjs-ui/bell.kay'
+import Bell from '@kayjs/ui/bell.kay'
 
 const notes = [{ key: 'a', label: 'Deploy done', read: false, href: '/plain' }, { key: 'b', label: 'Review asked', read: true }, { key: 'c', label: 'Hostile', read: false, href: 'javascript:alert(1)' }]
 ---

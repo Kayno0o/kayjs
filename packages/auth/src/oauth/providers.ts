@@ -79,7 +79,7 @@ export function githubProvider(opts: ProviderOptions = {}): OAuthProvider<Github
   const api = base === undefined ? 'https://api.github.com' : `${base}/api/v3`
   const scopes = opts.scopes ?? ['read:user']
   const headers = {
-    'User-Agent': '@kaynooo/kayjs-auth',
+    'User-Agent': '@kayjs/auth',
     'Accept': 'application/vnd.github+json',
   }
 

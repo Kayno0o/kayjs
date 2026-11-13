@@ -1,16 +1,16 @@
 ---
-import type { IconChoice } from '@kaynooo/kayjs-ui'
+import type { IconChoice } from '@kayjs/ui'
 import type { Action, Failure } from 'kay'
 import { signal } from 'kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
-import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import IconPicker from '@kayjs/ui/icon-picker.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
+import Select from '@kayjs/ui/select.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // The library's signal-driven controls in a SaveForm, with no `onDiscard`: the page's signals follow a Discard on their own.
 const { find } = props<{ find: (query: string, limit: number) => Promise<IconChoice[]> }>()

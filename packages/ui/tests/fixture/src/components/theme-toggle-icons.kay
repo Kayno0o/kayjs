@@ -1,5 +1,5 @@
 --- island
-import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
+import ThemeToggle from '@kayjs/ui/theme-toggle.kay'
 import Sun from '~icons/tabler/sun'
 ---
 ThemeToggle(class={{ root: { root: 'mine-root', option: 'mine-option' } }})

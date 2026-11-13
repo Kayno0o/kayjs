@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+import Timeline from '@kayjs/ui/timeline.kay'
 
 // A selectable timeline bound to a key shown below it, a plain one, and a button standing for the parent picking an entry itself.
 const { onSelect } = props<{ onSelect: (key: string | undefined, text: string) => void }>()

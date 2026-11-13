@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@iconify-json/tabler": "*",
-    "@kaynooo/kayjs-auth": "*",
-    "@kaynooo/kayjs-mail": "*",
-    "@kaynooo/kayjs-ui": "*",
+    "@kayjs/auth": "*",
+    "@kayjs/mail": "*",
+    "@kayjs/ui": "*",
     "@kaynooo/pg-orm": "*",
     "elysia": "*",
     "kay": "file:../.."

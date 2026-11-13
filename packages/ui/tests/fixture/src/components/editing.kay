@@ -1,6 +1,6 @@
 ---
-import { rowEditing } from '@kaynooo/kayjs-ui'
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import { rowEditing } from '@kayjs/ui'
+import Dialog from '@kayjs/ui/dialog.kay'
 
 const friends = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Grace' }]
 const friend = rowEditing<{ id: number, name: string }, { name: string }>()

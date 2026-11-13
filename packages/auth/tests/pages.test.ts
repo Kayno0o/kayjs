@@ -56,7 +56,7 @@ describe('auth({ module }) registers the app\'s auth module', () => {
   test('names the module and the export kay takes the plugin from, with the pages, the dev tool and the command', () => {
     const extension = auth({ module: './src/auth' })
 
-    expect(extension).toMatchObject({ name: '@kaynooo/kayjs-auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
+    expect(extension).toMatchObject({ name: '@kayjs/auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
     expect(extension.devTool).toEqual(auth({ server: false }).devTool)
     expect(extension.commands).toEqual(auth({ server: false }).commands)
   })

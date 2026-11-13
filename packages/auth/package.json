@@ -1,5 +1,5 @@
 {
-  "name": "@kaynooo/kayjs-auth",
+  "name": "@kayjs/auth",
   "type": "module",
   "version": "1.103.0",
   "description": "Auth for kay apps on kay sessions: OAuth, passwords, two-factor, magic links and bearer tokens",
@@ -64,7 +64,7 @@
     "test": "$npm_execpath test --parallel=6 --timeout 20000 --path-ignore-patterns='**/{pgStore,lastOne,sharedDatabase}.test.ts' && $npm_execpath test --isolate --timeout 20000 pgStore.test lastOne.test sharedDatabase.test"
   },
   "peerDependencies": {
-    "@kaynooo/kayjs-ui": "workspace:~",
+    "@kayjs/ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.1.2 || ^8.0.0",
     "elysia": "^1.4.31",
     "kay": "~1.103.0"
@@ -80,8 +80,8 @@
   },
   "devDependencies": {
     "@kaynooo/eslint": "^7.1.6",
-    "@kaynooo/kayjs-mail": "workspace:~",
-    "@kaynooo/kayjs-ui": "workspace:~",
+    "@kayjs/mail": "workspace:~",
+    "@kayjs/ui": "workspace:~",
     "@kaynooo/pg-orm": "^8.1.4",
     "@types/bun": "^1.4.4",
     "elysia": "^1.4.31",

@@ -1,5 +1,5 @@
-import type { MailReply } from '@kaynooo/kayjs-mail'
-import { mailer } from '@kaynooo/kayjs-mail'
+import type { MailReply } from '@kayjs/mail'
+import { mailer } from '@kayjs/mail'
 import Plain from './mails/plain.kay'
 
 // The replies handed to the inbound route, which a test reads.

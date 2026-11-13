@@ -9,7 +9,7 @@ Pass actions in `tools` and the model can call them:
 ```kay
 --- server
 import { s, action } from 'kay'
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
 
@@ -56,11 +56,11 @@ const outcome = await site.call(assistant, { messages })
 
 ### Benching a prompt against the real model
 
-`mocked(action, run)` (from `@kaynooo/kayjs-ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, or `tool: false`; a page with params is refused once the app serves it, not in a script). The input is checked against the action's schema before `run`, as for `tool()`.
+`mocked(action, run)` (from `@kayjs/ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, or `tool: false`; a page with params is refused once the app serves it, not in a script). The input is checked against the action's schema before `run`, as for `tool()`.
 
 ```ts
-import type { AiMessage } from '@kaynooo/kayjs-ai'
-import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
+import type { AiMessage } from '@kayjs/ai'
+import { ask, mocked, openai } from '@kayjs/ai'
 import { systemPrompt } from '../src/assistant'
 import { forecast, route } from '../src/routes/_actions.kay'
 
@@ -91,7 +91,7 @@ Run it as `bun --preload kay/test/preload bench.ts`, which lets the script impor
 
 ### Function tools
 
-A scheduled job or a queue worker has no visitor to run an action as. `tool({ name, description, input, run })` (from `@kaynooo/kayjs-ai`) makes a tool of a plain function, which `tools` takes beside actions and which works with or without a request:
+A scheduled job or a queue worker has no visitor to run an action as. `tool({ name, description, input, run })` (from `@kayjs/ai`) makes a tool of a plain function, which `tools` takes beside actions and which works with or without a request:
 
 ```ts
 const findArticle = tool({ name: 'find_article', description: 'Finds an article by its title', input: s.Object({ title: s.String() }), run: ({ title }) => articles.find(title) })

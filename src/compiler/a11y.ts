@@ -10,8 +10,8 @@ const UNLABELLED_TYPES = new Set(['hidden', 'submit', 'reset', 'button', 'image'
 // What names an element besides its content.
 const NAMING = ['aria-label', 'aria-labelledby', 'title']
 const HEADING = /^h([1-6])$/
-const UI_IMPORT = /^import\b[^\n]*['"]@kaynooo\/kayjs-ui\/[^'"\n]*['"];?[ \t]*$/gm
-const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kaynooo\/kayjs-ui\/tooltip\.kay['"]/m
+const UI_IMPORT = /^import\b[^\n]*['"]@kayjs\/ui\/[^'"\n]*['"];?[ \t]*$/gm
+const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kayjs\/ui\/tooltip\.kay['"]/m
 const WHITESPACE_CHAR = /\s/
 const TOOLTIP_NAME = /\bTooltip\b/
 
@@ -309,7 +309,7 @@ function elementLints(file: KayFile): Diagnostic[] {
     }
 
     if (!imported)
-      edits.push({ start: file.script.start + last.index + last[0].length, end: file.script.start + last.index + last[0].length, text: '\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'' })
+      edits.push({ start: file.script.start + last.index + last[0].length, end: file.script.start + last.index + last[0].length, text: '\nimport Tooltip from \'@kayjs/ui/tooltip.kay\'' })
 
     return edits
   }

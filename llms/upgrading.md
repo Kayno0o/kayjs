@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.104.0
+
+### kay and its libraries are `@kayjs/*`
+
+kay is `@kayjs/kay`, and kayjs-ui, kayjs-auth, kayjs-mail, kayjs-cms and kayjs-ai are `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`, published to npm and to the Forgejo registry; `@kaynooo/kayjs` and `@kaynooo/kayjs-*` stop at 1.103, which stays installable. `kay upgrade` writes the new names in `package.json` (the `kay` alias becomes `"kay": "npm:@kayjs/kay@~1.104.0"`, so imports of `kay` are unchanged), installs, and rewrites every `@kaynooo/kayjs-*` import, config key and stylesheet import (`deprecated-package-names`). From an app on 1.103 or before, run it from the new kay: `bunx -p @kayjs/kay kay upgrade`. By hand: replace each name in `package.json`, run `bun install`, then `kay check --fix` for the sources. `@kaynooo/utils`, `@kaynooo/eslint`, `@kaynooo/pg-orm` and `@kaynooo/cli-kit` keep their names.
+
 ## 1.103.0
 
 ### A page with `--- island` or `--- client` is refused

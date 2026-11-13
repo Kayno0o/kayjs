@@ -9,7 +9,7 @@
 ```kay
 --- island
 import { reply } from '../routes/chat.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 Chat(action={reply} label="Assistant" onSend={({ messages }) => track('ask', messages.length)} onReply={turn => save(turn.content)} onError={failure => report(failure.status)})
 ```
@@ -22,7 +22,7 @@ Chat(action={reply} label="Assistant" onSend={({ messages }) => track('ask', mes
 ---
 import { signal } from 'kay'
 import { reply } from '../routes/chat.kay'
-import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 
 const open = signal(false)
 ---

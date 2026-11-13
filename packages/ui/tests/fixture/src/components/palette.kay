@@ -1,6 +1,6 @@
 ---
-import type { PaletteEntry } from '@kaynooo/kayjs-ui'
-import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import type { PaletteEntry } from '@kayjs/ui'
+import CommandPalette from '@kayjs/ui/command-palette.kay'
 
 // What the test reads back: each change of the palette's state, and each action run.
 const { onOpenChange, onRecentChange, onAction, recent = [], shortcut, siteSearch = false, hostile = false, loose = false, search } = props<{ onOpenChange: (open: boolean) => void, onRecentChange: (recent: string[]) => void, onAction: (name: string) => void, recent?: string[], shortcut?: string | false | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> }>()

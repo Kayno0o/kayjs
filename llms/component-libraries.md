@@ -20,7 +20,7 @@ The library hands the app one value to list in `extensions`, see [Extensions](#e
 
 ```ts
 // The app's kay.config.ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ extensions: [auth()] })
@@ -33,7 +33,7 @@ export default defineConfig({ extensions: [auth()] })
 A package can ship `.kay` components, which the app installing it compiles as its own: on the server, in islands, and in `kay build --compile` and `--static`.
 
 - Ship the `.kay` sources, list `kay` under `peerDependencies`, and import from `kay`, so the app's one copy of kay, and its registered types, serve the library too.
-- Give each component a specifier in the exports map, `"exports": { "./*.kay": "./src/*.kay", ".": "./src/index.ts" }`, imported as `import Button from '@kaynooo/kayjs-ui/button.kay'`. Without an exports map a component is imported by its path in the package.
+- Give each component a specifier in the exports map, `"exports": { "./*.kay": "./src/*.kay", ".": "./src/index.ts" }`, imported as `import Button from '@kayjs/ui/button.kay'`. Without an exports map a component is imported by its path in the package.
 - Settings the app may replace, such as theme classes or an icon resolver, live in one module named in package.json, `"kay": { "settings": "./src/settings.ts" }`, which default-exports the settings and which the library's components import.
 - A library whose extension gives `ctx` keys through a `context` module names it, `"kay": { "context": "./src/context.ts" }`, so its components read `ctx.<key>` typed and as a plain key read in an app that does not call the extension; any other `ctx` key stays a type error, and `kay check` reports a declared module that does not exist, naming the package.
 - A library words its own texts in message catalogs, `<locale>.ts` each in one directory named in package.json, `"kay": { "messages": "./src/messages" }`: every app that installs it reads them under its own `src/messages`, key by key, with no line in `kay.config.ts` and no extension, a regional locale such as `fr-CA` reading its language's catalog when the library has none for the region. A library whose components call `t` with keys of its own must declare its catalog: once an app has any catalog, `kay check` types `t` from those and refuses keys that none holds. An extension's `messages` still serves a library that lists one.
@@ -49,12 +49,12 @@ A package can ship `.kay` components, which the app installing it compiles as it
 - The app's stylesheets leave out each rule of a library's stylesheets whose selector needs a class nothing names, in `kay dev` and `kay build`, with Tailwind or without: kayjs-ui's theme ships only the components the app renders. A class counts as named when a file of the app's folder (templates, scripts, Markdown, HTML, stylesheets, JSON, YAML, comments included) or a library file it reaches writes it whole. A class put together at runtime (`` `kui-btn-${tone}` ``) or written only in content kept outside the project (a CMS body in the database) or in files outside the app's folder (a Tailwind `@source` elsewhere, a workspace package that is not a kay library) is not seen: write it whole in any file of the app, for instance in a comment in `app.css`, to keep its rules. Only the stylesheets the library's exports map reaches, and those they pull in with a relative `@import`, are pruned by.
 - `kay check` reports a type error inside a library component the app uses once, at the component's own line; one the app never imports reports nothing.
 - Errors inside the library's own `.ts` modules are the library's, as `skipLibCheck` leaves a declaration file's, so an optional peer the app has not installed reports nothing there, while the app's own calls into those modules are checked.
-- `librarySettings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `librarySettings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`, a module default-exporting the library's settings type, `UiSettings` for kayjs-ui.
+- `librarySettings` in `kay.config.ts` replaces a library's settings module with the app's, by the library's name, on the server and in the browser: `librarySettings: { '@kayjs/ui': './src/ui-settings.ts' }`, a module default-exporting the library's settings type, `UiSettings` for kayjs-ui.
 - The app's settings module may spread the library's defaults to change a few: `export default { ...defaults, tone: 'text-red-500' }`. `kay check` checks it against the defaults it replaces.
 - One project renders with one set of settings: `bun test`, the server and `kay build` all read them from `kay.config.ts`.
-- kay's own libraries, `@kaynooo/kayjs-auth`, `@kaynooo/kayjs-ui`, `@kaynooo/kayjs-mail`, `@kaynooo/kayjs-cms` and `@kaynooo/kayjs-ai`, are released with kay at its version, each peering on kay's minor and on the libraries of that same version: install the ones matching the app's kay, and move them together.
+- kay's own libraries, `@kayjs/auth`, `@kayjs/ui`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`, are released with kay at its version, each peering on kay's minor and on the libraries of that same version: install the ones matching the app's kay, and move them together.
 - An app on a `^0.x` range of one of kay's libraries moves it to kay's version by hand, as a caret on 0.x never reaches it.
-- A library linked rather than installed, `"@kaynooo/kayjs-ui": "link:../kayjs-ui"`, works the same, and so does one installed in a `node_modules` above the project, as a workspace hoists it, or kept under `node_modules/.bun/` by Bun's isolated linker, a workspace's default, whose stylesheets the app's Tailwind plugin processes all the same, a bare `@import` of the library's own dependencies included: the app's own `package.json` names it either way. A linked library's own `kay`, a dev dependency in its folder, loads as the app's, so its `api()` and its signals are the app's own; its other peers resolve from its folder, as any linked package's do.
+- A library linked rather than installed, `"@kayjs/ui": "link:../kayjs-ui"`, works the same, and so does one installed in a `node_modules` above the project, as a workspace hoists it, or kept under `node_modules/.bun/` by Bun's isolated linker, a workspace's default, whose stylesheets the app's Tailwind plugin processes all the same, a bare `@import` of the library's own dependencies included: the app's own `package.json` names it either way. A linked library's own `kay`, a dev dependency in its folder, loads as the app's, so its `api()` and its signals are the app's own; its other peers resolve from its folder, as any linked package's do.
 
 ### Extensions
 
@@ -66,7 +66,7 @@ import type { KayExtension } from 'kay/server'
 
 export function auth({ prefix = '/auth' } = {}): KayExtension {
   return {
-    name: '@kaynooo/kayjs-auth',
+    name: '@kayjs/auth',
     routes: { dir: `${import.meta.dir}/routes`, prefix },
     api: { dir: `${import.meta.dir}/api`, prefix },
     messages: `${import.meta.dir}/messages`,

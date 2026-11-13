@@ -1,8 +1,8 @@
 --- island
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
-import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
+import SideNav from '@kayjs/ui/side-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
 
 const links = [{ href: '/', label: 'Home' }]
 const none: { href: string, label: string }[] = []

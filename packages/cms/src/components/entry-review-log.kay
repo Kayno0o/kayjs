@@ -1,6 +1,6 @@
 ---
 import type { ReviewView } from '../review'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Notice from '@kayjs/ui/notice.kay'
 import { wording } from 'kay/words'
 import EntryEdited from './entry-edited.kay'
 

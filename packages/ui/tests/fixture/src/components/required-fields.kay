@@ -1,5 +1,5 @@
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 FormField(label="Title" required)
   input#title(name="title")

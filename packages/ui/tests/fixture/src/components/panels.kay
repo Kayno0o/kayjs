@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
-import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
+import SplitLayout from '@kayjs/ui/split-layout.kay'
 
 // What the test reads back: how often the panel closed.
 const { onClose, listWidthKey, onSettled, sizeKey } = props<{ onClose: () => void, listWidthKey?: string, onSettled?: (size: number) => void, sizeKey?: string }>()

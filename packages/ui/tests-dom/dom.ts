@@ -8,7 +8,7 @@ process.env.KAY_ROOT = join(import.meta.dir, '..', 'tests', 'fixture')
 
 // A component of the library, imported from the fixture's node_modules for mountComponent.
 export async function library(name: string): Promise<(props: Record<string, unknown>) => unknown> {
-  return ((await import(`${process.env.KAY_ROOT}/node_modules/@kaynooo/kayjs-ui/src/${name}.kay`)) as { default: (props: Record<string, unknown>) => unknown }).default
+  return ((await import(`${process.env.KAY_ROOT}/node_modules/@kayjs/ui/src/${name}.kay`)) as { default: (props: Record<string, unknown>) => unknown }).default
 }
 
 // The kui names of an element, which stay when its recipe moves the look into utilities; an app's own class is read with classList.

@@ -1,7 +1,7 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import Popover from '@kaynooo/kayjs-ui/popover.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import Popover from '@kayjs/ui/popover.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
 import Palette from '~icons/tabler/palette'
 import { palette, pickTheme, scheme, SCHEMES, THEMES } from '../theme'
 ---

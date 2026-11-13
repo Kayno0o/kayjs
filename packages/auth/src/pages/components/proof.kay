@@ -1,7 +1,7 @@
 ---
 import type { User } from '../../core'
 import { wording } from 'kay/words'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // An island renders it with the labels its page gives, as the messages only its server render or its own source name reach the browser.
 const { user, secondFactor = false, passwordLabel = wording('auth.proof.password', 'Current password'), codeLabel = wording('auth.proof.code', 'Code from your authenticator app') } = props<{ user: Pick<User, 'hasPassword' | 'twoFactor'>, secondFactor?: boolean, passwordLabel?: string, codeLabel?: string }>()

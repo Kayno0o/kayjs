@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kayjs/ui/theme.css';
 
 /* The admin starts its own page, so its colours and light or dark scheme come from the theme it imports. */
 body {

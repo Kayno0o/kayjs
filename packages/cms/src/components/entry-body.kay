@@ -1,8 +1,8 @@
 ---
 import type { FormScope } from '../form'
 import { effect, guardLeave, onCleanup } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
 import { wording } from 'kay/words'
 import { previewMarkdown } from '../editor/preview'
 import { uploadFile, uploading } from '../editor/upload'

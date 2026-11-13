@@ -1,13 +1,13 @@
 ---
 import { signal } from 'kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import Meter from '@kaynooo/kayjs-ui/meter.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import Card from '@kayjs/ui/card.kay'
+import Meter from '@kayjs/ui/meter.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Stat from '@kayjs/ui/stat.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 const VISITS: Record<string, number> = { day: 182, week: 1284, month: 5310 }
 const PERIODS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]

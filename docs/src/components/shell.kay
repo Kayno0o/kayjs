@@ -1,9 +1,9 @@
 ---
 import type { Navigation } from '../pages'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import Button from '@kayjs/ui/button.kay'
+import Icon from '@kayjs/ui/icon.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 import BrandGithub from '~icons/tabler/brand-github'
 import { FORGE, RELEASES, REPOSITORY } from '../forge'
 import { partOf } from '../sections'

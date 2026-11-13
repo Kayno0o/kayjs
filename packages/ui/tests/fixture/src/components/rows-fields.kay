@@ -1,8 +1,8 @@
 ---
 import type { Action } from 'kay'
 import { signal } from 'kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
 
 // A signal editor writing the rows back, a plain form posting them under a name, and a SaveForm around the same field; `save` stands in for the action.
 const { save, held } = props<{ save: (form: FormData) => Promise<void>, held?: Element[] }>()

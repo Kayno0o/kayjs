@@ -1,6 +1,6 @@
 --- server
 
-import { ask, tool } from '@kaynooo/kayjs-ai'
+import { ask, tool } from '@kayjs/ai'
 import { action, s } from 'kay'
 import { done, heard, hooks, testing } from '../testing'
 import { wipe } from './locked/_actions.kay'

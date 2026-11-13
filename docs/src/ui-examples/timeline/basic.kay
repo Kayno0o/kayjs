@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import type { TimelineEntry } from '@kaynooo/kayjs-ui'
-import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+import type { TimelineEntry } from '@kayjs/ui'
+import Timeline from '@kayjs/ui/timeline.kay'
 
 const picked = signal<string | undefined>('lunch')
 const entries: TimelineEntry[] = [

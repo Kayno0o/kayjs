@@ -289,7 +289,7 @@ function ownAuth(options: OwnOptions): AuthPages {
   }
 
   const extension: AuthPages = {
-    name: '@kaynooo/kayjs-auth',
+    name: '@kayjs/auth',
     appFiles: APP_FILES,
     server: async app => (await build(app)).plugin,
     ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
@@ -313,7 +313,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
 
   const given = { prefix: options.prefix, home }
   const extension: AuthPages = {
-    name: '@kaynooo/kayjs-auth',
+    name: '@kayjs/auth',
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
     ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },

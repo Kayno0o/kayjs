@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import process from 'node:process'
-import { ai, fakeAi } from '@kaynooo/kayjs-ai'
+import { ai, fakeAi } from '@kayjs/ai'
 import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { reply } from '../src/routes/chat.kay'

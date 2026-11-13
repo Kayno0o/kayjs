@@ -7,9 +7,9 @@ export const rename = action(t.Object({ name: t.String({ minLength: 2, maxLength
 const failure = rename.failed()
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
 ---
 main
   form#form(action={rename})

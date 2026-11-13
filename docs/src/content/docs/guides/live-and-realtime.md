@@ -441,7 +441,7 @@ Notifications that live elsewhere, your own table or a third-party feed, go in `
 
 ```kay
 ---
-import Bell from '@kaynooo/kayjs-ui/bell.kay'
+import Bell from '@kayjs/ui/bell.kay'
 ---
 header
   Bell

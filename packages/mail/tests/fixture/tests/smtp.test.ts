@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto'
 import process from 'node:process'
-import { mailer, smtp } from '@kaynooo/kayjs-mail'
+import { mailer, smtp } from '@kayjs/mail'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { memoryJobs } from 'kay/server'

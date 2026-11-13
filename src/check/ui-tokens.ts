@@ -18,7 +18,7 @@ const COLOR = '--color-kui-'
 const NAMESPACES = ['color', 'text', 'font-weight', 'tracking', 'spacing', 'radius', 'font'] as const
 const KINDS = { 'color': 'color', 'text': 'text', 'font-weight': 'weight', 'tracking': 'tracking', 'spacing': 'spacing', 'radius': 'radius', 'font': 'family' } as const
 
-const recipe = (component: string, part: string, use: string): string => `set \`${use}\` on the \`${part}\` part of \`${component}\` in src/ui.ts: \`'@kaynooo/kayjs-ui/${component}.kay': { parts: { ${part}: '${use}' } }\``
+const recipe = (component: string, part: string, use: string): string => `set \`${use}\` on the \`${part}\` part of \`${component}\` in src/ui.ts: \`'@kayjs/ui/${component}.kay': { parts: { ${part}: '${use}' } }\``
 const privateName = (name: string): UiToken => ({ kind: 'var', help: `\`--kui-${name}\` is private to the component, now \`--_${name}\`; it is set and read on the component's own element, so restyle the component from src/ui.ts or \`class\` instead` })
 const calc = (factor: string): string => `calc(var(--spacing) * ${factor})`
 

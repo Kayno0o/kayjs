@@ -40,7 +40,7 @@ Each link keeps its real address, so a middle click or a new tab still opens it,
 
 ```kay
 ---
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
 import { signal } from 'kay'
 
 const rows = Array.from({ length: 45 }, (_, index) => `Row ${index + 1}`)

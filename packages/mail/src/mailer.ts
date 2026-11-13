@@ -516,13 +516,13 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   const env = smtpEnv({ listed: true })
 
   if (module !== undefined) {
-    return { name: '@kaynooo/kayjs-mail', devTool, env, serverModule: { path: module, export: 'mail', prepare: (exported) => {
+    return { name: '@kayjs/mail', devTool, env, serverModule: { path: module, export: 'mail', prepare: (exported) => {
       register(exported as Mailer)
     } } }
   }
 
   if (server === false)
-    return { name: '@kaynooo/kayjs-mail', devTool, env }
+    return { name: '@kayjs/mail', devTool, env }
 
   // Built at each start of a site, so two sites in one process hold a mailer each.
   const build = async (app?: ExtensionApp): Promise<Mailer> => {
@@ -534,7 +534,7 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
     return built
   }
 
-  return { name: '@kaynooo/kayjs-mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
+  return { name: '@kayjs/mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.

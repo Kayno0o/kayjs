@@ -1,6 +1,6 @@
 ---
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
 import '../app.css'
 ---
 main

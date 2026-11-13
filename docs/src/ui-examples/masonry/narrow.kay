@@ -1,5 +1,5 @@
 --- island
-import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+import Masonry from '@kayjs/ui/masonry.kay'
 
 const heights = [64, 112, 40, 88, 136, 56, 100, 72, 120]
 const tiles = heights.map((height, id) => ({ id, height }))

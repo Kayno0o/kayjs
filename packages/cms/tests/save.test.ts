@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { until } from './until'
 
 // kayjs-ui's toasts alone, as its entry also loads icons only kay's build resolves.
-const toastModule = join(dirname(Bun.resolveSync('@kaynooo/kayjs-ui/package.json', import.meta.dir)), 'src/toast.ts')
+const toastModule = join(dirname(Bun.resolveSync('@kayjs/ui/package.json', import.meta.dir)), 'src/toast.ts')
 const { toasts } = await import(toastModule) as typeof import('../../ui/src/toast')
 
-void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule) as Promise<Record<string, unknown>>)
+void mock.module('@kayjs/ui', async () => import(toastModule) as Promise<Record<string, unknown>>)
 
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')

@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
 
 const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const series = [{ name: 'Visits', values: [120, 180, 150, 210, 260, 190, 240] }]

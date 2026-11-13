@@ -25,7 +25,7 @@ s.Object({ title: s.String(), translationKey: s.Optional(s.String()) })
 A `FileSaver` renames a folder entry's file with `move(move)`; without it the saver cannot rename entries.
 
 ```ts
-import type { FileSaver } from '@kaynooo/kayjs-cms'
+import type { FileSaver } from '@kayjs/cms'
 
 const saver: FileSaver = {
   async save(change) { /* ... */ },

@@ -1,8 +1,8 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Select from '@kayjs/ui/select.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 
 const PERIODS = [
   { value: '24h', label: 'Last 24 hours' },

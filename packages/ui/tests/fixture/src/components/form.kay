@@ -1,9 +1,9 @@
 ---
 import type { Action, Failure } from 'kay'
 import { ActionError, signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // `add` stands in for the server: it answers the saved title, or throws the messages a schema refusal carries.
 const { add: call, onSave, onError, refused } = props<{ add: (input: { title: string }) => Promise<string | { errors: Record<string, string> } | { data: unknown }>, onSave: (title: string) => void, onError?: ((failure: { error: unknown }) => unknown) | undefined, refused?: ((data: never) => Record<string, string> | string | undefined) | undefined }>()

@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import type { AudioChapter, AudioCue } from '@kaynooo/kayjs-ui'
-import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import type { AudioChapter, AudioCue } from '@kayjs/ui'
+import AudioPlayer from '@kayjs/ui/audio-player.kay'
 import { SILENCE } from './clip'
 
 const chapters: AudioChapter[] = [

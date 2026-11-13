@@ -3,8 +3,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const KAY_ROOT = join(import.meta.dir, '..')
+// A library installed as `@kayjs/ui` is labelled `kayjs-ui`.
 const LIBRARY_PREFIX = 'kayjs-'
-const SCOPE = '@kaynooo'
+const SCOPE = '@kayjs'
 const FENCE = /^\s*(`{3,}|~{3,})/
 const HEADING = /^(#{1,6}) (.+)$/
 const LINK_LINE = /^\s*[-*]\s+\[[^\]]*\]\([^)]*\)/
@@ -82,7 +83,7 @@ export function docFiles(root: string): DocFile[] {
   return [...packageFiles('kay', KAY_ROOT), ...installedLibraries(root).flatMap(([name, dir]) => packageFiles(name, dir))]
 }
 
-// The `@kaynooo/kayjs-*` packages with docs, each by name and directory.
+// The `@kayjs/*` packages with docs, each by name and directory.
 export function installedLibraries(root: string): [string, string][] {
   const found = new Map<string, string>()
 
@@ -90,8 +91,10 @@ export function installedLibraries(root: string): [string, string][] {
     const scope = join(dir, 'node_modules', SCOPE)
 
     for (const name of existsSync(scope) ? readdirSync(scope).sort() : []) {
-      if (name.startsWith(LIBRARY_PREFIX) && !found.has(name) && existsSync(join(scope, name, 'llms.txt')))
-        found.set(name, join(scope, name))
+      const label = LIBRARY_PREFIX + name
+
+      if (name !== 'kay' && !found.has(label) && existsSync(join(scope, name, 'llms.txt')))
+        found.set(label, join(scope, name))
     }
 
     if (join(dir, '..') === dir)
@@ -195,11 +198,11 @@ export function slug(heading: string): string {
   return heading.toLowerCase().replace(NOT_SLUG, '').replace(SPACE, '-')
 }
 
-// The file or the section a label such as `kayjs-ui/forms-and-steps#steps` names, its `.md` and its package's `@kaynooo/` optional.
+// The file or the section a label such as `kayjs-ui/forms-and-steps#steps` names, its `.md` and its package's `@kayjs/` scope optional.
 export function findLabel(files: DocFile[], label: string): { file: DocFile, section?: DocSection } | undefined {
   const path = labelPath(label)
   const anchor = label.slice(path.length + 1)
-  const wanted = path.replace(`${SCOPE}/`, '').toLowerCase()
+  const wanted = path.replace(`${SCOPE}/`, LIBRARY_PREFIX).toLowerCase()
   const file = files.find(doc => [doc.label, doc.label.replace(MD_SUFFIX, ''), doc.label.replace(LLMS_SUFFIX, '/llms')].includes(wanted))
 
   if (file === undefined || anchor === '')

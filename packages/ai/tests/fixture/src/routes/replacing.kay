@@ -1,5 +1,5 @@
 --- server
-import { replaces } from '@kaynooo/kayjs-ai'
+import { replaces } from '@kayjs/ai'
 import { action, s } from 'kay'
 
 // Says what a Chat with regenerate and editable posted: what the post replaces, the roles of the history and its last message, how many files it holds. A regenerated or edited "hold" never ends, "silent" says nothing for a while, and "fail" fails once, for tests that stop, reload or retry.

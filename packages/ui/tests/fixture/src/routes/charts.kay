@@ -1,8 +1,8 @@
 ---
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
-import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
-import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+import BarChart from '@kayjs/ui/bar-chart.kay'
+import ContributionGraph from '@kayjs/ui/contribution-graph.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
+import ScatterChart from '@kayjs/ui/scatter-chart.kay'
 
 const days = Array.from({ length: 21 }, (_, index) => ({ day: new Date(Date.UTC(2026, 7, 31 + index)).toISOString().slice(0, 10), intensity: index % 3 / 2, description: index === 0 ? '3 commits' : undefined }))
 ---

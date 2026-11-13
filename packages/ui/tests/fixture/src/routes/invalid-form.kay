@@ -5,7 +5,7 @@ import { action } from 'kay'
 export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
 --- script
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // A message of the page's own beside the action's, which the island shows and hides as a check of its own would; the second form shows it on a group.
 const issue = signal<string>()

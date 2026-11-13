@@ -3,7 +3,7 @@ import { findNotice } from '../../notices'
 
 const notice = await findNotice(Number(ctx.params.id)) ?? ctx.notFound()
 --- script
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Card from '@kayjs/ui/card.kay'
 ---
 head
   title {notice.title}

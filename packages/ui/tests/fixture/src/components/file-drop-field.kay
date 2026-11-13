@@ -1,6 +1,6 @@
 ---
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 FormField#field(label="Photo" hint="A PNG" required)
   FileDrop#drop(name="photo")

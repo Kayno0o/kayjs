@@ -6,8 +6,8 @@ import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, proofOf, schemas } from '../../forms'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Button from '@kayjs/ui/button.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 // Re-proves the user, so the export link below shows for the next ten minutes.
 export const prove = action(schemas.proof, async (input, ctx) => {

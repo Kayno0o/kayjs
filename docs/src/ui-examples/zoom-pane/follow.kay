@@ -1,7 +1,7 @@
 ---
-import type { Plate } from '@kaynooo/kayjs-ui'
+import type { Plate } from '@kayjs/ui'
 import { signal } from 'kay'
-import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 
 const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
 ---

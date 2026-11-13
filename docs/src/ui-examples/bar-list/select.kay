@@ -1,6 +1,6 @@
 ---
-import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import BarList from '@kayjs/ui/bar-list.kay'
+import { toast } from '@kayjs/ui'
 
 const rows = [
   { key: 'fr', label: 'France', value: 420 },

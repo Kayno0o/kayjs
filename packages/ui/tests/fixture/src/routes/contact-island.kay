@@ -8,7 +8,7 @@ export const contact = action(s.Object({
 }), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 ---
 ---
-import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+import ContactForm from '@kayjs/ui/contact-form.kay'
 
 ---
 main

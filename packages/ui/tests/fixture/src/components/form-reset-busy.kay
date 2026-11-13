@@ -1,8 +1,8 @@
 ---
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // Controls whose `onChange` the test answers, kept off the page's signals so a refused change is put back by the control itself.
 const { answer } = props<{ answer: (name: string, value: unknown) => unknown }>()

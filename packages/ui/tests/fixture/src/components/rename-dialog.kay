@@ -1,7 +1,7 @@
 ---
 import type { Action } from 'kay'
 import { signal } from 'kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
 
 const { action } = props<{ action: Action<{ name: string }, string> }>()
 const open = signal(true)

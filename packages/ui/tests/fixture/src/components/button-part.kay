@@ -1,7 +1,7 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import Button from '@kayjs/ui/button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import TimeInput from '@kayjs/ui/time-input.kay'
 import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'frame', cta: '', busyCta: '' } })

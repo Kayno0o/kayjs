@@ -1,6 +1,6 @@
 ---
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import DescriptionList from '@kaynooo/kayjs-ui/description-list.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import DescriptionList from '@kayjs/ui/description-list.kay'
 import '../app.css'
 
 const items = [

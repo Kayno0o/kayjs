@@ -6,7 +6,7 @@
 
 ```kay
 --- server
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 import { s, action } from 'kay'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'Be brief' }))
@@ -15,13 +15,13 @@ export const reply = action(s.Object({ messages: chatMessages() }), ({ messages 
 
 ```kay
 ---
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 import { reply } from '../routes/reply.kay'
 ---
 Chat(action={reply} label="Assistant")
 ```
 
-`chatMessages({ maxItems, maxLength, attachments })` (from `@kaynooo/kayjs-ai`) is the schema of the history a Chat posts: at least one message with a `role` of `user` or `assistant` and a `content`, at most `maxItems` messages (40) of `maxLength` characters (4,000). `attachments: true` or `{ type, maxFiles }` adds the files of `attach` (images and PDFs, 4 a message by default). An action that keeps the conversation itself and reads only the message just sent takes the same schema and `lastChatMessage(messages)`.
+`chatMessages({ maxItems, maxLength, attachments })` (from `@kayjs/ai`) is the schema of the history a Chat posts: at least one message with a `role` of `user` or `assistant` and a `content`, at most `maxItems` messages (40) of `maxLength` characters (4,000). `attachments: true` or `{ type, maxFiles }` adds the files of `attach` (images and PDFs, 4 a message by default). An action that keeps the conversation itself and reads only the message just sent takes the same schema and `lastChatMessage(messages)`.
 
 ### Attaching files
 
@@ -29,7 +29,7 @@ Chat(action={reply} label="Assistant")
 
 ```kay
 --- server
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 import { s, action } from 'kay'
 
 export const reply = action(s.Object({ messages: chatMessages({ attachments: { type: 'image/png' } }) }), ({ messages }) => ask(messages), { maxSize: '20mb' })
@@ -49,7 +49,7 @@ The attach button, the upload's checks (`accept`, `maxFiles`, `maxSize`), their 
 ```kay
 --- server
 import { s, action } from 'kay'
-import { transcribe } from '@kaynooo/kayjs-ai'
+import { transcribe } from '@kayjs/ai'
 
 export const dictate = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb', protect: { rateLimit: { max: 10, window: '1m' } } })
 ---
@@ -90,7 +90,7 @@ Chat(action={reply} transcribe={dictate})
 - `action`: the streaming action, typed `Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
 - `history`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns with neither text nor files are not counted.
 - `maxChars`: the most characters each send posts (40,000), the oldest messages leaving first and the last staying; the chat lowers it by itself: a 413 from the action (`ask`'s `too-long` past its `maxInputChars`) makes it post half as much, oldest messages first, and ask again (5 times at most) until the action takes it or only the last message is left, remembering the size for the next sends. Each refusal counts against the action's rate limit, so set `maxChars` to the action's `maxInputChars` to avoid the first one.
-- `initial`: `ChatTurn[]` shown to start with and sent with the first message, a `ChatTurn` being `{ role, content, sources? }` (`import type { ChatTurn } from '@kaynooo/kayjs-ai'`): `kay check` refuses an `AiMessage` with `attachments`, as an island prop carries no `Blob`.
+- `initial`: `ChatTurn[]` shown to start with and sent with the first message, a `ChatTurn` being `{ role, content, sources? }` (`import type { ChatTurn } from '@kayjs/ai'`): `kay check` refuses an `AiMessage` with `attachments`, as an island prop carries no `Blob`.
 - `label`: names the message list for screen readers (`Chat`); `fieldLabel` names the field the visitor writes in (`Message`, `ai.chat.field`), and `startedLabel` is what the status line says once the conversation is started over (`New conversation started`, `ai.chat.started`). A held tool call's Allow and Deny buttons are named with the tool (`Allow: search`), and Allow takes focus when the call is first drawn, unless focus is elsewhere on the page.
 - `disclosure` (`You are talking to an AI. Your messages are sent to its provider to answer.`, the `ai.chat.disclosure` message): the line under the log, `p.kai-chat-disclosure`; `''` hides it, [personal data](personal-data.md).
 - `greeting` (`How can I help?`) and `suggestions` (`string[]`): the empty chat shows them in `.kai-chat-empty` instead of the log, and a click on a suggestion sends it. The folded line of a reply's tools words each tool by the `label` of its action's `tool` (`tool: { label: 'Searched the docs' }`) or of its `tool()`; a tool without one shows its name, one called more than once adds `x2`. `toolLabels` (`Record<string, string>`) words a tool by its name in place of that, `{ search_docs: 'Searched the docs' }`, for a tool whose action cannot say it; `kay check` warns (`unknown-tool-label`) of a key naming no tool of the project. `icons` names the round buttons' icons, see [chat-blocks](chat-blocks.md). `@turn`, `@actions`, `@call`, `@source`, `@empty` and `@footer` replace how a turn, a tool call, a source and the empty chat are drawn: [Chat blocks](chat-blocks.md).
@@ -108,7 +108,7 @@ Chat(action={reply} transcribe={dictate})
 
 ### Restyle
 
-Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send`, `record`, `recordSpinner`, `retry`, `actions`, `regenerate`, `edit`, `editField`, `save` and `cancel` (the Try again button, shown only after a failed reply), the list's parts of [`conversations`](chat-conversations.md#words-and-parts) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) the sources under a reply `@kaynooo/kayjs-ai/chat-sources.kay` (`root`, `label`, `list`, `item`, `link`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
+Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send`, `record`, `recordSpinner`, `retry`, `actions`, `regenerate`, `edit`, `editField`, `save` and `cancel` (the Try again button, shown only after a failed reply), the list's parts of [`conversations`](chat-conversations.md#words-and-parts) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kayjs/ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kayjs/ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) the sources under a reply `@kayjs/ai/chat-sources.kay` (`root`, `label`, `list`, `item`, `link`) and the launcher's panel `@kayjs/ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 
 ### Behaviour
 

@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
 import '../app.css'
 
 const planets = [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]

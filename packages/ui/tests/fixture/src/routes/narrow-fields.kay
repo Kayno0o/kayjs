@@ -1,8 +1,8 @@
 ---
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Select from '@kayjs/ui/select.kay'
 
 const long = 'A user name that is far longer than any phone is wide, in a filter row of a history page'
 const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: long }]

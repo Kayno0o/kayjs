@@ -1,7 +1,7 @@
 ---
-import type { TreeNode } from '@kaynooo/kayjs-ui'
-import { nodeKey } from '@kaynooo/kayjs-ui/lib/tree'
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import type { TreeNode } from '@kayjs/ui'
+import { nodeKey } from '@kayjs/ui/lib/tree'
+import TreeView from '@kayjs/ui/tree-view.kay'
 
 // What the test reads back: the menu entries run, the stars clicked, and the selection and rows the tree reports.
 const { onAction, onStar, onSelect } = props<{ onAction: (label: string) => void, onStar: (id: string) => void, onSelect: (id: string) => void }>()

@@ -8,18 +8,18 @@ import { scratchDir } from './scratch'
 
 const ROOT = join(import.meta.dir, '..')
 const LINK = /\]\((?!\w+:|\/|#)([^)\s#]+\.(?:md|txt))(?:#[^)\s]*)?\)/g
-const FOLDERS = new Map([['', 'kayjs'], ['packages/ui', 'kayjs-ui'], ['packages/cms', 'kayjs-cms']])
+const FOLDERS = new Map([['', 'kay'], ['packages/ui', 'ui'], ['packages/cms', 'cms']])
 
 async function packages(): Promise<string[]> {
   return ['', ...(await readdir(join(ROOT, 'packages'))).map(name => `packages/${name}`)].filter(folder => existsSync(join(ROOT, folder, 'package.json')))
 }
 
 describe('rewriteLinks', () => {
-  it('points a link into another package at its folder in node_modules/@kaynooo', () => {
-    expect(rewriteLinks('llms/recipes.md', '[a](../packages/cms/llms/loaders.md#x)', FOLDERS)).toBe('[a](../../kayjs-cms/llms/loaders.md#x)')
-    expect(rewriteLinks('llms.txt', '[a](packages/ui/llms.txt)', FOLDERS)).toBe('[a](../kayjs-ui/llms.txt)')
-    expect(rewriteLinks('packages/cms/llms/history.md', '[a](../../../llms/content.md)', FOLDERS)).toBe('[a](../../kayjs/llms/content.md)')
-    expect(rewriteLinks('packages/cms/llms/history.md', '[a](../../ui/llms/basics.md)', FOLDERS)).toBe('[a](../../kayjs-ui/llms/basics.md)')
+  it('points a link into another package at its folder in node_modules/@kayjs', () => {
+    expect(rewriteLinks('llms/recipes.md', '[a](../packages/cms/llms/loaders.md#x)', FOLDERS)).toBe('[a](../../cms/llms/loaders.md#x)')
+    expect(rewriteLinks('llms.txt', '[a](packages/ui/llms.txt)', FOLDERS)).toBe('[a](../ui/llms.txt)')
+    expect(rewriteLinks('packages/cms/llms/history.md', '[a](../../../llms/content.md)', FOLDERS)).toBe('[a](../../kay/llms/content.md)')
+    expect(rewriteLinks('packages/cms/llms/history.md', '[a](../../ui/llms/basics.md)', FOLDERS)).toBe('[a](../../ui/llms/basics.md)')
   })
 
   it('leaves a link inside a package, a URL, an anchor and a path out of the repo alone', () => {
@@ -31,10 +31,10 @@ describe('rewriteLinks', () => {
 })
 
 describe('packed tarballs', () => {
-  it('resolve every link of the shipped docs from node_modules/@kaynooo', async () => {
+  it('resolve every link of the shipped docs from node_modules/@kayjs', async () => {
     const mirror = await scratchDir('pack-links-')
     const tarballs = join(mirror, 'tarballs')
-    const installed = join(mirror, 'node_modules', '@kaynooo')
+    const installed = join(mirror, 'node_modules', '@kayjs')
     const names = new Map<string, string>()
 
     // The docs and manifests alone, with the manifests' scripts and dependencies dropped so a pack here builds and resolves nothing.
@@ -61,7 +61,7 @@ describe('packed tarballs', () => {
     for (const [folder, name] of names) {
       await $`bun pm pack --destination ${tarballs} --quiet --ignore-scripts`.cwd(join(mirror, folder)).quiet()
 
-      const target = join(installed, name.replace('@kaynooo/', ''))
+      const target = join(installed, name.replace('@kayjs/', ''))
       const tarball = (await readdir(tarballs)).find(file => file.startsWith(`${name.replace('@', '').replace('/', '-')}-`))
 
       await mkdir(target, { recursive: true })
@@ -106,10 +106,10 @@ describe('packed tarballs', () => {
 
     await mkdir(join(mirror, 'llms'), { recursive: true })
     await mkdir(join(mirror, 'packages', 'ui'), { recursive: true })
-    await Bun.write(join(mirror, 'packages', 'ui', 'package.json'), '{"name":"@kaynooo/kayjs-ui"}')
+    await Bun.write(join(mirror, 'packages', 'ui', 'package.json'), '{"name":"@kayjs/ui"}')
     await Bun.write(join(mirror, 'llms.txt'), '[a](packages/ui/llms.txt)')
     await rewrite(mirror)
-    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../kayjs-ui/llms.txt)')
+    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../ui/llms.txt)')
     await restore(mirror)
     expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](packages/ui/llms.txt)')
   })
@@ -119,11 +119,11 @@ describe('rewriteLinks in Markdown that is not a plain inline link', () => {
   it('leaves fenced code, code spans and the links of a longer fence alone', () => {
     const text = ['[a](packages/ui/llms.txt)', '```md', '[b](packages/ui/llms.txt)', '```', '~~~~', '[c](packages/ui/llms.txt)', '~~~', '[d](packages/ui/llms.txt)', '~~~~', 'use `[e](packages/ui/llms.txt)` or [f](packages/ui/llms.txt) after'].join('\n')
 
-    expect(rewriteLinks('llms.txt', text, FOLDERS).split('\n')).toEqual(['[a](../kayjs-ui/llms.txt)', '```md', '[b](packages/ui/llms.txt)', '```', '~~~~', '[c](packages/ui/llms.txt)', '~~~', '[d](packages/ui/llms.txt)', '~~~~', 'use `[e](packages/ui/llms.txt)` or [f](../kayjs-ui/llms.txt) after'])
+    expect(rewriteLinks('llms.txt', text, FOLDERS).split('\n')).toEqual(['[a](../ui/llms.txt)', '```md', '[b](packages/ui/llms.txt)', '```', '~~~~', '[c](packages/ui/llms.txt)', '~~~', '[d](packages/ui/llms.txt)', '~~~~', 'use `[e](packages/ui/llms.txt)` or [f](../ui/llms.txt) after'])
   })
 
   it('rewrites reference definitions and titled links like inline ones', () => {
-    expect(rewriteLinks('llms.txt', '[ui]: packages/ui/llms.txt#top "UI"\n[web]: https://x.fr/a.md\n[a](packages/ui/llms.txt "title") and [b](packages/ui/llms.txt \'t\')', FOLDERS)).toBe('[ui]: ../kayjs-ui/llms.txt#top "UI"\n[web]: https://x.fr/a.md\n[a](../kayjs-ui/llms.txt "title") and [b](../kayjs-ui/llms.txt \'t\')')
+    expect(rewriteLinks('llms.txt', '[ui]: packages/ui/llms.txt#top "UI"\n[web]: https://x.fr/a.md\n[a](packages/ui/llms.txt "title") and [b](packages/ui/llms.txt \'t\')', FOLDERS)).toBe('[ui]: ../ui/llms.txt#top "UI"\n[web]: https://x.fr/a.md\n[a](../ui/llms.txt "title") and [b](../ui/llms.txt \'t\')')
   })
 })
 
@@ -135,7 +135,7 @@ describe('the backup of a pack', () => {
 
     for (const name of ['ui', 'cms']) {
       await mkdir(join(mirror, 'packages', name), { recursive: true })
-      await Bun.write(join(mirror, 'packages', name, 'package.json'), `{"name":"@kaynooo/kayjs-${name}"}`)
+      await Bun.write(join(mirror, 'packages', name, 'package.json'), `{"name":"@kayjs/${name}"}`)
       await Bun.write(join(mirror, 'packages', name, 'llms.txt'), '[a](../../llms.txt) [b](../cms/llms.txt)')
     }
 
@@ -161,11 +161,11 @@ describe('the backup of a pack', () => {
 
     await rewrite(mirror, 'packages/ui')
     await rewrite(mirror, 'packages/cms')
-    expect(await Bun.file(join(mirror, 'packages', 'ui', 'llms.txt')).text()).toBe('[a](../kayjs/llms.txt) [b](../kayjs-cms/llms.txt)')
+    expect(await Bun.file(join(mirror, 'packages', 'ui', 'llms.txt')).text()).toBe('[a](../kay/llms.txt) [b](../cms/llms.txt)')
     expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](packages/ui/llms.txt)')
     await restore(mirror, 'packages/cms')
     expect(await Bun.file(join(mirror, 'packages', 'cms', 'llms.txt')).text()).toBe('[a](../../llms.txt) [b](../cms/llms.txt)')
-    expect(await Bun.file(join(mirror, 'packages', 'ui', 'llms.txt')).text()).toBe('[a](../kayjs/llms.txt) [b](../kayjs-cms/llms.txt)')
+    expect(await Bun.file(join(mirror, 'packages', 'ui', 'llms.txt')).text()).toBe('[a](../kay/llms.txt) [b](../cms/llms.txt)')
     await restore(mirror, 'packages/ui')
     expect(await Bun.file(join(mirror, 'packages', 'ui', 'llms.txt')).text()).toBe('[a](../../llms.txt) [b](../cms/llms.txt)')
   })
@@ -175,10 +175,10 @@ describe('the backup of a pack', () => {
     const pack = Bun.spawn(['sleep', '1'])
 
     await rewrite(mirror, '', pack.pid)
-    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../kayjs-ui/llms.txt)')
+    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../ui/llms.txt)')
     // Another pack's backup is not this one's to restore.
     await restoreAfter(process.pid + 1_000_000, mirror, '')
-    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../kayjs-ui/llms.txt)')
+    expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](../ui/llms.txt)')
     await restoreAfter(pack.pid, mirror, '')
     expect(await Bun.file(join(mirror, 'llms.txt')).text()).toBe('[a](packages/ui/llms.txt)')
   })

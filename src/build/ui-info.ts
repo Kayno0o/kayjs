@@ -27,7 +27,7 @@ export interface StyleInfo {
   recipe: boolean
 }
 
-const THEME = '@kaynooo/kayjs-ui/theme.css'
+const THEME = '@kayjs/ui/theme.css'
 const DECLARATION = /^\s*(--[\w-]+)\s*:([^;]+);/gm
 const COMMENT = /\/\*[\s\S]*?\*\//g
 const THEME_BLOCK = /@theme\b[^{;]*\{([^{}]*)\}/g

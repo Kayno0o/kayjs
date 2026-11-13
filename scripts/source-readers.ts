@@ -37,7 +37,7 @@ export const SOURCE_FILE_READERS: [RegExp, string[]][] = [
 export const SOURCE_FILE_READ = /(?:Bun\.file|readFile(?:Sync)?)\([^\n]*?[`'"]((?:(?:\.\.\/)+src|(?:\.\.\/)*packages\/[\w-]+\/src|(?<=resolve\([`'"])src)\/[^`'"]*?\.(?!ts\b)[a-z]+)[`'"]/g
 
 // What marks a test as depending on the stylesheet of the UI library: it reads it, loads the UI extension that references it, or imports it from a stylesheet. Browser tests are left out of `SOURCE_FILE_READERS`.
-export const UI_THEME_USE = /packages\/ui\/src\/(?:extension|theme\.css)|kayjs-ui\/theme\.css/
+export const UI_THEME_USE = /packages\/ui\/src\/(?:extension|theme\.css)|@kayjs\/ui\/theme\.css/
 
 // Tests walking every fixture as files, so a new fixture reaches them though no test names it; `tests/land.test.ts` fails for a test walking the fixtures that is not listed here.
 export const FIXTURE_WALKERS = [

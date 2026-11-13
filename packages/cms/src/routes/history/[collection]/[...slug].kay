@@ -1,5 +1,5 @@
 --- server
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryHeader from '../../../components/entry-header.kay'

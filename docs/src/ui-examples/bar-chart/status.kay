@@ -1,5 +1,5 @@
 ---
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import BarChart from '@kayjs/ui/bar-chart.kay'
 
 const runs = ['02:00', '03:00', '04:00', '05:00', '06:00']
 const series = [{

@@ -1,5 +1,5 @@
 --- island
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import TreeView from '@kayjs/ui/tree-view.kay'
 import { signal } from 'kay'
 
 const { calls } = props<{ calls: string[] }>()

@@ -11,7 +11,7 @@ import { scratchDir } from './scratch'
 
 const LAYOUT = '---\nimport \'../app.css\'\n---\nslot\n'
 const PAGE = 'p.card Card\n'
-const REFERENCE = '@reference \'@kaynooo/kayjs-ui/theme.css\';'
+const REFERENCE = '@reference \'@kayjs/ui/theme.css\';'
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const roots: string[] = []
 

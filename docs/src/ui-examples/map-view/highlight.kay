@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import MapView from '@kaynooo/kayjs-ui/map-view.kay'
+import MapView from '@kayjs/ui/map-view.kay'
 
 const legs = {
   Louvre: [[48.8606, 2.3376], [48.8530, 2.3499]],

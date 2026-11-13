@@ -7,8 +7,8 @@ const KAY_PACKAGE = resolve(import.meta.dir, '../..')
 const KAY_SOURCE = resolve(import.meta.dir, '..') + sep
 const SCANNED = new Map<string, 'ts' | 'tsx' | 'js' | 'jsx'>([['.ts', 'ts'], ['.mts', 'ts'], ['.tsx', 'tsx'], ['.js', 'js'], ['.mjs', 'js'], ['.cjs', 'js'], ['.jsx', 'jsx']])
 const KAY_SPECIFIER = /^kay(?:\/|$)/
-const KAY_LIBRARY = /^(?:@kaynooo\/)?kayjs-/
-const LIBRARY_FOLDER = /^(?:@kaynooo[\\/])?kayjs-/
+const KAY_LIBRARY = /^(?:@kayjs\/(?!kay(?:\/|$))|kayjs-)/
+const LIBRARY_FOLDER = /^(?:@kayjs[\\/](?!kay(?:[\\/]|$))|kayjs-)/
 // The names `mountComponent` defines for the bundle: a file of kay reading one is built for the app's settings, so the bundle keeps its own copy of it.
 const DEFINED = /\bKAY_(?:FRENCH|I18N)\b/
 // A file of kay reading the page keeps it per mount: what it holds of the document it first met, a listener or the tab's visibility, restarts as it does on a page load. The reactive core and the modules built on it alone are what the test and the bundle share.

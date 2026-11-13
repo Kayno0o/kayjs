@@ -1,4 +1,4 @@
-import { outbox } from '@kaynooo/kayjs-mail'
+import { outbox } from '@kayjs/mail'
 import { beforeEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { joinAs } from './members'

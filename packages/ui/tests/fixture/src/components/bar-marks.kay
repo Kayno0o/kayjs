@@ -1,9 +1,9 @@
 --- client
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
-import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
-import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
-import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+import BarChart from '@kayjs/ui/bar-chart.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
+import Sparkline from '@kayjs/ui/sparkline.kay'
+import ContributionGraph from '@kayjs/ui/contribution-graph.kay'
+import ScatterChart from '@kayjs/ui/scatter-chart.kay'
 
 const { heard, steered = null } = props<{ heard: unknown[], steered?: number | null }>()
 ---

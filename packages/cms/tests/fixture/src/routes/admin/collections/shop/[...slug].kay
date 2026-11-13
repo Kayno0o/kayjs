@@ -1,5 +1,5 @@
 --- server
-import { entryScreen } from '@kaynooo/kayjs-cms'
+import { entryScreen } from '@kayjs/cms'
 import ShopEntry from '../../../../components/shop-entry.kay'
 
 // The shop's entry screen is the app's own, built from the cms's parts.

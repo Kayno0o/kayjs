@@ -1,6 +1,6 @@
 ---
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import CollapsibleSection from '@kayjs/ui/collapsible-section.kay'
 ---
 .flex.flex-col.gap-3
   CollapsibleSection(title="Active" open boxed)

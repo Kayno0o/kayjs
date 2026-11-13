@@ -1,5 +1,5 @@
-import type { Logo, MailSettings } from '@kaynooo/kayjs-mail'
-import { cssColors, mailDefaults } from '@kaynooo/kayjs-mail'
+import type { Logo, MailSettings } from '@kayjs/mail'
+import { cssColors, mailDefaults } from '@kayjs/mail'
 import site from './styles/site.css' with { type: 'text' }
 
 const colour = cssColors(site, 'styles/site.css')

@@ -1,5 +1,5 @@
 ---
-import { attempt } from '@kaynooo/kayjs-ui'
+import { attempt } from '@kayjs/ui'
 import { onCleanup, onMount, signal } from 'kay'
 
 const COPIED_MS = 2000

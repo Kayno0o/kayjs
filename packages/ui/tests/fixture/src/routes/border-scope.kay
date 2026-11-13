@@ -1,5 +1,5 @@
 ---
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Card from '@kayjs/ui/card.kay'
 import '../app.css'
 ---
 //- A Card inside a subtree and one outside it, to see which a `--border-width` set on the subtree reaches.

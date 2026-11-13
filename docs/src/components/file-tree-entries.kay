@@ -1,6 +1,6 @@
 ---
 import type { FileEntry } from '../file-tree'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import Icon from '@kayjs/ui/icon.kay'
 import { fileIcon } from '../file-icons'
 import FileTreeEntries from './file-tree-entries.kay'
 

@@ -1,12 +1,12 @@
 --- island
-import type { Tone } from '@kaynooo/kayjs-ui'
-import Menu from '@kaynooo/kayjs-ui/menu.kay'
-import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
-import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
-import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import type { Tone } from '@kayjs/ui'
+import Menu from '@kayjs/ui/menu.kay'
+import Sparkline from '@kayjs/ui/sparkline.kay'
+import Stat from '@kayjs/ui/stat.kay'
+import StatusStrip from '@kayjs/ui/status-strip.kay'
+import Timeline from '@kayjs/ui/timeline.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import { toast } from '@kayjs/ui'
 
 // Every tone once on each component that colours by one.
 const tones: Tone[] = ['neutral', 'accent', 'success', 'warning', 'danger', 'info']

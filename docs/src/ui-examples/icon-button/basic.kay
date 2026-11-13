@@ -1,4 +1,4 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 ---
 IconButton(icon="plus" label="Add")

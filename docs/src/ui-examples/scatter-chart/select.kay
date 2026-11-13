@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+import ScatterChart from '@kayjs/ui/scatter-chart.kay'
 
 const points = [
   { key: 'a', label: 'Outer Wilds', x: 22, y: 95, weight: 3 },

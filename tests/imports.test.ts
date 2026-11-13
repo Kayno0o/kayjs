@@ -2,7 +2,7 @@ import { expect, it } from 'bun:test'
 import { unknownNameHelp } from '../src/check/export-homes'
 import { insertImport } from '../src/imports'
 
-const cms = 'import { cms } from \'@kaynooo/kayjs-cms\''
+const cms = 'import { cms } from \'@kayjs/cms\''
 
 it('places an import where the preset sorts it, among externals and after builtins', () => {
   const config = 'import { defineConfig } from \'kay/server\'\nimport tailwind from \'bun-plugin-tailwind\'\n\nexport default defineConfig({})\n'

@@ -1,7 +1,7 @@
 --- island
-import type { Column } from '@kaynooo/kayjs-ui'
+import type { Column } from '@kayjs/ui'
 import { signal } from 'kay'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Table from '@kayjs/ui/table.kay'
 
 interface Row {
   id: number

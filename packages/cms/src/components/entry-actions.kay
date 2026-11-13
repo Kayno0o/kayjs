@@ -1,7 +1,7 @@
 ---
 import type { EntryForm } from '../form'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import { revokeSharedLinks, shareDraft } from '../editor/save'

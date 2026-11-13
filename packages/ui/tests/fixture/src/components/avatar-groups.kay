@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
 
 const { onOpenChange, onLoad, onError } = props<{ onOpenChange: (open: boolean) => void, onLoad: (count: number) => void, onError: (error: unknown) => void }>()
 

@@ -1,16 +1,16 @@
 ---
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
-import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Slider from '@kaynooo/kayjs-ui/slider.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import ColorInput from '@kayjs/ui/color-input.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import DateRangeInput from '@kayjs/ui/date-range-input.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import RangeInput from '@kayjs/ui/range-input.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Slider from '@kayjs/ui/slider.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // A Segmented and a ChipGroup writing their label above them, beside ones keeping it for screen readers only.
 const shapes = [{ value: 'grid', label: 'Grid' }, { value: 'list', label: 'List' }] as const

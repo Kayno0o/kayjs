@@ -1,5 +1,5 @@
 --- island
 import { reply } from '../routes/chat.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 Chat(action={reply} label="Assistant" suggestions={() => ['Sync one', 'Sync two']})

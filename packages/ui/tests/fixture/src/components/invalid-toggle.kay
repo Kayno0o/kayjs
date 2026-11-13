@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 
 // A TextInput whose `invalid` one button flips, inside a FormField another gives a message.
 const invalid = signal(true)

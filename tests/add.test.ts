@@ -168,12 +168,12 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
     // What `bun add` would have installed: the workspace copy of the library.
-    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
+    await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kayjs/mail'))
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-mail'] = '~1.0.0'
+    manifest.dependencies['@kayjs/mail'] = '~1.0.0'
     await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
 
     const result = await addFeatures(dir, ['mail'], { install: false })
@@ -181,7 +181,7 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
     expect(result.written).toEqual(['kay.config.ts'])
     expect(result.notes).toEqual([expect.stringContaining('MAIL_URL')])
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail()],')
-    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('import { mail } from \'@kaynooo/kayjs-mail\'\n')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('import { mail } from \'@kayjs/mail\'\n')
     expect(await Bun.file(join(dir, 'src/mail.ts')).exists()).toBe(false)
 
     // A second run finds both done.
@@ -197,8 +197,8 @@ it('plans the package.json write of a library that resolves but is not in packag
 
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
-    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
+    await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kayjs/mail'))
 
     const before = await Bun.file(join(dir, 'package.json')).text()
     const result = await addFeatures(dir, ['mail'], { dryRun: true })
@@ -216,12 +216,12 @@ it('adds kayjs-ai as its extension alone, with no file', async () => {
 
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
-    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/ai'), join(dir, 'node_modules/@kaynooo/kayjs-ai'))
+    await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(repo, 'packages/ai'), join(dir, 'node_modules/@kayjs/ai'))
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-ai'] = '~1.0.0'
+    manifest.dependencies['@kayjs/ai'] = '~1.0.0'
     await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
 
     const result = await addFeatures(dir, ['ai'], { install: false })
@@ -236,13 +236,13 @@ it('adds kayjs-ai as its extension alone, with no file', async () => {
 })
 
 it('puts an extension first in an existing list, and refuses a config without defineConfig', () => {
-  const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
+  const extension = { import: 'import { cms } from \'@kayjs/cms\'', expression: 'cms()' }
 
-  expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
+  expect(addExtension('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [other()],\n})\n', extension)).toBe('import { cms } from \'@kayjs/cms\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  extensions: [cms(), other()],\n})\n')
   expect(addExtension('export default { lang: \'en\' }\n', extension)).toBeUndefined()
-  const mail = { import: 'import { mail } from \'@kaynooo/kayjs-mail\'', expression: 'mail({ module: \'./src/mail\' })' }
+  const mail = { import: 'import { mail } from \'@kayjs/mail\'', expression: 'mail({ module: \'./src/mail\' })' }
 
-  expect(addExtension('import { defineConfig } from \'kay/server\'\nexport default defineConfig({ extensions: [] })\n', mail)).toContain('import { mail } from \'@kaynooo/kayjs-mail\'')
+  expect(addExtension('import { defineConfig } from \'kay/server\'\nexport default defineConfig({ extensions: [] })\n', mail)).toContain('import { mail } from \'@kayjs/mail\'')
 })
 
 it('leaves the project as it was when a library refuses, package.json included', async () => {
@@ -250,16 +250,16 @@ it('leaves the project as it was when a library refuses, package.json included',
 
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
-    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kaynooo/kayjs-auth'))
-    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kaynooo/kayjs-ui'))
+    await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kayjs/auth'))
+    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kayjs/ui'))
     await mkdir(join(dir, 'src/routes'), { recursive: true })
     await writeFile(join(dir, 'src/routes/_guard.ts'), 'export default 1\n')
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-auth'] = '~1.0.0'
-    manifest.dependencies['@kaynooo/kayjs-ui'] = '~1.0.0'
+    manifest.dependencies['@kayjs/auth'] = '~1.0.0'
+    manifest.dependencies['@kayjs/ui'] = '~1.0.0'
     await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
 
     const files = ['package.json', 'kay.config.ts', 'src/routes/_guard.ts', '.gitignore']
@@ -298,15 +298,15 @@ it('puts package.json and the lockfile back as they were, one a bun add made inc
 })
 
 it('adds an extension without breaking a config it does not recognise', async () => {
-  const extension = { import: 'import { cms } from \'@kaynooo/kayjs-cms\'', expression: 'cms()' }
+  const extension = { import: 'import { cms } from \'@kayjs/cms\'', expression: 'cms()' }
   const multiline = 'import {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({})\n'
 
-  expect(addExtension(multiline, extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\nimport {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({\n  extensions: [cms()],\n})\n')
+  expect(addExtension(multiline, extension)).toBe('import { cms } from \'@kayjs/cms\'\nimport {\n  defineConfig,\n} from \'kay/server\'\n\nexport default defineConfig({\n  extensions: [cms()],\n})\n')
   // Configured by hand already: left as it is, and a list held in a variable is a shape it stops at.
-  expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)).toContain('extensions: [cms({ files: forgejo() })] })')
-  expect(addExtension('import { cms, forgejo } from \'@kaynooo/kayjs-cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)!.match(/cms\(/g)).toHaveLength(1)
+  expect(addExtension('import { cms, forgejo } from \'@kayjs/cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)).toContain('extensions: [cms({ files: forgejo() })] })')
+  expect(addExtension('import { cms, forgejo } from \'@kayjs/cms\'\nexport default defineConfig({ extensions: [cms({ files: forgejo() })] })\n', extension)!.match(/cms\(/g)).toHaveLength(1)
   expect(addExtension('export default defineConfig({ extensions: list })\n', extension)).toBeUndefined()
-  expect(addExtension('export default defineConfig({ extensions: [] })\n', extension)).toBe('import { cms } from \'@kaynooo/kayjs-cms\'\n\nexport default defineConfig({ extensions: [cms()] })\n')
+  expect(addExtension('export default defineConfig({ extensions: [] })\n', extension)).toBe('import { cms } from \'@kayjs/cms\'\n\nexport default defineConfig({ extensions: [cms()] })\n')
 })
 
 it('refuses a name that is no feature, an inherited one included', async () => {
@@ -373,17 +373,17 @@ it('restores package.json and the lockfile when a library refuses after a stubbe
     const dir = await projectWith(root, PRESETS.server.features)
 
     await writeFile(join(dir, 'bun.lock'), 'old lock')
-    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kaynooo/kayjs-auth'))
-    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kaynooo/kayjs-ui'))
+    await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kayjs/auth'))
+    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kayjs/ui'))
     await mkdir(join(dir, 'src/routes'), { recursive: true })
     await writeFile(join(dir, 'src/routes/_guard.ts'), 'export default 1\n')
 
     const before = await Bun.file(join(dir, 'package.json')).text()
     const manifest = JSON.parse(before) as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-auth'] = '~1.0.0'
-    manifest.dependencies['@kaynooo/kayjs-ui'] = '~1.0.0'
+    manifest.dependencies['@kayjs/auth'] = '~1.0.0'
+    manifest.dependencies['@kayjs/ui'] = '~1.0.0'
     await writeFile(join(root, 'after.json'), JSON.stringify(manifest))
 
     const { bun, calls } = await stubBun(root, `cp '${join(root, 'after.json')}' package.json\nprintf 'new lock' > bun.lock\nprintf 'binary' > bun.lockb`)
@@ -412,7 +412,7 @@ it('installs @iconify-json/tabler as a dev dependency, as kay new does', async (
     const lines = await calls()
 
     expect(lines).toHaveLength(2)
-    expect(lines[0]).toContain('add @kaynooo/kayjs-cms@~')
+    expect(lines[0]).toContain('add @kayjs/cms@~')
     expect(lines[0]).not.toContain('iconify')
     expect(lines[1]).toContain('add -d @iconify-json/tabler@')
   }
@@ -662,10 +662,10 @@ it('shows a hand edit as an ordered diff', () => {
 // A project with the workspace copies of kay's libraries linked into its node_modules, as `bun add` would have left them.
 async function linkedProject(dir: string, features: readonly Feature[], libraries: readonly string[]): Promise<void> {
   await createProject(dir, { kay: '^1.0.0', features })
-  await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+  await mkdir(join(dir, 'node_modules/@kayjs'), { recursive: true })
 
   for (const library of libraries)
-    await symlink(join(repo, `packages/${library}`), join(dir, `node_modules/@kaynooo/kayjs-${library}`))
+    await symlink(join(repo, `packages/${library}`), join(dir, `node_modules/@kayjs/${library}`))
 }
 
 it('adds the ui extension with no line in the layout or the stylesheet', async () => {
@@ -680,7 +680,7 @@ it('adds the ui extension with no line in the layout or the stylesheet', async (
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('import { ui } from \'@kaynooo/kayjs-ui\'')
+    expect(config).toContain('import { ui } from \'@kayjs/ui\'')
     expect(config).toContain('extensions: [ui()]')
     expect((await addFeatures(dir, ['ui'], { install: false })).written).toEqual([])
   }
@@ -711,7 +711,7 @@ it('adds kayjs-auth as the one line auth() in the config, with the guard and the
 
     expect(result.written).toEqual(['.env.example', 'kay.config.ts', 'src/routes/_guard.ts'])
     expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
-    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('import { authGuard } from \'@kaynooo/kayjs-auth\'\n')
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('import { authGuard } from \'@kayjs/auth\'\n')
     expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default authGuard()')
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
@@ -751,11 +751,11 @@ it('adds kayjs-auth over the project\'s pg-orm tables, the mailer being found by
     const tables = await Bun.file(join(dir, 'src/db/index.ts')).text()
 
     expect(tables).toContain('export const tables = [...authTables, Member]')
-    expect(tables).toContain('import { authTables } from \'@kaynooo/kayjs-auth/pg\'')
+    expect(tables).toContain('import { authTables } from \'@kayjs/auth/pg\'')
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
+    expect(config).toContain('store: async () => (await import(\'@kayjs/auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
     expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
     expect(await Bun.file(join(dir, '.env.example')).text()).not.toContain('AUTH_DATABASE_URL')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
@@ -774,14 +774,14 @@ it('names a non-ASCII package whole, and says nothing of a mailer the project ha
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { name: string, dependencies: Record<string, string> }
 
     manifest.name = 'café-du-coin'
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, '@kaynooo/kayjs-mail': '^1.0.0' } }))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, '@kayjs/mail': '^1.0.0' } }))
 
     const bare = await addFeatures(dir, ['auth'], { install: false })
 
     expect(bare.notes.join('\n')).toContain('add mail() to the extensions of kay.config.ts')
     expect(bare.notes.join('\n')).not.toContain('kay add mail')
 
-    await writeFile(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/config\'\nimport { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default defineConfig({ extensions: [mail()] })\n')
+    await writeFile(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/config\'\nimport { mail } from \'@kayjs/mail\'\n\nexport default defineConfig({ extensions: [mail()] })\n')
     const result = await addFeatures(dir, ['auth'], { install: false })
 
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('auth({ name: \'Café Du Coin\' })')
@@ -918,7 +918,7 @@ it('writes the server beside kayjs-auth and postgres, and leaves a kayjs-auth pr
 
 it('installs a package at its latest version when kay carries no devDependencies', () => {
   expect(rangeIn({ version: '1.2.3' }, '@iconify-json/tabler')).toBe('latest')
-  expect(rangeIn({ version: '1.2.3' }, '@kaynooo/kayjs-ui')).toBe('~1.2.3')
+  expect(rangeIn({ version: '1.2.3' }, '@kayjs/ui')).toBe('~1.2.3')
   expect(rangeIn({ version: '1.2.3', devDependencies: { '@iconify-json/tabler': '^1.0.0' } }, '@iconify-json/tabler')).toBe('^1.0.0')
 })
 
@@ -943,7 +943,7 @@ it('never writes back the CLAUDE.md and .mcp.json the app deleted', async () => 
 
 // A `bun` that links the workspace copies of the libraries into node_modules, as `bun add` would have left them.
 async function linkingBun(root: string): Promise<{ bun: string, calls: () => Promise<string[]> }> {
-  return stubBun(root, `mkdir -p node_modules/@kaynooo\nfor library in ui mail cms ai; do ln -sfn '${repo}'/packages/$library node_modules/@kaynooo/kayjs-$library; done`)
+  return stubBun(root, `mkdir -p node_modules/@kayjs\nfor library in ui mail cms ai; do ln -sfn '${repo}'/packages/$library node_modules/@kayjs/$library; done`)
 }
 
 it('writes with kay new --with the files kay add writes to the project kay new made without them', async () => {

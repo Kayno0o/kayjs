@@ -4,8 +4,8 @@ import { action } from 'kay'
 
 export const draft = action(t.Object({ name: t.String({ maxLength: 100 }) }), ({ name }) => name)
 --- script
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 ---
 Toaster
 SaveForm(action={draft} failureLabel="Could not save" saved="Saved." confirm="Apply this change?")

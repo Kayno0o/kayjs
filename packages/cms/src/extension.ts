@@ -91,7 +91,7 @@ export function cms(options: CmsOptions = {}): KayExtension {
   const { prefix } = configure(options)
 
   return {
-    name: '@kaynooo/kayjs-cms',
+    name: '@kayjs/cms',
     routes: { dir: `${import.meta.dir}/routes`, prefix: prefix === '/' ? ROOT_MOUNT : prefix },
     api: { dir: `${import.meta.dir}/api`, prefix: API_PREFIX },
     editor: `${import.meta.dir}/editor/editor.kay`,

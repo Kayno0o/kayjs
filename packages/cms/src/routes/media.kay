@@ -1,8 +1,8 @@
 --- server
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import Button from '@kayjs/ui/button.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import MediaLibrary from '../components/media-library.kay'

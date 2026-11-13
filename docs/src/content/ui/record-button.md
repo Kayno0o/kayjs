@@ -39,4 +39,4 @@ Its texts are `ui.recordButton.*` messages, the microphone's troubles included, 
 
 ## Drawn otherwise
 
-`recorder()` and `recordWords()` from `@kaynooo/kayjs-ui/lib/record` are the button's state, for a microphone drawn another way: `state`, `problem`, `said` and `seconds` are signals, `press()` starts or stops and `cancel()` drops. It takes the same `onStart`, `onStop`, `onCancel` and `onError`. The recorder's browser code is a chunk of its own, loaded when the component mounts, so a page without a microphone ships none of it.
+`recorder()` and `recordWords()` from `@kayjs/ui/lib/record` are the button's state, for a microphone drawn another way: `state`, `problem`, `said` and `seconds` are signals, `press()` starts or stops and `cancel()` drops. It takes the same `onStart`, `onStop`, `onCancel` and `onError`. The recorder's browser code is a chunk of its own, loaded when the component mounts, so a page without a microphone ships none of it.

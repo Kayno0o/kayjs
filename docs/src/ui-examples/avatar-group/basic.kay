@@ -1,5 +1,5 @@
 ---
-import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
 
 const team = [
   { name: 'Ada Lovelace', status: 'online' as const },

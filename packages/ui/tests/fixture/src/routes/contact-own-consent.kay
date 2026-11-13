@@ -1,11 +1,11 @@
 --- server
-import { contactForm } from '@kaynooo/kayjs-mail'
+import { contactForm } from '@kayjs/mail'
 import { action, s } from 'kay'
 
 export const contact = action(...contactForm({ enqueue: async () => undefined as never }, { fields: { consent: s.Boolean() } }))
 ---
 ---
-import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+import ContactForm from '@kayjs/ui/contact-form.kay'
 ---
 main
   ContactForm(action={contact})

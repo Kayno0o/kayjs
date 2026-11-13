@@ -26,8 +26,8 @@ export const post = action(s.Object({
 
 const [user, notices] = await Promise.all([ctx.locals.auth.user(), latestNotices()])
 --- script
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Card from '@kayjs/ui/card.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 import LiveBoard from '../components/live-board.kay'
 import NewNotice from '../components/new-notice.kay'
 ---

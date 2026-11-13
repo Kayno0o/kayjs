@@ -4,10 +4,10 @@ import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
 import { failure, issue, profileIssue, proofOf, schemas } from '../../forms'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 export const resend = action(async (ctx) => {
   const result = await ctx.locals.auth.email.sendVerification()

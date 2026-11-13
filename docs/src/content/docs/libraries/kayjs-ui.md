@@ -3,25 +3,25 @@ title: kayjs-ui
 order: 3
 description: A set of kay components styled by one theme you restyle from your own stylesheet.
 ---
-`@kaynooo/kayjs-ui` is a set of `.kay` components that your app compiles as its own, styled by the classes of one `theme.css`. Components use `kui-` prefixed classes, and utilities in the recipes that hold their look, so they never meet your own.
+`@kayjs/ui` is a set of `.kay` components that your app compiles as its own, styled by the classes of one `theme.css`. Components use `kui-` prefixed classes, and utilities in the recipes that hold their look, so they never meet your own.
 
 ## Install
 
 In a kay project with Tailwind, `kay add ui` does the install and lists `ui()` in `kay.config.ts`, which brings the theme, a `Toaster` and a `TooltipHost` to every page: nothing else is wired. Otherwise:
 
 ```sh
-bun add @kaynooo/kayjs-ui @iconify-json/tabler
+bun add @kayjs/ui @iconify-json/tabler
 ```
 
 ```ts
 // kay.config.ts
 import { defineConfig } from 'kay/server'
-import { ui } from '@kaynooo/kayjs-ui'
+import { ui } from '@kayjs/ui'
 
 export default defineConfig({ extensions: [ui()] })
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/ui`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
 kay and Tailwind v4 are peers, and the default icons are Tabler's. Three peers are optional: `bun add chartist` (2.x) for `LineChart`, `bun add leaflet` for `MapView` (loaded once the map is near the viewport), and `bun add hls.js` for an `.m3u8` video in a browser without native HLS. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
@@ -33,7 +33,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ```css
 @import 'tailwindcss';
-@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kayjs/ui/theme.css';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);
@@ -42,7 +42,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 A token you read only through a name built at runtime, such as `var(--color-lane-${n})`, needs `@theme static { }` or `:root`, as Tailwind drops a `@theme` variable nothing uses.
 
-To use a theme utility in `@apply`, such as `@apply border border-border bg-popover`, write it in `src/app.css`, with nothing else: `ui()` gives that stylesheet the tokens and writes no rule, so the theme is not loaded a second time. An `@reference '@kaynooo/kayjs-ui/theme.css';` you already wrote keeps working. Without `ui()`, start the stylesheet with that line, or the build fails with `Cannot apply unknown utility class`.
+To use a theme utility in `@apply`, such as `@apply border border-border bg-popover`, write it in `src/app.css`, with nothing else: `ui()` gives that stylesheet the tokens and writes no rule, so the theme is not loaded a second time. An `@reference '@kayjs/ui/theme.css';` you already wrote keeps working. Without `ui()`, start the stylesheet with that line, or the build fails with `Cannot apply unknown utility class`.
 
 Your stylesheet ships only the rules of the components you render. kay drops every `kui-` rule whose class no file of your app, and no component it renders, writes whole.
 
@@ -64,7 +64,7 @@ Set them on `:root` or `html`, as `@theme` does: a seed set on one element does 
 
 `--border-width` is the keyline of buttons, cards, rows, widgets, notices, avatars, toasts, dialogs, side panels, tooltips, tables, boxed sections, segmented controls, chips, toggles, chart plots and the other framed boxes. The dashed frame and the handles the image cropper draws around the crop keep their fixed borders, as they have to show over any photo. It is a length: `2px`, not `2px solid red`, which it ignores.
 
-Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kaynooo/kayjs-ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
+Labels, headings and table heads are uppercase unless `--label-case` is `none`, and `--font-label` sets their font. Three skins ship, `@kayjs/ui/skins/brutalist.css` (which sets the three shadow tokens below), `soft.css` and `space.css`, imported after `theme.css`; an app importing none keeps the default theme, and your own `@theme` after one wins.
 
 The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and every box framed by a 1px hairline over a lifted fill, with no shadows. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
@@ -86,7 +86,7 @@ A skin's rules sit at one class of specificity or none, so a rule of yours with 
 Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
 
 ```css
-@import '@kaynooo/kayjs-ui/skins/space.css';
+@import '@kayjs/ui/skins/space.css';
 ```
 
 Corners are Tailwind's own `--radius-sm` (badges, toggle thumbs), `--radius-md` (buttons, fields, chips, toggle tracks) and `--radius-lg` (cards, dialogs, popovers, notices), and avatars are round. Set all three to `0` for square corners. `--font-mono` is the monospace of the markdown editor and code, and `--density` (`1`) multiplies the card, inline and section gaps and the field insets.
@@ -115,8 +115,8 @@ A touch screen has no hover, so a tap shows a hint, or the `data-tooltip` of an 
 
 ```kay
 ---
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 import '../app.css'
 ---
 slot
@@ -140,8 +140,8 @@ Import each component by its `.kay` path. Types, `toast`, `attempt`, `messageOf`
 
 ```kay
 ---
-import { toast } from '@kaynooo/kayjs-ui'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import { toast } from '@kayjs/ui'
+import Button from '@kayjs/ui/button.kay'
 
 const save = () => toast.success('Saved')
 ---
@@ -182,7 +182,7 @@ A call with a spread (`Table({...props})`), or a Table read anywhere but as a ta
 
 The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.
 
-Only an import written as `import Table from '@kaynooo/kayjs-ui/table.kay'` (or a relative one) is specialized.
+Only an import written as `import Table from '@kayjs/ui/table.kay'` (or a relative one) is specialized.
 
 ## Restyle a component
 
@@ -242,9 +242,9 @@ A page can pass a Dialog or a Popover its content. A layout, or a page with a `-
 
 ## Copy a component
 
-A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kaynooo/kayjs-ui/card.kay` in `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`, at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
+A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kayjs/ui/card.kay` in `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`, at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
 
-Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kaynooo/kayjs-ui/<name>.kay`, `@kaynooo/kayjs-ui/lib/<name>` or `@kaynooo/kayjs-ui/field-look`, which are for such copies and not a stable API.
+Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kayjs/ui/<name>.kay`, `@kayjs/ui/lib/<name>` or `@kayjs/ui/field-look`, which are for such copies and not a stable API.
 
 Components of the library that use the one you copied, such as `FormDialog` for `Dialog`, keep the library's version; the command lists them. An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so both keep your look. One keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy. `--dry-run` shows what would change without writing.
 
@@ -259,14 +259,14 @@ Icons are slots (`close`, `delete`, `search`, ...) mapped to any icon set. Repla
 ```ts
 // kay.config.ts
 export default defineConfig({
-  librarySettings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' },
+  librarySettings: { '@kayjs/ui': './src/ui-settings.ts' },
 })
 ```
 
 ```ts
 // src/ui-settings.ts
-import type { UiSettings } from '@kaynooo/kayjs-ui'
-import { uiDefaults } from '@kaynooo/kayjs-ui'
+import type { UiSettings } from '@kayjs/ui'
+import { uiDefaults } from '@kayjs/ui'
 import close from '~icons/tabler/circle-x'
 
 const settings: UiSettings = { ...uiDefaults, icons: { ...uiDefaults.icons, close } }
@@ -317,7 +317,7 @@ Charts: [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/
 
 Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more), [VirtualList](/ui/virtual-list).
 
-Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui/dnd` and is in the full reference. A move by arrow key is said to screen readers: where the item landed, as `Moved to 2 of 3`. A handle with no label or text of its own is named `Reorder` and the item's label or text, such as `Reorder Milk`, without the text of the buttons beside it, and it follows the item's text when that changes; give it an `aria-label` to say more.
+Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kayjs/ui/dnd` and is in the full reference. A move by arrow key is said to screen readers: where the item landed, as `Moved to 2 of 3`. A handle with no label or text of its own is named `Reorder` and the item's label or text, such as `Reorder Milk`, without the text of the buttons beside it, and it follows the item's text when that changes; give it an `aria-label` to say more.
 
 <ReadMore href="/llms/kayjs-ui">Every component's props, forms with FormDialog, drag and drop, label translation and testing are in the full kayjs-ui reference.</ReadMore>
 

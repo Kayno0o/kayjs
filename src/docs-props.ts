@@ -16,7 +16,7 @@ const RELATIVE = /^\.\.?\//
 export interface ComponentProps {
   // `FormDialog`
   name: string
-  // `@kaynooo/kayjs-ui/form-dialog.kay`
+  // `@kayjs/ui/form-dialog.kay`
   specifier: string
   path: string
   // 1-based, of the statement taking the props

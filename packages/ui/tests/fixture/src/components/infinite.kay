@@ -1,6 +1,6 @@
 --- island
-import { infiniteList } from '@kaynooo/kayjs-ui'
-import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+import { infiniteList } from '@kayjs/ui'
+import LoadMore from '@kayjs/ui/load-more.kay'
 
 const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, failureLabel, retryLabel, button, expose } = props<{
   first?: { id: number }[]

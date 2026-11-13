@@ -13,7 +13,7 @@ import { mail } from '../mail'
 export const subscribe = action(...mail.list().form())
 ---
 ---
-import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
+import SubscribeForm from '@kayjs/ui/subscribe-form.kay'
 ---
 SubscribeForm(action={subscribe} privacy="/privacy")
 ```

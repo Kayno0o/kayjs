@@ -1,4 +1,4 @@
-import { authTables } from '@kaynooo/kayjs-auth/pg'
+import { authTables } from '@kayjs/auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 import { env } from '../env'
 import { Notice } from './notice'

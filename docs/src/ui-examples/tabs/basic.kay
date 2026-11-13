@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
 
 const tabs = [
   { value: 'details', label: 'Details' },

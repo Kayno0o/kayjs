@@ -1,5 +1,5 @@
 import type { EntryRef } from '../kay/contract'
-import { attempt, toast } from '@kaynooo/kayjs-ui'
+import { attempt, toast } from '@kayjs/ui'
 import { call } from 'kay'
 import { wording } from 'kay/words'
 import newsletterApi from '../api/newsletter'

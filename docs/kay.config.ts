@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 import tailwind from 'bun-plugin-tailwind'
 import { analytics } from 'kay/analytics'
 import { defineConfig, sqliteRates } from 'kay/server'

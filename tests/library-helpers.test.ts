@@ -12,10 +12,10 @@ const OTHER_KEY = new Uint8Array(32).fill(9)
 // What kay hands its libraries in place of their own copies.
 describe('kay/library', () => {
   it('reads the entries of src/ui.ts with their spans', async () => {
-    const text = 'const base = { "@kaynooo/kayjs-ui/card.kay": ({ parts: { head: "p-2" } }) as const }\n// Card: nope\nexport default defineUi({ ...base, Card: { parts: { head: "p-4" } }, [computed]: 1 })\n'
+    const text = 'const base = { "@kayjs/ui/card.kay": ({ parts: { head: "p-2" } }) as const }\n// Card: nope\nexport default defineUi({ ...base, Card: { parts: { head: "p-4" } }, [computed]: 1 })\n'
     const entries = (await uiConfigEntries(text))!
 
-    expect(entries.map(entry => entry.key)).toEqual(['@kaynooo/kayjs-ui/card.kay', 'Card'])
+    expect(entries.map(entry => entry.key)).toEqual(['@kayjs/ui/card.kay', 'Card'])
     expect(text.slice(entries[0]!.value.start, entries[0]!.value.end)).toBe('({ parts: { head: "p-2" } }) as const')
     expect(text.slice(entries[1]!.keySpan.start, entries[1]!.keySpan.end)).toBe('Card')
     expect(await uiConfigEntries('export default 3')).toEqual([])

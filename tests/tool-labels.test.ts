@@ -18,7 +18,7 @@ async function found(files: Record<string, string>, lints?: Record<string, strin
 }
 
 const ACTIONS = '--- server\nimport { action, s } from \'kay\'\nexport const homeState = action(s.Object({}), () => \'lit\', { tool: { readOnly: true } })\nexport const setLight = action(s.Object({}), () => \'ok\', { tool: { name: \'light\' } })\n---\n'
-const page = (labels: string) => `--- server\nimport { homeState } from './_actions.kay'\n--- script\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\n---\nChat(action={homeState} toolLabels={${labels}})\n`
+const page = (labels: string) => `--- server\nimport { homeState } from './_actions.kay'\n--- script\nimport Chat from '@kayjs/ai/chat.kay'\n---\nChat(action={homeState} toolLabels={${labels}})\n`
 
 it('flags a key that names no tool, and accepts the snake case of an export, a tool name and a numbered twin', async () => {
   const problems = await found({ 'src/routes/_actions.kay': ACTIONS, 'src/routes/index.kay': page('{ home_state: \'Read the home\', light: \'Set the light\', set_light_2: \'x\', \'home_stat\': \'typo\', gone: \'Gone\' }') })

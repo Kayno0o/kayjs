@@ -5,9 +5,9 @@ import { action } from 'kay'
 export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => 'ok')
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 ---
 main
   SaveForm(action={claim} validate="submit" saved="Saved." confirm="Apply this change?")

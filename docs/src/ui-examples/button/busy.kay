@@ -1,5 +1,5 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 
 async function save() {
   await new Promise(resolve => setTimeout(resolve, 1500))

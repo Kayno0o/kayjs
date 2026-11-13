@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // What the test reads back: the text after each change.
 const { value, onInput, onChange, onImage, toolbar, preview, previewTrusted, previewClass, labelled = false, plain = false, late = false } = props<{ value: string, onInput: (value: string) => void, onChange?: (value: string) => void, onImage?: (file: File) => Promise<string>, toolbar?: boolean | readonly ('bold' | 'italic' | 'heading' | 'bulletList' | 'numberedList' | 'link' | 'image')[], preview?: (markdown: string) => Promise<string>, previewTrusted?: boolean, previewClass?: string, labelled?: boolean, plain?: boolean, late?: boolean }>()

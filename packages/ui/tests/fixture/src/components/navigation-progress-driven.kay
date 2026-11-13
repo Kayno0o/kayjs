@@ -1,7 +1,7 @@
 ---
 import type { Duration } from 'kay'
 import { onMount } from 'kay'
-import NavigationProgress from '@kaynooo/kayjs-ui/navigation-progress.kay'
+import NavigationProgress from '@kayjs/ui/navigation-progress.kay'
 import { navigation as swap } from '../../../../../../src/runtime/navigation'
 
 const { delay, onShow, onHide } = props<{ delay: Duration, onShow: () => unknown, onHide: () => unknown }>()

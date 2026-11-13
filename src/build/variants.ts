@@ -10,7 +10,7 @@ const USES_CALL = /\buses\(\s*'(\w+)'\s*\)/y
 const KAY_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+\.kay)\2/gm
 const USES_IMPORT = /^import\s*\{[^}]*\buses\b[^}]*\}\s*from\s*(["'])([^"'\n]+)\1/m
 // The marker module, by where the library keeps it: an app's own `uses` is another function.
-const MARKER_FILE = /(?:packages\/ui|@kaynooo\/kayjs-ui)\/src\/uses\.ts$/
+const MARKER_FILE = /(?:packages\/ui|@kayjs\/ui)\/src\/uses\.ts$/
 // A line opening a fence, whose last one precedes the template.
 const FENCE = /^---(?:\s|$)/
 // A template `if` or `else if` whose condition calls `uses()`.

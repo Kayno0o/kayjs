@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Meter from '@kaynooo/kayjs-ui/meter.kay'
+import Meter from '@kayjs/ui/meter.kay'
 
 const usage = signal(40)
 ---

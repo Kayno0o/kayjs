@@ -1,7 +1,7 @@
 --- server
 const current = ctx.url.pathname
 --- script
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
 import '../../app.css'
 ---
 // The layout holds the nav, so a swap between its pages keeps the element and has to close its popover.

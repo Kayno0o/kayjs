@@ -24,11 +24,11 @@ describe('the mail extension\'s environment', () => {
 
 describe('mail()', () => {
   it('names the module kay imports the mailer from, as `mail`', () => {
-    expect(mail({ module: './src/mail' })).toMatchObject({ name: '@kaynooo/kayjs-mail', serverModule: { path: './src/mail', export: 'mail' } })
+    expect(mail({ module: './src/mail' })).toMatchObject({ name: '@kayjs/mail', serverModule: { path: './src/mail', export: 'mail' } })
   })
 
   it('takes a module or a server, or the options of the mailer', () => {
-    expect(mail({})).toMatchObject({ name: '@kaynooo/kayjs-mail', server: expect.any(Function) })
+    expect(mail({})).toMatchObject({ name: '@kayjs/mail', server: expect.any(Function) })
     expect(() => mail({ module: './src/mail', server: async () => ({}) as never })).toThrow('not both')
   })
 })

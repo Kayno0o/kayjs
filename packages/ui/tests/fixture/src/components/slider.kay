@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import Slider from '@kayjs/ui/slider.kay'
 
 // A Slider the page keeps in a signal, one it formats, one it hides the value of, and a second form field to prove the name posts.
 const { onInput, onChange } = props<{ onInput?: (value: number) => void, onChange?: (value: number) => unknown }>()

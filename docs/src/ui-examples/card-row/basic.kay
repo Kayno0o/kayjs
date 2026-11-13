@@ -1,4 +1,4 @@
 ---
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
 ---
 CardRow Europa

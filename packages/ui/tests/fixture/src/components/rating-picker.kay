@@ -1,5 +1,5 @@
 --- client
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Rating from '@kayjs/ui/rating.kay'
 
 const { heard, refuse = false } = props<{ heard: unknown[], refuse?: boolean }>()
 ---

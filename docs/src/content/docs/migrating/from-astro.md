@@ -11,7 +11,7 @@ description: Translate an Astro site into a kay project with kay migrate astro, 
 Point `--outdir` at a new or empty directory, one with no `package.json`, and it writes a whole kay project there. With Bun pointed at kay's registry, as in [Installation](/getting-started/installation), run it from the Astro project.
 
 ```sh
-bunx -p @kaynooo/kayjs kay migrate astro . --outdir ../my-site-kay
+bunx -p @kayjs/kay kay migrate astro . --outdir ../my-site-kay
 cd ../my-site-kay && bun install && bun run dev
 ```
 

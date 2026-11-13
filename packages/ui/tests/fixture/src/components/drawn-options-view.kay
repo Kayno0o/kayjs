@@ -1,8 +1,8 @@
 --- island
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
 
 const plans = [{ value: 'free', label: 'Free', description: 'For trying' }, { value: 'pro', label: 'Pro', description: 'For teams' }]
 const tags = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]

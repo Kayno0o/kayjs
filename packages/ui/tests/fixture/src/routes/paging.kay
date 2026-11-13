@@ -3,8 +3,8 @@ const page = Number(ctx.url.searchParams.get('page') ?? 1)
 const here = ctx.url
 ---
 ---
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
-import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
+import QrCode from '@kayjs/ui/qr-code.kay'
 ---
 main
   article#first

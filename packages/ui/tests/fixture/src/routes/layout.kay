@@ -1,15 +1,15 @@
 ---
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
-import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
-import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
-import Widget from '@kaynooo/kayjs-ui/widget.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
+import AppSwitcher from '@kayjs/ui/app-switcher.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import CollapsibleSection from '@kayjs/ui/collapsible-section.kay'
+import PageHeader from '@kayjs/ui/page-header.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
+import Select from '@kayjs/ui/select.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import TreeView from '@kayjs/ui/tree-view.kay'
+import Widget from '@kayjs/ui/widget.kay'
 ---
 main
   article#header

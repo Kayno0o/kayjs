@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
-import type { Plate } from '@kaynooo/kayjs-ui'
+import ZoomPane from '@kayjs/ui/zoom-pane.kay'
+import type { Plate } from '@kayjs/ui'
 
 // A pane the page drives with buttons, and which tells the page where it was taken.
 const { heard } = props<{ heard: Plate[] }>()

@@ -1,9 +1,9 @@
 ---
 import type { Action, Failure } from 'kay'
 import { ActionError, signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // `save` stands in for the server: it answers the saved name, the messages a schema refusal carries, or throws for a call that failed outright.
 const { save, onSave, onError, onDiscard, shortcut, confirm } = props<{ onError?: ((failure: { error: unknown }) => unknown) | undefined, confirm?: string | undefined, save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSave: (name: string) => void, onDiscard: () => void, shortcut?: string | false | undefined }>()

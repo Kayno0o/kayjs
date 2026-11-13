@@ -1,7 +1,7 @@
 ---
 import type { ScreenCollection } from '../kay/contract'
 import type { TranslationRow } from '../translations'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 import { wording } from 'kay/words'
 import { BODY_FIELD } from '../translations'
 import { collectionTitle, entryPath, translatePath } from '../listing'

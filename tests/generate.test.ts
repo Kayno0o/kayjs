@@ -255,7 +255,7 @@ it('signs a resource test in through authTest, or through the former form\'s own
   const own = resourceFiles('note', ['title:string'], PROJECT).files['tests/notes.test.ts']!
   const module = resourceFiles('note', ['title:string'], { ...PROJECT, authModule: true }).files['tests/notes.test.ts']!
 
-  expect(own).toContain('import { authTest } from \'@kaynooo/kayjs-auth/test\'')
+  expect(own).toContain('import { authTest } from \'@kayjs/auth/test\'')
   expect(own).toContain('await authTest(site).signInAs(')
   expect(module).toContain('import { auth } from \'../src/auth\'')
   expect(module).toContain('await auth.signInAs(site, ')
@@ -330,10 +330,10 @@ it('refuses a resource named or fielded wrongly', () => {
 
 it('adds a table to the tables of src/db/tables.ts, imported in order', () => {
   const table = { name: 'Post', file: './post' }
-  const base = 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables]\n'
+  const base = 'import { authTables } from \'@kayjs/auth/pg\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables]\n'
   const once = withTable(base, table)!
 
-  expect(once).toBe('import { authTables } from \'@kaynooo/kayjs-auth/pg\'\nimport { Post } from \'./post\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables, Post]\n')
+  expect(once).toBe('import { authTables } from \'@kayjs/auth/pg\'\nimport { Post } from \'./post\'\n\n// Add the app\'s own tables.\nexport const tables = [...authTables, Post]\n')
   expect(withTable(once, { name: 'Comment', file: './comment' })).toContain('import { Comment } from \'./comment\'\nimport { Post } from \'./post\'')
   expect(withTable(once, { name: 'Tag', file: './tag' })).toContain('import { Post } from \'./post\'\nimport { Tag } from \'./tag\'')
   expect(withTable(once, { name: 'Tag', file: './tag' })).toContain('[...authTables, Post, Tag]')
@@ -434,7 +434,7 @@ for (const ui of [true, false]) {
     if (!ui) {
       const manifest = JSON.parse(manifestText) as { dependencies: Record<string, string> }
 
-      delete manifest.dependencies['@kaynooo/kayjs-ui']
+      delete manifest.dependencies['@kayjs/ui']
       await Bun.write(join(dir, 'package.json'), JSON.stringify(manifest, undefined, 2))
     }
 

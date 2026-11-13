@@ -1,13 +1,13 @@
 --- server
 import { formatDate, localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 const PAGE_SIZE = 25
 const PAGE_MAX = 100_000

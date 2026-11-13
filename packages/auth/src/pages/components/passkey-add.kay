@@ -1,8 +1,8 @@
 ---
 import type { User } from '../../core'
 import { onMount, signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { canMakePasskey, makePasskey, passkeyFailure } from '../../browser'
 import { addPasskey, passkeyOptions } from '../routes/account/security.kay'
 import Proof from './proof.kay'

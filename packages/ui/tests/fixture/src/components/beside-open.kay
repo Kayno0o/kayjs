@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
 
 // A non-modal panel the server renders open: the count of its `onOpenChange` calls shows in the page.
 const open = signal(true)

@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
 
 const planets = [
   { value: 'mercury', label: 'Mercury' },

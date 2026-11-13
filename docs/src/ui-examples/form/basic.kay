@@ -1,9 +1,9 @@
 ---
 import type { Action, Failure } from 'kay'
 import { ActionError, signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
 
 const pending = signal(false)
 

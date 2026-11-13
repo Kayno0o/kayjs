@@ -7,13 +7,13 @@ const SRC = new Glob('src/**/*.{ts,kay}')
 test('kayjs-ui is an optional peer, imported by the chat files alone', async () => {
   const manifest = await Bun.file('package.json').json() as { peerDependencies: Record<string, string>, peerDependenciesMeta?: Record<string, unknown> }
 
-  expect(manifest.peerDependencies['@kaynooo/kayjs-ui']).toBeDefined()
-  expect(manifest.peerDependenciesMeta?.['@kaynooo/kayjs-ui']).toEqual({ optional: true })
+  expect(manifest.peerDependencies['@kayjs/ui']).toBeDefined()
+  expect(manifest.peerDependenciesMeta?.['@kayjs/ui']).toEqual({ optional: true })
 
   const importers: string[] = []
 
   for (const file of await Array.fromAsync(SRC.scan())) {
-    if ((await Bun.file(file).text()).includes('@kaynooo/kayjs-ui'))
+    if ((await Bun.file(file).text()).includes('@kayjs/ui'))
       importers.push(file)
   }
 

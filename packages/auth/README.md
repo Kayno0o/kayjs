@@ -4,15 +4,10 @@ Auth for kay apps, built on kay's sessions: OAuth and OpenID Connect sign-in (Di
 
 ## Install
 
-kayjs-auth is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml` (a project made by `kay new` already carries it in its `.npmrc`):
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kayjs-auth is published to npm as `@kayjs/auth`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
 
 ```sh
-bun add @kaynooo/kayjs-auth
+bun add @kayjs/auth
 ```
 
 kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres and SQLite store. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
@@ -21,15 +16,15 @@ kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-or
 
 ```ts
 // src/auth.ts
-import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { authCore, memoryAuth } from '@kaynooo/kayjs-auth'
+import type { AuthSessionData } from '@kayjs/auth'
+import { authCore, memoryAuth } from '@kayjs/auth'
 import { session } from 'kay/server'
 
 export const auth = authCore({
   sessions: session<AuthSessionData>(),
   // The session takes kay's KAY_SECRET, and kayjs-auth its key from the session's secret; pass `secret` (32+ characters) to keep a separate one.
   // OAuth callbacks and mailed links are built on kay's `site` (kay.config.ts or SITE_URL); `url` gives another.
-  // In the process, for trying it out; `pgAuth(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
+  // In the process, for trying it out; `pgAuth(db)` from '@kayjs/auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
   store: memoryAuth(),
   signInPage: '/login',
 })
@@ -39,7 +34,7 @@ kay.config.ts hands kay the plugin, imported only when the server builds the app
 
 ```ts
 // kay.config.ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({

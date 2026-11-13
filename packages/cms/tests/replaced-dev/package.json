@@ -3,7 +3,7 @@
   "private": true,
   "dependencies": {
     "@iconify-json/tabler": "*",
-    "@kaynooo/kayjs-cms": "link:../..",
-    "@kaynooo/kayjs-ui": "*"
+    "@kayjs/cms": "link:../..",
+    "@kayjs/ui": "*"
   }
 }

@@ -1,6 +1,6 @@
 ---
 import type { Action } from 'kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
 
 // A FormDialog that leaves `open` and `onOpenChange` out: its trigger opens it, and it keeps its own state.
 const { onOpenChange } = props<{ onOpenChange?: ((open: boolean) => unknown) | undefined }>()

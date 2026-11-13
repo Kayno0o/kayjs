@@ -17,10 +17,10 @@ async function project(libraries: string[], config: string, own: Record<string, 
   projects.push(root)
 
   const files: Record<string, string> = {
-    'package.json': JSON.stringify({ name: 'app', private: true, dependencies: Object.fromEntries(libraries.map(name => [`@kaynooo/kayjs-${name}`, '*'])) }),
+    'package.json': JSON.stringify({ name: 'app', private: true, dependencies: Object.fromEntries(libraries.map(name => [`@kayjs/${name}`, '*'])) }),
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true, paths: kayTypes() }, include: ['src', '.kay/types'] }),
     'kay.config.ts': config,
-    'src/routes/index.kay': '---\nimport ContactMail from \'@kaynooo/kayjs-mail/contact-mail.kay\'\n---\nContactMail(subject="Hello" name="Ada" email="ada@example.com" message="Hi" fields={[]} site="https://example.com")\n',
+    'src/routes/index.kay': '---\nimport ContactMail from \'@kayjs/mail/contact-mail.kay\'\n---\nContactMail(subject="Hello" name="Ada" email="ada@example.com" message="Hi" fields={[]} site="https://example.com")\n',
     ...own,
   }
 

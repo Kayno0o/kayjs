@@ -7,7 +7,7 @@
 A user message holds `attachments` beside its text: a `File` or `Blob` (an `s.File()` field gives a `File`), bytes, or a file of kay's store:
 
 ```ts
-import { ask, storedFile } from '@kaynooo/kayjs-ai'
+import { ask, storedFile } from '@kayjs/ai'
 
 ask([{ role: 'user', content: 'What is on this photo?', attachments: [photo] }])
 ask([{ role: 'user', content: 'Summarize', attachments: [storedFile(key), new Uint8Array(bytes)] }])
@@ -19,7 +19,7 @@ The scan goes with a `schema`, and `await` gives the checked object:
 
 ```kay
 --- server
-import { ask, storedFile } from '@kaynooo/kayjs-ai'
+import { ask, storedFile } from '@kayjs/ai'
 import { s, action } from 'kay'
 
 const bill = s.Object({ supplier: s.String(), total: s.Number(), due: s.Optional(s.String()) })

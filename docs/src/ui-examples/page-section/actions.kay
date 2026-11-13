@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 
 const moons = signal(['Io', 'Europa'])
 const names = ['Ganymede', 'Callisto', 'Amalthea']

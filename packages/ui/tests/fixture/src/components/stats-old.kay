@@ -1,5 +1,5 @@
 ---
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Stat from '@kayjs/ui/stat.kay'
 
 // A tile under the `variant` of 1.96, beside the same tile under `layout`.
 ---

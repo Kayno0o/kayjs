@@ -1,6 +1,6 @@
 ---
-import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
-import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import DateInput from '@kayjs/ui/date-input.kay'
+import DateRangeInput from '@kayjs/ui/date-range-input.kay'
 
 // A booking picker: weekends and one booked day are closed, each open day shows a price, and the months on show are told.
 const { closed, months, onDate } = props<{ closed: Set<string>, months: string[], onDate: (value: string) => void }>()

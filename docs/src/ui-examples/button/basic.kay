@@ -1,4 +1,4 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 ---
 Button(label="Save")

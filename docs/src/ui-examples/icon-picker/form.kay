@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
-import type { IconChoice } from '@kaynooo/kayjs-ui'
+import IconPicker from '@kayjs/ui/icon-picker.kay'
+import type { IconChoice } from '@kayjs/ui'
 import Bell from '~icons/tabler/bell'
 import Home from '~icons/tabler/home'
 import Rocket from '~icons/tabler/rocket'

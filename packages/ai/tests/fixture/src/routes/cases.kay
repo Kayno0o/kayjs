@@ -1,5 +1,5 @@
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 import { action } from 'kay'
 import { messages } from '../messages'
 import { refusals } from '../testing'

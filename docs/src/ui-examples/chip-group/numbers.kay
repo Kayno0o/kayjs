@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
 
 const days = signal([1, 3])
 const options = [{ value: 0, label: 'Sun' }, { value: 1, label: 'Mon' }, { value: 2, label: 'Tue' }, { value: 3, label: 'Wed' }, { value: 4, label: 'Thu' }, { value: 5, label: 'Fri' }, { value: 6, label: 'Sat' }] as const

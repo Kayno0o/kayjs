@@ -8,7 +8,7 @@ Every command takes an optional project directory, the current one by default, a
 A command that ends by itself reads `kay.config.ts` for 30 seconds at most, and fails naming it when the config awaits something that never settles. `kay start`, `kay render` and `kay dev` wait as long as it takes.
 
 ```sh
-bunx -p @kaynooo/kayjs kay new my-app
+bunx -p @kayjs/kay kay new my-app
 cd my-app
 bun install
 bun run dev
@@ -158,7 +158,7 @@ kay add ui
 
 Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed stops it with `kay add: nothing was written` and the lines to add by hand. A file you deleted is not written back.
 
-`ai`, `mail` and `cms` add the libraries `@kaynooo/kayjs-ai`, `@kaynooo/kayjs-mail` and `@kaynooo/kayjs-cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`. The import is written where your lint sorts imports, so a file with sorted imports passes `kay lint` with no `lint:fix` after.
+`ai`, `mail` and `cms` add the libraries `@kayjs/ai`, `@kayjs/mail` and `@kayjs/cms`, and list them in the `extensions` of `kay.config.ts`. That config has to be a plain `defineConfig({ ... })`. The import is written where your lint sorts imports, so a file with sorted imports passes `kay lint` with no `lint:fix` after.
 
 | Option | Effect |
 | --- | --- |
@@ -500,7 +500,7 @@ kay upgrade ../my-site
 kay upgrade --dry-run
 ```
 
-`kay upgrade` moves `kay` and every `@kaynooo/kayjs-*` library in `package.json` to the latest version, then installs. A range pointing at a path, a workspace or a git source is left as it is.
+`kay upgrade` moves `kay` and every `@kayjs/*` library in `package.json` to the latest version, then installs. A range pointing at a path, a workspace or a git source is left as it is.
 
 It then runs the kay it installed. Each minor you skipped may have replaced a form with a new one, and each is a lint in the `deprecated` group with a fix. The oldest minor's fixes run first.
 
@@ -550,7 +550,7 @@ kay doctor --port 4000
 | Check | Fails when |
 | --- | --- |
 | `bun` | Bun is older than kay needs |
-| `versions` | `@kaynooo/kayjs` or a `@kaynooo/kayjs-*` library listed in `package.json` is not installed, or a library is not on kay's minor |
+| `versions` | `@kayjs/kay` or a `@kayjs/*` library listed in `package.json` is not installed, or a library is not on kay's minor |
 | `peers` | `typescript7`, which `kay check` types the project with, is not installed. Warns when `axe-core`, which `kay a11y`, `page.a11y()` and the dev tool's accessibility warnings run, is not. Each says the `bun add -d` command that installs it |
 | `tsconfig` | No `tsconfig.json` in the project or above it, which `kay check` types the project through |
 | `config` | `kay.config.ts` does not load, or its `i18n` is refused (a default outside the locales, a bad tag, a domain for no locale) |
@@ -784,7 +784,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 
 The server offers tools and resources only. It has no prompts, which would repeat what `AGENTS.md` and the server's own instructions already tell an agent, and no resource subscriptions: the resources are the guides, which do not change while the server runs, and what does change (check problems, the dev server's errors) is read through `check` and `dev_errors`, whose `waitMs` waits for the next change.
 
-The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<file>.md` for each guide of kay's `llms/`, and `kay://<library>/llms.txt` with `kay://<library>/<file>.md` for each `@kaynooo/kayjs-*` library the project installed, at its installed version.
+The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<file>.md` for each guide of kay's `llms/`, and `kay://<library>/llms.txt` with `kay://<library>/<file>.md` for each `@kayjs/*` library the project installed, at its installed version.
 
 Each tool runs its command in a child process, so a call costs what the command does. Calls run one at a time, in the order they came.
 

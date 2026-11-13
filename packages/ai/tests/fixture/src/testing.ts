@@ -1,4 +1,4 @@
-import type { Provider } from '@kaynooo/kayjs-ai'
+import type { Provider } from '@kayjs/ai'
 
 // What the tests reach from the fixture's actions: the provider they ask, what the `echoing` reply waits for before its first word, and what the tools did.
 export const testing: { provider: Provider | undefined, echoAfter?: Promise<void> | undefined } = { provider: undefined }

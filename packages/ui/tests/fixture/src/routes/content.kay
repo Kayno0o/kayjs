@@ -1,14 +1,14 @@
 ---
-import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import AvatarGroup from '@kaynooo/kayjs-ui/avatar-group.kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import AudioPlayer from '@kayjs/ui/audio-player.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import AvatarGroup from '@kayjs/ui/avatar-group.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Card from '@kayjs/ui/card.kay'
+import Carousel from '@kayjs/ui/carousel.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import Notice from '@kayjs/ui/notice.kay'
+import QrCode from '@kayjs/ui/qr-code.kay'
+import Select from '@kayjs/ui/select.kay'
 ---
 main
   Card#card(title="Moons")

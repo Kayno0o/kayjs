@@ -1,5 +1,5 @@
 ---
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
 
 const options = [{ value: 'a', label: 'Alpha', description: 'First <b>letter</b>' }, { value: 'b', label: 'Beta', description: '   ' }, { value: 'c', label: 'Gamma' }]
 ---

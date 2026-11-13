@@ -15,8 +15,8 @@ async function project(files: Record<string, string>): Promise<string> {
 
 describe('deprecated-infinite-list-options', () => {
   it('renames pageSize in the options of infiniteList(), shorthands included', async () => {
-    const script = 'import { infiniteList } from \'@kaynooo/kayjs-ui\'\nimport * as ui from \'@kaynooo/kayjs-ui\'\n\nconst pageSize = 20\n\ninfiniteList([], { pageSize: 10, load: () => [] })\nui.infiniteList([], { pageSize, load: () => [] })\n'
-    const page = '---\nimport { infiniteList } from \'@kaynooo/kayjs-ui\'\n\nconst feed = infiniteList([], { pageSize: 5, load: () => [] })\n---\np hi\n'
+    const script = 'import { infiniteList } from \'@kayjs/ui\'\nimport * as ui from \'@kayjs/ui\'\n\nconst pageSize = 20\n\ninfiniteList([], { pageSize: 10, load: () => [] })\nui.infiniteList([], { pageSize, load: () => [] })\n'
+    const page = '---\nimport { infiniteList } from \'@kayjs/ui\'\n\nconst feed = infiniteList([], { pageSize: 5, load: () => [] })\n---\np hi\n'
     const root = await project({ 'src/feed.ts': script, 'src/routes/page.kay': page })
 
     try {
@@ -35,7 +35,7 @@ describe('deprecated-infinite-list-options', () => {
   })
 
   it('reports a key beside its new name with no fix, and leaves other functions alone', async () => {
-    const script = 'import { infiniteList } from \'@kaynooo/kayjs-ui\'\nimport { infiniteList as mine } from \'./mine\'\n\ninfiniteList([], { pageSize: 10, limit: 10, load: () => [] })\nmine([], { pageSize: 10 })\ninfiniteList([], { limit: 10, load: () => [] })\n'
+    const script = 'import { infiniteList } from \'@kayjs/ui\'\nimport { infiniteList as mine } from \'./mine\'\n\ninfiniteList([], { pageSize: 10, limit: 10, load: () => [] })\nmine([], { pageSize: 10 })\ninfiniteList([], { limit: 10, load: () => [] })\n'
     const root = await project({ 'src/feed.ts': script })
 
     try {

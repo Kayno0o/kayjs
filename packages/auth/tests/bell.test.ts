@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ui } from '@kaynooo/kayjs-ui'
+import { ui } from '@kayjs/ui'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { notify } from 'kay/server'

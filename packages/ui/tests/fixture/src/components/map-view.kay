@@ -1,6 +1,6 @@
 ---
-import type { MapPoint } from '@kaynooo/kayjs-ui'
-import MapView from '@kaynooo/kayjs-ui/map-view.kay'
+import type { MapPoint } from '@kayjs/ui'
+import MapView from '@kayjs/ui/map-view.kay'
 
 // What the tests set: the path highlighted on the map, and the custom map's tiles and route, which they change once it is drawn.
 const { highlight, hostile = false, tiles = 'https://tiles.example/{z}/{x}/{y}.png', attribution = 'Example tiles', darkTiles, maxZoom, route = [[0, 0], [1, 1]] } = props<{ highlight?: MapPoint[] | undefined, hostile?: boolean, tiles?: string, attribution?: string, darkTiles?: string | undefined, maxZoom?: number | undefined, route?: MapPoint[] }>()

@@ -1,8 +1,8 @@
 ---
-import { toast } from '@kaynooo/kayjs-ui'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { toast } from '@kayjs/ui'
+import Button from '@kayjs/ui/button.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { signal } from 'kay'
 import { post } from '../routes/index.kay'
 

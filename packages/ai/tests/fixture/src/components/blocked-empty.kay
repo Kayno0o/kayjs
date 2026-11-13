@@ -1,6 +1,6 @@
 --- island
 import { blocked } from '../routes/tools.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 Chat(action={blocked} label="Assistant")
   @empty(chat)

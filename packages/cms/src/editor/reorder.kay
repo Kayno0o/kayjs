@@ -1,5 +1,5 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 import { wording } from 'kay/words'
 import { followFocus, targetOf } from './reorder'
 import type { Direction } from './reorder'

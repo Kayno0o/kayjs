@@ -200,7 +200,7 @@ kay env
 ```
 DATABASE_URL    src/env.ts  string   always
 DOWNLOAD_KEY    src/env.ts  string (secret)  production
-MAIL_URL        the extension @kaynooo/kayjs-mail  string  production
+MAIL_URL        the extension @kayjs/mail  string  production
 PORT            kay         integer  optional    3000
 ```
 

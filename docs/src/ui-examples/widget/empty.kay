@@ -1,5 +1,5 @@
 ---
-import Widget from '@kaynooo/kayjs-ui/widget.kay'
+import Widget from '@kayjs/ui/widget.kay'
 ---
 Widget(title="Errors" icon="alert" empty)
   @emptyState

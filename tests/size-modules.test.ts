@@ -8,7 +8,7 @@ describe('the package a module of a measured page belongs to', () => {
     expect(packageOf('src/runtime/dom.ts')).toBe('kay')
     expect(packageOf('kay-runtime:kay:runtime')).toBe('kay')
     expect(packageOf('packages/ui/src/table.kay')).toBe('kayjs-ui')
-    expect(packageOf('node_modules/@kaynooo/kayjs-ui/src/table.kay')).toBe('kayjs-ui')
+    expect(packageOf('node_modules/@kayjs/ui/src/table.kay')).toBe('kayjs-ui')
     expect(packageOf('packages/auth/src/sign-in.kay')).toBe('kayjs-auth')
     expect(packageOf('kay-icon:~icons/tabler/arrow-up')).toBe('icons')
     expect(packageOf('node_modules/@kaynooo/utils/dist/chunk-1.js')).toBe('@kaynooo/utils')

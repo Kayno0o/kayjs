@@ -1,7 +1,7 @@
 --- server
 import { action } from 'kay'
 import { mail } from '../mail'
-import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
+import SubscribeForm from '@kayjs/mail/subscribe-form.kay'
 
 export const subscribeNoticed = action(...mail.list('spring', { title: 'Spring news', privacy: '/privacy' }).form())
 ---

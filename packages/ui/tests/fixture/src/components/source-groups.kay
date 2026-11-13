@@ -1,7 +1,7 @@
 --- island
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
 
 const { source, calls } = props<{ source: () => Promise<{ value: string, label: string }[]>, calls: string[] }>()
 ---

@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
-import type { TreeNode } from '@kaynooo/kayjs-ui'
-import { nodeKey } from '@kaynooo/kayjs-ui'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import type { TreeNode } from '@kayjs/ui'
+import { nodeKey } from '@kayjs/ui'
+import Icon from '@kayjs/ui/icon.kay'
+import TreeView from '@kayjs/ui/tree-view.kay'
 
 const starred = signal<string[]>([])
 const nodes: TreeNode[] = [

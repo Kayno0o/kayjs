@@ -5,7 +5,7 @@ import { action } from 'kay'
 export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
 --- script
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // A signal makes the page an island, which hydrates over the ids the server wrote.
 const bumped = signal(0)

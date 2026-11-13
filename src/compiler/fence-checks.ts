@@ -350,7 +350,7 @@ function propertyKey(property: NodeOfType<'Property'>): string | undefined {
   return property.key.type === 'Literal' && typeof property.key.value === 'string' ? property.key.value : undefined
 }
 
-const AI_PACKAGE = '@kaynooo/kayjs-ai'
+const AI_PACKAGE = '@kayjs/ai'
 const ASYNC_KEYWORD = /^(?:(?:static|public|private|protected|override)\s+)*(async\s*)/
 
 // The values an expression may be: both branches of a condition, the operands of a logical expression, and what a type assertion or a non-null mark wraps.

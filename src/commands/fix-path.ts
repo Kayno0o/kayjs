@@ -6,5 +6,5 @@ const LIBRARY_FILE = /^packages\/(\w+)\//
 export function fixPath(file: string): string {
   const library = LIBRARY_FILE.exec(file)?.[1]
 
-  return library === undefined || existsSync(file) ? file : file.replace(LIBRARY_FILE, `node_modules/@kaynooo/kayjs-${library}/`)
+  return library === undefined || existsSync(file) ? file : file.replace(LIBRARY_FILE, `node_modules/@kayjs/${library}/`)
 }

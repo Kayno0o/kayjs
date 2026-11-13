@@ -1,6 +1,6 @@
 --- client
 import { signal } from 'kay'
-import FileInput from '@kaynooo/kayjs-cms/file-input.kay'
+import FileInput from '@kayjs/cms/file-input.kay'
 
 type Input = Parameters<typeof FileInput>[0]
 

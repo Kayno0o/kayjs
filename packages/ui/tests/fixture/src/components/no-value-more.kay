@@ -1,8 +1,8 @@
 ---
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Select from '@kayjs/ui/select.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
 import { signal } from 'kay'
 
 // Controls left without a `value`, or switched between holding one and not, with the callbacks the tests listen to.

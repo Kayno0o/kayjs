@@ -1,11 +1,11 @@
 ---
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Slider from '@kaynooo/kayjs-ui/slider.kay'
-import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Select from '@kayjs/ui/select.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Slider from '@kayjs/ui/slider.kay'
+import ColorInput from '@kayjs/ui/color-input.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
 
 // Every control left without a `value` or a callback, inside a form: each keeps what is picked and posts it under its name.
 const { onPick } = props<{ onPick?: (value: string) => unknown }>()

@@ -1,4 +1,4 @@
-import { outbox } from '@kaynooo/kayjs-mail'
+import { outbox } from '@kayjs/mail'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import board from '../src/api/board'

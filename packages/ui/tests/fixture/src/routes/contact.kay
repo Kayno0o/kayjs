@@ -9,8 +9,8 @@ export const contact = action(s.Object({
 }), async ({ message }, ctx) => message === 'Please fail' ? ctx.fail(502, 'Could not send it') : undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 ---
 ---
-import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import ContactForm from '@kayjs/ui/contact-form.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 main
   ContactForm(action={contact} submitLabel="Send it")

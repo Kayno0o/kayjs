@@ -5,11 +5,11 @@ import { wording } from 'kay/words'
 import { describeAuditEntry } from '../../../../auditWording'
 import Message from '../../../components/message.kay'
 import { failure, schemas } from '../../../forms'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 

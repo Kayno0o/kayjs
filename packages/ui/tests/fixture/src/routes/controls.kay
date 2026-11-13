@@ -1,7 +1,7 @@
 ---
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
 ---

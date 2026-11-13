@@ -1,4 +1,4 @@
-import { announce } from '@kaynooo/kayjs-ui/announce'
+import { announce } from '@kayjs/ui/announce'
 import { flush } from 'kay'
 import { wording } from 'kay/words'
 

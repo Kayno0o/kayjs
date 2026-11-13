@@ -11,7 +11,7 @@ export const page = { prerender: true }
 const REGISTRY = `[install.scopes]
 "@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`
 
-const CREATE = `bunx -p @kaynooo/kayjs kay new my-app
+const CREATE = `bunx -p @kayjs/kay kay new my-app
 cd my-app
 bun install
 bun run dev`
@@ -58,9 +58,9 @@ form(action={signIn})
   button Sign in`
 
 const MAIL = `---
-import Button from '@kaynooo/kayjs-mail/button.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Button from '@kayjs/mail/button.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Paragraph from '@kayjs/mail/paragraph.kay'
 
 const { name, url } = props<{ name: string, url: string }>()
 ---
@@ -105,8 +105,8 @@ import ShieldLock from '~icons/tabler/shield-lock'
 import Terminal2 from '~icons/tabler/terminal-2'
 import TestPipe from '~icons/tabler/test-pipe'
 import WifiOff from '~icons/tabler/wifi-off'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Button from '@kayjs/ui/button.kay'
+import Card from '@kayjs/ui/card.kay'
 import Demo from '../../components/demo.kay'
 import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'

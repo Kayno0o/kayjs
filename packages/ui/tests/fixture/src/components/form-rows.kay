@@ -1,10 +1,10 @@
 ---
 import type { Action } from 'kay'
 import { ActionError, signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // The action refuses with the `errors` it is given, as a handler's refusal of a row cell does.
 const { errors, empty = false } = props<{ errors: Record<string, string>, empty?: boolean }>()

@@ -2,7 +2,7 @@
 @layer docs, theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css' layer(utilities);
-@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kayjs/ui/theme.css';
 /* The themes the header picks, outside the layers so a palette wins over kayjs-ui's defaults. */
 @import './palettes.css';
 @import './styles.css' layer(docs);

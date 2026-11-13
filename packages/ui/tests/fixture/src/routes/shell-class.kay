@@ -1,6 +1,6 @@
 ---
 import '../app.css'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 ---
 //- The app's own stylesheet and the ui() extension's both load; a utility passed through `class` must beat the component's own rule.
 IconButton#plain(icon="info" label="Plain")

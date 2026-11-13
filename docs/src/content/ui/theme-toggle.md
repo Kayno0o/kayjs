@@ -12,7 +12,7 @@ The server reads the cookie, so a layout writes the visitor's scheme into the fi
 
 ```kay
 ---
-import { scheme } from '@kaynooo/kayjs-ui'
+import { scheme } from '@kayjs/ui'
 ---
 head
   html(data-theme={scheme()})

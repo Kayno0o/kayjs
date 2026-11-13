@@ -1,6 +1,6 @@
 ---
-import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
-import type { ContributionDay } from '@kaynooo/kayjs-ui'
+import ContributionGraph from '@kayjs/ui/contribution-graph.kay'
+import type { ContributionDay } from '@kayjs/ui'
 
 const start = Date.UTC(2026, 4, 4)
 const days: ContributionDay[] = Array.from({ length: 140 }, (_, index) => {

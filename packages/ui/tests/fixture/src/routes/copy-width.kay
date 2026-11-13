@@ -1,5 +1,5 @@
 ---
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
 import '../app.css'
 ---
 main

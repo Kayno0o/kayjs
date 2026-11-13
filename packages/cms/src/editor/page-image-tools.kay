@@ -1,7 +1,7 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 import replace from '~icons/tabler/photo-up'
-import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
+import Toolbar from '@kayjs/ui/toolbar.kay'
 import { wording } from 'kay/words'
 import type { ImageBar } from './page-images'
 import './editor.css'

@@ -1,6 +1,6 @@
 ---
-import RelativeTime from '@kaynooo/kayjs-ui/relative-time.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import RelativeTime from '@kayjs/ui/relative-time.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 
 const threeDays = Date.now() - 3 * 86_400_000
 ---

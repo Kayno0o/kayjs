@@ -214,8 +214,8 @@ export const LINTS = {
     level: 'warn',
     group: 'a11y',
     summary: 'A `span` carrying `data-tooltip` and `tabindex="0"` by hand, in a file importing kayjs-ui, whose `Tooltip` renders the same tab stop: `Tooltip(text="Published on Monday") Published`. The `data-tooltip-placement` becomes `placement`. `kay check --fix` writes it, and the import with it; a span with another `text` or `placement` attribute, or in a file naming something else `Tooltip`, is left alone.',
-    wrong: '---\nimport TooltipHost from \'@kaynooo/kayjs-ui/tooltip-host.kay\'\n---\nspan(data-tooltip="Published on Monday" tabindex="0") Published\nTooltipHost',
-    right: '---\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'\nimport TooltipHost from \'@kaynooo/kayjs-ui/tooltip-host.kay\'\n---\nTooltip(text="Published on Monday") Published\nTooltipHost',
+    wrong: '---\nimport TooltipHost from \'@kayjs/ui/tooltip-host.kay\'\n---\nspan(data-tooltip="Published on Monday" tabindex="0") Published\nTooltipHost',
+    right: '---\nimport Tooltip from \'@kayjs/ui/tooltip.kay\'\nimport TooltipHost from \'@kayjs/ui/tooltip-host.kay\'\n---\nTooltip(text="Published on Monday") Published\nTooltipHost',
   },
   'uncontrolled-autoplay': {
     level: 'warn',
@@ -307,8 +307,8 @@ export const LINTS = {
     level: 'warn',
     group: 'code',
     summary: 'An `async` function returning `ask()` from kayjs-ai: the reply is a thenable, so the function awaits it and the action, API route or `await` block reading it gets the whole text at once, with no streaming. The fix removes `async` (not from a function with a return type); a function that awaits something first returns `ask(...).stream()` instead, and `return await ask(...)` says the whole text is meant, which this lint leaves alone. Found in `.kay` fences and `.ts` modules alike.',
-    wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))\n---\np x',
-    right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
+    wrong: '--- server\nimport { ask } from \'@kayjs/ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))\n---\np x',
+    right: '--- server\nimport { ask } from \'@kayjs/ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
   },
   'unreturned-fail': {
     level: 'warn',
@@ -671,8 +671,8 @@ export const LINTS = {
     group: 'code',
     site: true,
     summary: 'A key of a `toolLabels={{ ... }}` object literal on kayjs-ai\'s `Chat` that names no tool of the project: a tool is named by its export in snake case (`homeState` is `home_state`), by `tool: { name }` or by the `name` of a `tool()`, so a key matching none of them, nor any string the project\'s modules write, is a tool that was renamed or never was, and its calls show the raw name. `tool: { label }` on the action names its calls with no key to keep in step. Only `.kay` files with an object literal are read.',
-    wrong: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\n---\nChat(action={assistant} toolLabels={{ home_stat: \'Read the home\' }})',
-    right: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\n---\nChat(action={assistant})',
+    wrong: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kayjs/ai/chat.kay\'\n---\nChat(action={assistant} toolLabels={{ home_stat: \'Read the home\' }})',
+    right: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kayjs/ai/chat.kay\'\n---\nChat(action={assistant})',
   },
   // Its examples escape the call's parenthesis, as kay finds public fields by their text under an app's src, and kay's own tests build this repo as an app.
   'public-env-outside-src': {

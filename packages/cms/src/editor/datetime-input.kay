@@ -1,7 +1,7 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 import { wording } from 'kay/words'
 import { inputValue, storedValue, thisMinute, useEditorZone } from '../datetime'
 

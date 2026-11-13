@@ -32,7 +32,7 @@ The `day(iso, state)` block draws the inside of a day's button in place of its n
 
 ```kay
 ---
-import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateInput from '@kayjs/ui/date-input.kay'
 
 const closed = new Set(['2026-12-24', '2026-12-25'])
 const prices: Record<string, number> = { '2026-12-23': 90 }

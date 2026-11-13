@@ -6,8 +6,8 @@ import { scratchDir } from '../../../tests/scratch'
 import { appEnv, fixtureCopy } from './helpers/fixtureCopy'
 
 const CLI = join(import.meta.dir, '../../../src/cli.ts')
-const SERVER = '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nconst answer = ask(\'hi\')\n---\nawait answer\n  p Thinking\nthen text\n  p {text}\n'
-const ISLAND = '---\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nlet text = \'\'\n\nasync function go() {\n  text = await ask(\'hi\')\n}\n---\nbutton(onClick={go}) Ask\np {text}\n'
+const SERVER = '--- server\nimport { ask } from \'@kayjs/ai\'\n\nconst answer = ask(\'hi\')\n---\nawait answer\n  p Thinking\nthen text\n  p {text}\n'
+const ISLAND = '---\nimport { ask } from \'@kayjs/ai\'\n\nlet text = \'\'\n\nasync function go() {\n  text = await ask(\'hi\')\n}\n---\nbutton(onClick={go}) Ask\np {text}\n'
 
 async function build(page: string): Promise<{ code: number, output: string }> {
   const dir = await scratchDir('ai-island-')

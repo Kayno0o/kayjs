@@ -17,7 +17,7 @@ A link to an OAuth route changes the session on GET: give it `data-no-prefetch`,
 Two actions and an island add a passkey to the signed-in user:
 
 ```ts
-import { passkeyAttestation } from '@kaynooo/kayjs-auth'
+import { passkeyAttestation } from '@kayjs/auth'
 
 // The app's actions, `response` typed as `passkeys.register` takes it and refused before the handler when a part is missing
 export const passkeyOptions = action(proofSchema, async (proof, ctx) => ctx.locals.auth.passkeys.registrationOptions(proof))
@@ -26,7 +26,7 @@ export const addPasskey = action(s.Object({ response: passkeyAttestation, name: 
 
 ```ts
 // In an island on the account page
-import { makePasskey, passkeyFailure } from '@kaynooo/kayjs-auth/browser'
+import { makePasskey, passkeyFailure } from '@kayjs/auth/browser'
 
 try {
   const { options } = await passkeyOptions({ password })
@@ -83,7 +83,7 @@ catch (caught) {
 
 Passkeys are made for `site`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. A passkey ceremony run in a frame of another origin, its client data saying `crossOrigin` or naming a `topOrigin`, is refused, as kay's `frame-ancestors 'self'` keeps other origins from framing the pages. `passkeys: { rpName }` is the name the authenticator shows, `name` by default. `passkeys: { userVerification }` (`'required'`, `'preferred'` by default, or `'discouraged'`) is how hard answering a second factor with a passkey asks for a PIN or a biometric; `'required'` also refuses an answer given without it. Adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors. Each method below gives the options for the browser, kept as a challenge in the session that works once, for five minutes.
 
-- `@kaynooo/kayjs-auth/browser` is what an island calls, with the browser's own WebAuthn JSON methods and no library: `canAskPasskey()` and `canMakePasskey()` say whether to show the button, `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the typed JSON for the next action, or null when the person picked none, `rememberChoice()` reads the page's "keep me signed in" box (`input[name=remember]`) for the `remember` of `passkeys.signIn`, undefined when the page has none, and `passkeyFailure(caught, errors, failed)` is the message for what threw: the one of `errors` for the code an action refused with, nothing when the person dismissed the prompt, else `failed`.
+- `@kayjs/auth/browser` is what an island calls, with the browser's own WebAuthn JSON methods and no library: `canAskPasskey()` and `canMakePasskey()` say whether to show the button, `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the typed JSON for the next action, or null when the person picked none, `rememberChoice()` reads the page's "keep me signed in" box (`input[name=remember]`) for the `remember` of `passkeys.signIn`, undefined when the page has none, and `passkeyFailure(caught, errors, failed)` is the message for what threw: the one of `errors` for the code an action refused with, nothing when the person dismissed the prompt, else `failed`.
 - `passkeyAssertion` (`passkeys.signIn`, `twoFactor.verifyPasskey`, a `{ passkey }` proof) and `passkeyAttestation` (`passkeys.register`) are the schemas an action takes the answer with: typed as the method takes it, so no cast, and refused with a 422 when the answer lacks `id`, `rawId`, `type: 'public-key'` or a part of `response` the ceremony reads. The signature and challenge are the ceremony's to check.
 - `passkeys.registrationOptions(proof)` and `passkeys.register(response, name?)` add a passkey to the signed-in user, named as given (control and direction characters removed, 64 characters at most) or after the browser and system it was made on (`Safari on macOS`), and mail them. A passkey is a way in that skips the second factor and outlives every sign-out, so adding one takes a proof, the second factor when it is on, as linking a provider does (see Re-proof). The passkey is kept on the authenticator, so it signs in without a name typed first.
 - `passkeys.list()` lists `{ id, name, multiDevice, backedUp, userVerified, createdAt, lastUsedAt }` (a passkey with `userVerified: false`, one stored before passkeys always asked for user verification, is no way in until a sign-in or re-proof with it proves it; replace it by adding a new one); `passkeys.rename(id, name)` answers `{ ok }` or `{ ok: false, error: { code: 'not-found' | 'invalid-name' | 'signed-out' } }`; `passkeys.revoke(id, proof)` re-proves first, refuses the last passkey of an account with no other way in (`'last-way-in'`, also when a request unlinking the other way in runs at the same moment; a passkey with `userVerified: false` does not count), and mails the user.

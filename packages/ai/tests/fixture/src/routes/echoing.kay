@@ -1,5 +1,5 @@
 --- server
-import type { Progress } from '@kaynooo/kayjs-ai'
+import type { Progress } from '@kayjs/ai'
 import { action, s } from 'kay'
 import { testing } from '../testing'
 

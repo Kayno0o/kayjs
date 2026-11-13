@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { KayError, uiConfigEntries } from 'kay/library'
 
-const PACKAGE = '@kaynooo/kayjs-ui'
+const PACKAGE = '@kayjs/ui'
 
 // Where the copies go, under the app's `src/`, and where their pristine upstream text is kept.
 export const EJECTED_DIR = 'components/ui'

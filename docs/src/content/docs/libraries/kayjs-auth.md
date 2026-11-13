@@ -3,7 +3,7 @@ title: kayjs-auth
 order: 1
 description: Sessions-based auth for kay apps - passwords, OAuth, mailed links, two-factor and route guards.
 ---
-`@kaynooo/kayjs-auth` builds on kay's `session()`: passwords, OAuth sign-in, mailed links (verification, reset, magic links), TOTP two-factor, bearer tokens and a fail-closed gate for routes.
+`@kayjs/auth` builds on kay's `session()`: passwords, OAuth sign-in, mailed links (verification, reset, magic links), TOTP two-factor, bearer tokens and a fail-closed gate for routes.
 
 It ships every sign-in and account page, styled with kayjs-ui, in English and French. Turn them on with one line, then replace any page or text with your own. Or write every page yourself and call it from them.
 
@@ -12,10 +12,10 @@ Each account page is titled after its tab, such as "Security - Your account", so
 ## Install
 
 ```sh
-bun add @kaynooo/kayjs-auth
+bun add @kayjs/auth
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/auth`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
 kay, Elysia and kayjs-ui are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types), as its pages use kayjs-ui's components. `@kaynooo/pg-orm` is a peer too, for the Postgres store. kayjs-auth is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
@@ -26,7 +26,7 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 One line in `kay.config.ts` is the whole setup. There is no auth file to write:
 
 ```ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -58,8 +58,8 @@ An app that keeps session data of its own, or wires its store by hand, writes th
 `src/auth.ts` creates the auth object. `memoryAuth()` keeps users in the process, for trying it out.
 
 ```ts
-import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { authCore, memoryAuth } from '@kaynooo/kayjs-auth'
+import type { AuthSessionData } from '@kayjs/auth'
+import { authCore, memoryAuth } from '@kayjs/auth'
 import { session, sqliteSessions } from 'kay/server'
 
 export const auth = authCore({
@@ -80,7 +80,7 @@ Pass `secret` (at least 32 characters) only to keep a separate one; moving from 
 Then declare it in `kay.config.ts` with `module`. The module loads only when the server starts, so the config never loads your database.
 
 ```ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -110,10 +110,10 @@ To write every page yourself, leave out `pages` and set `signInPage` to your sig
 
 ### Postgres
 
-`pgAuth(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which the migration renames with their rows on 1.71 to 1.73 and on 1.77 or later, not on 1.74 to 1.76 ([Upgrading](../../../../../llms/upgrading.md)).
+`pgAuth(db)` from `@kayjs/auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which the migration renames with their rows on 1.71 to 1.73 and on 1.77 or later, not on 1.74 to 1.76 ([Upgrading](../../../../../llms/upgrading.md)).
 
 ```ts
-import { authTables, pgAuth } from '@kaynooo/kayjs-auth/pg'
+import { authTables, pgAuth } from '@kayjs/auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 
 export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables] })
@@ -206,9 +206,9 @@ Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: 
 
 ```kay
 ---
-import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
-import SignedOut from '@kaynooo/kayjs-auth/components/signed-out.kay'
-import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+import SignedIn from '@kayjs/auth/components/signed-in.kay'
+import SignedOut from '@kayjs/auth/components/signed-out.kay'
+import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 nav
   SignedOut
@@ -230,7 +230,7 @@ nav
 
 ```kay
 ---
-import ImpersonationBanner from '@kaynooo/kayjs-auth/components/impersonation-banner.kay'
+import ImpersonationBanner from '@kayjs/auth/components/impersonation-banner.kay'
 ---
 ImpersonationBanner
 slot
@@ -254,7 +254,7 @@ authCore({
 
 `account.delete` then asks for the proof as before, and only marks the account pending. The user stays signed in, gets a mail with a link to cancel, and `onEvent` and the audit log hear `account-deletion-scheduled` with the date. Asking again keeps the first date.
 
-Every prebuilt page shows a banner while the deletion is pending ("Your account will be deleted on March 14"), with a button that cancels it, and so does every page of your app with `viewer: true`. Elsewhere, put `DeletionBanner` from `@kaynooo/kayjs-auth/components/deletion-banner.kay` in a layout.
+Every prebuilt page shows a banner while the deletion is pending ("Your account will be deleted on March 14"), with a button that cancels it, and so does every page of your app with `viewer: true`. Elsewhere, put `DeletionBanner` from `@kayjs/auth/components/deletion-banner.kay` in a layout.
 
 For your own page, `auth.account.deletion()` gives the date (or null), `ctx.deletion` gives it in a template, and `auth.account.cancelDeletion()` cancels. The mailed link opens the account data page, and goes only to a verified address: an account without one is still pending, and cancels from the banner. A site without the prebuilt pages names its own page with `account: { cancelPage: '/settings/delete' }`.
 
@@ -276,7 +276,7 @@ authCore({
 })
 ```
 
-`check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `admin.createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kaynooo/kayjs-auth/rules`, the only entry exporting the rules, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
+`check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `admin.createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kayjs/auth/rules`, the only entry exporting the rules, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
 
 Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`. `error` is the same `ErrorShape` (`status`, `message`, `errors`, `data`) every result in kay carries, and its `code` is the kind, such as `'invalid'` or `'limited'`, which your page words. Compare `result.error.code`, not `result.error`.
 
@@ -472,7 +472,7 @@ A passkey stored before kayjs-auth always asked for user verification may have b
 
 ## Passkeys in an island
 
-An island asks for a passkey with `@kaynooo/kayjs-auth/browser`. It calls the browser's own WebAuthn methods and ships no library.
+An island asks for a passkey with `@kayjs/auth/browser`. It calls the browser's own WebAuthn methods and ships no library.
 
 `askPasskey(options)` and `makePasskey(options)` take the options an action returned. They answer the JSON the next action takes, or null when the person picked none.
 
@@ -599,7 +599,7 @@ With `admin` set, the prebuilt pages also serve an admin area under their prefix
 
 A visitor is sent to sign in, anyone else gets a 403, and a site with no `admin` option gets a 404.
 
-While an admin acts as a user, the admin pages answer 403 with the banner and the way back, and every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kaynooo/kayjs-auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
+While an admin acts as a user, the admin pages answer 403 with the banner and the way back, and every prebuilt page shows a banner with a button back to their own account. With `viewer: true`, the banner shows on every page of your app; elsewhere, put `ImpersonationBanner` from `@kayjs/auth/components/impersonation-banner.kay` in your layout. `auth.requireAdmin()` gives your own admin pages the same check.
 
 ## Organizations
 
@@ -666,7 +666,7 @@ The pages ask the same of the methods as your own would: a member without the ro
 Each entry of `oauth` adds `/auth/<name>` and `/auth/<name>/callback`. Register `site` plus the callback path at the provider.
 
 ```ts
-import { authCore, discordProvider } from '@kaynooo/kayjs-auth'
+import { authCore, discordProvider } from '@kayjs/auth'
 
 authCore({
   // ...
@@ -870,7 +870,7 @@ const site = await testSite()
 await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
 ```
 
-The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'`.
+The prebuilt pages' actions import as `@kayjs/auth/pages/<page>.kay`, such as `import { password } from '@kayjs/auth/pages/sign-in.kay'`.
 
 To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user. It mints the cookie the app reads from a plain request: `__Host-kay_session` in production when `site` in kay.config.ts is https, else `kay_session`. A request over https reads `__Host-kay_session` alone, so `{ secure: true }` asks for it, as for a site without `site` behind a proxy that says it was reached over https, and `{ secure: false }` asks for `kay_session`.
 
@@ -878,7 +878,7 @@ The cookie works minted before the first `testSite()` too, so a helper can mint 
 
 To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username, signs an existing one in as they are, and sets the session cookie on the site. It takes the fields of `admin.createUser` (`password`, `roles`, `emailVerified` and `locale` too), and `data` for the fields of your `user` schema. It works on any store. Call it again to switch member, and `auth.signOut(site)` to sign out.
 
-`auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`. With `auth()` alone and no `src/auth.ts` module, `authTest(site)` from `@kaynooo/kayjs-auth/test` makes the same calls on the auth `testSite()` built.
+`auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`. With `auth()` alone and no `src/auth.ts` module, `authTest(site)` from `@kayjs/auth/test` makes the same calls on the auth `testSite()` built.
 
 To test two-factor, `await auth.enrollTotp(user.id)` (or `as.enrollTotp(user.id)`) turns it on for a member as the app would once they confirm a code, with no session or mail. It gives `{ secret, code(offset?), recoveryCodes }`: `await enrolment.code()` is the code of the current step, and each recovery code signs in once. It throws for a missing member or one who has two-factor already.
 

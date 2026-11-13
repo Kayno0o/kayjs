@@ -1,8 +1,8 @@
 ---
 import type { Action } from 'kay'
 import { signal } from 'kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // A FormDialog whose action always fails, the failure words left to the test's props.
 const { words, onError } = props<{ words: { failureLabel?: string, failure?: string }, onError: (failure: { error: unknown }) => unknown }>()

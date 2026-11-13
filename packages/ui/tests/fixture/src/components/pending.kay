@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // `onChange` stands for the action behind each control, told which one changed and answering once the test settles it.
 // With `mirror`, the page keeps each value as its own state, set before the change is saved.

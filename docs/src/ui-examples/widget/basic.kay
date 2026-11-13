@@ -1,7 +1,7 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
-import Widget from '@kaynooo/kayjs-ui/widget.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import Stat from '@kayjs/ui/stat.kay'
+import Widget from '@kayjs/ui/widget.kay'
 ---
 Widget(title="Visitors" icon="info")
   @actions

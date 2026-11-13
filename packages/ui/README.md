@@ -4,15 +4,10 @@ Components for kay apps: buttons and icons, toasts, dialogs and a form dialog ca
 
 ## Install
 
-kayjs-ui is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml` (a project made by `kay new` already carries it in its `.npmrc`):
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kayjs-ui is published to npm as `@kayjs/ui`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
 
 ```sh
-bun add @kaynooo/kayjs-ui @iconify-json/tabler
+bun add @kayjs/ui @iconify-json/tabler
 ```
 
 kay and Tailwind v4 are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it. Three more are optional, installed only by an app using what needs them: `chartist` (2.x) for LineChart, `leaflet` for MapView, and `hls.js` for MediaGallery to play `.m3u8` playlists in browsers without native HLS.
@@ -24,7 +19,7 @@ The stylesheet the root layout imports brings the theme in right after Tailwind.
 ```css
 /* src/app.css */
 @import 'tailwindcss';
-@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kayjs/ui/theme.css';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);
@@ -41,8 +36,8 @@ The root layout renders the toasts and tooltips once. A second Toaster or Toolti
 
 ```kay
 ---
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 import '../app.css'
 ---
 slot
@@ -54,8 +49,8 @@ A component with an `on*` handler is an island, so it runs in the browser, where
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import { toast } from '@kayjs/ui'
 ---
 Button(label="Save" tone="accent" icon="plus" onClick={() => toast.success('Saved')})
 ```

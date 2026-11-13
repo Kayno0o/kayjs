@@ -1,9 +1,9 @@
 ---
 import type { Action, Failure } from 'kay'
 import { ActionError, signal } from 'kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // What the handler passes to `ctx.fail`: a message, for a field or the whole form.
 interface Refusal {

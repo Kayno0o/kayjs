@@ -318,7 +318,7 @@ export async function generate(dir: string, kind: string, name: string, options:
       throw new Error('kay generate: a resource needs a database, which this project has none of: run `kay add postgres` first')
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
-    const made = resourceFiles(name, options.fields ?? [], { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), authModule: await exportsAuth(dir), ui: '@kaynooo/kayjs-ui' in { ...manifest.devDependencies, ...manifest.dependencies } }, options.plural)
+    const made = resourceFiles(name, options.fields ?? [], { tailwind: features.has('tailwind'), tests: features.has('tests'), auth: features.has('auth'), authModule: await exportsAuth(dir), ui: '@kayjs/ui' in { ...manifest.devDependencies, ...manifest.dependencies } }, options.plural)
     const tables = existsSync(join(dir, TABLES_FILE)) ? withTable(await readFile(join(dir, TABLES_FILE), 'utf8'), made.table) : undefined
 
     if (tables === undefined)

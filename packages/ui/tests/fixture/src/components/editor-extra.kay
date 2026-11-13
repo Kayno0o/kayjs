@@ -1,6 +1,6 @@
 ---
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // An editor with an app button wrapping the selection in a callout, a failure and a preview callback.
 const { onInput, onImage, onImageError, onPreviewChange, previewing } = props<{ onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, onImageError?: (file: File, error: unknown) => void, onPreviewChange?: (previewing: boolean) => void, previewing?: boolean }>()

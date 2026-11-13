@@ -1,4 +1,4 @@
-name: Publish to Forgejo Package Registry
+name: Publish to the npm registries
 
 permissions:
   contents: read
@@ -122,12 +122,14 @@ jobs:
         env:
           KAYJS_AUTH_REQUIRE_DATABASE: '1'
 
+      # kay and its libraries are published as @kayjs/kay, @kayjs/ui, @kayjs/auth, @kayjs/mail, @kayjs/cms and @kayjs/ai (up to 1.103 they were @kaynooo/kayjs*, which stay on the Forgejo registry as they are). The Forgejo registry serves the `@kayjs` scope from the kaynooo owner like the `@kaynooo` one, so one name installs from either registry.
       # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet.
       # The token lives in ~/.npmrc for this step alone, so no later step, nor what it downloads, can publish with it.
       - name: Publish to Forgejo npm registry
         run: |
           trap 'rm -f ~/.npmrc' EXIT
           echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
+          echo "@kayjs:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" >> ~/.npmrc
           echo "//git.kaynooo.fr/api/packages/kaynooo/npm/:_authToken=${PACKAGE_TOKEN}" >> ~/.npmrc
           # A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
           publish() {
@@ -144,6 +146,31 @@ jobs:
           done
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+
+      # The same packages to npm under the kayjs org, only when NPM_TOKEN (an automation token of a member of the org) is set, so the release works before the secret exists. A version already there is skipped as on Forgejo.
+      - name: Publish to npm
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "NPM_TOKEN is not set, npm is skipped"
+            exit 0
+          fi
+          trap 'rm -f ~/.npmrc' EXIT
+          echo "@kayjs:registry=https://registry.npmjs.org/" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+          publish() {
+            package="$(jq -r '.name + "@" + .version' package.json)"
+            if bun pm view "$package" version > /dev/null 2>&1; then
+              echo "$package is already published"
+            else
+              bun publish --access public
+            fi
+          }
+          publish
+          for dir in packages/*/; do
+            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && publish) || exit 1
+          done
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # cli-changelog is on the Forgejo registry only, and bun x in CI resolves the scope from npmjs unless ~/.npmrc points it at Forgejo; no token needed to read. It is named `release`, as a bare `changelog` prints its help and exits 0.
       - name: Generate changelog

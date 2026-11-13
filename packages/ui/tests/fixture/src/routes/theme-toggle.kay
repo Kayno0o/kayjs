@@ -1,6 +1,6 @@
 ---
-import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
-import { scheme } from '@kaynooo/kayjs-ui'
+import ThemeToggle from '@kayjs/ui/theme-toggle.kay'
+import { scheme } from '@kayjs/ui'
 import '../app.css'
 ---
 head

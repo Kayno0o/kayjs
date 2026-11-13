@@ -3,7 +3,7 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, normalize, posix, relative, sep } from 'node:path'
 import process from 'node:process'
 
-// The repo keeps kay and its libraries side by side (`llms/` and `packages/ui/llms/`), where an installed app has `@kaynooo/kayjs/` beside `@kaynooo/kayjs-ui/`.
+// The repo keeps kay and its libraries side by side (`llms/` and `packages/ui/llms/`), where an installed app has `@kayjs/kay/` beside `@kayjs/ui/`.
 // `bun scripts/pack-links.ts rewrite [root]` (prepack) points every link between the two at the installed layout, `restore [root]` (postpack) puts the files back, so the repo reads as it does on the forge and the tarball as it does in node_modules.
 const BACKUP = join('node_modules', '.cache', 'pack-links')
 // A Markdown link target that is a relative path: not a URL, an absolute path or a bare anchor, with an optional title after it.
@@ -12,12 +12,12 @@ const LINK = /\]\((?!\w+:|\/|#)([^)\s#]+)(#[^)\s]*)?(\s+(?:"[^"]*"|'[^']*'))?\)/
 const DEFINITION = /^( {0,3}\[[^\]]+\]:[ \t]*)(?!\w+:|\/|#)([^\s#]+)(#\S*)?(\s.*)?$/
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 const CODE_SPAN = /(`+)[^`]*\1/g
-const SCOPE = /^@kaynooo\//
+const SCOPE = /^@kayjs\//
 const PACKAGE_FOLDER = /^packages\/[^/]+/
 
-// The folder each package holds in node_modules/@kaynooo, by the folder it lives in: `` for kay, `packages/ui` for kayjs-ui.
+// The folder each package holds in node_modules/@kayjs, by the folder it lives in: `` for kay, `packages/ui` for kayjs-ui.
 async function installedFolders(root: string): Promise<Map<string, string>> {
-  const folders = new Map([['', 'kayjs']])
+  const folders = new Map([['', 'kay']])
 
   for (const entry of await readdir(join(root, 'packages'), { withFileTypes: true })) {
     const manifest = join(root, 'packages', entry.name, 'package.json')
@@ -36,7 +36,7 @@ function owns(folder: string | undefined, file: string): boolean {
   return folder === undefined || packageOf(file) === folder
 }
 
-// `markdown`, the text of the repo file `file`, with each link into another package written as it resolves from node_modules/@kaynooo. Fenced code, code spans and what is not a link are left as written.
+// `markdown`, the text of the repo file `file`, with each link into another package written as it resolves from node_modules/@kayjs. Fenced code, code spans and what is not a link are left as written.
 export function rewriteLinks(file: string, markdown: string, folders: ReadonlyMap<string, string>): string {
   const own = packageOf(file)
   const retarget = (target: string): string => {

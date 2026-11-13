@@ -1,5 +1,5 @@
 ---
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 ---
 .flex.flex-col.gap-6
   PageSection(title="Moons")

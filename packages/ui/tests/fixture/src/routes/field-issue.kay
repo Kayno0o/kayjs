@@ -5,16 +5,16 @@ import { action } from 'kay'
 export const save = action(t.Object({ title: t.String({ maxLength: 100 }), other: t.String({ maxLength: 100 }) }), () => 'ok')
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import RangeInput from '@kayjs/ui/range-input.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
 const columns = [{ key: 'item', label: 'Item' }]

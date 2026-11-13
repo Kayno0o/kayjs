@@ -1,5 +1,5 @@
 ---
-import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+import SplitLayout from '@kayjs/ui/split-layout.kay'
 ---
 .h-64.overflow-hidden.rounded-lg.border.border-border
   SplitLayout(resizableList listWidthKey="docs-split-layout")

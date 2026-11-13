@@ -1,6 +1,6 @@
 ---
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import Icon from '@kayjs/ui/icon.kay'
 
 const moons = [
   { name: 'Io', radius: 1822 },

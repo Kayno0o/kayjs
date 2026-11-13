@@ -1,5 +1,5 @@
 ---
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
 
 const colors = [
   { value: 'red', label: 'Red' },

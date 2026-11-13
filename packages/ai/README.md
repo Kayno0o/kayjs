@@ -4,15 +4,10 @@ An LLM called from kay apps with no SDK and no streaming code: `ask()` over Anth
 
 ## Install
 
-kayjs-ai is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml` (a project made by `kay new` already carries it in its `.npmrc`):
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kayjs-ai is published to npm as `@kayjs/ai`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
 
 ```sh
-bun add @kaynooo/kayjs-ai
+bun add @kayjs/ai
 ```
 
 kay is a peer. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together.
@@ -23,7 +18,7 @@ Set `AI_MODEL` and one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL`
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 const answer = ask('Say hello')
 ---

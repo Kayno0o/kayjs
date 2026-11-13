@@ -1,5 +1,5 @@
 ---
-import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
+import StatusStrip from '@kayjs/ui/status-strip.kay'
 
 const checks = Array.from({ length: 60 }, (_, at) => at === 41 || at === 42 ? 'danger' as const : at < 3 ? undefined : 'success' as const)
 ---

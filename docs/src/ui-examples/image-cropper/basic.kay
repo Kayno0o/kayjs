@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
+import ImageCropper from '@kayjs/ui/image-cropper.kay'
 
 const photo = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">'

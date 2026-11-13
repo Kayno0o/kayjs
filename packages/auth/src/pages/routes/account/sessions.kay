@@ -3,10 +3,10 @@ import { action } from 'kay'
 import { formatRelativeTime, localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { schemas } from '../../forms'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 // Ending this device's own session signs it out, so it leaves the account pages.
 export const end = action(schemas.id, async ({ id }, ctx) => {

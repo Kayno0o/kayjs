@@ -8,7 +8,7 @@
 
 ```ts
 // kay.config.ts
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 
 export default defineConfig({ extensions: [ai()] })
 ```
@@ -16,7 +16,7 @@ export default defineConfig({ extensions: [ai()] })
 ### ask
 
 ```ts
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 ask('Why is the sky blue?')
 ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Again' }], { system: 'Answer in French', maxTokens: 500 })
@@ -27,7 +27,7 @@ ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, {
 ### An object instead of text
 
 ```ts
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 import { s } from 'kay'
 
 const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
@@ -42,7 +42,7 @@ An `await` block takes the reply as it is and renders `then` again with each sna
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 const summary = ask('Summarise kay in one line')
 ---
@@ -61,7 +61,7 @@ An action returning the reply streams it to the island calling it, with the acti
 ```kay
 --- server
 import { s, action } from 'kay'
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'You answer for the shop' }))
 ---

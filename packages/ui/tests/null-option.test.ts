@@ -29,7 +29,7 @@ beforeAll(async () => {
   for (const component of COMPONENTS) {
     for (const item of CASES) {
       await Bun.write(join(dir, `src/components/${item.name}-${component.file}.kay`), `---
-import ${component.name} from '@kaynooo/kayjs-ui/${component.file}.kay'
+import ${component.name} from '@kayjs/ui/${component.file}.kay'
 
 const held = ${item.held}
 const options = ${item.options}

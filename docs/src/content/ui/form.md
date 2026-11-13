@@ -10,9 +10,9 @@ Give each control the `name` of its field in the action's schema. A [FormField](
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
 import { add } from './_actions.kay'
 ---
 Form(action={add} saved="Added.")

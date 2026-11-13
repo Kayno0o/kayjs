@@ -55,7 +55,7 @@ CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { l
 
 ```kay
 ---
-import Bell from '@kaynooo/kayjs-ui/bell.kay'
+import Bell from '@kayjs/ui/bell.kay'
 ---
 header
   Bell
@@ -65,7 +65,7 @@ header
 - The visitor is the user the auth library names (kayjs-auth does), read on the server: `Bell` has no `user` prop. A page with a `Bell` is private and rendered per request, and `ui()` serves its `GET /_kay/ui/inbox` and `POST /_kay/ui/inbox/read`.
 - `label` (`Notifications`) names the button and `placement` is the menu's, as `Menu` takes it. The `bell` icon slot maps its icon ([Setup](setup.md)); `ui.bell.*` are its words ([Words](words.md)).
 - A title is text and a link is drawn only for a path of the site or an http(s) URL; an external one opens in a new tab.
-- `items={notes}` (`{ key, label, read?, href? }[]`, read by the page; `id`, `title` and `url` still work until 1.104, kay's own inbox answering them is mapped for you) lists the app's own notifications in place of the inbox, and the Bell then draws for anyone, signed in or not; `unread` sets the count (the unread items by default). The page stays static, so a source loaded in the browser or a callback goes through `BellInbox` (`@kaynooo/kayjs-ui/bell-inbox.kay`) in an island, which takes the same props and reads no `ctx`: `BellInbox(items={load} onRead={onRead} onOpenChange={onOpenChange})`.
+- `items={notes}` (`{ key, label, read?, href? }[]`, read by the page; `id`, `title` and `url` still work until 1.104, kay's own inbox answering them is mapped for you) lists the app's own notifications in place of the inbox, and the Bell then draws for anyone, signed in or not; `unread` sets the count (the unread items by default). The page stays static, so a source loaded in the browser or a callback goes through `BellInbox` (`@kayjs/ui/bell-inbox.kay`) in an island, which takes the same props and reads no `ctx`: `BellInbox(items={load} onRead={onRead} onOpenChange={onOpenChange})`.
 - `items` on `BellInbox` is a list or a function returning a list or a promise of one (`() => fetchNotes()`), asked once the Bell is in the page, again when a signal it reads changes and after every read. `onRead(key | undefined)` hears an item opened (`undefined` for "Mark all as read"), a custom source marking the read there (a promise is awaited, then the list is asked again) and the inbox source having been marked already. `onOpenChange(open)` hears the list shown or hidden and `open` shows it from the page. "Mark all as read" is drawn for a custom source only when `onRead` is given: a list's read state belongs to the page. A function source shows no "No notifications" before its first answer. A page with a `Bell` is rendered per request even with `items`. `@trigger(attributes, unread)` replaces the icon button, the attributes carrying an `aria-label` that holds the unread count and `unread()` being the count for a badge of your own (the default one is not drawn). `@item(note)` draws a row in place of its dot and title, the row staying the link or button that reads it: `BellInbox(items={load})` then `@item(note)` with `strong {note.who}`.
 
 ### TreeView

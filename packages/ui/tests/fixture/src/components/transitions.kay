@@ -1,7 +1,7 @@
 --- island
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
-import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
+import SiteFavicon from '@kayjs/ui/site-favicon.kay'
 
 const { calls, source = 'plain' } = props<{ calls: string[], source?: 'plain' | 'built' | 'fetched' | 'broken' | 'empty' }>()
 

@@ -1,5 +1,5 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 
 // Several buttons on one action: `onSave` answers the promise the test settles, `onSubmit` the form's.
 const { onSave, onSubmit, busy } = props<{ onSave: () => unknown, onSubmit: (event: SubmitEvent) => unknown, busy?: boolean }>()

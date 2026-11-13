@@ -38,8 +38,8 @@ Add and Remove move focus to the first control of a row, whatever it is. The blo
 
 ```kay
 ---
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import Select from '@kayjs/ui/select.kay'
 
 const units = [{ value: 'm', label: 'metres' }, { value: 'kg', label: 'kilos' }]
 const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity', type: 'number' as const }, { key: 'unit', label: 'Unit', cell: true }]

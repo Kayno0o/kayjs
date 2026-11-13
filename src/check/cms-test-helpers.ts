@@ -4,6 +4,7 @@ import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { importedName, walk } from './ast'
 import { scan } from './renamed-exports'
+import { renamePackages } from '../package-names'
 
 const NEEDLE = /\bcmsSign(?:InAs|InWith|Out)\b/
 const LINE_END = /^\r?\n/
@@ -12,12 +13,12 @@ const CLOSED = /^\s*\)$/
 const SEPARATED = /^\s*,\s*$/
 const HELP = 'write `cmsTest(site)` and its method'
 
-// The functions of `@kaynooo/kayjs-cms/test` renamed in 1.100, and the method of `cmsTest(site)` each became.
+// The functions of `@kayjs/cms/test` renamed in 1.100, and the method of `cmsTest(site)` each became.
 const METHODS: Record<string, string> = { cmsSignInAs: 'signInAs', cmsSignInWith: 'signInWith', cmsSignOut: 'signOut' }
 
 type Specifier = NodeOfType<'ImportDeclaration'>['specifiers'][number]
 
-// `cmsSignInAs(site, role)`, `cmsSignInWith(site, password)` and `cmsSignOut(site)` of `@kaynooo/kayjs-cms/test`, which are `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()` since 1.100, the same vocabulary as `auth.test(site)`.
+// `cmsSignInAs(site, role)`, `cmsSignInWith(site, password)` and `cmsSignOut(site)` of `@kayjs/cms/test`, which are `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()` since 1.100, the same vocabulary as `auth.test(site)`.
 // Found in the calls and the import in the TypeScript files and `.kay` files of the project. The fix rewrites the call and the import; an import that is aliased, or a name read other than by calling it, is reported with no fix.
 export async function cmsTestHelpers(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-cms-test-helpers', options.lints) === 'allow')
@@ -31,7 +32,7 @@ export async function cmsTestHelpers(root: string, options: CheckOptions): Promi
       let testName: string | undefined
 
       for (const statement of ast.body) {
-        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || statement.source.value !== '@kaynooo/kayjs-cms/test')
+        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || renamePackages(statement.source.value) !== '@kayjs/cms/test')
           continue
 
         for (const specifier of statement.specifiers) {
@@ -100,7 +101,7 @@ export async function cmsTestHelpers(root: string, options: CheckOptions): Promi
         const gone = names.length === 0 ? [{ start: base + statement.start, end: base + statement.end + (LINE_END.exec(span.slice(statement.end))?.[0].length ?? 0), text: '' }] : undefined
         const edits: Edit[] | null = importFixable && specifiers.length > 0 ? gone ?? [{ start: base + specifiers[0]!.start, end: base + specifiers.at(-1)!.end, text: names.join(', ') }] : null
 
-        report(base + statement.start, base + statement.end, 'the sign-in functions of `@kaynooo/kayjs-cms/test` are deprecated since 1.100: `cmsTest(site)` has `signInAs`, `signInWith` and `signOut`', 'import `cmsTest`', edits)
+        report(base + statement.start, base + statement.end, 'the sign-in functions of `@kayjs/cms/test` are deprecated since 1.100: `cmsTest(site)` has `signInAs`, `signInWith` and `signOut`', 'import `cmsTest`', edits)
       }
     }
   })

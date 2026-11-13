@@ -1,6 +1,6 @@
 ---
 import { onMount, signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 import { askPasskey, canAskPasskey, passkeyFailure, rememberChoice } from '../../browser'
 import { passkey, passkeyOptions } from '../routes/sign-in.kay'
 

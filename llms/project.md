@@ -7,7 +7,7 @@
 `kay new` scaffolds a project that already checks, builds and runs, from a preset (`blank`, `server`, `site` or `app`) plus the features added or dropped:
 
 ```sh
-bunx -p @kaynooo/kayjs kay new my-app --template app --without ws
+bunx -p @kayjs/kay kay new my-app --template app --without ws
 ```
 
 ### Set the project's settings
@@ -51,9 +51,9 @@ kay migrate astro ../my-astro-site --outdir ../my-kay-site
 
 ### Project setup
 
-- kay is published as `@kaynooo/kayjs` to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/` and installed under the name its imports use: `"kay": "npm:@kaynooo/kayjs@~<version>"` in `package.json`, a tilde since a minor release may break what the one before it took, each break listed in [Upgrading](upgrading.md) and every one `kay check` can recognise a `deprecated` lint with a fix, which `kay upgrade` applies as it moves the app, and a major is a rewrite, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`.
-- Before the first `kay new`, Bun is told once where the `@kaynooo` scope lives, in `~/.bunfig.toml`: `[install.scopes]` with `"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`.
-- `bunx -p @kaynooo/kayjs kay new my-app` writes a project that, after `cd my-app && bun install`, checks, builds and runs (`bun run dev`), both of those included: this setup, a layout, a page, a `_404.kay` and islands, or only what is picked of them (see [Commands](#commands) for the presets and features).
+- kay is published as `@kayjs/kay` to npm and to the registry at `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, its libraries as `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai` (`@kaynooo/kayjs*` up to 1.103, which `kay upgrade` moves an app off), and installed under the name its imports use: `"kay": "npm:@kayjs/kay@~<version>"` in `package.json`, a tilde since a minor release may break what the one before it took, each break listed in [Upgrading](upgrading.md) and every one `kay check` can recognise a `deprecated` lint with a fix, which `kay upgrade` applies as it moves the app, and a major is a rewrite, with `@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/` in the project's `.npmrc`.
+- Before the first `kay new`, Bun is told once where the `@kaynooo` scope lives (pg-orm and the other `@kaynooo` packages of a project are on the Forgejo registry only), in `~/.bunfig.toml`: `[install.scopes]` with `"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`.
+- `bunx -p @kayjs/kay kay new my-app` writes a project that, after `cd my-app && bun install`, checks, builds and runs (`bun run dev`), both of those included: this setup, a layout, a page, a `_404.kay` and islands, or only what is picked of them (see [Commands](#commands) for the presets and features).
 
 - kay runs on Bun 1.4.4 or later, as its `engines` says: the CLI and `pages()` refuse an older one, naming its version, its path and the fix, `bun update bun` when it is the project's npm `bun` package, which a plugin's peer dependency installs and package scripts run ahead of the system Bun.
 
@@ -125,7 +125,7 @@ export default defineConfig({
 
 - `kay/html`, `kay/dom`, `kay/dom-loop`, `kay/dom-await`, `kay/dom-try`, `kay/dom-spread`, `kay/dom-image`, `kay/pending`, `kay/i18n-links`, `kay/island`, `kay/await`, `kay/client`, `kay/arrival`, `kay/internal`, `kay/internal/title` and `kay/internal/server` are what compiled `.kay` files and kay's generated entries import, and `kay/jsx-runtime` is where TypeScript finds the JSX types of `jsxImportSource: "kay"`: the compiler's output contract rather than API, free to change in any release, never imported by an app. The root `kay` export also holds the compile-time types behind the generated shadow types, none of them for an app to name: `BindableMark`, `IslandBrand`, `HandedPart`, `HandsPart`, `HandedSignal`, `UnresolvedParameter`, `WidenedProps`, `CheckedHref`, `CheckedHtml`, `CheckedComputedHtml`, `BoundProp`, `BoundValue`, `PlainIslandProp`, `FunctionProp`, `Inferred`, `TemplateHelpers`, `TemplateValues` and `Truthy`, free to change in any release too.
 - A few entries also hold plumbing no page tells an app to call, free to change in any release: the paths, providers and tracker tags of `kay/analytics` (`ANALYTICS_PATH`, `ANALYTICS_SCRIPT_PATH`, `ANALYTICS_PROVIDERS`, `CUSTOM_COLLECT_PATH`, `CUSTOM_SCRIPT_PATH`, `NOTICE_SCRIPT_PATH`, `INTEGRITY`, `TRACKER_TAGS`, `isGated`, `LazyGuard`), the collection marker, publish times and cache key of `kay/content`, and the preview session reader of `kay/server`.
-- A name has one home: an entry beside a package's root exists for browser safety (`@kaynooo/kayjs-auth/rules`, `@kaynooo/kayjs-cms/form`, which an island imports without the server) and the root does not repeat its names, apart from `mount` (`kay`, `kay/mount`) and `sqliteCache` (`kay/server`, `kay/cache`).
+- A name has one home: an entry beside a package's root exists for browser safety (`@kayjs/auth/rules`, `@kayjs/cms/form`, which an island imports without the server) and the root does not repeat its names, apart from `mount` (`kay`, `kay/mount`) and `sqliteCache` (`kay/server`, `kay/cache`).
 - `kay/library` is what kay's own libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms, kayjs-ai) share with kay for their server code, such as the sanitizer's lists, sealing, locale matching, escaping and the user a library names for a request (`nameUser(request, () => id)`, read back by `userOf(request)`: kayjs-auth names the signed-in user and kayjs-ai counts them) and `configError(option, value, takes)`, the `config-invalid` `KayError` a library throws for a setting it refuses at boot, so neither keeps a copy: not API either, free to change with any minor, never imported by an app. The libraries are released in lockstep with kay, each one's peer range on kay's minor, so the same holds for what a library imports from it.
 
 ### Reserved paths

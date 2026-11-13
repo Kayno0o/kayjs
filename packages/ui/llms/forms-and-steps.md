@@ -17,9 +17,9 @@ export const rename = action(s.Object({ id: s.String({ maxLength: 64 }), title: 
 ```kay
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { rename } from '../routes/posts/[id].kay'
 
 const { post } = props<{ post: Post }>()
@@ -113,7 +113,7 @@ form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
 - `onStart()` runs once the microphone is open, `onStop('press' | 'limit')` as a recording ends (before `onRecord`), `onCancel()` on Escape, and `onError({ problem, error? })` with the code of the notice below (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost`, `empty`) or `'send'` with `onRecord`'s rejection as `error`.
 - `recording` and `onRecordingChange(recording)` are the state pair: `onRecordingChange` says `true` as a recording starts (the microphone is asked for) and `false` once it is over, however it ended (the press that stops it, Escape, `maxDuration`, a refused or lost microphone, the button going away), before `onStop` and `onRecord`. Give `recording` and the app drives it, `true` starting a recording as a press would and `false` stopping it and handing it over (one still asking for the microphone stops as soon as it opens); left out, the button keeps it itself. Only a change of `recording` acts, so a recording that ended on its own is not started again.
 - A danger notice says what went wrong: a microphone blocked, missing, in use or unplugged mid-recording (which drops it), a page off https, a browser that cannot record, nothing recorded. A hidden status region says when it starts, stops and is dropped. `label` (`Record`) names it, `microphone` is its icon slot, and it takes Button's `variant`, `tone` and `size`.
-- `recorder()` and `recordWords()` from `@kaynooo/kayjs-ui/lib/record` are its state for a button drawn otherwise, as kayjs-ai's Chat draws its microphone (its browser code loads once one mounts); `recorder` takes the same callbacks.
+- `recorder()` and `recordWords()` from `@kayjs/ui/lib/record` are its state for a button drawn otherwise, as kayjs-ai's Chat draws its microphone (its browser code loads once one mounts); `recorder` takes the same callbacks.
 
 ## Reference
 

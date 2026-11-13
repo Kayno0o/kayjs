@@ -10,7 +10,7 @@ The finished app is `examples/reading-list` in kay's repository.
 
 ## Create the project
 
-Kay is published as `@kaynooo/kayjs` on the registry at git.kaynooo.fr. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`.
+Kay is published as `@kayjs/kay` on npm. The other `@kaynooo` packages a project uses live on the registry at git.kaynooo.fr, so tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`.
 
 ```toml
 [install.scopes]
@@ -20,7 +20,7 @@ Kay is published as `@kaynooo/kayjs` on the registry at git.kaynooo.fr. Tell Bun
 Then scaffold a project and start it.
 
 ```sh
-bunx -p @kaynooo/kayjs kay new reading-list -y
+bunx -p @kayjs/kay kay new reading-list -y
 cd reading-list
 bun install
 bun run dev

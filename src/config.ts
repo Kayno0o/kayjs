@@ -114,7 +114,7 @@ export interface KayConfig extends AppHooks {
   markdown?: MarkdownConfig | undefined
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined
-  // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
+  // The app's own module for a kay library's settings, by the library's name: `{ '@kayjs/ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   librarySettings?: Record<string, string> | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined

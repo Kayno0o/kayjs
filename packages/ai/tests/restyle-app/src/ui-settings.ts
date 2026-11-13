@@ -1,5 +1,5 @@
-import type { UiSettings } from '@kaynooo/kayjs-ui'
-import { uiDefaults } from '@kaynooo/kayjs-ui'
+import type { UiSettings } from '@kayjs/ui'
+import { uiDefaults } from '@kayjs/ui'
 import plus from '~icons/tabler/circle-plus'
 import chat from '~icons/tabler/ghost'
 import stop from '~icons/tabler/hand-stop'

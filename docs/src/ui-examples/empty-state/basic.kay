@@ -1,5 +1,5 @@
 ---
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 ---
 EmptyState(
   title="No posts yet"

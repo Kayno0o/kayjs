@@ -1,11 +1,11 @@
 --- server
 import { action } from 'kay'
-import { mailer } from '@kaynooo/kayjs-mail'
+import { mailer } from '@kayjs/mail'
 
 export const subscribe = action(...mailer({ from: 'Fixture <hello@fixture.test>' }).list('ui').form())
 ---
 ---
-import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
+import SubscribeForm from '@kayjs/ui/subscribe-form.kay'
 
 ---
 main

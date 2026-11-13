@@ -1,6 +1,6 @@
 --- island
 import { signal, untrack } from 'kay'
-import BellInbox from '@kaynooo/kayjs-ui/bell-inbox.kay'
+import BellInbox from '@kayjs/ui/bell-inbox.kay'
 
 const all = [{ key: 'a', label: 'Deploy done', who: 'Ada', href: '/plain' }, { key: 'b', label: 'Review asked', who: 'Grace' }]
 const read = signal<string[]>([])

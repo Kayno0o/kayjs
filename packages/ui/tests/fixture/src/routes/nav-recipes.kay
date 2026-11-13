@@ -1,9 +1,9 @@
 ---
-import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
-import Steps from '@kaynooo/kayjs-ui/steps.kay'
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import Breadcrumb from '@kayjs/ui/breadcrumb.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+import Steps from '@kayjs/ui/steps.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
 import PlanetTabs from '../components/planet-tabs.kay'
 import '../space.css'
 

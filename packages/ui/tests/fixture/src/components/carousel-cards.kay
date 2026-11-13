@@ -1,5 +1,5 @@
 --- island
-import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+import Carousel from '@kayjs/ui/carousel.kay'
 ---
 // Slides with neither `src` nor `alt`, as the `@slide` block draws them.
 Carousel#cards(slides={[{ key: 'x', title: 'First' }, { key: 'y', title: 'Second' }]})

@@ -1,7 +1,7 @@
 ---
 import type { Source } from 'kay'
 import { signal } from 'kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Notice from '@kayjs/ui/notice.kay'
 
 const { onDismiss, sourced } = props<{ onDismiss: () => void, sourced: Pick<Source, 'error' | 'pending' | 'retry'> }>()
 

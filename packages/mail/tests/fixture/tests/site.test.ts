@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import process from 'node:process'
-import { outbox } from '@kaynooo/kayjs-mail'
+import { outbox } from '@kayjs/mail'
 import { beforeEach, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'

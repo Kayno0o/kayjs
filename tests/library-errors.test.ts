@@ -53,7 +53,7 @@ describe('the runtime error classes', () => {
   it('explain a library code, with the fix in the library\'s folder or its installed package', () => {
     expect(explainError('ai-error')).toContain('packages/ai/llms/testing-and-errors.md')
     expect(explainError('ai-error', file => `at ${file}`)).toContain('at packages/ai/llms/testing-and-errors.md')
-    expect(fixPath('packages/nope/llms/a.md')).toBe('node_modules/@kaynooo/kayjs-nope/llms/a.md')
+    expect(fixPath('packages/nope/llms/a.md')).toBe('node_modules/@kayjs/nope/llms/a.md')
     expect(fixPath('llms/errors.md')).toBe('llms/errors.md')
   })
 })

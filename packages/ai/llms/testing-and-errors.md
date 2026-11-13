@@ -7,8 +7,8 @@
 Under `bun test`, and in development until a provider is configured, `ask()` answers from `fakeAi`, as kayjs-mail answers into its `outbox`. A key in the test environment is never used.
 
 ```ts
-import { ask } from '@kaynooo/kayjs-ai'
-import { aiTest } from '@kaynooo/kayjs-ai/test'
+import { ask } from '@kayjs/ai'
+import { aiTest } from '@kayjs/ai/test'
 import { expect, it } from 'bun:test'
 
 const model = aiTest()

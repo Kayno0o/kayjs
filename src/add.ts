@@ -296,7 +296,7 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
     return plan
 
   const wanted = new Set([...current, ...core])
-  const implied = wanted.has('postgres') && !wanted.has('auth') && !current.has('postgres') && manifest.dependencies?.['@kaynooo/kayjs-auth'] === undefined
+  const implied = wanted.has('postgres') && !wanted.has('auth') && !current.has('postgres') && manifest.dependencies?.['@kayjs/auth'] === undefined
 
   if (implied)
     wanted.add('auth')
@@ -364,7 +364,7 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
       // The config carries kayjs-auth's store line, which a project of the former form keeps in src/auth.ts and an edited config is not rewritten for: the note names that file, never a reason to refuse the rest.
       else if (path === 'kay.config.ts' && existsSync(join(dir, 'src/auth.ts'))) {
         if (core.includes('postgres'))
-          notes.push('src/auth.ts holds this app\'s kayjs-auth store: point its store at the new database, `pgAuth(db)` from `@kaynooo/kayjs-auth/pg`')
+          notes.push('src/auth.ts holds this app\'s kayjs-auth store: point its store at the new database, `pgAuth(db)` from `@kayjs/auth/pg`')
       }
       else if (path === 'kay.config.ts') {
         notes.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)
@@ -516,7 +516,7 @@ async function packageRange(name: string): Promise<string> {
 
 // A kay installed from a tarball may carry no `devDependencies`, so a package it does not name is installed at its latest version.
 export function rangeIn(own: { version: string, devDependencies?: Record<string, string> }, name: string): string {
-  return name.startsWith('@kaynooo/kayjs-') ? `~${own.version}` : own.devDependencies?.[name] ?? 'latest'
+  return name.startsWith('@kayjs/') ? `~${own.version}` : own.devDependencies?.[name] ?? 'latest'
 }
 
 // Installs what the libraries need and the project lacks: a kayjs package at kay's own minor, any other at the range kay uses, the dev ones in a call of their own.

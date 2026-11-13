@@ -1,5 +1,5 @@
 --- client
-import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
+import EntryNotices from '@kayjs/cms/entry-notices.kay'
 
 // The entry notices on drafts a test opens, mounted with `mountComponent`.
 type Notices = Parameters<typeof EntryNotices>[0]

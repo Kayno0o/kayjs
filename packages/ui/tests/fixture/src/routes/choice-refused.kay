@@ -8,9 +8,9 @@ export const pick = action(t.Object({
 }), () => 'ok')
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
 
 const sizes = [{ value: 'a', label: 'Small' }, { value: 'b', label: 'Large' }]
 ---

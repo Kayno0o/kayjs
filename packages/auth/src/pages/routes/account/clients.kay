@@ -3,10 +3,10 @@ import { action } from 'kay'
 import { formatDate } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { schemas, scopeLabel } from '../../forms'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Button from '@kayjs/ui/button.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 export const revoke = action(schemas.oauthClient, async ({ id }, ctx) => {
   return (await ctx.locals.auth.oauthServer.revokeGrant(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })

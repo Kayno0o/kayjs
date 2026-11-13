@@ -1,6 +1,6 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import { toast } from '@kayjs/ui'
 ---
 .flex.flex-wrap.gap-2
   Button(label="Success" onClick={() => toast.success('Saved')})

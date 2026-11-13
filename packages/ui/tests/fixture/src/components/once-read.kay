@@ -1,10 +1,10 @@
 ---
 import type { Action } from 'kay'
 import { signal } from 'kay'
-import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
-import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+import Carousel from '@kayjs/ui/carousel.kay'
+import ContactForm from '@kayjs/ui/contact-form.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import VirtualList from '@kayjs/ui/virtual-list.kay'
 
 // Each prop below is passed from one signal the test flips with `#go`, to see the component follow what it reads at construction.
 const { onIndexChange } = props<{ onIndexChange: (index: number) => void }>()

@@ -1,6 +1,6 @@
 --- server
 import { action } from 'kay'
-import { contactForm, mailer } from '@kaynooo/kayjs-mail'
+import { contactForm, mailer } from '@kayjs/mail'
 import { delivery } from '../counter'
 
 const unconfigured = mailer({ from: 'Fixture <hello@fixture.test>', optional: true })

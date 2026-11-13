@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+import DateTimeInput from '@kayjs/ui/date-time-input.kay'
 
 const start = signal('2026-10-21T07:30:00Z')
 ---

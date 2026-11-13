@@ -1,6 +1,6 @@
 ---
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Select from '@kayjs/ui/select.kay'
 import { queryParam } from 'kay'
 
 const periods = ['24h', '7d', '30d'].map(value => ({ value, label: value }))

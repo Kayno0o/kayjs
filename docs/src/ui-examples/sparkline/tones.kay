@@ -1,5 +1,5 @@
 ---
-import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+import Sparkline from '@kayjs/ui/sparkline.kay'
 
 const times = [210, 190, 230, 640, 205, 180]
 const tones = times.map(time => time > 500 ? 'danger' as const : undefined)

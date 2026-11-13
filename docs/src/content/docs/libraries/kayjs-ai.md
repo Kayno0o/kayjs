@@ -3,15 +3,15 @@ title: kayjs-ai
 order: 0
 description: Call an LLM from a kay app with no SDK and no streaming code, over Anthropic or any OpenAI-compatible server.
 ---
-`@kaynooo/kayjs-ai` asks a language model from your server code. It talks to the providers over HTTP, so there is no SDK to install, and the answer streams into your page as it is written. In development and tests a fake answers, so nothing is billed and no key is needed.
+`@kayjs/ai` asks a language model from your server code. It talks to the providers over HTTP, so there is no SDK to install, and the answer streams into your page as it is written. In development and tests a fake answers, so nothing is billed and no key is needed.
 
 ## Install
 
 ```sh
-bun add @kaynooo/kayjs-ai
+bun add @kayjs/ai
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/ai`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
 kay is a peer. kayjs-ai is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
@@ -22,7 +22,7 @@ In a kay project, `kay add ai` does the install and the line below for you.
 List the extension in `kay.config.ts`. It makes `kay env` show the variables below, sets your limits and adds `kay i18n translate`. `ask` works without it, with no limits in development and the production defaults otherwise.
 
 ```ts
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 
 export default defineConfig({
   extensions: [
@@ -67,7 +67,7 @@ An API root must be an http(s) URL, and a key goes over plain http only to `loca
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 const answer = ask('Say hello in one line', { system: 'Be brief' })
 ---
@@ -88,7 +88,7 @@ An island cannot call `ask`, because the key must stay on the server. Importing 
 ```kay
 --- server
 import { s, action } from 'kay'
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 
 export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
 ---
@@ -109,7 +109,7 @@ Messages take only the roles `user` and `assistant`. The system prompt goes in t
 
 ```kay
 ---
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 import { reply } from '../routes/reply.kay'
 ---
 Chat(action={reply} label="Assistant")
@@ -144,7 +144,7 @@ The status of a tool call and the two parts it opens to are labels too: `running
 
 The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
 
-The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `failureLabel`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kaynooo/kayjs-ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
+The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `failureLabel`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kayjs/ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
 
 The chat posts its last 20 messages with each one; the `history` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
@@ -163,7 +163,7 @@ Write them in a component of your own, which renders as an island, as a page or 
 ```kay
 ---
 import { reply } from '../routes/chat.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 Chat(action={reply} label="Assistant")
   @call(call)
@@ -193,7 +193,7 @@ To start a question from your own link, dispatch a `kai:chat-send` event on `doc
 --- server
 import { reply } from './reply.kay'
 --- script
-import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 ---
 slot
 ChatLauncher(action={reply} label="Ask the docs")
@@ -211,7 +211,7 @@ Its header has a New conversation button, which clears the log and the kept hist
 
 <ReadMore href="/llms/kayjs-ai-chat-launcher">What the launcher takes of `Chat`, how its panel opens, closes and keeps the conversation, and its sizes.</ReadMore>
 
-Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `class` object, `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(class={{ log: 'max-h-96' }})`; a `class` string restyles the root.
+Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `class` object, `defineUi({ '@kayjs/ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(class={{ log: 'max-h-96' }})`; a `class` string restyles the root.
 
 - `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
 - `chat-calls.kay` (the tool calls): `root`, `summary`, `list`, `call`, `name`, `status`, `title` and `code`.
@@ -354,7 +354,7 @@ When you want data and not prose, pass a `schema`. It is a kay schema made with 
 ```kay
 --- server
 import { s } from 'kay'
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maximum: 5 }), tags: s.Array(s.String()) })
 const verdict = ask('Review the film Alien', { schema: review })
@@ -391,7 +391,7 @@ A user message can hold `attachments` beside its text. An attachment is a `File`
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 import { s, action } from 'kay'
 
 const bill = s.Object({ supplier: s.String(), total: s.Number() })
@@ -444,7 +444,7 @@ Give `ask` some of your actions as tools, and the model can use them. Passing an
 ```kay
 --- server
 import { s, action } from 'kay'
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
 
@@ -481,7 +481,7 @@ A scheduled job or a queue worker has no visitor, so give it plain functions mad
 
 ```ts
 import { s } from 'kay'
-import { ask, tool } from '@kaynooo/kayjs-ai'
+import { ask, tool } from '@kayjs/ai'
 
 const findArticle = tool({
   name: 'find_article',
@@ -516,8 +516,8 @@ A failed or stopped reply lists the requests that ended before it. A reply stopp
 When you change a prompt or swap a model, you want to know the model still calls the right tool. A script outside the server can ask the real model with your own actions as tools, if their `run` is a mock. `mocked(action, run)` keeps the action's name, description and input schema, so nothing is copied by hand and nothing drifts:
 
 ```ts
-import type { AiMessage } from '@kaynooo/kayjs-ai'
-import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
+import type { AiMessage } from '@kayjs/ai'
+import { ask, mocked, openai } from '@kayjs/ai'
 import { systemPrompt } from '../src/assistant'
 import { forecast, route } from '../src/routes/_actions.kay'
 
@@ -542,7 +542,7 @@ Run it as `bun --preload kay/test/preload bench.ts`, which lets a script import 
 A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day, and all visitors together 2,000,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `rateLimit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.
 
 ```ts
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 import { sqliteRates } from 'kay/server'
 
 export default defineConfig({
@@ -633,7 +633,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 Three more calls work like `ask`. `transcribe(audio)` writes a recording down and returns the text. `speak(text)` reads a text aloud and returns the audio as a `Blob`. `embed(texts)` turns texts into vectors, for a search over your own data.
 
 ```ts
-import { embed, speak, transcribe } from '@kaynooo/kayjs-ai'
+import { embed, speak, transcribe } from '@kayjs/ai'
 
 const text = await transcribe(recording, { language: 'fr' })
 const audio = await speak('Your table is booked', { voice: 'nova' })
@@ -683,8 +683,8 @@ A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailabl
 Under `bun test`, `ask` always answers from `fakeAi`, even when a key is set. A test says what the model answers and reads what was asked.
 
 ```ts
-import { ask } from '@kaynooo/kayjs-ai'
-import { aiTest } from '@kaynooo/kayjs-ai/test'
+import { ask } from '@kayjs/ai'
+import { aiTest } from '@kayjs/ai/test'
 
 const model = aiTest()
 

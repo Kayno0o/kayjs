@@ -1,11 +1,11 @@
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Rating from '@kayjs/ui/rating.kay'
 
 const plans = [{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]
 ---

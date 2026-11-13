@@ -17,8 +17,8 @@ const MARKERS = /<!--[[\]]-->/g
 const UI_DIR = 'src/components/ui'
 
 const PAGE = `---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
+import Button from '@kayjs/ui/button.kay'
+import Card from '@kayjs/ui/card.kay'
 ---
 Card(title="Hello")
   Button {"Go"}
@@ -30,17 +30,17 @@ const roots: string[] = []
 // An app in its own folder, as it would be scaffolded: a page using two components, and a `src/ui.ts` restyling one by its specifier.
 async function freshApp(): Promise<string> {
   const dir = await scratchDir('eject-')
-  const link = join(dir, 'node_modules', '@kaynooo', 'kayjs-ui')
+  const link = join(dir, 'node_modules', '@kayjs', 'ui')
 
   await mkdir(dirname(link), { recursive: true })
   await mkdir(join(dir, 'node_modules/@iconify-json'), { recursive: true })
   await symlink(LIBRARY, link)
   await symlink(join(LIBRARY, '../../node_modules/@iconify-json/tabler'), join(dir, 'node_modules/@iconify-json/tabler'))
-  await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'eject-app', private: true, dependencies: { '@iconify-json/tabler': '*', '@kaynooo/kayjs-ui': '*' } }))
+  await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'eject-app', private: true, dependencies: { '@iconify-json/tabler': '*', '@kayjs/ui': '*' } }))
   await mkdir(join(dir, 'src'), { recursive: true })
   await writeFile(join(dir, 'src/page.kay'), PAGE)
   await writeFile(join(dir, 'src/entry.ts'), 'export { default as Page } from \'./page.kay\'\n')
-  await writeFile(join(dir, 'src/ui.ts'), 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'rounded-xl\' } },\n})\n')
+  await writeFile(join(dir, 'src/ui.ts'), 'import { defineUi } from \'kay\'\n\nexport default defineUi({\n  \'@kayjs/ui/card.kay\': { parts: { root: \'rounded-xl\' } },\n})\n')
   roots.push(dir)
 
   return dir
@@ -101,10 +101,10 @@ describe('kay ui eject', () => {
     expect(out).toContain('copied card.kay')
     expect(existsSync(join(root, UI_DIR, 'card.kay'))).toBe(true)
     expect(await readFile(join(root, 'src/page.kay'), 'utf8')).toContain('import Card from \'./components/ui/card.kay\'')
-    expect(await readFile(join(root, 'src/page.kay'), 'utf8')).toContain('@kaynooo/kayjs-ui/button.kay')
+    expect(await readFile(join(root, 'src/page.kay'), 'utf8')).toContain('@kayjs/ui/button.kay')
     const uiTs = await readFile(join(root, 'src/ui.ts'), 'utf8')
 
-    expect(uiTs).toContain('\'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'rounded-xl\' } },\n  \'./components/ui/card.kay\': { parts: { root: \'rounded-xl\' } },')
+    expect(uiTs).toContain('\'@kayjs/ui/card.kay\': { parts: { root: \'rounded-xl\' } },\n  \'./components/ui/card.kay\': { parts: { root: \'rounded-xl\' } },')
 
     const html = await render()
 
@@ -129,9 +129,9 @@ describe('kay ui eject', () => {
     expect(out).toContain('button.kay, button-props.ts, internal/busy-button.kay')
     expect(out).toContain('still on kayjs-ui\'s button.kay: ')
     expect(copy).toContain('from \'./button-props\'')
-    expect(copy).toContain('from \'@kaynooo/kayjs-ui/icon.kay\'')
-    expect(copy).toContain('from \'@kaynooo/kayjs-ui/lib/defaults\'')
-    expect(await readFile(join(root, UI_DIR, 'internal/busy-button.kay'), 'utf8')).toContain('@kaynooo/kayjs-ui/lib/')
+    expect(copy).toContain('from \'@kayjs/ui/icon.kay\'')
+    expect(copy).toContain('from \'@kayjs/ui/lib/defaults\'')
+    expect(await readFile(join(root, UI_DIR, 'internal/busy-button.kay'), 'utf8')).toContain('@kayjs/ui/lib/')
     expect(await render()).toContain('kui-btn')
   })
 
@@ -176,11 +176,11 @@ describe('kay ui eject', () => {
 
     await run(eject, ['card'])
 
-    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { head: "b" } },\n  \'./components/ui/card.kay\': { parts: { head: "b" } },\n}\n')
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kayjs/ui/card.kay\': { parts: { head: "b" } },\n  \'./components/ui/card.kay\': { parts: { head: "b" } },\n}\n')
   })
 
   test('follows an entry of src/ui.ts held in a const the default object spreads', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } },\n}\n\nexport default defineUi({ ...shared })\n')
+    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  \'@kayjs/ui/card.kay\': { parts: { root: \'a\' } },\n}\n\nexport default defineUi({ ...shared })\n')
 
     await run(eject, ['card'])
 
@@ -191,7 +191,7 @@ describe('kay ui eject', () => {
   })
 
   test('reads an entry of src/ui.ts with comments and braces in strings', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': {\n    // the card\'s look }\n    parts: { root: \'a [&>*]:{b} \' }, /* } */\n  },\n}\n')
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kayjs/ui/card.kay\': {\n    // the card\'s look }\n    parts: { root: \'a [&>*]:{b} \' }, /* } */\n  },\n}\n')
 
     const { out } = await run(eject, ['card'])
     const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
@@ -203,17 +203,17 @@ describe('kay ui eject', () => {
   })
 
   test('finds a key written with double quotes, and ignores a path in a comment or a string', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  // "@kaynooo/kayjs-ui/card.kay": { was: "here" },\n  "@kaynooo/kayjs-ui/card.kay": { parts: { root: \'a\' } },\n  "Other": { parts: "\'./components/ui/card.kay\'" },\n}\n')
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  // "@kayjs/ui/card.kay": { was: "here" },\n  "@kayjs/ui/card.kay": { parts: { root: \'a\' } },\n  "Other": { parts: "\'./components/ui/card.kay\'" },\n}\n')
 
     const { out } = await run(eject, ['card'])
     const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
 
     expect(out).not.toContain('could not be read')
-    expect(text).toContain('  "@kaynooo/kayjs-ui/card.kay": { parts: { root: \'a\' } },\n  \'./components/ui/card.kay\': { parts: { root: \'a\' } },\n  "Other"')
+    expect(text).toContain('  "@kayjs/ui/card.kay": { parts: { root: \'a\' } },\n  \'./components/ui/card.kay\': { parts: { root: \'a\' } },\n  "Other"')
   })
 
   test('leaves src/ui.ts alone when the copy already has its key, or when only a comment names the component', async () => {
-    const already = 'export default {\n  "./components/ui/card.kay": { parts: { root: \'b\' } },\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } },\n}\n'
+    const already = 'export default {\n  "./components/ui/card.kay": { parts: { root: \'b\' } },\n  \'@kayjs/ui/card.kay\': { parts: { root: \'a\' } },\n}\n'
 
     await writeFile(join(root, 'src/ui.ts'), already)
     await run(eject, ['card'])
@@ -231,7 +231,7 @@ describe('kay ui eject', () => {
   test('reads a parenthesised entry whole', async () => {
     await writeFile(join(root, 'src/ui.ts'), 'export default {\n  Card: ({ parts: { root: \'a\' } }),\n}\n')
     await run(eject, ['card'])
-    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kaynooo/kayjs-ui/card.kay\': ({ parts: { root: \'a\' } }),\n  \'./components/ui/card.kay\': ({ parts: { root: \'a\' } }),\n}\n')
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe('export default {\n  \'@kayjs/ui/card.kay\': ({ parts: { root: \'a\' } }),\n  \'./components/ui/card.kay\': ({ parts: { root: \'a\' } }),\n}\n')
   })
 
   test('reads an entry holding a regex with a brace and a template with nested braces', async () => {
@@ -242,17 +242,17 @@ describe('kay ui eject', () => {
     const { out } = await run(eject, ['card'])
 
     expect(out).not.toContain('could not be read')
-    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe(`export default {\n  '@kaynooo/kayjs-ui/card.kay': ${entry},\n  './components/ui/card.kay': ${entry},\n}\n`)
+    expect(await readFile(join(root, 'src/ui.ts'), 'utf8')).toBe(`export default {\n  '@kayjs/ui/card.kay': ${entry},\n  './components/ui/card.kay': ${entry},\n}\n`)
   })
 
   test('says so when an entry of src/ui.ts cannot be read', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'a\' } /* \n}\n')
+    await writeFile(join(root, 'src/ui.ts'), 'export default {\n  \'@kayjs/ui/card.kay\': { parts: { root: \'a\' } /* \n}\n')
 
     expect((await run(eject, ['card'])).out).toContain('could not be read')
   })
 
   test('copies the winning entry when an own key of src/ui.ts overrides a spread one, with no note about a name and a path', async () => {
-    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  "@kaynooo/kayjs-ui/card.kay": { parts: { root: "a" } },\n}\n\nexport default defineUi({ ...shared, "@kaynooo/kayjs-ui/card.kay": { parts: { root: "b" } } })\n')
+    await writeFile(join(root, 'src/ui.ts'), 'const shared = {\n  "@kayjs/ui/card.kay": { parts: { root: "a" } },\n}\n\nexport default defineUi({ ...shared, "@kayjs/ui/card.kay": { parts: { root: "b" } } })\n')
 
     const { out } = await run(eject, ['card'])
     const text = await readFile(join(root, 'src/ui.ts'), 'utf8')
@@ -263,7 +263,7 @@ describe('kay ui eject', () => {
 
   test('rewrites the imports of nested files, type imports and dynamic imports', async () => {
     await mkdir(join(root, 'src/pages/deep'), { recursive: true })
-    await writeFile(join(root, 'src/pages/deep/x.ts'), 'import type Card from "@kaynooo/kayjs-ui/card.kay"\nconst load = () => import(\'@kaynooo/kayjs-ui/card.kay\')\nexport { Card, load }\n')
+    await writeFile(join(root, 'src/pages/deep/x.ts'), 'import type Card from "@kayjs/ui/card.kay"\nconst load = () => import(\'@kayjs/ui/card.kay\')\nexport { Card, load }\n')
 
     await run(eject, ['card'])
 
@@ -275,8 +275,8 @@ describe('kay ui eject', () => {
 
   test('rewrites the imports of the app\'s tests and root files too', async () => {
     await mkdir(join(root, 'tests'), { recursive: true })
-    await writeFile(join(root, 'tests/page.test.ts'), 'import Card from \'@kaynooo/kayjs-ui/card.kay\'\nexport { Card }\n')
-    await writeFile(join(root, 'kay.config.ts'), 'import Card from \'@kaynooo/kayjs-ui/card.kay\'\nexport default { Card }\n')
+    await writeFile(join(root, 'tests/page.test.ts'), 'import Card from \'@kayjs/ui/card.kay\'\nexport { Card }\n')
+    await writeFile(join(root, 'kay.config.ts'), 'import Card from \'@kayjs/ui/card.kay\'\nexport default { Card }\n')
 
     const { out } = await run(eject, ['card'])
 
@@ -460,9 +460,9 @@ describe('the command line', () => {
 
     roots.push(join(app, '..'))
     await createProject(app, { kay: '^1.0.0', features: PRESETS.app.features })
-    await writeFile(join(app, 'src/demo.ts'), 'export { default as Card } from \'@kaynooo/kayjs-ui/card.kay\'\n')
+    await writeFile(join(app, 'src/demo.ts'), 'export { default as Card } from \'@kayjs/ui/card.kay\'\n')
     await mkdir(join(app, 'tests'), { recursive: true })
-    await writeFile(join(app, 'tests/demo.ts'), 'export { default as Card } from \'@kaynooo/kayjs-ui/card.kay\'\n')
+    await writeFile(join(app, 'tests/demo.ts'), 'export { default as Card } from \'@kayjs/ui/card.kay\'\n')
 
     const kay = async (...args: string[]) => {
       const proc = Bun.spawn(['bun', join(LIBRARY, '../../src/cli.ts'), ...args], { cwd: app, stdout: 'pipe', stderr: 'pipe' })

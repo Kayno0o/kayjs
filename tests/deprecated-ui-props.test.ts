@@ -2,12 +2,12 @@ import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 
 const IMPORTS = [
-  'import Dialog from \'@kaynooo/kayjs-ui/dialog.kay\'',
-  'import SidePanel from \'@kaynooo/kayjs-ui/side-panel.kay\'',
-  'import FormDialog from \'@kaynooo/kayjs-ui/form-dialog.kay\'',
-  'import Stat from \'@kaynooo/kayjs-ui/stat.kay\'',
-  'import Chat from \'@kaynooo/kayjs-ai/chat.kay\'',
-  'import Launcher from \'@kaynooo/kayjs-ai/chat-launcher.kay\'',
+  'import Dialog from \'@kayjs/ui/dialog.kay\'',
+  'import SidePanel from \'@kayjs/ui/side-panel.kay\'',
+  'import FormDialog from \'@kayjs/ui/form-dialog.kay\'',
+  'import Stat from \'@kayjs/ui/stat.kay\'',
+  'import Chat from \'@kayjs/ai/chat.kay\'',
+  'import Launcher from \'@kayjs/ai/chat-launcher.kay\'',
   'import Other from \'./other.kay\'',
 ].join('\n')
 

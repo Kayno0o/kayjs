@@ -1,9 +1,9 @@
 --- island
-import { toast } from '@kaynooo/kayjs-ui'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { toast } from '@kayjs/ui'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Select from '@kayjs/ui/select.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 ---
 form.flex.flex-col.gap-4
   FormField(label="Site name" name="site")

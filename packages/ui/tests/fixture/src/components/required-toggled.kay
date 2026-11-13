@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // A required that the page turns off, and a ChipGroup holding the form back until one chip is picked.
 const needed = signal(true)

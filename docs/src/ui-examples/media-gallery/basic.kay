@@ -1,6 +1,6 @@
 ---
-import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
-import type { MediaItem } from '@kaynooo/kayjs-ui'
+import MediaGallery from '@kayjs/ui/media-gallery.kay'
+import type { MediaItem } from '@kayjs/ui'
 
 const picture = (hue: number, width: number) =>
   `data:image/svg+xml,${encodeURIComponent(

@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { authTables } from '@kaynooo/kayjs-auth/pg'
+import { authTables } from '@kayjs/auth/pg'
 import { Database, defineConfig } from '@kaynooo/pg-orm'
 import { Notice } from './src/db/notice'
 

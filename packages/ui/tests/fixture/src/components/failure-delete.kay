@@ -1,6 +1,6 @@
 ---
-import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import ConfirmDelete from '@kayjs/ui/confirm-delete.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // A ConfirmDelete whose call always fails, the failure words left to the test's props.
 const { words } = props<{ words: { failureLabel?: string, failure?: string } }>()

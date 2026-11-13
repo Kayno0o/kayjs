@@ -1,8 +1,8 @@
 --- server
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import Notice from '@kayjs/ui/notice.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
 import ImpersonationBanner from '../../../components/impersonation-banner.kay'
 import UserMenu from '../../../components/user-menu.kay'
 import Frame from '../../components/frame.kay'

@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
+import WhenVisible from '@kayjs/ui/when-visible.kay'
 
 // `load` stands in for a source: what it resolves to is how many rows it brought.
 const { load } = props<{ load: () => Promise<number> }>()

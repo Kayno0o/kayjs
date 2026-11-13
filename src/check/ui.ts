@@ -32,7 +32,7 @@ export function offered(file: string): { parts: Set<string>, variants: Record<st
 function specifierOf(ui: UiSource, file: string): string {
   const from = realpathSync(dirname(ui.file))
 
-  return file.startsWith(from + sep) ? `./${relative(from, file).split(sep).join('/')}` : `@kaynooo/kayjs-ui/${basename(file)}`
+  return file.startsWith(from + sep) ? `./${relative(from, file).split(sep).join('/')}` : `@kayjs/ui/${basename(file)}`
 }
 
 function componentProblems(ui: UiSource, component: UiComponent, report: (span: Span, message: string, help?: string) => void): void {

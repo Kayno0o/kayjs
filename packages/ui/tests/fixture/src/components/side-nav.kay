@@ -1,6 +1,6 @@
 --- island
-import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import SideNav from '@kayjs/ui/side-nav.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
 
 const { onCollapsedChange, onOpenChange } = props<{ onCollapsedChange: (collapsed: boolean) => void, onOpenChange: (open: boolean) => void }>()
 

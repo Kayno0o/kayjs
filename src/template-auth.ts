@@ -9,7 +9,7 @@ export function authFiles({ has }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
     '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nKAY_SECRET=\nSITE_URL=\n${postgres ? 'POSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n' : 'AUTH_DATABASE_URL=\n'}`,
-    'src/routes/_guard.ts': `import { authGuard } from '@kaynooo/kayjs-auth'
+    'src/routes/_guard.ts': `import { authGuard } from '@kayjs/auth'
 
 // Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.
 export default authGuard()
@@ -21,7 +21,7 @@ export default authGuard()
 // kayjs-auth's tables in a Postgres of the app's own, which a migration creates: the owner changes the schema, the app connects as app_rw.
 function postgresFiles(): Record<string, string> {
   return {
-    'src/db/tables.ts': `import { authTables } from '@kaynooo/kayjs-auth/pg'
+    'src/db/tables.ts': `import { authTables } from '@kayjs/auth/pg'
 
 // Add the app's own tables beside kayjs-auth's; a change goes to the database as a migration: \`bun run db:generate\`, then \`bun run db:migrate\`.
 // pg-orm.config.ts reads them from here, not from ./index: importing \`db\` there would build it on DATABASE_URL before \`kay/test/preload\` points it at the file's copy.

@@ -1,5 +1,5 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 import { rememberChoice } from '../../browser'
 
 const { providers } = props<{ providers: { name: string, label: string, href: string }[] }>()

@@ -1,9 +1,9 @@
 ---
-import Button from '@kaynooo/kayjs-mail/button.kay'
-import Fields from '@kaynooo/kayjs-mail/fields.kay'
-import Heading from '@kaynooo/kayjs-mail/heading.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Quote from '@kaynooo/kayjs-mail/quote.kay'
+import Button from '@kayjs/mail/button.kay'
+import Fields from '@kayjs/mail/fields.kay'
+import Heading from '@kayjs/mail/heading.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Quote from '@kayjs/mail/quote.kay'
 
 const { name, email, phone, topic, message } = props<{ name: string, email: string, phone?: string, topic: string, message: string }>()
 

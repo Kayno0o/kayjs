@@ -119,24 +119,24 @@ describe('kay doctor', () => {
   })
 
   it('compares each installed library with the kay beside it by minor, not by patch', async () => {
-    const same = await doctor(await project({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs": "x", "@kaynooo/kayjs-ui": "x" } }', ...installed('@kaynooo/kayjs', version), ...installed('@kaynooo/kayjs-ui', `${major}.${minor}.99`) }))
+    const same = await doctor(await project({ 'package.json': '{ "dependencies": { "@kayjs/kay": "x", "@kayjs/ui": "x" } }', ...installed('@kayjs/kay', version), ...installed('@kayjs/ui', `${major}.${minor}.99`) }))
 
     expect(same.check('versions').ok).toBe(true)
 
-    const drift = await doctor(await project({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs": "x", "@kaynooo/kayjs-ui": "x" } }', ...installed('@kaynooo/kayjs', version), ...installed('@kaynooo/kayjs-ui', otherMinor) }))
+    const drift = await doctor(await project({ 'package.json': '{ "dependencies": { "@kayjs/kay": "x", "@kayjs/ui": "x" } }', ...installed('@kayjs/kay', version), ...installed('@kayjs/ui', otherMinor) }))
 
     expect(drift.code).toBe(1)
     expect(drift.check('versions').ok).toBe(false)
-    expect(drift.check('versions').message).toContain(`@kaynooo/kayjs-ui ${otherMinor}`)
+    expect(drift.check('versions').message).toContain(`@kayjs/ui ${otherMinor}`)
     expect(drift.check('versions').message).toContain(version)
     expect(drift.check('versions').fix).toContain('bun update')
   })
 
   it('finds a library installed above the project, as a workspace hoists it', async () => {
-    const parent = await project({ ...installed('@kaynooo/kayjs', version), ...installed('@kaynooo/kayjs-hoisted', version) })
+    const parent = await project({ ...installed('@kayjs/kay', version), ...installed('@kayjs/hoisted', version) })
     const member = join(parent, 'app')
 
-    await Bun.write(join(member, 'package.json'), '{ "dependencies": { "@kaynooo/kayjs": "x", "@kaynooo/kayjs-hoisted": "x" } }')
+    await Bun.write(join(member, 'package.json'), '{ "dependencies": { "@kayjs/kay": "x", "@kayjs/hoisted": "x" } }')
 
     const result = await doctor(member)
 
@@ -144,10 +144,10 @@ describe('kay doctor', () => {
   })
 
   it('fails a listed library that is not installed, and ignores libraries it does not know', async () => {
-    const missing = await doctor(await project({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs-nonexistent": "x", "left-pad": "1.0.0" } }' }))
+    const missing = await doctor(await project({ 'package.json': '{ "dependencies": { "@kayjs/nonexistent": "x", "left-pad": "1.0.0" } }' }))
 
     expect(missing.check('versions').ok).toBe(false)
-    expect(missing.check('versions').message).toContain('@kaynooo/kayjs-nonexistent')
+    expect(missing.check('versions').message).toContain('@kayjs/nonexistent')
     expect(missing.check('versions').message).not.toContain('left-pad')
     expect(missing.check('versions').fix).toContain('bun install')
   })

@@ -1,5 +1,5 @@
 ---
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
 
 // What the test reads back: each tab shown.
 const { onChange, value = 'venus', disabledFirst = false, orientation, activation, lazy } = props<{ onChange?: (value: string) => void, value?: string, disabledFirst?: boolean, orientation?: 'horizontal' | 'vertical', activation?: 'auto' | 'manual', lazy?: boolean }>()

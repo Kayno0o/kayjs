@@ -274,8 +274,8 @@ describe('the files an extension names in appFiles', () => {
 
 // An app listing auth() beside mail(), with a probe route registering a user and answering the mails kayjs-mail kept.
 function AUTH_CONFIG(withMail: boolean) {
-  return `import { auth } from '@kaynooo/kayjs-auth'
-import { mail, outbox } from '@kaynooo/kayjs-mail'
+  return `import { auth } from '@kayjs/auth'
+import { mail, outbox } from '@kayjs/mail'
 import { Elysia } from 'elysia'
 import { defineConfig } from 'kay/server'
 import { mail as mailer } from './src/mail'
@@ -314,7 +314,7 @@ describe('auth() beside mail()', () => {
       'package.json': JSON.stringify({ name: 'app', dependencies: { '@iconify-json/tabler': '*' } }),
       'kay.config.ts': AUTH_CONFIG(withMail),
       'serve.ts': AUTH_SERVE,
-      'src/mail.ts': 'import { mailer, outbox } from \'@kaynooo/kayjs-mail\'\n\nexport const mail = mailer({ from: \'site@localhost\', transport: outbox })\n',
+      'src/mail.ts': 'import { mailer, outbox } from \'@kayjs/mail\'\n\nexport const mail = mailer({ from: \'site@localhost\', transport: outbox })\n',
     })
 
     const [listed, unlisted, elsewhere, other] = await Promise.all([written(files(true)), written(files(false)), scratchDir('app-files-elsewhere-'), scratchDir('app-files-other-')])

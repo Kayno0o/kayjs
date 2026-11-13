@@ -14,7 +14,7 @@ import { REMOVED_UI_CLASSES } from './removed-classes'
 // An app of its own, as `src/ui.ts` restyles every instance of a component in the app: the library's fixture app renders the same components untouched, and its contract tests compare them. Built apart from testSite, which serves one project per test process.
 const ROOT = join(import.meta.dir, 'restyle-app')
 const LIBRARY = join(import.meta.dir, '..')
-const LINK = join(ROOT, 'node_modules', '@kaynooo', 'kayjs-ui')
+const LINK = join(ROOT, 'node_modules', '@kayjs', 'ui')
 const OUT = join(ROOT, 'node_modules', '.cache', 'out')
 const MARKERS = /<!--[[\]]-->/g
 const REMOVED_CLASS = new RegExp(REMOVED_UI_CLASSES.map(name => `(?<![\\w-])${name}(?![\\w-])`).join('|'))
@@ -141,10 +141,10 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     const project = join(ROOT, 'node_modules', '.cache', 'bad-ui')
 
     await mkdir(join(project, 'src'), { recursive: true })
-    await writeFile(join(project, 'src/ui.ts'), 'export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { foot: \'a\' }, variants: { size: { sm: \'b\' } } }, \'@kaynooo/kayjs-ui/button.kay\': { variants: { tone: { loud: { root: \'c\' } } } } }')
+    await writeFile(join(project, 'src/ui.ts'), 'export default { \'@kayjs/ui/card.kay\': { parts: { foot: \'a\' }, variants: { size: { sm: \'b\' } } }, \'@kayjs/ui/button.kay\': { variants: { tone: { loud: { root: \'c\' } } } } }')
 
     expect(uiProblems(project).map(problem => problem.message)).toEqual([
-      '`@kaynooo/kayjs-ui/card.kay` has no part `foot`',
+      '`@kayjs/ui/card.kay` has no part `foot`',
     ])
     expect(uiProblems(ROOT)).toEqual([])
   })

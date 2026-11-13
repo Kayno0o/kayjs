@@ -7,7 +7,7 @@ export const claim = action(t.Object({
 }), () => 'ok')
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 main
   form#blur(action={claim} validate="blur")

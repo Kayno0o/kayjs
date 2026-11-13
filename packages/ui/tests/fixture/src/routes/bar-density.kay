@@ -1,6 +1,6 @@
 ---
 import '../app.css'
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import BarChart from '@kayjs/ui/bar-chart.kay'
 
 const days = Array.from({ length: 365 }, (_, index) => new Date(Date.UTC(2025, 0, 1 + index)).toISOString().slice(0, 10))
 const month = Array.from({ length: 30 }, (_, index) => `${25 + index % 6} Oct`)

@@ -28,7 +28,7 @@ description: A button showing only an icon, named by a label that doubles as its
 
 ## Your own drawing
 
-`icon` also takes a snippet, `@icon` under the IconButton, for a drawing no icon set has. IconButton still ships the default icon set, so an island drawing only its own `svg` imports `@kaynooo/kayjs-ui/bare-icon-button.kay` instead: the same button and props with the drawing nested inside it, and no icon lookup.
+`icon` also takes a snippet, `@icon` under the IconButton, for a drawing no icon set has. IconButton still ships the default icon set, so an island drawing only its own `svg` imports `@kayjs/ui/bare-icon-button.kay` instead: the same button and props with the drawing nested inside it, and no icon lookup.
 
 ## Disabled
 

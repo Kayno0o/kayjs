@@ -1,5 +1,5 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 import { signal } from 'kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'

@@ -5,7 +5,7 @@ import { Elysia } from 'elysia'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
-const HEAD = '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n\nconst COLUMNS = [{ key: \'name\', header: \'Name\', sortValue: true }, { key: \'age\', header: \'Age\', numeric: true }]\nconst ROWS = [{ id: 1, name: \'Cleo\', age: 40 }, { id: 2, name: \'Ada\', age: 36 }, { id: 3, name: \'Bo\', age: 52 }]\n---\n'
+const HEAD = '---\nimport Table from \'@kayjs/ui/table.kay\'\n\nconst COLUMNS = [{ key: \'name\', header: \'Name\', sortValue: true }, { key: \'age\', header: \'Age\', numeric: true }]\nconst ROWS = [{ id: 1, name: \'Cleo\', age: 40 }, { id: 2, name: \'Ada\', age: 36 }, { id: 3, name: \'Bo\', age: 52 }]\n---\n'
 const SLOT = /<slot data-component="[^"]*table\.kay"/g
 const HEADERS = /<th[^>]*>.*?<\/th>/gs
 
@@ -21,7 +21,7 @@ describe('a Table drawn by a page that sorts', () => {
 
   beforeAll(async () => {
     root = resolve(await fixtureCopy('ui-list'))
-    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'static-sort', dependencies: { 'kay': '*', '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
+    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'static-sort', dependencies: { 'kay': '*', '@kayjs/ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
 
     const tables = {
       one: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id")',

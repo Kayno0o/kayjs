@@ -1,5 +1,5 @@
 ---
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Stat from '@kayjs/ui/stat.kay'
 
 // The inline pill, a tile, a tile whose figure is toned, a pill with a change, a link, and a link tile with a change.
 ---

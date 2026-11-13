@@ -1,7 +1,7 @@
 ---
-import type { TreeNode } from '@kaynooo/kayjs-ui'
+import type { TreeNode } from '@kayjs/ui'
 import { signal } from 'kay'
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import TreeView from '@kayjs/ui/tree-view.kay'
 
 // What the test reads back: every node picked, and buttons standing for the parent picking a node itself or sending new nodes.
 const { onSelect } = props<{ onSelect: (id: string, node: TreeNode) => void }>()

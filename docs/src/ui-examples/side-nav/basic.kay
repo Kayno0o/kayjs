@@ -1,5 +1,5 @@
 ---
-import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
+import SideNav from '@kayjs/ui/side-nav.kay'
 
 const groups = [
   { label: 'Workspace', links: [{ href: '/', label: 'Overview', icon: 'info' }, { href: '/ui/side-nav', label: 'Inbox', badge: 3 }] },

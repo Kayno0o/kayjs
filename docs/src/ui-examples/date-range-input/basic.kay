@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
-import type { DateRange } from '@kaynooo/kayjs-ui'
+import DateRangeInput from '@kayjs/ui/date-range-input.kay'
+import type { DateRange } from '@kayjs/ui'
 
 const stay = signal<DateRange>(['2026-10-02', null])
 ---

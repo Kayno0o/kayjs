@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { fakeAi } from '@kaynooo/kayjs-ai'
+import { fakeAi } from '@kayjs/ai'
 import { afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
 import { done, refusals, testing } from '../src/testing'

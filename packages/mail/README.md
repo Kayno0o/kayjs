@@ -4,15 +4,10 @@ Mail for kay apps: SMTP configured from typed environment variables, mails writt
 
 ## Install
 
-kayjs-mail is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml` (a project made by `kay new` already carries it in its `.npmrc`):
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kayjs-mail is published to npm as `@kayjs/mail`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
 
 ```sh
-bun add @kaynooo/kayjs-mail
+bun add @kayjs/mail
 ```
 
 kay and Elysia are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
@@ -21,16 +16,16 @@ kay and Elysia are peers. It is released with kay, at kay's own version, and pee
 
 ```ts
 // kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail under kay dev
-import { mail } from '@kaynooo/kayjs-mail'
+import { mail } from '@kayjs/mail'
 
 export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
 ```
 
-`send(message)` and `enqueue(message)` from `@kaynooo/kayjs-mail` use that mailer. A transport or views of your own go in a `src/mail.ts` exporting `mailer({ ... })` as `mail`, listed with `mail({ module: './src/mail' })`.
+`send(message)` and `enqueue(message)` from `@kayjs/mail` use that mailer. A transport or views of your own go in a `src/mail.ts` exporting `mailer({ ... })` as `mail`, listed with `mail({ module: './src/mail' })`.
 
 ```kay
 --- server
-import { enqueue } from '@kaynooo/kayjs-mail'
+import { enqueue } from '@kayjs/mail'
 import Welcome from '../mails/welcome.kay'
 
 export const signUp = action(schema, async ({ name, email }) => {

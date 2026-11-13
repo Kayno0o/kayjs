@@ -1,8 +1,9 @@
 import type { Attribute, Details, ElementNode, Span } from './ast'
 import type { ImportBinding } from './script-shared'
+import { renamePackages } from '../package-names'
 
-// A kayjs-ui or kayjs-ai component's file, as `ui/dialog` for `@kaynooo/kayjs-ui/dialog.kay`.
-export const LIBRARY_SOURCE = /^@kaynooo\/kayjs-(ui|ai)\/([\w-]+)\.kay$/
+// A kayjs-ui or kayjs-ai component's file, as `ui/dialog` for `@kayjs/ui/dialog.kay`.
+export const LIBRARY_SOURCE = /^@kayjs\/(ui|ai)\/([\w-]+)\.kay$/
 
 // The kayjs-ui overlays whose `heading` block is `title` since 1.98, as Card's is, with `label` naming them for screen readers.
 const OVERLAYS = new Set(['ui/dialog', 'ui/side-panel', 'ui/form-dialog'])
@@ -14,7 +15,7 @@ export function libraryComponents(imports: readonly ImportBinding[]): Map<string
   const found = new Map<string, string>()
 
   for (const binding of imports) {
-    const match = binding.imported === 'default' && !binding.typeOnly ? LIBRARY_SOURCE.exec(binding.source) : null
+    const match = binding.imported === 'default' && !binding.typeOnly ? LIBRARY_SOURCE.exec(renamePackages(binding.source)) : null
 
     if (match)
       found.set(binding.local, `${match[1]}/${match[2]}`)

@@ -1,5 +1,5 @@
 --- island
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
 import { signal } from 'kay'
 
 const page = signal(1)

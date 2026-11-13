@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
 import { blocked } from '../routes/tools.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 
 const liked = signal<string[]>([])
 ---

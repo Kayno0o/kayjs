@@ -1,5 +1,5 @@
 --- client
-import FieldInput from '@kaynooo/kayjs-cms/field-input.kay'
+import FieldInput from '@kayjs/cms/field-input.kay'
 
 // The editor's list field on drafts a test opens, mounted with `mountComponent`.
 type Input = Parameters<typeof FieldInput>[0]

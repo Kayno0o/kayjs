@@ -14,7 +14,7 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 describe('deprecated-ui-item-keys', () => {
-  const imports = '---\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Bell from \'@kaynooo/kayjs-ui/bell.kay\'\nimport BellInbox from \'@kaynooo/kayjs-ui/bell-inbox.kay\'\n'
+  const imports = '---\nimport TreeView from \'@kayjs/ui/tree-view.kay\'\nimport Bell from \'@kayjs/ui/bell.kay\'\nimport BellInbox from \'@kayjs/ui/bell-inbox.kay\'\n'
 
   it('renames tree nodes at every depth and the notifications of a Bell, one bound to a const included', async () => {
     const page = `${imports}const notes = [{ id: 'n', title: 'Hi', url: '/hi' }]\nconst id = 'x'\n---\nTreeView(label="Files" nodes={[{ id: 'a', label: 'A', children: [{ id, label: 'X', children: [{ id: 'deep', label: 'Deep' }] }] }]})\nBell(items={notes})\nBellInbox(items={[{ id: 'm', title: 'Yo', read: true }]})\n`

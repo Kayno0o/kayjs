@@ -2,8 +2,8 @@
 import { ctx } from 'kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Button from '@kayjs/ui/button.kay'
+import Notice from '@kayjs/ui/notice.kay'
 import { claimBanner, currentViewer } from '../viewer'
 
 const features = currentViewer().auth.features()

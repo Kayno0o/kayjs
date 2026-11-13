@@ -1,5 +1,5 @@
 ---
-import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 ---
 ZoomPane(
   label="Grid, up to 3 times"

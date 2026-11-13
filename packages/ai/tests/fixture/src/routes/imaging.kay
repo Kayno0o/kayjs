@@ -1,7 +1,7 @@
 --- server
 import { reply } from './echoing.kay'
 --- script
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Imaging
 Chat(action={reply} label="Assistant" images="/files" initial={[{ role: 'assistant', content: '![chart](/files/chart.png?v=1&w=2) ![other](/elsewhere/a.png) ![foreign](https://evil.example/x.png?q=chat) ![dots](/files/../secret.png) ![proto](//evil.example/files/a.png)' }]})

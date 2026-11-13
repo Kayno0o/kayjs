@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
+import HoverCard from '@kayjs/ui/hover-card.kay'
 
 const planets = [{ name: 'Mars', moons: 2 }, { name: 'Earth', moons: 1 }, { name: 'Venus', moons: 0 }]
 const hovered = signal<{ element: Element, moons: number } | null>(null)

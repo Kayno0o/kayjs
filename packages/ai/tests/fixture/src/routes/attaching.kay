@@ -1,5 +1,5 @@
 --- server
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 import { action, s } from 'kay'
 
 // A chat that takes files: a message holds the images the visitor attached.

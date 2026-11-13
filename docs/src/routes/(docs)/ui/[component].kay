@@ -28,7 +28,7 @@ head
     p.eyebrow kayjs-ui · {version}
     h1 {title}
     p.lede {description}
-    p.import: code import {title} from '@kaynooo/kayjs-ui/{component.slug}.kay'
+    p.import: code import {title} from '@kayjs/ui/{component.slug}.kay'
   Toc(sections={sections})
   article.prose
     Content

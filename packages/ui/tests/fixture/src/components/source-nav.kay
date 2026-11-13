@@ -1,6 +1,6 @@
 --- island
-import Steps from '@kaynooo/kayjs-ui/steps.kay'
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import Steps from '@kayjs/ui/steps.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
 
 const { tabs, steps, calls } = props<{ tabs: () => Promise<{ value: string, label: string }[]>, steps: () => Promise<{ key: string, label: string }[]>, calls: string[] }>()
 ---

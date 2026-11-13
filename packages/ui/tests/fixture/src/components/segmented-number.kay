@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
 
 // A Segmented over numbers, its choice kept in a signal of the page as an app would, and a second one the parent may set to none.
 // `onChange` is told each pick by the group's own type, which the typed handlers below prove to the check.

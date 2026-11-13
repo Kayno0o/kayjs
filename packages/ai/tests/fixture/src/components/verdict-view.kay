@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
 import type { ActionStream } from 'kay'
-import type { DeepPartial } from '@kaynooo/kayjs-ai'
+import type { DeepPartial } from '@kayjs/ai'
 import type { verdict } from '../answers'
 import type { Static } from 'kay'
 import { summarize } from '../routes/verdicts.kay'

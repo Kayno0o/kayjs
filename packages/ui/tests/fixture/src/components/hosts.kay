@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
+import { toast } from '@kayjs/ui'
 
 // The app's hosts, which an extension's own come after, as a layout wraps its pages.
 const app = signal(true)

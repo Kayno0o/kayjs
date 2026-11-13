@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import ConfirmHost from '@kaynooo/kayjs-ui/confirm-host.kay'
-import { confirm } from '@kaynooo/kayjs-ui/lib/confirm'
+import ConfirmHost from '@kayjs/ui/confirm-host.kay'
+import { confirm } from '@kayjs/ui/lib/confirm'
 
 const hosted = signal(true)
 const answers = signal<string[]>([])

@@ -1,6 +1,6 @@
 --- island
 import { signal } from 'kay'
-import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import Menu from '@kayjs/ui/menu.kay'
 
 const at = signal({ x: 0, y: 0 })
 const pointOpen = signal(false)

@@ -1,6 +1,6 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+import Button from '@kayjs/ui/button.kay'
+import PageHeader from '@kayjs/ui/page-header.kay'
 ---
 PageHeader(title="Moons")
   @actions

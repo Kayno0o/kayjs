@@ -34,7 +34,7 @@ interface Imports {
 }
 
 // The names kay is installed under: the alias projects import it as, its own, and the one it was published as up to 0.3.
-const KAY_PACKAGES = new Set(['kay', '@kaynooo/kayjs', '@kaynooo/kay'])
+const KAY_PACKAGES = new Set(['kay', '@kayjs/kay', '@kaynooo/kay'])
 const KAY_EXTENSION = '.kay'
 const LIBRARY_DEPENDENCIES: (keyof Manifest)[] = ['dependencies', 'optionalDependencies']
 // Where a library names kay, a peer most often.

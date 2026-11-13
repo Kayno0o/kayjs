@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 const published = signal(true)
 ---

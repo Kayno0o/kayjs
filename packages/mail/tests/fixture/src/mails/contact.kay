@@ -1,9 +1,9 @@
 ---
-import type { MailField } from '@kaynooo/kayjs-mail'
-import Fields from '@kaynooo/kayjs-mail/fields.kay'
-import Heading from '@kaynooo/kayjs-mail/heading.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Quote from '@kaynooo/kayjs-mail/quote.kay'
+import type { MailField } from '@kayjs/mail'
+import Fields from '@kayjs/mail/fields.kay'
+import Heading from '@kayjs/mail/heading.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Quote from '@kayjs/mail/quote.kay'
 
 const { fields, message } = props<{ fields: MailField[], message: string }>()
 ---

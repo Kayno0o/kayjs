@@ -1,5 +1,5 @@
 ---
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Badge from '@kayjs/ui/badge.kay'
 import { wording } from 'kay/words'
 import { useGoesLive } from '../datetime'
 

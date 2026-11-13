@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import Select from '@kayjs/ui/select.kay'
 
 const { heard = [], submit = true } = props<{ heard?: string[], submit?: boolean }>()
 const posts = signal(0)

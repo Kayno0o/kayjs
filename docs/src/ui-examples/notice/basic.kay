@@ -1,5 +1,5 @@
 ---
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Notice from '@kayjs/ui/notice.kay'
 ---
 .flex.max-w-md.flex-col.gap-2
   Notice(label="Your changes are saved.")

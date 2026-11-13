@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Combobox from '@kayjs/ui/combobox.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 
 const kind = signal<'text' | 'search'>('text')
 const icon = signal<'globe' | false | undefined>(undefined)

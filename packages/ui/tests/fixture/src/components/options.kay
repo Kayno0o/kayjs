@@ -1,9 +1,9 @@
 ---
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Select from '@kayjs/ui/select.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
 
 // One option shape across the groups: `{ value, label, icon?, disabled? }`, a Select taking no icon.
 const { onTab } = props<{ onTab: (value: string) => void }>()

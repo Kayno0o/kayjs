@@ -2,15 +2,15 @@ import type { Setup } from './template-shared'
 import { lines, quote } from './template-shared'
 
 // Over the app's own database, loaded as the server starts so the config stays off it.
-const POSTGRES_STORE = ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)'
+const POSTGRES_STORE = ', store: async () => (await import(\'@kayjs/auth/pg\')).pgAuth((await import(\'./src/db\')).db)'
 
 export function config({ has, settings }: Setup): string {
   const server = has('server')
   const base = settings.base === undefined ? undefined : quote(settings.base)
 
   return lines(
-    has('auth') && 'import { auth } from \'@kaynooo/kayjs-auth\'',
-    has('auth') && 'import { ui } from \'@kaynooo/kayjs-ui\'',
+    has('auth') && 'import { auth } from \'@kayjs/auth\'',
+    has('auth') && 'import { ui } from \'@kayjs/ui\'',
     !server && base !== undefined && 'import process from \'node:process\'',
     'import { defineConfig } from \'kay/server\'',
     '',

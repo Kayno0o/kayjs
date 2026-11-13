@@ -8,8 +8,8 @@ import Panel from '../components/panel.kay'
 import ProviderButtons from '../components/provider-buttons.kay'
 import Separator from '../components/separator.kay'
 import { captchaFor, captchaOf, guarded, issue, refusal, refusedFor, remembered, rememberOf, schemas } from '../forms'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 // Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
 export const page = { guards: false }

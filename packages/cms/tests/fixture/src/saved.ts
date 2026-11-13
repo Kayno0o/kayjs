@@ -1,4 +1,4 @@
-import type { FileChange, FileSaver } from '@kaynooo/kayjs-cms'
+import type { FileChange, FileSaver } from '@kayjs/cms'
 
 // The files the screens saved, kept rather than written, which the tests read back.
 export const saved: FileChange[] = []

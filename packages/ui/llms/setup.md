@@ -4,13 +4,13 @@
 
 ### Setup
 
-kayjs-ui is published as `@kaynooo/kayjs-ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
+kayjs-ui is published as `@kayjs/ui` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Tailwind v4 and `@iconify-json/tabler` are peer dependencies. It is released with kay at its version and peers on kay's minor: the app installs the one matching its kay and moves them together.
 
 ```sh
 kay add ui
 ```
 
-It installs the package and `@iconify-json/tabler` (needing Tailwind in the app) and lists `ui()` from `@kaynooo/kayjs-ui` in `extensions` in kay.config.ts. That one line brings the theme, a `Toaster`, a `TooltipHost` and a `ConfirmHost` (for `confirm()`) on every page, outside the app's layouts, so no layout or stylesheet names them. Doing it by hand, `bun add @kaynooo/kayjs-ui @iconify-json/tabler` and add `ui()`. The extension's stylesheet comes before the app's, so the app's own `@theme` overrides win.
+It installs the package and `@iconify-json/tabler` (needing Tailwind in the app) and lists `ui()` from `@kayjs/ui` in `extensions` in kay.config.ts. That one line brings the theme, a `Toaster`, a `TooltipHost` and a `ConfirmHost` (for `confirm()`) on every page, outside the app's layouts, so no layout or stylesheet names them. Doing it by hand, `bun add @kayjs/ui @iconify-json/tabler` and add `ui()`. The extension's stylesheet comes before the app's, so the app's own `@theme` overrides win.
 
 Three peers are optional, installed only when used: `chartist` (2.x) for `LineChart`, `leaflet` for `MapView`, `hls.js` for an `.m3u8` video in a browser without native HLS.
 
@@ -18,7 +18,7 @@ Three peers are optional, installed only when used: `chartist` (2.x) for `LineCh
 
 ```css
 @import 'tailwindcss';
-@import '@kaynooo/kayjs-ui/theme.css';
+@import '@kayjs/ui/theme.css';
 
 @theme {
   --color-accent: light-dark(#3b6fd4, #7aa2f7);
@@ -27,7 +27,7 @@ Three peers are optional, installed only when used: `chartist` (2.x) for `LineCh
 
 kay leaves out the theme's rules for the `kui-` classes no file of the app or component it renders writes whole, so an app ships the CSS of the components it uses; a class put together at runtime, or written only in a CMS body, is kept by writing it whole in any file of the app, for instance in a comment in `app.css` (see Using a component library in kay's `llms/component-libraries.md`).
 
-`@apply` of a theme utility (`@apply bg-popover`) in a stylesheet of the app builds with `ui()` alone: kay adds an `@reference` of the theme after its Tailwind import for you, which brings the tokens and writes no rule, so the theme is not loaded twice. An `@reference '@kaynooo/kayjs-ui/theme.css';` the app already writes stays harmless. An app without `ui()` writes that line itself, or the build fails with `Cannot apply unknown utility class`.
+`@apply` of a theme utility (`@apply bg-popover`) in a stylesheet of the app builds with `ui()` alone: kay adds an `@reference` of the theme after its Tailwind import for you, which brings the tokens and writes no rule, so the theme is not loaded twice. An `@reference '@kayjs/ui/theme.css';` the app already writes stays harmless. An app without `ui()` writes that line itself, or the build fails with `Cannot apply unknown utility class`.
 
 A token read only through a name built at runtime (`var(--color-lane-${n})`) is dropped by Tailwind unless it sits in `@theme static { }` or `:root`.
 
@@ -47,7 +47,7 @@ The theme's tokens are `@theme default` and carry the app's own names, so one th
 - `--shadow-raised` (under a Card, CardRow, Widget and toast) and `--shadow-press` (under a Button and a framed IconButton, which move down by `--press-travel` and drop that shadow while pressed) are `none` and `0px` by default. A brutalist skin: `--shadow-raised: 4px 4px 0 var(--color-foreground)`, `--shadow-press: 3px 3px 0 var(--color-foreground)`, `--press-travel: 3px`.
 - `--shell-line` and `--shell-fill` are the hairline and the fill of a Button, a framed IconButton and a stat badge, redeclared by the tones, the hover and the ghost forms in `theme.css`. Set them as utilities on the part so the app's value wins, with `hover:` for the hovered look: `Button: { parts: { root: '[--shell-line:var(--color-accent)] hover:[--shell-fill:transparent]' } }` (the `space` skin's hairline key is this).
 - A knob only one component reads is no token: restyle that component everywhere in `src/ui.ts` (`Badge: { parts: { root: 'uppercase font-mono tracking-wider border-2' } }`) and one instance through `class`. A per-instance length is set on it, as `class="[--table-height:50vh]"`, `--chart-height` for a LineChart, BarChart or ScatterChart, `--zoom-scale` for a ZoomPane.
-- Skins: `@import '@kaynooo/kayjs-ui/skins/brutalist.css';`, `soft.css` or `space.css` after `theme.css` sets a whole look (brutalist: black and white, 2px keylines, square corners, offset shadows, monospace capitals; soft: sentence case and a faint shadow; space: dark only, near-black background, starlight accent, Space Grotesk, a 1px hairline on every box and no shadows, buttons as hairline keys lit in the accent on hover, drawn checkboxes, themed selects, and a `starfield` background utility of tiled dots). The default theme stays for an app importing none. `space.css` names the family `Space Grotesk`: serve it with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]`. Your own `@theme` after the import wins.
+- Skins: `@import '@kayjs/ui/skins/brutalist.css';`, `soft.css` or `space.css` after `theme.css` sets a whole look (brutalist: black and white, 2px keylines, square corners, offset shadows, monospace capitals; soft: sentence case and a faint shadow; space: dark only, near-black background, starlight accent, Space Grotesk, a 1px hairline on every box and no shadows, buttons as hairline keys lit in the accent on hover, drawn checkboxes, themed selects, and a `starfield` background utility of tiled dots). The default theme stays for an app importing none. `space.css` names the family `Space Grotesk`: serve it with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]`. Your own `@theme` after the import wins.
 - Where a skin's import goes: after `theme.css`, or with `ui()` (which injects the theme before the app's CSS) after `@import 'tailwindcss'` in `src/app.css`. What each sets besides the eight seeds, so an override of yours knows what it changes: `soft` sets `--label-case: none`, `--tracking-label: 0.02em` and `--shadow-raised`; `brutalist` sets `--border-width: 2px`, the three `--radius-*` to `0`, `--font-label`, `--shadow-raised`, `--shadow-press` and `--press-travel`; `space` sets `--font-sans`, `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border`, `--color-border-strong`, `--label-case: none`, `--tracking-label`, `color-scheme: dark` on `:root` and `[data-theme]`, `border-color: var(--color-input)` on Segmented and FileDrop and `--_control-line` on pagination steps, unchecked chips, Segmented and FileDrop, `border-color: var(--color-border-strong)` and `box-shadow: none` on overlays (dialog, popover, toast, tooltip, palette, combobox list, select picker, side panel, chart tooltip, nav popover), drawn checkboxes (accent border on hover), and themed selects (a chevron, and with `appearance: base-select` the `::picker(select)` list and its options). It also sets the key look (`--shell-line`, `--shell-fill`, accent on hover) on `.kui-btn` and a framed `.kui-icon-btn`, except tone, ghost, inline, pressed and disabled buttons, which keep the theme's look; a keyboard-focused button shows the theme's focus hairline and outline.
 - A skin's rules sit at one class of specificity or none (the key's hover at two, as the theme's own), so an app rule in `@layer components` with one class beats them, and unlayered CSS and `ui.ts` part classes (utilities layer) already did. `starfield` sets `--color-background` and `isolation: isolate` on the element and draws four dots on its `::before` (`position: fixed; inset: 0; z-index: -1; pointer-events: none`), so an app styling `.starfield::before` knows. `class="starfield bg-surface"` changes the ground. For a fuller sky, style `.starfield::before` with your own `background-image` list that repeats the dots and adds your gradients, with its own `background-size`.
 
@@ -57,7 +57,7 @@ The theme is dark unless the visitor's system asks for light. `data-theme="light
 
 ```kay
 ---
-import { scheme } from '@kaynooo/kayjs-ui'
+import { scheme } from '@kayjs/ui'
 ---
 head
   html(data-theme={scheme()})
@@ -73,8 +73,8 @@ A layout may still render its own `Toaster` and `TooltipHost`, as an app did bef
 
 ```kay
 ---
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 import '../app.css'
 ---
 slot
@@ -90,13 +90,13 @@ The icons the components draw come from slots, each named for what it means: `al
 
 ```ts
 // kay.config.ts
-export default defineConfig({ librarySettings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' } })
+export default defineConfig({ librarySettings: { '@kayjs/ui': './src/ui-settings.ts' } })
 ```
 
 ```ts
 // src/ui-settings.ts
-import type { UiSettings } from '@kaynooo/kayjs-ui'
-import { uiDefaults } from '@kaynooo/kayjs-ui'
+import type { UiSettings } from '@kayjs/ui'
+import { uiDefaults } from '@kayjs/ui'
 import close from '~icons/tabler/x'
 
 const settings: UiSettings = { ...uiDefaults, icons: { ...uiDefaults.icons, close } }
@@ -112,9 +112,9 @@ See [Restyle a component](restyle.md): `class` as a string or an object of parts
 
 ### Copy a component into the app
 
-When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the imports of `@kaynooo/kayjs-ui/card.kay` in the app's `src/`, `tests/` and root `.ts` files (`kay.config.ts`) at the copy. `--dry-run` lists what would be written, `--format json` prints `{ component, files, rewritten, notes, stillOnLibrary, dryRun }`, `--quiet` prints only a failure. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
+When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the imports of `@kayjs/ui/card.kay` in the app's `src/`, `tests/` and root `.ts` files (`kay.config.ts`) at the copy. `--dry-run` lists what would be written, `--format json` prints `{ component, files, rewritten, notes, stillOnLibrary, dryRun }`, `--quiet` prints only a failure. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
 
-- Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kaynooo/kayjs-ui/icon.kay` and `@kaynooo/kayjs-ui/lib/defaults` (`lib/` and `field-look` are for copies and not a stable API, as are `holdToasts` and `TOOLBAR_ACTIONS` of the root). Another public component the copy uses stays upstream too: eject it separately.
+- Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kayjs/ui/icon.kay` and `@kayjs/ui/lib/defaults` (`lib/` and `field-look` are for copies and not a stable API, as are `holdToasts` and `TOOLBAR_ACTIONS` of the root). Another public component the copy uses stays upstream too: eject it separately.
 - kayjs-ui's own components keep the library's version of what they use (`FormDialog` uses the library's `Dialog`); the command lists them.
 - An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so the copy and the library's own users keep the app's look; one keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy.
 - `src/components/ui/.upstream/` records the version and the library's text each copy came from, to commit with it. `--dry-run` writes nothing, and an ejected or existing file is refused.
@@ -126,7 +126,7 @@ A page that uses the components renders them in `testSite()` like the app's own.
 
 ## Reference
 
-- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `rowEditing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
+- Import each component by its `.kay` path: `import Button from '@kayjs/ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `rowEditing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kayjs/ui'`, and the drag and drop controllers from `@kayjs/ui/dnd`.
 - The theme reads the app's own names (`--color-background`, `--color-foreground`, `--color-accent`, `--color-muted`, `--color-border`, `--radius-lg`, `--border-width`, `--density`...), so one `@theme` feeds the app and the library. The `kui-` names it used before 1.72 are gone since 1.75: [upgrading](../../../llms/upgrading.md) pairs each with its new name.
 
 Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-`, so a site's own `btn` or `card` never meets them, while the theme's tokens carry the app's own names (`--color-accent`, `--color-background`), so one theme feeds the app and the library. A rule of the app's on one of those classes restyles every instance, and `--border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).

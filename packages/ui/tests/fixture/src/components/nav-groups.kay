@@ -1,7 +1,7 @@
 --- island
 import { signal } from 'kay'
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
-import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
 
 const { onOpenChange, onReady } = props<{ onOpenChange: (open: boolean) => void, onReady: (set: (open: boolean) => void) => void }>()
 

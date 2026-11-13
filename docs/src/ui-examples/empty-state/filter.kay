@@ -1,6 +1,6 @@
 ---
 import { memo, signal } from 'kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 
 const planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn']
 const query = signal('')

@@ -8,6 +8,7 @@ import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { constBindings, keyName, unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
+import { renamePackages } from '../package-names'
 
 interface ItemProp {
   // The prop holding the list, as `items`.
@@ -36,7 +37,7 @@ const ITEM_KEYS: ItemLint = {
   },
 }
 
-const LIBRARY_FILE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
+const LIBRARY_FILE = /^@kayjs\/ui\/([\w-]+)\.kay$/
 
 const KAY_FILE = /\.kay$/
 
@@ -54,7 +55,7 @@ async function itemLint(root: string, options: CheckOptions, lint: ItemLint): Pr
   if (lintLevel(code, options.lints) === 'allow')
     return []
 
-  const needle = new RegExp(`kayjs-ui/(?:${Object.keys(components).join('|')})\\.kay`)
+  const needle = new RegExp(`(?:@kayjs/ui|@kaynooo/kayjs-ui)/(?:${Object.keys(components).join('|')})\\.kay`)
 
   const found: CheckDiagnostic[] = []
 
@@ -75,7 +76,7 @@ async function itemLint(root: string, options: CheckOptions, lint: ItemLint): Pr
       if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
         continue
 
-      const spec = LIBRARY_FILE.exec(statement.source.value) && components[LIBRARY_FILE.exec(statement.source.value)![1]!]
+      const spec = LIBRARY_FILE.exec(renamePackages(statement.source.value)) && components[LIBRARY_FILE.exec(renamePackages(statement.source.value))![1]!]
 
       for (const specifier of statement.specifiers) {
         if (spec && specifier.type === 'ImportDefaultSpecifier')

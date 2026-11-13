@@ -1,5 +1,5 @@
 ---
-import { Board } from '@kaynooo/kayjs-ui/dnd'
+import { Board } from '@kayjs/ui/dnd'
 import { signal } from 'kay'
 
 // Columns whose cards really move in keyed lists, so a test sees where a later key press starts from.

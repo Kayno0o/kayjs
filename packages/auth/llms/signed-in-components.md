@@ -8,9 +8,9 @@
 
 ```kay
 ---
-import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
-import SignedOut from '@kaynooo/kayjs-auth/components/signed-out.kay'
-import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+import SignedIn from '@kayjs/auth/components/signed-in.kay'
+import SignedOut from '@kayjs/auth/components/signed-out.kay'
+import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 nav
   SignedOut
@@ -32,7 +32,7 @@ nav
 
 ```kay
 ---
-import ImpersonationBanner from '@kaynooo/kayjs-auth/components/impersonation-banner.kay'
+import ImpersonationBanner from '@kayjs/auth/components/impersonation-banner.kay'
 ---
 ImpersonationBanner
 slot
@@ -43,7 +43,7 @@ slot
 
 ### Show a pending deletion
 
-With `account.deleteAfter`, `DeletionBanner` (`@kaynooo/kayjs-auth/components/deletion-banner.kay`, no props or fence) shows `Your account will be deleted on <date>` and a button that cancels (a post to `<prefix>/cancel-deletion`), and nothing for anyone else. The prebuilt pages carry it, as do all pages with `viewer: true`; put it in a layout of your own elsewhere, once per request. It reads `ctx.deletion`, the date or null. See [Deleting an account after a grace period](passwords-and-mails.md#deleting-an-account-after-a-grace-period).
+With `account.deleteAfter`, `DeletionBanner` (`@kayjs/auth/components/deletion-banner.kay`, no props or fence) shows `Your account will be deleted on <date>` and a button that cancels (a post to `<prefix>/cancel-deletion`), and nothing for anyone else. The prebuilt pages carry it, as do all pages with `viewer: true`; put it in a layout of your own elsewhere, once per request. It reads `ctx.deletion`, the date or null. See [Deleting an account after a grace period](passwords-and-mails.md#deleting-an-account-after-a-grace-period).
 
 ### Show them with the first bytes
 
@@ -56,4 +56,4 @@ A page reads the user before it renders when its imports reach `SignedIn`, `Sign
 ## Reference
 
 - `viewer` goes beside `module` and `pages` in `auth({ ... })`: left out, the pages reaching a template reading `ctx` read the user; `true` reads it on every page.
-- `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kaynooo/kayjs-auth/components/<name>.kay`.
+- `SignedIn` takes `role`; `UserMenu` takes `account`; `SignedOut`, `ImpersonationBanner` and `DeletionBanner` take none. All import from `@kayjs/auth/components/<name>.kay`.

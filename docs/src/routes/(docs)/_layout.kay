@@ -8,9 +8,9 @@ export const page = { security: { csp: { 'script-src': ['\'wasm-unsafe-eval\''] 
 const nav = await navigation()
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 --- script
-import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 import ArrowUp from '~icons/tabler/arrow-up'
 import ArrowsMaximize from '~icons/tabler/arrows-maximize'
 import ArrowsMinimize from '~icons/tabler/arrows-minimize'

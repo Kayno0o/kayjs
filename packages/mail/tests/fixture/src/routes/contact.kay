@@ -1,6 +1,6 @@
 --- server
 import { action, s } from 'kay'
-import { contactForm } from '@kaynooo/kayjs-mail'
+import { contactForm } from '@kayjs/mail'
 import { mail } from '../mail'
 
 export const contact = action(...contactForm(mail, { to: 'team@fixture.test', fields: { phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }, labels: { topic: 'Subject' }, reach: 'hello@fixture.test' }))

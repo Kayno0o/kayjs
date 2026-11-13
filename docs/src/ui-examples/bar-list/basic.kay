@@ -1,5 +1,5 @@
 ---
-import BarList from '@kaynooo/kayjs-ui/bar-list.kay'
+import BarList from '@kayjs/ui/bar-list.kay'
 
 const rows = [
   { key: 'fr', label: 'France', value: 420, display: '420 visits' },

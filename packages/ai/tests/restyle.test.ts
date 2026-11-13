@@ -10,7 +10,7 @@ const ROOT = join(import.meta.dir, 'restyle-app')
 const LIBRARY = join(import.meta.dir, '..')
 const UI = join(LIBRARY, '../ui')
 const OUT = join(ROOT, 'node_modules', '.cache', 'out')
-const SETTINGS = { '@kaynooo/kayjs-ui': './src/ui-settings.ts' }
+const SETTINGS = { '@kayjs/ui': './src/ui-settings.ts' }
 const TABLER = join(UI, '../../node_modules/@iconify-json/tabler/icons.json')
 const PATH = /\sd="([^"]+)"/
 const MARKERS = /<!--[[\]]-->/g
@@ -23,7 +23,7 @@ let icons: Record<string, string> = {}
 const body = (name: string): string => icons[name]!
 
 async function link(name: string, target: string): Promise<void> {
-  const path = join(ROOT, 'node_modules', '@kaynooo', name)
+  const path = join(ROOT, 'node_modules', '@kayjs', name)
 
   if (existsSync(path))
     return

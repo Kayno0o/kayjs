@@ -1,7 +1,7 @@
 --- server
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
+import Tooltip from '@kayjs/ui/tooltip.kay'
 import SignOut from '../components/sign-out.kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'

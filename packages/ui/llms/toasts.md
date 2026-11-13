@@ -3,7 +3,7 @@
 ## Common tasks
 
 ```ts
-import { attempt, toast } from '@kaynooo/kayjs-ui'
+import { attempt, toast } from '@kayjs/ui'
 
 toast.success('Saved')
 toast.error('Could not save')
@@ -57,7 +57,7 @@ A toast stays for six seconds, an error for ten, or until its close button is pr
 ## confirm and ConfirmHost
 
 ```ts
-import { confirm } from '@kaynooo/kayjs-ui'
+import { confirm } from '@kayjs/ui'
 
 if (await confirm({ message: 'Publish to every subscriber?', title: 'Publish', confirmLabel: 'Publish' }))
   await publish()

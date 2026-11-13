@@ -1,6 +1,6 @@
 ---
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
 
 const links = [
   { href: '/', label: 'Overview', icon: 'info' },

@@ -92,7 +92,7 @@ describe('kay\'s libraries', () => {
     const dir = path.replace(MANIFEST_FILE, '') || '.'
     const declared = new Set([manifest.name, ...[manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies].flatMap(field => Object.keys(field ?? {}))])
     // `~icons` is the virtual module kay's build serves; kayjs-auth imports kayjs-mail only inside a try, when the app registers mail().
-    const known = new Set(['~icons', ...dir === 'packages/auth' ? ['@kaynooo/kayjs-mail'] : []])
+    const known = new Set(['~icons', ...dir === 'packages/auth' ? ['@kayjs/mail'] : []])
     const loaders = { ts: new Bun.Transpiler({ loader: 'ts' }), tsx: new Bun.Transpiler({ loader: 'tsx' }) }
     const undeclared: string[] = []
 
@@ -771,7 +771,7 @@ describe('the release\'s failure path', () => {
 
 // A library keeping data in SQL names where: `/pg` and `/sqlite` entries beside its root, which imports no driver, so an app on Postgres loads no SQLite and the reverse.
 describe('the libraries that keep data in SQL', () => {
-  const keepers = libraries.filter(({ manifest }) => ['@kaynooo/kayjs-mail', '@kaynooo/kayjs-ai', '@kaynooo/kayjs-cms'].includes(manifest.name))
+  const keepers = libraries.filter(({ manifest }) => ['@kayjs/mail', '@kayjs/ai', '@kayjs/cms'].includes(manifest.name))
   const DRIVERS = new Set(['bun:sqlite', 'bun', '@kaynooo/pg-orm'])
   const SCRIPT_IMPORT = /(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
   const transpiler = new Bun.Transpiler({ loader: 'ts' })

@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import Button from '@kayjs/ui/button.kay'
+import Dialog from '@kayjs/ui/dialog.kay'
 
 const open = signal(false)
 const saving = signal(false)

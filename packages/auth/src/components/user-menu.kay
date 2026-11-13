@@ -2,7 +2,7 @@
 import { ctx } from 'kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 import { currentViewer } from '../viewer'
 
 // `account={false}` leaves out the link to the account page, as the account page itself does.

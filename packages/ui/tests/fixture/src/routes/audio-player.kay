@@ -1,5 +1,5 @@
 ---
-import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import AudioPlayer from '@kayjs/ui/audio-player.kay'
 import '../app.css'
 
 // `/episode.wav` is 30 seconds of silence; `#long` has no source and a chapter past the hour.

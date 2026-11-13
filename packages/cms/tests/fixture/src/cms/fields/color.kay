@@ -1,6 +1,6 @@
 ---
-import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import type { CustomFieldProps } from '@kayjs/cms'
+import FormField from '@kayjs/ui/form-field.kay'
 
 const { value, onChange, label, hint, issue, required } = props<CustomFieldProps>()
 ---

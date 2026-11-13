@@ -1,5 +1,5 @@
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 
 const answer = ask('Say hello', { system: 'Be brief' })
 ---

@@ -1,5 +1,5 @@
 ---
-import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import AppHeader from '@kayjs/ui/app-header.kay'
 
 const links = [{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', label: '<b>Data</b>' }, { href: '/charts', label: 'Charts', icon: 'info' }] as const
 ---

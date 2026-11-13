@@ -1,5 +1,5 @@
 import type { InferEntity } from '@kaynooo/pg-orm'
-import { AuthUsers } from '@kaynooo/kayjs-auth/pg'
+import { AuthUsers } from '@kayjs/auth/pg'
 import { defineTable } from '@kaynooo/pg-orm'
 
 // A notice pinned to the board, deleted with its author.

@@ -381,8 +381,8 @@ describe('kay env', () => {
 
   it('lists a mailer built at import time once, under the module that builds it and as the mailer is set up, and finds a caller whose path says defineEnv', async () => {
     const root = await project({
-      'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/defineEnv-mail/mail.ts\' })] }\n',
-      'src/defineEnv-mail/mail.ts': 'import { mailer } from \'@kaynooo/kayjs-mail\'\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ OWN: s.String() }))\nexport const mail = mailer({ optional: true })\n',
+      'kay.config.ts': 'import { mail } from \'@kayjs/mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/defineEnv-mail/mail.ts\' })] }\n',
+      'src/defineEnv-mail/mail.ts': 'import { mailer } from \'@kayjs/mail\'\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ OWN: s.String() }))\nexport const mail = mailer({ optional: true })\n',
     })
     const { stdout, stderr, code } = await kay(['env', '--format', 'json'], root, {}, false)
 
@@ -695,8 +695,8 @@ describe('kay env against compose and .env.example', () => {
 
   it('asks compose for MAIL_URL of a mailer that is not optional, and not of an optional one, whatever file builds it', async () => {
     const mailer = async (options: string) => project({
-      'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/mail.ts\' })] }\n',
-      'src/mail.ts': `import { mailer } from '@kaynooo/kayjs-mail'\n\nexport const mail = mailer(${options})\n`,
+      'kay.config.ts': 'import { mail } from \'@kayjs/mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/mail.ts\' })] }\n',
+      'src/mail.ts': `import { mailer } from '@kayjs/mail'\n\nexport const mail = mailer(${options})\n`,
       'compose.yaml': 'services:\n  app:\n    environment:\n      SITE_URL: https://example.com\n',
     })
     // Spawned, as the mailer declares its variables only where it delivers over SMTP, which a test process does not.
@@ -709,7 +709,7 @@ describe('kay env against compose and .env.example', () => {
     expect(await messages('{ optional: true }')).toEqual([])
     expect(await messages('{}')).toEqual([expect.stringContaining('MAIL_URL is required')])
 
-    const missing = await project({ 'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/gone.ts\' })] }\n', 'compose.yaml': 'services: {}\n' })
+    const missing = await project({ 'kay.config.ts': 'import { mail } from \'@kayjs/mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/gone.ts\' })] }\n', 'compose.yaml': 'services: {}\n' })
 
     expect((await kay(['env', '--compose', 'compose.yaml', '--format', 'json'], missing, {}, false)).stdout).toContain('MAIL_URL')
   })

@@ -69,7 +69,7 @@ s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-
 ```kay
 ---
 // src/cms/fields/color.kay
-import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
+import type { CustomFieldProps } from '@kayjs/cms'
 
 const { value, onChange, label } = props<CustomFieldProps>()
 ---

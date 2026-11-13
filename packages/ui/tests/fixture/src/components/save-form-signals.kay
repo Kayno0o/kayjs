@@ -1,9 +1,9 @@
 ---
 import { ActionError, signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 
 // An editor whose state is signals and whose save takes an object: `save` stands in for the server and answers false for a refusal the editor shows itself, or the messages a schema refusal carries.
 const { save, isNew = false, status, onDiscard, cancelHref, confirm, saveDisabled } = props<{ cancelHref?: string | undefined, confirm?: string | undefined, saveDisabled?: string | boolean | undefined, save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, isNew?: boolean, status?: string | undefined, onDiscard: () => void }>()

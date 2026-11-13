@@ -1,5 +1,5 @@
 ---
-import { Sortable } from '@kaynooo/kayjs-ui/dnd'
+import { Sortable } from '@kayjs/ui/dnd'
 import { signal } from 'kay'
 
 // An item whose text changes and which holds a control of its own, to see what its bare handle is named after.

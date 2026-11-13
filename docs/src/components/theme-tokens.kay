@@ -1,5 +1,5 @@
 ---
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
 import { memo } from 'kay'
 import { themeCss } from '../palettes'
 import { palette, scheme } from '../theme'

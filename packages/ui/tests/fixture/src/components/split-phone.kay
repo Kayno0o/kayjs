@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+import SplitLayout from '@kayjs/ui/split-layout.kay'
 
 const sidebarOpen = signal(false)
 ---

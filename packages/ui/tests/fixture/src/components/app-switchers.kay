@@ -1,6 +1,6 @@
 --- island
-import type { SwitcherApp } from '@kaynooo/kayjs-ui'
-import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+import type { SwitcherApp } from '@kayjs/ui'
+import AppSwitcher from '@kayjs/ui/app-switcher.kay'
 
 const apps: SwitcherApp[] = [
   { key: 'atlas', href: '/atlas', label: 'Atlas', icon: 'globe' },

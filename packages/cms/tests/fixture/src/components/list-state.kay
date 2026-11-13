@@ -1,5 +1,5 @@
 --- client
-import FieldInput from '@kaynooo/kayjs-cms/field-input.kay'
+import FieldInput from '@kayjs/cms/field-input.kay'
 import { cmsDrafts } from '../../../../src/drafts'
 
 // The editor's list field on drafts of its own, so the page follows the edits as it does in the editor, with the saved value written out for a test to read.

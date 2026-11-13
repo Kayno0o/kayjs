@@ -1,7 +1,7 @@
 ---
 import { navigate } from 'kay'
-import type { TreeNode } from '@kaynooo/kayjs-ui'
-import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import type { TreeNode } from '@kayjs/ui'
+import TreeView from '@kayjs/ui/tree-view.kay'
 
 const nodes: TreeNode[] = [
   { key: 'group', label: 'Group', children: [{ key: 'here', label: 'Here', href: '/tree-links', menu: [{ label: 'Rename', onSelect: () => undefined }] }, { key: 'other', label: 'Other', href: '/tree-links?view=b' }] },

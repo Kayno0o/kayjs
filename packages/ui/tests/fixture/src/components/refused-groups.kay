@@ -1,10 +1,10 @@
 ---
 import { focusInvalid } from 'kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import RangeInput from '@kayjs/ui/range-input.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
 
 // Each role=group control of a FormField that shows a message, to read the mark it takes.
 const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]

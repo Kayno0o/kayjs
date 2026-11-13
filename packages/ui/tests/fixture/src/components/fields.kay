@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Select from '@kayjs/ui/select.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
 
 const { onPlanet, onCommit, onFilter, onLeave, onPicked } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void, onFilter?: (query: string) => void, onLeave?: (id: string) => void, onPicked?: (picked: unknown) => void }>()
 

@@ -1,8 +1,8 @@
 --- server
 const user = await ctx.locals.auth.user()
 --- script
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 import '../app.css'
 ---
 a.skip-link(href="#main-content") Skip to main content

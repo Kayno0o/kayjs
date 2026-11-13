@@ -1,5 +1,5 @@
 ---
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import Icon from '@kayjs/ui/icon.kay'
 ---
 .flex.flex-wrap.items-center.gap-3.text-xl
   Icon(icon="success")

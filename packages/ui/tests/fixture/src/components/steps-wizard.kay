@@ -1,5 +1,5 @@
 --- client
-import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import Steps from '@kayjs/ui/steps.kay'
 import { signal } from 'kay'
 
 const { picks, withUrl = false } = props<{ picks: string[], withUrl?: boolean }>()

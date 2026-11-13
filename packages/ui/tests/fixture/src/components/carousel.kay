@@ -1,5 +1,5 @@
 ---
-import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+import Carousel from '@kayjs/ui/carousel.kay'
 import type { Duration } from 'kay'
 import { signal } from 'kay'
 

@@ -1,5 +1,5 @@
 --- island
-import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import TabNav from '@kayjs/ui/tab-nav.kay'
 import { signal } from 'kay'
 
 // The links arrive after the first render, as from an async source: the test hands them over through deliverTabs.

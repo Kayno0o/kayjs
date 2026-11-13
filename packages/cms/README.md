@@ -4,15 +4,10 @@ A CMS for kay sites' [content collections](../../llms/content.md): open the real
 
 ## Install
 
-kayjs-cms is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml` (a project made by `kay new` already carries it in its `.npmrc`):
-
-```toml
-[install.scopes]
-"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
-```
+kayjs-cms is published to npm as `@kayjs/cms`, beside kay, and to the Forgejo registry at git.kaynooo.fr under the same name.
 
 ```sh
-bun add @kaynooo/kayjs-cms @iconify-json/tabler
+bun add @kayjs/cms @iconify-json/tabler
 ```
 
 kay is a peer. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it. The editor is drawn with kayjs-ui, so the app imports its theme as [kayjs-ui's README](../ui/README.md#theme) says. kayjs-ui is a peer dependency, so the app and the CMS share one copy: the screens and the editor render their own `Toaster` and `TooltipHost`, which give way to the app's when it renders them.
@@ -21,7 +16,7 @@ kay is a peer. It is released with kay, at kay's own version, and peers on kay's
 
 ```ts
 // kay.config.ts
-import { cms, forgejo } from '@kaynooo/kayjs-cms'
+import { cms, forgejo } from '@kayjs/cms'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -46,7 +41,7 @@ An image or file field (`imageField()`, `fileField()` from `kay/content`) takes 
 
 Replacing or removing a file leaves the old upload stored: the unused-uploads screen at `<prefix>/uploads` lists the uploads directly in a collection's folder that no entry mentions, in any collection, locale, draft or loaded collection, each with the image variants it would take with it, and deletes only the ones you confirm, and only with a `guard`. Uploads under a day old, or that the storage dates not at all, are held back: a save the site has not rebuilt from, another server's save or an unsaved form may use them. A URL written by hand in a page, a file of the repository outside the collections is not seen either, while an upload a revision or a trashed entry still mentions is kept, so check each upload before you confirm; the screen lists nothing while a collection or entry cannot be read, or the storage cannot list its files.
 
-An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
+An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kayjs/cms/entry-editor.kay` and `@kayjs/cms/entry-table.kay` in it.
 
 ## Reference
 

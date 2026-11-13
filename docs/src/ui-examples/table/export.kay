@@ -1,5 +1,5 @@
 ---
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Table from '@kayjs/ui/table.kay'
 
 interface Moon {
   id: number

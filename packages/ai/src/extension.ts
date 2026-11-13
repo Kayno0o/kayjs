@@ -44,7 +44,7 @@ export function ai(options: AiOptions = {}): KayExtension {
   registerConversationData()
 
   return {
-    name: '@kaynooo/kayjs-ai',
+    name: '@kayjs/ai',
     env: aiEnv(true),
     commands: { 'i18n translate': `${import.meta.dir}/translate.ts` },
     devTool: { module: `${import.meta.dir}/devTool.ts` },

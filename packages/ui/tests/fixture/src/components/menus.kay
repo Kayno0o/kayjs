@@ -1,9 +1,9 @@
 --- island
-import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import type { MenuEntry } from '@kayjs/ui'
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import Button from '@kayjs/ui/button.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import Menu from '@kayjs/ui/menu.kay'
 
 // Entries and triggers by `tone`.
 const items: MenuEntry[] = [

@@ -12,8 +12,8 @@ Give each control the `name` of its field in the action's schema, as for a [Form
 
 ```kay
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import SaveForm from '@kayjs/ui/save-form.kay'
 import { rename } from '../routes/posts/[id].kay'
 
 const { post } = props<{ post: Post }>()

@@ -1,6 +1,6 @@
 ---
 import { memo, signal } from 'kay'
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
 
 // Each tab's label counts what its field holds, so typing hands Tabs a new list.
 const typed = signal<Record<string, string>>({})

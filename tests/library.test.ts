@@ -13,7 +13,7 @@ import { scratchDir } from './scratch'
 const CLI = resolve('src/cli.ts')
 
 // A library's manifest, naming kay as a peer by `kay`, the name it is published as, or the one it was published as up to 0.3.
-function manifest(kay: 'kay' | '@kaynooo/kayjs' | '@kaynooo/kay'): string {
+function manifest(kay: 'kay' | '@kayjs/kay' | '@kaynooo/kay'): string {
   return JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { [kay]: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts' }, kay: { settings: './src/settings' } })
 }
 
@@ -86,7 +86,7 @@ afterAll(async () => {
 describe('the names a kay library names kay by', () => {
   it('finds a library whose peer is kay, the name it is published as, or the one it was published as up to 0.3', async () => {
     const app = await scratchDir('dom-')
-    const names = { 'lib-alias': 'kay', 'lib-current': '@kaynooo/kayjs', 'lib-old': '@kaynooo/kay' } as const
+    const names = { 'lib-alias': 'kay', 'lib-current': '@kayjs/kay', 'lib-old': '@kaynooo/kay' } as const
 
     projects.push(app)
     await write(app, { 'package.json': JSON.stringify({ name: 'app', private: true, dependencies: Object.fromEntries(Object.keys(names).map(name => [name, '1.0.0'])) }) })
@@ -545,7 +545,7 @@ describe('a linked library bringing its own kay', () => {
       'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, devDependencies: { kay: '*' }, exports: { './api': './src/api.ts' } }),
       'src/api.ts': 'import { api } from \'kay/server\'\nimport dataTab from \'kay/dev-tab-data\'\nimport only from \'kay/only-here\'\n\nexport default api().get(\'/\', () => ({ from: \'lib\', tab: dataTab.name, only }))\n',
       // The library's own copy, which answers no Elysia instance the app's server would take.
-      'node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module', exports: { './server': './src/server/index.ts', './dev-tab-data': './src/runtime/dev-tab-data.ts', './only-here': './src/only-here.ts' } }),
+      'node_modules/kay/package.json': JSON.stringify({ name: '@kayjs/kay', type: 'module', exports: { './server': './src/server/index.ts', './dev-tab-data': './src/runtime/dev-tab-data.ts', './only-here': './src/only-here.ts' } }),
       'node_modules/kay/src/server/index.ts': 'export function api() {\n  return { get: () => ({ copy: true }) }\n}\n',
       'node_modules/kay/src/runtime/dev-tab-data.ts': 'export default function copy() {}\n',
       'node_modules/kay/src/only-here.ts': 'export default \'copy\'\n',
@@ -571,9 +571,9 @@ describe('a linked library bringing its own kay', () => {
 
     projects.push(checkout, shared, holding)
     await write(checkout, {
-      'package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module' }),
+      'package.json': JSON.stringify({ name: '@kayjs/kay', type: 'module' }),
       'examples/app/package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'shared-lib': '1.0.0', 'holding-lib': '1.0.0' } }),
-      'examples/app/node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs' }),
+      'examples/app/node_modules/kay/package.json': JSON.stringify({ name: '@kayjs/kay' }),
     })
     await write(shared, { 'package.json': JSON.stringify({ name: 'shared-lib', peerDependencies: { kay: '*' } }) })
     await write(holding, { 'package.json': JSON.stringify({ name: 'holding-lib', peerDependencies: { kay: '*' } }) })

@@ -1,5 +1,5 @@
 ---
-import { infiniteList } from '@kaynooo/kayjs-ui'
+import { infiniteList } from '@kayjs/ui'
 
 const { rows } = props<{ rows: { id: number }[] }>()
 

@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 
 const { onChange } = props<{ onChange: (value: number) => unknown }>()
 

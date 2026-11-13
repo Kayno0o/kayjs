@@ -28,9 +28,9 @@ Then a component of the app, which has an island because it holds a signal:
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { rename } from '../routes/posts/[id].kay'
 
 const { post } = props<{ post: Post }>()
@@ -101,10 +101,10 @@ A list adding and editing its rows through one dialog keeps which row is open wi
 
 ```kay
 ---
-import { rowEditing } from '@kaynooo/kayjs-ui'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { rowEditing } from '@kayjs/ui'
+import Button from '@kayjs/ui/button.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { save } from '../routes/friends.kay'
 
 const { friends } = props<{ friends: Friend[] }>()

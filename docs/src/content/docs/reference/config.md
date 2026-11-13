@@ -154,7 +154,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |
 | `timeZone` | The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a message's date and the relative time tooltip, on the server and in islands, unless a call names its own. The server's and the visitor's zone by default, and the zone a `schedule` cron is read in unless it names its own. See [Internationalization](/guides/i18n#sizes-durations-and-the-time-zone) |
 | `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
-| `librarySettings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
+| `librarySettings` | A module for a kay library's settings, such as `{ '@kayjs/ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
 | `lints` | The level of each lint. See [Checks](/reference/checks) |
 
 ## Server

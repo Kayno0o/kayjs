@@ -1,7 +1,7 @@
 ---
 import type { ActivityRow } from '../screens'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 import { wording } from 'kay/words'
 import EntryEdited from './entry-edited.kay'
 

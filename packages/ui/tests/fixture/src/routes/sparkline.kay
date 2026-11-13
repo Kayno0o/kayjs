@@ -1,6 +1,6 @@
 ---
-import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
-import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
+import Sparkline from '@kayjs/ui/sparkline.kay'
+import StatusStrip from '@kayjs/ui/status-strip.kay'
 import '../app.css'
 ---
 main

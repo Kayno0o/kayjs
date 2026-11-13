@@ -1,5 +1,5 @@
 ---
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Stat from '@kayjs/ui/stat.kay'
 ---
 .flex.flex-wrap.gap-6
   Stat(value="1.9e27 kg" label="mass" icon="info")

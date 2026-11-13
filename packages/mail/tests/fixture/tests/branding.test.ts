@@ -1,4 +1,4 @@
-import { mailer } from '@kaynooo/kayjs-mail'
+import { mailer } from '@kayjs/mail'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { branding } from '../src/mail-settings'
 import Branded from '../src/mails/branded.kay'

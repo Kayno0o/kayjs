@@ -444,7 +444,7 @@ describe('the types of auth() with no module', () => {
     // @ts-expect-error -- a default role the hierarchy lacks
     auth({ roles: { admin: [] }, defaultRoles: ['editor'] })
 
-    expect(extension.name).toBe('@kaynooo/kayjs-auth')
+    expect(extension.name).toBe('@kayjs/auth')
   })
 })
 
@@ -476,7 +476,7 @@ describe('the mailer auth() picks', () => {
   })
 
   test('sends through the mailer mail() of kay.config.ts registered when the app has no src/mail.ts', async () => {
-    const { mail: register, outbox } = await import('@kaynooo/kayjs-mail')
+    const { mail: register, outbox } = await import('@kayjs/mail')
     const built = await (register({ from: 'site@site.test' }).server as unknown as () => Promise<Elysia & { stop: () => Promise<unknown> }>)()
     const bare = (extensions: string[]) => ({ root, extensions, modules: {} })
 
@@ -499,18 +499,18 @@ describe('the mailer auth() picks', () => {
   })
 
   test('takes no running mail() for no mailer, and lets a failing registered mailer through', async () => {
-    const real = await import('@kaynooo/kayjs-mail')
+    const real = await import('@kayjs/mail')
     const site = { root, extensions: [MAIL_EXTENSION], modules: {} }
 
     expect(await emailOf(undefined, site)).toBeUndefined()
 
-    void mock.module('@kaynooo/kayjs-mail', () => ({ ...real, registeredMailer: async () => Promise.reject(new Error('loader failed')) }))
+    void mock.module('@kayjs/mail', () => ({ ...real, registeredMailer: async () => Promise.reject(new Error('loader failed')) }))
 
     try {
       await expect(emailOf(undefined, site)).rejects.toThrow('loader failed')
     }
     finally {
-      void mock.module('@kaynooo/kayjs-mail', () => real)
+      void mock.module('@kayjs/mail', () => real)
     }
   })
 

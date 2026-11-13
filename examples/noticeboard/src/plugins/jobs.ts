@@ -1,4 +1,4 @@
-import { AuthUsers } from '@kaynooo/kayjs-auth/pg'
+import { AuthUsers } from '@kayjs/auth/pg'
 import { siteUrl } from 'kay/seo'
 import { queue } from 'kay/server'
 import { db } from '../db'

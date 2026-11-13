@@ -1,5 +1,5 @@
 import type { NoticeInterface } from './db/notice'
-import { AuthUsers } from '@kaynooo/kayjs-auth/pg'
+import { AuthUsers } from '@kayjs/auth/pg'
 import { db } from './db'
 import { Notice } from './db/notice'
 

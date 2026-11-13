@@ -1,4 +1,4 @@
-import type { ListFilter, SortState } from '@kaynooo/kayjs-ui'
+import type { ListFilter, SortState } from '@kayjs/ui'
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'

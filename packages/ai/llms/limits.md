@@ -8,7 +8,7 @@ A public chat is paid for by whoever runs it. `ai()` in `kay.config.ts` sets wha
 
 ```ts
 // kay.config.ts
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 import { sqliteRates } from 'kay/server'
 
 export default defineConfig({

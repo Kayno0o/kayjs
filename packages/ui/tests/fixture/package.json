@@ -3,6 +3,6 @@
   "private": true,
   "dependencies": {
     "@iconify-json/tabler": "*",
-    "@kaynooo/kayjs-ui": "link:../.."
+    "@kayjs/ui": "link:../.."
   }
 }

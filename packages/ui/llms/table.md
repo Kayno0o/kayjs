@@ -5,7 +5,7 @@
 ### Table
 
 ```ts
-import type { Column } from '@kaynooo/kayjs-ui'
+import type { Column } from '@kayjs/ui'
 
 const columns: Column<Post>[] = [
   { key: 'title', header: 'Title', sortValue: true },
@@ -41,7 +41,7 @@ A call with a spread (`Table({...props})`), or a Table read anywhere but as a ta
 
 The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.
 
-Only an import written as `import Table from '@kaynooo/kayjs-ui/table.kay'` (or a relative one) is specialized.
+Only an import written as `import Table from '@kayjs/ui/table.kay'` (or a relative one) is specialized.
 
 ## Reference
 

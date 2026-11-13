@@ -1,8 +1,8 @@
 ---
-import type { IconSlot, Size } from '@kaynooo/kayjs-ui'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
+import type { IconSlot, Size } from '@kayjs/ui'
+import Button from '@kayjs/ui/button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import Tooltip from '@kayjs/ui/tooltip.kay'
 
 // A control the signed-in person's role may not use: disabled, with `reason` as its tooltip. A disabled Button gets no hover or focus, so its tooltip sits on a Tooltip wrapper a keyboard reaches. With `icon` it is an icon button, which keeps its tab stop and shows `label` and the reason as its own tooltip, so it needs no wrapper. `ariaLabel` is the text button's name when the row it sits in must be told apart.
 const { label, reason, ariaLabel, icon, tone, variant, size } = props<{ label: string, reason: string | undefined, ariaLabel?: string | undefined, icon?: IconSlot | undefined, tone?: 'neutral' | 'accent' | 'danger' | undefined, variant?: 'solid' | 'ghost' | 'inline' | undefined, size?: Size | undefined }>()

@@ -50,7 +50,7 @@ export const APPS: App[] = [
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
 const SCOPE_PREFIX = /^@/
 const DOT_SLASH = /^\.\//
-const KAY_ALIAS = 'npm:@kaynooo/kayjs@'
+const KAY_ALIAS = 'npm:@kayjs/kay@'
 
 export interface Manifest {
   name?: string
@@ -76,7 +76,7 @@ export function pointAtKay(manifest: Manifest, tarballs: Record<string, string>)
     const rewritten: Record<string, string> = {}
 
     for (const [name, range] of Object.entries(dependencies)) {
-      const target = range.startsWith(KAY_ALIAS) ? '@kaynooo/kayjs' : name
+      const target = range.startsWith(KAY_ALIAS) ? '@kayjs/kay' : name
       const tarball = tarballs[target]
 
       if (tarball === undefined) {
@@ -97,7 +97,7 @@ export function pointAtKay(manifest: Manifest, tarballs: Record<string, string>)
 
 // Overrides in the root manifest, so the kay and kayjs-* a packed library depends on or peers on come from the tarballs too, not the registry.
 export function overrideKay(manifest: Manifest, tarballs: Record<string, string>): Manifest {
-  const overrides = Object.fromEntries([...Object.entries(tarballs).map(([name, tarball]) => [name, `file:${tarball}`]), ['kay', `file:${tarballs['@kaynooo/kayjs']}`]])
+  const overrides = Object.fromEntries([...Object.entries(tarballs).map(([name, tarball]) => [name, `file:${tarball}`]), ['kay', `file:${tarballs['@kayjs/kay']}`]])
 
   // Sorted, as the apps' own lint asks of a manifest.
   const merged: Record<string, string> = { ...(manifest.overrides as Record<string, string> | undefined), ...overrides }

@@ -1,5 +1,5 @@
 import type { CmsOptions } from '../src/settings'
-import { mailer } from '@kaynooo/kayjs-mail'
+import { mailer } from '@kayjs/mail'
 import { expect, test } from 'bun:test'
 import { configure, settings } from '../src/settings'
 

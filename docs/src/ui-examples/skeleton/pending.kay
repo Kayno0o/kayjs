@@ -1,5 +1,5 @@
 ---
-import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
+import Skeleton from '@kayjs/ui/skeleton.kay'
 
 const comments = new Promise<string[]>(resolve => setTimeout(resolve, 2000, ['Great telescope.', 'Sharp at high power.']))
 ---

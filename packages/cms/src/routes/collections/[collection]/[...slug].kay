@@ -1,5 +1,5 @@
 --- server
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'

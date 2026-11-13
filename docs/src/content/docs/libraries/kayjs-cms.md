@@ -3,17 +3,17 @@ title: kayjs-cms
 order: 4
 description: Edit a kay site's content on the page it renders, and manage each collection from screens generated from its schema.
 ---
-`@kaynooo/kayjs-cms` edits a kay site's [content collections](/guides/content) in two ways. Edit mode opens the real page: click a title, edit it in a sidebar, and the page updates as you type. The screens, generated from each collection's schema, list, search, add, edit, publish and delete entries.
+`@kayjs/cms` edits a kay site's [content collections](/guides/content) in two ways. Edit mode opens the real page: click a title, edit it in a sidebar, and the page updates as you type. The screens, generated from each collection's schema, list, search, add, edit, publish and delete entries.
 
 Both save the same way. A file entry is a Forgejo, GitHub or GitLab commit, or a change in the working tree under `kay dev`. A loaded entry goes through its collection's loader.
 
 ## Install
 
 ```sh
-bun add @kaynooo/kayjs-cms @kaynooo/kayjs-ui @iconify-json/tabler
+bun add @kayjs/cms @kayjs/ui @iconify-json/tabler
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/cms`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
 kay and kayjs-ui are peers. The editor is drawn with kayjs-ui, so the app imports [its theme](/libraries/kayjs-ui#theme). kayjs-cms is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
@@ -24,8 +24,8 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 In a kay project, `kay add cms` installs the packages and adds the extension below with its defaults. Otherwise, put `cms()` in `kay.config.ts`'s `extensions`.
 
 ```ts
-import { auth } from '@kaynooo/kayjs-auth'
-import { cms } from '@kaynooo/kayjs-cms'
+import { auth } from '@kayjs/auth'
+import { cms } from '@kayjs/cms'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -56,7 +56,7 @@ A visitor the guard turns away as anonymous lands on a sign-in screen, not a bar
 For a small site with no members, `passwordGuard` is the whole setup. It takes one password, or one per role:
 
 ```ts
-import { cms, passwordGuard } from '@kaynooo/kayjs-cms'
+import { cms, passwordGuard } from '@kayjs/cms'
 
 cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })
 cms({ guard: passwordGuard({ editor: env.EDITOR_PASSWORD, admin: env.ADMIN_PASSWORD }, { maxAge: '30d' }) })
@@ -72,10 +72,10 @@ Signing out deletes the cookie and ends it on the server, so a copy of it stops 
 
 An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries per visitor every quarter of an hour, and refuses every try once 100 wrong passwords came from anyone in that time.
 
-A test signs a site in without the form, saves an entry and reads it back, with `cmsTest(site)` from `@kaynooo/kayjs-cms/test`:
+A test signs a site in without the form, saves an entry and reads it back, with `cmsTest(site)` from `@kayjs/cms/test`:
 
 ```ts
-import { cmsTest } from '@kaynooo/kayjs-cms/test'
+import { cmsTest } from '@kayjs/cms/test'
 
 const editor = cmsTest(site)
 
@@ -284,7 +284,7 @@ A person your guard let in is told from then on, also after a restart or on anot
 
 A list watches through a room of its own, so it is no editor of the entry to anyone, and it marks the first 50 rows of a page. It also shows "Being edited" for your own other tab on the page editor. A named editor is told of editors without a name as "1 other editor". Every open tab on one of these holds a live connection, so a browser on HTTP/1 allows a host only a few.
 
-A screen of your own built from the parts shows the same list by passing `presence` to `EntryEditor`, or `room` and `member` to `EntryPresence`. `entryPresence(ctx, collection, entry)` from `@kaynooo/kayjs-cms/presence` returns both.
+A screen of your own built from the parts shows the same list by passing `presence` to `EntryEditor`, or `room` and `member` to `EntryPresence`. `entryPresence(ctx, collection, entry)` from `@kayjs/cms/presence` returns both.
 
 ## Collection titles
 
@@ -453,7 +453,7 @@ s.Object({ accent: s.Optional(customField('color', s.String({ pattern: '^#[0-9a-
 ```kay
 ---
 // src/cms/fields/color.kay
-import type { CustomFieldProps } from '@kaynooo/kayjs-cms'
+import type { CustomFieldProps } from '@kayjs/cms'
 
 const { value, onChange, label } = props<CustomFieldProps>()
 ---
@@ -613,7 +613,7 @@ Editors saving on a running site need a loader with `save` and `remove`. kayjs-c
 ```ts
 import { s } from 'kay'
 import { collection } from 'kay/content'
-import { sqliteLoader } from '@kaynooo/kayjs-cms/sqlite'
+import { sqliteLoader } from '@kayjs/cms/sqlite'
 
 export const posts = collection(sqliteLoader({
   name: 'posts',
@@ -625,7 +625,7 @@ export const posts = collection(sqliteLoader({
 })
 ```
 
-The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgLoader` from `@kaynooo/kayjs-cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `source`, a connection URL, a Bun `SQL` or a pg-orm `Database` (`sql` is its deprecated name).
+The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgLoader` from `@kayjs/cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `source`, a connection URL, a Bun `SQL` or a pg-orm `Database` (`sql` is its deprecated name).
 
 A pg-orm app passes its own database, `source: db`, and adds the table to pg-orm's `ignoreTables` (`kay_content` unless you pass `table`), or pg-orm sees it as a table to drop.
 
@@ -764,8 +764,8 @@ A production server refuses to boot on the working tree, as the next deploy woul
 Any `{ save(change) }` is a saver. `change` has the file's `repoPath`, its new `text` (`undefined` to delete it), a commit `message` and the `base` version it was edited from.
 
 ```ts
-import type { FileSaver } from '@kaynooo/kayjs-cms'
-import { fileVersion, SaveConflictError } from '@kaynooo/kayjs-cms'
+import type { FileSaver } from '@kayjs/cms'
+import { fileVersion, SaveConflictError } from '@kayjs/cms'
 
 const saver: FileSaver = {
   async save({ absolute, text, base }) {
@@ -898,29 +898,29 @@ Write a page at the screen's path, such as `src/routes/admin/collections/shop/[.
 
 The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages, Media and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
 
-Give the header a logo in the cms settings: name a module in `kay.config.ts` as `librarySettings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kaynooo/kayjs-cms`).
+Give the header a logo in the cms settings: name a module in `kay.config.ts` as `librarySettings: { '@kayjs/cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kayjs/cms`).
 
 `src` is a file of `public/` or an https URL, shown before the name, and `width`, `height` and `href` are optional (`href` is not used here, as the header links to the admin, and the image is drawn 1.5rem high whatever the size, which only gives its proportions). A `src` that is no path of the site or https URL answers the admin with a 500 naming it.
 
 The pages are `noindex`, and they take kayjs-ui's theme, light or dark as the device is, so the app needs Tailwind and its build plugin, as kayjs-ui does. The `seo` and fonts of `kay.config.ts` and your security headers still apply, but not the CSS or head tags your root layout adds.
 
-An entry screen heads its title with crumbs: Content, then the collection, each a link. A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kaynooo/kayjs-cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
+An entry screen heads its title with crumbs: Content, then the collection, each a link. A `src/routes/admin/_layout.kay` replaces that layout for all the screens. It holds the chrome, the toaster, the tooltip host and the stylesheet `@kayjs/cms/admin.css`. Render kayjs-ui's `Toaster` and `TooltipHost` and import that stylesheet to keep them. Set `export const page = { layouts: false }` in yours to stay clear of the site's layouts as the default does.
 
-In the page, read what the screen reads with `entryScreen`, `listScreen` and `collectionScreen` from `@kaynooo/kayjs-cms`, then render a component of your own, or the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
+In the page, read what the screen reads with `entryScreen`, `listScreen` and `collectionScreen` from `@kayjs/cms`, then render a component of your own, or the screens' own `@kayjs/cms/entry-editor.kay` and `@kayjs/cms/entry-table.kay`.
 
 ## Building an entry screen
 
-To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `cmsEntryForm` from `@kaynooo/kayjs-cms/form`, with the `EntryForm` and `FormScope` types, keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
+To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `cmsEntryForm` from `@kayjs/cms/form`, with the `EntryForm` and `FormScope` types, keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
 
 ```kay
 ---
-import type { ScreenCollection, StoredEntry } from '@kaynooo/kayjs-cms'
-import EntryActions from '@kaynooo/kayjs-cms/entry-actions.kay'
-import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
-import EntryHeader from '@kaynooo/kayjs-cms/entry-header.kay'
-import EntryIdentity from '@kaynooo/kayjs-cms/entry-identity.kay'
-import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
-import { cmsEntryForm } from '@kaynooo/kayjs-cms/form'
+import type { ScreenCollection, StoredEntry } from '@kayjs/cms'
+import EntryActions from '@kayjs/cms/entry-actions.kay'
+import EntryField from '@kayjs/cms/entry-field.kay'
+import EntryHeader from '@kayjs/cms/entry-header.kay'
+import EntryIdentity from '@kayjs/cms/entry-identity.kay'
+import EntryNotices from '@kayjs/cms/entry-notices.kay'
+import { cmsEntryForm } from '@kayjs/cms/form'
 
 const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()
 

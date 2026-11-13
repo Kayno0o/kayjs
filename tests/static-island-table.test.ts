@@ -12,14 +12,14 @@ afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
-const PAGE = (table: string) => `---\nimport Table from '@kaynooo/kayjs-ui/table.kay'\n\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst ROWS = [{ id: 1, name: 'Ada' }]\n---\n${table}\n`
+const PAGE = (table: string) => `---\nimport Table from '@kayjs/ui/table.kay'\n\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst ROWS = [{ id: 1, name: 'Ada' }]\n---\n${table}\n`
 
 describe('a Table drawn by a page', () => {
   it('is no island with nothing interactive, sorting or not, and one with any feature', async () => {
     const root = resolve(await fixtureCopy('ui-list'))
 
     dirs.push(root)
-    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'static-table', dependencies: { 'kay': '*', '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
+    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'static-table', dependencies: { 'kay': '*', '@kayjs/ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
 
     const tables = { plain: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} label="People")', sorted: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id")', selected: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} selectable)', paged: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} pageSize={5})' }
 

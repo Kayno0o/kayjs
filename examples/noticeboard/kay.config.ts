@@ -1,5 +1,5 @@
-import { auth } from '@kaynooo/kayjs-auth'
-import { mail } from '@kaynooo/kayjs-mail'
+import { auth } from '@kayjs/auth'
+import { mail } from '@kayjs/mail'
 import tailwind from 'bun-plugin-tailwind'
 import { defineConfig } from 'kay/server'
 

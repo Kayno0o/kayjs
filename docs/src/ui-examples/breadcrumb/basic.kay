@@ -1,5 +1,5 @@
 ---
-import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+import Breadcrumb from '@kayjs/ui/breadcrumb.kay'
 
 const items = [
   { label: 'Home', href: '/' },

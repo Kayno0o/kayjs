@@ -1,4 +1,4 @@
-import { ai } from '@kaynooo/kayjs-ai'
+import { ai } from '@kayjs/ai'
 import { defineConfig } from 'kay/server'
 
 const ESCAPED = /[&<>]/g

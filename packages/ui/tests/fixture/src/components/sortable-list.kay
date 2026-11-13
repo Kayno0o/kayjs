@@ -1,5 +1,5 @@
 ---
-import { Sortable } from '@kaynooo/kayjs-ui/dnd'
+import { Sortable } from '@kayjs/ui/dnd'
 import { signal } from 'kay'
 
 // Rows that really move in a keyed list, so a test sees the order a later key press has to start from.

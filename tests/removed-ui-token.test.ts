@@ -126,7 +126,7 @@ describe('removed-ui-token', () => {
       expect(await after('src/app.css')).toBe(css)
       expect(found).toHaveLength(6)
       expect(found.every(problem => problem.code === 'removed-ui-token' && problem.severity === 'warning' && problem.fixes === undefined)).toBe(true)
-      expect(found.find(problem => problem.message.startsWith('`--kui-badge-case`'))?.help).toContain('\'@kaynooo/kayjs-ui/badge.kay\': { parts: { root: \'normal-case\' } }')
+      expect(found.find(problem => problem.message.startsWith('`--kui-badge-case`'))?.help).toContain('\'@kayjs/ui/badge.kay\': { parts: { root: \'normal-case\' } }')
       expect(found.find(problem => problem.message.startsWith('`--kui-shell-line`'))?.help).toContain('`--shell-line`')
       expect(found.find(problem => problem.message.startsWith('`--kui-border-badge`'))?.help).toContain('`--border-width`')
     }
@@ -142,7 +142,7 @@ describe('removed-ui-token', () => {
       'p(class="bg-card-kui-canvas not-bg-kui-canvasx") y',
       '',
     ].join('\n')
-    const ui = 'export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'bg-kui-mantle border-kui-overlay0 text-kui-subtext0\' } } }\n'
+    const ui = 'export default { \'@kayjs/ui/card.kay\': { parts: { root: \'bg-kui-mantle border-kui-overlay0 text-kui-subtext0\' } } }\n'
     const { root, found, after } = await fixed({ 'src/routes/index.kay': page, 'src/ui.ts': ui })
 
     try {
@@ -152,7 +152,7 @@ describe('removed-ui-token', () => {
         'p(class="bg-card-kui-canvas not-bg-kui-canvasx") y',
         '',
       ].join('\n'))
-      expect(await after('src/ui.ts')).toBe('export default { \'@kaynooo/kayjs-ui/card.kay\': { parts: { root: \'bg-popover border-border-strong text-muted\' } } }\n')
+      expect(await after('src/ui.ts')).toBe('export default { \'@kayjs/ui/card.kay\': { parts: { root: \'bg-popover border-border-strong text-muted\' } } }\n')
       expect(found.filter(problem => problem.fixes === undefined).map(problem => (/^`[^`]+`/).exec(problem.message)?.[0])).toEqual(['`bg-kui-fill-danger`'])
     }
     finally {

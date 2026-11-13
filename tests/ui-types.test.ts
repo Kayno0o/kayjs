@@ -39,7 +39,7 @@ async function problems(ui: string, use = 'Tile(title="t")\nUnion\n', extra: Rec
       Bun.write(join(root, 'src/loose.kay'), LOOSE),
       Bun.write(join(root, 'src/union.kay'), UNION),
       Bun.write(join(root, 'src/use.kay'), `---\nimport Tile from './components/tile.kay'\nimport Union from './union.kay'\n---\n${use}`),
-      Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': '*', 'kay': '*' } })),
+      Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kayjs/ui': '*', 'kay': '*' } })),
       Bun.write(join(root, 'src/ui.ts'), ui),
       ...Object.entries(extra).map(async ([file, text]) => Bun.write(join(root, file), text)),
     ])
@@ -154,9 +154,9 @@ describe('a value added to a kayjs-ui component', () => {
 
     try {
       await Promise.all([
-        Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': '*', 'kay': '*' } })),
+        Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kayjs/ui': '*', 'kay': '*' } })),
         Bun.write(join(root, 'src/ui.ts'), 'export default { Button: { variants: { tone: { brand: \'bg-brand\' } } }, ConfirmDelete: { parts: \'p-1\' }, Notice: { variants: { tone: { brand: \'x\' } } }, Dialog: { variants: { size: { huge: \'x\' } } } }'),
-        Bun.write(join(root, 'src/use.kay'), '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Notice from \'@kaynooo/kayjs-ui/notice.kay\'\n---\nButton(tone="brand" label="a")\nNotice(tone="brand") a\n'),
+        Bun.write(join(root, 'src/use.kay'), '---\nimport Button from \'@kayjs/ui/button.kay\'\nimport Notice from \'@kayjs/ui/notice.kay\'\n---\nButton(tone="brand" label="a")\nNotice(tone="brand") a\n'),
       ])
       expect((await check(root)).map(problem => `${problem.file}: ${problem.message}`)).toEqual([])
     }

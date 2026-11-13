@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
 import { sleep } from '@kaynooo/utils/function'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Button from '@kayjs/ui/button.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 import { wording } from 'kay/words'
 import { fetchSitePaths } from '../editor/save'
 import type { RedirectStatus } from '../missing'

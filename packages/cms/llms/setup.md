@@ -9,8 +9,8 @@ Installing the cms, where a folder entry's file goes when an editor saves, and h
 `kay add cms` installs the packages and adds `cms()` to `extensions`. `role` lets in the kayjs-auth users holding it, the app's `authorize` deciding as in `auth.guard()`; a production server with no `files` commits to the Forgejo `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH` name, or to GitHub or GitLab with `CMS_HOST=github` or `CMS_HOST=gitlab` and the same minus `CMS_BASE_URL` (`kay env` lists them), and refuses to boot without them. Hosts: Forgejo, GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed) ship a saver; `forgejo()` is written against Forgejo's batch contents endpoint and is not verified against Gitea, and any other host needs a saver of your own, below.
 
 ```ts
-import { auth } from '@kaynooo/kayjs-auth'
-import { cms } from '@kaynooo/kayjs-cms'
+import { auth } from '@kayjs/auth'
+import { cms } from '@kayjs/cms'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({ role: 'editor' })] })

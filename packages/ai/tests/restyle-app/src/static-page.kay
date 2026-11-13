@@ -1,5 +1,5 @@
 ---
-import Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+import Launcher from '@kayjs/ai/chat-launcher.kay'
 
 const reply = (() => undefined) as never
 ---

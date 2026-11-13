@@ -1,11 +1,11 @@
 --- island
-import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
-import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
-import MapView from '@kaynooo/kayjs-ui/map-view.kay'
-import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
-import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
-import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+import ImageCropper from '@kayjs/ui/image-cropper.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
+import Masonry from '@kayjs/ui/masonry.kay'
+import MapView from '@kayjs/ui/map-view.kay'
+import MediaGallery from '@kayjs/ui/media-gallery.kay'
+import ScatterChart from '@kayjs/ui/scatter-chart.kay'
+import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 
 const picture = (colour: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="${colour}"/></svg>`)}`
 const items = [{ key: 1, kind: 'image' as const, thumb: picture('#6c8ef5'), preview: picture('#6c8ef5'), label: 'Blue' }, { key: 2, kind: 'image' as const, thumb: picture('#f58fb0'), preview: picture('#f58fb0'), label: 'Pink' }]

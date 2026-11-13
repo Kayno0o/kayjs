@@ -1,5 +1,5 @@
 --- server
-import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kayjs/ai'
 import { action, s } from 'kay'
 
 // Says one word and keeps working until the visitor stops it, so a test speaks while a reply is under way.
@@ -20,7 +20,7 @@ export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }
   return text === 'refuse' ? ctx.fail(422, 'Too noisy to write down.') : { text }
 }, { maxSize: '1mb' })
 --- script
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Speaking
 Chat(action={reply} label="Assistant" attach newButton transcribe={transcribe})

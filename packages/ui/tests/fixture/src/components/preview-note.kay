@@ -1,6 +1,6 @@
 --- island
 import { trustHtml } from 'kay'
-import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
 
 // A note opened with its preview on and the first preview rendered by the server; `preview` answers what the same text renders to, a moment later.
 const { html } = props<{ html: string }>()

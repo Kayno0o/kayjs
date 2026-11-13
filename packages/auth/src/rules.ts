@@ -1,4 +1,4 @@
-// The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kaynooo/kayjs-auth/rules` to refuse before posting, and the server checks every one again.
+// The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kayjs/auth/rules` to refuse before posting, and the server checks every one again.
 
 import { isEmail } from 'kay'
 

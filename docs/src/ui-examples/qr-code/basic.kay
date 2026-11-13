@@ -1,5 +1,5 @@
 ---
-import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+import QrCode from '@kayjs/ui/qr-code.kay'
 ---
 QrCode(
   value="https://kayjs.kaynooo.fr"

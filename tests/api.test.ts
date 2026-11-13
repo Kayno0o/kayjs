@@ -86,13 +86,13 @@ it('names only entries and exports that exist', () => {
   }
 })
 
-// A copy `kay ui eject` writes imports its shared siblings as `@kaynooo/kayjs-ui/lib/<name>`, which the wildcard export keeps resolving.
+// A copy `kay ui eject` writes imports its shared siblings as `@kayjs/ui/lib/<name>`, which the wildcard export keeps resolving.
 it('resolves every lib import of a ui component', () => {
   const exports = (JSON.parse(readFileSync('packages/ui/package.json', 'utf8')) as { exports: Record<string, string> }).exports
 
   expect(exports['./lib/*']).toBe('./src/*.ts')
 
-  const imports = [...new Glob('packages/ui/src/**/*.{kay,ts}').scanSync()].flatMap(file => [...readFileSync(file, 'utf8').matchAll(/@kaynooo\/kayjs-ui\/lib\/([\w-]+)/g)].map(match => match[1]!))
+  const imports = [...new Glob('packages/ui/src/**/*.{kay,ts}').scanSync()].flatMap(file => [...readFileSync(file, 'utf8').matchAll(/@kayjs\/ui\/lib\/([\w-]+)/g)].map(match => match[1]!))
 
   for (const name of new Set(imports))
     expect(Bun.file(`packages/ui/src/${name}.ts`).size, name).toBeGreaterThan(0)

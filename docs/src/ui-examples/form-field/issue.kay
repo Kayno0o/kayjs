@@ -1,5 +1,5 @@
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 ---
 .max-w-sm
   FormField(label="Title" issue="Two letters at least" required)

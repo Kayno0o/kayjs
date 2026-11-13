@@ -2,9 +2,9 @@
 import { formatDate, localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { describeAuditEntry } from '../../../auditWording'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 const PAGE_SIZE = 50
 const CURSOR_MAX = 2000

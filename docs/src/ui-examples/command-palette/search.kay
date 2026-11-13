@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
-import type { PaletteEntry } from '@kaynooo/kayjs-ui'
-import { toast } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import CommandPalette from '@kayjs/ui/command-palette.kay'
+import type { PaletteEntry } from '@kayjs/ui'
+import { toast } from '@kayjs/ui'
 
 const open = signal(false)
 const entries: PaletteEntry[] = [

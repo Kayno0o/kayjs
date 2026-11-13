@@ -80,7 +80,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
 export type OwnPlugin<Role extends string, Prefix extends string, Scope extends string, OrgRole extends string, UserData extends object> = ReturnType<typeof CreateAuth<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>>['plugin']
 
 // The name kayjs-mail's `mail()` extension lists itself by.
-export const MAIL_EXTENSION = '@kaynooo/kayjs-mail'
+export const MAIL_EXTENSION = '@kayjs/mail'
 // A relative SQLite path: `sqlite://data/auth.sqlite`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
 const SQLITE_FILE = /^sqlite:(?:\/\/)?(?![/:])([^?]+)$/
 
@@ -232,10 +232,10 @@ async function registeredMailer(app: ExtensionApp): Promise<unknown> {
   if (!app.extensions.includes(MAIL_EXTENSION))
     return undefined
 
-  let mail: typeof import('@kaynooo/kayjs-mail')
+  let mail: typeof import('@kayjs/mail')
 
   try {
-    mail = await import('@kaynooo/kayjs-mail')
+    mail = await import('@kayjs/mail')
   }
   catch {
     return undefined
@@ -264,7 +264,7 @@ export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Pr
     return withPrivacy({ mailer: { send: send as never } }, mail)
 
   try {
-    const { authMailer } = await import('@kaynooo/kayjs-mail')
+    const { authMailer } = await import('@kayjs/mail')
 
     return withPrivacy({ mailer: authMailer(send as never) }, mail)
   }

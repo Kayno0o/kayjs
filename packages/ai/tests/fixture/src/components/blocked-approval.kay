@@ -1,6 +1,6 @@
 --- island
 import { approving } from '../routes/tools.kay'
-import Chat from '@kaynooo/kayjs-ai/chat.kay'
+import Chat from '@kayjs/ai/chat.kay'
 ---
 Chat(action={approving} label="Assistant" editable)
   @turn(turn, index)

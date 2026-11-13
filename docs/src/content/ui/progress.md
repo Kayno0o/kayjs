@@ -18,7 +18,7 @@ An action's `progress()` reads from 0 to 1 while the browser sends a file, so pa
 
 ```kay
 ---
-import Progress from '@kaynooo/kayjs-ui/progress.kay'
+import Progress from '@kayjs/ui/progress.kay'
 import { upload } from '../routes/photos.kay'
 
 async function send(event: Event) {

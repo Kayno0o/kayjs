@@ -1,5 +1,5 @@
 ---
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import FileDrop from '@kayjs/ui/file-drop.kay'
 
 // A zone keeping its files for a form, reporting what it left out and what it keeps.
 const { onReject, onChange, issue, plain = false } = props<{ onReject: (reason: string, names: string[]) => void, onChange: (names: string[]) => void, issue?: string | undefined, plain?: boolean }>()

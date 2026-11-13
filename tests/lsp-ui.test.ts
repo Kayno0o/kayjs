@@ -165,7 +165,7 @@ describe('completion through the language server', () => {
   let editor: Editor
 
   const files: Record<string, string> = {
-    'package.json': '{ "name": "ui-completion", "type": "module", "dependencies": { "kay": "*", "@kaynooo/kayjs-ui": "*" } }\n',
+    'package.json': '{ "name": "ui-completion", "type": "module", "dependencies": { "kay": "*", "@kayjs/ui": "*" } }\n',
     'src/components/panel.kay': '---\nimport { recipe } from \'kay\'\nconst look = recipe({ parts: { root: \'p-2\', body: \'text-sm\' }, variants: { size: { sm: \'text-sm\', lg: \'text-lg\' } } })\n---\ndiv(part="root")\n  div(part="body")\n    slot\n',
     'src/components/plain.kay': 'div Plain\n',
   }

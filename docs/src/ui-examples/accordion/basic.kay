@@ -1,5 +1,5 @@
 --- island
-import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+import Accordion from '@kayjs/ui/accordion.kay'
 
 const items = [
   { key: 'shipping', label: 'Shipping', open: true },

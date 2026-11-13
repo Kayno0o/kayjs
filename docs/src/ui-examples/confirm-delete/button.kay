@@ -1,6 +1,6 @@
 ---
-import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import ConfirmDelete from '@kayjs/ui/confirm-delete.kay'
+import { toast } from '@kayjs/ui'
 
 async function empty() {
   await new Promise(resolve => setTimeout(resolve, 600))

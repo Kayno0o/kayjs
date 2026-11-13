@@ -1,5 +1,5 @@
 ---
-import type { ListConfirmProps } from '@kaynooo/kayjs-mail'
+import type { ListConfirmProps } from '@kayjs/mail'
 import { rendered } from '../counter'
 
 const { url, site, host } = props<ListConfirmProps>()

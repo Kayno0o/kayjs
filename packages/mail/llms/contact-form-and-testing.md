@@ -8,7 +8,7 @@
 
 ```kay
 --- server
-import { contactForm } from '@kaynooo/kayjs-mail'
+import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
 import { mail } from '../mail'
 
@@ -29,7 +29,7 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 Under `bun test` mails go to the outbox, with no SMTP server to stub:
 
 ```ts
-import { mailTest } from '@kaynooo/kayjs-mail/test'
+import { mailTest } from '@kayjs/mail/test'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'
@@ -100,8 +100,8 @@ The provider's bounces and complaints come from its own webhook: set the matchin
 
 ```ts
 // src/auth.ts
-import { authCore } from '@kaynooo/kayjs-auth'
-import { authMailer } from '@kaynooo/kayjs-mail'
+import { authCore } from '@kayjs/auth'
+import { authMailer } from '@kayjs/mail'
 import { mail } from './mail'
 
 export const auth = authCore({
@@ -136,9 +136,9 @@ authMailer(mail.enqueue, { views: { 'reset-password': () => import('./mails/auth
 import { t } from 'kay/i18n'
 
 // src/mails/auth/reset-password.kay
-import type { AuthMail } from '@kaynooo/kayjs-mail'
-import AuthLink from '@kaynooo/kayjs-mail/auth-link.kay'
-import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import type { AuthMail } from '@kayjs/mail'
+import AuthLink from '@kayjs/mail/auth-link.kay'
+import Paragraph from '@kayjs/mail/paragraph.kay'
 
 const { mail } = props<{ mail: AuthMail }>()
 ---

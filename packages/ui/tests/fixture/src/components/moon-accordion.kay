@@ -1,5 +1,5 @@
 --- island
-import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+import Accordion from '@kayjs/ui/accordion.kay'
 
 const { multiple = false, level } = props<{ multiple?: boolean, level?: 1 | 2 | 3 | 4 | 5 | 6 }>()
 const items = [{ key: 'mars', label: 'Mars' }, { key: 'venus', label: 'Venus', open: true }, { key: 'earth', label: 'Earth' }]

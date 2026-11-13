@@ -169,7 +169,7 @@ afterAll(async () => {
     await rm(join((await serverPreset).dir, '..'), { recursive: true, force: true })
 }, 60_000)
 
-const LIBRARIES = ['kayjs-auth', 'kayjs-mail', 'kayjs-ui']
+const LIBRARIES = ['auth', 'mail', 'ui']
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.
 async function installKay(dir: string) {
@@ -192,13 +192,13 @@ async function installKay(dir: string) {
 
   // kayjs-auth, kayjs-mail (which auth types a dynamic import of) and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
   if (await Bun.file(join(dir, 'src/routes/_guard.ts')).exists()) {
-    const scope = join(modules, '@kaynooo')
+    const scope = join(modules, '@kayjs')
 
     await rm(scope, { force: true })
     await mkdir(scope)
     await Promise.all([
-      ...(await readdir(join(repo, 'node_modules/@kaynooo'))).filter(name => !LIBRARIES.includes(name)).map(async name => symlink(join(repo, 'node_modules/@kaynooo', name), join(scope, name))),
-      ...LIBRARIES.map(async name => cp(join(repo, 'node_modules/@kaynooo', name), join(scope, name), { recursive: true, dereference: true, filter: source => basename(source) !== 'node_modules' })),
+      ...(await readdir(join(repo, 'node_modules/@kayjs'))).filter(name => !LIBRARIES.includes(name)).map(async name => symlink(join(repo, 'node_modules/@kayjs', name), join(scope, name))),
+      ...LIBRARIES.map(async name => cp(join(repo, 'node_modules/@kayjs', name), join(scope, name), { recursive: true, dereference: true, filter: source => basename(source) !== 'node_modules' })),
     ])
   }
 }
@@ -826,7 +826,7 @@ describe('kay new', () => {
 
       expect(manifest.scripts.dev).toBe('kay dev')
       expect(Object.keys(manifest.scripts).filter(name => name.startsWith('db:'))).toEqual([])
-      expect(Object.keys(manifest.dependencies)).toEqual(expect.arrayContaining(['@kaynooo/kayjs-auth', '@kaynooo/kayjs-ui', '@kaynooo/pg-orm']))
+      expect(Object.keys(manifest.dependencies)).toEqual(expect.arrayContaining(['@kayjs/auth', '@kayjs/ui', '@kaynooo/pg-orm']))
       // No Postgres service in CI, and the file lives on a volume the image prepares for the app's user.
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).not.toContain('postgres')
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN mkdir data && chown nobody data\n')
@@ -921,7 +921,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL')
       expect(await Bun.file(join(dir, 'src/db/tables.ts')).text()).toContain('export const tables = [...authTables]')
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('import { tables } from \'./src/db/tables\'')
-      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('store: async () => (await import(\'@kayjs/auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)

@@ -1,5 +1,5 @@
 ---
-import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import Pagination from '@kayjs/ui/pagination.kay'
 ---
 Pagination(
   page={10}

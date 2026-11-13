@@ -1,5 +1,5 @@
 ---
-import Progress from '@kaynooo/kayjs-ui/progress.kay'
+import Progress from '@kayjs/ui/progress.kay'
 
 const done = 30
 ---

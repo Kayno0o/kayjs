@@ -203,16 +203,16 @@ describe('kay check on the catalogs', () => {
     const write = async (locale: string, body: string) => Bun.write(join(root, 'src/messages', `${locale}.ts`), `import { defineMessages } from 'kay/i18n'\n\nexport default defineMessages(${body})\n`)
 
     try {
-      await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kaynooo/kayjs-ui': 'workspace:*', '@kaynooo/kayjs-mail': 'workspace:*' } }))
-      await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
-      await symlink(join(import.meta.dir, '../packages/ui'), join(root, 'node_modules/@kaynooo/kayjs-ui'))
-      await symlink(join(import.meta.dir, '../packages/mail'), join(root, 'node_modules/@kaynooo/kayjs-mail'))
+      await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@kayjs/ui': 'workspace:*', '@kayjs/mail': 'workspace:*' } }))
+      await mkdir(join(root, 'node_modules/@kayjs'), { recursive: true })
+      await symlink(join(import.meta.dir, '../packages/ui'), join(root, 'node_modules/@kayjs/ui'))
+      await symlink(join(import.meta.dir, '../packages/mail'), join(root, 'node_modules/@kayjs/mail'))
       await write('en', '{ title: \'Words\', bye: \'Bye\' }')
       await write('fr', '{ title: \'Mots\', bye: \'Salut\' }')
       await write('de', '{ title: \'Wörter\' }')
       const extensions = libraryMessageExtensions(root)
 
-      expect(extensions.map(({ name }) => name).toSorted()).toEqual(['@kaynooo/kayjs-mail', '@kaynooo/kayjs-ui'])
+      expect(extensions.map(({ name }) => name).toSorted()).toEqual(['@kayjs/mail', '@kayjs/ui'])
 
       // kayjs-ui ships fr alone and kayjs-mail en and fr: de is held to the app's own keys.
       for (const defaultLocale of ['en', 'fr'])

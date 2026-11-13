@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Tabs from '@kayjs/ui/tabs.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // The access group sits on a tab other than the one shown, and its message arrives from outside as a refused post would.
 const issue = signal<string>()

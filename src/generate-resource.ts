@@ -284,10 +284,10 @@ function tableComponent(names: Names, fields: readonly Field[]): string {
   const columns = fields.map(({ name, label, type }, index) => `  { key: '${name}', header: '${label}', sortValue: true${index === 0 ? ', cell: true' : ''}${type === 'int' || type === 'float' ? ', numeric: true' : ''} },`).join('\n')
 
   return `--- island
-import type { Column } from '@kaynooo/kayjs-ui'
+import type { Column } from '@kayjs/ui'
 import type { InferEntity } from '@kaynooo/pg-orm'
 import type { ${pascal} } from '../db/${slug}'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Table from '@kayjs/ui/table.kay'
 
 type Row = InferEntity<typeof ${pascal}>
 
@@ -320,7 +320,7 @@ function editPage(names: Names, fields: readonly Field[], project: ResourceProje
   const removal = `form(action={remove.with({ id: ${row}.id })})\n  button Delete\na(href="/${folder}") Back\n`
 
   if (project.ui)
-    return `${server}--- script\nimport FormField from '@kaynooo/kayjs-ui/form-field.kay'\nimport SaveForm from '@kaynooo/kayjs-ui/save-form.kay'\n---\n${head}SaveForm(action={update} failureLabel="Could not save the ${label.toLowerCase()}" saved="Saved.")\n  input(type="hidden" name="id" value={${row}.id})\n${controls(fields, true, row, 1).join('\n')}\n${removal}`
+    return `${server}--- script\nimport FormField from '@kayjs/ui/form-field.kay'\nimport SaveForm from '@kayjs/ui/save-form.kay'\n---\n${head}SaveForm(action={update} failureLabel="Could not save the ${label.toLowerCase()}" saved="Saved.")\n  input(type="hidden" name="id" value={${row}.id})\n${controls(fields, true, row, 1).join('\n')}\n${removal}`
 
   return `${server}---\n${head}form(action={update.with({ id: ${row}.id })})\n${controls(fields, false, row, 1).join('\n')}\n  button Save\n${removal}`
 }
@@ -329,9 +329,9 @@ function createDialog(names: Names, fields: readonly Field[]): string {
   const label = names.label.toLowerCase()
 
   return `---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Button from '@kayjs/ui/button.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import FormField from '@kayjs/ui/form-field.kay'
 import { signal } from 'kay'
 import { create } from '../routes/${names.folder}/_actions.kay'
 
@@ -360,7 +360,7 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
   const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean') ?? fields[0]!
   const person = `{ email: 'ada@example.com', username: 'Ada' }`
   const signIn = project.auth ? `  await ${project.authModule ? `auth.signInAs(site, ${person})` : `authTest(site).signInAs(${person})`}\n` : ''
-  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kaynooo/kayjs-auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { db } from '../src/db'\nimport { ${names.pascal} } from '../src/db/${names.slug}'\nimport { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
+  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kayjs/auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { db } from '../src/db'\nimport { ${names.pascal} } from '../src/db/${names.slug}'\nimport { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
   const refusal = `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
 
   const listed = shown.type === 'boolean' ? `expect(page.text()).not.toContain('No ${plural.toLowerCase()} yet.')` : `expect(page.text()).toContain('${TYPES[shown.type].shown}')`

@@ -1,6 +1,6 @@
 --- island
-import { infiniteList } from '@kaynooo/kayjs-ui'
-import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+import { infiniteList } from '@kayjs/ui'
+import LoadMore from '@kayjs/ui/load-more.kay'
 
 const SIZE = 15
 const TOTAL = 40

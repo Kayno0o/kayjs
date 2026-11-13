@@ -1,5 +1,5 @@
-import type { UiSettings } from '@kaynooo/kayjs-ui'
-import { uiDefaults } from '@kaynooo/kayjs-ui'
+import type { UiSettings } from '@kayjs/ui'
+import { uiDefaults } from '@kayjs/ui'
 
 const { alert, back, chevron, close, delete: remove, globe, info, menu, play, plus, search, spinner, star, success, zoomFit, zoomIn, zoomOut } = uiDefaults.icons
 

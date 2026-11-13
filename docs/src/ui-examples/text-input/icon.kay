@@ -1,6 +1,6 @@
 ---
 import { signal } from 'kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
 
 const query = signal('')
 ---

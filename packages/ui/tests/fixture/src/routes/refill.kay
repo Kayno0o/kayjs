@@ -23,20 +23,20 @@ export const signup = action(t.Object({
 }), async () => 'ok')
 ---
 ---
-import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
-import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import Rating from '@kaynooo/kayjs-ui/rating.kay'
-import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
-import Slider from '@kaynooo/kayjs-ui/slider.kay'
-import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
-import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
-import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import ColorInput from '@kayjs/ui/color-input.kay'
+import DateInput from '@kayjs/ui/date-input.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import Rating from '@kayjs/ui/rating.kay'
+import Segmented from '@kayjs/ui/segmented.kay'
+import Slider from '@kayjs/ui/slider.kay'
+import TimeInput from '@kayjs/ui/time-input.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import ChipGroup from '@kayjs/ui/chip-group.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Select from '@kayjs/ui/select.kay'
+import Textarea from '@kayjs/ui/textarea.kay'
+import TextInput from '@kayjs/ui/text-input.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 const plans = [{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]
 const sizes = [{ value: 's', label: 'Small' }, { value: 'l', label: 'Large' }]

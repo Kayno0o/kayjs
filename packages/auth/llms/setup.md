@@ -4,13 +4,13 @@
 
 ### Setup
 
-kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types), kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
+kayjs-auth is published as `@kayjs/auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types), kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
 
 One line in kay.config.ts is the whole setup, and the app has no auth file:
 
 ```ts
 // kay.config.ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -28,9 +28,9 @@ Session data of the app's own, or a store wired by hand, takes `auth({ module: '
 
 ```ts
 // src/auth.ts
-import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { authCore } from '@kaynooo/kayjs-auth'
-import { authTables, pgAuth } from '@kaynooo/kayjs-auth/pg'
+import type { AuthSessionData } from '@kayjs/auth'
+import { authCore } from '@kayjs/auth'
+import { authTables, pgAuth } from '@kayjs/auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 import { session } from 'kay/server'
 import { Posts } from './tables'
@@ -47,7 +47,7 @@ export const auth = authCore({
 
 ```ts
 // kay.config.ts
-import { auth } from '@kaynooo/kayjs-auth'
+import { auth } from '@kayjs/auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
@@ -83,8 +83,8 @@ A plain Elysia app, or one mounting the plugin by hand, gives `auth({ server: fa
 
 - `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`: the signed-in state lives in the app's kay session, and kayjs-auth sets no cookie of its own.
 - `secret`: derived from the session's secret ([The app secret](../../../llms/environment.md#the-app-secret)), so keep old session secrets in its list while sealed TOTP secrets and provider tokens exist. Pass one (32 characters or more; a list rotates) only to keep a separate one; moving from `AUTH_SECRET` takes `secret: [...sessions.deriveSecret('kayjs-auth'), process.env.AUTH_SECRET!]` until nothing sealed under the old one is left.
-- The OAuth plumbing behind `oauth` (`createOAuthClient`, `createOAuthTokenRefresher`, `createTokenRefresher`, `createPkcePair`, `challengeOf`, `OAuthExchangeError`), `SIGNED_IN_HINT`, `resolveRules`, `DEFAULT_RULES`, `mixesConfusableScripts` and the modules of `@kaynooo/kayjs-auth/pages/*.kay` (their `load`, `page` and actions) are what the extension mounts, not API: replace a page by writing one at its path.
-- `store`: see Stores. `authTables` of `@kaynooo/kayjs-auth/pg` is every table below, each exported on its own for an app table's foreign key: `AuthUsers`, `AuthSessions`, `AuthIdentities`, `AuthPasskeys`, `AuthRecoveryCodes`, `AuthTokens`, `AuthAttempts`, `AuthAudit`, `AuthBearerTokens`, `AuthOrganizations`, `AuthMembers`, `AuthInvitations`, `AuthOAuthClients`, `AuthOAuthCodes`, `AuthOAuthGrants` and `AuthOAuthRefresh`.
+- The OAuth plumbing behind `oauth` (`createOAuthClient`, `createOAuthTokenRefresher`, `createTokenRefresher`, `createPkcePair`, `challengeOf`, `OAuthExchangeError`), `SIGNED_IN_HINT`, `resolveRules`, `DEFAULT_RULES`, `mixesConfusableScripts` and the modules of `@kayjs/auth/pages/*.kay` (their `load`, `page` and actions) are what the extension mounts, not API: replace a page by writing one at its path.
+- `store`: see Stores. `authTables` of `@kayjs/auth/pg` is every table below, each exported on its own for an app table's foreign key: `AuthUsers`, `AuthSessions`, `AuthIdentities`, `AuthPasskeys`, `AuthRecoveryCodes`, `AuthTokens`, `AuthAttempts`, `AuthAudit`, `AuthBearerTokens`, `AuthOrganizations`, `AuthMembers`, `AuthInvitations`, `AuthOAuthClients`, `AuthOAuthCodes`, `AuthOAuthGrants` and `AuthOAuthRefresh`.
 - `site`: the site's public origin, for OAuth callbacks, mailed links and passkeys; kay's `site` (kay.config.ts, else `SITE_URL`) when left out; a plain Elysia app gives its own. With OAuth or mail configured and no origin anywhere, the server refuses to start and a request answers 500, naming `SITE_URL`; `kay dev` supplies `http://localhost:<port>`. `name`: the site's name in mails and authenticator apps, the origin's host by default.
 - `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default, and where `authGuard()` and `requireUser()` send an anonymous visitor opening a page when there are no `pages`. `failurePage`: where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak through an `allow` list. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `securityPage`: where `twoFactor.require` sends a user to turn two-factor on, the pages' account security page by default. `pages`: see Prebuilt pages, which these then default to.
 - The rest sit with their topic: `oauth`, `allow`, `onSignUp`, `profileFields` (OAuth); `signUp`, `rules` (Passwords); `email` (Mailed links); `beforeDelete` (Account); `account` (Deleting an account after a grace period); `onEvent` (Security mails); `roles`, `defaultRoles`, `authorize` (Guards and gates); `scopes` (Bearer tokens); `rateLimit` (Limits); `captcha`, `breachedPasswords` (Bots and breached passwords); `remember`, `sessionsPage`, `locate` (Sessions); `passkeys`; `audit` (Events and the audit log); `admin`; `organizations`; `oauthServer` (OAuth server for MCP clients). The hooks follow [kay's hook convention](../../../llms/hooks.md) and take one event object with a `context` (an `AuthHookContext`): `onSignUp({ user, profile, context })`, `beforeDelete({ user, context })`, `onEvent({ event, user, context, ... })`. `onSignUp` and `onEvent` only observe: a throw is logged, reported to the app's `onError` with source `auth.onSignUp` or `auth.onEvent`, and never fails the sign-up or the sign-in.

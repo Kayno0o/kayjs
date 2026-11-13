@@ -3,15 +3,15 @@ title: kayjs-mail
 order: 2
 description: Send mail from kay apps with SMTP, mails written as .kay components, and an outbox in development.
 ---
-`@kaynooo/kayjs-mail` sends mail over SMTP, renders mails written as `.kay` components to html and text, and queues them with retries through kay's queue. In development and tests nothing leaves the process: mails go to an outbox.
+`@kayjs/mail` sends mail over SMTP, renders mails written as `.kay` components to html and text, and queues them with retries through kay's queue. In development and tests nothing leaves the process: mails go to an outbox.
 
 ## Install
 
 ```sh
-bun add @kaynooo/kayjs-mail
+bun add @kayjs/mail
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+It installs from npm as `@kayjs/mail`, and from the Forgejo registry under the same name. The other `@kaynooo` packages a project uses, such as pg-orm, need that scope pointed at the Forgejo registry: a project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
 kay and Elysia are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types). kayjs-mail is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
@@ -24,7 +24,7 @@ In a kay project, `kay add mail` does the install and lists `mail()` in `kay.con
 Give `mail()` the options of `mailer()`. `from` is your own address. A visitor's address goes in `replyTo`.
 
 ```ts
-import { mail } from '@kaynooo/kayjs-mail'
+import { mail } from '@kayjs/mail'
 
 export default defineConfig({
   extensions: [
@@ -36,7 +36,7 @@ export default defineConfig({
 Send from anywhere with `send`, or `enqueue` to leave the mail to the queue. Both use the mailer the config registered, and assume one running site per process: when several run, as test sites can, call the `send` of each site's own mailer.
 
 ```ts
-import { send } from '@kaynooo/kayjs-mail'
+import { send } from '@kayjs/mail'
 
 await send({ to: 'ada@example.com', subject: 'Hello', text: 'Hi Ada' })
 ```
@@ -79,10 +79,10 @@ A mail is a `.kay` component. Clients drop stylesheets, so the components kayjs-
 
 ```kay
 ---
-import Button from '@kaynooo/kayjs-mail/button.kay'
-import Heading from '@kaynooo/kayjs-mail/heading.kay'
-import Layout from '@kaynooo/kayjs-mail/layout.kay'
-import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Button from '@kayjs/mail/button.kay'
+import Heading from '@kayjs/mail/heading.kay'
+import Layout from '@kayjs/mail/layout.kay'
+import Paragraph from '@kayjs/mail/paragraph.kay'
 
 const { name, url } = props<{ name: string, url: string }>()
 ---
@@ -111,7 +111,7 @@ It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` w
 Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColors`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.
 
 ```ts
-import { cssColors, mailDefaults } from '@kaynooo/kayjs-mail'
+import { cssColors, mailDefaults } from '@kayjs/mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
 const colour = cssColors(stylesheet, 'styles/global.css')
@@ -129,8 +129,8 @@ Set `dark` in the settings to choose any of them. A colour you leave out is stil
 
 ```ts
 // src/mail-settings.ts
-import type { MailSettings } from '@kaynooo/kayjs-mail'
-import { mailDefaults } from '@kaynooo/kayjs-mail'
+import type { MailSettings } from '@kayjs/mail'
+import { mailDefaults } from '@kayjs/mail'
 
 export default { ...mailDefaults, accent: '#0047ff', dark: { background: '#101014', accent: '#7aa2ff' } } satisfies MailSettings
 ```
@@ -302,7 +302,7 @@ The same transports exist as `resend({ apiKey })`, `postmark({ token })`, `sendg
 
 ```kay
 --- server
-import { contactForm } from '@kaynooo/kayjs-mail'
+import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
 import { mail } from '../mail'
 
@@ -349,7 +349,7 @@ The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`m
 --- server
 import { action } from 'kay'
 import { mail } from '../mail'
-import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
+import SubscribeForm from '@kayjs/mail/subscribe-form.kay'
 
 export const subscribe = action(...mail.list().form())
 ---
@@ -384,7 +384,7 @@ A restart or a deploy in the middle carries on where it stopped, and nobody gets
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 
-An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ listStore: pgLists(db) })` (from `@kaynooo/kayjs-mail/pg`), where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
+An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ listStore: pgLists(db) })` (from `@kayjs/mail/pg`), where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
 
 If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTableNames` in pg-orm's `ignoreTables`.
 
@@ -461,7 +461,7 @@ export default {
 Under `bun test`, mails go to the outbox. `mailTest(site)` reads the ones a test site sent, from an outbox that is empty at the start of every test, so you clear nothing by hand. An enqueued mail reaches it once `site.runJobs()` ran, including one the action enqueued or sent without awaiting.
 
 ```ts
-import { mailTest } from '@kaynooo/kayjs-mail/test'
+import { mailTest } from '@kayjs/mail/test'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'
@@ -487,8 +487,8 @@ A view written from scratch can take its default wording from `authWords(mail)`.
 
 ```ts
 // src/auth.ts
-import { authCore } from '@kaynooo/kayjs-auth'
-import { authMailer } from '@kaynooo/kayjs-mail'
+import { authCore } from '@kayjs/auth'
+import { authMailer } from '@kayjs/mail'
 import { mail } from './mail'
 
 export const auth = authCore({

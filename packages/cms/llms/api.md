@@ -9,7 +9,7 @@ The functions the screens and the editor are made of, for a site building its ow
 `fieldsOf(schema)` gives the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`.
 
 ```ts
-import { fieldsOf } from '@kaynooo/kayjs-cms'
+import { fieldsOf } from '@kayjs/cms'
 
 const fields = fieldsOf(schema).map(field => field.label)
 ```

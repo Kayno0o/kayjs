@@ -18,7 +18,7 @@ export interface ComponentPage {
 }
 
 const ROOT = join(import.meta.dir, '../..')
-const PACKAGES = join(ROOT, 'node_modules/@kaynooo')
+const PACKAGES = join(ROOT, 'node_modules/@kayjs')
 const USAGE = join(import.meta.dir, 'content/ui')
 const PROPS_CACHE = join(import.meta.dir, '../.kay/cache/ui-props.json')
 const LIBRARIES = ['kayjs-ai', 'kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui']
@@ -38,7 +38,7 @@ const TOPIC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 // Each library's llms.txt and the topic files it lists, from its package under packages/ as the workspace links it at the root, listed after kay's own reference: they describe the version kay releases the library at.
 export async function loadLibraries(): Promise<LibraryReference[]> {
   const pages = await Promise.all(LIBRARIES.map(async (name, index) => {
-    const dir = join(PACKAGES, name)
+    const dir = join(PACKAGES, name.slice('kayjs-'.length))
     const text = await Bun.file(join(dir, 'llms.txt')).text()
     const { version } = await Bun.file(join(dir, 'package.json')).json() as { version: string }
     const linked = (markdown: string) => crossLinked(markdown).replace(TOPIC_LINK, (_link, topic: string, anchor = '') => `](/llms/${name}-${topic}${anchor})`)
@@ -56,7 +56,7 @@ export async function loadLibraries(): Promise<LibraryReference[]> {
 
 // One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props and parts read from its source, which `withProps: false` leaves empty for a caller that reads only the usage.
 export async function loadComponents({ withProps = true } = {}): Promise<ComponentPage[]> {
-  const source = join(PACKAGES, 'kayjs-ui/src')
+  const source = join(PACKAGES, 'ui/src')
   const files = [...new Bun.Glob('*.kay').scanSync(source)].sort()
   const props = withProps ? propsOf(files.map(file => join(source, file)), PROPS_CACHE) : new Map<string, Prop[]>()
 

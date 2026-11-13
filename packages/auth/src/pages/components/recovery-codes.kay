@@ -1,6 +1,6 @@
 ---
 import { wording } from 'kay/words'
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
 
 const { codes } = props<{ codes: string[] }>()
 ---

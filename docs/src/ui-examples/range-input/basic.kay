@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
-import type { RangeValue } from '@kaynooo/kayjs-ui'
+import RangeInput from '@kayjs/ui/range-input.kay'
+import type { RangeValue } from '@kayjs/ui'
 
 const hours = signal<RangeValue>([2, null])
 ---

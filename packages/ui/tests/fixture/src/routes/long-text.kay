@@ -1,8 +1,8 @@
 ---
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Card from '@kayjs/ui/card.kay'
+import Notice from '@kayjs/ui/notice.kay'
+import PageHeader from '@kayjs/ui/page-header.kay'
+import Table from '@kayjs/ui/table.kay'
 import '../app.css'
 
 // Words with no space to break at, such as an image reference, a digest or a path.

@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import { confirm, toast } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import { confirm, toast } from '@kayjs/ui'
 
 const status = signal('Draft')
 

@@ -1,5 +1,5 @@
 ---
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Table from '@kayjs/ui/table.kay'
 import '../app.css'
 
 const planets = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }]

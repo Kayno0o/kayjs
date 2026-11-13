@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Menu from '@kaynooo/kayjs-ui/menu.kay'
-import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import Menu from '@kayjs/ui/menu.kay'
+import type { MenuEntry } from '@kayjs/ui'
 
 const files = signal(['report.pdf', 'notes.md', 'photo.png'])
 

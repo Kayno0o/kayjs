@@ -1,5 +1,5 @@
 {
-  "name": "@kaynooo/kayjs-ui",
+  "name": "@kayjs/ui",
   "type": "module",
   "version": "1.103.0",
   "description": "Components for kay apps: dialogs, tables, toasts, forms and more, as .kay sources the app compiles as its own",

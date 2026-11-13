@@ -1,13 +1,13 @@
 ---
-import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import Meter from '@kaynooo/kayjs-ui/meter.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import Progress from '@kaynooo/kayjs-ui/progress.kay'
-import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
-import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import Avatar from '@kayjs/ui/avatar.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Card from '@kayjs/ui/card.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import Meter from '@kayjs/ui/meter.kay'
+import Notice from '@kayjs/ui/notice.kay'
+import Progress from '@kayjs/ui/progress.kay'
+import Skeleton from '@kayjs/ui/skeleton.kay'
+import Stat from '@kayjs/ui/stat.kay'
 import TonesIsland from '../components/tones-island.kay'
 ---
 main

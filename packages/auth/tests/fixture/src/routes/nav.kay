@@ -2,11 +2,11 @@
 export const page = { guards: false }
 ---
 ---
-import SignedIn from '@kaynooo/kayjs-auth/components/signed-in.kay'
-import SignedOut from '@kaynooo/kayjs-auth/components/signed-out.kay'
-import DeletionBanner from '@kaynooo/kayjs-auth/components/deletion-banner.kay'
-import ImpersonationBanner from '@kaynooo/kayjs-auth/components/impersonation-banner.kay'
-import UserMenu from '@kaynooo/kayjs-auth/components/user-menu.kay'
+import SignedIn from '@kayjs/auth/components/signed-in.kay'
+import SignedOut from '@kayjs/auth/components/signed-out.kay'
+import DeletionBanner from '@kayjs/auth/components/deletion-banner.kay'
+import ImpersonationBanner from '@kayjs/auth/components/impersonation-banner.kay'
+import UserMenu from '@kayjs/auth/components/user-menu.kay'
 ---
 ImpersonationBanner
 DeletionBanner

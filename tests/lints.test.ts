@@ -251,7 +251,7 @@ describe('missing-captcha', () => {
 })
 
 describe('async-reply', () => {
-  const server = (body: string, imports = 'import { ask } from \'@kaynooo/kayjs-ai\'') => `--- server\n${imports}\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
+  const server = (body: string, imports = 'import { ask } from \'@kayjs/ai\'') => `--- server\n${imports}\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
   const reply = 'export const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))'
 
   it('reports an async arrow returning ask() in an action, with a fix removing async', () => {
@@ -267,8 +267,8 @@ describe('async-reply', () => {
     expect(found('export const a = async (m: never) => { return ask(m) }')).toBe(1)
     expect(found('export async function a(m: never) { return ask(m) }')).toBe(1)
     expect(found('export const o = { async a(m: never) { return ask(m) } }')).toBe(1)
-    expect(found('export const a = async (m: never) => ai.ask(m)', 'import * as ai from \'@kaynooo/kayjs-ai\'')).toBe(1)
-    expect(found('export const a = async (m: never) => run(m)', 'import { ask as run } from \'@kaynooo/kayjs-ai\'')).toBe(1)
+    expect(found('export const a = async (m: never) => ai.ask(m)', 'import * as ai from \'@kayjs/ai\'')).toBe(1)
+    expect(found('export const a = async (m: never) => run(m)', 'import { ask as run } from \'@kayjs/ai\'')).toBe(1)
     expect(fixed(server('export async function a(m: never) { return ask(m) }'))).toEqual([server('export function a(m: never) { return ask(m) }')])
   })
 
@@ -322,7 +322,7 @@ describe('async-reply', () => {
     expect(found('export class A { private async *a(m: never) { return ask(m) } }')).toEqual([])
     expect(found('export const a = async (m: never) => await ask(m)')).toEqual([])
     expect(found('export const a = async (ask: (m: never) => never, m: never) => ask(m)')).toEqual([])
-    expect(lints(server(reply, 'import type { ask } from \'@kaynooo/kayjs-ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
+    expect(lints(server(reply, 'import type { ask } from \'@kayjs/ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
     expect(lints(server(reply, 'import { ask } from \'./ask\'')).filter(d => d.code === 'async-reply')).toEqual([])
     expect(lints(server(`// kay-allow async-reply\n${reply}`)).filter(d => d.code === 'async-reply')).toEqual([])
   })
@@ -339,7 +339,7 @@ describe('async-reply', () => {
     expect(found('export const a = async (m: never) => { function ask(x: never) { return x } return ask(m) }')).toEqual([])
     expect(found('export const a = async (m: never) => { try { load() } catch (ask) { return ask(m) } }')).toEqual([])
     expect(found('export const a = async (ai: { ask: (m: never) => never }, m: never) => ai.ask(m)')).toHaveLength(0)
-    expect(lints(server('export const a = async (ai: { ask: (m: never) => never }, m: never) => ai.ask(m)', 'import * as ai from \'@kaynooo/kayjs-ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
+    expect(lints(server('export const a = async (ai: { ask: (m: never) => never }, m: never) => ai.ask(m)', 'import * as ai from \'@kayjs/ai\'')).filter(d => d.code === 'async-reply')).toEqual([])
     expect(found('export const a = async (m: never) => { const x = 1; return ask(m) }')).toHaveLength(1)
   })
 
@@ -359,7 +359,7 @@ describe('async-reply', () => {
   })
 
   it('reads a plain module, where an API route is written', () => {
-    const route = 'import { ask } from \'@kaynooo/kayjs-ai\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/chat\', async ({ body }) => ask(body.messages))\n'
+    const route = 'import { ask } from \'@kayjs/ai\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/chat\', async ({ body }) => ask(body.messages))\n'
     const found = moduleChecks(route)
 
     expect(found.map(d => d.code)).toEqual(['async-reply'])
@@ -1054,8 +1054,8 @@ describe('a11y lints', () => {
   })
 
   it('writes a hand-made tooltip target as kayjs-ui\'s Tooltip, with its import, only in a file using the library', () => {
-    const head = '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\n'
-    const imported = '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'\n---\n'
+    const head = '---\nimport Button from \'@kayjs/ui/button.kay\'\n---\n'
+    const imported = '---\nimport Button from \'@kayjs/ui/button.kay\'\nimport Tooltip from \'@kayjs/ui/tooltip.kay\'\n---\n'
 
     expect(only('hand-tooltip', `${head}span(data-tooltip="A" tabindex="0") a\nspan.x(tabindex="0" data-tooltip={b} data-tooltip-placement="bottom") b\nspan(data-tooltip="C") c\nspan(data-tooltip="D" tabindex="-1") d\ndiv(data-tooltip="E" tabindex="0") e\nspan(data-tooltip="F" tabindex="0" text="g") f\n`)).toEqual(['hand-tooltip tabindex', 'hand-tooltip tabindex'])
     expect(fixed(`${head}span(data-tooltip="A" tabindex="0") a\n`)).toEqual([`${imported}Tooltip(text="A") a\n`])
@@ -1065,7 +1065,7 @@ describe('a11y lints', () => {
     expect(fixed(`${head}span(\n\tdata-tooltip="C"\n\ttabindex="0"\n) c\n`)).toEqual([`${imported}Tooltip(\n\ttext="C"\n) c\n`])
     expect(only('hand-tooltip', `${head}span(data-tooltip="A" tabindex="0" {...rest}) a\n`)).toEqual([])
     expect(only('hand-tooltip', 'span(data-tooltip="A" tabindex="0") a\n')).toEqual([])
-    expect(only('hand-tooltip', '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Tooltip from \'./mine.kay\'\n---\nspan(data-tooltip="A" tabindex="0") a\n')).toEqual([])
+    expect(only('hand-tooltip', '---\nimport Button from \'@kayjs/ui/button.kay\'\nimport Tooltip from \'./mine.kay\'\n---\nspan(data-tooltip="A" tabindex="0") a\n')).toEqual([])
   })
 
   it('reports media playing by itself with no controls, and a meta refresh with a delay', () => {

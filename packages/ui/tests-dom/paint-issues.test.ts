@@ -109,7 +109,7 @@ test('marks every field of a group and the group itself', () => {
 })
 
 test('marks a Checkbox on its own, and leaves it to the FormField of the same name', () => {
-  const [alone, framed] = page(`<form id="a"><slot data-component="node_modules/@kaynooo/kayjs-ui/src/checkbox.kay"><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form><form id="b"><div data-kui-field="f"><label><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></label><span data-part="issues" data-field="terms"></span></div></form>`)
+  const [alone, framed] = page(`<form id="a"><slot data-component="node_modules/@kayjs/ui/src/checkbox.kay"><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form><form id="b"><div data-kui-field="f"><label><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></label><span data-part="issues" data-field="terms"></span></div></form>`)
 
   paintIssues(alone!, { terms: 'Accept' })
   expect([alone!.querySelector('[data-form-issue]')!.textContent, alone!.querySelector('input')!.getAttribute('aria-invalid')]).toEqual(['Accept', 'true'])

@@ -1,5 +1,5 @@
 ---
-import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
+import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
 ---
 BareIconButton(label="Send" variant="ghost")
   svg.kui-icon(viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true")

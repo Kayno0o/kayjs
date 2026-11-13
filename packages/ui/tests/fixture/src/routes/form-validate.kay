@@ -8,9 +8,9 @@ export const claim = action(t.Object({
 }), () => 'ok')
 ---
 ---
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Form from '@kaynooo/kayjs-ui/form.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Form from '@kayjs/ui/form.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
 ---
 main
   Form(action={claim} id="blur" validate="blur" saved="Added.")

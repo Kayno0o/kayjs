@@ -228,12 +228,12 @@ describe('a library\'s stylesheet in an app', () => {
 
     projects.push(root)
     await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(resolve('packages/ui'), join(root, 'node_modules/@kaynooo/kayjs-ui'))
+    await symlink(resolve('packages/ui'), join(root, 'node_modules/@kayjs/ui'))
     await symlink(resolve('node_modules/@iconify-json'), join(root, 'node_modules/@iconify-json'))
     await Promise.all(Object.entries({
-      ...project('@import "@kaynooo/kayjs-ui/theme.css";\n'),
-      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
-      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton(tone="danger") Delete\n',
+      ...project('@import "@kayjs/ui/theme.css";\n'),
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { '@kayjs/ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
+      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport Button from \'@kayjs/ui/button.kay\'\n---\nButton(tone="danger") Delete\n',
     }).map(async ([name, text]) => Bun.write(join(root, name), text)))
 
     const client = await buildClient(root, {})

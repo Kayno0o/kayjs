@@ -13,7 +13,7 @@ import { chooseRemember } from '../sessions'
 export class PasskeyMethods {
   constructor(private readonly state: RequestState) {}
 
-  // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
+  // The options for `makePasskey` of `@kayjs/auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
   async registrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyRegistrationOptions(this.state, proof)
   }
@@ -36,7 +36,7 @@ export class PasskeyMethods {
     return (await load.passkeys()).removePasskey(this.state, id, proof)
   }
 
-  // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
+  // The options for `askPasskey` of `@kayjs/auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
   async signInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
     if (!this.state.core.switches.passkeys)
       throw configError('auth', 'passkeys', 'passkeys are switched off: `passkeys: false` in the options of authCore or auth()')

@@ -1,5 +1,5 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
 ---
 .flex.flex-wrap.items-center.gap-2
   IconButton(icon="plus" label="Add" variant="solid")

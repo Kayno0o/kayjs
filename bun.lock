@@ -21,12 +21,12 @@
         "@fontsource/inter": "^5.3.0",
         "@happy-dom/global-registrator": "^21.0.4",
         "@iconify-json/tabler": "^1.2.42",
+        "@kayjs/ai": "workspace:*",
+        "@kayjs/auth": "workspace:*",
+        "@kayjs/cms": "workspace:*",
+        "@kayjs/mail": "workspace:*",
+        "@kayjs/ui": "workspace:*",
         "@kaynooo/eslint": "^7.1.6",
-        "@kaynooo/kayjs-ai": "workspace:*",
-        "@kaynooo/kayjs-auth": "workspace:*",
-        "@kaynooo/kayjs-cms": "workspace:*",
-        "@kaynooo/kayjs-mail": "workspace:*",
-        "@kaynooo/kayjs-ui": "workspace:*",
         "@kaynooo/pg-orm": "^8.1.4",
         "@oxc-parser/binding-wasm32-wasip1": "0.155.0",
         "@types/babel__traverse": "^7.28.0",
@@ -59,48 +59,48 @@
       "name": "kay-docs",
       "devDependencies": {
         "@iconify-json/tabler": "^1.2.42",
-        "@kaynooo/kayjs-ai": "workspace:*",
-        "@kaynooo/kayjs-ui": "workspace:*",
+        "@kayjs/ai": "workspace:*",
+        "@kayjs/ui": "workspace:*",
       },
     },
     "packages/ai": {
-      "name": "@kaynooo/kayjs-ai",
+      "name": "@kayjs/ai",
       "version": "1.103.0",
       "dependencies": {
         "@kaynooo/utils": "^3.1.0",
       },
       "devDependencies": {
+        "@kayjs/ui": "workspace:~",
         "@kaynooo/eslint": "^7.1.6",
-        "@kaynooo/kayjs-ui": "workspace:~",
         "@types/bun": "^1.4.4",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
-        "@kaynooo/kayjs-ui": "workspace:~",
+        "@kayjs/ui": "workspace:~",
         "kay": "~1.103.0",
       },
       "optionalPeers": [
-        "@kaynooo/kayjs-ui",
+        "@kayjs/ui",
       ],
     },
     "packages/auth": {
-      "name": "@kaynooo/kayjs-auth",
+      "name": "@kayjs/auth",
       "version": "1.103.0",
       "dependencies": {
         "@kaynooo/utils": "^3.1.0",
         "jose": "^6.2.13",
       },
       "devDependencies": {
+        "@kayjs/mail": "workspace:~",
+        "@kayjs/ui": "workspace:~",
         "@kaynooo/eslint": "^7.1.6",
-        "@kaynooo/kayjs-mail": "workspace:~",
-        "@kaynooo/kayjs-ui": "workspace:~",
         "@kaynooo/pg-orm": "^8.1.4",
         "@types/bun": "^1.4.4",
         "elysia": "^1.4.31",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
-        "@kaynooo/kayjs-ui": "workspace:~",
+        "@kayjs/ui": "workspace:~",
         "@kaynooo/pg-orm": "^7.1.2 || ^8.0.0",
         "elysia": "^1.4.31",
         "kay": "~1.103.0",
@@ -110,29 +110,29 @@
       ],
     },
     "packages/cms": {
-      "name": "@kaynooo/kayjs-cms",
+      "name": "@kayjs/cms",
       "version": "1.103.0",
       "dependencies": {
         "@kaynooo/utils": "^3.1.0",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
+        "@kayjs/mail": "workspace:~",
+        "@kayjs/ui": "workspace:~",
         "@kaynooo/eslint": "^7.1.6",
-        "@kaynooo/kayjs-mail": "workspace:~",
-        "@kaynooo/kayjs-ui": "workspace:~",
         "@types/bun": "^1.4.4",
         "bun-plugin-tailwind": "^0.1.2",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
-        "@kaynooo/kayjs-ui": "workspace:~",
+        "@kayjs/ui": "workspace:~",
         "kay": "~1.103.0",
         "tailwindcss": "^4.3.3",
       },
     },
     "packages/mail": {
-      "name": "@kaynooo/kayjs-mail",
+      "name": "@kayjs/mail",
       "version": "1.103.0",
       "dependencies": {
         "@kaynooo/utils": "^3.1.0",
@@ -150,7 +150,7 @@
       },
     },
     "packages/ui": {
-      "name": "@kaynooo/kayjs-ui",
+      "name": "@kayjs/ui",
       "version": "1.103.0",
       "dependencies": {
         "@kaynooo/utils": "^3.1.0",
@@ -277,19 +277,19 @@
 
     "@jsquash/avif": ["@jsquash/avif@2.1.1", "", { "dependencies": { "wasm-feature-detect": "^1.2.11" } }, "sha512-LMRxd0fMgfCLtobDh0/sFYJMMiRJTNYSEEWvRDKXlAeZ08t3gI5V+1thIT0XjXJ+SVG7Zug9B0XPyx0Ti5VRNA=="],
 
+    "@kayjs/ai": ["@kayjs/ai@workspace:packages/ai"],
+
+    "@kayjs/auth": ["@kayjs/auth@workspace:packages/auth"],
+
+    "@kayjs/cms": ["@kayjs/cms@workspace:packages/cms"],
+
+    "@kayjs/mail": ["@kayjs/mail@workspace:packages/mail"],
+
+    "@kayjs/ui": ["@kayjs/ui@workspace:packages/ui"],
+
     "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.41.2", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.41.2/cli-kit-0.41.2.tgz", { "dependencies": { "@kaynooo/utils": "3.1.0" } }, "sha512-eoglZCtqJULLZLWzANm6L6u8pBn7pXXwM1GG7VZ/uBQjU/EhzwtsDCeGgI3qDzJ/NZhpbVQS0ccR1wcZugWfew=="],
 
     "@kaynooo/eslint": ["@kaynooo/eslint@7.1.6", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Feslint/-/7.1.6/eslint-7.1.6.tgz", { "dependencies": { "@e18e/eslint-plugin": "^0.8.0", "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2", "@eslint/markdown": "^8.0.3", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/eslint-plugin": "^8.67.0", "@typescript-eslint/parser": "^8.67.0", "eslint-config-flat-gitignore": "^2.3.0", "eslint-flat-config-utils": "^3.2.0", "eslint-merge-processors": "^2.0.0", "eslint-plugin-antfu": "^3.2.3", "eslint-plugin-better-tailwindcss": "^4.7.0", "eslint-plugin-format": "^2.0.1", "eslint-plugin-import-lite": "^0.6.0", "eslint-plugin-jsonc": "^3.4.1", "eslint-plugin-no-only-tests": "^3.4.0", "eslint-plugin-perfectionist": "^5.10.1", "eslint-plugin-regexp": "^3.2.0", "eslint-plugin-toml": "^1.5.0", "eslint-plugin-unicorn": "^73.0.0", "eslint-plugin-unused-imports": "^4.4.1", "eslint-plugin-yml": "^3.8.1", "globals": "^17.11.0", "toml-eslint-parser": "^1.0.3", "yaml-eslint-parser": "^2.1.0" }, "peerDependencies": { "eslint": "^10.7.0" }, "bin": { "keslint": "dist/bin.js" } }, "sha512-18Cj2f7NyF9OWMpO9oiVTH1SVA/JfZBhPATAF/Au8ou1aFIrZUfVKjpbEhmrNYvM9WljPaYyMNsKphamkYzWzQ=="],
-
-    "@kaynooo/kayjs-ai": ["@kaynooo/kayjs-ai@workspace:packages/ai"],
-
-    "@kaynooo/kayjs-auth": ["@kaynooo/kayjs-auth@workspace:packages/auth"],
-
-    "@kaynooo/kayjs-cms": ["@kaynooo/kayjs-cms@workspace:packages/cms"],
-
-    "@kaynooo/kayjs-mail": ["@kaynooo/kayjs-mail@workspace:packages/mail"],
-
-    "@kaynooo/kayjs-ui": ["@kaynooo/kayjs-ui@workspace:packages/ui"],
 
     "@kaynooo/pg-orm": ["@kaynooo/pg-orm@8.1.4", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fpg-orm/-/8.1.4/pg-orm-8.1.4.tgz", { "bin": { "pg-orm": "dist/cli.js" } }, "sha512-oRhfaO8YIaOwPyxIPtS0BIvXJgaVUkAXHPtVfHA1wbebFbxBSOXJgcpXzP16i1JaLASQcIYAj3rHVtO+qyIPGw=="],
 

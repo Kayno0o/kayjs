@@ -1,7 +1,7 @@
 --- island
-import { infiniteList } from '@kaynooo/kayjs-ui'
-import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import { infiniteList } from '@kayjs/ui'
+import LoadMore from '@kayjs/ui/load-more.kay'
+import Table from '@kayjs/ui/table.kay'
 
 const { first = 100, size = 100, total = 1000, inBox = false, table = true, virtual = false } = props<{ first?: number, size?: number, total?: number, inBox?: boolean, table?: boolean, virtual?: boolean }>()
 

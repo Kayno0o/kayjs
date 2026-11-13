@@ -1,7 +1,7 @@
 --- island
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import Button from '@kayjs/ui/button.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
 
 const days = signal(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
 const visits = signal([120, 180, 150, 210, 260, 190, 240])

@@ -1,9 +1,9 @@
 --- island
-import type { MultiSelectOption } from '@kaynooo/kayjs-ui'
-import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
-import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
-import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import type { MultiSelectOption } from '@kayjs/ui'
+import IconPicker from '@kayjs/ui/icon-picker.kay'
+import MultiSelect from '@kayjs/ui/multi-select.kay'
+import RadioGroup from '@kayjs/ui/radio-group.kay'
+import Select from '@kayjs/ui/select.kay'
 import { signal, trustHtml } from 'kay'
 
 const { calls } = props<{ calls: string[] }>()

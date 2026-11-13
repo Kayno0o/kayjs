@@ -1,11 +1,11 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
-import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
-import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
+import Button from '@kayjs/ui/button.kay'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import CopyButton from '@kayjs/ui/copy-button.kay'
+import Icon from '@kayjs/ui/icon.kay'
+import Notice from '@kayjs/ui/notice.kay'
+import Toaster from '@kayjs/ui/toaster.kay'
+import Tooltip from '@kayjs/ui/tooltip.kay'
 import home from '~icons/tabler/home'
 ---
 main

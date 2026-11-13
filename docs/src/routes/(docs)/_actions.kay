@@ -1,5 +1,5 @@
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask } from '@kayjs/ai'
 import { s } from 'kay'
 import { action, logFrom } from 'kay'
 import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'

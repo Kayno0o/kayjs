@@ -1,5 +1,5 @@
 ---
-import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import Steps from '@kayjs/ui/steps.kay'
 
 const steps = [
   { key: 'account', label: 'Account' },

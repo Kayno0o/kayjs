@@ -1,8 +1,8 @@
 ---
 import type { Action } from 'kay'
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
-import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import Dialog from '@kayjs/ui/dialog.kay'
+import FormDialog from '@kayjs/ui/form-dialog.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
 
 // The `heading` block of 1.96, which still draws in the title element beside the `title` string that names the dialog.
 const save = Object.assign(async () => 'saved', { pending: () => false, url: '/_kay/action/form/save' }) as unknown as Action<Record<string, never>, string>

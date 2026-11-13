@@ -6,7 +6,7 @@ import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, ID_MAX, schemas } from '../forms'
 import { organizationPage, organizationsPage } from '../organizationPage'
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 
 // Whoever holds the link opens this page, signed in or not, so none of the app's guards run here. The id sits in the address, which no Referer header may carry to another site.
 export const page = { guards: false, security: { headers: { 'referrer-policy': 'same-origin' } } }

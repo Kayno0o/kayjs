@@ -1,6 +1,6 @@
 ---
-import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
-import { toast } from '@kaynooo/kayjs-ui'
+import IconButton from '@kayjs/ui/icon-button.kay'
+import { toast } from '@kayjs/ui'
 ---
 //- Renders neither a Toaster nor a TooltipHost: the ui() extension mounts them.
 h1 Shell

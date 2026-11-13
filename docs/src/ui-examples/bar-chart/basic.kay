@@ -1,5 +1,5 @@
 ---
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import BarChart from '@kayjs/ui/bar-chart.kay'
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 ---

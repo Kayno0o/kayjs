@@ -1,8 +1,8 @@
 ---
-import type { Plate } from '@kaynooo/kayjs-ui'
+import type { Plate } from '@kayjs/ui'
 import { signal } from 'kay'
-import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
-import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+import HoverCard from '@kayjs/ui/hover-card.kay'
+import ZoomPane from '@kayjs/ui/zoom-pane.kay'
 
 const hovered = signal<Element | null>(null)
 const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })

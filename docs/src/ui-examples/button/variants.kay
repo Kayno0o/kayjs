@@ -1,5 +1,5 @@
 ---
-import Button from '@kaynooo/kayjs-ui/button.kay'
+import Button from '@kayjs/ui/button.kay'
 ---
 .flex.flex-wrap.items-center.gap-2
   Button(label="Cancel")

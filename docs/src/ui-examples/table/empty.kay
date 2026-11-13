@@ -1,9 +1,9 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import Table from '@kaynooo/kayjs-ui/table.kay'
-import type { Column } from '@kaynooo/kayjs-ui'
+import Button from '@kayjs/ui/button.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import Table from '@kayjs/ui/table.kay'
+import type { Column } from '@kayjs/ui'
 
 interface Moon {
   id: number

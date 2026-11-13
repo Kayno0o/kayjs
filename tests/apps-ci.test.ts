@@ -14,16 +14,16 @@ const workflow = Bun.YAML.parse(await Bun.file('.forgejo/workflows/apps.yml').te
 const steps = workflow.jobs.apps.steps
 
 describe('pointAtKay', () => {
-  const tarballs = { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' }
+  const tarballs = { '@kayjs/kay': '/t/kayjs.tgz', '@kayjs/ui': '/t/ui.tgz' }
 
   it('points kay under its alias and each library at their tarballs, leaving the rest', () => {
     const next = pointAtKay({
-      dependencies: { 'kay': 'npm:@kaynooo/kayjs@~1.77.0', '@kaynooo/kayjs-ui': '~1.77.0', 'elysia': '^1.4.0' },
-      devDependencies: { '@kaynooo/kayjs-mail': '~1.77.0' },
+      dependencies: { 'kay': 'npm:@kayjs/kay@~1.77.0', '@kayjs/ui': '~1.77.0', 'elysia': '^1.4.0' },
+      devDependencies: { '@kayjs/mail': '~1.77.0' },
     }, tarballs)
 
-    expect(next?.dependencies).toEqual({ 'kay': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'elysia': '^1.4.0' })
-    expect(next?.devDependencies).toEqual({ '@kaynooo/kayjs-mail': '~1.77.0' })
+    expect(next?.dependencies).toEqual({ 'kay': 'file:/t/kayjs.tgz', '@kayjs/ui': 'file:/t/ui.tgz', 'elysia': '^1.4.0' })
+    expect(next?.devDependencies).toEqual({ '@kayjs/mail': '~1.77.0' })
   })
 
   it('returns undefined for a manifest that depends on neither', () => {
@@ -34,7 +34,7 @@ describe('pointAtKay', () => {
 
 describe('tarballName', () => {
   it('follows bun pm pack', () => {
-    expect(tarballName('@kaynooo/kayjs-ui', '1.83.0')).toBe('kaynooo-kayjs-ui-1.83.0.tgz')
+    expect(tarballName('@kayjs/ui', '1.83.0')).toBe('kayjs-ui-1.83.0.tgz')
   })
 })
 
@@ -174,30 +174,30 @@ describe('the clones directory', () => {
 
 describe('overrideKay', () => {
   it('overrides every packed name and kay, keeping the app\'s own overrides', () => {
-    const next = overrideKay({ overrides: { left: '1.0.0' } }, { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' })
+    const next = overrideKay({ overrides: { left: '1.0.0' } }, { '@kayjs/kay': '/t/kayjs.tgz', '@kayjs/ui': '/t/ui.tgz' })
 
-    expect(next.overrides).toEqual({ 'left': '1.0.0', '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' })
+    expect(next.overrides).toEqual({ 'left': '1.0.0', '@kayjs/kay': 'file:/t/kayjs.tgz', '@kayjs/ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' })
   })
 })
 
 describe('pointApp', () => {
-  const tarballs = { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' }
+  const tarballs = { '@kayjs/kay': '/t/kayjs.tgz', '@kayjs/ui': '/t/ui.tgz' }
 
   it('overrides at a workspace root that has no kay dependency of its own', () => {
     const next = pointApp({
       'package.json': { workspaces: ['shell', 'relay'] },
-      'shell/package.json': { dependencies: { kay: 'npm:@kaynooo/kayjs@~1.77.0' } },
+      'shell/package.json': { dependencies: { kay: 'npm:@kayjs/kay@~1.77.0' } },
       'relay/package.json': { dependencies: { elysia: '^1.4.0' } },
     }, 'package.json', tarballs)
 
     expect(Object.keys(next).sort()).toEqual(['package.json', 'shell/package.json'])
-    expect(next['package.json']).toEqual({ workspaces: ['shell', 'relay'], devDependencies: { 'axe-core': '^4.14.0', 'typescript7': 'npm:typescript@^7.0.2' }, overrides: { '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' } })
+    expect(next['package.json']).toEqual({ workspaces: ['shell', 'relay'], devDependencies: { 'axe-core': '^4.14.0', 'typescript7': 'npm:typescript@^7.0.2' }, overrides: { '@kayjs/kay': 'file:/t/kayjs.tgz', '@kayjs/ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' } })
   })
 
   it('overrides at a root that depends on kay itself, and only for the install folder', () => {
     const next = pointApp({
-      'dashboard/package.json': { dependencies: { '@kaynooo/kayjs-ui': '~1.77.0' } },
-      'other/package.json': { dependencies: { '@kaynooo/kayjs-ui': '~1.77.0' } },
+      'dashboard/package.json': { dependencies: { '@kayjs/ui': '~1.77.0' } },
+      'other/package.json': { dependencies: { '@kayjs/ui': '~1.77.0' } },
     }, 'dashboard/package.json', tarballs)
 
     expect(next['dashboard/package.json']?.overrides).toBeDefined()

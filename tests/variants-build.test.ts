@@ -21,7 +21,7 @@ const LIST = 'restart('
 
 // An island holding a Table written as `table`, a signal making it one.
 function island(imports: string, table: string): string {
-  return `---\nimport { signal } from 'kay'\nimport Table from '@kaynooo/kayjs-ui/table.kay'\n${imports}\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst rows = signal([{ id: 1, name: 'a' }])\n---\nbutton(onClick={() => rows.set([])}) Clear\n${table}\n`
+  return `---\nimport { signal } from 'kay'\nimport Table from '@kayjs/ui/table.kay'\n${imports}\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst rows = signal([{ id: 1, name: 'a' }])\n---\nbutton(onClick={() => rows.set([])}) Clear\n${table}\n`
 }
 
 async function built(components: Record<string, string>) {
@@ -101,7 +101,7 @@ describe('a component with features', () => {
   }, 120_000)
 
   it('leaves the marks, the selection and the tooltip out of a BarChart that is written without them', async () => {
-    const chart = (props: string) => `---\nimport { signal } from 'kay'\nimport BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nBarChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
+    const chart = (props: string) => `---\nimport { signal } from 'kay'\nimport BarChart from '@kayjs/ui/bar-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nBarChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
     const plain = await (await built({ Plain: chart('') })).text('Plain')
     const whole = await (await built({ Spread: chart(' {...{}}') })).text('Spread')
 
@@ -112,8 +112,8 @@ describe('a component with features', () => {
   }, 120_000)
 
   it('leaves the selection and the tooltip out of a ScatterChart, and the marks and the selection out of a LineChart, written without them', async () => {
-    const scatter = (props: string) => `---\nimport { signal } from 'kay'\nimport ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'\nconst points = signal([{ key: 'a', x: 1, y: 2, label: 'a' }])\n---\nbutton(onClick={() => points.set([])}) Clear\nScatterChart(label="Runs" points={points()}${props})\n`
-    const line = (props: string) => `---\nimport { signal } from 'kay'\nimport LineChart from '@kaynooo/kayjs-ui/line-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nLineChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
+    const scatter = (props: string) => `---\nimport { signal } from 'kay'\nimport ScatterChart from '@kayjs/ui/scatter-chart.kay'\nconst points = signal([{ key: 'a', x: 1, y: 2, label: 'a' }])\n---\nbutton(onClick={() => points.set([])}) Clear\nScatterChart(label="Runs" points={points()}${props})\n`
+    const line = (props: string) => `---\nimport { signal } from 'kay'\nimport LineChart from '@kayjs/ui/line-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nLineChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
 
     for (const [name, write, marker] of [['Scatter', scatter, 'data-kind'], ['Line', line, 'data-kind']] as const) {
       const plain = await (await built({ [name]: write('') })).text(name)
@@ -130,8 +130,8 @@ describe('a component with features', () => {
 
     dirs.push(root)
     // The app depends on the library, which is how kay finds its components.
-    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'direct', dependencies: { 'kay': '*', '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
-    await Bun.write(join(root, 'src/routes/direct.kay'), '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n\nconst COLUMNS = [{ key: \'name\', header: \'Name\' }]\nconst ROWS = [{ id: 1, name: \'a\' }]\n---\nTable(columns={COLUMNS} rows={ROWS} rowKey="id" selectable)\n')
+    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'direct', dependencies: { 'kay': '*', '@kayjs/ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
+    await Bun.write(join(root, 'src/routes/direct.kay'), '---\nimport Table from \'@kayjs/ui/table.kay\'\n\nconst COLUMNS = [{ key: \'name\', header: \'Name\' }]\nconst ROWS = [{ id: 1, name: \'a\' }]\n---\nTable(columns={COLUMNS} rows={ROWS} rowKey="id" selectable)\n')
 
     const client = await buildClient(root, clientOptionsOf(await loadConfig(root), { dev: false, underKayDev: false }))
     const id = Object.keys(client.islands).find(name => name.endsWith('/table.kay'))!

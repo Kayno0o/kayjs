@@ -26,7 +26,7 @@ const LISTED = Symbol.for('kay.envListed')
 // The caller's file in a stack frame such as `at /app/src/env.ts:3:20` or `at env (file:///app/src/env.ts:3:20)`.
 const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):\d+:\d+\)?$/
 // A library of kay declares its variables for the app that builds it, so the app's module is the one to list them under.
-const KAY_LIBRARY = /^@kaynooo\/kayjs-/
+const KAY_LIBRARY = /^@kayjs\/(?!kay(?:\/|$))/
 const libraries = new Map<string, boolean>()
 
 // The part of a schema the listing reads, so this module loads no Elysia.

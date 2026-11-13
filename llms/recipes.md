@@ -139,8 +139,8 @@ See [Actions](actions.md) and [Test databases and setup](testing-setup.md).
 `authCore` declares the roles, an admin meeting what an editor does, and `pages: true` serves the sign-in, register and account pages, `src/auth.ts`:
 
 ```ts
-import { authCore } from '@kaynooo/kayjs-auth'
-import { pgAuth } from '@kaynooo/kayjs-auth/pg'
+import { authCore } from '@kayjs/auth'
+import { pgAuth } from '@kayjs/auth/pg'
 import { db } from './db'
 import { sessions } from './session'
 
@@ -154,7 +154,7 @@ export const auth = authCore({
 })
 ```
 
-`tables` in `src/db/index.ts` gains `...authTables` from `@kaynooo/kayjs-auth/pg`, so the migration holds kayjs-auth's tables beside the app's, and `src/session.ts` exports `sessions = session<AuthSessionData>()` from `kay/server`. A `_guard.ts` closes a folder to signed-in users, and a deeper one narrows a folder to admins:
+`tables` in `src/db/index.ts` gains `...authTables` from `@kayjs/auth/pg`, so the migration holds kayjs-auth's tables beside the app's, and `src/session.ts` exports `sessions = session<AuthSessionData>()` from `kay/server`. A `_guard.ts` closes a folder to signed-in users, and a deeper one narrows a folder to admins:
 
 ```ts
 // src/routes/dashboard/_guard.ts

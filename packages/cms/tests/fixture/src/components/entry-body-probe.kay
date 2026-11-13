@@ -1,5 +1,5 @@
 --- client
-import EntryBody from '@kaynooo/kayjs-cms/entry-body.kay'
+import EntryBody from '@kayjs/cms/entry-body.kay'
 import { resource } from 'kay'
 import editorApi from '../../../../src/api/editor'
 import { cmsDrafts } from '../../../../src/drafts'

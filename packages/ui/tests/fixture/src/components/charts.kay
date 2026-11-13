@@ -1,9 +1,9 @@
 ---
-import type { ScatterPoint } from '@kaynooo/kayjs-ui'
-import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
-import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
-import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
-import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+import type { ScatterPoint } from '@kayjs/ui'
+import BarChart from '@kayjs/ui/bar-chart.kay'
+import ContributionGraph from '@kayjs/ui/contribution-graph.kay'
+import LineChart from '@kayjs/ui/line-chart.kay'
+import ScatterChart from '@kayjs/ui/scatter-chart.kay'
 import { signal } from 'kay'
 
 // What the test reads back: the dot pressed, the span dragged.

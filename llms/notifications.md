@@ -22,7 +22,7 @@ export async function shipOrder(order: { id: string, userId: string }) {
 
 ```kay
 ---
-import Bell from '@kaynooo/kayjs-ui/bell.kay'
+import Bell from '@kayjs/ui/bell.kay'
 ---
 header
   nav

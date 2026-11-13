@@ -24,7 +24,7 @@ describe('the Styles tab\'s endpoints', () => {
 
   beforeEach(async () => {
     root = await scratchDir('dev-ui-')
-    await put('package.json', '{ "name": "dev-ui", "type": "module", "dependencies": { "kay": "*", "@kaynooo/kayjs-ui": "*" } }\n')
+    await put('package.json', '{ "name": "dev-ui", "type": "module", "dependencies": { "kay": "*", "@kayjs/ui": "*" } }\n')
     await put(PANEL_FILE, PANEL)
     await put('src/components/plain.kay', 'div Plain\n')
   })

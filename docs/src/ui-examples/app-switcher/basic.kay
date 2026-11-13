@@ -1,5 +1,5 @@
 ---
-import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+import AppSwitcher from '@kayjs/ui/app-switcher.kay'
 
 const apps = [
   { key: 'atlas', href: '#atlas', label: 'Atlas', icon: 'globe', description: 'Maps and places' },

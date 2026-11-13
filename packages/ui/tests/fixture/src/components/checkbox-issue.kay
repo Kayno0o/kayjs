@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import Checkbox from '@kayjs/ui/checkbox.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import Toggle from '@kayjs/ui/toggle.kay'
 
 // A Checkbox and a Toggle whose `issue` one button sets after the island started with none, and a FormField of the same `name` around a Checkbox.
 const issue = signal<string>()

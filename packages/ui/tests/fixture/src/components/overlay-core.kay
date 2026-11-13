@@ -1,6 +1,6 @@
 ---
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import Dialog from '@kayjs/ui/dialog.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
 
 // Overlays held open, to read what the shared head, close control, link and size write.
 const { onClosed } = props<{ onClosed: (name: string) => void }>()

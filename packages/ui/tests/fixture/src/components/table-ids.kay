@@ -1,6 +1,6 @@
 ---
 import { uid } from 'kay'
-import Table from '@kaynooo/kayjs-ui/table.kay'
+import Table from '@kayjs/ui/table.kay'
 
 // Draws an id before and after a Table with a column toggle: the ids it draws in between must be those of the full Table, as the server draws them.
 const COLUMNS = [{ key: 'name', header: 'Name' }, { key: 'size', header: 'Size' }]

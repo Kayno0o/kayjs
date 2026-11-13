@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import RowsField from '@kayjs/ui/rows-field.kay'
+import Select from '@kayjs/ui/select.kay'
 
 // Lines of a quote: a text name, a number quantity and a Select of units drawn by the cell block.
 const { adds, removes } = props<{ adds: string[], removes: string[] }>()

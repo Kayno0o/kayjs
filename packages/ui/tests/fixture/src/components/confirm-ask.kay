@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
-import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
-import { confirm } from '@kaynooo/kayjs-ui/lib/confirm'
+import Dialog from '@kayjs/ui/dialog.kay'
+import SidePanel from '@kayjs/ui/side-panel.kay'
+import { confirm } from '@kayjs/ui/lib/confirm'
 
 // Every answer `confirm()` gave, and the dialog a dirty guard sits on.
 const answers = signal<string[]>([])

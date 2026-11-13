@@ -9,7 +9,7 @@ import { recorder } from './src/saved'
 export default defineConfig({
   requireGuards: false,
   extensions: [cms({ collections: { scratch: { history: false }, shop: { form: { fields: ['price', ['stock', 'live'], 'photo'], exclude: ['sku', 'position'] }, list: { columns: ['price', 'live'], actions: ['delete'] } } }, uploads: { maxSize: '64kb' }, guard: guard(ctx => (ctx.request.headers.has('x-deny') ? ctx.deny(403, 'Denied') : undefined)), files: recorder, author: ({ url }) => ({ name: url.searchParams.get('as') ?? 'Fixture editor', email: 'editor@example.com' }) })],
-  librarySettings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' },
+  librarySettings: { '@kayjs/cms': './src/cms-settings.ts' },
   plugins: [tailwind],
   markdown: { highlight },
   i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },

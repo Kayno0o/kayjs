@@ -24,7 +24,7 @@ test('mountComponent applies the src/ui.ts of the project it mounts from', async
   expect(plain.root.querySelector('.kui-card')?.className).toStartWith('kui-card ')
 
   const app = join(import.meta.dir, '..', 'tests', 'restyle-app')
-  const link = join(app, 'node_modules', '@kaynooo', 'kayjs-ui')
+  const link = join(app, 'node_modules', '@kayjs', 'ui')
 
   if (!existsSync(link)) {
     await mkdir(dirname(link), { recursive: true })

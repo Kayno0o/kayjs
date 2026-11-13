@@ -5,12 +5,12 @@ import { wording } from 'kay/words'
 import Message from '../../../components/message.kay'
 import { failure, schemas } from '../../../forms'
 import { organizationPage } from '../../../organizationPage'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
-import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
-import FormField from '@kaynooo/kayjs-ui/form-field.kay'
-import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Button from '@kayjs/ui/button.kay'
+import CardRow from '@kayjs/ui/card-row.kay'
+import EmptyState from '@kayjs/ui/empty-state.kay'
+import FormField from '@kayjs/ui/form-field.kay'
+import PageSection from '@kayjs/ui/page-section.kay'
 
 export const create = action(schemas.organization, async ({ name, slug }, ctx) => {
   const result = await ctx.locals.auth.organizations.create({ name: name.trim(), ...slug?.trim() && { slug: slug.trim() } })

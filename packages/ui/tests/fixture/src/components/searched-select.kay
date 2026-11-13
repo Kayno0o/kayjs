@@ -1,6 +1,6 @@
 --- island
-import type { OptionsSource } from '@kaynooo/kayjs-ui'
-import Select from '@kaynooo/kayjs-ui/select.kay'
+import type { OptionsSource } from '@kayjs/ui'
+import Select from '@kayjs/ui/select.kay'
 import { signal } from 'kay'
 
 const { source, calls } = props<{ source: OptionsSource<{ value: string, label: string }>, calls: string[] }>()

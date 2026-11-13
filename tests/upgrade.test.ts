@@ -201,6 +201,62 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('moves an app on the @kaynooo names to the @kayjs ones with the 1.104 they were first published at, in package.json and in the installs', async () => {
+    const root = await project(MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.103.0', '@kaynooo/kayjs-ui': '1.103.0', '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' }, ['1.104'])
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(MANIFEST.replace('"@kaynooo/kayjs-ui": "^1.40.2"', '"@kayjs/ui": "~1.104.0"').replace('npm:@kaynooo/kayjs@~1.40.1', 'npm:@kayjs/kay@~1.104.0'))
+      expect(calls.installs).toEqual([[
+        { name: '@kayjs/ui', spec: '~1.104.0', section: 'dependencies' },
+        { name: 'kay', spec: 'npm:@kayjs/kay@~1.104.0', section: 'devDependencies' },
+      ]])
+      expect(calls.kay.find(args => args[0] === 'check')).toEqual(['check', '--fix', '--since', '1.104'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('installs the stepping stones before 1.104 under the old names and 1.104 under the new ones', async () => {
+    const root = await project()
+    const { deps, calls } = fakes({ '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' })
+    const stones = steppingStones('1.40.1', '1.104.0')
+
+    try {
+      expect(stones.length).toBeGreaterThan(0)
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(calls.installs).toHaveLength(stones.length + 1)
+      expect(calls.installs.slice(0, -1).flat().map(change => change.name)).not.toContain('@kayjs/ui')
+      expect(calls.installs.slice(0, -1).flat().every(change => !change.spec.includes('@kayjs/'))).toBe(true)
+      expect(calls.installs.at(-1)).toEqual([
+        { name: '@kayjs/ui', spec: '~1.104.0', section: 'dependencies' },
+        { name: 'kay', spec: 'npm:@kayjs/kay@~1.104.0', section: 'devDependencies' },
+      ])
+      expect(await Bun.file(join(root, 'package.json')).text()).toContain('"@kayjs/ui": "~1.104.0"')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps an app on the new names there, moving them to the latest', async () => {
+    const root = await project(MANIFEST.replace('@kaynooo/kayjs-ui', '@kayjs/ui').replace('npm:@kaynooo/kayjs@', 'npm:@kayjs/kay@').replace('^1.40.2', '~1.104.0').replace('~1.40.1', '~1.104.0'))
+    const { deps, calls } = fakes({ '@kayjs/kay': '1.105.0', '@kayjs/ui': '1.105.0' })
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(calls.installs).toEqual([[
+        { name: '@kayjs/ui', spec: '~1.105.0', section: 'dependencies' },
+        { name: 'kay', spec: 'npm:@kayjs/kay@~1.105.0', section: 'devDependencies' },
+      ]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('raises an elysia below the one kay depends on, whatever its range or its locked copy, so one copy is installed', async () => {
     const floor = (/\d+\.\d+\.\d+/).exec(kayDependencies.elysia)![0]
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })

@@ -1,5 +1,5 @@
 ---
-import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
+import SiteFavicon from '@kayjs/ui/site-favicon.kay'
 
 const sites = [
   'example.com',

@@ -30,7 +30,7 @@ export default function auth(project: Project) {
   // A project kay new scaffolded keeps the tables apart from `db`, so pg-orm.config.ts reads them without building `db`.
   const tablesFile = project.read('src/db/tables.ts')?.includes('export const tables') === true ? 'src/db/tables.ts' : 'src/db/index.ts'
   const mailModule = project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true
-  const mailDepended = project.depends('@kaynooo/kayjs-mail')
+  const mailDepended = project.depends('@kayjs/mail')
   const mailed = mailModule || (mailDepended && project.read('kay.config.ts')?.includes('mail(') === true)
 
   return {
@@ -39,11 +39,11 @@ export default function auth(project: Project) {
       'src/routes/_guard.ts': authGuard(),
     },
     edits: ownDatabase
-      ? [{ file: tablesFile, find: TABLES, replace: withAuthTables, done: '...authTables', import: 'import { authTables } from \'@kaynooo/kayjs-auth/pg\'' }]
+      ? [{ file: tablesFile, find: TABLES, replace: withAuthTables, done: '...authTables', import: 'import { authTables } from \'@kayjs/auth/pg\'' }]
       : [],
     example: authExample(ownDatabase),
     ignore: ownDatabase ? [] : ['data'],
-    extension: { import: 'import { auth } from \'@kaynooo/kayjs-auth\'', expression: authCall(siteName(project.name), ownDatabase) },
+    extension: { import: 'import { auth } from \'@kayjs/auth\'', expression: authCall(siteName(project.name), ownDatabase) },
     notes: [
       ownDatabase ? 'Run your migration generator (bun run db:generate) for the kay_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.sqlite: set AUTH_DATABASE_URL (a Postgres url) before production.',
       ...mailed ? [] : [mailDepended ? 'Without a mailer, password resets, magic links and verification mails cannot be sent: add mail() to the extensions of kay.config.ts, and auth() sends through it.' : 'Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail`, and auth() sends through it.'],
@@ -59,12 +59,12 @@ function authExample(ownDatabase: boolean): string[] {
 
 // The `auth()` of kay.config.ts: the name mails and authenticator apps show, and over the app's own database a store loading it as the server starts, so the config stays off the database.
 function authCall(name: string, ownDatabase: boolean): string {
-  const store = ownDatabase ? ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)' : ''
+  const store = ownDatabase ? ', store: async () => (await import(\'@kayjs/auth/pg\')).pgAuth((await import(\'./src/db\')).db)' : ''
 
   return `auth({ name: '${name}'${store} })`
 }
 
 // The root guard: every page below needs a signed-in visitor; the sign-in and register pages stay open.
 function authGuard(): string {
-  return 'import { authGuard } from \'@kaynooo/kayjs-auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default authGuard()\n'
+  return 'import { authGuard } from \'@kayjs/auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default authGuard()\n'
 }

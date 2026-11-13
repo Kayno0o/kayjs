@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import Button from '@kaynooo/kayjs-ui/button.kay'
-import NavigationProgress from '@kaynooo/kayjs-ui/navigation-progress.kay'
+import Button from '@kayjs/ui/button.kay'
+import NavigationProgress from '@kayjs/ui/navigation-progress.kay'
 
 const waiting = signal(false)
 ---

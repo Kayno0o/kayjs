@@ -1,7 +1,7 @@
 ---
 import { signal } from 'kay'
-import MapView from '@kaynooo/kayjs-ui/map-view.kay'
-import type { MapMarker, MapPoint } from '@kaynooo/kayjs-ui'
+import MapView from '@kayjs/ui/map-view.kay'
+import type { MapMarker, MapPoint } from '@kayjs/ui'
 
 // A map the parent drives: markers with a popup block, a click and a move reported, and a view the test's button sets.
 const { clicks, moves } = props<{ clicks: string[], moves: { center: MapPoint, zoom: number }[] }>()

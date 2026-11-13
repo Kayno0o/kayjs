@@ -1,5 +1,5 @@
 import type { TestSite } from 'kay/test'
-import { outbox } from '@kaynooo/kayjs-mail'
+import { outbox } from '@kayjs/mail'
 import { expect } from 'bun:test'
 import { changeUsername, register, signOut, verify } from './pages'
 

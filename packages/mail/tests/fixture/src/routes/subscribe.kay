@@ -2,7 +2,7 @@
 import { action } from 'kay'
 import { hear, mail } from '../mail'
 import Counted from '../mails/counted-confirm.kay'
-import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'
+import SubscribeForm from '@kayjs/mail/subscribe-form.kay'
 
 export const subscribe = action(...mail.list().form())
 export const subscribeStrict = action(...mail.list('strict', { protection: { rateLimit: { max: 2, window: '10m' } } }).form())

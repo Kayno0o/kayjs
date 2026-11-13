@@ -406,7 +406,7 @@ describe('kay installed under node_modules', () => {
 })
 
 describe('a kay library under node_modules', () => {
-  for (const name of ['kayjs-x', '@kaynooo/kayjs-x']) {
+  for (const name of ['kayjs-x', '@kayjs/x']) {
     it(`exposes the names ${name} re-exports with export *`, async () => {
       const at = await project({
         [`node_modules/${name}/package.json`]: `{"name":"${name}","type":"module","exports":{".":"./index.ts"}}\n`,

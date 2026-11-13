@@ -31,8 +31,8 @@ export interface Check {
   fix?: string
 }
 
-const KAY_PACKAGE = '@kaynooo/kayjs'
-const LIBRARY_PREFIX = '@kaynooo/kayjs-'
+const KAY_PACKAGE = '@kayjs/kay'
+const LIBRARY_PREFIX = '@kayjs/'
 const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
 // The build directories kay writes a manifest into: `kay build` and `kay dev`, with the command that makes each again.
 const BUILDS = [{ dir: `${KAY_DIR}/client`, fix: 'run `kay build`' }, { dir: `${KAY_DIR}/dev`, fix: 'restart `kay dev`' }]

@@ -1,5 +1,5 @@
 ---
-import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import TooltipHost from '@kayjs/ui/tooltip-host.kay'
 ---
 //- A group locked with a disabled fieldset, as kayjs-cms locks the fields a role may not change: its tooltip must show under the pointer over the fieldset and over a disabled control inside it.
 main

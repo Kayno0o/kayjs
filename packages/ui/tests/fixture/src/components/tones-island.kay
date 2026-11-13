@@ -1,8 +1,8 @@
 ---
 import { signal } from 'kay'
-import Badge from '@kaynooo/kayjs-ui/badge.kay'
-import Card from '@kaynooo/kayjs-ui/card.kay'
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import Badge from '@kayjs/ui/badge.kay'
+import Card from '@kayjs/ui/card.kay'
+import Notice from '@kayjs/ui/notice.kay'
 
 const open = signal(false)
 ---
