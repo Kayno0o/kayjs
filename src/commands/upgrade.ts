@@ -4,6 +4,7 @@ import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { engines } from '../../package.json'
+import { renameProjectFiles } from '../check/renamed-packages'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { isKayPackage, RENAMED_IN, renamePackages } from '../package-names'
 import { done, formatOption, printDocument, printFailure, projectRoot } from './command'
@@ -88,7 +89,7 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
           return 'served'
 
         const version = spec.slice(spec.lastIndexOf('@') + 1)
-        const kay = Bun.semver.satisfies(version, '*') && Bun.semver.order(version, RENAMED_IN) === -1 ? OLD_KAY_PACKAGE : KAY_PACKAGE
+        const kay = SEMVER.test(version) && Bun.semver.order(version, RENAMED_IN) === -1 ? OLD_KAY_PACKAGE : KAY_PACKAGE
 
         return (await runner([bun, 'info', kay, 'version'], root, true)).code === 0 ? 'missing' : 'unknown'
       }
@@ -379,12 +380,13 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
       return 1
     }
 
+    await renameWhenCrossing(root, behind, phase.version)
+
     for (const since of await crossed(root, behind, phase.version, deps)) {
       step('rewriting', `what ${since} deprecated`)
       const rewritten = await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
 
-      if (phase.stone && rewritten.code !== 0)
-        leftOnTheWay = true
+      leftOnTheWay ||= phase.stone && rewritten.code !== 0
     }
 
     behind = phase.version
@@ -665,7 +667,7 @@ function planPhases(original: string, found: KayDependency[], latest: Map<KayDep
 
     // A version from 1.104 is installed under the new names: the text, the dependencies planned after it and the installs of this phase take them.
     if (Bun.semver.order(version, RENAMED_IN) !== -1) {
-      source = renamePackages(source)
+      source = renameInSections(source)
 
       for (const dependency of state) {
         dependency.name = renamePackages(dependency.name)
@@ -793,6 +795,26 @@ function sectionSpan(source: string, section: string): { start: number, end: num
   }
 
   return undefined
+}
+
+// A phase that moves the app to the new names writes them in its files before the installed kay runs: that kay loads the project's config, which imports the old names the install no longer holds.
+async function renameWhenCrossing(root: string, from: string, to: string): Promise<void> {
+  if (Bun.semver.order(from, RENAMED_IN) === -1 && Bun.semver.order(to, RENAMED_IN) !== -1)
+    await renameProjectFiles(root)
+}
+
+// `source` with the old names written as the new ones in the sections listing dependencies only: an `overrides` or `resolutions` entry pinning `npm:@kaynooo/kayjs@~1.40.1` names a version the new package never had.
+function renameInSections(source: string): string {
+  let renamed = source
+
+  for (const section of SECTIONS) {
+    const span = sectionSpan(renamed, section)
+
+    if (span !== undefined)
+      renamed = renamed.slice(0, span.start) + renamePackages(renamed.slice(span.start, span.end)) + renamed.slice(span.end)
+  }
+
+  return renamed
 }
 
 // Rewrites the range inside the section listing the dependency, so a same-looking range in `overrides` or `peerDependencies` is left alone; undefined when no such entry was found.

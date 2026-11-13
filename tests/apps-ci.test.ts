@@ -1,6 +1,6 @@
 import { chmod } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
-import { APPS, cleanClones, clones, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs, writeStubs } from '../scripts/apps-ci'
+import { APPS, cleanClones, clones, oldNamesIn, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName, workspaceDirs, writeStubs } from '../scripts/apps-ci'
 import { BLOCKING, dispatchRun, exitCode, NO_FT, SECRET_UNSET } from '../scripts/release-apps'
 import { scratchDir } from './scratch'
 
@@ -29,6 +29,13 @@ describe('pointAtKay', () => {
   it('returns undefined for a manifest that depends on neither', () => {
     expect(pointAtKay({ dependencies: { elysia: '^1.4.0' } }, tarballs)).toBeUndefined()
     expect(pointAtKay({}, tarballs)).toBeUndefined()
+  })
+})
+
+describe('oldNamesIn', () => {
+  it('names each old package a manifest depends on, under its key or an alias, and nothing for an app on the new names', () => {
+    expect(oldNamesIn({ a: { dependencies: { '@kaynooo/kayjs-ui': '~1.103.0', 'kay': 'npm:@kaynooo/kayjs@~1.103.0', 'elysia': '^1.4.0' } }, b: { devDependencies: { '@kaynooo/kayjs-ui': '~1.103.0' } } })).toEqual(['@kaynooo/kayjs', '@kaynooo/kayjs-ui'])
+    expect(oldNamesIn({ a: { dependencies: { 'kay': 'npm:@kayjs/kay@~1.104.0', '@kayjs/ui': '~1.104.0', '@kaynooo/pg-orm': '^8.0.0' } } })).toEqual([])
   })
 })
 

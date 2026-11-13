@@ -1,13 +1,14 @@
 import type { BunPlugin } from 'bun'
 import type { InternalConfig, KayConfig, LoadedConfig } from './config'
 import { existsSync, realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { APP_CONTEXT, CONFIG_FILE } from './config'
 import { CONFIG_GROUPS, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
+import { OLD_PACKAGE_NAME, RENAMED_PACKAGES } from './package-names'
 import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
@@ -58,13 +59,32 @@ function withoutServer(source: string): string | undefined {
   return onlyDefineConfig ? source.replace(SERVER_NAMES_IMPORT, statement => statement.replace(SERVER_SPECIFIER, () => JSON.stringify(schemaModule()))) : undefined
 }
 
+// The config's source with each `@kaynooo/kayjs*` name that no longer resolves from `dir` written as its `@kayjs/*` name, so an app whose packages were renamed (by `kay upgrade` or by hand) still loads a config that `kay check --fix` has yet to rewrite.
+function withoutOldNames(source: string, dir: string): string {
+  return source.replace(OLD_PACKAGE_NAME, (name) => {
+    try {
+      Bun.resolveSync(name, dir)
+
+      return name
+    }
+    catch {
+      return RENAMED_PACKAGES[name]!
+    }
+  })
+}
+
 // A runtime plugin cannot resolve a bare specifier, so the config's source is rewritten as it loads.
-// The plugin takes only this file, and only when it is light, as a loader answering nothing for a file fails and one answering for every config would keep later plugins from theirs.
+// The plugin takes only this file, and only when it has something to rewrite, as a loader answering nothing for a file fails and one answering for every config would keep later plugins from theirs.
 // It stays registered for that one file, which the server loader's plugin also answers for.
 async function readConfigLightly(file: string): Promise<void> {
   const real = realpathSync(file)
 
-  if (lightConfigs.has(real) || withoutServer(await Bun.file(real).text()) === undefined)
+  if (lightConfigs.has(real))
+    return
+
+  const source = await Bun.file(real).text()
+
+  if (withoutServer(source) === undefined && withoutOldNames(source, dirname(real)) === source)
     return
 
   lightConfigs.add(real)
@@ -72,9 +92,9 @@ async function readConfigLightly(file: string): Promise<void> {
     name: 'kay-config',
     setup(build) {
       build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}(?:\\?.*)?$`) }, async () => {
-        const source = await Bun.file(real).text()
+        const text = await Bun.file(real).text()
 
-        return { contents: withoutServer(source) ?? source, loader: 'ts' as const }
+        return { contents: withoutOldNames(withoutServer(text) ?? text, dirname(real)), loader: 'ts' as const }
       })
     },
   })

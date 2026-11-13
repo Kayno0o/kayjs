@@ -62,9 +62,16 @@ describe('deprecated-package-names', () => {
       'src/page.kay': '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport { cms } from \'@kaynooo/kayjs-cms\'\n---\nTable\n',
     }, async (root) => {
       expect(await applySafeFixes(root, await renamedPackages(root, undefined))).toBe(4)
-      expect(await read(root, 'package.json')).toBe('{ "dependencies": { "@kayjs/ui": "~1.103.0", "@kaynooo/pg-orm": "^8.1.4" }, "devDependencies": { "kay": "npm:@kayjs/kay@~1.103.0" } }\n')
+      expect(await read(root, 'package.json')).toBe('{ "dependencies": { "@kayjs/ui": "~1.104.0", "@kaynooo/pg-orm": "^8.1.4" }, "devDependencies": { "kay": "npm:@kayjs/kay@~1.104.0" } }\n')
       expect(await read(root, 'src/page.kay')).toBe('---\nimport Table from \'@kayjs/ui/table.kay\'\nimport { cms } from \'@kayjs/cms\'\n---\nTable\n')
       expect(await renamedPackages(root, undefined)).toEqual([])
+    })
+  })
+
+  it('raises a manifest range below 1.104 to it, keeping its form, and leaves one at or above it', async () => {
+    await withFiles({ 'package.json': '{ "dependencies": { "@kaynooo/kayjs-ui": "^1.103.2", "@kaynooo/kayjs-cms": "~1.104.1" }, "devDependencies": { "kay": "npm:@kaynooo/kayjs@~1.90.0" } }\n' }, async (root) => {
+      await applySafeFixes(root, await renamedPackages(root, undefined))
+      expect(await read(root, 'package.json')).toBe('{ "dependencies": { "@kayjs/ui": "^1.104.0", "@kayjs/cms": "~1.104.1" }, "devDependencies": { "kay": "npm:@kayjs/kay@~1.104.0" } }\n')
     })
   })
 

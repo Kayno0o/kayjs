@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
+import { OLD_PACKAGE_NAME } from '../src/package-names'
 import { PEERS, peerSpec } from '../src/peers'
 
 // `bun scripts/apps-ci.ts pack` packs kay and each library into KAY_APPS_DIR, `bun scripts/apps-ci.ts <app>...` clones each app, installs it against those tarballs and runs its own check, lint and test scripts: what the Apps workflow runs before a release.
@@ -93,6 +94,22 @@ export function pointAtKay(manifest: Manifest, tarballs: Record<string, string>)
   }
 
   return changed ? next : undefined
+}
+
+// The old `@kaynooo/kayjs*` names the manifests (by path) list as dependencies: no tarball is named so since 1.104, so an app listing them is not tested against this release.
+export function oldNamesIn(manifests: Record<string, Manifest>): string[] {
+  const found = new Set<string>()
+
+  for (const manifest of Object.values(manifests)) {
+    for (const field of DEPENDENCY_FIELDS) {
+      for (const [name, range] of Object.entries(manifest[field] as Record<string, string> | undefined ?? {})) {
+        for (const match of `${name} ${range}`.matchAll(OLD_PACKAGE_NAME))
+          found.add(match[0])
+      }
+    }
+  }
+
+  return [...found].sort()
 }
 
 // Overrides in the root manifest, so the kay and kayjs-* a packed library depends on or peers on come from the tarballs too, not the registry.
@@ -275,6 +292,11 @@ async function run(app: App) {
 
   for (const path of (await manifestPaths(directory)).filter(file => file.startsWith(prefix)))
     manifests[path] = await Bun.file(join(directory, path)).json() as Manifest
+
+  const old = oldNamesIn(manifests)
+
+  if (old.length > 0)
+    console.log(`${app.name} is still on the old names (${old.join(', ')}), which no tarball of this release replaces: it is not tested against it until \`kay upgrade\` moves it`)
 
   const pointedManifests = Object.entries(pointApp(manifests, join(app.install ?? '.', 'package.json'), tarballs))
 

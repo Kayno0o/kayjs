@@ -131,19 +131,7 @@ jobs:
           echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
           echo "@kayjs:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" >> ~/.npmrc
           echo "//git.kaynooo.fr/api/packages/kaynooo/npm/:_authToken=${PACKAGE_TOKEN}" >> ~/.npmrc
-          # A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
-          publish() {
-            package="$(jq -r '.name + "@" + .version' package.json)"
-            if bun pm view "$package" version > /dev/null 2>&1; then
-              echo "$package is already published"
-            else
-              bun publish --access public
-            fi
-          }
-          publish
-          for dir in packages/*/; do
-            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && publish) || exit 1
-          done
+          scripts/publish-packages.sh https://git.kaynooo.fr/api/packages/kaynooo/npm/
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
@@ -157,18 +145,7 @@ jobs:
           trap 'rm -f ~/.npmrc' EXIT
           echo "@kayjs:registry=https://registry.npmjs.org/" > ~/.npmrc
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-          publish() {
-            package="$(jq -r '.name + "@" + .version' package.json)"
-            if bun pm view "$package" version > /dev/null 2>&1; then
-              echo "$package is already published"
-            else
-              bun publish --access public
-            fi
-          }
-          publish
-          for dir in packages/*/; do
-            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && publish) || exit 1
-          done
+          scripts/publish-packages.sh https://registry.npmjs.org/
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 

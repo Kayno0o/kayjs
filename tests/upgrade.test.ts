@@ -219,6 +219,50 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('writes the new names in the project\'s files before the installed kay runs, as its config import must resolve once the old packages are gone', async () => {
+    const root = await project(MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0'), {
+      'kay.config.ts': 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nexport default { extensions: [ui()] }\n',
+      'src/app.css': '@import \'@kaynooo/kayjs-ui/theme.css\';\n',
+    })
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.103.0', '@kaynooo/kayjs-ui': '1.103.0', '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' })
+    const seen: string[][] = []
+    const kay = deps.kay
+
+    deps.kay = async (dir, args, capture, env) => {
+      seen.push(await Promise.all(['kay.config.ts', 'src/app.css'].map(async file => Bun.file(join(dir, file)).text())))
+
+      return kay(dir, args, capture, env)
+    }
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(seen.length).toBeGreaterThan(0)
+      expect(seen.every(([config, css]) => config!.includes('\'@kayjs/ui/extension\'') && css!.includes('\'@kayjs/ui/theme.css\''))).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the ranges of overrides and resolutions alone when it moves to the new names, as the new package never had those versions', async () => {
+    const manifest = MANIFEST.replace('^1.40.2', '~1.103.0').replace('~1.40.1', '~1.103.0').replace('  "devDependencies"', '  "overrides": { "kay": "npm:@kaynooo/kayjs@~1.40.1" },\n  "resolutions": { "kay": "npm:@kaynooo/kayjs@~1.40.1" },\n  "devDependencies"')
+    const root = await project(manifest)
+
+    try {
+      await quietly(async () => upgradeProject(root, fakes({ '@kaynooo/kayjs': '1.103.0', '@kaynooo/kayjs-ui': '1.103.0', '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' }).deps))
+
+      const text = await Bun.file(join(root, 'package.json')).text()
+
+      expect(text).toContain('"overrides": { "kay": "npm:@kaynooo/kayjs@~1.40.1" }')
+      expect(text).toContain('"resolutions": { "kay": "npm:@kaynooo/kayjs@~1.40.1" }')
+      expect(text).toContain('"kay": "npm:@kayjs/kay@~1.104.0"')
+      expect(text).toContain('"@kayjs/ui": "~1.104.0"')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('installs the stepping stones before 1.104 under the old names and 1.104 under the new ones', async () => {
     const root = await project()
     const { deps, calls } = fakes({ '@kayjs/kay': '1.104.0', '@kayjs/ui': '1.104.0' })
@@ -1264,6 +1308,34 @@ describe('kay check --since', () => {
 
     expect(await run('--since', '1.46.0')).toEqual({ code: 1, stderr: 'kay check: --since takes a minor, as `1.46`, not `1.46.0`\n' })
     expect(await run('--since', '1.46', '--only', 'code')).toEqual({ code: 1, stderr: 'kay check: --since reports the deprecations of one minor, so it does not go with --only\n' })
+  })
+})
+
+describe('kay check --fix --since 1.104', () => {
+  it('renames the packages of a project whose config still imports an old name that no longer resolves, loading the config as renamed', async () => {
+    // Outside the checkout, whose parents' node_modules still hold the old names: only kay and @kayjs/ui are installed, as `bun install` leaves an app after the rename.
+    const root = await mkdtemp(join(tmpdir(), 'rename-check-'))
+
+    await mkdir(join(root, 'node_modules/@kayjs'), { recursive: true })
+    await symlink(join(import.meta.dir, '..'), join(root, 'node_modules/kay'))
+    await symlink(join(import.meta.dir, '../packages/ui'), join(root, 'node_modules/@kayjs/ui'))
+    await Promise.all([
+      Bun.write(join(root, 'package.json'), '{ "name": "app", "dependencies": { "@kayjs/ui": "~1.104.0" } }\n'),
+      Bun.write(join(root, 'tsconfig.json'), await Bun.file(join(import.meta.dir, 'fixtures/ui-list/tsconfig.json')).text()),
+      Bun.write(join(root, 'kay.config.ts'), 'import { ui } from \'@kaynooo/kayjs-ui/extension\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [ui()], observe: { log: false }, requireGuards: false })\n'),
+      Bun.write(join(root, 'src/routes/index.kay'), 'h1 Hi\n'),
+    ])
+
+    try {
+      const child = Bun.spawn([process.execPath, CLI, 'check', '--fix', '--since', '1.104', root], { stdout: 'pipe', stderr: 'pipe' })
+      const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect(stdout + stderr).not.toContain('Cannot find')
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('\'@kayjs/ui/extension\'')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 
