@@ -20,6 +20,7 @@ export function majorWarning(root: string, name: string, held: string, wanted: s
   const file = installed === undefined ? undefined : CHANGE_FILES.map(file => join(installed.dir, file)).find(path => existsSync(path))
   const repository = typeof installed?.repository === 'string' ? installed.repository : installed?.repository?.url
   const where = file === undefined ? repository?.replace(GIT_PREFIX, '') : relative(root, file)
+  const notes = where === undefined ? '' : `: what changed is ${file === undefined ? 'at' : 'in'} ${where}`
 
-  return `${name} was raised from ${held} to ${wanted}, across a major, so its API may have changed${where === undefined ? '' : `: what changed is in ${where}`}`
+  return `${name} was raised from ${held} to ${wanted}, across a major, so its API may have changed${notes}`
 }
