@@ -1,9 +1,0 @@
----
-import { signal } from 'kay'
-import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
-
-const open = signal(false)
----
-button#opener(type="button" onClick={() => open = true}) Open
-Dialog#late(open={open()} title="Late" onOpenChange={() => open = false})
-  p Waiting

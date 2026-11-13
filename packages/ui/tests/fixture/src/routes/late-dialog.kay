@@ -1,5 +1,0 @@
----
-import LateDialog from '../components/late-dialog.kay'
----
-main
-  LateDialog
