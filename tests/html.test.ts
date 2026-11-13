@@ -237,13 +237,15 @@ describe('sanitizeHtml', () => {
   })
 
   it('reads a megabyte of unclosed tags in one pass', () => {
-    const started = performance.now()
+    const started = process.cpuUsage()
 
     for (const opener of ['<script>', '<!--', '<style>x</style'])
       sanitizeHtml(opener.repeat(1_000_000 / opener.length))
 
-    // About 150 ms in one pass, 1.6 s on a loaded CI host; a pass per tag would take minutes.
-    expect(performance.now() - started).toBeLessThan(5000)
+    // About 150 ms of CPU in one pass, where a pass per tag would take minutes; CPU time, as the wall clock of a loaded CI host passed 5 s.
+    const { user, system } = process.cpuUsage(started)
+
+    expect((user + system) / 1000).toBeLessThan(5000)
   })
 
   it('gives markup it already gave back as it is', () => {
