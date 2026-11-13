@@ -1,8 +1,9 @@
 import type { RowKey, RowKeyValue } from './table'
-import { effect, memo, signal, uid } from 'kay'
+import { effect, memo, signal } from 'kay'
 import { rowKeyOf } from './table'
 
 export interface ExpandInput<Row, Key extends RowKey<Row>> {
+  tableId: string
   rowKey: Key
   expanded: () => RowKeyValue<Row, Key>[] | undefined
   onOpenChange: () => ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
@@ -12,7 +13,6 @@ export interface ExpandInput<Row, Key extends RowKey<Row>> {
 export function expanding<Row, Key extends RowKey<Row>>(input: ExpandInput<Row, Key>) {
   type Value = RowKeyValue<Row, Key>
 
-  const tableId = uid()
   const none: Value[] = []
   const opened = signal<Value[]>(input.expanded() ?? none)
 
@@ -21,7 +21,7 @@ export function expanding<Row, Key extends RowKey<Row>>(input: ExpandInput<Row, 
   })
 
   const openSet = memo(() => new Set(opened()))
-  const detailId = (row: Row) => `${tableId}-detail-${String(rowKeyOf(row, input.rowKey)).replace(/\s/g, '_')}`
+  const detailId = (row: Row) => `${input.tableId}-detail-${String(rowKeyOf(row, input.rowKey)).replace(/\s/g, '_')}`
 
   function toggleRow(key: Value) {
     const open = !openSet().has(key)

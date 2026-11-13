@@ -2959,6 +2959,7 @@ interface ExpandInput<Row, Key extends RowKey<Row>>
   expanded: () => RowKeyValue<Row, Key>[] | undefined
   onOpenChange: () => ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
   rowKey: Key
+  tableId: string
 
 [./lib/table-export] downloadCsv
 function downloadCsv<Row>(rows: Row[], columns: Column<Row>[], name: string): void

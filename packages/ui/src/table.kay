@@ -3,7 +3,7 @@ import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { RowsSource } from './source'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
@@ -299,7 +299,9 @@ const skeletonCells = () => Array.from({ length: columnCount() }, (_, index) => 
 const openLabel = (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row)
 const broke = () => list ? list.failed() : source.failed()
 const select = uses('selectable') ? selection({ rowKey, rows, kept, selected: () => selected, onChange: () => onSelectedChange, enabled: () => selectable, settling: () => waiting() || broke() }) : undefined
-const expansion = uses('expandable') ? expanding({ rowKey, expanded: () => expanded, onOpenChange: () => onOpenChange }) : undefined
+// Drawn whatever the variant, as the server draws it: an id taken only by a Table with `expandable` would shift every later one of the island.
+const tableId = uid()
+const expansion = uses('expandable') ? expanding({ tableId, rowKey, expanded: () => expanded, onOpenChange: () => onOpenChange }) : undefined
 const linked = () => rowHref !== undefined || onRowClick !== undefined
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 

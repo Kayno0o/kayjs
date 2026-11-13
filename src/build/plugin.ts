@@ -22,7 +22,7 @@ import { liveIds } from './live-ids'
 import { withLocaleLinks } from './navigation-locale'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
-import { specializedSource, USES_QUERY, variantImports } from './variants'
+import { specializedSource, USES_QUERY, VariantIndex } from './variants'
 
 export interface KayPluginOptions {
   // Defaults to `dom` when bundling for the browser and `ssr` everywhere else, the Bun runtime included.
@@ -81,6 +81,27 @@ const WORKER_BUNDLE = join(import.meta.dir, 'worker-bundle.ts')
 
 // The workers this process bundled, kept while the files they read and wrote are as they were: `kay dev` builds the same workers again with every edit, and a process each is most of what a build costs.
 const bundledWorkers = new Map<string, { result: WorkerResult, stamp: string }>()
+
+// Serves a component as the variant its `?uses=` names: resolved from the importer, loaded specialized to its features.
+function variantHooks(build: Bun.PluginBuilder, load: (file: string, twin: boolean, features: ReadonlySet<string>) => Promise<Bun.OnLoadResult>): void {
+  build.onResolve({ filter: USES_QUERY }, ({ path, importer }) => {
+    const features = USES_QUERY.exec(path)![1]!
+    const base = path.slice(0, path.length - features.length - '?uses='.length)
+
+    try {
+      return { path: `${Bun.resolveSync(base, dirname(withoutTwin(importer.replace(USES_SUFFIX, ''))))}?uses=${features}`, namespace: VARIANT_NAMESPACE }
+    }
+    catch {
+      // The normal resolver names what is wrong with the specifier.
+      return undefined
+    }
+  })
+  build.onLoad({ filter: USES_QUERY, namespace: VARIANT_NAMESPACE }, async ({ path }) => {
+    const features = USES_QUERY.exec(path)![1]!
+
+    return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('.').filter(Boolean)))
+  })
+}
 
 function stampOf(files: string[]): string {
   return files.map((file) => {
@@ -225,6 +246,8 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         })
       }
 
+      // One index for the build: the call sites of the whole project decide a component's variant.
+      const variantIndex = new VariantIndex(join(root, 'src'))
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
       const localizing = (contents: string) => options.localeLinks === true ? withLocaleLinks(contents) : contents
 
@@ -233,10 +256,10 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       // A twin's frames show its namespace and the whole path, where a file's show its path from where the build ran.
       const load = async (file: string, twin = false, features?: ReadonlySet<string>) => {
         const original = await Bun.file(withoutTwin(file)).text()
-        const source = features === undefined ? original : specializedSource(original, features)
+        const source = features === undefined ? original : specializedSource(original, features, withoutTwin(file))
 
         const compiled = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable, variant: features === undefined ? undefined : [...features].sort().join('.') })
-        const code = target === 'dom' ? await variantImports(compiled, withoutTwin(file), source) : compiled
+        const code = target === 'dom' ? await variantIndex.variantImports(compiled, withoutTwin(file), original) : compiled
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
@@ -254,17 +277,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       if (build.config !== undefined) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
         build.onLoad({ filter: KAY_MODULE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path, true))
-        build.onResolve({ filter: USES_QUERY }, ({ path, importer }) => {
-          const features = USES_QUERY.exec(path)![1]!
-          const base = path.slice(0, path.length - features.length - '?uses='.length)
-
-          return { path: `${Bun.resolveSync(base, dirname(withoutTwin(importer.replace(USES_SUFFIX, ''))))}?uses=${features}`, namespace: VARIANT_NAMESPACE }
-        })
-        build.onLoad({ filter: USES_QUERY, namespace: VARIANT_NAMESPACE }, async ({ path }) => {
-          const features = USES_QUERY.exec(path)![1]!
-
-          return load(path.slice(0, path.length - features.length - '?uses='.length), false, new Set(features.split('.').filter(Boolean)))
-        })
+        variantHooks(build, load)
         build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))
         build.onLoad({ filter: ANY, namespace: ICON_NAMESPACE }, ({ path }) => ({ contents: iconModule(iconSets, path), loader: 'js' }))
       }

@@ -1,43 +1,165 @@
-import { dirname } from 'node:path'
+import type { Dirent } from 'node:fs'
+import { readdirSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { elementsIn } from '../compiler/ast'
 import { parseExpanded } from '../compiler/markdown-block'
 
-// A component names the features an app may leave out with `uses('selectable')`: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the importing file writes at its call sites. See `specializedSource`.
-const USES_CALL = /\buses\(\s*'(\w+)'\s*\)/g
+// A component names the features an app may leave out with `uses('selectable')`, the `uses` it imports from kayjs-ui's marker module: a call that is true while the prop is there to be written, and that a browser build replaces with `true` or `false` once it has read the props the files of the project write at their call sites. See `specializedSource`.
+const USES_CALL = /\buses\(\s*'(\w+)'\s*\)/y
 const KAY_IMPORT = /^import\s+(\w+)\s+from\s+(["'])([^"'\n]+\.kay)\2/gm
+const USES_IMPORT = /^import\s*\{[^}\n]*\buses\b[^}\n]*\}\s*from\s*(["'])([^"'\n]+)\1/m
+// The marker module, by where the library keeps it: an app's own `uses` is another function.
+const MARKER_FILE = /(?:packages\/ui|@kaynooo\/kayjs-ui)\/src\/uses\.ts$/
 // A line opening a fence, whose last one precedes the template.
 const FENCE = /^---(?:\s|$)/
-// A template `if` whose condition calls `uses()`.
-const USES_IF = /^([ \t]*)if (.*\buses\(.*)$/
+// A template `if` or `else if` whose condition calls `uses()`.
+const USES_IF = /^([ \t]*)((?:else )?if) (.*\buses\(.*)$/
+const IDENTIFIER_CHAR = /[\w$.]/
+const BACKSLASH = /\\/g
 
-// The suffix an import of a variant carries: the features, joined by dots, the call sites of the importing file use.
+// The suffix an import of a variant carries: the features, joined by dots, the call sites of the project use.
 export const USES_QUERY = /\.kay\?uses=([\w.]*)$/
+const VARIANT_INPUT = /^kay-variant:|\?uses=[\w.]*$/g
 
-const featuresOf = new Map<string, Promise<string[]>>()
+// A path the bundler names for a variant, as the file it is made from.
+export function variantFile(input: string): string {
+  return input.replace(VARIANT_INPUT, '')
+}
 
-export function usesNames(source: string): string[] {
-  return [...new Set([...source.matchAll(USES_CALL)].map(match => match[1]!))]
+// Whether `source` imports `uses` from the marker module, which makes its calls the marker's.
+function importsMarker(source: string, file: string): boolean {
+  const hit = USES_IMPORT.exec(source)
+
+  if (hit === null)
+    return false
+
+  try {
+    return MARKER_FILE.test(Bun.resolveSync(hit[2]!, dirname(file)).replace(BACKSLASH, '/'))
+  }
+  catch {
+    return false
+  }
+}
+
+// `text` with each marker call outside comments and strings replaced by what `answer` says of its feature.
+function replaceCalls(text: string, answer: (feature: string) => string): string {
+  let out = ''
+  let quote = ''
+  let at = 0
+
+  while (at < text.length) {
+    const char = text[at]!
+
+    if (quote !== '') {
+      out += char
+
+      if (char === '\\' && at + 1 < text.length)
+        out += text[++at]!
+      else if (char === quote || (char === '\n' && quote !== '`'))
+        quote = ''
+
+      at++
+
+      continue
+    }
+
+    if (char === '/' && text[at + 1] === '/') {
+      const end = text.indexOf('\n', at)
+      const next = end === -1 ? text.length : end
+
+      out += text.slice(at, next)
+      at = next
+
+      continue
+    }
+
+    if (char === '/' && text[at + 1] === '*') {
+      const end = text.indexOf('*/', at + 2)
+      const next = end === -1 ? text.length : end + 2
+
+      out += text.slice(at, next)
+      at = next
+
+      continue
+    }
+
+    if (char === '\'' || char === '"' || char === '`') {
+      quote = char
+      out += char
+      at++
+
+      continue
+    }
+
+    if (char === 'u' && !IDENTIFIER_CHAR.test(text[at - 1] ?? '')) {
+      USES_CALL.lastIndex = at
+
+      const call = USES_CALL.exec(text)
+
+      if (call !== null) {
+        out += answer(call[1]!)
+        at += call[0].length
+
+        continue
+      }
+    }
+
+    out += char
+    at++
+  }
+
+  return out
+}
+
+const featuresOf = new Map<string, { stamp: number, names: Promise<string[]> }>()
+
+// The features a text names: the `uses('x')` of a file importing the marker, none otherwise.
+export function usesNames(source: string, file = ''): string[] {
+  if (file !== '' && !importsMarker(source, file))
+    return []
+
+  const found = new Set<string>()
+
+  replaceCalls(source, (feature) => {
+    found.add(feature)
+
+    return ''
+  })
+
+  return [...found]
 }
 
 async function readNames(path: string): Promise<string[]> {
   try {
-    return usesNames(await Bun.file(path).text())
+    return usesNames(await Bun.file(path).text(), path)
   }
   catch {
     return []
   }
 }
 
-// The features a component file names, read once: none when the file has no `uses()` call or cannot be read.
+// The features a component file names, read again when the file changes: none when it has no marker call or cannot be read.
 async function declaredFeatures(path: string): Promise<string[]> {
-  let found = featuresOf.get(path)
+  let stamp = 0
 
-  if (found === undefined) {
-    found = readNames(path)
-    featuresOf.set(path, found)
+  try {
+    stamp = (await stat(path)).mtimeMs
+  }
+  catch {
+    return []
   }
 
-  return found
+  const kept = featuresOf.get(path)
+
+  if (kept?.stamp === stamp)
+    return kept.names
+
+  const names = readNames(path)
+
+  featuresOf.set(path, { stamp, names })
+
+  return names
 }
 
 // Whether a condition made of `true`, `false` and anything else, joined by `&&` and `||`, is `false` whatever the rest holds.
@@ -102,13 +224,18 @@ function splitTop(text: string, operator: '&&' | '||'): string[] | undefined {
   return parts
 }
 
-// The source with each `uses('x')` as `true` when `x` is among `present`, `false` otherwise, and a template `if` that cannot hold with them reduced to `if false` with its lines blanked: the block keeps its markers for the server markup the island hydrates, and the lines keep their numbers for the source map. A block of that kind has no `else` after it.
-export function specializedSource(source: string, present: ReadonlySet<string>): string {
-  const lines = source.split('\n')
-  const replaced = (text: string) => text.replace(USES_CALL, (_call, name: string) => present.has(name) ? 'true' : 'false')
+// The source with each `uses('x')` of its script and of its `if` conditions as `true` when `x` is among `present`, `false` otherwise, and a template `if` that cannot hold with them reduced to `if false` with its lines blanked: the block keeps its markers for the server markup the island hydrates, and the lines keep their numbers for the source map. An `else` after a blanked block still follows it. A `file` that does not import the marker is returned as it is.
+export function specializedSource(source: string, present: ReadonlySet<string>, file = ''): string {
+  if (file !== '' && !importsMarker(source, file))
+    return source
 
+  const lines = source.split('\n')
+  const replaced = (text: string) => replaceCalls(text, name => present.has(name) ? 'true' : 'false')
   // The template starts after the last fence line.
   const template = lines.findLastIndex(line => FENCE.test(line)) + 1
+
+  for (let at = 0; at < template; at++)
+    lines[at] = replaced(lines[at]!)
 
   for (let at = template; at < lines.length; at++) {
     const hit = USES_IF.exec(lines[at]!)
@@ -116,17 +243,17 @@ export function specializedSource(source: string, present: ReadonlySet<string>):
     if (hit === null)
       continue
 
-    const condition = replaced(hit[2]!)
+    const condition = replaced(hit[3]!)
 
     if (!alwaysFalse(condition)) {
-      lines[at] = `${hit[1]}if ${condition}`
+      lines[at] = `${hit[1]}${hit[2]} ${condition}`
 
       continue
     }
 
     const indent = hit[1]!.length
 
-    lines[at] = `${hit[1]}if false`
+    lines[at] = `${hit[1]}${hit[2]} false`
 
     for (let next = at + 1; next < lines.length; next++) {
       const line = lines[next]!
@@ -139,18 +266,21 @@ export function specializedSource(source: string, present: ReadonlySet<string>):
     }
   }
 
-  return replaced(lines.join('\n'))
+  return lines.join('\n')
 }
 
-// The props the call sites of each `.kay` component a file imports write, by the name the file gives it: a component read anywhere but as a tag, or called with a spread, is left out, as every prop of it may be written.
-export function propsWritten(source: string, locals: readonly string[]): Map<string, Set<string>> {
+// Stands for every prop of a component: it is called with a spread or read as a value, so any may be written.
+export const ANY = Symbol('any')
+
+// The props the call sites of each `.kay` component a file imports write, by the name the file gives it.
+export function propsWritten(source: string, locals: readonly string[]): Map<string, Set<string> | typeof ANY> {
   const { file } = parseExpanded(source)
   const written = new Map<string, Set<string>>()
   const calls = new Map<string, number>()
   const open = new Set(locals)
 
   for (const element of elementsIn(file.template)) {
-    if (!element.component || !open.has(element.name))
+    if (!element.component || !locals.includes(element.name))
       continue
 
     calls.set(element.name, (calls.get(element.name) ?? 0) + 1)
@@ -180,12 +310,19 @@ export function propsWritten(source: string, locals: readonly string[]): Map<str
       open.delete(local)
   }
 
-  return new Map([...written].filter(([local]) => open.has(local)))
+  return new Map(locals.map(local => [local, open.has(local) ? written.get(local) ?? new Set<string>() : ANY]))
 }
 
-// The imports of the compiled `code` of `file` that name a component with features, pointed at the variant its call sites use: `import Table from './table.kay'` as `./table.kay?uses=pageSize`.
-export async function variantImports(code: string, file: string, source: string): Promise<string> {
-  const candidates = new Map<string, { specifier: string, features: string[] }>()
+interface Candidate {
+  local: string
+  specifier: string
+  path: string
+  features: string[]
+}
+
+// The `.kay` components a file imports that name features.
+async function candidatesOf(code: string, file: string): Promise<Candidate[]> {
+  const found: Candidate[] = []
 
   for (const [, local, , specifier] of code.matchAll(KAY_IMPORT)) {
     let path: string
@@ -200,25 +337,104 @@ export async function variantImports(code: string, file: string, source: string)
     const features = await declaredFeatures(path)
 
     if (features.length > 0)
-      candidates.set(local!, { specifier: specifier!, features })
+      found.push({ local: local!, specifier: specifier!, path, features })
   }
 
-  if (candidates.size === 0)
-    return code
+  return found
+}
 
-  const written = propsWritten(source, [...candidates.keys()])
-  let result = code
+// What the `.kay` files of a project write of each component with features, all of them together: a component has one variant, so the chunks of two islands using a Table share it.
+export class VariantIndex {
+  private readonly union = new Map<string, Set<string> | typeof ANY>()
+  private readonly indexed = new Set<string>()
+  private scan: Promise<void> | undefined
 
-  for (const [local, { specifier, features }] of candidates) {
-    const props = written.get(local)
+  constructor(private readonly dir: string) {}
 
-    if (props === undefined)
+  // Reads the project's files once, as the bundler asks for the first variant.
+  private async scanned(): Promise<void> {
+    this.scan ??= (async () => {
+      for (const file of kayFiles(this.dir))
+        await this.add(file, await Bun.file(file).text())
+    })()
+
+    return this.scan
+  }
+
+  private async add(file: string, source: string): Promise<void> {
+    if (this.indexed.has(file))
+      return
+
+    this.indexed.add(file)
+
+    const candidates = await candidatesOf(source, file)
+
+    if (candidates.length === 0)
+      return
+
+    let written: ReturnType<typeof propsWritten>
+
+    try {
+      written = propsWritten(source, candidates.map(candidate => candidate.local))
+    }
+    catch {
+      written = new Map(candidates.map(candidate => [candidate.local, ANY]))
+    }
+
+    for (const { local, path } of candidates) {
+      const props = written.get(local) ?? new Set<string>()
+      const before = this.union.get(path)
+
+      this.union.set(path, before === ANY || props === ANY ? ANY : new Set([...before ?? [], ...props]))
+    }
+  }
+
+  // The imports of the compiled `code` of `file` that name a component with features, pointed at the one variant the project's call sites need: `import Table from './table.kay'` as `./table.kay?uses=pageSize`. `source` is the file's own, for one the scan did not meet.
+  async variantImports(code: string, file: string, source: string): Promise<string> {
+    const candidates = await candidatesOf(code, file)
+
+    if (candidates.length === 0)
+      return code
+
+    await this.scanned()
+    await this.add(file, source)
+
+    let result = code
+
+    for (const { specifier, path, features } of candidates) {
+      const props = this.union.get(path) ?? new Set<string>()
+      const used = (props === ANY ? features : features.filter(feature => props.has(feature))).sort()
+
+      result = result.replace(new RegExp(`^(import\\s+\\w+\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('.')}${quote}`)
+    }
+
+    return result
+  }
+}
+
+// The `.kay` files under a directory, leaving out what a project installs and builds.
+function kayFiles(dir: string): string[] {
+  const found: string[] = []
+  let entries: Dirent[]
+
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  }
+  catch {
+    return found
+  }
+
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.'))
       continue
 
-    const used = features.filter(feature => props.has(feature)).sort()
+    const path = join(dir, entry.name)
 
-    result = result.replace(new RegExp(`^(import\\s+${local}\\s+from\\s+)(["'])${RegExp.escape(specifier)}\\2`, 'm'), (_import, head: string, quote: string) => `${head}${quote}${specifier}?uses=${used.join('.')}${quote}`)
+    if (entry.isDirectory())
+      found.push(...kayFiles(path))
+    else if (entry.name.endsWith('.kay'))
+      found.push(path)
   }
 
-  return result
+  return found
 }

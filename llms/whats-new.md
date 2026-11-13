@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports `innerHTML` bound to a name typed as a string literal, a `for` item over an `as const` array or a `const` string, as the runtime already dropped it: pass `sanitizeHtml(value)` or `trustHtml(value)`, or write the markup out ([templates](templates-elements-slots-snippets.md)).
 - `pages()`, `api()`, `session()`, `schedule()`, `background()`, `queue()`, `workflow()` and a library's mailer return a `KayPlugin` from `kay/server`, kay's own name for the Elysia instance they are in 1.x, with `plugin.elysia` as the documented, unstable way to reach it; `KayExtension`, `shutdown` and a test site's `use` take a `PluginInput`, so an Elysia instance keeps working ([Locals](server.md#mount-a-server-plugin)).
 - kayjs-ui: a Table ships the code of the features its call sites write, as an island: one with no `selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter` or `pageSize` leaves them out of its chunks, with nothing declared by the app. A library component opts in by calling `uses('feature')` for each prop it guards.
+- kayjs-ui: a Table in an island ships only the features the project's call sites write (`selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter`, `pageSize` and the rest), one variant shared by every island, with nothing to declare; a spread or a Table read as a value keeps them all ([Table](../packages/ui/llms/table.md#what-a-page-ships)).
 
 ## 1.102.0
 

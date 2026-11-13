@@ -10,8 +10,37 @@ afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
+// What only the code of a feature holds: the CSV export, the row selection, the expand toggle, the virtual window, the list sync.
+const EXPORT = 'text/csv'
+const SELECT = 'ui.table.selectRow'
+const EXPAND = 'ui.table.expandRow'
+const VIRTUAL = 'overscan'
+const LIST = 'restart('
+
+// An island holding a Table written as `table`, a signal making it one.
+function island(imports: string, table: string): string {
+  return `---\nimport { signal } from 'kay'\nimport Table from '@kaynooo/kayjs-ui/table.kay'\n${imports}\nconst COLUMNS = [{ key: 'name', header: 'Name' }]\nconst rows = signal([{ id: 1, name: 'a' }])\n---\nbutton(onClick={() => rows.set([])}) Clear\n${table}\n`
+}
+
+async function built(components: Record<string, string>) {
+  const root = resolve(await fixtureCopy('ui-list'))
+
+  dirs.push(root)
+
+  const page = Object.keys(components).map(name => `import ${name} from '../components/${name.toLowerCase()}.kay'`).join('\n')
+  const uses = Object.keys(components).map(name => name).join('\n')
+
+  await Promise.all(Object.entries(components).map(async ([name, text]) => Bun.write(join(root, `src/components/${name.toLowerCase()}.kay`), text)))
+  await Bun.write(join(root, 'src/routes/variants.kay'), `---\n${page}\n---\n${uses}\n`)
+
+  const client = await buildClient(root)
+  const text = async (name: string) => (await Promise.all(client.islands[`src/components/${name.toLowerCase()}.kay`]!.map(async chunk => Bun.file(join(client.dir, chunk.slice('/_kay/'.length))).text()))).join('\n')
+
+  return { client, text }
+}
+
 describe('a component with features', () => {
-  it('ships the ones its call sites write: a Table with a filter and pages carries neither the CSV export nor the row selection', async () => {
+  it('ships the ones its call sites write: a Table with a filter and pages carries none of the others', async () => {
     const root = resolve(await fixtureCopy('ui-list'))
 
     dirs.push(root)
@@ -19,11 +48,53 @@ describe('a component with features', () => {
     const chunks = client.islands['src/components/item-list.kay']!
     const text = (await Promise.all(chunks.map(async chunk => Bun.file(join(client.dir, chunk.slice('/_kay/'.length))).text()))).join('\n')
 
-    // The page size picker and the filter are in.
     expect(text).toContain('ui.table.filter')
     expect(text).toContain('pageSizes')
-    // Export and selection are not: their modules and the code behind them stay out.
-    expect(text).not.toContain('text/csv')
-    expect(text).not.toContain('ui.table.selectRow')
+
+    for (const left of [EXPORT, SELECT, EXPAND, VIRTUAL, LIST])
+      expect(text, left).not.toContain(left)
+  }, 120_000)
+
+  it('is whole where a file spreads onto it or reads it as a value, and one variant serves every island that uses it', async () => {
+    const { text } = await built({
+      Spread: island('', 'Table({...{ selectable: true }} columns={COLUMNS} rows={rows()} rowKey="id")'),
+      Value: island('const keep = Table\nconsole.log(keep)', 'Table(columns={COLUMNS} rows={rows()} rowKey="id")'),
+    })
+
+    // A spread anywhere asks for every feature of the component, in every island.
+    for (const name of ['Spread', 'Value']) {
+      const code = await text(name)
+
+      expect(code, name).toContain(EXPORT)
+      expect(code, name).toContain(EXPAND)
+      expect(code, name).toContain(VIRTUAL)
+      expect(code, name).toContain(LIST)
+    }
+  }, 120_000)
+
+  it('is the union of the call sites of the project: two islands share one Table, each with the features of both', async () => {
+    const { client, text } = await built({
+      Picking: island('', 'Table(columns={COLUMNS} rows={rows()} rowKey="id" selectable)'),
+      Saving: island('', 'Table(columns={COLUMNS} rows={rows()} rowKey="id" exportable)'),
+    })
+    const picking = client.islands['src/components/picking.kay']!
+    const saving = client.islands['src/components/saving.kay']!
+    const bodies = new Set<string>()
+
+    for (const name of ['Picking', 'Saving']) {
+      const code = await text(name)
+
+      expect(code, name).toContain(SELECT)
+      expect(code, name).toContain(EXPORT)
+      expect(code, name).not.toContain(EXPAND)
+    }
+
+    // The core of the Table is in one chunk both load.
+    for (const chunk of [...picking, ...saving]) {
+      if ((await Bun.file(join(client.dir, chunk.slice('/_kay/'.length))).text()).includes('ui.table.loading'))
+        bodies.add(chunk)
+    }
+
+    expect(bodies.size).toBe(1)
   }, 120_000)
 })

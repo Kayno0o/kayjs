@@ -1,0 +1,12 @@
+---
+import { uid } from 'kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+// Draws an id before and after a Table with a column toggle: the ids it draws in between must be those of the full Table, as the server draws them.
+const COLUMNS = [{ key: 'name', header: 'Name' }, { key: 'size', header: 'Size' }]
+const ROWS = [{ id: 1, name: 'a', size: 2 }]
+const first = uid()
+---
+span#before {first}
+Table(columns={COLUMNS} rows={ROWS} rowKey="id" columnToggle)
+span#after {uid()}

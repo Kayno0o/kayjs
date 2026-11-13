@@ -27,6 +27,18 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
     EmptyState(title="No post matches")
 ```
 
+## What a page ships
+
+A Table in an island ships only the features the project's `.kay` files write on it. With no `selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter`, `fields`, `filterParam`, `sortParam`, `list`, `pageSize`, `rowHref` or `onRowClick` at any call site, the code behind that prop stays out of the island's chunks: a table with only `filter` and `pageSize` loads about 22 KB less than one with every feature.
+
+Nothing is declared. kay reads the props at each `<Table>` call of the project's `src`, takes the union, and builds one variant of the Table that every island loads, so two islands share it.
+
+A call with a spread (`Table({...props})`), or a Table read anywhere but as a tag (`const T = Table`, passed as a value), asks for every feature.
+
+The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.
+
+Only an import written as `import Table from '@kaynooo/kayjs-ui/table.kay'` (or a relative one) is specialized. A Table used directly from a static page, as its own island, still ships every feature.
+
 ## Reference
 
 - With a `@cell(row, column)` block, every column shows what it draws, but one with `cell: false`, which shows the row's value at `key` as text, as every column does without the block. A table where any column sets `cell: true` draws only those through the block.

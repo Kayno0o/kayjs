@@ -3250,8 +3250,13 @@ describe('pruning the compile caches', () => {
       const variant = `${Bun.hash(file).toString(36)}-ssr-inspect.json`
 
       await Bun.write(join(cacheDir, variant), '{}')
-      expect(await pruneCompileCache(cacheDir)).toBe(1)
+      // The variant a gone component's importer called for goes with it.
+      const gone = join(cacheDir, '1abc-dom-uses-x1y.json')
+
+      await Bun.write(gone, '{}')
+      expect(await pruneCompileCache(cacheDir)).toBe(2)
       expect(await Bun.file(join(cacheDir, variant)).exists()).toBe(true)
+      expect(await Bun.file(gone).exists()).toBe(false)
 
       const left = await readdir(cacheDir)
 

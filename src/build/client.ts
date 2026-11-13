@@ -52,6 +52,7 @@ import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
+import { variantFile } from './variants'
 
 export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
   minify?: boolean | undefined
@@ -125,7 +126,7 @@ export async function buildClient(root: string, options: ClientOptions = {}, sta
   const built = fromManifest(root, manifest)
 
   built.unresolved = styles!.server
-  const bundled = Object.values(scripts!.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input))
+  const bundled = Object.values(scripts!.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => variantFile(input)))
 
   built.packages = packagesOf([...bundled, ...styles!.inputs])
 
@@ -227,7 +228,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     if (increments || stamps) {
       const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
-      const islandInputs = scripts ? realPaths(Object.values(scripts.inputs).flatMap(inputs => Object.keys(inputs))) : previous!.islandInputs
+      const islandInputs = scripts ? realPaths(Object.values(scripts.inputs).flatMap(inputs => Object.keys(inputs).map(variantFile))) : previous!.islandInputs
 
       last = increments?.next(previous, { sources, islandInputs, styleInputs, classTable: classTableText, manifest: text }, scripts, styles, texts)
 
@@ -780,7 +781,7 @@ export function islandManifest(root: string, outputs: Outputs, islands: Map<stri
     // Inputs are named relative to the working directory, the root in development.
     if (hot) {
       for (const chunk of chunks)
-        (manifest.chunkInputs ??= {})[assetUrl(chunk)] = Object.keys(outputs[chunk]?.inputs ?? {}).map(input => islandPath(root, input))
+        (manifest.chunkInputs ??= {})[assetUrl(chunk)] = Object.keys(outputs[chunk]?.inputs ?? {}).map(input => islandPath(root, variantFile(input)))
     }
   }
 

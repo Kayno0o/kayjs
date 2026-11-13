@@ -1,5 +1,8 @@
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { propsWritten, specializedSource, usesNames } from '../src/build/variants'
+import { ANY, propsWritten, specializedSource, usesNames } from '../src/build/variants'
+import { scratchDir } from './scratch'
 
 const CHILD = [
   '---',
@@ -48,6 +51,31 @@ describe('specializedSource', () => {
   })
 })
 
+describe('specializedSource around else and the text', () => {
+  it('leaves an else after a blanked if and an else if with a call', () => {
+    const out = specializedSource('---\n---\nif uses(\'a\') && p\n  b one\nelse if uses(\'b\') && q\n  b two\nelse\n  b three', new Set()).split('\n')
+
+    expect(out).toEqual(['---', '---', 'if false', '', 'else if false', '', 'else', '  b three'])
+  })
+
+  it('leaves a call in a comment or a string, and a method of that name', () => {
+    const out = specializedSource('const a = uses(\'x\')\n// uses(\'x\')\nconst b = \'uses(\\\'x\\\')\'\nconst c = other.uses(\'x\')\n---\n', new Set(['x']))
+
+    expect(out).toBe('const a = true\n// uses(\'x\')\nconst b = \'uses(\\\'x\\\')\'\nconst c = other.uses(\'x\')\n---\n')
+  })
+
+  it('leaves the file of an app whose own uses is not the marker', async () => {
+    const dir = await scratchDir('variants-')
+    const file = join(dir, 'own.kay')
+    const text = 'import { uses } from \'./uses\'\nconst on = uses(\'x\')\n---\n'
+
+    await Bun.write(join(dir, 'uses.ts'), 'export const uses = (name: string) => name === \'x\'\n')
+    expect(specializedSource(text, new Set(), file)).toBe(text)
+    expect(usesNames(text, file)).toEqual([])
+    await rm(dir, { recursive: true, force: true })
+  })
+})
+
 describe('propsWritten', () => {
   const head = 'import Table from \'./table.kay\'\n---\n'
 
@@ -58,7 +86,7 @@ describe('propsWritten', () => {
   })
 
   it('leaves out a component called with a spread or read as a value', () => {
-    expect(propsWritten(`${head}Table({...rest})`, ['Table']).has('Table')).toBe(false)
-    expect(propsWritten(`${head}const keep = Table\nTable(rows={r})`, ['Table']).has('Table')).toBe(false)
+    expect(propsWritten(`${head}Table({...rest})`, ['Table']).get('Table')).toBe(ANY)
+    expect(propsWritten(`${head}const keep = Table\nTable(rows={r})`, ['Table']).get('Table')).toBe(ANY)
   })
 })

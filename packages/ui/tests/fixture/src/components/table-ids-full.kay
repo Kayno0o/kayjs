@@ -1,0 +1,13 @@
+---
+import { uid } from 'kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+// The same page with a spread on the Table, which keeps every feature in it.
+const COLUMNS = [{ key: 'name', header: 'Name' }, { key: 'size', header: 'Size' }]
+const ROWS = [{ id: 1, name: 'a', size: 2 }]
+const more = { columnToggle: true }
+const first = uid()
+---
+span#before {first}
+Table({...more} columns={COLUMNS} rows={ROWS} rowKey="id")
+span#after {uid()}
