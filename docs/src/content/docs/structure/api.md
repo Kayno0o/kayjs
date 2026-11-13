@@ -5,7 +5,7 @@ description: Elysia modules, each mounted at /api plus its path.
 path: src/api/
 ---
 
-Each `.ts` module in `src/api/` exports an Elysia instance by default, and kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`.
+Each `.ts` module in `src/api/` exports a `KayPlugin` by default (`api()`, an Elysia instance in kay 1.x), and kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`.
 
 ```ts
 import { s } from 'kay'

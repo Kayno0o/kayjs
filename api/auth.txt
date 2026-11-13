@@ -61,104 +61,8 @@ const auditWording: Record<string, AuditWording>
 type AuditWording = Record<AuthEvent, AuditPhrase>
 
 [.] auth
-function auth<Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData> | undefined): AuthPages<Elysia<"", {
-  decorator: {};
-  store: {};
-  derive: {
-    readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-  };
-  resolve: {};
-}, {
-  typebox: {};
-  error: {};
-}, {
-  schema: {};
-  standaloneSchema: {};
-  macro: {};
-  macroFn: {};
-  parser: {};
-  response: {} & ExtractErrorFromHandle<{
-    readonly auth: Auth<Scope, Role, OrgRole, UserData>;
-  }>;
-}, {} & CreateEden<JoinPath<"", `${Prefix}/export`>, {
-  get: {
-    body: unknown;
-    params: IsNever<keyof IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>> extends true ? ResolvePath<`${Prefix}/export`> : IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>;
-    query: unknown;
-    headers: unknown;
-    response: {
-      [K in keyof ComposeElysiaResponse<IntersectIfObjectSchema<UnwrapRoute<InputSchema<never>, {}, JoinPath<"", `${Prefix}/export`>>, {}>, (ctx: {
-        body: unknown;
-        query: Record<string, string>;
-        params: undefined extends IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown> ? Record<string, string> : PrettifyIfObject<IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>>;
-        headers: Record<string, string | undefined>;
-        cookie: Record<string, Cookie<unknown>>;
-        server: Server<unknown> | null;
-        redirect: (url: string, status?: 301 | 302 | 303 | 307 | 308 | undefined) => Response;
-        set: {
-          headers: HTTPHeaders;
-          status?: number | "Continue" | "Switching Protocols" | "Processing" | "Early Hints" | "OK" | "Created" | "Accepted" | "Non-Authoritative Information" | "No Content" | "Reset Content" | "Partial Content" | "Multi-Status" | "Already Reported" | "Multiple Choices" | "Moved Permanently" | "Found" | "See Other" | "Not Modified" | "Temporary Redirect" | "Permanent Redirect" | "Bad Request" | "Unauthorized" | "Payment Required" | "Forbidden" | "Not Found" | "Method Not Allowed" | "Not Acceptable" | "Proxy Authentication Required" | "Request Timeout" | "Conflict" | "Gone" | "Length Required" | "Precondition Failed" | "Payload Too Large" | "URI Too Long" | "Unsupported Media Type" | "Range Not Satisfiable" | "Expectation Failed" | "I'm a teapot" | "Enhance Your Calm" | "Misdirected Request" | "Unprocessable Content" | "Locked" | "Failed Dependency" | "Too Early" | "Upgrade Required" | "Precondition Required" | "Too Many Requests" | "Request Header Fields Too Large" | "Unavailable For Legal Reasons" | "Internal Server Error" | "Not Implemented" | "Bad Gateway" | "Service Unavailable" | "Gateway Timeout" | "HTTP Version Not Supported" | "Variant Also Negotiates" | "Insufficient Storage" | "Loop Detected" | "Not Extended" | "Network Authentication Required";
-          redirect?: string;
-          cookie?: Record<string, {
-            domain?: string | undefined;
-            expires?: Date | undefined;
-            httpOnly?: boolean | undefined;
-            maxAge?: number | undefined;
-            path?: string | undefined;
-            priority?: "low" | "medium" | "high" | undefined;
-            partitioned?: boolean | undefined;
-            sameSite?: boolean | "lax" | "strict" | "none" | undefined;
-            secure?: boolean | undefined;
-            secrets?: string | (string | null)[] | null;
-            value?: unknown;
-          }>;
-        };
-        path: string;
-        route: string;
-        request: Request;
-        store: {};
-        status: <const Code extends number | keyof StatusMap, const T = Code extends 300 | 301 | 302 | 303 | 307 | 308 | 401 | 403 | 404 | 429 | 100 | 101 | 102 | 103 | 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 304 | 400 | 402 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 420 | 421 | 422 | 423 | 424 | 425 | 426 | 428 | 431 | 451 | 500 | 501 | 502 | 503 | 504 | 505 | 506 | 507 | 508 | 510 | 511 ? {
-          readonly 100: "Continue";
-          readonly 101: "Switching Protocols";
-          readonly 102: "Processing";
-          readonly 103: "Early Hints";
-          readonly 200: "OK";
-          readonly 201: "Created";
-          readonly 202: "Accepted";
-          readonly 203: "Non-Authoritative Information";
-          readonly 204: "No Content";
-          readonly 205: "Reset Content";
-          readonly 206: "Partial Content";
-          readonly 207: "Multi-Status";
-          readonly 208: "Already Reported";
-          readonly 300: "Multiple Choices";
-          readonly 301: "Moved Permanently";
-          readonly 302: "Found";
-          readonly 303: "See Other";
-          readonly 304: "Not Modified";
-          readonly 307: "Temporary Redirect";
-          readonly 308: "Permanent Redirect";
-          readonly 400: "Bad Request";
-          readonly 401: "Unauthorized";
-          readonly 402: "Payment Required";
-          readonly 403: "Forbidden"; ...#19244c9f (262 lines)
-  post: { ...#49e81ac2 (322 lines)
-  post: { ...#85ce010b (322 lines)
-  post: { ...#5a74771c (322 lines)
-  get: { ...#8f997215 (322 lines)
-  get: { ...#3a38f79a (322 lines)
-  post: { ...#32c44ad6 (322 lines)
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {}; ...#4abc5abd (2 lines)
-  derive: {};
-  resolve: {};
-  schema: {};
-  standaloneSchema: {};
-  response: {}; ...#b28f3903 (2 lines)
-function auth(options: AuthExtensionOptions): AuthPages<AnyElysia>
+function auth<Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData> | undefined): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>
+function auth(options: AuthExtensionOptions): AuthPages<PluginInput>
 
 [.] Auth
 class Auth
@@ -322,7 +226,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
   signOut(site: { ...#2b384ff2 (3 lines)
   [PAGES_OF]: PagesHandle | undefined;
   [CHECK_USER]: (input: CreateUserInput) => Promise<RegisterErrors>;
-  plugin: Elysia<"", { ...#d61b4529 (2286 lines)
+  plugin: Elysia<"", { ...#1be8a05d (2288 lines)
   hasRole: (required: Role) => Predicate<BareUser<Record<string, unknown>>>;
   isGranted: (role: Role, user: BareUser<Record<string, unknown>>) => boolean;
   memberOf: (role?: OrgRole | undefined, memberOptions?: { ...#6ade75cc (3 lines)
@@ -340,7 +244,7 @@ interface AuthExtensionOptions extends AuthPagesOptions
   module?: string | undefined
   pages?: boolean | undefined
   prefix?: string | undefined
-  server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
+  server?: (() => PluginInput | Promise<PluginInput>) | false | undefined
   viewer?: boolean | undefined
 
 [.] AuthFailed
@@ -433,7 +337,7 @@ interface AuthMember<Role extends string = string>
   user: { id: string; email: null | string; username: null | string; }
 
 [.] AuthModule
-type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
+type AuthModule = { auth: { plugin: PluginInput } } | { default: { plugin: PluginInput } }
 
 [.] AuthOptions
 interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>
@@ -508,7 +412,7 @@ type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_t
 }
 
 [.] AuthPages
-interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server>
+interface AuthPages<Server extends PluginInput = PluginInput> extends KayExtension<Server>
   home: string
   prefix: string
 
@@ -1501,11 +1405,11 @@ interface PkcePair
 [.] PluginOf
 type PluginOf<Module> = Module extends {
   auth: {
-    plugin: infer Plugin extends AnyElysia
+    plugin: infer Plugin extends PluginInput
   }
 } ? Plugin : Module extends {
   default: {
-    plugin: infer Plugin extends AnyElysia
+    plugin: infer Plugin extends PluginInput
   }
 } ? Plugin : never
 

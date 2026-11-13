@@ -208,7 +208,7 @@ describe('the files an extension names in appFiles', () => {
       const { code, stderr } = await run([process.execPath, 'serve.ts'], root, { KAY_ROOT: root })
 
       expect(code).not.toBe(0)
-      expect(stderr).toContain('broken.ts must export an Elysia instance by default')
+      expect(stderr).toContain('broken.ts must export a KayPlugin by default')
       expect(stderr).toContain('or a function of the ExtensionApp building one')
     }
     finally {

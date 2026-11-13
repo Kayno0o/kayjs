@@ -20,7 +20,7 @@ import type { CredentialRules } from './rules'
 import type { AuthStore } from './store'
 import type { Level, PolicyContext } from './types'
 import { Elysia } from 'elysia'
-import { requestOfContext } from 'kay/library'
+import { kayPlugin, requestOfContext } from 'kay/library'
 import { banned, linkedUser } from './core'
 import { gateOf, guardOf, memberOf } from './guards'
 import { load } from './load'
@@ -175,7 +175,7 @@ export function authCore<Data extends AuthSessionData, Role extends string = str
     // What `kay auth create-user` asks before the password: what `createUser` would refuse the login for.
     [CHECK_USER]: async (input: CreateUserInput) => (await load.password()).userProblems(core, input),
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
-    plugin,
+    plugin: kayPlugin(plugin),
     hasRole: access.hasRole,
     isGranted: (role: Role, user: BareUser) => access.isGranted(role, user.roles),
     memberOf: (role?: OrgRole, memberOptions: { param?: string } = {}) => memberOf(core, role, memberOptions),

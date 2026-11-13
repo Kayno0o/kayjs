@@ -3112,7 +3112,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
 
     try {
       expect((await refusals(root)).map(([file, message]) => [file, message!.slice(0, message!.indexOf(':'))])).toEqual([
-        ['src/api/chat.ts', 'It must export an Elysia instance by default'],
+        ['src/api/chat.ts', 'It must export a KayPlugin by default'],
         ['src/params/even.ts', 'It must export a matcher by default'],
         ['src/routes/_guard.ts', 'It must export a guard by default'],
       ])

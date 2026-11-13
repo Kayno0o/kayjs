@@ -76,8 +76,8 @@ export function exportsCheck(root: string, routesDir: string, routes: Route[], a
   const entries: { file: string, type: string, wanted: string, named?: string }[] = [
     ...[...guards].map(file => ({ file, type: 'Guard', wanted: 'a guard by default: export default guard(ctx => ...)' })),
     ...api.map(module => module.extension === undefined
-      ? { file: module.file, type: 'AnyElysia', wanted: 'an Elysia instance by default: export default new Elysia().get(\'/\', () => ...)' }
-      : { file: module.file, type: 'AnyElysia | ((app: ExtensionApp) => AnyElysia | Promise<AnyElysia>)', wanted: 'an Elysia instance by default, or a function of the ExtensionApp building one: export default (app: ExtensionApp) => api().get(\'/\', () => ...)' }),
+      ? { file: module.file, type: 'PluginInput', wanted: 'a KayPlugin by default: export default api().get(\'/\', () => ...)' }
+      : { file: module.file, type: 'PluginInput | ((app: ExtensionApp) => PluginInput | Promise<PluginInput>)', wanted: 'a KayPlugin by default, or a function of the ExtensionApp building one: export default (app: ExtensionApp) => api().get(\'/\', () => ...)' }),
     ...[...matchers].map(file => ({ file, type: '(value: string) => unknown', wanted: 'a matcher by default: export default (value: string) => value or undefined' })),
     // Its context is the app's to type, `EndpointContext<{ slug: string }>`; what it returns is checked.
     ...endpoints.flatMap((endpoint) => {
@@ -93,8 +93,7 @@ export function exportsCheck(root: string, routesDir: string, routes: Route[], a
   // An import that finds no such export is reported at the import, a wrong one at its check.
   return assertions([
     ...kayTypes.length > 0 ? [`import type { ${kayTypes.join(', ')} } from 'kay'`] : [],
-    ...api.length > 0 ? ['import type { AnyElysia } from \'elysia\''] : [],
-    ...api.some(module => module.extension !== undefined) ? ['import type { ExtensionApp } from \'kay/server\''] : [],
+    ...api.length > 0 ? [`import type { ${api.some(module => module.extension !== undefined) ? 'ExtensionApp, ' : ''}PluginInput } from 'kay/server'`] : [],
     ...entries.map(({ file, wanted, named }, index) => ({ code: `import ${named === undefined ? `kayExport${index}` : `{ ${named} as kayExport${index} }`} from ${modulePath(root, file)}`, about: { file, wanted } })),
     '',
     ...entries.map(({ file, wanted, type }, index) => ({ code: `export const kayCheck${index}: ${type} = kayExport${index}`, about: { file, wanted } })),

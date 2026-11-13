@@ -99,7 +99,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     const instance = await moduleInstance(module, appOf)
 
     if (!(instance instanceof Elysia))
-      throw new KayError('route-invalid', `kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)${module.extension === undefined ? '' : ', or a function of the ExtensionApp building one'}`)
+      throw new KayError('route-invalid', `kay: ${module.file} must export a KayPlugin by default: export default api().get('/', () => ...)${module.extension === undefined ? '' : ', or a function of the ExtensionApp building one'}`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
     mounted.push({ ...module, instance })

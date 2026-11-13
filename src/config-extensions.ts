@@ -154,7 +154,7 @@ async function serverFromModule(name: string, { path, export: exported = 'defaul
   const server = typeof built === 'object' && built !== null && !('handle' in built) && 'plugin' in built ? built.plugin : built
 
   if (typeof server !== 'object' || server === null || !('handle' in server))
-    throw new KayError('config-invalid', `kay: the extension ${name} takes its server from ${path}, which does not export an Elysia plugin as \`${exported}\``)
+    throw new KayError('config-invalid', `kay: the extension ${name} takes its server from ${path}, which does not export a KayPlugin as \`${exported}\``)
 
   return server as AnyElysia
 }

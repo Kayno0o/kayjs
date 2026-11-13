@@ -1,5 +1,4 @@
-import type { AnyElysia } from 'elysia'
-import type { ExtensionApp } from 'kay/server'
+import type { ExtensionApp, PluginInput } from 'kay/server'
 import type { AuthOptions, authCore as CreateAuth } from './auth'
 import type { AuthSessionData, OAuthApp } from './core'
 import type { EmailOptions } from './email'
@@ -282,7 +281,7 @@ export function builtOwn(site: { cookies: Bun.CookieMap }): OwnTest | undefined 
 }
 
 /** The `authCore` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
-export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: AnyElysia }> {
+export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: PluginInput }> {
   const { authCore } = await import('./auth')
   const { hooks: loadHooks, store, oauth, email, pages, prefix, home, cookie, ...rest } = options
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
@@ -310,5 +309,5 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   if (app.testCookies)
     builtFor.set(app.testCookies, made)
 
-  return made as unknown as UserMaker & { plugin: AnyElysia }
+  return made as unknown as UserMaker & { plugin: PluginInput }
 }

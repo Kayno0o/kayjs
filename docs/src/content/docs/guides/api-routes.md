@@ -4,7 +4,7 @@ order: 6
 description: Add typed Elysia routes under src/api, call them from islands, open them to other sites, and document or expose them to agents.
 ---
 
-Each `.ts` module in `src/api/` exports an Elysia instance by default. Kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`.
+Each `.ts` module in `src/api/` exports a `KayPlugin` by default (`api()`, an Elysia instance in kay 1.x). Kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`.
 
 ```ts
 import { s } from 'kay'

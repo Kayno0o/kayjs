@@ -1,5 +1,4 @@
-import type { AnyElysia } from 'elysia'
-import type { ExtensionApp, KayExtension } from 'kay/server'
+import type { ExtensionApp, KayExtension, PluginInput } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
 import type { BareUser, Core } from '../core'
 import type { CodedLink, CodeMode } from '../email'
@@ -69,7 +68,7 @@ export interface AuthPagesConfig extends AuthPagesOptions {
   profile?: ProfileOptions | undefined
 }
 
-export interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server> {
+export interface AuthPages<Server extends PluginInput = PluginInput> extends KayExtension<Server> {
   prefix: string
   home: string
 }
@@ -180,10 +179,10 @@ export function pagePaths(prefix: string) {
 }
 
 // The module `src/auth.ts` is: the `authCore` result as its `auth` export or its default one.
-export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
+export type AuthModule = { auth: { plugin: PluginInput } } | { default: { plugin: PluginInput } }
 
 // The plugin of an `AuthModule`, for `kay check` to type `ctx.locals.auth` off.
-export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
+export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends PluginInput } } ? Plugin : Module extends { default: { plugin: infer Plugin extends PluginInput } } ? Plugin : never
 
 // What `authCore` hands `auth()` to settle the prefix and home between them, whichever of the two was made first.
 export const PAGES_OF = Symbol('kayjs-auth.pages')
@@ -213,7 +212,7 @@ export interface UserMaker {
 const COMMANDS = { 'auth create-user': `${import.meta.dir}/../createUserCommand.ts` }
 
 // The `auth` of a module: the `authCore` result as its `auth` export or its default one.
-function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyElysia, [PAGES_OF]?: PagesHandle | undefined }>>) {
+function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: PluginInput, [PAGES_OF]?: PagesHandle | undefined }>>) {
   const auth = module.auth ?? module.default
 
   if (!auth)
@@ -223,7 +222,7 @@ function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyEl
 }
 
 // The `auth` behind a plugin handed as `server`.
-async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | undefined): Promise<UserMaker> {
+async function authOfServer(server: (() => PluginInput | Promise<PluginInput>) | undefined): Promise<UserMaker> {
   const plugin = await server?.() as { [AUTH_OF]?: UserMaker } | undefined
   const auth = plugin?.[AUTH_OF]
 
@@ -245,7 +244,7 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
   // The file exporting the app's `auth`, the `authCore` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
   module?: string | undefined
   // Any other plugin carrying an `authCore` result, as a function, in place of `module`. `false` builds no plugin, for an app mounting it by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone, as `mail({ server: false })` serves nothing.
-  server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
+  server?: (() => PluginInput | Promise<PluginInput>) | false | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
   // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `SignedOut`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
@@ -277,7 +276,7 @@ export function auth(options: object = {}): AuthPages {
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
   // Built again only when the hooks, the mail module or kayjs-mail's registration are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened; a test site always builds its own, so two sites of one project do not share a store.
-  let current: { root: string, database: string | undefined, hooks: unknown, mail: unknown, mailed: boolean, built: Promise<UserMaker & { plugin: AnyElysia }> } | undefined
+  let current: { root: string, database: string | undefined, hooks: unknown, mail: unknown, mailed: boolean, built: Promise<UserMaker & { plugin: PluginInput }> } | undefined
 
   const build = async (app: ExtensionApp) => {
     if (app.testCookies)
@@ -325,7 +324,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
     home: home ?? '/',
   }
 
-  const load = async (root: string): Promise<UserMaker> => module === undefined ? authOfServer(server) : authOfModule({ auth: ((await import(resolve(root, module))) as { auth: { plugin: AnyElysia } }).auth }) as unknown as UserMaker
+  const load = async (root: string): Promise<UserMaker> => module === undefined ? authOfServer(server) : authOfModule({ auth: ((await import(resolve(root, module))) as { auth: { plugin: PluginInput } }).auth }) as unknown as UserMaker
 
   return Object.assign(extension, { [LOAD_AUTH]: load })
 }

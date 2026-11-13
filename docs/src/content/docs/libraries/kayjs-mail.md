@@ -13,7 +13,7 @@ bun add @kaynooo/kayjs-mail
 
 The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
-kay and Elysia are peers. kayjs-mail is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+kay and Elysia are peers (Elysia is an implementation detail of kay: you name `KayPlugin` and `Schema`, never its types). kayjs-mail is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
 An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 

@@ -4,7 +4,7 @@
 
 ### Setup
 
-kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
+kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia (an implementation detail of kay: an app names `KayPlugin` and `Schema`, never Elysia's types), kayjs-ui (for the prebuilt pages) and `@kaynooo/pg-orm` (for the default store) are peer dependencies.
 
 One line in kay.config.ts is the whole setup, and the app has no auth file:
 
@@ -77,7 +77,7 @@ else
 
 `auth({ module })`: `module` is the file exporting the `authCore` result as `export const auth`, relative to the project root. The extension hands `pages()` its plugin, used before the pages, so the app mounts nothing else and declares no `Register`, and `kay check` types `ctx.locals.auth` and checks links to kayjs-auth's routes off it. The module loads as `pages()` builds the app, never for `kay check`, the editor or `kay build`. `pages: false` serves the plugin alone, and `auth({ server })` takes any other plugin as a function.
 
-A plain Elysia app, or one mounting the plugin by hand, gives `auth({ server: false })` in kay.config.ts (the escape `mail({ server: false })` takes too), uses `auth.plugin` before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` in kay's `Register` for `kay check`. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. What it logs goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`.
+A plain Elysia app, or one mounting the plugin by hand, gives `auth({ server: false })` in kay.config.ts (the escape `mail({ server: false })` takes too), uses `auth.plugin` (a `KayPlugin`, which is the Elysia instance in 1.x and holds it as `.elysia`) before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` in kay's `Register` for `kay check`. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. What it logs goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`.
 
 `authCore` options (`auth()` takes them all but `sessions`):
 
