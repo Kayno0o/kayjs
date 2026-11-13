@@ -21,7 +21,7 @@ export type KayPlugin<Locals extends SingletonBase['resolve'] = Empty, Scope ext
 // What a function taking a plugin accepts: kay's own or a plain Elysia instance, which kay 1.x took before `KayPlugin` and still does for three minors.
 export type PluginInput = AnyElysia | KayPlugin
 
-// Gives `instance` its `elysia`, itself: a plain constant, so Elysia's own copying of an instance's properties meets a value and no getter.
+// Gives `instance` its `elysia`, itself, out of its key listings so nothing that spreads or lists the instance meets it.
 export function kayPlugin<Instance extends AnyElysia>(instance: Instance): Instance & { readonly elysia: AnyElysia } {
   if (!Object.hasOwn(instance, ELYSIA))
     Object.defineProperty(instance, ELYSIA, { value: instance, enumerable: false })

@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { api, background, queue, schedule, session, shutdown, workflow } from '../src/server'
 import { kayPlugin } from '../src/server/plugin'
+import { pages } from './shared-pages'
 
 describe('KayPlugin', () => {
   it('hands the Elysia instance behind it as `elysia`, for every plugin kay builds', () => {
@@ -48,7 +49,14 @@ describe('KayPlugin', () => {
     expect(hits).toEqual(['ping', 'ping'])
   })
 
-  it('serves a handler of a plugin used by an app that also uses `session()`', async () => {
+  it('hands the Elysia instance behind pages()', async () => {
+    const served = await pages({ requireGuards: false, dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true, dev: true })
+
+    expect(served.elysia).toBe(served)
+    expect(Object.keys(served)).not.toContain('elysia')
+  })
+
+  it('reads `session` in a handler of an app using `session()`', async () => {
     const app = new Elysia().use(session({ secret: 'x'.repeat(32) })).get('/id', ({ session: current }) => typeof current.set)
 
     expect(await (await app.handle(new Request('http://localhost/id'))).text()).toBe('function')
