@@ -459,10 +459,9 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   ) as unknown as TrackedCall<never, unknown>
 }
 
-// A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
 let warming = false
 
-// An island holding an action caller loads the posting code once the browser is idle, so a call made as the page goes away (`pagehide`, which cannot wait for a chunk) finds it in; it stays out of the first load. A failure is left for the call itself to report.
+// An island holding an action caller loads the posting code once the browser is idle, so a call made as the page goes away (`pagehide`, which cannot wait for a chunk) finds it in; it stays out of the first load. A failure is left for the call itself to retry and report, so an idle load never reloads the page.
 function warmCode(): void {
   if (warming || typeof window === 'undefined')
     return
@@ -471,7 +470,7 @@ function warmCode(): void {
 
   const load = async () => {
     try {
-      await postCode()
+      posting = await import('./action-post')
     }
     catch {}
   }
@@ -486,6 +485,7 @@ function postingCode(): typeof import('./action-post') | Promise<typeof import('
   return posting ?? postCode()
 }
 
+// A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
 async function postCode(): Promise<typeof import('./action-post')> {
   for (let attempt = 0; ; attempt++) {
     try {
