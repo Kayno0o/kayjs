@@ -48,7 +48,7 @@ import { inSignalsScope } from './signals'
 import { buildFiles } from './source-files'
 import { forgetBundleMaps } from './sourcemap'
 import { styleUses } from './style-uses'
-import { styleImports, withoutStyles, writeRecipeStylesheets } from './styles'
+import { styleImports, withoutStyles, writeComponentStylesheets } from './styles'
 import { mergingSupports } from './supports'
 import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
@@ -688,7 +688,7 @@ async function bundleStyles(root: string, { pages, libraries, classes, shorthand
   // Read while Bun.build parses and bundles: a stylesheet waits for it only once it is loaded.
   const unusedClasses = unusedLibraryClasses(root, libraries, classes)
 
-  await writeRecipeStylesheets(root, [...libraries.flatMap(library => library.files), ...await findKayFiles(root, { project: true, ownKayOnly: true })])
+  await writeComponentStylesheets(root, [...libraries.flatMap(library => library.files), ...await findKayFiles(root, { project: true, ownKayOnly: true })])
 
   const since = raisedMark()
   const [build, unused] = await Promise.all([Bun.build({

@@ -82,6 +82,23 @@ async function keepStylesheet(file: string, contents: string): Promise<void> {
   }
 }
 
+// Writes a `--- style` fence as a stylesheet of its own under the cache, its selectors scoped, and gives its path.
+async function writeScopedStylesheet(root: string, path: string, css: string, reference: () => Promise<string | undefined>): Promise<string> {
+  const moduleId = islandId(throughLinks(root, path), root)
+  const file = join(cacheDir(root, 'scoped'), `${scopeHash(moduleId)}.css`)
+
+  scopedTouched = true
+  touchCacheFile(file)
+
+  const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
+  // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
+  const entry = THEME_USE.test(scoped) ? await reference() : undefined
+
+  await keepStylesheet(file, entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`)
+
+  return file
+}
+
 // Writes the stylesheet of the classes a component's recipe lifted, undefined when it lifts none.
 async function writeRecipeStylesheet(root: string, path: string, source: string, reference: () => Promise<string | undefined>): Promise<string | undefined> {
   const rules = source.includes('recipe(') ? (await recipeLifter(root))?.lift(source, path)?.rules : undefined
@@ -99,13 +116,19 @@ async function writeRecipeStylesheet(root: string, path: string, source: string,
   return file
 }
 
-// Writes the stylesheets of the recipes among `files` before the bundler runs: Bun reads a folder once, so a file written into it while it bundles can fail to resolve.
-export async function writeRecipeStylesheets(root: string, files: string[]): Promise<void> {
+// Writes the stylesheets of the `--- style` fences and recipes among `files` before the bundler runs: Bun reads a folder once, so a file written into it while it bundles can fail to resolve.
+export async function writeComponentStylesheets(root: string, files: string[]): Promise<void> {
   const reference = tailwindEntry(root, true)
 
   await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async (file) => {
     try {
-      await writeRecipeStylesheet(root, file, await Bun.file(file).text(), async () => reference)
+      const source = await Bun.file(file).text()
+      const { style } = parseKay(source)
+
+      await Promise.all([
+        style && writeScopedStylesheet(root, file, source.slice(style.start, style.end), async () => reference),
+        writeRecipeStylesheet(root, file, source, async () => reference),
+      ])
     }
     catch (error) {
       // A file deleted since the listing is no recipe to write.
@@ -179,21 +202,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   // The app's Tailwind entry, looked up once per build for every fence using `@apply`.
   let tailwindReference: Promise<string | undefined> | undefined
   // A `--- style` fence reaches the bundler as a stylesheet of its own, written under the cache with its selectors scoped.
-  const scopedStylesheet = async (path: string, css: string) => {
-    const moduleId = islandId(throughLinks(root, path), root)
-    const file = join(cacheDir(root, 'scoped'), `${scopeHash(moduleId)}.css`)
-
-    scopedTouched = true
-    touchCacheFile(file)
-
-    const scoped = rebaseUrls(scopeCss(css, scopeAttribute(moduleId)), dirname(path), dirname(file))
-    // `@apply` in a stylesheet of its own needs the app's Tailwind entry as a reference, which kay writes so the fence needs no line of it.
-    const entry = THEME_USE.test(scoped) ? await (tailwindReference ??= tailwindEntry(root, true)) : undefined
-
-    await keepStylesheet(file, entry === undefined ? scoped : `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${scoped}`)
-
-    return importing(note(path, [file]))
-  }
+  const scopedStylesheet = async (path: string, css: string) => importing(note(path, [await writeScopedStylesheet(root, path, css, async () => tailwindReference ??= tailwindEntry(root, true))]))
   // The rules of the classes a component's recipe lifted into the stylesheet, which the pages rendering the component carry as they carry a `--- style` fence's.
   const recipeStylesheet = async (path: string, source: string) => {
     const file = await writeRecipeStylesheet(root, path, source, async () => tailwindReference ??= tailwindEntry(root, true))

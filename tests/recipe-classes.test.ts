@@ -303,6 +303,22 @@ describe('the Cases of a lifted recipe', () => {
     expect(await rules()).toContain('text-transform: uppercase')
   }, 180_000)
 
+  it('builds a component with a `--- style` fence beside the recipes, with no scoped stylesheet cached yet', async () => {
+    const copy = await project()
+
+    // Bun lists the folder once, at the first stylesheet it resolves there: a fence loaded after the recipes, a few imports down, is written past that listing.
+    await Bun.write(join(copy, 'src/components/note.kay'), '--- style\n.note { color: rebeccapurple }\n---\np.note fenced\n')
+    await Bun.write(join(copy, 'src/components/outer.kay'), '---\nimport Inner from \'./inner.kay\'\n---\nInner\n')
+    await Bun.write(join(copy, 'src/components/inner.kay'), '---\nimport Note from \'./note.kay\'\n---\nNote\n')
+    await edit(join(copy, 'src/routes/index.kay'), text => `${text.replace('import Tag from \'../components/tag.kay\'', 'import Tag from \'../components/tag.kay\'\nimport Outer from \'../components/outer.kay\'')}Outer\n`)
+    await rm(join(copy, '.kay/cache/scoped'), { recursive: true, force: true })
+
+    const { html, css } = await page(copy)
+
+    expect(html).toContain('fenced')
+    expect(css).toMatch(/\.note\[data-k-[\da-z]+\] \{\s+color: #639/)
+  }, 120_000)
+
   it('leaves an app without Tailwind as written', async () => {
     const copy = await project()
 
