@@ -6,6 +6,7 @@ import { blank, blankComments } from './removed-ui-tokens'
 
 const COMMENT = /\/\*[\s\S]*?\*\//g
 const SIZE = 'xs|sm|base|lg|xl|[2-9]xl'
+const THEME = /@theme\b[^{]*\{([^}]*)\}/g
 // A colour of the app's theme named like a size of Tailwind's `text-` utility: `--color-base`.
 const DECLARED = new RegExp(`(?<![\\w-])--color-(${SIZE})\\s*:`, 'g')
 
@@ -22,7 +23,7 @@ export async function textSizeColour(root: string, options: CheckOptions): Promi
 
     return { file, source, code: CSS_FILE.test(file) ? source.replace(COMMENT, blank) : blankComments(source) }
   }))
-  const names = new Set(sources.flatMap(({ code, file }) => CSS_FILE.test(file) ? [...code.matchAll(DECLARED)].map(match => match[1]!) : []))
+  const names = new Set(sources.flatMap(({ code, file }) => CSS_FILE.test(file) ? [...code.matchAll(THEME)].flatMap(theme => [...theme[1]!.matchAll(DECLARED)]).map(match => match[1]!) : []))
 
   if (names.size === 0)
     return []

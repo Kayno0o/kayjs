@@ -26,7 +26,7 @@ it('reports each use of a size whose name is also a theme colour', async () => {
 
 it('leaves a size alone when no colour of the theme has its name, and comments', async () => {
   expect(await found({ 'src/app.css': '@theme { --color-background: #000; }\n', 'src/routes/index.kay': 'p.text-base Hello\n' })).toEqual([])
-  expect(await found({ 'src/app.css': '/* --color-base: #000 */\n@theme { --color-lg: red; }\n', 'src/routes/index.kay': '// text-base\np.text-sm.text-background Hello\np.text-lg-x hi\n' })).toEqual([])
+  expect(await found({ 'src/app.css': '/* --color-base: #000 */\n:root { --color-lg: red; }\n', 'src/routes/index.kay': '// text-base\np.text-sm.text-background Hello\np.text-lg-x hi\n' })).toEqual([])
 })
 
 it('is silenced by allowing it', async () => {
