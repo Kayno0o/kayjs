@@ -112,6 +112,8 @@ export async function detectFeatures(dir: string): Promise<Set<Feature>> {
     ['tailwind', css?.includes('@import \'tailwindcss\'') === true],
     ['accents', at('src/theme.ts')],
     ['eslint', at('eslint.config.ts')],
+    // kayjs-ui's skin, imported by the stylesheet whether `ui()` mounts it or not.
+    ['ui', css?.includes('@kayjs/ui/') === true],
     ['tests', at('bunfig.toml')],
     ['ci', ['.forgejo', '.github'].some(host => at(`${host}/workflows/test.yml`) || at(`${host}/workflows/pages.yml`))],
     ['docker', at('Dockerfile')],

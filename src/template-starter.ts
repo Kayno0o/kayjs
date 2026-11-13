@@ -4,12 +4,30 @@ import { fence, lines } from './template-shared'
 function header({ has, tw }: Setup): string {
   const links = has('auth') ? '[{ href: \'/\', label: \'Home\' }, { href: \'/auth/account\', label: \'Account\' }]' : '[{ href: \'/\', label: \'Home\' }]'
 
+  // kayjs-ui's AppHeader folds the links into a menu on a narrow screen and marks the one of the page on screen.
+  if (has('ui')) {
+    return lines(
+      '---',
+      'import AppHeader from \'@kayjs/ui/app-header.kay\'',
+      has('accents') && 'import AccentPicker from \'./accent-picker.kay\'',
+      '',
+      'const { current } = props<{ current: string }>()',
+      `const links = ${links}`,
+      '---',
+      'AppHeader(links={links} current={current} label="Main navigation")',
+      '  @brand',
+      '    a.text-xl.font-semibold.no-underline(href="/") __NAME__',
+      has('accents') && '  @actions',
+      has('accents') && '    AccentPicker',
+    )
+  }
+
   return lines(
     '---',
     has('accents') && 'import AccentPicker from \'./accent-picker.kay\'\n',
     `const links = ${links}`,
     '---',
-    `header${tw('.border-b-2.border-overlay0.bg-base.px-8.py-3')}`,
+    `header${tw('.border-b.border-border.bg-background.px-8.py-3')}`,
     `  nav${tw('.mx-auto.flex.max-w-5xl.items-center.justify-between.gap-4')}(aria-label="Main navigation")`,
     `    a${tw('.text-xl.font-bold.no-underline')}(href="/") __NAME__`,
     `    ul${tw('.flex.gap-4')}`,
@@ -21,9 +39,12 @@ function header({ has, tw }: Setup): string {
 }
 
 export function layout({ has, tw }: Setup): string {
+  const current = has('starter') && has('ui')
+
   return lines(
-    fence('---', has('starter') && 'import Header from \'../components/header.kay\'', (has('starter') || has('tailwind')) && 'import \'../app.css\''),
-    has('starter') && 'a.skip-link(href="#main-content") Skip to main content\nHeader',
+    // The header marks the link of the page on screen.
+    fence(current ? '--- server\nconst path = ctx.url.pathname\n--- script' : '---', has('starter') && 'import Header from \'../components/header.kay\'', (has('starter') || has('tailwind')) && 'import \'../app.css\''),
+    has('starter') && `a.skip-link(href="#main-content") Skip to main content\nHeader${current ? '(current={path})' : ''}`,
     `main${has('starter') ? '#main-content' : ''}${tw('.mx-auto.w-full.max-w-5xl.grow.px-8.py-6')}`,
     '  slot',
   )
@@ -51,7 +72,7 @@ export function home({ has, tw }: Setup): string {
     '---',
     'head',
     '  title Home',
-    `section${tw('.flex.flex-col.items-center.gap-6.py-12')}`,
+    `section${tw('.flex.flex-col.items-center.gap-6.rounded-lg.border.border-border.bg-surface.py-12')}`,
     `  Rocket${tw('.size-16.text-accent.motion-safe:animate-bounce')}`,
     `  h1${tw('.text-3xl.font-bold')} {greeting}`,
     '  Counter(start={0})',

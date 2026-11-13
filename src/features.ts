@@ -4,7 +4,7 @@ import type { Feature } from './template-shared'
 export const FEATURES: Record<Feature, { description: string, needs: readonly Feature[], packages?: readonly string[], brings?: readonly Feature[], templated?: true }> = {
   server: { description: 'an Elysia server, run in production as one executable; off, a static site built to dist', needs: [] },
   starter: { description: 'a header, a 404 page, and a home page greeting from the server with a counter island', needs: [] },
-  tailwind: { description: 'Tailwind over the Catppuccin Mocha palette', needs: [] },
+  tailwind: { description: 'Tailwind over orbit\'s near-black palette, with a starfield behind the page', needs: [] },
   accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
   eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
   tests: { description: 'kay test through kay/test, with a first test', needs: [] },
@@ -16,7 +16,7 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   ai: { description: 'kayjs-ai: ask(), an LLM called with no SDK, streaming into await blocks and actions, answered by a scripted fake in development and tests', needs: [], packages: ['@kayjs/ai'] },
   mail: { description: 'kayjs-mail: a mailer reading SMTP from the environment, with the outbox page in development', needs: [], packages: ['@kayjs/mail'] },
   cms: { description: 'kayjs-cms: collection screens under /admin, and content edited on the page it renders', needs: [], packages: ['@kayjs/cms', '@kayjs/ui', '@iconify-json/tabler'] },
-  ui: { description: 'kayjs-ui: the theme, one Toaster and one TooltipHost for every page, with no line in the layout or app.css', needs: ['tailwind'], packages: ['@kayjs/ui', '@iconify-json/tabler'] },
+  ui: { description: 'kayjs-ui: its space skin, one Toaster and one TooltipHost for every page, and the header drawn with AppHeader', needs: ['tailwind'], packages: ['@kayjs/ui', '@iconify-json/tabler'], templated: true },
 }
 
 export const FEATURE_NAMES = Object.keys(FEATURES) as Feature[]

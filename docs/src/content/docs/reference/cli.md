@@ -57,7 +57,7 @@ kay new my-app --template app --without docker
 | Option | Effect |
 | --- | --- |
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |
-| `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests`; `ai`, `mail`, `cms` and `ui` install the library and run `kay add` on the new project, so they need the network |
+| `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests`; `ai`, `mail` and `cms` install the library and run `kay add` on the new project, so they need the network |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
 | `--agents none` | Leaves out `AGENTS.md`, `CLAUDE.md` and `.mcp.json` |
@@ -89,8 +89,9 @@ Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports 
 | --- | --- | --- |
 | `server` | An Elysia server, run in production as one executable; without it, a static site built to `dist` | server, app |
 | `starter` | A header, a skip link, a 404 page, and a home page greeting from the server with a counter island | server, site, app |
-| `tailwind` | Tailwind over the Catppuccin Mocha palette; without it, the markup carries no classes | server, site, app |
-| `accents` | An accent picker in the header, kept in a cookie; needs `starter` and `tailwind` | none |
+| `tailwind` | Tailwind over orbit's near-black palette, with a starfield behind the page and a hairline on every box; without it, the markup carries no classes | server, site, app |
+| `ui` | kayjs-ui: its space skin, Space Grotesk and JetBrains Mono, `ui()` in `kay.config.ts`, and the header drawn with `AppHeader`; needs `tailwind` | server, site, app |
+| `accents` | An accent picker in the header, twelve accents kept in a cookie; needs `starter` and `tailwind` | none |
 | `eslint` | ESLint through `@kaynooo/eslint`, `.kay` fences and template expressions included | server, site, app |
 | `tests` | `kay test` through `kay/test`, with a first test | server, site, app |
 | `ci` | A Forgejo or GitHub workflow checking, formatting, linting, testing and building the server, or publishing the static site to Pages | server, site, app |

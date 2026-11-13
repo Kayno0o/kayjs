@@ -39,8 +39,8 @@ const site = await testSite()
 const accentStyle = async (value: string) => (await site.visit('/', { headers: { cookie: \`accent=\${encodeURIComponent(encodeValue(value))}\` } })).html
 
 it('renders the kept accent from the first paint, a known one only', async () => {
-  expect(await accentStyle('mauve')).toContain('<style>:root { --accent: var(--accent-mauve); }</style>')
-  expect(await accentStyle('x); } body { display: none')).toContain('<style>:root { --accent: var(--accent-peach); }</style>')
+  expect(await accentStyle('mint')).toContain('<style>:root { --accent: var(--accent-mint); }</style>')
+  expect(await accentStyle('x); } body { display: none')).toContain('<style>:root { --accent: var(--accent-starlight); }</style>')
 })
 
 it('changes the accent on a click', async () => {
@@ -50,11 +50,11 @@ it('changes the accent on a click', async () => {
   try {
     const { root, unmount } = await mountComponent(AccentPicker)
 
-    root.querySelector<HTMLButtonElement>('[aria-label="mauve"]')!.click()
+    root.querySelector<HTMLButtonElement>('[aria-label="mint"]')!.click()
     await settle()
 
-    expect(root.querySelector('style')!.textContent).toBe(':root { --accent: var(--accent-mauve); }')
-    expect(root.querySelector('[aria-label="mauve"]')!.getAttribute('aria-checked')).toBe('true')
+    expect(root.querySelector('style')!.textContent).toBe(':root { --accent: var(--accent-mint); }')
+    expect(root.querySelector('[aria-label="mint"]')!.getAttribute('aria-checked')).toBe('true')
     expect(document.cookie).toContain('accent=')
     unmount()
   }
@@ -170,6 +170,8 @@ afterAll(async () => {
 }, 60_000)
 
 const LIBRARIES = ['auth', 'mail', 'ui']
+// The starter's header is kayjs-ui's AppHeader, which hands its menu state to an island on every page it draws.
+const HEADER_ISLANDS = ['node_modules/@kayjs/ui/src/app-header.kay', 'node_modules/@kayjs/ui/src/internal/site-nav-state.kay', 'node_modules/@kayjs/ui/src/site-nav.kay']
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.
 async function installKay(dir: string) {
@@ -191,7 +193,7 @@ async function installKay(dir: string) {
   await chmod(join(modules, '.bin', 'kay'), 0o755)
 
   // kayjs-auth, kayjs-mail (which auth types a dynamic import of) and kayjs-ui resolve `kay` from where they sit, so copies of the workspace's own go beside the project's kay: linked, they would type-check against the checkout's.
-  if (await Bun.file(join(dir, 'src/routes/_guard.ts')).exists()) {
+  if ((await Bun.file(join(dir, 'package.json')).text()).includes('"@kayjs/ui"')) {
     const scope = join(modules, '@kayjs')
 
     await rm(scope, { force: true })
@@ -222,8 +224,8 @@ const DOCKER_COPY = /^COPY (?!--from)(.+) \S+$/gm
 const MIGRATIONS = /migrationsDir: '([^']+)'/g
 // The package each command a script runs comes from, Bun aside.
 const SCRIPT_BINS: Record<string, string | undefined> = { 'bun': undefined, 'kay': 'kay', 'keslint': '@kaynooo/eslint', 'pg-orm': '@kaynooo/pg-orm' }
-// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, pg-orm, which kayjs-auth's default SQLite store loads from the app, Tailwind's plugin, which kay adds itself, and the two kay loads for its type and accessibility checks.
-const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm', 'bun-plugin-tailwind', 'axe-core', 'typescript7'])
+// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, the two fonts the config serves, pg-orm, which kayjs-auth's default SQLite store loads from the app, Tailwind's plugin, which kay adds itself, and the two kay loads for its type and accessibility checks.
+const UNIMPORTED = new Set(['@types/bun', 'elysia', '@fontsource-variable/jetbrains-mono', '@fontsource-variable/space-grotesk', '@iconify-json/tabler', '@kaynooo/pg-orm', 'bun-plugin-tailwind', 'axe-core', 'typescript7'])
 
 // What a scaffold's files name that it lacks: a relative import, preload, extended tsconfig, copied file or migrations folder, a package it imports without depending on it, a script package.json does not hold; and a dependency nothing imports.
 function unresolved(files: Record<string, string>): { paths: string[], undeclared: string[], unused: string[], scripts: string[] } {
@@ -688,7 +690,7 @@ describe('kay new', () => {
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
-    expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'axe-core', 'bun-plugin-tailwind', 'tailwindcss', 'typescript7'])
+    expect(Object.keys(manifest.devDependencies)).toEqual(['@fontsource-variable/jetbrains-mono', '@fontsource-variable/space-grotesk', '@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'axe-core', 'bun-plugin-tailwind', 'tailwindcss', 'typescript7'])
     // At the ranges kay's package.json declares for its optional peers.
     const peers = (await Bun.file(join(repo, 'package.json')).json() as { peerDependencies: Record<string, string> }).peerDependencies
 
@@ -737,7 +739,7 @@ describe('kay new', () => {
       const client = await buildClient(dir)
 
       // In the order the bundler wrote their chunks, not the source's.
-      expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
+      expect(Object.keys(client.islands).sort()).toEqual([...HEADER_ISLANDS, 'src/components/accent-picker.kay', 'src/components/counter.kay'])
       const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
       expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
@@ -881,10 +883,10 @@ describe('kay new', () => {
     expect(one!['compose.dev.yaml']).not.toContain('__DB_PORT__')
   })
 
-  it('sizes the accent picker popover to its seven swatches', async () => {
+  it('sizes the accent picker popover to its swatches', async () => {
     const files = await projectFiles('/x/app', new Set<Feature>([...PRESETS.app.features, 'accents']), '^1.0.0')
 
-    expect(files['src/components/accent-picker.kay']).toContain('grid w-max grid-cols-7')
+    expect(files['src/components/accent-picker.kay']).toContain('grid w-max grid-cols-6')
   })
 
   it('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
@@ -970,7 +972,7 @@ describe('kay new', () => {
         expect({ code, passed: report.includes('2 pass'), ...code === 0 && report.includes('2 pass') ? {} : { report, output } }).toEqual({ code: 0, passed: true })
       }
 
-      expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual(['src/components/counter.kay', 'src/components/online.kay'])
+      expect(Object.keys((await buildClient(dir)).islands).toSorted()).toEqual([...HEADER_ISLANDS, 'src/components/counter.kay', 'src/components/online.kay'])
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })

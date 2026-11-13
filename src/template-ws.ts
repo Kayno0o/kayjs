@@ -29,7 +29,7 @@ import online from '../api/online'
 
 const live = socket(online, '/')
 ---
-p${tw('.text-subtext1')} {live.status() === 'open' ? \`\${live.last()?.online ?? 1} online now\` : 'Connecting...'}
+p${tw('.text-muted')} {live.status() === 'open' ? \`\${live.last()?.online ?? 1} online now\` : 'Connecting...'}
 `,
   }
 }

@@ -28,6 +28,11 @@ export interface Setup {
   settings: ConfigSettings
 }
 
+// The features a project holds: kayjs-auth draws its pages with kayjs-ui, so a project with `auth` holds `ui` too.
+export function holds(features: ReadonlySet<Feature>): (feature: Feature) => boolean {
+  return feature => features.has(feature) || (feature === 'ui' && features.has('auth'))
+}
+
 export const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 
 // A file of these lines, each `false` left out.

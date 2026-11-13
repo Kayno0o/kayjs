@@ -18,6 +18,22 @@ function printMissing(features: readonly Feature[], quiet: boolean): void {
     console.log(`\n  Add ${missing.map(feature => ADDABLE[feature]).join(' and ')} later with ${colors.cyan(missing.map(feature => `kay add ${feature}`).join(' and '))}.`)
 }
 
+// The preset with what --with adds and --without drops. kayjs-ui is in the presets to style the starter, so a project without Tailwind leaves it out unless it was asked for.
+function chosenFeatures(template: Preset, added: readonly Feature[], removed: readonly Feature[]): Set<Feature> {
+  const chosen = new Set(PRESETS[template].features)
+
+  for (const name of added)
+    chosen.add(name)
+
+  for (const name of removed)
+    chosen.delete(name)
+
+  if (removed.includes('tailwind') && !added.includes('ui'))
+    chosen.delete('ui')
+
+  return chosen
+}
+
 export const scaffold: Command = {
   usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--editor helix,zed|none] [--forge forgejo|github] [--agents none] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
   options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'agents': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
@@ -85,13 +101,7 @@ export const scaffold: Command = {
 
       // With no option saying what to scaffold, a terminal asks; anything else takes the preset, the server's by default, with what --with and --without change.
       const ask = template === undefined && added === undefined && removed === undefined && yes !== true && isInteractive()
-      const chosen = new Set(PRESETS[(template as Preset | undefined) ?? 'server'].features)
-
-      for (const name of listed(added))
-        chosen.add(name as Feature)
-
-      for (const name of listed(removed))
-        chosen.delete(name as Feature)
+      const chosen = chosenFeatures((template as Preset | undefined) ?? 'server', listed(added) as Feature[], listed(removed) as Feature[])
 
       const features = ask ? await pickFeatures() : [...chosen]
 

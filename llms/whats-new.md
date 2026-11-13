@@ -6,6 +6,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - `kay upgrade` warns when it raises a dependency the app shares with kay across a major (a 0.x minor counts), naming the versions and the package's migration file or repository, in text and as `warnings` under `--format json` ([kay upgrade](check-and-tools.md)).
 - kayjs-ui: a Meter and a Progress draw their track `surface-strong`, so the unfilled part reads inside a Card or any `bg-surface` box; Toggle's frame, Slider's and AudioPlayer's range track already read at 3:1, and a test holds every track on the background, surface and popover in both schemes and each skin ([Setup](../packages/ui/llms/setup.md)).
+- `kay new` starts from orbit's look: kayjs-ui's space skin (the `ui` feature, now in every preset, with `AppHeader`, Space Grotesk and JetBrains Mono through `fonts`), a near-black palette named as kayjs-ui names it (`background`, `foreground`, `border`, `muted`), a starfield behind the page, a hairline on every box, and an accent picker of twelve accents; the palette no longer defines `--color-base`, which made `text-base` paint text the page background ([kay new](project-new-and-add.md)).
+- The `text-size-colour` lint reports `text-base` (or another size) in an app whose CSS defines a colour of the same name, such as `--color-base`, where the utility is the font size and the text colour at once ([code lints](code-lints.md)).
 
 ## 1.104.0
 

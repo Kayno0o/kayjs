@@ -180,7 +180,7 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
 
     expect(result.written).toEqual(['kay.config.ts'])
     expect(result.notes).toEqual([expect.stringContaining('MAIL_URL')])
-    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail()],')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail(), ui()],')
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('import { mail } from \'@kayjs/mail\'\n')
     expect(await Bun.file(join(dir, 'src/mail.ts')).exists()).toBe(false)
 
@@ -228,7 +228,7 @@ it('adds kayjs-ai as its extension alone, with no file', async () => {
 
     expect(result.written).toEqual(['kay.config.ts'])
     expect(result.notes).toEqual([expect.stringContaining('AI_MODEL')])
-    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [ai()],')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [ai(), ui()],')
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
@@ -403,7 +403,7 @@ it('installs @iconify-json/tabler as a dev dependency, as kay new does', async (
   const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
 
   try {
-    const dir = await projectWith(root, PRESETS.server.features.filter(feature => feature !== 'starter' && feature !== 'accents'))
+    const dir = await projectWith(root, PRESETS.server.features.filter(feature => feature !== 'starter' && feature !== 'accents' && feature !== 'ui'))
     const { bun, calls } = await stubBun(root, 'exit 0')
 
     // The stub installs nothing, so the library cannot be loaded: the calls are what is checked.
@@ -672,7 +672,7 @@ it('adds the ui extension with no line in the layout or the stylesheet', async (
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {
-    await linkedProject(dir, PRESETS.server.features, ['ui'])
+    await linkedProject(dir, PRESETS.server.features.filter(feature => feature !== 'ui'), ['ui'])
 
     const result = await addFeatures(dir, ['ui'], { install: false })
 
@@ -994,10 +994,10 @@ it('lists the template files in a dry run when the libraries are not beside kay,
 
   try {
     const notes: string[] = []
-    const files = await createProject(join(root, 'app'), { features: [...PRESETS.server.features, 'ui'], dryRun: true, librariesFrom: root, notes })
+    const files = await createProject(join(root, 'app'), { features: [...PRESETS.server.features, 'mail'], dryRun: true, librariesFrom: root, notes })
 
     expect(files).toContain('kay.config.ts')
-    expect(notes).toEqual([expect.stringContaining('ui is not installed beside kay')])
+    expect(notes).toEqual([expect.stringContaining('mail is not installed beside kay')])
     expect(existsSync(join(root, 'app'))).toBe(false)
   }
   finally {
@@ -1011,10 +1011,10 @@ it('says kay new wrote the project and how to finish when the install of a libra
   try {
     const { bun } = await stubBun(root, 'echo no network >&2\nexit 1')
     const dir = join(root, 'app')
-    const create = createProject(dir, { kay: '^1.0.0', features: [...PRESETS.server.features, 'ui'], bun })
+    const create = createProject(dir, { kay: '^1.0.0', features: [...PRESETS.server.features, 'mail'], bun })
 
-    await expect(create).rejects.toThrow(`kay new: the project is written in ${dir}, but adding ui failed`)
-    await expect(create).rejects.toThrow(`cd ${dir} && kay add ui`)
+    await expect(create).rejects.toThrow(`kay new: the project is written in ${dir}, but adding mail failed`)
+    await expect(create).rejects.toThrow(`cd ${dir} && kay add mail`)
     expect(existsSync(join(dir, 'package.json'))).toBe(true)
   }
   finally {

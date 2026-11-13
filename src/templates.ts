@@ -3,7 +3,7 @@ import { authFiles, authTestFiles } from './template-auth'
 import { pagesWorkflow, testWorkflow } from './template-ci'
 import { config, SERVER_ENTRY } from './template-config'
 import { serverContainerFiles, staticContainerFiles } from './template-docker'
-import { blocks, DEFAULT_RUNNERS, lines, REGISTRY } from './template-shared'
+import { blocks, DEFAULT_RUNNERS, holds, lines, REGISTRY } from './template-shared'
 import { home, homeTest, layout, starterFiles } from './template-starter'
 import { ACCENT_FILES, editorExtensions, editorSettings, PLAIN_CSS, tailwindCss } from './template-styles'
 import { WS_TEST, wsFiles } from './template-ws'
@@ -41,7 +41,7 @@ export const AGENT_FILES: readonly string[] = ['AGENTS.md', 'CLAUDE.md', '.mcp.j
 
 // Every file but package.json, tsconfig.json and the agents' instructions and MCP registration, which `createProject` writes from the same features and scripts.
 export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}, host: Host = 'forgejo', runner: string = DEFAULT_RUNNERS[host]): Record<string, string> {
-  const has = (feature: Feature) => features.has(feature)
+  const has = holds(features)
   const setup: Setup = { has, host, runner, tw: classes => has('tailwind') ? classes : '', settings }
   const server = has('server')
 

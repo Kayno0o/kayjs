@@ -8,6 +8,7 @@ import { checklist, select } from '@kaynooo/cli-kit/prompt'
 import { addFeatures, LibraryNotInstalledError } from './add'
 import { nativeExe } from './compiler/native-typescript'
 import { FEATURE_NAMES, FEATURES } from './features'
+import { holds } from './template-shared'
 import { AGENT_FILES, agentsFile, CLAUDE_FILE, MCP_FILE, templateFiles } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
@@ -28,7 +29,7 @@ export type { Feature, Host }
 
 export type Preset = 'blank' | 'server' | 'site' | 'app'
 
-const SITE: readonly Feature[] = ['starter', 'tailwind', 'eslint', 'tests', 'ci', 'docker']
+const SITE: readonly Feature[] = ['starter', 'tailwind', 'ui', 'eslint', 'tests', 'ci', 'docker']
 
 export const PRESETS: Record<Preset, { description: string, features: readonly Feature[] }> = {
   blank: { description: 'one bare page and nothing else', features: [] },
@@ -228,7 +229,7 @@ async function librariesDryRun(files: Record<string, string>, libraries: readonl
 
 // Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.
 export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}, host?: Host, runner?: string): Promise<Record<string, string>> {
-  const has = (feature: Feature) => features.has(feature)
+  const has = holds(features)
   const name = packageName(basename(resolve(dir)))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string>, peerDependencies: Record<string, string> }
   // A kay minor may break, so the project takes its patches only.
@@ -244,7 +245,8 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     ...has('postgres') && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' },
   }
   const devDependencies = [
-    (has('starter') || has('accents') || has('auth')) && '@iconify-json/tabler',
+    ...has('ui') ? ['@fontsource-variable/jetbrains-mono', '@fontsource-variable/space-grotesk'] : [],
+    (has('starter') || has('accents') || has('ui')) && '@iconify-json/tabler',
     has('eslint') && '@kaynooo/eslint',
     '@types/bun',
     // The type checks and the accessibility checks load these from the app, at the ranges kay declares as its optional peers.
@@ -262,7 +264,7 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
       type: 'module',
       private: true,
       scripts,
-      dependencies: { ...has('auth') && { '@kayjs/auth': `~${kay.version}`, '@kayjs/ui': `~${kay.version}`, '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, elysia: kay.dependencies.elysia, kay: dependency },
+      dependencies: { ...has('auth') && { '@kayjs/auth': `~${kay.version}`, '@kaynooo/pg-orm': kay.devDependencies['@kaynooo/pg-orm'] }, ...has('ui') && { '@kayjs/ui': `~${kay.version}` }, elysia: kay.dependencies.elysia, kay: dependency },
       devDependencies: Object.fromEntries(devDependencies.map(dev => [dev, kay.peerDependencies[dev] ?? kay.devDependencies[dev]!])),
     }, null, 2)}\n`,
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
