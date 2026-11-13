@@ -26,8 +26,8 @@ export function islandFence(file: KayFile): Fix | undefined {
 }
 
 // A pin on a page, a layout or a special page: they render on the server and are never islands.
-export function markerMismatch(pin: NonNullable<KayFile['pin']>, route: boolean): Diagnostic[] {
-  if (!route || pin.kind !== 'island')
+export function markerMismatch(pin: NonNullable<KayFile['pin']>, page: boolean): Diagnostic[] {
+  if (!page || pin.kind !== 'island')
     return []
 
   return [{ start: pin.start, end: pin.end, code: 'island-marker', message: 'A page, a layout or a special page renders on the server and is never an island, and `--- island` says it is one', note: 'an island is a component a page renders', help: 'delete it, and move what needs the browser to a component of its own', checkOnly: true }]

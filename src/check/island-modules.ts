@@ -4,14 +4,14 @@ import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { resolveFrom, scoped, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
-import { isPageFile } from '../build/page-dirs'
+import { isPageFile, pageDirsOf } from '../build/page-dirs'
 import { isBuiltinSpecifier } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { buildFiles } from '../build/source-files'
 import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { isApiStubbed } from '../server/api-modules'
-import { islandOnlyComponents } from './island-only'
+import { islandOnlyComponents, rendersIn } from './island-only'
 
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
 // What the browser bundle takes as a module, a package's JavaScript included.
@@ -95,9 +95,10 @@ export async function browserModules(root: string, routesDir: string, extensions
 
   await Promise.all(built.files.filter(file => !sources.has(file)).map(async file => sources.set(file, await Bun.file(file).text())))
 
-  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!), isPageFile(file, [routesDir])))
+  const pages = pageDirsOf(root, routesDir, extensions)
+  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!), isPageFile(file, pages)))
   const files = [...own.keys()]
-  const islandOnly = await islandOnlyComponents(root, routesDir, files, sources)
+  const islandOnly = await islandOnlyComponents(root, routesDir, files, sources, rendersIn(sources, pages))
   const project = realpathSync(root) + sep
   const islands = built.files.filter((file, index) => roles[index] === 'island' && own.has(file))
   const seeds = [...new Set([...islands, ...islandOnly])]

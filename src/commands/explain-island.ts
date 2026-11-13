@@ -4,12 +4,12 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { findKayFiles } from '../build/files'
-import { isPageFile } from '../build/page-dirs'
+import { isPageFile, pageDirs } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { formatDiagnostic } from '../compiler/frame'
 import { CAUSE_KINDS, describeCause, ISLAND_RULE } from '../compiler/island-cause'
-import { projectPaths } from '../project'
+import { loadConfigWithin } from '../config-loader'
 import { printDocument, printFailure, projectRoot } from './command'
 
 type Role = 'island' | 'static'
@@ -30,13 +30,13 @@ function shown(cause: IslandCause) {
 }
 
 // The role of each file, as `compileKay` decides it, with what decides it, and the files that do not compile, which have no role.
-async function explained(root: string, files: string[]): Promise<{ found: Explained[], broken: string[] }> {
+async function explained(root: string, files: string[], pages: readonly string[]): Promise<{ found: Explained[], broken: string[] }> {
   const found: Explained[] = []
   const broken: string[] = []
 
   for (const file of files) {
     const source = await readFile(file, 'utf8')
-    const { island, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source), page: isPageFile(file, [projectPaths(root).routes]) ? true : undefined })
+    const { island, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source), page: isPageFile(file, pages) ? true : undefined })
     const error = diagnostics.find(diagnostic => diagnostic.severity !== 'warning')
 
     if (error !== undefined) {
@@ -65,6 +65,8 @@ export async function explainIsland(file: string | undefined, format: ProblemFor
   if (root === undefined)
     return 1
 
+  const pages = pageDirs(root, await loadConfigWithin(root))
+
   if (file !== undefined) {
     const path = resolve(file)
 
@@ -74,7 +76,7 @@ export async function explainIsland(file: string | undefined, format: ProblemFor
       return 1
     }
 
-    const { found: [entry], broken } = await explained(root, [path])
+    const { found: [entry], broken } = await explained(root, [path], pages)
 
     if (entry === undefined) {
       printFailure('explain', broken[0]!, format)
@@ -90,7 +92,7 @@ export async function explainIsland(file: string | undefined, format: ProblemFor
     return 0
   }
 
-  const { found, broken } = await explained(root, await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true }))
+  const { found, broken } = await explained(root, await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true }), pages)
   const islands = found.filter(entry => entry.role !== 'static').sort((a, b) => a.file.localeCompare(b.file))
 
   if (format === 'json')

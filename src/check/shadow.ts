@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'n
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { packageContextModule } from '../build/manifests'
-import { mountedPageDirs, isPageFile } from '../build/page-dirs'
+import { isPageFile, mountedPageDirs } from '../build/page-dirs'
 import { importedSignals } from '../build/signals'
 import { uiEntryOf } from '../build/ui'
 import { compileKay } from '../compiler'

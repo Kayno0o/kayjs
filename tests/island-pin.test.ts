@@ -1,7 +1,8 @@
 import type { Diagnostic } from '../src/compiler/ast'
-import { describe, expect, it } from 'bun:test'
+import { mkdir, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isPageFile } from '../src/build/page-dirs'
+import { describe, expect, it } from 'bun:test'
+import { isPageFile, mountedPageDirs } from '../src/build/page-dirs'
 import { analyzeKayCached, transformKay } from '../src/build/transform'
 import { compileShadow } from '../src/check/shadow'
 import { browserRole, compileKay, rendersAsIsland } from '../src/compiler'
@@ -241,7 +242,7 @@ describe('a plain page', () => {
     const roleOf = async (name: string) => {
       const file = join(routesDir, name)
       const page = isPageFile(file, [routesDir])
-      const built = /KayIsland\(/.test(transformKay(pinned, file, { target: 'ssr', root, hydratable: true }))
+      const built = (/KayIsland\(/).test(transformKay(pinned, file, { target: 'ssr', root, hydratable: true }))
       const analysis = await analyzeKayCached(pinned, file, root, cache, true, undefined, false, page)
       const shadow = compileShadow(root, file, pinned, { routesDir, mounts: [] })
 
@@ -250,6 +251,43 @@ describe('a plain page', () => {
 
     expect(await roleOf('p.kay')).toEqual({ page: true, built: false, analysed: false, marker: [true, true] })
     expect(await roleOf('_partial.kay')).toEqual({ page: false, built: true, analysed: true, marker: [false, false] })
+  })
+})
+
+describe('isPageFile', () => {
+  it('takes a routable file of the routes directory or of a mount, and no `_` file or outer folder', async () => {
+    const root = await scratchDir('page-file')
+    const routes = join(root, 'src/routes')
+    const mounted = join(root, 'node_modules/ext/routes')
+    const outer = join(root, 'node_modules/ext/outer')
+    const dirs = mountedPageDirs(routes, [{ dir: mounted, prefix: '' }, { dir: outer, prefix: '', outer: join(root, 'x') }])
+
+    expect(dirs).toEqual([routes, mounted])
+    expect(isPageFile(join(routes, 'p.kay'), dirs)).toBe(true)
+    expect(isPageFile(join(mounted, 'sub/p.kay'), dirs)).toBe(true)
+    expect(isPageFile(join(routes, '_partial.kay'), dirs)).toBe(false)
+    expect(isPageFile(join(routes, '_layout.kay'), dirs)).toBe(false)
+    expect(isPageFile(join(outer, 'c.kay'), dirs)).toBe(false)
+    expect(isPageFile(join(root, 'src/components/c.kay'), dirs)).toBe(false)
+  })
+
+  it('follows a linked routes directory', async () => {
+    const root = await scratchDir('page-link')
+
+    await mkdir(join(root, 'real'), { recursive: true })
+    await symlink(join(root, 'real'), join(root, 'linked'))
+    await Bun.write(join(root, 'real/p.kay'), 'p x\n')
+
+    expect(isPageFile(join(root, 'real/p.kay'), [join(root, 'linked')])).toBe(true)
+  })
+
+  it('leaves a recipe in a partial to the component it is, as the check reads it', () => {
+    const recipe = '---\nimport { recipe } from \'kay\'\nconst look = recipe({ variants: { tone: { a: \'\' } } })\n---\np(class={look()}) x\n'
+    const root = '/tmp/nokay'
+    const build = (file: string) => transformKay(recipe, join(root, file), { target: 'ssr', root })
+
+    expect(() => build('src/routes/_partial.kay')).not.toThrow()
+    expect(() => build('src/routes/p.kay')).toThrow()
   })
 })
 

@@ -35,8 +35,8 @@ import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
 import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
-import { isPageFile, pageDirs as pageDirsOf } from './page-dirs'
 import { throughLinks } from './links'
+import { isPageFile, pageDirs } from './page-dirs'
 import { kay } from './plugin'
 import { unusedLibraryClasses } from './prune'
 import { referencesOf } from './references'
@@ -338,9 +338,9 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const cacheDir = projectPaths(root).cache
   // A file beside the routes directory, outside it and the mounted pages, is a component, where a root `@block` has no layout to fill a slot of; one outside the app's source, as another project's pages under a root above it, is left alone, as are kay's own pages when the root is kay's checkout.
   const routes = projectPaths(root, options).routes
-  const pageDirs = [routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
-  const isComponent = (file: string): boolean => file.startsWith(dirname(routes) + sep) && !pageDirs.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file) && !file.startsWith(KAY_SOURCE)
-  const pages = pageDirsOf(root, options)
+  const folders = [routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
+  const isComponent = (file: string): boolean => file.startsWith(dirname(routes) + sep) && !folders.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file) && !file.startsWith(KAY_SOURCE)
+  const pages = pageDirs(root, options)
   const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, isComponent(file), isPageFile(file, pages))))
 
   // What the files gone held, kept no longer.

@@ -158,7 +158,7 @@ export async function embeddedMapCached(source: string, filename: string, code: 
   return map
 }
 
-// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `component` says the file sits outside the routes, so a root `@block` in it is refused though nothing here checks types. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
+// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `component` says the file sits outside the routes, so a root `@block` in it is refused though nothing here checks types; `page` says it is a page (`isPageFile`), which takes the fence checks and whose pin pins nothing. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
 export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels, component = false, page = false): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
   const signals = importedSignals(filename, source)
@@ -181,7 +181,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : page ? true : undefined, component })
+  const pageOption = component ? false : page || undefined
+  const { island, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: pageOption, component })
   const analysis = { island, cause, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {

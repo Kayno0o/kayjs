@@ -7,7 +7,12 @@ import { routeMounts } from '../server/routes'
 
 // The directories holding the project's pages: its routes directory and the ones its extensions mount, not the folder of an outer layout, whose other `.kay` files are components.
 export function pageDirs(root: string, config: Pick<KayConfig, 'dirs' | 'contentConfig' | 'entry' | 'extensions'>): string[] {
-  return [projectPaths(root, config).routes, ...routeMounts(root, config.extensions, false).filter(mount => mount.outer === undefined).map(mount => mount.dir)]
+  return pageDirsOf(root, projectPaths(root, config).routes, config.extensions)
+}
+
+// The same directories for a caller that has the routes directory already.
+export function pageDirsOf(root: string, routesDir: string, extensions: KayConfig['extensions']): string[] {
+  return mountedPageDirs(routesDir, routeMounts(root, extensions, false))
 }
 
 // The page directories of a check that has the routes directory and the mounts read already: the same ones `pageDirs` lists.

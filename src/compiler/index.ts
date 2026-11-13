@@ -71,7 +71,7 @@ export interface CompileOptions {
   namedRefresh?: boolean | undefined
   // Server output of a static component's `?island` twin, which carries markers like an island.
   twinBuild?: boolean | undefined
-  // Whether the file is a page of a routes directory, which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does; `false` says it is a component, where a root `@block` is refused.
+  // Whether the file is a page of a routes directory (`isPageFile`), which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does, is refused `--- client` and `--- island`, and is no island by its pin; `false` says it is a component, where a root `@block` is refused.
   page?: boolean | undefined
   // Whether the file is known to be a component, which has no `--- server` fence: a library checked on its own has pages no routes directory names, so only a caller knowing its routes says so.
   component?: boolean | undefined
