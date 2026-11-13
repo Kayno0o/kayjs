@@ -166,6 +166,10 @@ A visitor who asks for less data (`Save-Data: on` or `prefers-reduced-data`) get
 
 <ReadMore href="/llms/islands">How many events an island keeps while it loads, and when it drops them.</ReadMore>
 
+## What loads when
+
+The code that sends an action call is not in the island's first load. An island that holds an action loads it once the browser is idle, so a call made as the page goes away finds it in, and the first call fetches it otherwise. A failed fetch is tried again after one second and after three before the call fails as any call that could not be sent.
+
 ## Shared and persisted state
 
 A signal exported from a `.ts` module is one state for every island on the page that imports it. This is `src/cart.ts`.
