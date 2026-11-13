@@ -1,10 +1,10 @@
 import type { Dirent } from 'node:fs'
+import type { RecipeLifter } from './recipe-classes'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { chmod, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
-import type { RecipeLifter } from './recipe-classes'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
