@@ -267,7 +267,7 @@ function sendable(props: object): boolean {
 }
 
 // The markup of an island rendered by a page that needs none of it: detached as the island's own render is, so it reads and draws the same, but with no slot around it and nothing noted for the page's script.
-// The children and blocks are rendered here, in the page, as an island's are, and an island inside the component stays an island of its own.
+// The children and blocks are rendered here, in the page and with its field marks, as markup of the page's own, and an island inside the component stays an island of its own.
 function staticUse<P extends object>(component: (props: P) => JSX.Element, props: P): JSX.Element {
   const slots = staticSlots(props)
   const given = Object.defineProperties({}, Object.getOwnPropertyDescriptors(props)) as P
