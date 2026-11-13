@@ -281,9 +281,9 @@ describe('isPageFile', () => {
     expect(isPageFile(join(root, 'real/p.kay'), [join(root, 'linked')])).toBe(true)
   })
 
-  it('leaves a recipe in a partial to the component it is, as the check reads it', () => {
+  it('leaves a recipe in a partial to the component it is, as the check reads it', async () => {
     const recipe = '---\nimport { recipe } from \'kay\'\nconst look = recipe({ variants: { tone: { a: \'\' } } })\n---\np(class={look()}) x\n'
-    const root = '/tmp/nokay'
+    const root = await scratchDir('page-partial')
     const build = (file: string) => transformKay(recipe, join(root, file), { target: 'ssr', root })
 
     expect(() => build('src/routes/_partial.kay')).not.toThrow()
