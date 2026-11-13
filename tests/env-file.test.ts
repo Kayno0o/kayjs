@@ -260,6 +260,28 @@ describe('kay check with an env_file the checkout leaves out', () => {
 
     expect(messages).toEqual(['STRAY is in .env.example and no schema declares it, no compose service sets it and none interpolates it'])
   })
+
+  it('takes a required env_file missing from a fresh clone as filled from its example, and still names one with no example', async () => {
+    const root = await folder({
+      'compose.yaml': 'services:\n  app:\n    env_file: .env\n  worker:\n    env_file:\n      - worker.env\n',
+      '.env.example': 'API_KEY=\nTOKEN=\n',
+    })
+    const messages = (await compareEnv(root, variables, { compose: 'compose.yaml', example: '.env.example' })).map(({ message }) => message)
+
+    expect(messages).toEqual([expect.stringMatching(/^env_file worker\.env of \S*compose\.yaml does not exist$/)])
+  })
+
+  it('counts a variable a module kay.config.ts imports reads as read by the config', async () => {
+    const root = await folder({
+      'compose.yaml': 'services:\n  app:\n    env_file: .env\n',
+      'kay.config.ts': 'import { SITE } from \'./src/data/seo\'\n\nexport default { site: SITE }\n',
+      'src/data/seo.ts': 'import { host } from \'./host.ts\'\n\nexport const SITE = `https://${host}`\n',
+      'src/data/host.ts': '// kay-env: raw\nexport const host = (process.env.CLIENT_URL ?? \'\') || \'example.com\'\n',
+      '.env.example': 'API_KEY=\nTOKEN=\nCLIENT_URL=\n',
+    })
+
+    expect(await compareEnv(root, variables, { compose: 'compose.yaml', example: '.env.example' })).toEqual([])
+  })
 })
 
 describe('kay check with the variables Docker Compose reads itself', () => {

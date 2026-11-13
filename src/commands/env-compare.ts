@@ -138,14 +138,14 @@ async function composeAssignments(file: string, text: string, problem: (message:
       if (!await source.exists()) {
         // A file listed as not required is allowed to be missing.
         const required = !entries.some(entry => (entry as { path?: unknown, required?: unknown } | null)?.path === path && (entry as { required?: unknown }).required === false)
+        // A file the checkout leaves out, such as a gitignored `.env`, is filled from the example beside it, so it sets every variable the example lists and a fresh clone lacking it is fine.
+        const example = Bun.file(`${target}.example`)
+        const filledFrom = await example.exists()
 
-        if (required)
+        if (required && !filledFrom)
           problem(`env_file ${path} of ${relative(process.cwd(), file)} does not exist`)
 
-        // A file the checkout leaves out, such as a gitignored `.env`, is filled from the example beside it, so it sets every variable the example lists.
-        const example = Bun.file(`${target}.example`)
-
-        if (await example.exists()) {
+        if (filledFrom) {
           for (const { name } of parseEnvFile(await example.text()))
             filled.add(name)
         }
@@ -237,7 +237,6 @@ async function contentConfig(root: string): Promise<string> {
 
 // The files that load before the server boots or run on their own, whose raw reads no schema of the app fits: the content config, and every module reached through relative imports from a file a `bun build` script of package.json names, such as a standalone binary's entry, wherever it sits. A module the entry shares with the app is exempt for the whole app.
 async function standaloneFiles(root: string): Promise<Set<string>> {
-  const found = new Set<string>()
   const queue = [await contentConfig(root)]
   const scripts = ((await readJson(join(root, 'package.json'))) as { scripts?: Record<string, unknown> } | undefined)?.scripts ?? {}
 
@@ -246,6 +245,13 @@ async function standaloneFiles(root: string): Promise<Set<string>> {
       queue.push(...buildEntries(root, build[0]))
     }
   }
+
+  return withImports(queue)
+}
+
+// The files given and every module they reach through relative imports.
+async function withImports(queue: string[]): Promise<Set<string>> {
+  const found = new Set<string>()
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
     if (found.has(file))
@@ -282,11 +288,11 @@ function lineReads(source: string): { direct: RegExpExecArray[], names: string[]
   return { direct, names }
 }
 
-// The variables kay.config.ts and the files `standaloneFiles` names read themselves, such as `process.env.UMAMI_HOST` in the config: they load before any schema, so what they read is declared by the read.
+// The variables kay.config.ts, the modules it imports and the files `standaloneFiles` names read themselves, such as `process.env.UMAMI_HOST` in the config: they load before any schema, so what they read is declared by the read.
 async function ownReads(root: string): Promise<Set<string>> {
   const found = new Set<string>()
 
-  for (const file of [join(root, CONFIG_FILE), ...await standaloneFiles(root)]) {
+  for (const file of [...await withImports([join(root, CONFIG_FILE)]), ...await standaloneFiles(root)]) {
     for (const source of (await readText(file)).split(LINE_BREAK)) {
       for (const name of lineReads(source).names)
         found.add(name)
