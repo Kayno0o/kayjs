@@ -189,9 +189,17 @@ function prune(nodes: Node[], drops: (name: string) => boolean): Node[] {
   })
 }
 
-// The parsed stylesheet without the selectors needing a class of `unused`, or a class of `unescaped` as the class attribute writes it, and without the rules and conditional blocks left with none.
-export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>, unescaped: ReadonlySet<string> = new Set()): Node[] {
-  return unused.size === 0 && unescaped.size === 0 ? nodes : prune(nodes, name => unused.has(name) || (unescaped.size > 0 && unescaped.has(unescapeClass(name))))
+// The parsed stylesheet without the selectors needing a class of `unused`, and without the rules and conditional blocks left with none.
+export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>): Node[] {
+  return unused.size === 0 ? nodes : prune(nodes, name => unused.has(name))
+}
+
+// The parsed stylesheet with the selectors needing a class of `unused`, as the class attribute writes it, left out of its `@layer utilities` blocks alone.
+export function pruneUtilityLayer(nodes: Node[], unused: ReadonlySet<string>): Node[] {
+  if (unused.size === 0)
+    return nodes
+
+  return nodes.map(node => 'prelude' in node && node.prelude.replace(COMMENTS, '').trim() === '@layer utilities' ? { prelude: node.prelude, body: prune(node.body, name => unused.has(unescapeClass(name))) } : node)
 }
 
 const ESCAPE = /\\(?:([\da-f]{1,6})\s?|([\s\S]))/gi

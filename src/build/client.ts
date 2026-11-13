@@ -27,7 +27,7 @@ import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { routeMounts } from '../server/routes'
 import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
-import { pruneNodes } from './class-rules'
+import { pruneNodes, pruneUtilityLayer } from './class-rules'
 import { buildClassTable, mergesAtRuntime } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
@@ -38,8 +38,9 @@ import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { isPageFile, pageDirs } from './page-dirs'
 import { kay } from './plugin'
-import { recipeOnlyUtilities, unusedLibraryClasses } from './prune'
+import { unusedLibraryClasses } from './prune'
 import { recipeLifter } from './recipe-classes'
+import { recipeOnlyUtilities } from './recipe-utilities'
 import { referencesOf } from './references'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
@@ -700,7 +701,7 @@ async function bundleStyles(root: string, { pages, files, libraries, classes, sh
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses, await recipeOnlyNames), { root, files: referencesOf(options.extensions) })],
+    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async (nodes, tailwind) => pruneUtilityLayer(pruneNodes(nodes, await unusedClasses), tailwind ? await recipeOnlyNames : new Set()), { root, files: referencesOf(options.extensions) })],
   }), unusedClasses, recipeOnlyNames])
 
   if (!build.success)

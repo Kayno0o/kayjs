@@ -293,6 +293,66 @@ describe('the Cases of a lifted recipe', () => {
     expect(css).not.toMatch(/\.inline-block\s*\{/)
   }, 120_000)
 
+  it('keeps the rule of a utility a recipe lifted that a markdown, SVG or HTML file names', async () => {
+    const copy = await project()
+
+    await Bun.write(join(copy, 'docs/note.md'), 'Use `gap-1` here.\n')
+    await Bun.write(join(copy, 'src/icon.svg'), '<svg class="items-center"></svg>\n')
+    await Bun.write(join(copy, 'public/page.html'), '<p class="bg-red-600">x</p>\n')
+
+    const { css } = await page(copy)
+
+    for (const name of ['gap-1', 'items-center', 'bg-red-600'])
+      expect(css).toMatch(new RegExp(`\\.${name}\\s*\\{`))
+
+    expect(css).not.toMatch(/\.inline-flex\s*\{/)
+  }, 120_000)
+
+  it('prunes a variant and an escaped utility a recipe lifted, and keeps them where a file names them', async () => {
+    const copy = await project()
+
+    await Bun.write(join(copy, 'src/components/wide.kay'), '---\nimport { recipe } from \'kay\'\n\nconst look = recipe({ parts: \'hover:bg-red-600 w-1/2 mt-3\' })\n---\ndiv(part="root") wide\n')
+    await edit(join(copy, 'src/routes/index.kay'), text => `${text.replace('import Tag from \'../components/tag.kay\'', 'import Tag from \'../components/tag.kay\'\nimport Wide from \'../components/wide.kay\'')}Wide\n`)
+
+    const alone = await page(copy)
+
+    expect(alone.css).toMatch(/width: (?:50%|calc\(1 ?\/ ?2 \* 100%\))/)
+    expect(alone.css).not.toMatch(/\.hover\\:bg-red-600/)
+    expect(alone.css).not.toMatch(/\.w-1\\\/2\s*\{/)
+    expect(alone.css).not.toMatch(/\.mt-3\s*\{/)
+
+    await Bun.write(join(copy, 'docs/note.md'), '<p class="hover:bg-red-600 w-1/2">x</p>\n')
+
+    const named = await page(copy)
+
+    expect(named.css).toMatch(/\.hover\\:bg-red-600/)
+    expect(named.css).toMatch(/\.w-1\\\/2\s*\{/)
+    expect(named.css).not.toMatch(/\.mt-3\s*\{/)
+  }, 180_000)
+
+  it('leaves a library stylesheet rule that names a lifted class as written', async () => {
+    const copy = await project()
+    const library = join(copy, 'node_modules/tag-lib')
+
+    await Bun.write(join(copy, 'package.json'), '{ "name": "app", "private": true, "dependencies": { "tag-lib": "1.0.0" } }\n')
+    await Bun.write(join(library, 'package.json'), '{ "name": "tag-lib", "version": "1.0.0", "type": "module", "peerDependencies": { "kay": "*" }, "exports": { "./*.kay": "./src/*.kay", "./*.css": "./src/*.css" } }\n')
+    await Bun.write(join(library, 'src/badge.css'), '.inline-flex { outline-color: teal; }\n')
+    await Bun.write(join(library, 'src/badge.kay'), '---\nimport \'./badge.css\'\n---\nspan.inline-flex badge\n')
+    await edit(join(copy, 'src/routes/index.kay'), text => text.replace('import Tag', 'import Badge from \'tag-lib/badge.kay\'\nimport Tag').replace('\nLiveTag', '\nLiveTag\nBadge'))
+
+    const { css } = await page(copy)
+
+    expect(css).toMatch(/\.inline-flex\s*\{\s*outline-color: teal/)
+  }, 120_000)
+
+  it('drops no rule when a stylesheet names a folder outside the root', async () => {
+    const copy = await project()
+
+    await edit(join(copy, 'src/app.css'), text => `${text}\n@source "../../outside";\n`)
+
+    expect((await page(copy)).css).toMatch(/\.inline-flex\s*\{/)
+  }, 120_000)
+
   it('keeps the rule of a utility a recipe lifted that a file or an `@source inline` names too', async () => {
     const copy = await project()
 

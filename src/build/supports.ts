@@ -171,15 +171,15 @@ async function referenced<T>(path: string, references: StyleReferences, load: ()
 }
 
 // The stylesheet build's plugins, each stylesheet one returns merged, and a last one merging those no plugin loads; `transform` runs on the parsed stylesheet first, as kay prunes a library's unused classes, so each output is parsed and printed once.
-export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[]) => Node[] | Promise<Node[]> = nodes => nodes, references?: StyleReferences): BunPlugin[] {
-  const rewrite = async (css: string) => css.includes('{') ? print(merge(await transform(parse(css)), false)) : css
+export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[], tailwind: boolean) => Node[] | Promise<Node[]> = nodes => nodes, references?: StyleReferences): BunPlugin[] {
+  const rewrite = async (css: string, tailwind: boolean) => css.includes('{') ? print(merge(await transform(parse(css), tailwind), false)) : css
   const wrapped = plugins.map((plugin): BunPlugin => ({
     ...plugin,
     async setup(build) {
       const onLoad: PluginBuilder['onLoad'] = (constraints, callback) => build.onLoad(constraints, async (args) => {
         const result = await (references !== undefined && references.files.length > 0 && args.namespace === 'file' && referenceable(args.path, references.root) ? referenced(args.path, references, async () => callback(args)) : callback(args))
 
-        return result && 'contents' in result && typeof result.contents === 'string' && (result.loader === 'css' || (result.loader === undefined && CSS_FILE.test(args.path))) ? { ...result, contents: await rewrite(result.contents) } : result
+        return result && 'contents' in result && typeof result.contents === 'string' && (result.loader === 'css' || (result.loader === undefined && CSS_FILE.test(args.path))) ? { ...result, contents: await rewrite(result.contents, true) } : result
       })
 
       return plugin.setup(new Proxy(build, { get: (target, key) => key === 'onLoad' ? onLoad : Reflect.get(target, key) as unknown }))
@@ -190,7 +190,7 @@ export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[])
     setup(build) {
       build.onLoad({ filter: CSS_FILE }, async ({ path }) => {
         const css = await Bun.file(path).text()
-        const merged = await rewrite(css)
+        const merged = await rewrite(css, false)
 
         return merged === css ? undefined : { contents: merged, loader: 'css' }
       })

@@ -1,12 +1,10 @@
 import type { KayLibrary } from './libraries'
-import type { RecipeLifter } from './recipe-classes'
 import type { Node } from './supports'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { kindOf, selectors } from './class-rules'
 import { CSS_FILE, fileStamp, findProjectFiles, readSource, settledBefore } from './files'
 import { exportsFile } from './libraries'
-import { inlineClasses, wordsOf } from './style-uses'
 import { parse } from './supports'
 
 // A class written with no escape, the only kind a word of a source file names as written.
@@ -159,32 +157,4 @@ export async function unusedLibraryClasses(root: string, libraries: KayLibrary[]
   }
 
   return unused
-}
-
-// The utilities a recipe lifted into its own rules that nothing else names, whose rules Tailwind still writes from the raw source it scans: no file of the app, no word kay read, no `@source inline` of the stylesheets asks for them.
-export async function recipeOnlyUtilities(root: string, lifter: RecipeLifter | undefined, named: Iterable<string>): Promise<Set<string>> {
-  const lifted = lifter?.utilities() ?? new Set<string>()
-
-  if (lifted.size === 0)
-    return lifted
-
-  for (const file of await findProjectFiles(root, NAMING_FILE, { project: true, ownKayOnly: true })) {
-    try {
-      for (const word of wordsOf(file))
-        lifted.delete(word)
-
-      if (CSS_FILE.test(file)) {
-        for (const name of inlineClasses(readSource(file).text))
-          lifted.delete(name)
-      }
-    }
-    catch {
-      // A file removed since the walk found it names nothing.
-    }
-  }
-
-  for (const word of named)
-    lifted.delete(word)
-
-  return lifted
 }

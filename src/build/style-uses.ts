@@ -64,11 +64,6 @@ function tokensOf(file: string): { text: string, words: Set<string>, fragments: 
   return found
 }
 
-// The words a file names, a component read as the build does, its recipes' lifted utilities gone.
-export function wordsOf(file: string): ReadonlySet<string> {
-  return tokensOf(file).words
-}
-
 // The classes a stylesheet's `@source inline` lists.
 export function inlineClasses(css: string): string[] {
   return [...css.matchAll(SOURCE_INLINE)].flatMap(([, , pattern]) => pattern!.split(SPACES).flatMap(expandInline))
