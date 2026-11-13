@@ -1351,6 +1351,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/data",
     "GET /_kay/dev/data/rows",
     "POST /_kay/dev/data/query",
+    "GET /_kay/dev/offered",
     "GET /_kay/dev/not-found",
     "POST /_kay/dev/not-found",
     "GET /_kay/dev/routes",
