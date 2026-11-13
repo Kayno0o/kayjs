@@ -141,16 +141,34 @@ const lifters = new WeakMap<Design, RecipeLifter>()
 let lastId = 0
 
 // The lifter of an app's Tailwind, kept while its design system stands; none when the app has no Tailwind or its design system does not load.
+// A test run keeps the classes as written, which its assertions read and its sites often serve with no stylesheet; a test of the lift sets `KAY_RECIPE_CLASSES`.
 export async function recipeLifter(root: string): Promise<RecipeLifter | undefined> {
   const design = (await tailwindDesign(root, await configReferences(root)))?.design
 
-  if (design === undefined)
+  if (design === undefined || (process.env.NODE_ENV === 'test' && process.env.KAY_RECIPE_CLASSES === undefined))
     return undefined
 
   let known = lifters.get(design)
 
   if (known === undefined) {
-    known = { id: ++lastId, lift: (source, file) => liftRecipes(source, islandId(throughLinks(root, withoutTwin(file)), root), token => isUtility(design, token)) }
+    // The build, the compile and the source reads each lift the same text, so the last result of a file is kept.
+    const lifted = new Map<string, { source: string, result: Lifted | undefined }>()
+
+    known = {
+      id: ++lastId,
+      lift: (source, file) => {
+        const kept = lifted.get(file)
+
+        if (kept?.source === source)
+          return kept.result
+
+        const result = liftRecipes(source, islandId(throughLinks(root, withoutTwin(file)), root), token => isUtility(design, token))
+
+        lifted.set(file, { source, result })
+
+        return result
+      },
+    }
     lifters.set(design, known)
   }
 

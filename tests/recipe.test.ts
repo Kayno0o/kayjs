@@ -14,11 +14,9 @@ import { kayTypes } from './kay-types'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
+await plugin(kay())
+
 const scratch = await scratchDir('recipe-')
-
-// A root with no Tailwind, so the recipes' classes stay as written here: the lifting has its own tests.
-await plugin(kay({ root: scratch }))
-
 const MARKERS = /<!--[[\]]-->/g
 const CARD = `---
 import { recipe } from 'kay'
@@ -145,7 +143,7 @@ describe('a component with a recipe, as an island', () => {
     GlobalRegistrator.register()
     await Bun.write(join(scratch, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Card from \'./card.kay\'\nimport Parent from \'./parent.kay\'\n\nexport { Card, Parent, render }\n')
 
-    const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay({ root: scratch })] })
+    const build = await Bun.build({ entrypoints: [join(scratch, 'entry.ts')], outdir: join(scratch, 'out'), target: 'browser', plugins: [kay()] })
 
     if (!build.success)
       throw new AggregateError(build.logs, 'client build failed')

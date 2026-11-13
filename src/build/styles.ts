@@ -82,6 +82,30 @@ async function keepStylesheet(file: string, contents: string): Promise<void> {
   }
 }
 
+// Writes the stylesheet of the classes a component's recipe lifted, undefined when it lifts none.
+async function writeRecipeStylesheet(root: string, path: string, source: string, reference: () => Promise<string | undefined>): Promise<string | undefined> {
+  const rules = source.includes('recipe(') ? (await recipeLifter(root))?.lift(source, path)?.rules : undefined
+  const entry = rules === undefined ? undefined : await reference()
+
+  if (rules === undefined || entry === undefined)
+    return undefined
+
+  const file = join(cacheDir(root, 'scoped'), `${scopeHash(`${islandId(throughLinks(root, path), root)}\0recipe`)}.css`)
+
+  scopedTouched = true
+  touchCacheFile(file)
+  await keepStylesheet(file, `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${rules}`)
+
+  return file
+}
+
+// Writes the stylesheets of the recipes among `files` before the bundler runs: Bun reads a folder once, so a file written into it while it bundles can fail to resolve.
+export async function writeRecipeStylesheets(root: string, files: string[]): Promise<void> {
+  const reference = tailwindEntry(root, true)
+
+  await Promise.all(files.filter(file => KAY_FILE.test(file)).map(async file => writeRecipeStylesheet(root, file, await Bun.file(file).text(), async () => reference)))
+}
+
 // A module importing each of these files for what it brings along.
 function importing(paths: string[]): string {
   return paths.map(path => `import ${JSON.stringify(path)}\n`).join('')
@@ -163,19 +187,9 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   }
   // The rules of the classes a component's recipe lifted into the stylesheet, which the pages rendering the component carry as they carry a `--- style` fence's.
   const recipeStylesheet = async (path: string, source: string) => {
-    const rules = source.includes('recipe(') ? (await recipeLifter(root))?.lift(source, path)?.rules : undefined
-    const entry = rules === undefined ? undefined : await (tailwindReference ??= tailwindEntry(root, true))
+    const file = await writeRecipeStylesheet(root, path, source, async () => tailwindReference ??= tailwindEntry(root, true))
 
-    if (rules === undefined || entry === undefined)
-      return ''
-
-    const file = join(cacheDir(root, 'scoped'), `${scopeHash(`${islandId(throughLinks(root, path), root)}\0recipe`)}.css`)
-
-    scopedTouched = true
-    touchCacheFile(file)
-    await keepStylesheet(file, `@reference ${JSON.stringify(relative(dirname(file), entry).split(sep).join('/'))};\n${rules}`)
-
-    return importing(note(path, [file]))
+    return file === undefined ? '' : importing(note(path, [file]))
   }
   // Server code never reaches the bundler, but the assets it imports, through the project's modules too, are written all the same.
   const walked = new Set<string>()
