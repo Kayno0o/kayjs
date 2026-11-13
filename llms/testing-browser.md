@@ -46,6 +46,7 @@ expect(await page.path()).toBe('/account')
 - `fill(selector, text)` replaces a field's text as typing does, once the field's island hydrated (hydrating would write the text away); `type(text)` and `press(key)` go to the focused element.
 - `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches.
 - `waitFor(selector, { text, gone })` and `waitUntil(fn, { what })` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for (`what` names a `waitUntil`, as in a server test) with the stack of the test's own call.
+- `waitFor`'s `text` is compared as the page reads it with the no-break spaces folded (U+00A0 and U+202F, which kay writes in French typography) into plain ones, on both sides, so the text as the template writes it matches; any other difference is exact, and a timeout names an element that holds the text up to its whitespace (a thin space, a line break). `page.text` and `evaluate` return the page's own characters, so compare those with `.replace(/[\u00A0\u202F]/g, ' ')`; `site.visit(...).text` and `find(...).text` already fold every whitespace run into one space, `html` is raw.
 - A wait whose function keeps throwing names the last error when it times out.
 - `evaluate(fn, ...args)` runs a function in the page, its arguments and result crossing as JSON.
 - Only the source of that function crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way.

@@ -13,6 +13,7 @@ import { optionMs } from '../runtime/duration'
 import { EAGER_ISLANDS } from '../runtime/markers'
 import { installClock } from './clock'
 import { createNetwork } from './network'
+import { waitForText } from './text-match'
 
 // A `Cookie` header, `name=value; other=value`, as a list; a value keeps any `=` after the first.
 export function cookiePairs(cookies: BrowserOptions['cookies']): { name: string, value: string }[] {
@@ -747,11 +748,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     value: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
     count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
     evaluate: async (run, ...args) => serial(async () => inView(script(run, args))),
-    waitFor: async (selector, wait = {}) => atCaller(new Error('the call'), async () => serial(async () => {
-      const found = script((css: string, text?: string) => [...document.querySelectorAll(css)].some(element => text === undefined || element.textContent?.includes(text)), [selector, wait.text])
-
-      await poll(wait.gone ? `!${found}` : found, `${selector}${wait.text === undefined ? '' : ` with text "${wait.text}"`}${wait.gone ? ' to be gone' : ''}`, waitMs(wait.timeout))
-    })),
+    waitFor: async (selector, wait = {}) => atCaller(new Error('the call'), async () => serial(async () => waitForText({ poll, inView, selector, wait, timeout: waitMs(wait.timeout) }))),
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await inView<boolean>('!!window.axe')) {
