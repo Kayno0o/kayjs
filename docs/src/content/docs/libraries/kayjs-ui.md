@@ -168,6 +168,8 @@ A Table in an island ships only the features the project's `.kay` files write on
 
 Nothing is declared. kay reads the props at each `<Table>` call of the project's `.kay` files (not `node_modules`), takes the union, and builds one variant of the Table that every island loads, so two islands share it.
 
+A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less.
+
 A call with a spread (`Table({...props})`), or a Table read anywhere but as a tag (`const T = Table`, passed as a value), asks for every feature.
 
 The server render, `kay check` and a plain `bun test` use the full Table. The `kay dev` client and `mountComponent` build the browser variant, so a test mounting a page sees what the island ships.

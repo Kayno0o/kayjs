@@ -82,6 +82,12 @@ describe('specializedSource around else and the text', () => {
     expect(specializedSource(text, new Set(['x']))).toBe(text.replaceAll('uses(\'x\')', 'true'))
   })
 
+  it('divides after a postfix increment, and reads a regex after await, typeof and a backslash at a line end', () => {
+    const text = 'const a = i++ / 2 + uses(\'x\')\nconst b = n-- / 2 / 1 + uses(\'x\')\nasync function f() { return await /\'/.test(s) && uses(\'x\') }\nconst c = typeof /\'/ + uses(\'x\')\nconst d = /a\\\n/ + uses(\'x\')\n---\n'
+
+    expect(specializedSource(text, new Set(['x']))).toBe(text.replaceAll('uses(\'x\')', 'true'))
+  })
+
   it('leaves the file of an app whose own uses is not the marker', async () => {
     const dir = await scratchDir('variants-')
     const file = join(dir, 'own.kay')

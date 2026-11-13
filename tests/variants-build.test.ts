@@ -100,6 +100,17 @@ describe('a component with features', () => {
     expect(bodies.size).toBe(1)
   }, 120_000)
 
+  it('leaves the marks, the selection and the tooltip out of a BarChart that is written without them', async () => {
+    const chart = (props: string) => `---\nimport { signal } from 'kay'\nimport BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nBarChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
+    const plain = await (await built({ Plain: chart('') })).text('Plain')
+    const whole = await (await built({ Spread: chart(' {...{}}') })).text('Spread')
+
+    // The link and button columns, the events and the tooltip are code a chart without those props never draws.
+    expect(whole).toContain('data-kind')
+    expect(plain).not.toContain('data-kind')
+    expect(whole.length - plain.length).toBeGreaterThan(4000)
+  }, 120_000)
+
   it('is the variant a page needs when the page draws it itself, as its own island', async () => {
     const root = resolve(await fixtureCopy('ui-list'))
 

@@ -48,6 +48,10 @@ const KEYWORD_BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|case|in|of|yield|awa
 
 // Whether a `/` after `before` opens a regular expression, `last` being the last code character of it.
 function opensRegex(before: string, last: string): boolean {
+  // A `/` after a postfix `++` or `--` divides.
+  if ((last === '+' || last === '-') && before.trimEnd().endsWith(last + last))
+    return false
+
   return last === '' || BEFORE_REGEX.test(last) || (IDENTIFIER_CHAR.test(last) && KEYWORD_BEFORE_REGEX.test(before.trimEnd()))
 }
 

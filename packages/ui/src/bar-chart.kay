@@ -11,6 +11,7 @@ import { activeMarks, chartTooltip, EVENT_LOOK, markKind, placeEvents, TOOLTIP_L
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, seriesFill, steppedPoint, valueTicks } from './plot'
 import { formatNumber, wording } from 'kay/words'
+import { uses } from './uses'
 
 const look = recipe({
   parts: {
@@ -100,7 +101,8 @@ const reading = (item: BarSeries, at: number) => {
   return typeof value === 'number' ? formatValue(value) : '-'
 }
 
-const placed = memo(() => placeEvents(events, labels))
+// The features a chart's call sites leave out (marks, onMark, href, onSelect, tooltip) are left out of its island (`uses`).
+const placed = memo(() => uses('marks') ? placeEvents(events, labels) : [])
 
 // Side by side with the events on the same column, each a pointer's width further along.
 const eventStyle = (event: ChartEvent, slot: number) => `margin-left: ${slot * 0.5}rem${event.color ? `; --event-color: ${event.color}` : ''}`
@@ -109,12 +111,12 @@ const eventStyle = (event: ChartEvent, slot: number) => `margin-left: ${slot * 0
 const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
 
 function markPressedAt(item: PlacedEvent) {
-  void onMark?.(item.event, item.source)
+  void (uses('onMark') ? onMark : undefined)?.(item.event, item.source)
 }
 
 // A plain click on a mark link goes to `onMark` when the app gave one; a modified or middle click is left to the browser.
 function markPressed(event: MouseEvent, item: PlacedEvent) {
-  if (!onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  if (!uses('onMark') || !onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
   event.preventDefault()
@@ -153,17 +155,17 @@ function keyDown(event: KeyboardEvent) {
 
 const mark = (at: number): ChartMark => ({ index: at, label: labels[at]!, values: series.map(item => item.values[at] ?? null) })
 const marks = activeMarks({ active: () => active, onActive: () => onActive })
-const tip = chartTooltip()
+const tip = uses('tooltip') ? chartTooltip() : undefined
 
 function link(at: number) {
-  const to = href?.(mark(at))
+  const to = uses('href') ? href?.(mark(at)) : undefined
 
   return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
 function pressed(event: MouseEvent, at: number) {
-  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  if (!uses('onSelect') || !onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
   event.preventDefault()
@@ -198,16 +200,16 @@ else
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
       div(part="columns" style={gaps()})
         for _, at of labels key={at}
-          if markKind(link(at)?.href, onSelect !== undefined) === 'link'
+          if uses('href') && markKind(link(at)?.href, onSelect !== undefined) === 'link'
             a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
-          else if onSelect
+          else if uses('onSelect') && onSelect
             button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else
             span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
-      if placed().length > 0
+      if uses('marks') && placed().length > 0
         div(part="events" style={gaps()} aria-hidden={placed().some(item => item.event.href) || onMark ? undefined : 'true'})
           for _, at of labels key={at}
             span(part="eventCell")
@@ -215,14 +217,14 @@ else
                 if markKind(item.event.href, onMark !== undefined) === 'link'
                   a(part="event" {...markLink(item)} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item.event, item.slot)} onClick={event => markPressed(event, item)})
                     span(part="eventRule")
-                else if onMark
+                else if uses('onMark') && onMark
                   button(part="event" type="button" data-kind="button" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item.event, item.slot)} onClick={() => markPressedAt(item)})
                     span(part="eventRule")
                 else
                   span(part="event" aria-hidden="true" style={eventStyle(item.event, item.slot)})
                     span(part="eventRule")
-    if tooltip && marks.current() !== null && marks.anchor()
-      div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
+    if uses('tooltip') && tooltip && marks.current() !== null && marks.anchor()
+      div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")
         {tooltip(mark(marks.current()!))}
     if xLabels
       div(part="axis" aria-hidden="true" style={gaps()})
