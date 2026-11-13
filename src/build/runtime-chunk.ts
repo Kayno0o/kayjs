@@ -25,8 +25,8 @@ const DEFAULT_IMPORT = /^[\w$]+\s*(?:,|$)/
 const NAMED = /\{([^}]*)\}/
 const ALIAS = /\s+as\s+/
 const KAY_SPECIFIER = /^kay(?:\/|$)/
-// Lazy modules whose imports of the runtime stay with them rather than join the chunk a page loads: the code reviving an action, which only a page passing an island one loads, carries the action runtime along, and the reader of a streaming action's answer, whose `ended()`, `onData()` and `retry()` a page with no such action does not carry.
-const STANDALONE = new Set([resolve(RUNTIME_DIR, 'action-reviver.ts'), resolve(RUNTIME_DIR, 'action-stream.ts')])
+// Lazy modules whose imports of the runtime stay with them rather than join the chunk a page loads: the code reviving an action, which only a page passing an island one loads, carries the action runtime along, the code posting an action call, which the first call loads, and the reader of a streaming action's answer, whose `ended()`, `onData()` and `retry()` a page with no such action does not carry.
+const STANDALONE = new Set([resolve(RUNTIME_DIR, 'action-reviver.ts'), resolve(RUNTIME_DIR, 'action-stream.ts'), resolve(RUNTIME_DIR, 'action-post.ts')])
 // Entries of the runtime that bundle a package, or that few pages use, which stay in the chunks of the islands importing them rather than weigh on every page: the `for`, `await` and `try` blocks, the spread and the localizing of the links an island writes, which most islands do without.
 const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title', 'kay/dom-loop', 'kay/dom-await', 'kay/dom-try', 'kay/dom-spread', 'kay/i18n-links'])
 const RELATIVE = /^\.\.?\//

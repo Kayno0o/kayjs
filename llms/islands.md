@@ -274,4 +274,8 @@ if !connected()
 - Only an island takes `hydrate`, and only from a static parent.
 - For a visitor asking for less data (`Save-Data: on`, `prefers-reduced-data`, `saveData: false` turning it off), an island with no `hydrate` hydrates as `visible` does: at once in view, else once it scrolls near, a click meanwhile replayed. `hydrate="load"`, `idle`, `visible`, `interaction`, `media(...)` and `client` go as written, so `hydrate="load"` keeps an island that must work at once, and an island holding a form waits like any other. A deferred server island is fetched only once it nears the viewport, not when the browser is idle, and the `Save-Data` page preloads no chunk of an island that waits, only the entry's, the code waiting for the viewport and the chunks of its `hydrate="load"` and `client` islands (marked `data-load` in the page); a component used both ways on a page keeps its chunks, marked `data-wait` too, and still gets the waiting code preloaded.
 
+### The action caller
+
+- The code that posts an action call and reads its answer loads with the first call, so an island that only declares or passes an action does not carry it. An island holding an action caller loads it at idle, so a call made as the page goes away finds it in; a chunk a deploy dropped reloads the page as other chunks do.
+
 Shared and persisted state, transitions, error fallbacks, element size, context and unique ids are in [Islands: state to unique ids](islands-state-to-ids.md).
