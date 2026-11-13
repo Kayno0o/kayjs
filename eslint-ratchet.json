@@ -81,9 +81,6 @@
   "src/commands/env-compare.ts": {
     "complexity": 46
   },
-  "src/commands/new.ts": {
-    "complexity": 42
-  },
   "src/commands/not-found.ts": {
     "complexity": 44
   },
