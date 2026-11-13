@@ -1,6 +1,6 @@
 # Islands
 
-A component is an island when its own code needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script (a `live` or `persisted` value a module exports included, whether the component imports it from that module, from one re-exporting it or from one importing it and handing it on; a component with a `--- server` fence stays on the server), or a `--- island` or `--- client` fence line; what an island renders is part of it, and nothing a component passes makes it one. It is decided at compile time, from the file and its imports.
+A component is an island when its own code needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script (a `live` or `persisted` value a module exports included, whether the component imports it from that module, from one re-exporting it or from one importing it and handing it on; a component with a `--- server` fence stays on the server; a function of that module reading the value inside does not count, only the value itself being imported), or a `--- island` or `--- client` fence line; what an island renders is part of it, and nothing a component passes makes it one. It is decided at compile time, from the file and its imports.
 
 ## Common tasks
 

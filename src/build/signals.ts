@@ -1,7 +1,7 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { importedModules, moduleLinks, moduleSignals } from '../compiler/module-signals'
+import { importedModules, moduleSignals, scanModule } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
@@ -115,7 +115,7 @@ function signalsOf(path: string): Record<string, SignalKind> {
       return known.signals
 
     const stamps = new Map<string, string | undefined>()
-    const signals = collect(path, stamps, [])
+    const signals = collect(path, { stamps, done: new Map(), cuts: 0 }, [])
 
     scanned.set(path, { stamps, signals })
 
@@ -126,28 +126,45 @@ function signalsOf(path: string): Record<string, SignalKind> {
   }
 }
 
+// One scan of a module: the stamps of the files it read, what each finished module exported, and how many times a cycle cut a read short, a module read under a cut being incomplete and so not kept.
+interface Scan {
+  stamps: Map<string, string | undefined>
+  done: Map<string, Record<string, SignalKind>>
+  cuts: number
+}
+
 // The signals a module exports, those it hands on from another included; `trail` is the modules being read, so a cycle of re-exports ends.
-function collect(path: string, stamps: Map<string, string | undefined>, trail: string[]): Record<string, SignalKind> {
+function collect(path: string, scan: Scan, trail: string[]): Record<string, SignalKind> {
+  const kept = scan.done.get(path)
+
+  if (kept)
+    return kept
+
   const stamp = stampOf(path)
 
-  stamps.set(path, stamp)
+  scan.stamps.set(path, stamp)
 
-  if (stamp === undefined || trail.includes(path))
+  if (stamp === undefined)
     return {}
 
+  if (trail.includes(path)) {
+    scan.cuts++
+
+    return {}
+  }
+
+  const cuts = scan.cuts
   const text = readFileSync(path, 'utf8')
-  const signals = kindsOf(path, text)
 
   if (KAY_FILE.test(path))
-    return signals
+    return kindsOf(path, text)
 
-  const jsx = scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx'
-  const links = moduleLinks(text, jsx)
+  const { signals, links } = scanModule(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
   const next = [...trail, path]
   const from = (specifier: string) => {
     const target = scannable(specifier, path)
 
-    return target === undefined ? {} : collect(target, stamps, next)
+    return target === undefined ? {} : collect(target, scan, next)
   }
 
   for (const specifier of links.stars) {
@@ -158,11 +175,14 @@ function collect(path: string, stamps: Map<string, string | undefined>, trail: s
   }
 
   for (const { exported, source, imported } of links.names) {
-    const kind = from(source)[imported]
+    const found = from(source)
 
-    if (kind)
-      signals[exported] = kind
+    if (Object.hasOwn(found, imported))
+      signals[exported] = found[imported]!
   }
+
+  if (scan.cuts === cuts)
+    scan.done.set(path, signals)
 
   return signals
 }

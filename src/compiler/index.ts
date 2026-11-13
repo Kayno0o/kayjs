@@ -135,15 +135,22 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
+// What a module exports a name as, none for `toString` and the other names an object inherits.
+function kindOf(imported: ImportedSignals | undefined, source: string, name: string): SignalKind | undefined {
+  const module = imported?.[source]
+
+  return module && Object.hasOwn(module, name) ? module[name] : undefined
+}
+
 // The live values a script imports, which make its component an island: the server changes them and the page follows.
 function liveBindings(script: ScriptAnalysis, imported: ImportedSignals | undefined): ScriptAnalysis['imports'] {
-  return script.imports.filter(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')
+  return script.imports.filter(binding => !binding.typeOnly && kindOf(imported, binding.source, binding.imported) === 'live')
 }
 
 // The first live or persisted value a script imports, which makes its component an island: the browser holds the one, the server changes the other.
 function browserBinding(script: ScriptAnalysis, imported: ImportedSignals | undefined): { local: string, kind: 'live' | 'persisted' } | undefined {
   for (const binding of script.imports) {
-    const kind = binding.typeOnly ? undefined : imported?.[binding.source]?.[binding.imported]
+    const kind = binding.typeOnly ? undefined : kindOf(imported, binding.source, binding.imported)
 
     if (kind === 'live' || kind === 'persisted')
       return { local: binding.local, kind }
@@ -301,7 +308,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
-    const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
+    const kind = binding.typeOnly ? undefined : kindOf(options.importedSignals, binding.source, binding.imported)
 
     return kind ? [[binding.local, kind === 'persisted' ? 'signal' : kind] as const] : []
   }))

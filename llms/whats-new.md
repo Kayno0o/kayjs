@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The `text-size-colour` lint reports `text-base` (or another size) in an app whose CSS defines a colour of the same name, such as `--color-base`, where the utility is the font size and the text colour at once ([code lints](code-lints.md)).
 - `kay lint --fix` leaves no semicolon in a `.kay` fence: a fix that rewrites code up to the next token (`style/semi` after the `import type` split of `import/consistent-type-specifier-style`) is cut down to what it changes, so it applies instead of being dropped.
 - A component reading a `persisted` value (`local`, `session`, `cookie` or `query`) imported from a `.ts` module is an island, as one reading a `live` value is, also when the module re-exports it (`export { x } from`, `export *`) or imports it and exposes it; `kay explain island` says so: [Islands](islands.md).
+- A component reading a `persisted` value (`local`, `session`, `cookie` or `query`) imported from a `.ts` module is an island, as one reading a `live` value is, also when the module re-exports it (`export { x } from`, `export *`) or imports it and exposes it (a `live` value or a `signal` reached that way is now found too); `kay explain island` says so: [Islands](islands.md).
 
 ## 1.104.0
 

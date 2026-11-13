@@ -21,6 +21,13 @@ export function moduleSignals(source: string, jsx = false): Record<string, Signa
   return ast ? signalsIn(ast) : {}
 }
 
+// A module's signals and what it hands on from other modules, from one parse that a module naming neither `kay` nor an export skips.
+export function scanModule(source: string, jsx = false): { signals: Record<string, SignalKind>, links: ModuleLinks } {
+  const ast = NAMES_KAY.test(source) || EXPORT.test(source) ? parseModule(source, jsx) : undefined
+
+  return { signals: ast && NAMES_KAY.test(source) ? signalsIn(ast) : {}, links: ast ? linksIn(ast) : { stars: [], names: [] } }
+}
+
 function parseModule(source: string, jsx: boolean): Program | undefined {
   try {
     return parseProgram(source, { lang: jsx ? 'tsx' : 'ts', semantic: true }).program
@@ -84,7 +91,7 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
   }
 
   // Every top-level `const` made by a signal call, exported or not, so an `export { name }` or an alias finds it.
-  const locals: Record<string, SignalKind> = {}
+  const locals = new Map<string, SignalKind>()
 
   for (const statement of ast.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
@@ -94,12 +101,12 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
 
     for (const { id, init } of declaration.declarations) {
       const name = init?.type === 'CallExpression' ? madeBy(init.callee, persisted) : undefined
-      const kind = init?.type === 'Identifier' ? locals[init.name] : made.get(name ?? '')
+      const kind = init?.type === 'Identifier' ? locals.get(init.name) : made.get(name ?? '')
 
       if (id.type !== 'Identifier' || !kind)
         continue
 
-      locals[id.name] = kind
+      locals.set(id.name, kind)
 
       if (statement.type === 'ExportNamedDeclaration')
         found[id.name] = kind
@@ -111,7 +118,7 @@ function signalsIn(ast: Program): Record<string, SignalKind> {
       continue
 
     for (const specifier of statement.specifiers) {
-      const local = specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' && specifier.local.type === 'Identifier' ? locals[specifier.local.name] : undefined
+      const local = specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' && specifier.local.type === 'Identifier' ? locals.get(specifier.local.name) : undefined
 
       if (local)
         found[nameOf(specifier.exported)] = local
@@ -134,12 +141,11 @@ export interface ModuleLinks {
   names: { exported: string, source: string, imported: string }[]
 }
 
-export function moduleLinks(source: string, jsx = false): ModuleLinks {
+function linksIn(ast: Program): ModuleLinks {
   const links: ModuleLinks = { stars: [], names: [] }
-  const ast = EXPORT.test(source) ? parseModule(source, jsx) : undefined
   const imports = new Map<string, { source: string, imported: string }>()
 
-  for (const statement of ast?.body ?? []) {
+  for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
       continue
 
@@ -149,7 +155,7 @@ export function moduleLinks(source: string, jsx = false): ModuleLinks {
     }
   }
 
-  for (const statement of ast?.body ?? []) {
+  for (const statement of ast.body) {
     if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type' && !statement.exported)
       links.stars.push(statement.source.value)
 

@@ -122,6 +122,27 @@ describe('the signals a module exports', () => {
     expect(signals('./lib/types')).toEqual({})
   })
 
+  it('take no kind from a name an object inherits', async () => {
+    const { signals } = await project({
+      'lib/history.ts': MADE,
+      'lib/odd.ts': 'import { signal } from \'kay\'\n\nconst s = signal(0)\nfunction toString() {}\n\nexport { toString, s }\nexport { valueOf, history } from \'./history\'\n',
+    })
+
+    expect(signals('./lib/odd')).toEqual({ './lib/odd': { s: 'signal', history: 'persisted' } })
+    expect(compile('---\nimport { toString } from \'./odd\'\n---\np {toString()}\n', 'src/components/part.kay', { importedSignals: { './odd': { s: 'signal' } } }).island).toBeUndefined()
+  })
+
+  it('read a barrel of several names from one module, a diamond of stars and a live value handed on', async () => {
+    const { signals } = await project({
+      'lib/many.ts': 'import { persisted, live } from \'kay\'\n\nexport const a = persisted.local(\'a\', 0)\nexport const b = persisted.local(\'b\', 0)\nexport const room = live(0)\n',
+      'lib/left.ts': 'export * from \'./many\'\n',
+      'lib/right.ts': 'export { a as ra, b as rb, room } from \'./many\'\n',
+      'lib/top.ts': 'export * from \'./left\'\nexport * from \'./right\'\n',
+    })
+
+    expect(signals('./lib/top')).toEqual({ './lib/top': { a: 'persisted', b: 'persisted', room: 'live', ra: 'persisted', rb: 'persisted' } })
+  })
+
   it('end a cycle of re-exports', async () => {
     const { signals } = await project({
       'lib/a.ts': 'export * from \'./b\'\nexport { history } from \'./b\'\n',
