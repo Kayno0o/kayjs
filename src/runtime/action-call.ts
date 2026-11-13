@@ -162,7 +162,6 @@ export function reviveActions(): void {
 }
 
 // The post a page with islands was rendered in answer to, read again once a swap brings another page.
-
 function pageOutcome(): Outcome | undefined {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }
@@ -455,14 +454,22 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   ) as unknown as TrackedCall<never, unknown>
 }
 
-// The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
-async function postCode(): Promise<typeof import('./action-post')> {
-  try {
-    return await import('./action-post')
-  }
-  catch (error) {
-    await skew()
+// A flaky connection gets the chunk retried after 1 s and 3 s, as a lazy component's is. The code that posts a call, loaded by the first call; a chunk a deploy removed asks the server whether the build changed, which reloads the page, and the call fails as any call that could not be sent.
+const CODE_RETRIES = 2
 
-    throw error
+async function postCode(): Promise<typeof import('./action-post')> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await import('./action-post')
+    }
+    catch (error) {
+      if (attempt >= CODE_RETRIES) {
+        await skew()
+
+        throw error
+      }
+
+      await new Promise(done => setTimeout(done, 1000 * (attempt * 2 + 1)))
+    }
   }
 }
