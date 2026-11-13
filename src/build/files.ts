@@ -4,6 +4,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { chmod, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
+import type { RecipeLifter } from './recipe-classes'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -63,14 +64,10 @@ interface KeptRead extends SourceRead {
 const reads = new Map<string, KeptRead>()
 
 // What stands in for the text of a `.kay` file while a build runs: its recipes' classes written in a stylesheet, so every reader of the build meets the classes the pages carry.
-export interface SourceLift {
-  readonly id: number
-  lift: (source: string, file: string) => { source: string } | undefined
-}
+// Set by each build before it reads; the cache of reads is keyed by the lifter's id, so a read made under another build's lifter is never served to this one.
+let lifting: RecipeLifter | undefined
 
-let lifting: SourceLift | undefined
-
-export function liftSources(lift: SourceLift | undefined): void {
+export function liftSources(lift: RecipeLifter | undefined): void {
   lifting = lift
 }
 let generation = 0

@@ -107,8 +107,10 @@ export async function writeRecipeStylesheets(root: string, files: string[]): Pro
     try {
       await writeRecipeStylesheet(root, file, await Bun.file(file).text(), async () => reference)
     }
-    catch {
+    catch (error) {
       // A file deleted since the listing is no recipe to write.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        throw error
     }
   }))
 }
