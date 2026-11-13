@@ -14,6 +14,8 @@ const GLOB = /[*{[?]/
 // A run of characters a class name can sit in, cut where markup, a string or a list ends it.
 const CANDIDATE = /[^\s'"`<>{}=;,|\\]+/g
 const PIECES = /[.()[\]]/
+// What the runs above are cut at but an arbitrary value or variant holds (`data-[state=open]:p-2`): a name with one is looked for in the text itself.
+const CUT_INSIDE = /[=>,;|{}'"`]/
 
 // Where Tailwind looks for classes besides what it finds from the app's root: the folders and files `source()` and `@source` of the stylesheets name, and the classes `@source inline` lists. Undefined when one cannot be read or lies outside the root.
 function stylesheetSources(root: string, stylesheets: string[]): { extra: string[], inline: string[] } | undefined {
@@ -115,7 +117,7 @@ function wordsIn(file: string, universe: ReadonlySet<string>, key: string): stri
     return known.found
 
   const text = KAY_FILE.test(file) ? readSource(file).text : readFileSync(file, 'utf8')
-  const found = [...new Set(candidates(text).filter(word => universe.has(word)))]
+  const found = [...new Set([...candidates(text).filter(word => universe.has(word)), ...[...universe].filter(word => CUT_INSIDE.test(word) && text.includes(word))])]
 
   fileWords.set(file, { stamp, key, found })
 

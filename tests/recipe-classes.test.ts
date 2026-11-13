@@ -336,13 +336,14 @@ describe('the Cases of a lifted recipe', () => {
 
     await Bun.write(join(copy, 'package.json'), '{ "name": "app", "private": true, "dependencies": { "tag-lib": "1.0.0" } }\n')
     await Bun.write(join(library, 'package.json'), '{ "name": "tag-lib", "version": "1.0.0", "type": "module", "peerDependencies": { "kay": "*" }, "exports": { "./*.kay": "./src/*.kay", "./*.css": "./src/*.css" } }\n')
-    await Bun.write(join(library, 'src/badge.css'), '.inline-flex { outline-color: teal; }\n')
+    await Bun.write(join(library, 'src/badge.css'), '.inline-flex { outline-color: teal; }\n@layer utilities { .items-center { outline-color: navy; } }\n')
     await Bun.write(join(library, 'src/badge.kay'), '---\nimport \'./badge.css\'\n---\nspan.inline-flex badge\n')
     await edit(join(copy, 'src/routes/index.kay'), text => text.replace('import Tag', 'import Badge from \'tag-lib/badge.kay\'\nimport Tag').replace('\nLiveTag', '\nLiveTag\nBadge'))
 
     const { css } = await page(copy)
 
     expect(css).toMatch(/\.inline-flex\s*\{\s*outline-color: teal/)
+    expect(css).toMatch(/\.items-center\s*\{\s*outline-color: navy/)
   }, 120_000)
 
   it('drops no rule when a stylesheet names a folder outside the root', async () => {
