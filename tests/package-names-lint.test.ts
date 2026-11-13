@@ -48,10 +48,10 @@ describe('deprecated-package-names', () => {
 
       expect(found.map(d => [d.file.slice(root.length + 1), d.line, d.column, d.severity, d.message])).toEqual([
         ['package.json', 3, 6, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
-        ['package.json', 5, 31, 'warning', '`@kaynooo/kayjs` is `@kayjs/kay` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
+        ['package.json', 5, 36, 'warning', '`@kaynooo/kayjs` is `@kayjs/kay` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
         ['src/app.css', 1, 10, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
-        ['src/routes/index.kay', 2, 22, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
-        ['src/ui.ts', 1, 20, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
+        ['src/routes/index.kay', 2, 21, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
+        ['src/ui.ts', 1, 19, 'warning', '`@kaynooo/kayjs-ui` is `@kayjs/ui` since 1.104: kay and its libraries are published under the `@kayjs` scope'],
       ])
     })
   })

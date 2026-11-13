@@ -218,7 +218,7 @@ async function localeCatalog(root: string, config: I18nConfig, extensions: KayEx
   return { file, source, own: [...messages.keys()], entries, shipped: new Set(libraries.map(catalog => dirname(relative(root, catalog)))) }
 }
 
-const LIBRARIES = new Map([['ui', 'kayjs-ui'], ['cms', 'kayjs-cms'], ['auth', 'kayjs-auth'], ['mail', 'kayjs-mail'], ['ai', 'kayjs-ai']])
+const LIBRARIES = new Map([['ui', '@kayjs/ui'], ['cms', '@kayjs/cms'], ['auth', '@kayjs/auth'], ['mail', '@kayjs/mail'], ['ai', '@kayjs/ai']])
 // `wording('ui.table.filter', 'Filter'` in a library's source, the key and the English it falls back to; a key written at run time, or an English put together from parts, is not compared.
 const WORDING = /\bwording\(\s*(['"])([a-z]+\.[\w.]+)\1\s*,\s*(?:'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)")/g
 const sourcesRead = new Map<string, Promise<Map<string, string>>>()
@@ -261,7 +261,7 @@ async function readEnglish(root: string, library: string): Promise<Map<string, s
   const english = new Map<string, string>()
 
   try {
-    const folder = dirname(Bun.resolveSync(`@kaynooo/${library}`, root))
+    const folder = dirname(Bun.resolveSync(library, root))
 
     for (const path of await Array.fromAsync(new Bun.Glob('**/*.{kay,ts}').scan({ cwd: folder }))) {
       for (const match of (await Bun.file(join(folder, path)).text()).matchAll(WORDING)) {

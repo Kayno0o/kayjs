@@ -3,8 +3,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const KAY_ROOT = join(import.meta.dir, '..')
+
 // A library installed as `@kayjs/ui` is labelled `kayjs-ui`.
-const LIBRARY_PREFIX = 'kayjs-'
+export const LIBRARY_PREFIX = 'kayjs-'
 const SCOPE = '@kayjs'
 const FENCE = /^\s*(`{3,}|~{3,})/
 const HEADING = /^(#{1,6}) (.+)$/

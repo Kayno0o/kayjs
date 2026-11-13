@@ -34,6 +34,7 @@ const RANGE = /^((?:npm:@?[^@]+@)?)[~^]?(\d+\.\d+\.\d+)$/
 // What `bun add` is told to keep a package in the section it was in.
 const SECTION_FLAGS: Record<string, string[]> = { devDependencies: ['--dev'], optionalDependencies: ['--optional'] }
 const KAY_PACKAGE = '@kayjs/kay'
+const OLD_KAY_PACKAGE = '@kaynooo/kayjs'
 // Whether a dependency is kay, under its new name or the one it had before 1.104.
 const isKay = (dependency: KayDependency) => renamePackages(dependency.registry) === KAY_PACKAGE
 const SECTION_OPEN = /\s*:\s*\{/y
@@ -81,16 +82,20 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
       return true
     },
     pruned: async (root, changes) => {
-      // A failed lookup is a missing version only when kay's own package still answers: a network error, an outage or a refused login fails both, and says nothing of the version.
+      // A failed lookup is a missing version only when kay's own package still answers, under the name of the version asked (`@kaynooo/kayjs` below 1.104): a network error, an outage or a refused login fails both, and says nothing of the version.
       const lookup = async (spec: string): Promise<'served' | 'missing' | 'unknown'> => {
         if ((await runner([bun, 'info', spec, 'version'], root, true)).code === 0)
           return 'served'
 
-        return (await runner([bun, 'info', KAY_PACKAGE, 'version'], root, true)).code === 0 ? 'missing' : 'unknown'
+        const version = spec.slice(spec.lastIndexOf('@') + 1)
+        const kay = Bun.semver.satisfies(version, '*') && Bun.semver.order(version, RENAMED_IN) === -1 ? OLD_KAY_PACKAGE : KAY_PACKAGE
+
+        return (await runner([bun, 'info', kay, 'version'], root, true)).code === 0 ? 'missing' : 'unknown'
       }
 
-      for (const { spec } of changes) {
-        const wanted = spec.replace('npm:', '').replace('~', '')
+      for (const { name, spec } of changes) {
+        // `npm:@kaynooo/kayjs@~1.73.0` names its package, `~1.73.0` is the package the key names.
+        const wanted = (spec.startsWith('npm:') ? spec.slice(4) : `${name}@${spec}`).replace('~', '')
         const own = await lookup(wanted)
 
         if (own !== 'served')

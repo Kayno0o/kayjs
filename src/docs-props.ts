@@ -1,7 +1,7 @@
 // The props a component of an installed kayjs-* library declares, read from its installed `.kay` source, as `kay docs <Component>` prints them.
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
-import { installedLibraries } from './docs-search'
+import { installedLibraries, LIBRARY_PREFIX } from './docs-search'
 
 const NAME = /^[A-Z][\w-]*$/i
 const HYPHEN = /-/g
@@ -57,6 +57,8 @@ function components(name: string, dir: string): [string, string][] {
   const manifestPath = join(dir, 'package.json')
   const manifest = existsSync(manifestPath) ? readManifest(manifestPath) : {}
   const found: [string, string][] = []
+  // The label `kayjs-ui` is installed as `@kayjs/ui`.
+  const specifierRoot = `@kayjs/${name.slice(LIBRARY_PREFIX.length)}`
 
   for (const [key, value] of Object.entries(manifest.exports ?? {})) {
     if (!key.endsWith('.kay') || typeof value !== 'string')
@@ -65,7 +67,7 @@ function components(name: string, dir: string): [string, string][] {
     const star = value.indexOf('*')
 
     if (star === -1) {
-      found.push([`@kaynooo/${name}/${key.slice(2)}`, join(dir, value)])
+      found.push([`${specifierRoot}/${key.slice(2)}`, join(dir, value)])
 
       continue
     }
@@ -73,7 +75,7 @@ function components(name: string, dir: string): [string, string][] {
     const [prefix, suffix] = [value.slice(2, star), value.slice(star + 1)]
 
     for (const file of new Bun.Glob(value.slice(2)).scanSync({ cwd: dir }))
-      found.push([`@kaynooo/${name}/${key.slice(2).replace('*', file.slice(prefix.length, file.length - suffix.length))}`, join(dir, file)])
+      found.push([`${specifierRoot}/${key.slice(2).replace('*', file.slice(prefix.length, file.length - suffix.length))}`, join(dir, file)])
   }
 
   return found.sort(([a], [b]) => a.localeCompare(b))

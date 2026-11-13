@@ -5,7 +5,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { explainDiagnostic, isDiagnosticCode } from '../compiler/diagnostics'
 import { componentPlace, componentProps } from '../docs-props'
-import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
+import { docFiles, excerpt, findLabel, isLabel, labelPath, LIBRARY_PREFIX, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { fixPath } from './fix-path'
 
@@ -152,7 +152,7 @@ function missingLabel(files: DocFile[], label: string): string {
   if (findLabel(files, path) !== undefined)
     return `\`${label}\` names no heading of \`${path}\`; \`kay docs ${path}\` lists them`
 
-  const bare = path.replace('@kaynooo/', '')
+  const bare = path.replace('@kayjs/', LIBRARY_PREFIX)
   const name = bare.slice(0, bare.indexOf('/'))
 
   return files.some(file => file.label.startsWith(`${name}/`))
