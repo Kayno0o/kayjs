@@ -1,5 +1,4 @@
-import type { ServerAction } from 'kay'
-import type { TSchema } from 'kay/library'
+import type { Schema, ServerAction } from 'kay'
 import type { Offered, Ran } from './loop'
 import type { FunctionTool, FunctionToolOptions } from './types'
 import { logFrom } from 'kay'
@@ -12,7 +11,7 @@ const NAME = /^[\w-]{1,64}$/
 const built = new WeakSet<object>()
 
 // A tool that is a plain function, for an ask with no visitor to run as, such as a scheduled job's: it runs with the app's own rights, whoever (or nobody) asked.
-export function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>): FunctionTool {
+export function tool<const Spec extends Schema>(options: FunctionToolOptions<Spec>): FunctionTool {
   if (typeof options !== 'object' || options === null || typeof options.name !== 'string' || !NAME.test(options.name) || typeof options.description !== 'string' || options.description === '' || typeof options.run !== 'function' || typeof options.input !== 'object' || options.input === null)
     throw configError('ai', 'tools', 'tool takes { name, description, input, run }: a name of letters, digits, _ and - up to 64 characters, a description, a schema s.Object({ ... }) and the function to run')
 
@@ -24,7 +23,7 @@ export function tool<const Schema extends TSchema>(options: FunctionToolOptions<
 }
 
 // An action as a function tool whose `run` is the one given: the name, description, label and input schema are the action's own, so an ask outside the app, such as a script benching a prompt against the real model, offers what the app does and nothing restated.
-export function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: FunctionToolOptions<Schema>['run']): FunctionTool {
+export function mocked<const Spec extends Schema, const Honeypot extends string = never>(action: ServerAction<Spec, unknown, Honeypot>, run: FunctionToolOptions<Spec>['run']): FunctionTool {
   const offered = actionTool(action as unknown as Parameters<typeof actionTool>[0])
 
   if (!offered)

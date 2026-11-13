@@ -81,7 +81,7 @@ interface AnthropicOptions
   model?: string | undefined
 
 [.] ask
-function ask<const Schema extends TSchema>(prompt: AiMessage[] | string, options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+function ask<const Spec extends Schema>(prompt: AiMessage[] | string, options: StructuredAskOptions<Spec>): ReplyOf<Spec>
 function ask(prompt: AiMessage[] | string, options?: AskOptions | undefined): AiReply
 
 [.] Asked
@@ -344,7 +344,7 @@ interface FinishHookCall
 [.] FunctionTool
 interface FunctionTool
   description: string
-  input: TSchema
+  input: Schema
   label?: string | undefined
   name: string
   run: (input: never, context: FunctionToolContext) => unknown
@@ -354,12 +354,12 @@ interface FunctionToolContext
   signal: AbortSignal
 
 [.] FunctionToolOptions
-interface FunctionToolOptions<Schema extends TSchema = TSchema>
+interface FunctionToolOptions<Spec extends Schema = Schema>
   description: string
-  input: Schema
+  input: Spec
   label?: string | undefined
   name: string
-  run: (input: (Schema & { params: []; })["static"], context: FunctionToolContext) => unknown
+  run: (input: Static<Spec>, context: FunctionToolContext) => unknown
 
 [.] ground
 function ground<T>(found: readonly T[], read: (item: T) => Passage, options?: GroundOptions): { system: string; sources: Source[]; }
@@ -386,9 +386,7 @@ interface Media
   type: string
 
 [.] mocked
-function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & {
-  params: [];
-})["static"], context: FunctionToolContext) => unknown): FunctionTool
+function mocked<const Spec extends Schema, const Honeypot extends string = never>(action: ServerAction<Spec, unknown, Honeypot>, run: (input: Static<Spec>, context: FunctionToolContext) => unknown): FunctionTool
 
 [.] ModelsOptions
 interface ModelsOptions
@@ -502,7 +500,7 @@ interface Replaces
   turns: number
 
 [.] ReplyOf
-type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
+type ReplyOf<Spec extends Schema> = StructuredReply<Static<Spec>>
 
 [.] RequestHookCall
 interface RequestHookCall
@@ -607,7 +605,7 @@ interface StoredTurn
   thinkingBy?: string[] | undefined
 
 [.] StructuredAskOptions
-interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions
+interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions
   approval?: Confirm | false | undefined
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
@@ -629,7 +627,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   provider?: Provider | undefined
   /** @deprecated The old name of `effort`, which wins when both are given. Removed in 1.103.0; `deprecated-ai-options` rewrites it. */ reasoning?: Reasoning | undefined
   retry?: RetryOptions | false | undefined
-  schema: Schema
+  schema: Spec
   signal?: AbortSignal | undefined
   sources?: readonly Source[] | undefined
   system?: string | undefined
@@ -657,7 +655,7 @@ interface Timeouts
   idle: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] tool
-function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>): FunctionTool
+function tool<const Spec extends Schema>(options: FunctionToolOptions<Spec>): FunctionTool
 
 [.] ToolAction
 type ToolAction = Action<never, unknown>

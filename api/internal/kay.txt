@@ -694,7 +694,7 @@ function formScope<Result>(target: unknown, render: () => Result, only?: boolean
 function formValue(target: unknown, name: string): string | undefined
 
 [./internal] isAction
-function isAction(value: unknown): value is ServerAction<TSchema, unknown, never>
+function isAction(value: unknown): value is ServerAction<Schema, unknown, never>
 
 [./internal] issueScope
 function issueScope<Result>(target: unknown, render: () => Result, only?: boolean): Result
@@ -1342,6 +1342,9 @@ function safeCode(markup: string): string
 [./library] sameText
 function sameText(given: string, expected: string): boolean
 
+[./library] Schema
+interface Schema extends TSchema
+
 [./library] sealWith
 function sealWith(key: Uint8Array<ArrayBufferLike>, text: string, context?: string | undefined): string
 
@@ -1365,6 +1368,9 @@ function siteWithBase(site: string | undefined, base: string | undefined): strin
 
 [./library] sourceHash
 function sourceHash(text: string): string
+
+[./library] Static
+type Static<Type extends Schema, Params extends unknown[] = []> = TypeBoxStatic<Type, Params>
 
 [./library] stoppers
 function stoppers(request: Request): Pick<RequestContext<Record<string, string>, object>, "deny" | "notFound" | "redirect">

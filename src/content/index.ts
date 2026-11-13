@@ -1,9 +1,9 @@
-import type { Static, TSchema } from 'elysia'
 import type { CacheStore } from '../runtime/cache'
 import type { Duration } from '../runtime/duration'
 import type { Component } from '../runtime/jsx'
 import type { PreviewScope } from '../runtime/preview'
 import type { Html } from '../runtime/rendered'
+import type { Schema, Static } from '../runtime/schema'
 import type { FeedFormat, FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
@@ -136,13 +136,13 @@ type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean |
 // The fields of the data holding a date, which `publishAt` may name.
 type DateField<Data> = { [Name in keyof Data]-?: Data[Name] extends Date | null | undefined ? Name : never }[keyof Data] & string
 
-export interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boolean> {
+export interface CollectionOptions<Spec extends Schema, Routed extends boolean = boolean> {
   // The name a CMS screen titles the collection with, `Produits`; the export's name, humanized, when left out. The name still keeps the URLs, the markers and the upload folder.
   title?: string | undefined
   // A line telling an editor what the collection holds, which a CMS shows above its entries and its form.
   description?: string | undefined
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
-  schema: Schema
+  schema: Spec
   // Steps carrying stored entries over when the schema changes, each taking an entry's data in the shape it had and giving the new one: `[renameField('cost', 'price'), convertField('price', Number)]`. They run, in order, only on an entry the schema refuses, until it accepts it; a loader's entry that changed is written back through its `save` once, a folder's entry is migrated as read, the file kept until a CMS saves it. Write a step to leave data in the new shape as it is.
   migrations?: Migration[] | undefined
   // The kay components a Markdown entry may use, by the name it writes them with: `<Callout type="warn">`.
@@ -166,23 +166,23 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   // The `sizes` of the relative images in the entries' Markdown, `kay.config.ts`'s `markdown.imageSizes` unless set here; `100vw` by default. An image's own `sizes` attribute wins.
   imageSizes?: string | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
-  draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
+  draft?: ((entry: Entry<Static<Spec>>) => boolean) | BooleanField<Static<Spec>> | undefined
   // A date field, `'publishAt'`, holding an entry back as a draft is until that time and showing it by itself then: in `all()`, `get()`, the pages prerendered from it, the sitemap and the feed. A date alone is 00:00 UTC, a date with an offset is that instant; an entry without one is published. A draft stays one whatever its date.
-  publishAt?: DateField<Static<Schema>> | undefined
+  publishAt?: DateField<Static<Spec>> | undefined
   // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering 410 Gone when its code calls `ctx.notFound()` after `get()` found nothing for the ended entry, or what the app chose otherwise (a redirect); a redirect from the path wins over the 410. An entry without one never ends; `kay dev` and preview mode keep showing it.
-  unpublishAt?: DateField<Static<Schema>> | undefined
+  unpublishAt?: DateField<Static<Spec>> | undefined
   // A date field, `'updatedAt'`, holding when an entry last changed: the sitemap's `lastmod` of its page unless the page sets one, the entry page's `article:modified_time` and the feed's `updated`. An entry without one has no modified time. `'mtime'` takes the time of the entry's file, `'git'` the date of its last commit, from one `git log` for the folder: a file git does not know (untracked, or outside a repository) takes its mtime, and a loader's entry has none. A schema field named `mtime` or `git` is read as a field.
-  modified?: DateField<Static<Schema>> | 'mtime' | 'git' | undefined
+  modified?: DateField<Static<Spec>> | 'mtime' | 'git' | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
-  order?: NumberField<Static<Schema>> | undefined
+  order?: NumberField<Static<Spec>> | undefined
   // The order `all()` lists entries in; by `order`, else by slug.
-  sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
+  sort?: ((a: Entry<Static<Spec>>, b: Entry<Static<Spec>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
-  feed?: FeedOptions<Static<Schema>, Routed> | undefined
+  feed?: FeedOptions<Static<Spec>, Routed> | undefined
   // Each entry sits in a folder named after its locale, `fr/hello.md`, a translation sharing its slug: `all()` and `get()` read the request's locale, the default locale's entry standing in for one it lacks, and the feed is served once per locale.
   localized?: boolean | undefined
   // The path of the page showing an entry, under the base, which a CMS opens it on; by default the page whose `prerender` lists the collection.
-  url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Schema> }) => string) | undefined
+  url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Spec> }) => string) | undefined
   // The path of the page showing an entry, with its slug as a param: `'/blog/:slug'`, or `'/docs/*slug'` for slugs with folders. Each entry gets a typed `url` from it, a feed's items link to it by default, and `kay check` reports a route no page serves.
   route?: string | undefined
   // Every open page that read the collection follows it: once `invalidate()` drops its entries, a CMS saving or removing one included, the page shows what `all()` and `get()` give now. Needs the read in a page's server fence or a layout's; a static export of such a page fails.
@@ -190,7 +190,7 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   // The collection holds one entry, such as a home page's texts: a CMS opens its form straight from the content list, with no row, no New entry and no Delete, titled with the collection's `title`. Its entry is the collection's only one, `index` when it is first written, and `one()` reads it. Not for a `localized` collection.
   single?: boolean | undefined
   // For a `single` collection, the data it holds until its entry is written: a CMS opens the form filled with it, the first save writes it, and `one()` gives it while no entry exists.
-  seed?: Static<Schema> | undefined
+  seed?: Static<Spec> | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean> {
@@ -204,7 +204,7 @@ export interface Collection<Data, Components extends Record<string, Component<ne
   readonly dir: string | undefined
   // The loader filling it, or undefined for a folder's.
   readonly loader: ContentLoader | undefined
-  readonly options: CollectionOptions<TSchema>
+  readonly options: CollectionOptions<Schema>
   // The components its Markdown entries may use, typed as given, which `kay check` reads their props from.
   readonly components: Components
   // Every entry, in the collection's order; in a localized collection those of the request's locale or the one given, or every locale's outside a request.
@@ -231,8 +231,8 @@ interface Entries<Data> {
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
 // kept: folder, a collection over a folder is compiled by `kay build` and the same for every visitor until the next one, while one over a loader may read a database or refresh on a `ttl` that no invalidation tells the page of. A page reading it is refreshed by `invalidate()`, and one in preview mode is never served a kept copy.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = 'rss'>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath, format?: Formats } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Schema>, Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
-  type Data = Static<Schema>
+export function collection<Spec extends Schema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Spec> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = 'rss'>(source: string | ContentLoader<Stored<Static<Spec>>>, options: CollectionOptions<Spec, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath, format?: Formats } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Spec>, Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
+  type Data = Static<Spec>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
   // Its `save` is typed from the schema for the app; kay hands it data it checked against that schema.
@@ -311,7 +311,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   // What the loader gives, migrated and compiled; an entry the schema refuses is left out and reported, so one stale row does not hide the others. The result is kept as any load's is, so an entry an editor fixes shows from that save's `invalidate()`, or at the next load past `ttl`.
   const fetchLoaded = async (preview: boolean, write = true) => {
-    const { raw, carried } = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<TSchema>)
+    const { raw, carried } = await compileLoaded(loader!, preview, markdownOf(options), options as CollectionOptions<Schema>)
     const { entries, problems } = validEntries(raw, options.schema, components, localized)
 
     // Only an entry that proved valid is written back.
@@ -477,7 +477,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     name,
     dir: loader ? undefined : name,
     loader,
-    options: options as CollectionOptions<TSchema>,
+    options: options as CollectionOptions<Schema>,
     components: components as Components,
     all: async (locale) => {
       const { list, paired } = await loaded()
@@ -536,7 +536,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
 }
 
 // What a loader gives, compiled as files are: a Markdown body into segments and headings, HTML as one segment; two entries sharing a slug fail the collection.
-async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>, options: CollectionOptions<TSchema>): Promise<{ raw: RawEntry[], carried: Carried[] }> {
+async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: ReturnType<typeof markdownOf>, options: CollectionOptions<Schema>): Promise<{ raw: RawEntry[], carried: Carried[] }> {
   let given: unknown = await loader.load({ preview })
 
   if (!Array.isArray(given))

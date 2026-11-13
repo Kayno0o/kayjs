@@ -124,6 +124,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nconst user = { name: \'Ada\' } as { name: string } | null\n---\nif user as u\n  p {u.name}',
     right: '---\nconst user = { name: \'Ada\' } as { name: string } | null\n---\nif user then u\n  p {u.name}',
   },
+  'deprecated-schema-type': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.103',
+    site: true,
+    summary: '`TSchema` imported from `kay/library`, `Schema` since 1.103: kay\'s own name for what `s` builds and every schema option takes, so a signature of the app does not name TypeBox, whose type follows the Elysia kay is built on. The old name works until 1.106. Found on an import from `kay/library` in the TypeScript files and `.kay` files of the project. The fix renames the import and each use of it; a file that already has a `Schema` of its own is reported with no fix, and one that imports it aliased with only the import renamed.',
+    wrong: '---\nimport type { TSchema } from \'kay/library\'\n\nexport function check<Fields extends TSchema>(fields: Fields) {\n  return fields\n}\n---\np x',
+    right: '---\nimport type { Schema } from \'kay/library\'\n\nexport function check<Fields extends Schema>(fields: Fields) {\n  return fields\n}\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
@@ -154,4 +163,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.100' },
   { since: '1.101' },
   { since: '1.102' },
+  { since: '1.103' },
 ]

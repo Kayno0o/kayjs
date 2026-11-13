@@ -1,5 +1,5 @@
-import type { Elysia, TSchema } from 'elysia'
-import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
+import type { Elysia } from 'elysia'
+import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX, Schema } from 'kay'
 import type { Hook } from 'kay/library'
 import type { SuppressionReason } from './events'
 import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
@@ -96,7 +96,7 @@ export interface BroadcastStatus extends BroadcastProgress {
 }
 
 // `wording` is the id of the notice the form showed, posted by `SubscribeForm` and kept as the proof of consent.
-type SubscribeSchema = TSchema & { static: { email: string, wording?: string | undefined } }
+type SubscribeSchema = Schema & { static: { email: string, wording?: string | undefined } }
 
 // One address on one list, as a person asking for their data is shown it.
 export interface Subscription {

@@ -43,17 +43,18 @@ import { eventNames } from './event-names'
 import { filterOptions } from './filter-options'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-
 import { infiniteListOptions } from './infinite-list-options'
-import { islandOnlyComponents } from './island-only'
 
+import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
+
 import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { persistedStorage } from './persisted-storage'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
+import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
@@ -167,6 +168,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => infiniteListOptions(root, options),
   async ({ root, options }) => cmsTestHelpers(root, options),
   async ({ root, options }) => eventNames(root, options),
+  async ({ root, options }) => schemaType(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

@@ -1,4 +1,3 @@
-import type { Static, TSchema } from 'elysia'
 import type { BeforeHook, Hook } from '../server/hooks'
 import type { ActionError, FAILURE } from './action-error'
 import type { ApiError } from './api-error'
@@ -8,6 +7,7 @@ import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
 import type { Connection, LoadStatus, Source } from './live'
+import type { Schema, Static } from './schema'
 import type { MaybePromise, StoreBase } from './store-base'
 
 export type { CallResult }
@@ -106,7 +106,7 @@ export type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
 
 // How an action is offered to an agent as an MCP tool.
 // The schemas an `output` takes: a tool result's structured content is an object, so a union, an array or a primitive is not one.
-export type OutputSchema = TSchema & { type: 'object' }
+export type OutputSchema = Schema & { type: 'object' }
 
 export interface ActionTool<Output = never, Shape extends OutputSchema = OutputSchema> {
   // Its name, in place of the export's in snake case: `addNote` is `add_note`.
@@ -424,13 +424,13 @@ export interface Action<Input, Output, Honeypot extends string = never> {
 // What a call may send for an input the handler reads: a `Blob` where it reads a `File`, since the server names every posted Blob, and `undefined` on an optional field, which the schema takes as the field left out.
 export type Sendable<Value> = Value extends File ? Blob : Value extends readonly unknown[] ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value extends Record<string, unknown> ? { [Key in keyof Value]: Partial<Pick<Value, Key>> extends Pick<Value, Key> ? Sendable<Value[Key]> | undefined : Sendable<Value[Key]> } : Value
 
-export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot> {
-  readonly schema: Schema
-  readonly handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>
+export interface ServerAction<Spec extends Schema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Spec>>, Output, Honeypot> {
+  readonly schema: Spec
+  readonly handler: (input: Static<Spec>, ctx: ActionContext) => Output | Promise<Output>
   readonly protection?: ResolvedProtection
 }
 
-export function isAction(value: unknown): value is ServerAction<TSchema, unknown> {
+export function isAction(value: unknown): value is ServerAction<Schema, unknown> {
   return typeof value === 'function' && ACTION in value
 }
 

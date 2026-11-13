@@ -1,6 +1,6 @@
-import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { IconProps, IconSet } from '../runtime/icons'
+import type { Schema } from '../runtime/schema'
 import type { FieldHint, FieldInputOptions, StringOptions } from './edit-shared'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
@@ -218,7 +218,7 @@ export function markdownField(options?: StringOptions): ReturnType<typeof t.Stri
 
 // A field of any schema a CMS edits with the component the app gives the kind, `src/cms/fields/<kind>.kay` in kayjs-cms; the schema alone validates what it saves.
 // kept: free
-export function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema {
+export function customField<Spec extends Schema>(kind: string, schema: Spec): Spec {
   if (!KIND_NAME.test(kind))
     throw new KayError('content-api-misuse', `kay: customField(${JSON.stringify(kind)}) names a kind outside letters, digits, - and _, which no src/cms/fields/<kind>.kay file can have`)
 
@@ -230,18 +230,18 @@ export function customField<Schema extends TSchema>(kind: string, schema: Schema
 
 // A field of any schema with options for how a CMS enters it: a placeholder, a prefix or suffix, the rows of a text, the labels of an enum, a list's title field, a sibling it waits for. Its kind and every other keyword are kept.
 // kept: free
-export function fieldInput<Schema extends TSchema>(schema: Schema, options: FieldInputOptions): Schema {
+export function fieldInput<Spec extends Schema>(schema: Spec, options: FieldInputOptions): Spec {
   return { ...schema, 'x-kay-input': options }
 }
 
 // A field of any schema whose value no other entry of the collection, of its locale in a localized one, holds: saving an entry that repeats it is refused.
 // kept: free
-export function unique<Schema extends TSchema>(schema: Schema): Schema {
+export function unique<Spec extends Schema>(schema: Spec): Spec {
   return { ...schema, 'x-kay-unique': true }
 }
 
 // A field of any schema that `kay i18n translate` leaves as it is, such as a category, a brand or a code: the translation keeps the default locale's value. Its kind and every other keyword are kept.
 // kept: free
-export function untranslated<Schema extends TSchema>(schema: Schema): Schema {
+export function untranslated<Spec extends Schema>(schema: Spec): Spec {
   return { ...schema, 'x-kay-translate': false }
 }

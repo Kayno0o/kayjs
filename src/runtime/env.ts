@@ -1,5 +1,5 @@
-import type { Static, TSchema } from 'elysia'
 import type { Register } from './checks'
+import type { Schema, Static } from './schema'
 
 // Where the server, as it boots, and the island entry, as it loads, keep the values `publicEnv` reads.
 export const PUBLIC_ENV = /* @__PURE__ */ Symbol.for('kay.publicEnv')
@@ -7,10 +7,10 @@ export const PUBLIC_ENV = /* @__PURE__ */ Symbol.for('kay.publicEnv')
 // Type only: the fields of a `defineEnv` schema marked `s.Public`, which its result carries so `kay check` can type `publicEnv` from the modules declaring them.
 declare const PUBLIC_FIELDS: unique symbol
 
-export interface WithPublicFields<Schema extends TSchema> { readonly [PUBLIC_FIELDS]: PublicFieldsOf<Schema> }
+export interface WithPublicFields<Spec extends Schema> { readonly [PUBLIC_FIELDS]: PublicFieldsOf<Spec> }
 
-export type PublicFieldsOf<Schema extends TSchema> = Schema extends { properties: infer Fields extends Record<string, TSchema> }
-  ? { [Name in keyof Static<Schema> as Name extends keyof Fields ? Fields[Name] extends { public: true } ? Name : never : never]: Static<Schema>[Name] }
+export type PublicFieldsOf<Spec extends Schema> = Spec extends { properties: infer Fields extends Record<string, Schema> }
+  ? { [Name in keyof Static<Spec> as Name extends keyof Fields ? Fields[Name] extends { public: true } ? Name : never : never]: Static<Spec>[Name] }
   : Record<never, never>
 
 type Intersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (value: infer Joined) => void ? Joined : never

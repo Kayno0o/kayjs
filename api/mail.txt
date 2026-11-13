@@ -76,10 +76,10 @@ interface BroadcastStatus extends BroadcastProgress
   waiting: number
 
 [.] contactForm
-function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot, never, OutputSchema>]
+function contactForm<const Extra extends Record<string, Schema> = Record<never, Schema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot, never, OutputSchema>]
 
 [.] ContactInput
-type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = {
+type ContactInput<Extra extends Record<string, Schema> = Record<never, Schema>, Consent extends boolean = false> = {
   name: string, email: string, message: string
 } & (Consent extends true ? {
   consent: true
@@ -95,7 +95,7 @@ interface ContactMailProps
   subject: string
 
 [.] ContactOptions
-interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>, Honeypot extends string = 'website', Consent extends boolean = false>
+interface ContactOptions<Extra extends Record<string, Schema> = Record<never, Schema>, Honeypot extends string = 'website', Consent extends boolean = false>
   consent?: Consent | undefined
   errors?: Partial<Record<"consent" | "email" | "message" | "name", (() => string) | string>> | undefined
   fields?: Extra | undefined

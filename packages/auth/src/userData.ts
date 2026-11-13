@@ -1,5 +1,5 @@
-import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
+import type { Schema } from 'kay'
 import { Buffer } from 'node:buffer'
 import { TypeCompiler } from 'elysia/type-system'
 import { configError } from 'kay/library'
@@ -7,13 +7,13 @@ import { configError } from 'kay/library'
 // What a user's app data is held to: the top-level fields the app's schema declares, and the schema's check.
 export interface UserDataRules {
   keys: string[]
-  check: TypeCheck<TSchema>
+  check: TypeCheck<Schema>
 }
 
 // The most bytes of JSON a user's app data may take, so a profile cannot fill a row.
 const MOST_DATA_LENGTH = 16_384
 
-export function userDataRules(schema: TSchema): UserDataRules {
+export function userDataRules(schema: Schema): UserDataRules {
   const properties = (schema as { properties?: Record<string, unknown> }).properties
 
   if (properties === undefined)

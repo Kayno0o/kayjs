@@ -1,4 +1,4 @@
-import type { TSchema } from 'kay/library'
+import type { Schema } from 'kay'
 import type { AiReply, StructuredReply } from './types'
 import { checkAnswer } from 'kay/library'
 import { AiError } from './errors'
@@ -11,7 +11,7 @@ function refusedWith(text: string, reason: string, fields: string[] = []): AiErr
 }
 
 // The object an answer's text is, checked against the schema: the value as the schema types it, else an error of the `schema` kind that says why.
-function valueOf(schema: TSchema, text: string, finish: string | undefined): unknown {
+function valueOf(schema: Schema, text: string, finish: string | undefined): unknown {
   let value: unknown
 
   try {
@@ -42,7 +42,7 @@ function valueOf(schema: TSchema, text: string, finish: string | undefined): unk
 }
 
 // A reply read as the object it answers: `await` checks the whole text once it ended, `for await` gives the object so far, and the last value it gives is the checked one.
-export function structured<Value>(base: AiReply, schema: TSchema): StructuredReply<Value, unknown> {
+export function structured<Value>(base: AiReply, schema: Schema): StructuredReply<Value, unknown> {
   let answered: Promise<Value> | undefined
 
   const answer = async (): Promise<Value> => {

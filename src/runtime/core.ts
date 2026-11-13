@@ -1,5 +1,4 @@
 import type { CookieMap } from 'bun'
-import type { Static, TSchema } from 'elysia'
 import type { CookieDeleteOptions } from '../server/cookies'
 import type { CorsOptions } from '../server/cors'
 import type { RateLimit } from './action-shared'
@@ -8,6 +7,7 @@ import type { Deferred, Locals, Redirect, Register, RouteParams } from './checks
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
+import type { Schema, Static } from './schema'
 import { durationMs } from './duration'
 import { lasting } from './lasting'
 import { createEffect, createSignal, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
@@ -413,7 +413,7 @@ export interface EndpointSettings {
   // `false` serves the file with no guard, where `requireGuards` would refuse it.
   guards?: false
   // The search params `ctx.query` is read against; a query it refuses answers 400.
-  query?: TSchema
+  query?: Schema
   // At most `max` requests from one client, or from whatever `key` names, every `window`, counted across the file's methods after its guards; past that it answers 429 with `Retry-After`.
   rateLimit?: RateLimit | RateLimit[] | undefined
   // Lets other sites' pages call the file from the browser: `cors: { origins: ['https://app.example.com'] }`. `false` keeps it to its own site where the app's `cors` opens the others.
@@ -470,7 +470,7 @@ export interface PageSettings {
   // The longest the page may take to answer, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the page answers 504 through the nearest `_error.kay`; the innermost layout or page that sets it wins.
   timeout?: Duration | false
   // The schema `ctx.query` is read against; a query it refuses answers 400.
-  query?: TSchema
+  query?: Schema
   // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.
   sitemap?: boolean | object
   // When the page last changed, for the sitemap's `lastmod`: a `Date`, a date string such as '2026-05-06', or a function of the params of each URL the sitemap lists, returning one or nothing.
@@ -499,7 +499,7 @@ export interface PageSecurity {
 }
 
 // What a query schema gives `ctx.query`.
-export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
+export type QueryOf<Spec> = Spec extends Schema ? Static<Spec> : never
 
 // What a page's template reads: every name its `--- server` fence declares.
 export type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>

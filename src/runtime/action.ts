@@ -1,6 +1,7 @@
-import type { Static, t, TSchema } from 'elysia'
+import type { t } from 'elysia'
 import type { ActionContext, ActionProtection, Answer, CallOptions, OutputSchema, ServerAction, Settled, Success } from './action-shared'
 import type { RouteParams } from './checks'
+import type { Schema, Static } from './schema'
 import { callable } from './action-call'
 import { minTimeOf, resolveProtection, workOf } from './action-protection'
 import { ACTION, isAction } from './action-shared'
@@ -40,14 +41,14 @@ const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'obje
 // `action` as `kay check` reads it in a page's server fence, whose `ctx.params` are those of the page's route: not something to write.
 export interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object> {
   <Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
-  <Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params, Extract<keyof Static<Schema>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
+  <Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Params, Extract<keyof Static<Spec>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Spec, Settled<Output>, Honeypot>
 }
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
 // kept: free, it registers a route answering a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
 export function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): NoInputAction<Settled<Output>, Honeypot>
-export function action<Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<RouteParams, Extract<keyof Static<Schema>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Schema, Settled<Output>, Honeypot>
+export function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<RouteParams, Extract<keyof Static<Spec>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape>): ServerAction<Spec, Settled<Output>, Honeypot>
 export function action(first: unknown, second?: unknown, third?: ActionProtection<string>): unknown {
   if (typeof first === 'function') {
     const handler = first as (ctx: ActionContext) => unknown
@@ -55,10 +56,10 @@ export function action(first: unknown, second?: unknown, third?: ActionProtectio
     return declare(emptySchema(), (_input, ctx) => handler(ctx), second as ActionProtection<string> | undefined)
   }
 
-  return declare(first as TSchema, second as (input: unknown, ctx: ActionContext) => unknown, third)
+  return declare(first as Schema, second as (input: unknown, ctx: ActionContext) => unknown, third)
 }
 
-export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {
+export function declare(schema: Schema, handler: (input: unknown, ctx: ActionContext) => unknown, options: ActionProtection<string> | undefined): ServerAction<Schema, unknown> {
   const protection = resolveProtection(options)
 
   // Refused as the module loads, rather than on the first post.
@@ -88,7 +89,7 @@ export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionCo
     handler: { value: handler, enumerable: true },
     protection: { value: protection, enumerable: true },
     [ACTION]: { value: true },
-  }) as unknown as ServerAction<TSchema, unknown>
+  }) as unknown as ServerAction<Schema, unknown>
 }
 
 // Gives every action a page module exports the URL the server registers it under.

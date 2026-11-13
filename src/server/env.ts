@@ -1,5 +1,6 @@
-import type { Elysia, Static, TSchema } from 'elysia'
+import type { Elysia } from 'elysia'
 import type { PublicFieldsOf, WithPublicFields } from '../runtime/env'
+import type { Schema, Static } from '../runtime/schema'
 import type { EnvSchemaRecord } from './env-state'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
@@ -41,7 +42,7 @@ function loadSamples(length: number, pattern: unknown): string[] {
 }
 
 // A `s.Object` of the variables, each read on its own.
-export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
+export type EnvSchema = Schema & { properties: Record<string, Schema> }
 
 // The text of the file `<NAME>_FILE` names, trimmed and read once, as the server boots; a file that cannot be read or holds nothing is an error naming the variable and the path, never the content.
 function readSecretFile(name: string, file: string, path: string): string {
@@ -63,7 +64,7 @@ function readSecretFile(name: string, file: string, path: string): string {
 // A field marked `s.Public` reaches islands as `publicEnv` from `kay`, with no config key; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused.
 // A string field, `s.Public` ones apart, also reads `<NAME>_FILE`, the path of a file holding the value, trimmed and read once, as a compose secret hands it; both set, or a file that cannot be read or is empty, stops the boot naming them, unless the field is `s.Optional`, which is left unset with one warning naming the file.
 // A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
-export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>) {
+export function defineEnv<Spec extends EnvSchema>(declared: Spec, source: Record<string, string | undefined> = process.env): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>) {
   recordEnv(declared, defineEnv)
 
   const production = source.NODE_ENV === 'production'
@@ -113,7 +114,7 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
 
     registerPublic(declared, values)
 
-    return values as ReturnType<typeof defineEnv<Schema>>
+    return values as ReturnType<typeof defineEnv<Spec>>
   }
 
   if (!building())
@@ -143,12 +144,12 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
 
   registerPublic(declared, env)
 
-  return env as ReturnType<typeof defineEnv<Schema>>
+  return env as ReturnType<typeof defineEnv<Spec>>
 }
 
 // What `--load` gives a variable the build lacks or refuses: a fixed string of 32 characters or its `minLength`, which a session secret's own check accepts and writes nothing to disk; `undefined` for a field of another type.
 // A field with an `enum` or `const` reads as its first value, and one the plain string does not satisfy as the first of kay's samples it accepts (a URL, an email, a literal `pattern` start...), checked without decoding; a rule none of them meets leaves the plain string.
-function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
+function loadPlaceholder(name: string, field: Schema | undefined): unknown {
   const { minLength, type, enum: values, const: only, pattern } = (field ?? {}) as { minLength?: unknown, type?: unknown, enum?: unknown, const?: unknown, pattern?: unknown }
 
   if (type !== 'string')
@@ -162,7 +163,7 @@ function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
 
   const length = Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0)
   const plain = `kay-load-placeholder-${name}`.padEnd(length, '_')
-  const check = compiledCheck(field as TSchema)
+  const check = compiledCheck(field as Schema)
 
   for (const candidate of [plain, ...loadSamples(length, pattern)]) {
     if (check.Check(candidate))
@@ -172,11 +173,11 @@ function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
   return plain
 }
 
-function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {
+function without<Spec extends EnvSchema>(schema: Spec, placeholders: Record<string, string>): Spec {
   if (Object.keys(placeholders).length === 0)
     return schema
 
-  return t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !(name in placeholders)))) as unknown as Schema
+  return t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !(name in placeholders)))) as unknown as Spec
 }
 
 // What development and tests give a `requiredInProduction` string with no default that the environment leaves out: a derived value for a secret, `''` otherwise.
@@ -200,7 +201,7 @@ function placeholdersFor(schema: EnvSchema, input: Record<string, string>, mode:
 }
 
 // The schema with every `requiredInProduction` field made required and stripped of its default.
-function requiredInProduction<Schema extends EnvSchema>(schema: Schema): Schema {
+function requiredInProduction<Spec extends EnvSchema>(schema: Spec): Spec {
   if (!Object.values(schema.properties).some(field => (field as { requiredInProduction?: unknown }).requiredInProduction === true))
     return schema
 
@@ -214,7 +215,7 @@ function requiredInProduction<Schema extends EnvSchema>(schema: Schema): Schema 
     delete required[OPTIONAL]
 
     return [name, required]
-  }))) as unknown as Schema
+  }))) as unknown as Spec
 }
 
 // One variable of a schema as `kay env` lists it.

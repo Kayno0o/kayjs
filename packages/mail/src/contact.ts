@@ -1,5 +1,4 @@
-import type { Static, TSchema } from 'elysia'
-import type { ActionContext, ActionProtect, ActionProtection, Failure, JSX } from 'kay'
+import type { ActionContext, ActionProtect, ActionProtection, Failure, JSX, Schema, Static } from 'kay'
 import type { Hook } from 'kay/library'
 import type { Mailer } from './mailer'
 import type { Address, MailField } from './types'
@@ -35,7 +34,7 @@ const ERROR_WORDS = {
   consent: () => wording('mail.contact.errors.consent', DEFAULT_ERRORS.consent),
 }
 
-export interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>, Honeypot extends string = 'website', Consent extends boolean = false> {
+export interface ContactOptions<Extra extends Record<string, Schema> = Record<never, Schema>, Honeypot extends string = 'website', Consent extends boolean = false> {
   // The fields beyond `name`, `email` and `message`, as schemas: `{ phone: s.Optional(s.String({ maxLength: 30 })), topic: s.UnionEnum(['quote', 'other']) }`. They go in the mail, after the email, in this order.
   fields?: Extra | undefined
   // What each of those is called in the mail, the field's name with its words apart and a capital by default.
@@ -64,13 +63,13 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   protection?: Omit<ActionProtect<Honeypot>, 'honeypot'> & Pick<ActionProtection, 'tool' | 'maxSize'> | undefined
 }
 
-export type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
+export type ContactInput<Extra extends Record<string, Schema> = Record<never, Schema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
 
 // The object schema built below, typed by the input it validates.
-type ContactSchema<Extra extends Record<string, TSchema>, Consent extends boolean> = TSchema & { static: ContactInput<Extra, Consent> }
+type ContactSchema<Extra extends Record<string, Schema>, Consent extends boolean> = Schema & { static: ContactInput<Extra, Consent> }
 
 // The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))`. A post is checked, queued as a mail to the site with the visitor in `replyTo` (the queue retries it, so a relay that is down never loses it or holds the visitor up) and answered with a refusal worded in the page's language when the mailer is not configured or the mail cannot be rendered, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
-export function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'enqueue'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
+export function contactForm<const Extra extends Record<string, Schema> = Record<never, Schema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'enqueue'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
   schema: ContactSchema<Extra, Consent>,
   handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext) => Promise<Failure<string> | undefined>,
   protection: ActionProtection<Honeypot>,

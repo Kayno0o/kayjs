@@ -41,6 +41,7 @@ export type { RefuseOptions } from '../runtime/refuse'
 export { refuse } from '../runtime/refuse'
 export { safeCode } from '../runtime/safe-code'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'
+export type { Schema, Static } from '../runtime/schema'
 export { configuredSite, setSite } from '../runtime/site'
 export { openSqlite } from '../runtime/sqlite.server'
 export { parseEvents } from '../runtime/sse'
@@ -101,6 +102,7 @@ export { sha256 } from './sha256'
 export { stoppers } from './signals'
 export { appSecrets, keyedDigest } from './stamp'
 export type { MissingTranslations } from './translations'
+// Deprecated since 1.103: `Schema`, kay's own name for it.
 export type { TSchema } from 'elysia'
 
 type Translations = typeof import('./translations')

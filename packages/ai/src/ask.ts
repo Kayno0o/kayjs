@@ -1,4 +1,4 @@
-import type { TSchema } from 'kay/library'
+import type { Schema } from 'kay'
 import type { HeldCall } from './conversation'
 import type { Offered } from './loop'
 import type { Replaces } from './resume'
@@ -150,7 +150,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
 
 const answers = new WeakMap<object, { plain: object, chars: number }>()
 
-// The JSON Schema a provider is asked for, from a kay schema that must describe an object, and its length.
+// The JSON Spec a provider is asked for, from a kay schema that must describe an object, and its length.
 function answerSchema(schema: unknown): { plain: object, chars: number } {
   const known = typeof schema === 'object' && schema !== null ? answers.get(schema) : undefined
 
@@ -181,9 +181,9 @@ export function replaces(request: Request | undefined = currentRequest()): Repla
 // The reply stops, and the provider request with it, when the request being answered is aborted, when `options.signal` is, or when a reader leaves early; with `outlive` only `options.signal` and `reply.stop()` stop it.
 // A call a Chat sends to resume or stop a reply that outlived its page gets that reply, or an empty one, and asks no provider.
 // With a `schema` the reply is the object it describes instead: `await` gives it checked and typed, `for await` the object so far.
-export function ask<const Schema extends TSchema>(prompt: string | AiMessage[], options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+export function ask<const Spec extends Schema>(prompt: string | AiMessage[], options: StructuredAskOptions<Spec>): ReplyOf<Spec>
 export function ask(prompt: string | AiMessage[], options?: AskOptions): AiReply
-export function ask(prompt: string | AiMessage[], options: AskOptions | StructuredAskOptions = {}): AiReply | ReplyOf<TSchema> {
+export function ask(prompt: string | AiMessage[], options: AskOptions | StructuredAskOptions = {}): AiReply | ReplyOf<Schema> {
   const schema = 'schema' in options ? options.schema : undefined
   const call = replyCall()
   const held = heldCall()
@@ -193,7 +193,7 @@ export function ask(prompt: string | AiMessage[], options: AskOptions | Structur
 }
 
 // A Chat with `keepOnServer` posts its new message alone, and the conversation it holds on the server is asked with it.
-function asked(prompt: string | AiMessage[], options: AskOptions, schema: TSchema | undefined, call: ReplyCall | undefined, held: HeldCall | undefined): AiReply {
+function asked(prompt: string | AiMessage[], options: AskOptions, schema: Schema | undefined, call: ReplyCall | undefined, held: HeldCall | undefined): AiReply {
   if (held === undefined)
     return reply(prompt, options, schema, call)
 
@@ -282,7 +282,7 @@ function remembered(made: AiReply, options: AskOptions, call: ReplyCall | undefi
   return made
 }
 
-function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): AiReply {
+function reply(prompt: string | AiMessage[], options: AskOptions, answer: Schema | undefined, call: ReplyCall | undefined, replayed = false): AiReply {
   const messages = messagesOf(prompt, replayed)
   const fallbackName = options.provider === undefined ? defaultNamed() : undefined
   const chosen = options.model === undefined ? fallbackName : named(options.model)

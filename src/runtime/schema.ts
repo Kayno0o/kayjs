@@ -1,4 +1,4 @@
-import type { TSchema } from 'elysia'
+import type { TSchema, Static as TypeBoxStatic } from 'elysia'
 import type { ByteSize } from './byte-size'
 import { t as schema } from 'elysia'
 import { FormatRegistry } from 'elysia/type-system'
@@ -6,6 +6,13 @@ import { byteSize } from './byte-size'
 import { isEmail } from './email'
 
 type Builder = typeof schema
+
+// What `s` builds and every API taking a schema accepts: an action's input, an env, a collection, an API route's `query`. In kay 1.x it is the TypeBox schema of Elysia, so a `t.Object(...)` of Elysia is one too, and `s.typebox` is the builder behind it; neither is part of kay's stable API.
+
+export interface Schema extends TSchema {}
+
+// The value a schema describes.
+export type Static<Type extends Schema, Params extends unknown[] = []> = TypeBoxStatic<Type, Params>
 
 // The `email` format is kay's own check, the one the browser, auth and mail share, in place of Elysia's.
 FormatRegistry.Set('email', isEmail)
@@ -62,4 +69,4 @@ const Files = (options?: FilesOptions): ReturnType<Builder['Files']> => schema.F
 
 // Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv`, `UnionKeys`, and `File` and `Files` taking a size as an action's `maxSize` does.
 // kept: free
-export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, File, Files, Secret, Public, UnionKeys }
+export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys, readonly typebox: Builder } = { ...schema, UnionEnum, File, Files, Secret, Public, UnionKeys, typebox: schema }

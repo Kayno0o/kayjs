@@ -1,5 +1,5 @@
-import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase, TSchema } from 'elysia'
-import type { Duration, Guard } from 'kay'
+import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonBase } from 'elysia'
+import type { Duration, Guard, Schema } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { Access } from './access'
 import type { IssueTokenResult, TokenOptions } from './bearer'
@@ -77,7 +77,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   onSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
   // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `profileFields` fills it, and a store keeps it as JSON.
-  user?: (TSchema & { static: UserData }) | undefined
+  user?: (Schema & { static: UserData }) | undefined
   // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.
   profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
   // Called before a user is deleted, with `{ user, context }`, to delete the app's own records for them or to keep the account: `false`, or throwing `refuse(message)`, refuses, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. A throw of any other kind refuses with 500 and is reported with source `auth.beforeDelete`. An account no one asked to delete, a stale guest or unverified one, stays and is tried again the next run.

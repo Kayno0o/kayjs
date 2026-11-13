@@ -1,10 +1,6 @@
 [.] action
 function action<Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): NoInputAction<Settled<Output>, Honeypot>
-function action<Schema extends TSchema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Schema, handler: (input: (Schema & {
-  params: [];
-})["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof (Schema & {
-  params: [];
-})["static"], string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
+function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<Spec, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
@@ -356,7 +352,7 @@ interface EndpointSettings
   guards?: false
   maxSize?: ByteSize | undefined
   prerender?: boolean | object
-  query?: TSchema
+  query?: Schema
   rateLimit?: RateLimit | RateLimit[] | undefined
 
 [.] ErrorData
@@ -806,7 +802,7 @@ interface PageSettings
   layouts?: false
   noindex?: boolean
   prerender?: boolean | object
-  query?: TSchema
+  query?: Schema
   rateLimit?: RateLimit | RateLimit[] | false | undefined
   reload?: true
   search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
@@ -936,12 +932,12 @@ const publicEnv: Readonly<Record<never, never>>
 type PublicEnv = Register extends { publicEnv: infer Values extends object } ? Readonly<Values> : Readonly<Record<never, never>>
 
 [.] PublicFieldsOf
-type PublicFieldsOf<Schema extends TSchema> = Schema extends {
-  properties: infer Fields extends Record<string, TSchema>
+type PublicFieldsOf<Spec extends Schema> = Spec extends {
+  properties: infer Fields extends Record<string, Schema>
 } ? {
-  [Name in keyof Static<Schema> as Name extends keyof Fields ? Fields[Name] extends {
+  [Name in keyof Static<Spec> as Name extends keyof Fields ? Fields[Name] extends {
     public: true
-  } ? Name : never : never]: Static<Schema>[Name]
+  } ? Name : never : never]: Static<Spec>[Name]
 } : Record<never, never>
 
 [.] PublicFieldsOfModule
@@ -972,7 +968,7 @@ interface QueryHistoryOptions
   history?: "push" | "replace" | undefined
 
 [.] QueryOf
-type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
+type QueryOf<Spec> = Spec extends Schema ? Static<Spec> : never
 
 [.] queryParam
 function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions | undefined): Signal<T>
@@ -1191,6 +1187,31 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
     public: true;
   };
   UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+  readonly typebox: Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
+    String: (property?: ElysiaStringOptions | undefined) => TString;
+    Numeric: (property?: NumberOptions | undefined) => TNumber;
+    NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
+    Integer: (property?: IntegerOptions | undefined) => TInteger;
+    Date: (property?: DateOptions | undefined) => TDate;
+    BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
+    ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
+    ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+    ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+    File: TFile;
+    Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+    Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
+    MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
+    Cookie: <T extends TProperties>(properties: T, {
+      domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
+    }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
+    UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+    NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
+    Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
+    ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
+    Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
+  } & {
+    Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+  };
 }
 
 [.] SafeHtml
@@ -1206,6 +1227,9 @@ interface SanitizeOptions
   lazyImages?: boolean | undefined
   relativeUrls?: boolean | undefined
   tags?: string[] | undefined
+
+[.] Schema
+interface Schema extends TSchema
 
 [.] SearchHit
 interface SearchHit
@@ -1248,25 +1272,23 @@ interface Selection<Key>
   set: (key: ((current: Key | undefined) => Key | undefined) | Key | undefined) => void
 
 [.] ServerAction
-interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot>
-  error: (field?: "" | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | Honeypot | undefined) => string | undefined
-  failed: () => FormFailure<Sendable<(Schema & { params: []; })["static"]>, FailureData<Output>, Honeypot> | undefined
-  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
+interface ServerAction<Spec extends Schema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Spec>>, Output, Honeypot>
+  error: (field?: "" | Extract<keyof Sendable<Static<Spec>>, string> | Honeypot | undefined) => string | undefined
+  failed: () => FormFailure<Sendable<Static<Spec>>, FailureData<Output>, Honeypot> | undefined
+  handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
   pending: () => boolean
   progress: () => number | undefined
   protection?: ResolvedProtection
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
-  schema: Schema
+  schema: Spec
   settled: () => Promise<void>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: ({
   queue?: CallQueue | undefined;
-} & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<(Schema & {
-  params: [];
-})["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+} & TrackHooks<Answer<Exclude<Output, Failure<unknown>>>>) | undefined) => TrackedCall<Sendable<Static<Spec>>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
-  validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | undefined) => Promise<boolean>
-  with: (fields: Partial<Sendable<(Schema & { params: []; })["static"]>>) => Action<Sendable<(Schema & { params: []; })["static"]>, Output, Honeypot>
+  validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<Static<Spec>>, string> | undefined) => Promise<boolean>
+  with: (fields: Partial<Sendable<Static<Spec>>>) => Action<Sendable<Static<Spec>>, Output, Honeypot>
 
 [.] ServerOfModule
 type ServerOfModule<Module, Name extends string> = Module extends Record<Name, infer Value> ? Typed<Carried<Value extends (...args: never[]) => infer Built ? Awaited<Built> : Value>> : never
@@ -1334,9 +1356,7 @@ interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | Connecti
   status: () => S
 
 [.] Static
-type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type & {
-    params: Params;
-})['static']> = Result
+type Static<Type extends Schema, Params extends unknown[] = []> = TypeBoxStatic<Type, Params>
 
 [.] store
 function store<T extends object>(value: T): T
@@ -1460,7 +1480,7 @@ const webPush: { state: () => PushState; enable(): Promise<PushEnableResult>; su
 function withBase(path: string): string
 
 [.] WithPublicFields
-interface WithPublicFields<Schema extends TSchema>
+interface WithPublicFields<Spec extends Schema>
 
 [.] withQuery
 function withQuery(changes: Readonly<Record<string, null | number | string | undefined>>): string
@@ -1812,9 +1832,7 @@ function blocks<const Types extends Record<string, AnyObject>>(types: Types, opt
 function bodyHtml(body: string, entry?: { collection?: string | undefined; slug?: string | undefined; locale?: string | undefined; }): Promise<string>
 
 [./content] collection
-function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: ContentLoader<Stored<(Schema & {
-  params: [];
-})["static"]>> | string, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & {
+function collection<Spec extends Schema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Spec> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: ContentLoader<Stored<Static<Spec>>> | string, options: CollectionOptions<Spec, [Route] extends [never] ? false : true> & {
   components?: Components;
   feed?: undefined | {
     path: FeedPath;
@@ -1822,9 +1840,7 @@ function collection<Schema extends TSchema, Components extends Record<string, Co
   };
   seed?: Seed;
   route?: Route | undefined;
-}): Collection<(Schema & {
-  params: [];
-})["static"], Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true>
+}): Collection<Static<Spec>, Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true>
 
 [./content] Collection
 interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean>
@@ -1836,7 +1852,7 @@ interface Collection<Data, Components extends Record<string, Component<never>> =
   loader: ContentLoader<unknown> | undefined
   name: string
   one: <Fallback extends Data | undefined = undefined>(fallback?: Fallback | undefined) => Promise<Fallback extends undefined ? Seeded extends true ? Data : Data | undefined : Data>
-  options: CollectionOptions<TSchema, boolean>
+  options: CollectionOptions<Schema, boolean>
   translation: (entry: { slug: string; data: unknown; }, locale: string) => Promise<EntryOf<Data, Routed> | undefined>
 
 [./content] collectionInfo
@@ -1870,12 +1886,12 @@ interface CollectionInfo
 function collectionLoader(name: string): ContentLoader<unknown> | undefined
 
 [./content] CollectionOptions
-interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boolean>
+interface CollectionOptions<Spec extends Schema, Routed extends boolean = boolean>
   components?: Record<string, Component<never>> | undefined
   containers?: boolean | undefined
   description?: string | undefined
-  draft?: ((entry: Entry<(Schema & { params: []; })["static"]>) => boolean) | BooleanField<(Schema & { params: []; })["static"]> | undefined
-  feed?: FeedOptions<(Schema & { params: []; })["static"], Routed> | undefined
+  draft?: ((entry: Entry<Static<Spec>>) => boolean) | BooleanField<Static<Spec>> | undefined
+  feed?: FeedOptions<Static<Spec>, Routed> | undefined
   footnotes?: boolean | undefined
   headingLinks?: boolean | undefined
   highlight?: Highlighter | undefined
@@ -1883,21 +1899,21 @@ interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boo
   live?: boolean | undefined
   localized?: boolean | undefined
   migrations?: Migration[] | undefined
-  modified?: "git" | "mtime" | DateField<(Schema & { params: []; })["static"]> | undefined
-  order?: NumberField<(Schema & { params: []; })["static"]> | undefined
+  modified?: "git" | "mtime" | DateField<Static<Spec>> | undefined
+  order?: NumberField<Static<Spec>> | undefined
   preprocess?: MarkdownPreprocess | undefined
-  publishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
+  publishAt?: DateField<Static<Spec>> | undefined
   readingSpeed?: number | undefined
   route?: string | undefined
-  schema: Schema
-  seed?: (Schema & { params: []; })["static"] | undefined
+  schema: Spec
+  seed?: Static<Spec> | undefined
   single?: boolean | undefined
-  sort?: ((a: Entry<(Schema & { params: []; })["static"]>, b: Entry<(Schema & { params: []; })["static"]>) => number) | undefined
+  sort?: ((a: Entry<Static<Spec>>, b: Entry<Static<Spec>>) => number) | undefined
   title?: string | undefined
   transform?: MarkdownTransform | undefined
   trusted?: boolean | undefined
-  unpublishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
-  url?: ((entry: { slug: string; locale?: string | undefined; data: (Schema & { params: []; })["static"]; }) => string) | undefined
+  unpublishAt?: DateField<Static<Spec>> | undefined
+  url?: ((entry: { slug: string; locale?: string | undefined; data: Static<Spec>; }) => string) | undefined
 
 [./content] collections
 function collections({ counts }?: { counts?: boolean | undefined; }): Promise<CollectionInfo[]>
@@ -1939,7 +1955,7 @@ interface ContentLoader<Data = unknown>
 function convertField(name: string, convert: (value: unknown, data: Record<string, unknown>) => unknown): Migration
 
 [./content] customField
-function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema
+function customField<Spec extends Schema>(kind: string, schema: Spec): Spec
 
 [./content] DataValue
 type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
@@ -2050,7 +2066,7 @@ interface FieldHint
   width?: string | undefined
 
 [./content] fieldInput
-function fieldInput<Schema extends TSchema>(schema: Schema, options: FieldInputOptions): Schema
+function fieldInput<Spec extends Schema>(schema: Spec, options: FieldInputOptions): Spec
 
 [./content] FieldInputOptions
 interface FieldInputOptions
@@ -2259,10 +2275,10 @@ type TranslationIndex = ReadonlyMap<string, ReadonlyMap<string, string>>
 function translations(name: string): Promise<TranslationIndex>
 
 [./content] unique
-function unique<Schema extends TSchema>(schema: Schema): Schema
+function unique<Spec extends Schema>(schema: Spec): Spec
 
 [./content] untranslated
-function untranslated<Schema extends TSchema>(schema: Schema): Schema
+function untranslated<Spec extends Schema>(schema: Spec): Spec
 
 [./content] UploadFieldOptions
 interface UploadFieldOptions
@@ -2715,9 +2731,7 @@ function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Con
 }): Config
 
 [./server] defineEnv
-function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & {
-  params: [];
-})["static"] & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>)
+function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<string, string | undefined>): Static<Spec> & (keyof PublicFieldsOf<Spec> extends never ? unknown : WithPublicFields<Spec>)
 
 [./server] DeletableSessionStore
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
@@ -3543,6 +3557,31 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
     public: true;
   };
   UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+  readonly typebox: Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
+    String: (property?: ElysiaStringOptions | undefined) => TString;
+    Numeric: (property?: NumberOptions | undefined) => TNumber;
+    NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
+    Integer: (property?: IntegerOptions | undefined) => TInteger;
+    Date: (property?: DateOptions | undefined) => TDate;
+    BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
+    ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
+    ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+    ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+    File: TFile;
+    Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+    Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
+    MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
+    Cookie: <T extends TProperties>(properties: T, {
+      domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
+    }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
+    UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+    NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
+    Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
+    ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
+    Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
+  } & {
+    Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+  };
 }
 
 [./server] s3Files

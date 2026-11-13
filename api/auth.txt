@@ -487,7 +487,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   store: AuthStore
   twoFactor?: false | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
-  user?: (TSchema & { static: UserData; }) | undefined
+  user?: (Schema & { static: UserData; }) | undefined
 
 [.] AuthorizeOutcome
 type AuthorizeOutcome = | {
@@ -1442,7 +1442,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   store?: StoreOption | undefined
   twoFactor?: false | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
-  user?: (TSchema & { static: UserData; }) | undefined
+  user?: (Schema & { static: UserData; }) | undefined
   viewer?: boolean | undefined
 
 [.] Passkey

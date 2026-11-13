@@ -1,6 +1,6 @@
-import type { Action, Duration, Static } from 'kay'
+import type { Action, Duration, Schema, Static } from 'kay'
 import type { IconProps } from 'kay/icons'
-import type { BeforeHook, ByteSize, Hook, TSchema } from 'kay/library'
+import type { BeforeHook, ByteSize, Hook } from 'kay/library'
 import type { StoredFile } from './attachments'
 import type { AiErrorKind } from './errors'
 
@@ -129,7 +129,7 @@ export interface ProviderRequest {
   maxTokens: number
   temperature: number | undefined
   reasoning?: Reasoning | undefined
-  // JSON Schema of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
+  // JSON Spec of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
   schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
   cache?: boolean | '1h' | undefined
@@ -217,7 +217,7 @@ export interface FunctionToolContext {
   signal: AbortSignal
 }
 
-export interface FunctionToolOptions<Schema extends TSchema = TSchema> {
+export interface FunctionToolOptions<Spec extends Schema = Schema> {
   // What the model calls it by: letters, digits, `_` and `-`, up to 64 characters, unique among the `tools` of an ask.
   name: string
   // What the model reads to decide when to call it.
@@ -225,9 +225,9 @@ export interface FunctionToolOptions<Schema extends TSchema = TSchema> {
   // The words a chat shows for a call to it, such as `Searched the docs`, in place of its name.
   label?: string | undefined
   // The object the model gives, a kay schema (`s.Object({ ... })`): a call it refuses is answered to the model, `run` never sees it.
-  input: Schema
+  input: Spec
   // What the call does, with the input checked and typed by the schema: its result goes back to the model, as the text it is or as JSON. A throw tells the model the tool could not run, and goes to the app's log.
-  run: (input: Static<Schema>, context: FunctionToolContext) => unknown
+  run: (input: Static<Spec>, context: FunctionToolContext) => unknown
 }
 
 declare const functionTool: unique symbol
@@ -238,7 +238,7 @@ export interface FunctionTool {
   readonly name: string
   readonly description: string
   readonly label?: string | undefined
-  readonly input: TSchema
+  readonly input: Schema
   readonly run: (input: never, context: FunctionToolContext) => unknown
 }
 
@@ -365,9 +365,9 @@ export interface AskOptions extends AskHooks, Resilience {
 }
 
 // The options of an ask for an object.
-export interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions {
+export interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions {
   // The object the model answers, a kay schema (`s.Object({ ... })`): `await ask(messages, { schema })` is the value it describes, typed by the schema and checked against it, and `for await` gives the object so far as it streams. An answer the schema refuses fails the reply with a `schema` error. Each provider is asked through its own JSON-schema output; `tools`, `maxSteps`, limits and `maxInputChars` apply as without one.
-  schema: Schema
+  schema: Spec
 }
 
 // A tool call as the reply shows it, plain data a chat renders: `running` until the action answers, then `done` or `failed`.
@@ -485,4 +485,4 @@ export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends P
 }
 
 // What `ask` gives for a schema: the checked value and its snapshots.
-export type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
+export type ReplyOf<Spec extends Schema> = StructuredReply<Static<Spec>>
