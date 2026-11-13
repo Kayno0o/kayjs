@@ -413,14 +413,31 @@ function mapMessage(linted: Linted, message: LintMessage): LintMessage | undefin
   const endPosition = end === undefined ? undefined : positionAt(entry.source, span.end)
   // Props compile to `__props.name`, in a fence as in the template, so a message or fix quoting that code is put back to what the .kay file wrote, unless the file writes `__props` itself.
   const named = entry.source.includes('__props') ? (text: string) => text : (text: string) => text.replaceAll(COMPILED_PROPS, '')
-  const fix = message.fix && mapFix(entry, unindentedFix(linted, message.fix), tailwind)
+  const mapped = (written: LintFix) => mapFix(entry, unindentedFix(linted, written), tailwind) ?? mapFix(entry, unindentedFix(linted, narrowed(linted.text, written)), tailwind)
+  const fix = message.fix && mapped(message.fix)
   const suggestions = message.suggestions?.flatMap((suggestion) => {
-    const mappedFix = mapFix(entry, unindentedFix(linted, suggestion.fix), tailwind)
+    const mappedFix = mapped(suggestion.fix)
 
     return mappedFix ? [{ ...suggestion, desc: named(suggestion.desc), fix: { ...mappedFix, text: named(mappedFix.text) } }] : []
   })
 
   return { ...message, message: named(levelled(linted, message, start)), ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix: fix && { ...fix, text: named(fix.text) }, suggestions }
+}
+
+// A fix cut down to what it changes: a rule that rewrites up to the next token (`style/semi` takes the `;` with the code after it, to keep the line from joining the next) reaches into the code the shadow generated, which a fix cannot cross, though what it changes is the author's own.
+function narrowed(text: string, fix: LintFix): LintFix {
+  const old = text.slice(fix.range[0], fix.range[1])
+  let head = 0
+
+  while (head < old.length && head < fix.text.length && old[head] === fix.text[head])
+    head++
+
+  let tail = 0
+
+  while (tail < old.length - head && tail < fix.text.length - head && old[old.length - 1 - tail] === fix.text[fix.text.length - 1 - tail])
+    tail++
+
+  return { range: [fix.range[0] + head, fix.range[1] - tail], text: fix.text.slice(head, fix.text.length - tail) }
 }
 
 // A fix stands only when the code it replaces was copied verbatim from the .kay file, or is a class the template writes as the string joins it, and a line break it adds only in a fence: a template expression is one line of the file.

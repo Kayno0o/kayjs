@@ -269,6 +269,28 @@ span {m}
     expect(fixed.messages).toEqual([])
   })
 
+  it('removes a semicolon the fix of another rule left in a fence, as the same code in a .ts file', async () => {
+    const { default: parser } = await tsParser
+    const { default: stylistic } = await import('@stylistic/eslint-plugin')
+    const { default: imports } = await import('eslint-plugin-import-lite')
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, plugins: { style: stylistic, import: imports }, rules: { 'style/semi': ['error', 'never'], 'import/consistent-type-specifier-style': ['error', 'top-level'] } },
+    ] as never
+    const lintFixed = async (text: string) => (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig, fix: true }).lintText(text, { filePath: FILE }))[0]!
+    const semicolon = await lintFixed('---\nconst size = 1;\n---\np {size}\n')
+
+    expect(semicolon.output).toBe('---\nconst size = 1\n---\np {size}\n')
+    expect(semicolon.messages).toEqual([])
+
+    const split = await lintFixed('---\nimport { type Dealt, deal } from \'../lib/deal\'\n\nconst dealt: Dealt = deal()\n---\np {dealt}\n')
+
+    expect(split.output).toMatch(/import type \{ ?Dealt ?\} from '..\/lib\/deal'\n/)
+    expect(split.output).not.toContain(';')
+    expect(split.messages).toEqual([])
+  })
+
   it('reports the heads of else if, await and slot, and a spread, whose spans the other constructs do not cover', async () => {
     const { messages } = await lint(`---
 const { rest, load } = props<{ rest: Record<string, string>, load: Promise<string> }>()

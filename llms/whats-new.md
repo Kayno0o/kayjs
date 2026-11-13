@@ -9,6 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay new` starts from orbit's look: kayjs-ui's space skin (the `ui` feature, now in every preset, with `AppHeader`, Space Grotesk and JetBrains Mono through `fonts`), a near-black palette named as kayjs-ui names it (`background`, `foreground`, `border`, `muted`), a starfield behind the page, a hairline on every box, and an accent picker of twelve accents; the palette no longer defines `--color-base`, which made `text-base` paint text the page background ([kay new](project-new-and-add.md)).
 - kayjs-ui's `AppHeader` and `SiteNav` are islands only in a use that sets `open`, `onOpenChange` or `link`, so a header with none of them is markup and its menu the browser's popover, with no script of its own ([kayjs-ui](../docs/src/content/docs/libraries/kayjs-ui.md)).
 - The `text-size-colour` lint reports `text-base` (or another size) in an app whose CSS defines a colour of the same name, such as `--color-base`, where the utility is the font size and the text colour at once ([code lints](code-lints.md)).
+- `kay lint --fix` leaves no semicolon in a `.kay` fence: a fix that rewrites code up to the next token (`style/semi` after the `import type` split of `import/consistent-type-specifier-style`) is cut down to what it changes, so it applies instead of being dropped.
 
 ## 1.104.0
 
