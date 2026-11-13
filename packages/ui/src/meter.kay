@@ -62,14 +62,14 @@ const shares = () => {
 }
 const held = () => segments ? shares().reduce((sum, { share }) => sum + share, 0) : max > 0 ? clamp(value, max) : 0
 const percent = (amount: number) => max > 0 ? amount / max * 100 : 0
-const text = () => formatValue ? formatValue(held(), max) : segments ? `${shares().map(({ segment, share }) => `${share} ${segment.label}`).join(', ')} of ${max}` : `${held()} / ${max}`
+const text = () => formatValue ? formatValue(held(), max) : segments?.length ? `${shares().map(({ segment, share }) => `${share} ${segment.label}`).join(', ')} of ${max}` : `${held()} / ${max}`
 const tone = () => thresholdTone(thresholds, held())
 ---
 snippet bar()
   // The accent is the fill's own class, not the recipe's, so `fillClass` and the caller's `class={{ fill }}` both replace it.
   div(part="root" {...rest} role="meter" aria-valuenow={held()} aria-valuemin={0} aria-valuemax={max} aria-valuetext={formatValue || segments ? text() : undefined} aria-label={label} data-size={size})
     if segments
-      for item of shares() key={item.segment.label}
+      for item, index of shares() key={index}
         div(part="fill" class={[fillOf(item.segment.tone), item.segment.class]} data-tone={item.segment.tone} style={`width: ${percent(item.share)}%`})
     else
       div(part="fill" class={[fillOf(tone()), fillClass]} data-tone={tone()} style={`width: ${percent(held())}%`})
