@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.103.0
 
 - The island entry carries no class table when no module an island bundles merges classes at runtime (a class expression, a spread, a part or a recipe): hubble's heartbeat page loads 16.9 KB gzip less JS with the recipe lift, kay's docs home HTML is 21% smaller ([styles](styles-and-assets.md#override-a-class-a-component-sets)).
 - `Schema` from `kay` is the type of what `s` builds, taken wherever a schema is (`action`, `defineEnv`, `collection`, an API route's `query`, kayjs-ai's `ask` and `tool`, kayjs-mail's `contactForm`) in place of Elysia's `TSchema`, with `s.typebox` as the documented, unstable way to the TypeBox builder; `TSchema` from `kay/library` works until 1.106 and `kay upgrade` renames it ([schemas](schemas.md)).
