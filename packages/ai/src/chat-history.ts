@@ -154,7 +154,7 @@ export function newReplyId(): string {
 
 const LEGACY_CONVERSATION_PREFIX = 'kai-chat-conversation:'
 
-// The local storage key naming the conversation a chat shows for an action, `kai:chat-conversation:<url>`. A value kept under the old `kai-chat-conversation:` name is moved to it once, so a visitor keeps the conversation they were in; the move goes with 1.103.
+// The local storage key naming the conversation a chat shows for an action, `kai:chat-conversation:<url>`. A value kept under the old `kai-chat-conversation:` name is moved to it once, so a visitor keeps the conversation they were in; the move goes with 2.0.
 export function conversationKey(url: string): string {
   const key = `kai:chat-conversation:${url}`
 

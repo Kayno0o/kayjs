@@ -70,7 +70,7 @@ async function worker(): Promise<ServiceWorkerRegistration | undefined> {
 
 const POSTED_KEY = 'kay:push-posted'
 const REFUSED_KEY = 'kay:push-refused'
-// The names before 1.99, read once and moved to the new ones, so a browser keeps its record; the move goes with 1.103.
+// The names before 1.99, read once and moved to the new ones, so a browser keeps its record; the move goes with 2.0, as dropping it would lose a visitor's record.
 const LEGACY_POSTED_KEY = 'kay-push-posted'
 const LEGACY_REFUSED_KEY = 'kay-push-refused'
 

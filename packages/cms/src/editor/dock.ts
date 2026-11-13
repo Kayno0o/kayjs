@@ -12,7 +12,7 @@ export interface Layout {
 }
 
 const KEY = 'kcms:editor'
-// The name before 1.99: read when the new one holds nothing and removed on the next write, so a layout is kept; it goes with 1.103.
+// The name before 1.99: read when the new one holds nothing and removed on the next write, so a layout is kept; it goes with 2.0.
 const LEGACY_KEY = 'kcms-editor'
 // 64rem and 40rem, where the editor first fits beside the page and where it stops fitting there at all.
 const WIDE = 1024
