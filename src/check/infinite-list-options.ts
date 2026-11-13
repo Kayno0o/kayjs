@@ -1,6 +1,6 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
-import { renamedCallOptions } from './renamed-call-options'
 import { renamePackages } from '../package-names'
+import { renamedCallOptions } from './renamed-call-options'
 
 const INFINITE_LIST = /\binfiniteList\b/
 

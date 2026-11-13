@@ -2,9 +2,9 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node, NodeOfType } from '../compiler/estree'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
+import { renamePackages } from '../package-names'
 import { importedName, walk } from './ast'
 import { scan } from './renamed-exports'
-import { renamePackages } from '../package-names'
 
 const NEEDLE = /\bcmsSign(?:InAs|InWith|Out)\b/
 const LINE_END = /^\r?\n/
