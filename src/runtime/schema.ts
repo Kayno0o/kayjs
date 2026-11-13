@@ -8,7 +8,6 @@ import { isEmail } from './email'
 type Builder = typeof schema
 
 // What `s` builds and every API taking a schema accepts: an action's input, an env, a collection, an API route's `query`. In kay 1.x it is the TypeBox schema of Elysia, so a `t.Object(...)` of Elysia is one too, and `s.typebox` is the builder behind it; neither is part of kay's stable API.
-
 export interface Schema extends TSchema {}
 
 // The value a schema describes.
@@ -23,7 +22,7 @@ function Secret(options: Parameters<Builder['String']>[0] = {}): ReturnType<Buil
 }
 
 // A field of `defineEnv` an island may read, as `publicEnv` from `kay`, such as a map key or an analytics id; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused at boot, since every visitor reads it.
-function Public<Field extends TSchema>(field: Field): Field & { public: true } {
+function Public<Field extends Schema>(field: Field): Field & { public: true } {
   return { ...field, public: true }
 }
 

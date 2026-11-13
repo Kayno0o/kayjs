@@ -150,7 +150,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
 
 const answers = new WeakMap<object, { plain: object, chars: number }>()
 
-// The JSON Spec a provider is asked for, from a kay schema that must describe an object, and its length.
+// The JSON Schema a provider is asked for, from a kay schema that must describe an object, and its length.
 function answerSchema(schema: unknown): { plain: object, chars: number } {
   const known = typeof schema === 'object' && schema !== null ? answers.get(schema) : undefined
 

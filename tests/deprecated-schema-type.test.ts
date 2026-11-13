@@ -13,7 +13,43 @@ async function project(files: Record<string, string>): Promise<string> {
   return root
 }
 
+async function fixed(files: Record<string, string>, path: string): Promise<string> {
+  const root = await project(files)
+
+  try {
+    await applySafeFixes(root, await schemaType(root, {}))
+
+    return await Bun.file(join(root, path)).text()
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
 describe('deprecated-schema-type', () => {
+  it('renames only the import where the file aliases it', async () => {
+    const source = 'import type { TSchema as Shape } from \'kay/library\'\n\nexport type Field = Shape\n'
+
+    expect(await fixed({ 'src/a.ts': source }, 'src/a.ts')).toBe('import type { Schema as Shape } from \'kay/library\'\n\nexport type Field = Shape\n')
+  })
+
+  it('renames a re-export so the exported name stays', async () => {
+    expect(await fixed({ 'src/a.ts': 'export type { TSchema } from \'kay/library\'\n' }, 'src/a.ts')).toBe('export type { Schema as TSchema } from \'kay/library\'\n')
+  })
+
+  it('renames a use in the script of a .kay file', async () => {
+    const source = '---\nimport type { TSchema } from \'kay/library\'\n\nconst check = (fields: TSchema) => fields\n---\np x\n'
+
+    expect(await fixed({ 'src/pages/index.kay': source }, 'src/pages/index.kay')).toBe(source.replaceAll('TSchema', 'Schema'))
+  })
+
+  it('leaves a file that already imports Schema from kay as it is, since the rename would collide', async () => {
+    const source = 'import type { Schema } from \'kay\'\nimport type { TSchema } from \'kay/library\'\n\nexport type Both = Schema | TSchema\n'
+    const text = await fixed({ 'src/a.ts': source }, 'src/a.ts')
+
+    expect(text).toBe(source)
+  })
+
   it('renames the import of TSchema from kay/library and every use of it', async () => {
     const root = await project({ 'src/fields.ts': 'import type { Static, TSchema } from \'kay/library\'\n\nexport function check<Fields extends TSchema>(fields: Fields): Static<Fields> | TSchema {\n  return fields as never\n}\n' })
 

@@ -1183,7 +1183,7 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   File: (options?: FileOptions | undefined) => TUnsafe<File>;
   Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
   Secret: (options?: ElysiaStringOptions | undefined) => TString;
-  Public: <Field extends TSchema>(field: Field) => Field & {
+  Public: <Field extends Schema>(field: Field) => Field & {
     public: true;
   };
   UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
@@ -3553,7 +3553,7 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   File: (options?: FileOptions | undefined) => TUnsafe<File>;
   Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
   Secret: (options?: ElysiaStringOptions | undefined) => TString;
-  Public: <Field extends TSchema>(field: Field) => Field & {
+  Public: <Field extends Schema>(field: Field) => Field & {
     public: true;
   };
   UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;

@@ -21,6 +21,6 @@ export const s = /* @__PURE__ */ new Proxy({}, {
     if (typeof name === 'symbol' || name === 'then')
       return undefined
 
-    return name === 'typebox' ? schema : build
+    return name === 'typebox' ? s : build
   },
 }) as typeof server

@@ -129,7 +129,7 @@ export interface ProviderRequest {
   maxTokens: number
   temperature: number | undefined
   reasoning?: Reasoning | undefined
-  // JSON Spec of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
+  // JSON Schema of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
   schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
   cache?: boolean | '1h' | undefined

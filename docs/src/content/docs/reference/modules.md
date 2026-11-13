@@ -34,7 +34,7 @@ A name is imported where it is used, in a `.kay` file and in a `.ts` file alike;
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
 | `mediaQuery`, `reducedMotion` | Whether a media query, or reduced motion, matches, following a change while an island lives. See [Islands](/essentials/islands#following-a-media-query) |
 | `online`, `pageVisible`, `inView` | Whether the browser has a connection, whether the tab is shown, and whether an element shows in the viewport, following a change while an island lives. See [Islands](/essentials/islands#following-the-connection-the-tab-and-the-scroll) |
-| `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
+| `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...); `Schema` is the type of what it builds, `Static<typeof schema>` the value's type, and `s.typebox` the TypeBox builder underneath, unstable |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
 | `ActionError`, `ActionRedirectError` | What an action called from an island throws: its schema's messages, or the redirect it answered |

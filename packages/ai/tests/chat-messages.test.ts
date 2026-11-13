@@ -1,11 +1,10 @@
-import type { Static } from 'kay'
-import type { TSchema } from 'kay/library'
+import type { Schema, Static } from 'kay'
 import { expect, test } from 'bun:test'
 import { s } from 'kay'
 import { checkAnswer } from 'kay/library'
 import { chatMessages, lastChatMessage } from '../src'
 
-const accepts = (schema: TSchema, value: unknown) => 'value' in checkAnswer(s.Object({ messages: schema }), { messages: value })
+const accepts = (schema: Schema, value: unknown) => 'value' in checkAnswer(s.Object({ messages: schema }), { messages: value })
 const png = () => new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], 'a.png', { type: 'image/png' })
 
 test('accepts the history Chat posts, a role and a text per message, and refuses what is out of bounds', () => {
