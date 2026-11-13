@@ -10,10 +10,12 @@ it('draws an AppHeader and a SiteNav as markup until the page sets the menu', as
   try {
     const plain = (await site.visit('/header-static')).html
     const open = (await site.visit('/header-open')).html
+    const linked = (await site.visit('/header-nav-open')).html
 
     expect(plain).toContain('data-part="toggle"')
     expect(plain.match(SLOT)).toBeNull()
     expect(open.match(SLOT)?.length).toBeGreaterThan(0)
+    expect(linked.match(SLOT)).toHaveLength(1)
   }
   finally {
     await site.close()
