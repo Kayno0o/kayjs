@@ -10,6 +10,18 @@ import { catchError, createSignal, hydrationEnded, hydrationStarted, ownSignal, 
 import { inServerScope } from '../src/server/scope'
 import { eventually, turn } from './helpers/eventually'
 
+// An action's posting code loads with its first call, a task later than the call; these tests call an action and look at its request at once, so the code is loaded before any of them runs.
+beforeAll(async () => {
+  const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(stringify(null))) as unknown as typeof fetch)
+
+  try {
+    await actionStub('/_kay/action/test/warm')(undefined)
+  }
+  finally {
+    fetched.mockRestore()
+  }
+})
+
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
     const count = signal(1)
@@ -1360,6 +1372,7 @@ describe('optimistic changes', () => {
       const moving = move({ to: 1 }, { optimistic: () => at.set(1), signal: controller.signal })
 
       expect(at()).toBe(1)
+      await turn()
       controller.abort(new Error('the user left'))
       await expect(moving).rejects.toThrow('the user left')
       expect(at()).toBe(0)
@@ -1383,6 +1396,7 @@ describe('optimistic changes', () => {
       const controller = new AbortController()
       const moving = move({ to: 1 }, { ...options, signal: controller.signal })
 
+      await turn()
       controller.abort(new Error('the user left'))
       await expect(moving).rejects.toThrow('the user left')
     }
@@ -1447,6 +1461,7 @@ describe('a tracked action call', () => {
       const other = two({ id: 2 })
 
       expect([one.pending(), two.pending()]).toEqual([true, true])
+      await turn()
       releases[0]!(new Response(stringify('a')))
       expect(await calling).toEqual({ ok: true, data: 'a' })
       expect([one.pending(), two.pending(), saved.pending()]).toEqual([false, true, true])
@@ -1519,9 +1534,11 @@ describe('a tracked action call', () => {
         done = true
       })()
 
+      await turn()
       releases[0]!(new Response(stringify('a')))
       // A write started before the first one ended keeps the wait going.
       void swallow(saved({ id: 2 }))
+      await turn()
       // Nothing happens: the wait stays open while a write started before it ended is out.
       await Bun.sleep(5)
       expect(done).toBe(false)
