@@ -9,6 +9,7 @@ import { applySafeFixes } from '../src/check/fixes'
 import { infiniteListOptions } from '../src/check/infinite-list-options'
 import { localState } from '../src/check/local-state'
 import { persistedStorage } from '../src/check/persisted-storage'
+import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { uiItemKeys } from '../src/check/ui-items'
 import { compileKay } from '../src/compiler'
@@ -26,6 +27,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-cms-test-helpers': cmsTestHelpers,
   'deprecated-persisted-storage': persistedStorage,
   'deprecated-schema-type': schemaType,
+  'deprecated-package-names': renamedPackages,
 }
 
 // Every deprecated lint has a `safe` fix, which `kay upgrade` applies, that turns its `wrong` example into its `right` one (#2843). A lint whose old form no fix can rewrite without risk goes here with the reason, and `kay upgrade` leaves it to `llms/upgrading.md`: none today.
