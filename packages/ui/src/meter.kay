@@ -42,7 +42,7 @@ const { value, segments, max = 100, label, fillClass, size = 'md', formatValue, 
 
   // Words the value, `(value, max) => '3 of 10 GB'`: screen readers hear it as `aria-valuetext`, and `showValue` and `@reading` draw it.
   formatValue?: ((value: number, max: number) => string) | undefined
-  // Colours the fill by value: the first entry whose `upTo` is at least the value gives its `tone`, whatever the order, and a value past all of them keeps the accent. `[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]`.
+  // Colours the fill by value (ignored with `segments`, which carry their own `tone`): the first entry whose `upTo` is at least the value gives its `tone`, whatever the order, and a value past all of them keeps the accent. `[{ upTo: 70, tone: 'success' }, { upTo: 90, tone: 'warning' }, { upTo: Infinity, tone: 'danger' }]`.
   thresholds?: Threshold[] | undefined
   // Draws the value as text under the bar: `formatValue`'s words, else `value / max`.
   showValue?: boolean | undefined
@@ -62,7 +62,8 @@ const shares = () => {
 }
 const held = () => segments ? shares().reduce((sum, { share }) => sum + share, 0) : max > 0 ? clamp(value, max) : 0
 const percent = (amount: number) => max > 0 ? amount / max * 100 : 0
-const text = () => formatValue ? formatValue(held(), max) : segments?.length ? `${shares().map(({ segment, share }) => `${share} ${segment.label}`).join(', ')} of ${max}` : `${held()} / ${max}`
+const spoken = () => shares().filter(({ share }) => share > 0).map(({ segment, share }) => `${share} ${segment.label}`)
+const text = () => formatValue ? formatValue(held(), max) : spoken().length ? `${spoken().join(', ')} of ${max}` : `${held()} / ${max}`
 const tone = () => thresholdTone(thresholds, held())
 ---
 snippet bar()
@@ -70,7 +71,7 @@ snippet bar()
   div(part="root" {...rest} role="meter" aria-valuenow={held()} aria-valuemin={0} aria-valuemax={max} aria-valuetext={formatValue || segments ? text() : undefined} aria-label={label} data-size={size})
     if segments
       for item, index of shares() key={index}
-        div(part="fill" class={[fillOf(item.segment.tone), item.segment.class]} data-tone={item.segment.tone} style={`width: ${percent(item.share)}%`})
+        div(part="fill" class={[fillOf(item.segment.tone), fillClass, item.segment.class]} data-tone={item.segment.tone} style={`width: ${percent(item.share)}%`})
     else
       div(part="fill" class={[fillOf(tone()), fillClass]} data-tone={tone()} style={`width: ${percent(held())}%`})
 

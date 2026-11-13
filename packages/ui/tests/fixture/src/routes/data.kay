@@ -28,7 +28,7 @@ main
   article#meter-max
     Meter(value={3} max={4} label="Quota")
   article#meter-segments
-    Meter(segments={[{ value: 5, tone: 'success', label: 'known' }, { value: 2, tone: 'danger', label: 'missed' }, { value: 40, tone: 'neutral', label: 'rest' }]} max={22} label="Module")
+    Meter(segments={[{ value: 5, tone: 'success', label: 'known' }, { value: 2, tone: 'danger', label: 'missed' }, { value: 40, tone: 'neutral', label: 'rest' }, { value: 5, tone: 'info', label: 'over' }]} max={22} label="Module")
   article#meter-read
     Meter(value={3} max={10} label="Quota" showValue size="lg" thresholds={[{ upTo: 5, tone: 'success' }, { upTo: 9, tone: 'warning' }]})
   article#bars

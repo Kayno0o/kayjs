@@ -656,8 +656,8 @@ describe('data', () => {
     expect(await attributes('/data', '#meter-segments [role="meter"]', ['aria-valuenow', 'aria-valuemax', 'aria-valuetext'])).toEqual([{ 'aria-valuenow': '22', 'aria-valuemax': '22', 'aria-valuetext': '5 known, 2 missed, 15 rest of 22' }])
     const fills = await find('/data', '#meter-segments [data-part=fill]')
 
-    expect(fills.map(found => found.attributes.style)).toEqual(['width: 22.727272727272727%', 'width: 9.090909090909092%', 'width: 68.18181818181817%'])
-    expect(fills.map(found => found.attributes['data-tone'])).toEqual(['success', 'danger', 'neutral'])
+    expect(fills.map(found => found.attributes.style)).toEqual(['width: 22.727272727272727%', 'width: 9.090909090909092%', 'width: 68.18181818181817%', 'width: 0%'])
+    expect(fills.map(found => found.attributes['data-tone'])).toEqual(['success', 'danger', 'neutral', 'info'])
   })
 
   test('Meter draws its value under the bar from the server, and thresholds and size reach the markup', async () => {

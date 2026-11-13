@@ -118,3 +118,14 @@ test('a Progress takes formatValue, thresholds, size and the text too, and stays
 test('a Progress without formatValue reads its percentage', async () => {
   expect((await mount('progress', { value: 0.5, max: 1, showValue: true })).querySelector('[data-part=reading]')!.textContent).toBe('50%')
 })
+
+test('formatValue words the total of segments, and an empty list reads as a plain zero', async () => {
+  const words = bar(await mount('meter', { segments: [{ value: 2, label: 'a' }, { value: 3, label: 'b' }], max: 10, formatValue: (value: number, max: number) => `${value} used of ${max}` }), 'meter')
+
+  expect(words.getAttribute('aria-valuetext')).toBe('5 used of 10')
+  mounted?.unmount()
+
+  const empty = bar(await mount('meter', { segments: [], max: 10 }), 'meter')
+
+  expect([empty.getAttribute('aria-valuetext'), empty.getAttribute('aria-valuenow'), empty.querySelectorAll('[data-part=fill]').length]).toEqual(['0 / 10', '0', 0])
+})
