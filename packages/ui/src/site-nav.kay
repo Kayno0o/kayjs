@@ -1,4 +1,7 @@
----
+--- module
+// What turns a use into an island, each prop with whether it is on when left out: a use with none of them draws the bar as markup, its menu a popover the browser runs
+export const island = { interactive: { open: false, onOpenChange: false, link: false } } as const
+--- script
 import type { JSX, Snippet } from 'kay'
 import { memo, recipe, uid } from 'kay'
 import type { NavLink } from './defaults'

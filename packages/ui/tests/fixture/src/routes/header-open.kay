@@ -1,0 +1,8 @@
+---
+import AppHeader from '@kayjs/ui/app-header.kay'
+
+const links = [{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }] as const
+---
+//- The page sets the menu, so the header is an island following it.
+h1 Open header
+AppHeader(links={links} current="/" label="Main" open={false})

@@ -737,6 +737,9 @@ component default
   open?: boolean | undefined
   sticky?: boolean | undefined
 
+[./app-header.kay] island
+const island: { readonly interactive: { readonly open: false; readonly onOpenChange: false; readonly link: false; }; }
+
 [./app-switcher.kay] default
 component default
   apps: readonly SwitcherApp[]
@@ -2755,6 +2758,9 @@ component default
   menuLabel?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
+
+[./site-nav.kay] island
+const island: { readonly interactive: { readonly open: false; readonly onOpenChange: false; readonly link: false; }; }
 
 [./skeleton.kay] default
 component default

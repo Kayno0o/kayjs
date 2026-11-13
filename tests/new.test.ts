@@ -170,7 +170,7 @@ afterAll(async () => {
 }, 60_000)
 
 const LIBRARIES = ['auth', 'mail', 'ui']
-// The starter's header is kayjs-ui's AppHeader, which hands its menu state to an island on every page it draws.
+// The islands the build can load, an upper bound: the starter's header is kayjs-ui's AppHeader, an island only in a use that sets its menu, which the starter's does not.
 const HEADER_ISLANDS = ['node_modules/@kayjs/ui/src/app-header.kay', 'node_modules/@kayjs/ui/src/internal/site-nav-state.kay', 'node_modules/@kayjs/ui/src/site-nav.kay']
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.

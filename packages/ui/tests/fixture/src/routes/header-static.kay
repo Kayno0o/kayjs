@@ -1,0 +1,10 @@
+---
+import AppHeader from '@kayjs/ui/app-header.kay'
+import SiteNav from '@kayjs/ui/site-nav.kay'
+
+const links = [{ href: '/', label: 'Home' }, { href: '/data', label: 'Data' }] as const
+---
+//- No menu state given: the bar and the nav are markup, the menu a popover the browser runs.
+h1 Static header
+AppHeader(links={links} current="/" label="Main")
+SiteNav(links={links} current="/" label="Alone")
