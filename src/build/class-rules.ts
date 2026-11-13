@@ -189,9 +189,9 @@ function prune(nodes: Node[], drops: (name: string) => boolean): Node[] {
   })
 }
 
-// The parsed stylesheet without the selectors needing a class of `unused`, and without the rules and conditional blocks left with none.
-export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>): Node[] {
-  return unused.size === 0 ? nodes : prune(nodes, name => unused.has(name))
+// The parsed stylesheet without the selectors needing a class of `unused`, or a class of `unescaped` as the class attribute writes it, and without the rules and conditional blocks left with none.
+export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>, unescaped: ReadonlySet<string> = new Set()): Node[] {
+  return unused.size === 0 && unescaped.size === 0 ? nodes : prune(nodes, name => unused.has(name) || (unescaped.size > 0 && unescaped.has(unescapeClass(name))))
 }
 
 const ESCAPE = /\\(?:([\da-f]{1,6})\s?|([\s\S]))/gi

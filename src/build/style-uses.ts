@@ -249,12 +249,8 @@ function stylesheetClasses(file: string, kept: Set<string>, seen = new Set<strin
   for (const name of styledClassNames(parse(text)))
     found.add(name)
 
-  for (const [, , pattern] of text.matchAll(SOURCE_INLINE)) {
-    for (const word of pattern!.split(SPACES)) {
-      for (const name of expandInline(word))
-        kept.add(name)
-    }
-  }
+  for (const name of inlineClasses(text))
+    kept.add(name)
 
   for (const match of text.matchAll(CSS_IMPORT)) {
     const imported = resolve(dirname(file), match[1]!)

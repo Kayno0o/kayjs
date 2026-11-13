@@ -342,6 +342,24 @@ describe('the Cases of a lifted recipe', () => {
     expect(await rules()).toContain('text-transform: uppercase')
   }, 180_000)
 
+  it('writes the rule of a lifted utility under kay dev once a file starts naming it', async () => {
+    const copy = await project()
+    const tag = join(copy, 'src/components/tag.kay')
+    const dev = devBuilder(copy, { plugins: [tailwind] })
+    const rules = async () => (await Promise.all((await Array.fromAsync(new Bun.Glob('**/*.css').scan(clientDir(copy)))).map(async file => Bun.file(join(clientDir(copy), file)).text()))).join('\n')
+
+    expect((await dev(null)).failed).toBe(false)
+    expect(await rules()).not.toMatch(/\.inline-flex\s*\{/)
+
+    await dev([])
+    await Bun.sleep(20)
+    // The recipe in this file already holds the word, so only the template's use of it is new.
+    await edit(tag, text => text.replace('span(part="root"', 'span.inline-flex(part="root"'))
+    await dev(['src/components/tag.kay'])
+
+    expect(await rules()).toMatch(/\.inline-flex\s*\{/)
+  }, 180_000)
+
   it('builds a component with a `--- style` fence beside the recipes, with no scoped stylesheet cached yet', async () => {
     const copy = await project()
 
