@@ -153,7 +153,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     // A use asking for nothing the browser does renders as markup, with no island and no script for the page.
     if (staysPlain(depth, client, lives, props, asks))
-      return staticUse(component!, own)
+      return staticUse(component!, own, asks?.plain === true)
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
     const state = localeState()
@@ -268,12 +268,15 @@ function sendable(props: object): boolean {
 
 // The markup of an island rendered by a page that needs none of it: detached as the island's own render is, so it reads and draws the same, but with no slot around it and nothing noted for the page's script.
 // The children and blocks are rendered here, in the page and with its field marks, as markup of the page's own, and an island inside the component stays an island of its own.
-function staticUse<P extends object>(component: (props: P) => JSX.Element, props: P): JSX.Element {
+function staticUse<P extends object>(component: (props: P) => JSX.Element, props: P, plain: boolean): JSX.Element {
   const slots = staticSlots(props)
   const given = Object.defineProperties({}, Object.getOwnPropertyDescriptors(props)) as P
 
   for (const [key, markup] of slots)
     Object.defineProperty(given, key, { value: renderedHtml(markup), enumerable: true, configurable: true })
+
+  if (plain)
+    Object.defineProperty(given, 'plain', { value: true, enumerable: true, configurable: true })
 
   const prefix = islandPrefix()
   const { result: html } = withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component(given)))), true)))

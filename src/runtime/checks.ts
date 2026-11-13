@@ -51,6 +51,8 @@ export interface IslandAsks {
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
   interactive?: Readonly<Record<string, boolean>> | undefined
+  // Hands a `plain: true` prop to a use rendered as plain markup, for a component that has to draw what its browser code would otherwise measure.
+  plain?: boolean | undefined
 }
 
 export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand

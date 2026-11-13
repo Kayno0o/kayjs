@@ -21,7 +21,7 @@ describe('a Table drawn by a page', () => {
     dirs.push(root)
     await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'static-table', dependencies: { 'kay': '*', '@kaynooo/kayjs-ui': '*' }, devDependencies: { '@iconify-json/tabler': '*' } }))
 
-    const tables = { plain: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false})', sorted: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id")', selected: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} selectable)', paged: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} pageSize={5})' }
+    const tables = { plain: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} label="People")', sorted: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id")', selected: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} selectable)', paged: 'Table(columns={COLUMNS} rows={ROWS} rowKey="id" sortable={false} pageSize={5})' }
 
     await Promise.all(Object.entries(tables).map(async ([name, table]) => Bun.write(join(root, `src/routes/static-${name}.kay`), PAGE(table))))
 
@@ -32,6 +32,10 @@ describe('a Table drawn by a page', () => {
 
     expect(plain).toContain('Ada')
     expect(slots(plain)).toBe(0)
+
+    // The scroll box is a keyboard stop that screen readers name, as the browser would make it of a table that scrolls.
+    expect(plain).toMatch(/<div[^>]*tabindex="0"[^>]*>/)
+    expect(plain).toMatch(/<div[^>]*role="region"[^>]*aria-label="People"|<div[^>]*aria-label="People"[^>]*role="region"/)
 
     for (const name of ['sorted', 'selected', 'paged'])
       expect(slots(await page(name)), name).toBe(1)

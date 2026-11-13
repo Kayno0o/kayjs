@@ -1,6 +1,6 @@
 --- module
 // What turns a use of the Table into an island, each prop with whether it is on when left out: a page or a server component drawing it with none of them on, and passing no function, gets plain markup and no script.
-export const island = { interactive: { sortable: true, filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, sortParam: false, list: false } } as const
+export const island = { plain: true, interactive: { sortable: true, filter: false, filterParam: false, fields: false, selectable: false, exportable: false, columnToggle: false, expandable: false, pageSize: false, rowHref: false, onRowClick: false, virtual: false, sortParam: false, list: false } } as const
 --- <Row, Key extends RowKey<Row>>
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
@@ -118,7 +118,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, plain = false, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -129,6 +129,8 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   sort?: SortState | undefined
   // `false` leaves every header unsortable, `numeric` columns included, for rows the page holds only a part of, which a header click would sort alone.
   sortable?: boolean | undefined
+  // Set by kay when a page draws the Table as plain markup, which has no script to measure whether it scrolls: the scroll box is then always a keyboard stop, a region named by `label`. Leave it out.
+  plain?: boolean | undefined
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
@@ -292,7 +294,7 @@ const shownColumns = memo(() => columns().filter(column => !hiddenKeys().include
 const hasFoot = () => footer !== undefined || shownColumns().some(column => column.footer !== undefined)
 const columnCount = () => shownColumns().length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
 const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? label
-const scrolls = signal(virtual)
+const scrolls = signal(virtual || plain)
 const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
 const shown = memo(() => serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
 const waiting = () => busy || (list ? list.pending() && !list.failed() : source.loading())

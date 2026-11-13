@@ -521,6 +521,7 @@ interface IslandAsks
   hydrate?: HydrateWhen | undefined
   interactive?: Readonly<Record<string, boolean>> | undefined
   persist?: boolean | string | undefined
+  plain?: boolean | undefined
 
 [.] IslandComponent
 type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
