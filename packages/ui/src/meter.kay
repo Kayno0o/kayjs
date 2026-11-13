@@ -3,9 +3,24 @@ import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import { fillOf, thresholdTone } from './threshold'
 import type { Threshold } from './threshold'
+import type { Tone } from './tone'
+
+// One part of the total: `tone` (the accent when absent) colours it, `class` adds to it, `label` is what screen readers hear after its value.
+export interface MeterSegment {
+  value: number
+  label: string
+  tone?: Tone | undefined
+  class?: string | undefined
+}
 
 const look = recipe({
-  parts: { root: 'kui-meter w-full overflow-hidden bg-surface-strong', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+  parts: { root: 'kui-meter flex w-full overflow-hidden bg-surface', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+>>>>>>> 694d91a (feat(ui): Meter segments for parts of one total)
+=======
+  parts: { root: 'kui-meter flex w-full overflow-hidden bg-surface-strong', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+=======
+  parts: { root: 'kui-meter flex w-full overflow-hidden bg-surface', field: 'block', fill: 'h-full transition-[width] motion-reduce:transition-none', reading: 'mt-1 block text-xs text-muted tabular-nums' },
+>>>>>>> 694d91a (feat(ui): Meter segments for parts of one total)
   variants: {
     // The bar's height: `sm`, `md` (default) or `lg`.
     size: { sm: { root: 'h-1' }, md: { root: 'h-2' }, lg: { root: 'h-3' } },
@@ -13,9 +28,11 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { value, max = 100, label, fillClass, size = 'md', formatValue, thresholds, showValue, reading, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
-  // How much is filled, held between 0 and `max`.
-  value: number
+const { value, segments, max = 100, label, fillClass, size = 'md', formatValue, thresholds, showValue, reading, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // How much is filled, held between 0 and `max`. Ignored when `segments` is given.
+  value?: number | undefined
+  // Parts of one total laid end to end, `[{ value: 5, tone: 'success', label: 'known' }, { value: 2, tone: 'danger', label: 'missed' }]`, each held so the sum never passes `max`. Screen readers hear `5 known, 2 missed of 22` unless `formatValue` words the total.
+  segments?: MeterSegment[] | undefined
   // The value of a full meter, 100 by default so `value` reads as a percentage.
   max?: number | undefined
   // Names the meter for screen readers.
@@ -33,15 +50,29 @@ const { value, max = 100, label, fillClass, size = 'md', formatValue, thresholds
   reading?: Snippet<[text: string, value: number, max: number]> | undefined
 }>()
 
-const held = () => max > 0 ? Math.min(max, Math.max(0, Number.isNaN(value) ? 0 : value)) : 0
-const percent = () => max > 0 ? held() / max * 100 : 0
-const text = () => formatValue ? formatValue(held(), max) : `${held()} / ${max}`
+const clamp = (amount: number | undefined, room: number) => Math.min(room, Math.max(0, amount === undefined || Number.isNaN(amount) ? 0 : amount))
+// Each segment takes what is left of `max`, so the sum is held to it.
+const shares = () => {
+  let room = max > 0 ? max : 0
+  return (segments ?? []).map(segment => {
+    const share = clamp(segment.value, room)
+    room -= share
+    return { segment, share }
+  })
+}
+const held = () => segments ? shares().reduce((sum, { share }) => sum + share, 0) : max > 0 ? clamp(value, max) : 0
+const percent = (amount: number) => max > 0 ? amount / max * 100 : 0
+const text = () => formatValue ? formatValue(held(), max) : segments ? `${shares().map(({ segment, share }) => `${share} ${segment.label}`).join(', ')} of ${max}` : `${held()} / ${max}`
 const tone = () => thresholdTone(thresholds, held())
 ---
 snippet bar()
   // The accent is the fill's own class, not the recipe's, so `fillClass` and the caller's `class={{ fill }}` both replace it.
-  div(part="root" {...rest} role="meter" aria-valuenow={held()} aria-valuemin={0} aria-valuemax={max} aria-valuetext={formatValue ? text() : undefined} aria-label={label} data-size={size})
-    div(part="fill" class={[fillOf(tone()), fillClass]} data-tone={tone()} style={`width: ${percent()}%`})
+  div(part="root" {...rest} role="meter" aria-valuenow={held()} aria-valuemin={0} aria-valuemax={max} aria-valuetext={formatValue || segments ? text() : undefined} aria-label={label} data-size={size})
+    if segments
+      for item of shares() key={item.segment.label}
+        div(part="fill" class={[fillOf(item.segment.tone), item.segment.class]} data-tone={item.segment.tone} style={`width: ${percent(item.share)}%`})
+    else
+      div(part="fill" class={[fillOf(tone()), fillClass]} data-tone={tone()} style={`width: ${percent(held())}%`})
 
 if reading || showValue
   div(part="field")

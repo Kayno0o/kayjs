@@ -2072,9 +2072,17 @@ component default
   label: string
   max?: number | undefined
   reading?: ((text: string, value: number, max: number) => Element) | undefined
+  segments?: MeterSegment[] | undefined
   showValue?: boolean | undefined
   size?: "lg" | "md" | "sm" | undefined
   thresholds?: Threshold[] | undefined
+  value?: number | undefined
+
+[./meter.kay] MeterSegment
+interface MeterSegment
+  class?: string | undefined
+  label: string
+  tone?: Tone | undefined
   value: number
 
 [./multi-select.kay] default

@@ -652,6 +652,14 @@ describe('data', () => {
     expect((await one('/data', '#meter-max [data-part=fill]')).attributes.style).toBe('width: 75%')
   })
 
+  test('Meter segments sit side by side at their share of max, held to it, and are all read', async () => {
+    expect(await attributes('/data', '#meter-segments [role="meter"]', ['aria-valuenow', 'aria-valuemax', 'aria-valuetext'])).toEqual([{ 'aria-valuenow': '22', 'aria-valuemax': '22', 'aria-valuetext': '5 known, 2 missed, 15 rest of 22' }])
+    const fills = await find('/data', '#meter-segments [data-part=fill]')
+
+    expect(fills.map(found => found.attributes.style)).toEqual(['width: 22.727272727272727%', 'width: 9.090909090909092%', 'width: 68.18181818181817%'])
+    expect(fills.map(found => found.attributes['data-tone'])).toEqual(['success', 'danger', 'neutral'])
+  })
+
   test('Meter draws its value under the bar from the server, and thresholds and size reach the markup', async () => {
     expect((await one('/data', '#meter-read [data-part=reading]')).text).toBe('3 / 10')
     expect(await attributes('/data', '#meter-read [role="meter"]', ['aria-valuenow', 'aria-valuemax', 'data-size'])).toEqual([{ 'aria-valuenow': '3', 'aria-valuemax': '10', 'data-size': 'lg' }])
