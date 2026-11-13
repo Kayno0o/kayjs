@@ -24,7 +24,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev pa
         document.querySelector('.bar')!.classList.add('in-view')
         scrollTo(0, 1500)
 
-        const edited = patch(parse(html), parse(html.replace('Old', 'New').replace('<title>Patch', '<title>Next')))
+        // The note's own markup: a bare 'Old' can match first inside the request block's random id.
+        const edited = patch(parse(html), parse(html.replace('>Old<', '>New<').replace('<title>Patch', '<title>Next')))
         const island = patch(parse(html), parse(html.replace('</h1>', '</h1><slot data-component="x"></slot>')))
 
         return { edited, island, bar: document.querySelector('.bar')!.className, note: document.querySelector('.note')!.textContent, title: document.title, scroll: scrollY }
