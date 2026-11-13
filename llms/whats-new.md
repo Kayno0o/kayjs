@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `pages()`, `api()`, `session()`, `schedule()`, `background()`, `queue()`, `workflow()` and a library's mailer return a `KayPlugin` from `kay/server`, kay's own name for the Elysia instance they are in 1.x, with `plugin.elysia` as the documented, unstable way to reach it; `KayExtension`, `shutdown` and a test site's `use` take a `PluginInput`, so an Elysia instance keeps working ([Locals](server.md#mount-a-server-plugin)).
 - kayjs-ui: a Table drawn by a page with `sortable={false}` and no feature (`selectable`, `pageSize`, `filter` and the rest) ships no island and no script, through the new `interactive` list of an `export const island`, [documented with islands](./islands.md) and in [the Table](../packages/ui/llms/table.md#what-a-page-ships).
 - kayjs-ui: a Table in an island ships only the features the project's call sites write (`selectable`, `expandable`, `exportable`, `columnToggle`, `virtual`, `filter`, `pageSize` and the rest), one variant shared by every island, with nothing to declare; a spread or a Table read as a value keeps them all ([Table](../packages/ui/llms/table.md#what-a-page-ships)).
+- kayjs-ui: a BarChart, LineChart or ScatterChart in an island ships only the features the project's call sites write (`marks`, `onMark`, `href`, `onSelect`, `tooltip`), 4 to 8 KB less when none is written ([what a page ships](../packages/ui/llms/table.md#what-a-page-ships)).
 
 ## 1.102.1
 
