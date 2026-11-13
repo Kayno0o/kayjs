@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay upgrade` warns when it raises a dependency the app shares with kay across a major (a 0.x minor counts), naming the versions and the package's migration file or repository, in text and as `warnings` under `--format json` ([kay upgrade](check-and-tools.md)).
+
 ## 1.104.0
 
 - The 1.100 deprecations are gone: the `id` of a kayjs-ui TreeNode and the `id`, `title` and `url` of a Bell item (now `key`, `label` and `href`, with `nodeKey()` removed), `pageSize` of `infiniteList` (`limit`), `cmsSignInAs`, `cmsSignInWith` and `cmsSignOut` (`cmsTest(site)`), and `count` of `CollectionInfo` (`total`): [Upgrading](upgrading.md).

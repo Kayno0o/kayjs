@@ -478,6 +478,43 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('warns of a shared dependency raised across a major, pointing at its migration file or else its repository', async () => {
+    const latest = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    const manifest = MANIFEST.replace(kayDependencies.elysia, '^0.8.0')
+    const withFile = await project(manifest, {
+      'node_modules/elysia/package.json': '{ "name": "elysia", "version": "0.8.5", "repository": "https://example.test/elysia" }',
+      'node_modules/elysia/MIGRATION.md': '# Migrating',
+    })
+    const withRepository = await project(manifest, { 'node_modules/elysia/package.json': '{ "name": "elysia", "version": "0.8.5", "repository": { "type": "git", "url": "git+https://example.test/elysia.git" } }' })
+    const within = await project(MANIFEST.replace(kayDependencies.elysia, '^1.4.0'), { 'node_modules/elysia/package.json': '{ "name": "elysia", "version": "1.4.30", "repository": "https://example.test/elysia" }' })
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await upgradeProject(withFile, fakes(latest).deps)
+      expect(error.mock.calls.map(call => call.join(' ')).join('\n')).toMatch(/warning: elysia was raised from 0\.8\.0 to \d+\.\d+\.\d+, across a major.*node_modules\/elysia\/MIGRATION\.md/)
+
+      error.mockClear()
+      log.mockClear()
+      await upgradeProject(withRepository, fakes(latest).deps, { format: 'json' })
+      expect(error).not.toHaveBeenCalled()
+
+      const { warnings } = JSON.parse(String(log.mock.calls[0]![0])) as { warnings: string[] }
+
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toContain('what changed is at https://example.test/elysia.git')
+
+      error.mockClear()
+      await upgradeProject(within, fakes(latest).deps)
+      expect(error.mock.calls.map(call => call.join(' ')).join('\n')).not.toContain('across a major')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await Promise.all([withFile, withRepository, within].map(async dir => rm(dir, { recursive: true, force: true })))
+    }
+  })
+
   it('prints the steps and the packages moved as one document under --format json', async () => {
     const root = await project()
     const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })

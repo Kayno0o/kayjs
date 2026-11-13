@@ -8,6 +8,7 @@ import { renameProjectFiles } from '../check/renamed-packages'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { isKayPackage, RENAMED_IN, renamePackages } from '../package-names'
 import { done, formatOption, printDocument, printFailure, projectRoot } from './command'
+import { majorWarning } from './upgrade-majors'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
 export interface UpgradeDeps {
@@ -188,11 +189,13 @@ export const upgrade: Command = {
 export interface UpgradeResult {
   steps: { verb: string, rest: string }[]
   changed: DependencyChange[]
+  // A shared dependency that crossed a major (a 0.x minor counts) on the way, with the file or the repository to read what changed.
+  warnings: string[]
 }
 
 // With `dryRun`, lists the packages that would move and touches nothing: no write, no install, no rewrite.
 export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false, quiet = false, format = 'text' }: { dryRun?: boolean, quiet?: boolean, format?: ProblemFormat } = {}): Promise<number> {
-  const result: UpgradeResult = { steps: [], changed: [] }
+  const result: UpgradeResult = { steps: [], changed: [], warnings: [] }
   // Said in text, or kept in the document under json; quiet, the steps are not announced: what would move, and how it ended, still are.
   const say = (verb: string, rest: string, always: boolean) => {
     result.steps.push({ verb, rest })
@@ -209,10 +212,6 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
       printDocument(result)
 
     return code
-  }
-  const moved = (changes: DependencyChange[]) => {
-    for (const change of changes)
-      result.changed = [...result.changed.filter(({ name }) => name !== change.name), change]
   }
   const manifest = join(root, 'package.json')
 
@@ -268,19 +267,24 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     if (raised.length === 0)
       return true
 
-    moved(raised.map(({ change }) => change))
+    moved(result, raised.map(({ change }) => change))
 
     if (dryRun) {
       for (const one of raised)
         say(one.rewritten ? 'would raise' : 'would install', describeRaise(one, 'the installed kay'), true)
+
+      await warnAcrossMajors(root, raised, result, format)
 
       return true
     }
 
     step('raised', raised.map(one => describeRaise(one, `kay ${latestKay}`)).join(', '))
 
-    if (await deps.install(root, raised.map(({ change }) => change)))
+    if (await deps.install(root, raised.map(({ change }) => change))) {
+      await warnAcrossMajors(root, raised, result, format)
+
       return true
+    }
 
     await restore(manifest, settled)
     printFailure('upgrade', `the install of ${raised.map(({ change }) => change.name).join(', ')} failed, so package.json and the lockfile are back as they were; raise them by hand to what kay asks for, then run \`bun install\``, format)
@@ -299,7 +303,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   if (dryRun) {
     for (const { version, changes, stone } of phases) {
-      moved(changes)
+      moved(result, changes)
 
       for (const { name, spec } of changes)
         say('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}${stone ? ` (kay ${version} still rewrites forms the next minors drop)` : ''}`, true)
@@ -324,7 +328,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     await Bun.write(manifest, phase.source)
 
     if (await deps.install(root, phase.changes) && existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
-      moved(phase.changes)
+      moved(result, phase.changes)
       step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
       return true
@@ -490,6 +494,27 @@ async function raiseShared(root: string, manifest: string, source: string, write
   return raised
 }
 
+// Records the packages that moved, the last range of each.
+function moved(result: UpgradeResult, changes: DependencyChange[]): void {
+  for (const change of changes)
+    result.changed = [...result.changed.filter(({ name }) => name !== change.name), change]
+}
+
+// Names each raise that crossed a major, on stderr in text and in the document under json.
+async function warnAcrossMajors(root: string, raised: Raise[], result: UpgradeResult, format: ProblemFormat): Promise<void> {
+  for (const one of raised) {
+    const message = majorWarning(root, one.change.name, one.held, one.wanted, await findInstalled(root, one.change.name))
+
+    if (message === undefined)
+      continue
+
+    result.warnings.push(message)
+
+    if (format === 'text')
+      console.error(`warning: ${message}`)
+  }
+}
+
 interface Raise {
   change: DependencyChange
   // What the app had: the version of its range when that was below kay's, else of its installed copy.
@@ -505,10 +530,12 @@ function describeRaise({ change, held, wanted, rewritten }: Raise, kay: string):
 }
 
 // The manifest of a package as `node_modules` holds it from the app's folder up, as a hoisted install or a workspace puts it, never above the project: the first folder with `workspaces`, a lockfile or `.git`. Undefined when none is found.
-async function findInstalled(root: string, name: string): Promise<{ version?: string, dependencies?: Record<string, string> } | undefined> {
+async function findInstalled(root: string, name: string): Promise<{ dir: string, version?: string, dependencies?: Record<string, string>, repository?: string | { url?: string } } | undefined> {
   for (let dir = root; ; dir = dirname(dir)) {
     try {
-      return (await Bun.file(join(dir, 'node_modules', name, 'package.json')).json()) as { version?: string, dependencies?: Record<string, string> }
+      const folder = join(dir, 'node_modules', name)
+
+      return { dir: folder, ...(await Bun.file(join(folder, 'package.json')).json()) as object }
     }
     catch {
       // Not here, or unreadable: look in the folder above.

@@ -512,6 +512,8 @@ When none of them installs, it names the old forms it could not rewrite and the 
 
 A dependency of your `package.json` that kay also depends on, `elysia` for instance, is raised to the version kay's range starts at when your range or installed copy is below it, keeping your `~` or `^`. Otherwise the app and kay would each install a copy, and their types would not match. An app already on the latest kay gets this too, and `--dry-run` lists it.
 
+When that raise crosses a major version (a 0.x minor counts as one), `kay upgrade` warns with the package and its old and new versions, and points at the package's `MIGRATION.md`, `UPGRADING.md` or `CHANGELOG.md` when it ships one, else at its repository, so you read what changed before `kay check` fails on it.
+
 When the project is a git working tree with uncommitted changes to tracked files, `kay upgrade` warns that the rewrite will mix with them and goes on: commit or stash first to review the upgrade alone.
 
 If the install leaves an npm `bun` package older than the Bun kay needs, as the peer of `bun-plugin-tailwind` can, it runs `bun update bun` so kay does not refuse to start.
@@ -520,7 +522,7 @@ An app coming from kay 1.96 or older has no `typescript7` and `axe-core` of its 
 
 A last `kay check --fix` applies any other quick fix, such as moving a Dockerfile's `FROM oven/bun:<version>` up to the Bun the new kay needs, and prints what is left for you to change by hand, warnings too: `kay upgrade` says nothing is left only when nothing was printed, and exits 1 otherwise. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
-`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed. `--format json` prints `{ steps, changed }`: what each step said, and the packages moved.
+`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed. `--format json` prints `{ steps, changed, warnings }`: what each step said, the packages moved, and those major-version warnings.
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
