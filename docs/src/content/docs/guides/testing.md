@@ -448,7 +448,9 @@ The page clicks and types as a user does.
 
 A page's load on a freshly started browser, one kay started or restarted after recycling it, waits 20 seconds when you gave no `timeout`, until one page has loaded, as Chrome starts its renderer then and a busy CI host can take seconds over it. Every later load keeps the 5 seconds.
 
-The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for, with the stack of the test's own call. `waitFor`'s `text` reads the no-break spaces kay writes in French typography (U+00A0 and U+202F) as plain ones, in the page and in your text, so the text as the template writes it matches; a timeout says when an element holds the text up to its whitespace. `text(selector)` returns the page's own characters. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
+The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for, with the stack of the test's own call.
+
+`waitFor`'s `text` reads the no-break spaces kay writes in French typography (U+00A0 and U+202F) as plain ones, in the page and in your text, so the text as the template writes it matches; a timeout says when an element holds the text up to its whitespace. `text(selector)` returns the page's own characters. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
 
 `page.view` is the `Bun.WebView` behind the page, for what the helpers leave out, such as `screenshot()` or `cdp()`.
 
