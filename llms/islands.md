@@ -79,8 +79,6 @@ Comments(postId={postId} hydrate="visible")
 
 A component that wants one of these wherever it is used, a launcher kept across pages for one, exports `island` from a `--- module` fence; a parent's own `hydrate` or `persist` wins. Only `export const island = ...` in an island's module fence is read, and `kay check` reports any other form of the export, or one on a component that is no island:
 
-A component can also list the props that make a use of it an island: `export const island = { interactive: { sortable: true, selectable: false } } as const`, each prop with whether it is on when a use leaves it out. A page or a server component whose use turns none of them on, passes no function and writes no `hydrate` or `persist`, gets the component as plain markup: no island, and no script for the page when nothing else on it needs one. A use inside an island is part of that island as before, and the use is decided by the props it is given, so a spread counts. `kay explain island` names the props.
-
 ```kay
 --- module
 export const island = { persist: true, hydrate: 'idle' } as const
@@ -89,6 +87,8 @@ const { label } = props<{ label: string }>()
 ---
 button {label}
 ```
+
+A component can also list the props that make a use of it an island: `export const island = { interactive: { sortable: true, selectable: false } } as const`, each prop with whether it is on when a use leaves it out. A page or a server component whose use turns none of them on, passes no function, no promise and nothing `island` could not send, and writes no `hydrate` or `persist`, gets the component as plain markup: no island, and no script for the page when nothing else on it needs one. Its children and blocks render in the page as an island's do, and an island inside it stays an island of its own. A use inside another island is part of that island as before, and the props the use is given decide, so a spread counts. A route that is not prerendered still counts the island in `kay build`'s size estimate, an upper bound. `kay explain island` lists the props.
 
 ### Animate an element in and out
 

@@ -1,0 +1,5 @@
+---
+import Shell from '../components/shell.kay'
+---
+Shell(data={Promise.resolve(1)})
+  p Inside

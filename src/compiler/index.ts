@@ -16,7 +16,7 @@ import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { openRedirects } from './fence-redirects'
 import { cwd, scopeStorage } from './host'
-import { ignoredIslandExport, interactiveProps, islandMessages } from './island-arguments'
+import { ignoredIslandExport, interactiveProps, islandMessages, malformedInteractive } from './island-arguments'
 import { describeCause } from './island-cause'
 import { markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
@@ -147,14 +147,14 @@ function liveCause(file: KayFile, script: ScriptAnalysis, live: string | undefin
   return live === undefined || binding === undefined ? undefined : { kind: 'live', name: live, span: binding.span, line: lineOf(file.source, binding.span.start) }
 }
 
-// A cause found in the expanded source, in the file: its span, and its line counted in what the author wrote.
-// The cause with the props the component's `island` export lists as making a use interactive, when it lists some.
+// The cause with the props the component's `island` export lists as making a use interactive, when it lists some: a client-only component and one following a live value are islands in every use.
 function withInteractive(cause: IslandCause | undefined, script: ScriptAnalysis): IslandCause | undefined {
   const interactive = interactiveProps(script)
 
-  return cause !== undefined && interactive !== undefined ? { ...cause, interactive } : cause
+  return cause !== undefined && interactive !== undefined && cause.kind !== 'client' && cause.kind !== 'live' ? { ...cause, interactive } : cause
 }
 
+// A cause found in the expanded source, in the file: its span, and its line counted in what the author wrote.
 function realCause(cause: IslandCause | undefined, expansion: Expansion | undefined, original: string): IslandCause | undefined {
   if (cause === undefined || expansion === undefined)
     return cause
@@ -313,7 +313,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
     ...validate(file, script, server, generateOptions),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
-    ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(rawCause.span, cause)] : [], 'static-pin'),
+    ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(rawCause.span, { ...cause, interactive: undefined })] : [], 'static-pin'),
   ]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
@@ -340,7 +340,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...ignoredIslandExport(script, island !== undefined))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...serialAwaits(server), ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file), ...spelledOutScriptFence(file), ...ignoredIslandExport(script, island !== undefined), ...malformedInteractive(script))
   }
 
   if (checked && pin !== undefined)

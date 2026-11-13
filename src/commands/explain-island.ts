@@ -17,7 +17,7 @@ type Role = 'island' | 'static'
 interface Explained {
   file: string
   role: Role
-  cause?: { kind: string, name: string, line: number, description: string, meaning: string } | undefined
+  cause?: { kind: string, name: string, line: number, description: string, meaning: string, interactive?: Readonly<Record<string, boolean>> | undefined } | undefined
 }
 
 const ROLE_WORDS: Record<Role, string> = {
@@ -26,7 +26,7 @@ const ROLE_WORDS: Record<Role, string> = {
 }
 
 function shown(cause: IslandCause) {
-  return { kind: cause.kind, name: cause.name, line: cause.line, description: describeCause(cause), meaning: CAUSE_KINDS[cause.kind] }
+  return { kind: cause.kind, name: cause.name, line: cause.line, description: describeCause(cause), meaning: CAUSE_KINDS[cause.kind], ...cause.interactive === undefined ? {} : { interactive: cause.interactive } }
 }
 
 // The role of each file, as `compileKay` decides it, with what decides it, and the files that do not compile, which have no role.
@@ -54,7 +54,7 @@ async function explained(root: string, files: string[], pages: readonly string[]
 function lines(entry: Explained): string[] {
   return [
     `${entry.file}: ${ROLE_WORDS[entry.role]}`,
-    ...entry.cause === undefined ? [] : [`  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`],
+    ...entry.cause === undefined ? [] : [`  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`, ...entry.cause.interactive === undefined ? [] : [`  interactive props: ${Object.entries(entry.cause.interactive).map(([name, on]) => on ? `${name} (on unless false)` : name).join(', ')}`]],
   ]
 }
 

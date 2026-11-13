@@ -231,7 +231,8 @@ function staysPlain(depth: number, client: boolean, lives: readonly unknown[], p
     if (key === 'hydrate' || key === 'persist' || key === USE_FALLBACK)
       return false
 
-    if (!descriptor.get && typeof descriptor.value === 'function' && !isAction(descriptor.value))
+    // What an island would refuse to send, or send for the browser to finish (a promise), keeps the use an island.
+    if (!descriptor.get && (typeof descriptor.value === 'function' || isThenable(descriptor.value) || holdsMarkup(descriptor.value)))
       return false
   }
 
@@ -239,13 +240,43 @@ function staysPlain(depth: number, client: boolean, lives: readonly unknown[], p
     const value = (props as Record<string, unknown>)[key]
 
     return value === undefined ? !on : !value
-  })
+  }) && sendable(props)
+}
+
+function isThenable(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'then') === 'function'
+}
+
+// Whether the props could cross to the browser, so a use that an island would refuse is still told of it.
+function sendable(props: object): boolean {
+  const plain: Record<string, unknown> = {}
+
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(props))) {
+    if (!descriptor.get)
+      plain[key] = descriptor.value
+  }
+
+  try {
+    encodeValue(plain, true)
+
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 // The markup of an island rendered by a page that needs none of it: detached as the island's own render is, so it reads and draws the same, but with no slot around it and nothing noted for the page's script.
+// The children and blocks are rendered here, in the page, as an island's are, and an island inside the component stays an island of its own.
 function staticUse<P extends object>(component: (props: P) => JSX.Element, props: P): JSX.Element {
+  const slots = staticSlots(props)
+  const given = Object.defineProperties({}, Object.getOwnPropertyDescriptors(props)) as P
+
+  for (const [key, markup] of slots)
+    Object.defineProperty(given, key, { value: renderedHtml(markup), enumerable: true, configurable: true })
+
   const prefix = islandPrefix()
-  const { result: html } = withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component(props)))), true)))
+  const { result: html } = withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component(given)))), true)))
 
   return renderedHtml(html)
 }

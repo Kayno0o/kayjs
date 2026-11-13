@@ -113,9 +113,19 @@ describe('kay explain island', () => {
     const root = await project({ 'src/components/part.kay': '--- module\nexport const island = { interactive: { sortable: true, selectable: false } } as const\n--- island\nconst { sortable = true, selectable = false } = props<{ sortable?: boolean, selectable?: boolean }>()\n---\nbutton(onClick={() => 1}) {sortable}{selectable}\n' })
     const one = await kay(['explain', 'island', 'src/components/part.kay'], root)
 
-    expect(one.stdout).toContain('unless a use leaves out `selectable` and writes `sortable={false}`')
-    expect(one.stdout).toContain('renders as markup with no script')
+    expect(one.stdout).toContain('a use that turns on none of `sortable` (on unless `false`), `selectable` renders as markup with no script')
+    expect(one.stdout).toContain('interactive props: sortable (on unless false), selectable')
     expect(one.stdout).toContain('lists `interactive` props')
+  })
+
+  it('reports an interactive list the compiler cannot read, and leaves a client-only component out of the decision', () => {
+    const module = (list: string) => `--- module\nexport const island = { interactive: ${list} } as const\n--- island\nconst { a = false } = props<{ a?: boolean }>()\n---\nbutton(onClick={() => 1}) {a}\n`
+    const bad = compileKay(module('{ a: flag }'), 'src/components/part.kay', { check: true }).diagnostics.filter(each => each.code === 'fence-invalid')
+    const client = compileKay('--- module\nexport const island = { interactive: { a: false } } as const\n--- client\nconst x = 1\n---\np {x}\n', 'src/components/part.kay')
+
+    expect(bad).toHaveLength(1)
+    expect(compileKay(module('{ a: false }'), 'src/components/part.kay').cause?.interactive).toEqual({ a: false })
+    expect(client.cause?.interactive).toBeUndefined()
   })
 
   it('says the role of a file, its cause and the rule, and lists every island without a file', async () => {

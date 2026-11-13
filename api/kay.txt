@@ -516,6 +516,12 @@ interface InViewOptions
 [.] isEmail
 function isEmail(input: unknown): input is string
 
+[.] IslandAsks
+interface IslandAsks
+  hydrate?: HydrateWhen | undefined
+  interactive?: Readonly<Record<string, boolean>> | undefined
+  persist?: boolean | string | undefined
+
 [.] IslandComponent
 type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
 

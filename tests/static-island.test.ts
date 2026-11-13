@@ -70,6 +70,18 @@ for (const { name, base, trailingSlash, dev, locale } of VARIANTS) {
       expect(alone[0]!.replace(/^[^-]*-/, '')).toBe(held[0]!.replace(/^[^-]*-/, ''))
     }, 60_000)
 
+    it('renders its children in the page and leaves an island inside it an island of its own', async () => {
+      const page = await html('/shell')
+
+      expect(page).toContain('<section class="shell"><p>Inside</p>')
+      expect(page).not.toMatch(/<slot data-component="[^"]*shell\.kay"/)
+      expect(page.match(/<slot data-component="[^"]*field\.kay"/g)?.length).toBe(1)
+    }, 60_000)
+
+    it('is refused as the island would for a prop that cannot reach the browser, a promise', async () => {
+      expect(await html('/promised')).not.toContain('<section class="shell"')
+    }, 60_000)
+
     it('is part of the island it stands in, with no island of its own', async () => {
       const page = await html('/nested')
 

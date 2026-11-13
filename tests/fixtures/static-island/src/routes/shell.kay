@@ -1,0 +1,7 @@
+---
+import Field from '../components/field.kay'
+import Shell from '../components/shell.kay'
+---
+Shell
+  p Inside
+  Field

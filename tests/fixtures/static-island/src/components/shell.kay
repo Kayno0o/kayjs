@@ -1,0 +1,10 @@
+--- module
+export const island = { interactive: { open: false } } as const
+--- island
+import { signal } from 'kay'
+
+const { open = false, data } = props<{ open?: boolean, data?: unknown }>()
+const shown = signal(open)
+---
+section.shell(data-open={shown() ? '' : undefined} data-data={data === undefined ? undefined : 'given'})
+  slot

@@ -156,7 +156,7 @@ A component that wants one of these wherever it is used exports `island` from it
 
 A component can also say which props make a use of it an island: `export const island = { interactive: { sortable: true, selectable: false } } as const`, each prop with whether it is on when a use leaves it out. A page that uses it with none of them on, and passes no function, gets plain markup and ships no script for it.
 
-A use inside another island is part of that island as before. `kay explain island` lists the props of a component that has them.
+A use inside another island is part of that island as before, and an island inside the plain markup stays an island of its own. `kay explain island` lists the props of a component that has them.
 
 `client: { hydration: { visible: '640px' } }` in `kay.config.ts` changes how early that is, `200px` before the viewport by default, and `client.hydration.serverIslands` does the same for a deferred server island, a screen ahead by default. Both are CSS root margins.
 

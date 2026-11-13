@@ -19,17 +19,14 @@ export interface IslandCause {
 
 // The sentence of `kay build`, the lints and the lens.
 export function describeCause(cause: IslandCause): string {
-  return cause.interactive === undefined ? causeText(cause) : `${causeText(cause)}, unless a use ${staticUse(cause.interactive)}`
+  return cause.interactive === undefined ? causeText(cause) : `${causeText(cause)}; a use that turns on none of ${staticUse(cause.interactive)} renders as markup with no script`
 }
 
-// What a use does to ship no island, from the props its component lists.
+// The props a component lists, those on by default as the value that turns them off; a long list is counted, `kay explain island` printing it whole.
 function staticUse(interactive: Readonly<Record<string, boolean>>): string {
-  const names = Object.entries(interactive)
-  const off = names.filter(([, on]) => !on).map(([name]) => `\`${name}\``)
-  const on = names.filter(([, on]) => on).map(([name]) => `\`${name}={false}\``)
-  const parts = [...off.length === 0 ? [] : [`leaves out ${off.join(', ')}`], ...on.length === 0 ? [] : [`writes ${on.join(', ')}`]]
+  const names = Object.entries(interactive).map(([name, on]) => on ? `\`${name}\` (on unless \`false\`)` : `\`${name}\``)
 
-  return `${parts.join(' and ')} and passes no function or \`hydrate\` renders as markup with no script`
+  return names.length > 4 ? `its ${names.length} interactive props` : names.join(', ')
 }
 
 function causeText(cause: IslandCause): string {

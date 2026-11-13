@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { usesNames } from '../src/build/variants'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
@@ -35,4 +36,17 @@ describe('a Table drawn by a page', () => {
     for (const name of ['sorted', 'selected', 'paged'])
       expect(slots(await page(name)), name).toBe(1)
   }, 120_000)
+})
+
+describe('the Table', () => {
+  it('lists every feature it declares with `uses` among the props that make it interactive, and sorting', async () => {
+    const file = resolve('packages/ui/src/table.kay')
+    const source = await Bun.file(file).text()
+    const listed = Object.keys(JSON.parse(source.match(/interactive: (\{[^}]*\})/)![1]!.replace(/(\w+):/g, '"$1":')) as Record<string, boolean>)
+
+    expect(listed).toContain('sortable')
+
+    for (const name of await usesNames(source, file))
+      expect(listed, name).toContain(name)
+  })
 })

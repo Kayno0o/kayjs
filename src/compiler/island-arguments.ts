@@ -30,7 +30,7 @@ export function ignoredIslandExport(script: ScriptAnalysis, isIsland: boolean): 
   const asked = islandExport(script)
 
   if (asked?.form === 'listed')
-    return [{ ...asked.span, code: 'fence-invalid', message: 'Only `export const island = { hydrate, persist }` is read as what the component asks of its parents', help: 'write it as that declaration' }]
+    return [{ ...asked.span, code: 'fence-invalid', message: 'Only `export const island = { hydrate, persist, interactive }` is read as what the component asks of its parents', help: 'write it as that declaration' }]
 
   return asked && !isIsland ? [{ ...asked.span, code: 'fence-invalid', message: 'This component is no island, so nothing reads its `island` export', help: 'write `--- island`, or drop the export' }] : []
 }
@@ -72,6 +72,23 @@ export function interactiveProps(script: ScriptAnalysis): Record<string, boolean
   }
 
   return undefined
+}
+
+// The problem with an `interactive` that is no object of booleans written in place, which the compiler could not read and the runtime would take as it is.
+export function malformedInteractive(script: ScriptAnalysis): Diagnostic[] {
+  for (const statement of script.moduleFence?.ast.body ?? []) {
+    const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations.find(each => each.id.type === 'Identifier' && each.id.name === 'island') : undefined
+    const init = declaration?.init?.type === 'TSAsExpression' ? declaration.init.expression : declaration?.init
+    const property = init?.type === 'ObjectExpression' ? init.properties.find(each => each.type === 'Property' && each.key.type === 'Identifier' && each.key.name === 'interactive') : undefined
+
+    if (property?.type === 'Property' && interactiveProps(script) === undefined)
+      return [{ ...script.moduleFence!.shift(property), code: 'fence-invalid', message: '`interactive` is read only as an object of booleans written in place, each prop with whether it is on when a use leaves it out', help: 'write `interactive: { sortable: true, selectable: false }`' }]
+
+    if (property?.type === 'Property' && property.value.type === 'ObjectExpression' && property.value.properties.some(each => each.type !== 'Property' || each.key.type !== 'Identifier' || each.value.type !== 'Literal' || typeof each.value.value !== 'boolean'))
+      return [{ ...script.moduleFence!.shift(property), code: 'fence-invalid', message: 'Every prop of `interactive` must be a name given `true` or `false`', help: 'write `interactive: { sortable: true, selectable: false }`' }]
+  }
+
+  return []
 }
 
 // Whether the `--- module` fence has `export const island = { hydrate, persist }`: what the component asks of every parent that uses it.
