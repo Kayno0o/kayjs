@@ -227,7 +227,7 @@ describe('a library\'s stylesheet in an app', () => {
     const root = await scratchDir('prune-ui-')
 
     projects.push(root)
-    await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
+    await mkdir(join(root, 'node_modules/@kayjs'), { recursive: true })
     await symlink(resolve('packages/ui'), join(root, 'node_modules/@kayjs/ui'))
     await symlink(resolve('node_modules/@iconify-json'), join(root, 'node_modules/@iconify-json'))
     await Promise.all(Object.entries({
