@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.104.0
 
 - The 1.100 deprecations are gone: the `id` of a kayjs-ui TreeNode and the `id`, `title` and `url` of a Bell item (now `key`, `label` and `href`, with `nodeKey()` removed), `pageSize` of `infiniteList` (`limit`), `cmsSignInAs`, `cmsSignInWith` and `cmsSignOut` (`cmsTest(site)`), and `count` of `CollectionInfo` (`total`): [Upgrading](upgrading.md).
 - kay and its libraries are published under the `@kayjs` npm org: `@kayjs/kay`, `@kayjs/ui`, `@kayjs/auth`, `@kayjs/mail`, `@kayjs/cms` and `@kayjs/ai`, on npm and on the Forgejo registry, so no registry setup is needed for them; `kay upgrade` moves an app from `@kaynooo/kayjs*` and `deprecated-package-names` rewrites its imports, see [Upgrading](upgrading.md) and [Project setup](project.md#project-setup).

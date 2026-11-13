@@ -1,7 +1,7 @@
 {
   "name": "@kayjs/cms",
   "type": "module",
-  "version": "1.103.0",
+  "version": "1.104.0",
   "description": "A CMS for kay sites: collection screens, and content edited on the page it renders",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -73,7 +73,7 @@
   },
   "peerDependencies": {
     "@kayjs/ui": "workspace:~",
-    "kay": "~1.103.0",
+    "kay": "~1.104.0",
     "tailwindcss": "^4.3.3"
   },
   "dependencies": {
