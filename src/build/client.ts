@@ -28,7 +28,7 @@ import { routeMounts } from '../server/routes'
 import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
-import { buildClassTable } from './class-table'
+import { buildClassTable, mergesAtRuntime } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, liftSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
 import { keepBundleMapCached, pruneKeptMaps } from './kept-maps'
@@ -485,13 +485,16 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
   // `src/ui.ts` is written into the components it restyles, none of which imports it.
   const words = new Set([...bundled, ...existsSync(ui) ? [ui] : []].flatMap(file => fileWords(file)))
   const reaching = await reachingAny(outside.map(file => realpathSync(file)), entries, edges)
+  const reachingOutside = outside.filter(file => reaching.has(realpathSync(file)))
 
-  for (const file of outside) {
-    if (reaching.has(realpathSync(file))) {
-      for (const word of fileWords(file))
-        words.add(word)
-    }
+  for (const file of reachingOutside) {
+    for (const word of fileWords(file))
+      words.add(word)
   }
+
+  // The browser merges classes only where a component writes a class that is not a literal, a spread or a part; two literals side by side were resolved while compiling.
+  if (!(await Promise.all([...bundled, ...existsSync(ui) ? [ui] : [], ...reachingOutside].map(mergesAtRuntime))).some(Boolean))
+    return undefined
 
   return buildClassTable(root, words, references)
 }

@@ -86,6 +86,36 @@ describe('the table of the island entry', () => {
     }
   })
 
+  it('is none when the classes that meet are literals, which the compiler resolved', async () => {
+    const copy = resolve(await fixtureCopy('class-merge'))
+
+    await Bun.write(join(copy, 'src/components/panel.kay'), '---\nconst open = signal(false)\n---\nbutton.p-4(onClick={() => open.set(true)}) open\n')
+    await Bun.write(join(copy, 'src/components/toggle.kay'), '---\nconst on = signal(false)\n---\nbutton.p-6(onClick={() => on.set(true)}) toggle\n')
+
+    try {
+      expect(await islandClassTableOf(copy, await readClientSources(copy), [])).toBeUndefined()
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
+  it('is kept when a component writes a class expression beside a literal', async () => {
+    const copy = resolve(await fixtureCopy('class-merge'))
+
+    await Bun.write(join(copy, 'src/components/panel.kay'), '---\nconst open = signal(false)\nlet { extra = \'\' } = props<{ extra?: string }>()\n---\nbutton.p-4(class={[extra, \'p-6\']} onClick={() => open.set(true)}) open\n')
+    await Bun.write(join(copy, 'src/components/toggle.kay'), '---\nconst on = signal(false)\n---\nbutton.mt-2(onClick={() => on.set(true)}) toggle\n')
+
+    try {
+      const table = await islandClassTableOf(copy, await readClientSources(copy), [])
+
+      expect(Object.keys(table?.classes ?? {})).toEqual(expect.arrayContaining(['p-4', 'p-6']))
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
   it('holds the classes src/ui.ts writes into a component, which no island imports', async () => {
     const copy = resolve(await fixtureCopy('class-merge'))
 
