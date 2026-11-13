@@ -111,6 +111,20 @@ describe('a component with features', () => {
     expect(whole.length - plain.length).toBeGreaterThan(4000)
   }, 120_000)
 
+  it('leaves the selection and the tooltip out of a ScatterChart, and the marks and the selection out of a LineChart, written without them', async () => {
+    const scatter = (props: string) => `---\nimport { signal } from 'kay'\nimport ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'\nconst points = signal([{ key: 'a', x: 1, y: 2, label: 'a' }])\n---\nbutton(onClick={() => points.set([])}) Clear\nScatterChart(label="Runs" points={points()}${props})\n`
+    const line = (props: string) => `---\nimport { signal } from 'kay'\nimport LineChart from '@kaynooo/kayjs-ui/line-chart.kay'\nconst values = signal([1, 2])\n---\nbutton(onClick={() => values.set([])}) Clear\nLineChart(label="Runs" labels={['a', 'b']} series={[{ name: 'Runs', values: values() }]}${props})\n`
+
+    for (const [name, write, marker] of [['Scatter', scatter, 'data-kind'], ['Line', line, 'data-kind']] as const) {
+      const plain = await (await built({ [name]: write('') })).text(name)
+      const whole = await (await built({ [name]: write(' {...{}}') })).text(name)
+
+      expect(whole.length - plain.length, name).toBeGreaterThan(2000)
+      expect(whole, name).toContain(marker)
+      expect(plain, name).not.toContain(marker)
+    }
+  }, 120_000)
+
   it('is the variant a page needs when the page draws it itself, as its own island', async () => {
     const root = resolve(await fixtureCopy('ui-list'))
 

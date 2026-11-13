@@ -168,7 +168,7 @@ A Table in an island ships only the features the project's `.kay` files write on
 
 Nothing is declared. kay reads the props at each `<Table>` call of the project's `.kay` files (not `node_modules`), takes the union, and builds one variant of the Table that every island loads, so two islands share it.
 
-A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less.
+A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tooltip` at any call site, its events, link and button columns and tooltip stay out of the island, about 8 KB less. A LineChart leaves out `marks`, `onMark`, `onSelect` and `href` (about 4.5 KB), and a ScatterChart `onSelect`, `href` and `tooltip` (about 4 KB).
 
 A Table drawn by a page, or a server component, with `sortable={false}` and none of those props, and no function prop, is plain markup: no island, and no script for the page. Sorting is on by default, so a Table that sorts is an island. The static Table does not measure whether it scrolls, so a wide one is not a keyboard stop; give it `hydrate="idle"` to keep that.
 

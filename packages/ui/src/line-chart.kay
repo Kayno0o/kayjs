@@ -13,6 +13,7 @@ import { isExternal, tabOf } from './outside'
 import type { NewTab } from './outside'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { formatNumber, wording } from 'kay/words'
+import { uses } from './uses'
 
 // The 1.x events chartist emits only with its compat plugin, and the mark chartist puts on a chart whose output a plugin may change, which it then redraws on every update.
 const LEGACY_EVENTS = new Set(['data', 'optionsChanged', 'draw', 'created', 'animationBegin', 'animationEnd'])
@@ -214,7 +215,8 @@ const watchTip = (element: HTMLElement) => {
 const lit = () => active === undefined ? hovered() : active === null || labels.length === 0 ? null : { index: Math.min(Math.max(Math.round(active), 0), labels.length - 1) }
 
 // The events that fall on a label of the chart, with where each stands among those on its label.
-const placed = memo(() => placeEvents(marks, labels))
+// The features a chart's call sites leave out (marks, onMark, onSelect, href) are left out of its island (`uses`).
+const placed = memo(() => uses('marks') ? placeEvents(marks, labels) : [])
 const titlesAt = (index: number) => placed().filter(item => item.index === index).map(item => item.event.title)
 
 // Where an event's rule stands across the plot, side by side with the ones on its label.
@@ -228,12 +230,12 @@ const eventStyle = (item: PlacedEvent) => {
 const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
 
 function markPressedAt(item: PlacedEvent) {
-  void onMark?.(item.event, item.source)
+  void (uses('onMark') ? onMark : undefined)?.(item.event, item.source)
 }
 
 // A plain click on a mark link goes to `onMark` when the app gave one; a modified or middle click is left to the browser.
 function markPressed(event: MouseEvent, item: PlacedEvent) {
-  if (!onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  if (!uses('onMark') || !onMark || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
   event.preventDefault()
@@ -246,13 +248,13 @@ const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '',
 function choose(index: number) {
   const picked = mark(index)
 
-  if (onSelect) {
+  if (uses('onSelect') && onSelect) {
     void onSelect(picked)
 
     return
   }
 
-  const to = href?.(picked)
+  const to = uses('href') ? href?.(picked) : undefined
 
   if (to === undefined || to === '')
     return
@@ -267,7 +269,7 @@ function choose(index: number) {
 
 // The address of the point the keyboard is on, or none.
 const linkAt = (index: number) => {
-  const to = href?.(mark(index))
+  const to = uses('href') ? href?.(mark(index)) : undefined
 
   return to === undefined || to === '' ? undefined : to
 }
@@ -660,12 +662,12 @@ div(part="root" {...rest} role="figure" aria-label={label})
       for item, index of series key={item.name}
         if dot(index)
           div(part="dot" style={dot(index)})
-    if plot()
+    if uses('marks') && plot()
       for item of placed() key={`${item.index}-${item.slot}`}
         if markKind(item.event.href, onMark !== undefined) === 'link'
           a(part="event" {...markLink(item)} data-kind="link" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item)} onClick={event => markPressed(event, item)})
             span(part="eventRule")
-        else if onMark
+        else if uses('onMark') && onMark
           button(part="event" type="button" data-kind="button" aria-label={item.event.title} data-tooltip={item.event.title} style={eventStyle(item)} onClick={() => markPressedAt(item)})
             span(part="eventRule")
         else
@@ -692,8 +694,9 @@ div(part="root" {...rest} role="figure" aria-label={label})
         div(part="tooltipRow" data-total)
           span(part="tooltipName") {totalLabel}
           span(part="tooltipValue") {totalText(hovered()!.index)}
-      for title, at of titlesAt(hovered()!.index) key={at}
-        div(part="tooltipEvent") {title}
+      if uses('marks')
+        for title, at of titlesAt(hovered()!.index) key={at}
+          div(part="tooltipEvent") {title}
   // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
   div(part="data")
     table
@@ -705,7 +708,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
             th(scope="col") {item.name}
           if stacked
             th(scope="col") {totalLabel}
-          if placed().length > 0
+          if uses('marks') && placed().length > 0
             th(scope="col") {eventsLabel}
       tbody
         for name, index of labels key={index}
@@ -715,7 +718,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
               td {valueText(item, index)}
             if stacked
               td {totalText(index)}
-            if placed().length > 0
+            if uses('marks') && placed().length > 0
               td {titlesAt(index).join('; ')}
   if onRange
     span(part="hint" id={`${id}-hint`}) {rangeHint}

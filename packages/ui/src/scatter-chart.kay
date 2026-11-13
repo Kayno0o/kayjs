@@ -7,6 +7,7 @@ import type { NewTab } from './outside'
 import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
 import { axisExtent, axisPercent, dotSize, steppedPoint } from './plot'
 import { wording } from 'kay/words'
+import { uses } from './uses'
 
 const look = recipe({
   parts: {
@@ -80,17 +81,18 @@ function keyDown(event: KeyboardEvent) {
 }
 
 const marks = activeMarks({ active: () => active, onActive: () => onActive })
-const tip = chartTooltip()
+// The features a chart's call sites leave out (onSelect, href, tooltip) are left out of its island (`uses`).
+const tip = uses('tooltip') ? chartTooltip() : undefined
 
 function link(point: Point) {
-  const to = href?.(point)
+  const to = uses('href') ? href?.(point) : undefined
 
   return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
 function pressed(event: MouseEvent, point: Point) {
-  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  if (!uses('onSelect') || !onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
   event.preventDefault()
@@ -128,14 +130,14 @@ else
       for entry of cornerEntries() key={entry[0]}
         span(part="corner" data-corner={entry[0]}) {entry[1]}
       for point, at of points key={point.key}
-        if markKind(link(point)?.href, onSelect !== undefined) === 'link'
+        if uses('href') && markKind(link(point)?.href, onSelect !== undefined) === 'link'
           a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
-        else if onSelect
+        else if uses('onSelect') && onSelect
           button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else
           span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
-      if tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]
-        div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
+      if uses('tooltip') && tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]
+        div(part="tooltip" ref={tip!.watch} style={tip!.place(marks.anchor()!)} aria-hidden="true")
           {tooltip(points[marks.current()!]!)}
     if x.label
       span(part="axisLabel" data-axis="x") {x.label}
