@@ -57,7 +57,6 @@ describe('reasoning on Anthropic', () => {
     return bodyOf(server)
   }
 
-
   it('sends no thinking setting unless reasoning is given', async () => {
     expect('thinking' in await sent({})).toBe(false)
   })
