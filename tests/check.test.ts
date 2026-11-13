@@ -1076,9 +1076,23 @@ describe.concurrent('kay check, edge cases', () => {
     expect(await helps('[string, number]')).toEqual(['the component calls `@row` with parameters, (string, number): write the block with them, as `@row(...)`'])
   })
 
-  it('tells to call a signal it does not see made where its value goes', async () => {
+  it('reads a signal re-exported under another name as the signal it is', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { signal } from \'kay\'\n\nconst made = signal(\'red\')\n\nexport { made as accent }\n',
+      'src/routes/index.kay': '---\nimport { accent } from \'../accent\'\n---\np {accent}\nif accent\n  span on\np {accent.toUpperCase()}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[4, 'uncalled-signal'], [5, 'uncalled-signal'], [7, 'uncalled-signal']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tells to call a signal it does not see made where its value goes', async () => {
+    const root = await scratchProject({
+      'src/accent.ts': 'import { signal } from \'kay\'\n\nconst make = () => signal(\'red\')\n\nexport const accent = make()\n',
       'src/routes/index.kay': '---\nimport { accent } from \'../accent\'\n---\np {accent}\nif accent\n  span on\np {accent.toUpperCase()}\n',
     })
 
