@@ -172,7 +172,7 @@ A BarChart does the same: with no `marks`, `onMark`, `href`, `onSelect` or `tool
 
 A Table drawn by a page, or a server component, with none of those props except `sortParam`, and no function prop, is plain markup: no island, and no script for the page.
 
-It still sorts. Its sortable headers are links to the current page with the sort in the query, `?sort=name&direction=asc`, the other params kept and `aria-sort` set on the sorted header, and the server sorts `rows` before drawing them. `sortParam` names the param (and `<name>Direction`) for a page with two such tables.
+It still sorts. Its sortable headers are links to the current page with the sort in the query, `?sort=name&direction=asc`, the other params kept and `aria-sort` set on the sorted header, and the server sorts `rows` before drawing them. `sortParam` names the param (and `<name>Direction`) for a page with two such tables. Sorting by link needs a page the server renders per request, as a static file ignores the query.
 
 A Table that is an island keeps its buttons, and reads the URL's sort only when `sortParam` is written.
 
