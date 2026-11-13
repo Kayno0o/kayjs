@@ -56,8 +56,7 @@ describe('s from kay', () => {
     const plain = await browserBundle('import { signal } from \'kay\'\n\nexport const count = signal(1)\n')
     const building = await browserBundle('import { label } from \'./built\'\n\nexport const read = () => label\n')
 
-    expect(building).not.toContain('elysia')
-    expect(building).not.toContain('typebox')
+    expect(building).not.toContain('node_modules')
     expect(building.length).toBeLessThan(20_000)
     expect(building.length - plain.length).toBeLessThan(2_000)
 
