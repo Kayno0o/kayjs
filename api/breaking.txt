@@ -1,3 +1,4 @@
+ai [./chat-launcher.kay] island
 kay [./server] JobContext
 kay [./server] QueueOptions
 kay [./server] WorkflowOptions
@@ -11,3 +12,6 @@ kay [./test] TestSite
 kay [.] PersistedOptions
 mail [./subscribe-form.kay] default
 mail [.] registeredMailer
+ui [./app-header.kay] island
+ui [./site-nav.kay] island
+ui [./table.kay] island

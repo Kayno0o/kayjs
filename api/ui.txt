@@ -737,9 +737,6 @@ component default
   open?: boolean | undefined
   sticky?: boolean | undefined
 
-[./app-header.kay] island
-const island: { readonly interactive: { readonly open: false; readonly onOpenChange: false; readonly link: false; }; }
-
 [./app-switcher.kay] default
 component default
   apps: readonly SwitcherApp[]
@@ -2768,9 +2765,6 @@ component default
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
 
-[./site-nav.kay] island
-const island: { readonly interactive: { readonly open: false; readonly onOpenChange: false; readonly link: false; }; }
-
 [./skeleton.kay] default
 component default
   class?: string | undefined | { root?: string | undefined; block?: string | undefined; label?: string | undefined; }
@@ -3075,25 +3069,6 @@ component default
     size?: string | undefined;
   };
 }; columnToggle?: boolean | undefined; columns: Column<Row>[]; columnsLabel?: string | undefined; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; footer?: ((column: Column<Row>) => Element) | undefined; header?: ((column: Column<Row>) => Element) | undefined; hiddenColumns?: string[] | undefined; label?: string | undefined; limitParam?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onPageChange?: ((page: number, size: number) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onScrollChange?: ((scrolls: boolean) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; page?: number | undefined; pageParam?: string | undefined; pageSize?: number | undefined; pageSizes?: readonly number[] | undefined; plain?: boolean | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
-
-[./table.kay] island
-const island: {
-  readonly plain: true;
-  readonly interactive: {
-    readonly filter: false;
-    readonly filterParam: false;
-    readonly fields: false;
-    readonly selectable: false;
-    readonly exportable: false;
-    readonly columnToggle: false;
-    readonly expandable: false;
-    readonly pageSize: false;
-    readonly rowHref: false;
-    readonly onRowClick: false;
-    readonly virtual: false;
-    readonly list: false;
-  };
-}
 
 [./tabs.kay] default
 component default

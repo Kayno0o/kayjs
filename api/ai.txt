@@ -950,9 +950,6 @@ component default
   variant?: "bubble" | "plain" | undefined
   /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
-[./chat-launcher.kay] island
-const island: { readonly persist: true; readonly hydrate: "idle"; }
-
 [./chat-panel.kay] default
 component default
   children?: Element
