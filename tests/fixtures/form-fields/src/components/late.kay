@@ -1,4 +1,5 @@
---- island
+---
+island()
 import type { Action } from 'kay'
 import { signal } from 'kay'
 

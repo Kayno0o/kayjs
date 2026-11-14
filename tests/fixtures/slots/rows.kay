@@ -1,4 +1,5 @@
---- island
+---
+island()
 import List from './list.kay'
 ---
 List(items={['x', 'y']})

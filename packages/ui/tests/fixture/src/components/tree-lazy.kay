@@ -1,4 +1,5 @@
---- island
+---
+island()
 import TreeView from '@kayjs/ui/tree-view.kay'
 import { signal } from 'kay'
 

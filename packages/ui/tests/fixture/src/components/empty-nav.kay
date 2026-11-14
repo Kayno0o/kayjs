@@ -1,4 +1,5 @@
---- island
+---
+island()
 import AppHeader from '@kayjs/ui/app-header.kay'
 import SideNav from '@kayjs/ui/side-nav.kay'
 import SiteNav from '@kayjs/ui/site-nav.kay'

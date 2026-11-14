@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import { signal } from 'kay'
 import FileInput from '@kayjs/cms/file-input.kay'
 

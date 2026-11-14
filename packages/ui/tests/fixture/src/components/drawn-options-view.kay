@@ -1,4 +1,5 @@
---- island
+---
+island()
 import ChipGroup from '@kayjs/ui/chip-group.kay'
 import MultiSelect from '@kayjs/ui/multi-select.kay'
 import RadioGroup from '@kayjs/ui/radio-group.kay'

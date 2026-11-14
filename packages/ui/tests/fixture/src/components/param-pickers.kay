@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import Segmented from '@kayjs/ui/segmented.kay'
 import Select from '@kayjs/ui/select.kay'
 import { signal } from 'kay'

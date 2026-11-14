@@ -1,4 +1,5 @@
---- island
+---
+island()
 import ChipGroup from '@kayjs/ui/chip-group.kay'
 import RadioGroup from '@kayjs/ui/radio-group.kay'
 import Segmented from '@kayjs/ui/segmented.kay'

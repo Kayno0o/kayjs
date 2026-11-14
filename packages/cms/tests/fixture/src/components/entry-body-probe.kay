@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import EntryBody from '@kayjs/cms/entry-body.kay'
 import { resource } from 'kay'
 import editorApi from '../../../../src/api/editor'

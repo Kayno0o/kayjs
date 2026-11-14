@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Pagination from '@kayjs/ui/pagination.kay'
 import { signal } from 'kay'
 

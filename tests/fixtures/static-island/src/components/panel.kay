@@ -1,6 +1,5 @@
---- module
-export const island = { interactive: { sortable: true, selectable: false } } as const
---- island
+---
+island({ interactive: { sortable: true, selectable: false } })
 import { signal } from 'kay'
 
 const { items, sortable = true, selectable = false } = props<{ items: string[], sortable?: boolean, selectable?: boolean }>()

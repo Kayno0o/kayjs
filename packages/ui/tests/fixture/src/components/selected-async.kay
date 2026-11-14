@@ -1,4 +1,5 @@
---- island
+---
+island()
 import type { Column } from '@kayjs/ui'
 import { signal } from 'kay'
 import Table from '@kayjs/ui/table.kay'

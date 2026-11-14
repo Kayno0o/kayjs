@@ -1,4 +1,5 @@
---- island
+---
+island()
 import type { Action, Failure } from 'kay'
 import type { AiMessage, Progress } from '@kayjs/ai'
 import Chat from '@kayjs/ai/chat.kay'

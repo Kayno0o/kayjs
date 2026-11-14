@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Tabs from '@kayjs/ui/tabs.kay'
 
 // What the tests read back: each tab shown.

@@ -1,4 +1,5 @@
---- island
+---
+island()
 import LineChart from '@kayjs/ui/line-chart.kay'
 
 const seconds = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 9, 21, 16, 12, index * 10)).toISOString())

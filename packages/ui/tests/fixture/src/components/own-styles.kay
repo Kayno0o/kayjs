@@ -1,4 +1,5 @@
---- island
+---
+island()
 import HoverCard from '@kayjs/ui/hover-card.kay'
 import Popover from '@kayjs/ui/popover.kay'
 import Masonry from '@kayjs/ui/masonry.kay'

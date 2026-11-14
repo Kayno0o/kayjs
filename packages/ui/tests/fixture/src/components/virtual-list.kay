@@ -1,4 +1,5 @@
---- island
+---
+island()
 import VirtualList from '@kayjs/ui/virtual-list.kay'
 
 const { count } = props<{ count: number }>()

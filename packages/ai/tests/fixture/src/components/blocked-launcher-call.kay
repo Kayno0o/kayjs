@@ -1,4 +1,5 @@
---- island
+---
+island()
 import { blocked } from '../routes/tools.kay'
 import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 ---

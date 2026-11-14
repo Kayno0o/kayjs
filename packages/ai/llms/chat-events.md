@@ -4,10 +4,11 @@
 
 ### Hear what the chat does
 
-`Chat` and `ChatLauncher` take callbacks, so analytics, a badge or a save of the finished turn needs no wrapper around the action. They hold functions, so write them in a component of your own, which renders as an island: `kay check` refuses one from a static page or layout (`island-prop`), its fix writing `--- island`.
+`Chat` and `ChatLauncher` take callbacks, so analytics, a badge or a save of the finished turn needs no wrapper around the action. They hold functions, so write them in a component of your own, which renders as an island: `kay check` refuses one from a static page or layout (`island-prop`), its fix writing `island()`.
 
 ```kay
---- island
+---
+island()
 import { reply } from '../routes/chat.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---

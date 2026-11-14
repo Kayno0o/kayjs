@@ -1,4 +1,5 @@
---- island
+---
+island()
 import TabNav from '@kayjs/ui/tab-nav.kay'
 import { signal } from 'kay'
 

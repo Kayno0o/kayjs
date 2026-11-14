@@ -1,4 +1,4 @@
---- script
+---
 const { label } = props<{ label: string, field?: string }>()
 ---
 div.wrap

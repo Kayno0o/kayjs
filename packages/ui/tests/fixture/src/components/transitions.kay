@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Avatar from '@kayjs/ui/avatar.kay'
 import CopyButton from '@kayjs/ui/copy-button.kay'
 import SiteFavicon from '@kayjs/ui/site-favicon.kay'

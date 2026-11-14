@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import { signal } from 'kay'
 import { visitors } from '../live'
 

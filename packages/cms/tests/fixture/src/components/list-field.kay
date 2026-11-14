@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import FieldInput from '@kayjs/cms/field-input.kay'
 
 // The editor's list field on drafts a test opens, mounted with `mountComponent`.

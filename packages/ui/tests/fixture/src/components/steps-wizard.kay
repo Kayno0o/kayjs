@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import Steps from '@kayjs/ui/steps.kay'
 import { signal } from 'kay'
 

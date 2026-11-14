@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Breadcrumb from '@kayjs/ui/breadcrumb.kay'
 import TabNav from '@kayjs/ui/tab-nav.kay'
 import Tabs from '@kayjs/ui/tabs.kay'

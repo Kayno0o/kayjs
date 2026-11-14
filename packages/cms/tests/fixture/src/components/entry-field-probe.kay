@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import EntryField from '@kayjs/cms/entry-field.kay'
 import { cmsDrafts } from '../../../../src/drafts'
 import { formScope } from '../../../../src/form'

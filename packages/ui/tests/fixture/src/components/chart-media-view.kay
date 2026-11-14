@@ -1,4 +1,5 @@
---- island
+---
+island()
 import ImageCropper from '@kayjs/ui/image-cropper.kay'
 import LineChart from '@kayjs/ui/line-chart.kay'
 import Masonry from '@kayjs/ui/masonry.kay'

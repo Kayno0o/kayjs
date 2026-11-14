@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import BarChart from '@kayjs/ui/bar-chart.kay'
 import LineChart from '@kayjs/ui/line-chart.kay'
 import Sparkline from '@kayjs/ui/sparkline.kay'

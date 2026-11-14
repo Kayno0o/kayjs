@@ -1,4 +1,5 @@
---- island
+---
+island()
 import { trustHtml } from 'kay'
 import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
 

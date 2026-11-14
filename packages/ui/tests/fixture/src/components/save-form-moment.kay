@@ -1,4 +1,5 @@
---- island
+---
+island()
 import DateTimeInput from '@kayjs/ui/date-time-input.kay'
 import SaveForm from '@kayjs/ui/save-form.kay'
 

@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Combobox from '@kayjs/ui/combobox.kay'
 
 const people = ['Ada Lovelace', 'Alan Turing', 'Grace Hopper', 'Edsger Dijkstra', 'Barbara Liskov', 'Donald Knuth', 'Margaret Hamilton']

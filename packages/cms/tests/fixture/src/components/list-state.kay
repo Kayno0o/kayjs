@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import FieldInput from '@kayjs/cms/field-input.kay'
 import { cmsDrafts } from '../../../../src/drafts'
 

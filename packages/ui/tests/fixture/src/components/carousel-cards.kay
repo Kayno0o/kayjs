@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Carousel from '@kayjs/ui/carousel.kay'
 ---
 // Slides with neither `src` nor `alt`, as the `@slide` block draws them.

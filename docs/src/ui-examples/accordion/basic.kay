@@ -1,4 +1,5 @@
---- island
+---
+island()
 import Accordion from '@kayjs/ui/accordion.kay'
 
 const items = [

@@ -1,4 +1,5 @@
---- island
+---
+island()
 import { toast } from '@kayjs/ui'
 import Button from '@kayjs/ui/button.kay'
 import FormField from '@kayjs/ui/form-field.kay'

@@ -1,4 +1,5 @@
---- island
+---
+island()
 import type { Tone } from '@kayjs/ui'
 import Menu from '@kayjs/ui/menu.kay'
 import Sparkline from '@kayjs/ui/sparkline.kay'

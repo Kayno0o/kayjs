@@ -1,4 +1,5 @@
---- island
+---
+island()
 import { blocked } from '../routes/tools.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---

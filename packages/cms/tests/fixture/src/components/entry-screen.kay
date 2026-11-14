@@ -1,4 +1,5 @@
---- client
+---
+island({ render: 'client' })
 import type { ScreenCollection, StoredEntry } from '@kayjs/cms'
 import EntryEditor from '@kayjs/cms/entry-editor.kay'
 

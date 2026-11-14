@@ -1,4 +1,5 @@
---- island
+---
+island()
 import { signal } from 'kay'
 import AppHeader from '@kayjs/ui/app-header.kay'
 import SiteNav from '@kayjs/ui/site-nav.kay'
