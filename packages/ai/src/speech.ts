@@ -1,9 +1,9 @@
-import type { CallOptions } from './config'
-import type { AudioFormat } from './types'
+import type { AudioFormat, CallOptions } from './types'
 import { byteSize, configError } from 'kay/library'
-import { setUp } from './config'
+import { setUp } from './call'
 import { AiError } from './errors'
 import { billed } from './limits'
+import { speechLanguage } from './locale'
 
 const DEFAULT_MAX_RECORDING_BYTES = 10 * 1024 * 1024
 const DEFAULT_MAX_SPEAK_CHARS = 4096
@@ -13,7 +13,9 @@ const MIN_SPEED = 0.25
 const MAX_SPEED = 4
 
 export interface TranscribeOptions extends CallOptions {
-  // What is spoken, as an ISO 639-1 code such as `fr`, the two letters speech providers take, not a BCP 47 tag like `fr-FR`: left out, the model tells, which a short recording may get wrong.
+  // What is spoken, a BCP 47 tag such as `fr` or `fr-FR` as everywhere in kay, sent to the provider as the ISO 639-1 code it takes (`fr`): left out, the model tells, which a short recording may get wrong.
+  locale?: string | undefined
+  /** @deprecated Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108. */
   language?: string | undefined
   // The most bytes the recording may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails with a `too-long` error before the provider is called. `Infinity` lifts it.
   maxSize?: number | string | undefined
@@ -38,9 +40,11 @@ export async function transcribe(audio: Blob, options: TranscribeOptions = {}): 
   if (audio.size > max)
     throw new AiError('too-long', `the recording holds ${audio.size} bytes, past the ${max} that maxSize allows`)
 
-  const { send, model, timeout, signal } = setUp('transcribe', options)
+  const { send, signal } = setUp('transcribe', options)
+  const locale = options.locale ?? options.language
+  const language = locale === undefined ? undefined : speechLanguage(locale, 'transcribe({ locale })')
 
-  return billed(audio.size / BYTES_PER_CHAR, signal, async () => send({ audio, model, language: options.language, timeout }, signal), text => text.length)
+  return billed(audio.size / BYTES_PER_CHAR, signal, async () => send({ audio, language }), text => text.length)
 }
 
 // Reads a text aloud: the audio as a Blob, typed by its format, which `new Response(audio)` serves as it is. The server is `AI_AUDIO_URL`, else the OpenAI-compatible one `ask` uses, the model `AI_SPEECH_MODEL` and the voice `AI_VOICE`; under `bun test` the fake answers.
@@ -58,7 +62,7 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<B
   if (text.length > maxInputChars)
     throw new AiError('too-long', `the text holds ${text.length} characters, past the ${maxInputChars} that maxInputChars allows`)
 
-  const { send, model, voice, timeout, signal } = setUp('speak', options)
+  const { send, voice, signal } = setUp('speak', options)
 
-  return billed(text.length, signal, async () => send({ text, model, voice: options.voice ?? voice, speed, format: options.format, timeout }, signal), () => 0)
+  return billed(text.length, signal, async () => send({ text, voice: options.voice ?? voice, speed, format: options.format }), () => 0)
 }

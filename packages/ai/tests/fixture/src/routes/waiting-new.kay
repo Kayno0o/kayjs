@@ -4,4 +4,4 @@ import { held } from './cases.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Waiting
-Chat(action={held} label="Held" waitingLabel="Hold on")
+Chat(action={held} label="Held" labels={{ thinking: "Hold on" }})

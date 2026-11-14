@@ -1,4 +1,10 @@
+ai [./chat-launcher.kay] default.failureLabel	1.108	deprecated-ai-labels	Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
+ai [./chat-launcher.kay] default.waitingLabel	1.108	deprecated-ai-labels	Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
+ai [./chat.kay] default.failureLabel	1.108	deprecated-ai-labels	Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
+ai [./chat.kay] default.waitingLabel	1.108	deprecated-ai-labels	Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108.
 ai [./test] aiTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
+ai [.] DescribeImageOptions.language	1.108	deprecated-ai-language	Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108.
+ai [.] TranscribeOptions.language	1.108	deprecated-ai-language	Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108.
 auth [./test] authTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 cms [./test] cmsTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.

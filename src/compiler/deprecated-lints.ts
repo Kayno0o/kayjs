@@ -97,6 +97,23 @@ export const DEPRECATED_LINTS = {
     wrong: '--- server\nimport { action } from \'kay\'\nimport { send } from \'@kayjs/mail\'\n\nexport const notify = action(async () => {\n  await send({ to: \'ada@example.com\', subject: \'Hi\', text: \'Hello\' })\n})\n---\np x',
     right: '--- server\nimport { action } from \'kay\'\n\nexport const notify = action(async (_input, { locals }) => {\n  await locals.mail.send({ to: \'ada@example.com\', subject: \'Hi\', text: \'Hello\' })\n})\n---\np x',
   },
+  'deprecated-ai-labels': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'The `<key>Label` props of kayjs-ai\'s `Chat`, `ChatLauncher` and `ChatPanel`, `labels` since 1.105: one object keyed as the messages are (`ai.chat.send` is `labels.send`), in place of up to 45 props that each held one text. `waitingLabel` is `labels.thinking` and `failureLabel` `labels.error`. The old props work until 1.108 and win over `labels`. Found on a component bound to the library\'s file in a template. The fix writes the first prop as `labels={{ ... }}` holding every one; a template that has a `labels` already, or a prop with no value, is reported with no fix.',
+    wrong: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} sendLabel="Go" stopLabel="Halt")',
+    right: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} labels={{ send: "Go", stop: "Halt" }})',
+  },
+  'deprecated-ai-language': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`language` in the options of kayjs-ai\'s `transcribe()` and `describeImage()`, `locale` since 1.105: a BCP 47 tag such as `fr` or `pt-BR` as everywhere in kay, which `transcribe()` turns into the ISO 639-1 code its provider takes. The old name works until 1.108. Found on a call of either imported from `@kayjs/ai`, in the options object written in the call, in the TypeScript files and `.kay` files of the project. The fix renames the key, a bare `{ language }` becoming `locale: language`; an object that spreads another, or that has a `locale` already, is reported with no fix.',
+    wrong: '---\nimport { transcribe } from \'@kayjs/ai\'\n\nexport const text = async (audio: Blob) => transcribe(audio, { language: \'fr\' })\n---\np x',
+    right: '---\nimport { transcribe } from \'@kayjs/ai\'\n\nexport const text = async (audio: Blob) => transcribe(audio, { locale: \'fr\' })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

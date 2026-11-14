@@ -2,7 +2,7 @@
 import type { Action, Component, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ByteSize } from 'kay/library'
-import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
+import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatLabelProps, ChatLabels, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
 import { durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
 import Icon from '@kayjs/ui/icon.kay'
@@ -60,7 +60,7 @@ const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLabel = wording('ai.chat.field', 'Message'), startedLabel = wording('ai.chat.started', 'New conversation started'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), waitingLabel, sourcesLabel = wording('ai.chat.sources', 'Sources'), showReasoning, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), failureLabel, history: lastMessages, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, icons, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), remember, links = 'apart', images, runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), transcribe, recordLabel = wording('ai.chat.record', 'Speak a message'), transcribingLabel = wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = wording('ai.chat.conversations', 'Conversations'), untitledLabel = wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.'), turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
+const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Chat'), fieldLabel = labels.field ?? wording('ai.chat.field', 'Message'), startedLabel = labels.started ?? wording('ai.chat.started', 'New conversation started'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = labels.send ?? wording('ai.chat.send', 'Send'), stopLabel = labels.stop ?? wording('ai.chat.stop', 'Stop'), retryLabel = labels.retry ?? wording('ai.chat.retry', 'Try again'), waitingLabel, sourcesLabel = labels.sources ?? wording('ai.chat.sources', 'Sources'), showReasoning, reasoningLabel = labels.reasoning ?? wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = labels.stopped ?? wording('ai.chat.stopped', 'Stopped'), failureLabel, history: lastMessages, maxChars = POSTED_CHARACTERS, tableLabel = labels.table ?? wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, toolLabels = {}, icons, newButton = false, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), remember, links = 'apart', images, runningLabel = labels.running ?? wording('ai.chat.running', 'Running'), doneLabel = labels.done ?? wording('ai.chat.done', 'Done'), failedLabel = labels.failed ?? wording('ai.chat.failed', 'Failed'), argumentsLabel = labels.arguments ?? wording('ai.chat.arguments', 'Arguments'), resultLabel = labels.result ?? wording('ai.chat.result', 'Result'), approvalLabel = labels.approval ?? wording('ai.chat.approval', 'Needs your approval'), allowLabel = labels.allow ?? wording('ai.chat.allow', 'Allow'), denyLabel = labels.deny ?? wording('ai.chat.deny', 'Deny'), allowedLabel = labels.allowed ?? wording('ai.chat.allowed', 'Allowed:'), deniedLabel = labels.denied ?? wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxSize, attachLabel = labels.attach ?? wording('ai.chat.attach', 'Attach a file'), removeLabel = labels.remove ?? wording('ai.chat.remove', 'Remove'), attachRefusedLabel = labels.attachRefused ?? wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = labels.attachTooBig ?? wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = labels.attachFull ?? wording('ai.chat.attachFull', 'No more files can be attached.'), regenerate = false, editable = false, regenerateLabel = labels.regenerate ?? wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = labels.edit ?? wording('ai.chat.edit', 'Edit the message'), saveLabel = labels.save ?? wording('ai.chat.save', 'Save and send'), cancelLabel = labels.cancel ?? wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = labels.editEmpty ?? wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = labels.editBusy ?? wording('ai.chat.editBusy', 'Wait for the reply to finish.'), transcribe, recordLabel = labels.record ?? wording('ai.chat.record', 'Speak a message'), transcribingLabel = labels.transcribing ?? wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = labels.unheard ?? wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = labels.transcribeFailed ?? wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), fill = false, layout, variant, tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = labels.conversations ?? wording('ai.chat.conversations', 'Conversations'), untitledLabel = labels.untitled ?? wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = labels.rename ?? wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = labels.delete ?? wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = labels.deleteConfirm ?? wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = labels.conflict ?? wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = labels.loadFailed ?? wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = labels.changeFailed ?? wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = labels.signedOut ?? wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.'), turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -68,31 +68,13 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLab
   initial?: ChatTurn[] | undefined
   // Names the message list for screen readers.
   label?: string | undefined
-  // Names the field the visitor writes in, so it is not read as the message list is.
-  fieldLabel?: string | undefined
-  // Said to screen readers when `newButton` or the panel's header button starts the conversation over.
-  startedLabel?: string | undefined
   placeholder?: string | undefined
-  sendLabel?: string | undefined
-  stopLabel?: string | undefined
-  retryLabel?: string | undefined
-  // Said, and read out, while the first words of a reply are awaited: `Thinking…` by default.
-  waitingLabel?: string | undefined
-
-  // The title of the list of cited sources under a reply.
-  sourcesLabel?: string | undefined
-  // Marks a reply cut short by Stop.
-  stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`; the history posted opens on a user message, so an assistant one at its start is left out.
   history?: number | undefined
   // The most characters each send posts, the oldest messages leaving first; the chat lowers it by itself when the action answers 413, so it is only set to avoid that first refusal.
   maxChars?: number | undefined
-  // Names a table of a reply, which scrolls sideways inside its bubble when it is wider; a reply with several numbers them, `Table 1`, `Table 2`.
-  tableLabel?: string | undefined
-  // Whether the model's thinking is shown, folded under `reasoningLabel`, above the reply it came before; false hides it. A reply whose provider sends none shows nothing either way.
+  // Whether the model's thinking is shown, folded under `labels.reasoning`, above the reply it came before; false hides it. A reply whose provider sends none shows nothing either way.
   showReasoning?: boolean | undefined
-
-  reasoningLabel?: string | undefined
   // Whether each tool call opens to its arguments and result, shown as plain text; false shows its name and status only.
   toolDetails?: boolean | undefined
   // Said in the empty chat above the suggestions.
@@ -115,24 +97,9 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLab
   // What the round buttons draw, by name, in place of the library's own: an icon of the app's set or one imported from `~icons/<prefix>/<name>`, as `Icon` takes it. Only the names given change.
   icons?: ChatIcons | undefined
 
-  // The status of a tool call, and the names of its two parts.
-  runningLabel?: string | undefined
-  doneLabel?: string | undefined
-  failedLabel?: string | undefined
-  argumentsLabel?: string | undefined
-  resultLabel?: string | undefined
-  // A tool that changes something waits for the visitor: the line naming it (`Needs your approval`), its two buttons, and the start of the message each posts (`Allowed:` then the tool and its arguments, `Denied:` then the tool).
-  approvalLabel?: string | undefined
-  allowLabel?: string | undefined
-  denyLabel?: string | undefined
-  allowedLabel?: string | undefined
-  deniedLabel?: string | undefined
-  // Shown when the call is refused or the stream breaks off.
-  failureLabel?: string | undefined
 
-  // Shows a button beside the field, once the log holds a turn, which starts the conversation over as `ChatPanel`'s header button does: a reply under way stops, and the log, the field and the kept history are cleared. `newLabel` names it and `icons.new` replaces its plus.
+  // Shows a button beside the field, once the log holds a turn, which starts the conversation over as `ChatPanel`'s header button does: a reply under way stops, and the log, the field and the kept history are cleared. `labels.new` names it and `icons.new` replaces its plus.
   newButton?: boolean | undefined
-  newLabel?: string | undefined
 
   // A name under which the conversation is kept in the tab's session storage, so a reload of the tab finds it again; the tool calls of the replies are not kept. Without it, a reload starts afresh.
   remember?: string | undefined
@@ -148,32 +115,14 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLab
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
 
-  // The attach button's name and tooltip, the name of each file's remove button, and what a refused file says: a type that is not accepted, a file past `maxSize` and a message already holding `maxFiles`.
-  attachLabel?: string | undefined
-  removeLabel?: string | undefined
-  attachRefusedLabel?: string | undefined
-  attachTooBigLabel?: string | undefined
-  attachFullLabel?: string | undefined
 
   // Shows a button under the last reply, once nothing is under way, which drops it and asks again from the message before it; the action reads `replaces()` to drop the reply it stored. Not offered for an answer to a held tool call, whose approval is spent.
   regenerate?: boolean | undefined
   // Shows a button on each message of the visitor, which turns it into a field to change and send again: that message and every turn after it leave the log and the history, and the action reads `replaces()` to drop them from what it stored. Its files stay.
   editable?: boolean | undefined
-  // The buttons' names and tooltips, and the two buttons of the field an edit opens. Each message's edit button adds the start of the message to `editLabel`, `Edit the message: Hello`, so no two share a name. `editEmptyLabel` is said when Save finds no text and no file, and `editBusyLabel` when Enter in the field finds a reply under way.
-  regenerateLabel?: string | undefined
-  editLabel?: string | undefined
-  saveLabel?: string | undefined
-  cancelLabel?: string | undefined
-  editEmptyLabel?: string | undefined
-  editBusyLabel?: string | undefined
 
   // An action writing down what the visitor said, `action(s.Object({ audio: s.File() }), ...)` returning the text or `{ text }`: given, a microphone button beside the field records, and the text joins the field and is sent as typed. A reply under way keeps it in the field.
   transcribe?: Action<{ audio: File }, string | { text: string } | Failure<unknown>> | undefined
-  // The microphone button's name and tooltip, what is said while `transcribe` writes, and what a recording that gave no text and one that failed say. The microphone's own troubles are worded by kayjs-ui's `ui.recordButton.*`.
-  recordLabel?: string | undefined
-  transcribingLabel?: string | undefined
-  unheardLabel?: string | undefined
-  transcribeFailedLabel?: string | undefined
 
   // Fills the height of its container, which the app gives a height (a flex column, a grid row or a fixed one): the log takes the space and scrolls, the greeting sits above the form, and the form stays at the bottom, as the launcher's panel does. Without it the log grows to 32rem and scrolls past it.
   fill?: boolean | undefined
@@ -183,18 +132,6 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLab
   conversations?: boolean | undefined
   // Where the conversation shown is named: `address`, the page's `conversation` query param, which a link or a bookmark carries; `browser`, this browser's localStorage under the action's URL, for a chat on every page of the site, which `ChatLauncher` is, its list then made of buttons rather than links.
   conversationIn?: 'address' | 'browser' | undefined
-  // The list's name, the title of a conversation that opened on files alone, the names of the rename and delete buttons (followed by the conversation's title) and the question a delete asks before it deletes.
-  conversationsLabel?: string | undefined
-  untitledLabel?: string | undefined
-  renameLabel?: string | undefined
-  deleteLabel?: string | undefined
-  deleteConfirmLabel?: string | undefined
-  // Said when another tab wrote to the conversation first, which is then shown as stored with the message back in the field, when it could not be loaded, and when a rename or a delete failed.
-  conflictLabel?: string | undefined
-  loadFailedLabel?: string | undefined
-  changeFailedLabel?: string | undefined
-  // Said when the visitor's session lapsed while a conversation was kept on the server: the chat keeps what it shows and posts it whole from then on.
-  signedOutLabel?: string | undefined
   // Replaces what a turn shows with the app's own markup, given the turn as plain data and its place in the log; the turn being written is given too, its `content` growing. The log, the turn's element, the held tool calls' Allow and Deny buttons, the edit and regenerate buttons and the field that opens on an edit stay the chat's, so scrolling and screen-reader announcements work as for the default.
   turn?: Snippet<[turn: ChatTurnView, index: number]> | undefined
   // Adds markup to the row of buttons under a turn, after the regenerate and edit buttons, such as a copy button or thumbs; given a finished turn.
@@ -207,7 +144,9 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), fieldLab
   empty?: Snippet<[chat: { send: (text: string) => void }]> | undefined
   // Markup under the form, such as a link to the help or a limit counter.
   footer?: Snippet | undefined
-}>()
+  // The texts of the chat, by the keys of its messages: `labels={{ send: 'Go', stop: 'Halt' }}`. A key left out keeps its message, which the `wording` catalog words for every chat of the site.
+  labels?: ChatLabels | undefined
+} & ChatLabelProps>()
 
 // A size that is none fails as the chat renders, not at the first file attached.
 fileSizeLimit(maxSize)
@@ -224,7 +163,7 @@ const following = followLog(() => log, { threshold: PINNED_PX })
 const inBrowser = conversationIn === 'browser'
 const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted.local<string | undefined>(conversationKey(action.url), undefined) : queryParam<string | undefined>('conversation')
 
-const waiting = () => waitingLabel ?? wording('ai.chat.thinking', 'Thinking…')
+const waiting = () => waitingLabel ?? labels.thinking ?? wording('ai.chat.thinking', 'Thinking…')
 const reasoned = () => showReasoning ?? true
 const session = createChatSession({
   get action() { return action },
@@ -232,7 +171,7 @@ const session = createChatSession({
   get keep() { return lastMessages ?? 20 },
   get maxChars() { return maxChars },
   get remember() { return remember },
-  get errorMessage() { return failureLabel ?? wording('ai.chat.error', 'The reply failed.') },
+  get errorMessage() { return failureLabel ?? labels.error ?? wording('ai.chat.error', 'The reply failed.') },
   attachments,
   say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
   focus: () => field?.focus(),

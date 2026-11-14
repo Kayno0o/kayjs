@@ -7,6 +7,7 @@ import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { deprecatedAiLabels } from './deprecated-ai-labels'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
@@ -453,6 +454,7 @@ class Validator {
 
     if (library !== undefined) {
       deprecatedUiProps(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ui-props', message, details))
+      deprecatedAiLabels(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ai-labels', message, details))
     }
 
     if (this.options.check && !element.component)

@@ -4,4 +4,4 @@ import { reply } from './chat.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Hostile
-Chat(action={reply} label="Hostile" tableLabel={'Tab"le <x> & more'})
+Chat(action={reply} label="Hostile" labels={{ table: 'Tab"le <x> & more' }})

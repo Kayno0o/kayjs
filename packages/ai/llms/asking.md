@@ -99,6 +99,10 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
 
+### Options every call takes
+
+`ask`, `describeImage`, `transcribe`, `speak` and `embed` share one base, `CallOptions`: `provider`, `model`, `signal`, `timeout`, `retry`, `fallback`, and the hooks `onStep`, `onSuccess` and `onError`. An option reads the same on each, so a retry or a fallback written for an `ask` is written the same for an `embed` ([Speech and embeddings](speech-and-embeddings.md#options-every-call-takes)). `timeout` is `'30s'`, which sets the `connect` and the `idle` of an ask to it, or `{ connect, idle }`.
+
 ### Fields kayjs-ai does not model
 
 - `ask(..., { body: { top_p: 0.9, seed: 7, stop: ['END'] } })` adds those fields to the provider's request body as they are, so a parameter a provider takes (`top_p`, `seed`, `presence_penalty`, Mistral's `safe_prompt`, Anthropic's `top_k` or `metadata.user_id`, OpenRouter's `provider` routing) needs no kayjs-ai release. `openai({ baseUrl, body })` and `anthropic({ apiKey, body })` set fields once for every ask of that provider; the ask's own `body` wins field by field, top level only.

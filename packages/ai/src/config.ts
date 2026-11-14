@@ -1,14 +1,11 @@
-import type { Duration } from 'kay'
 import type { AnthropicOptions } from './anthropic'
 import type { Provider } from './types'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, currentRequest, durationSeconds } from 'kay/library'
+import { configError } from 'kay/library'
 import { defineEnv } from 'kay/server'
 import { anthropicAt } from './anthropic'
-import { AiError } from './errors'
 import { fakeAi } from './fake'
-import { named } from './models'
 import { OPENAI_URL, openaiAt } from './openai'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
@@ -97,30 +94,20 @@ export function choose(): Chosen {
   return { provider: openaiAt({ baseUrl: base ?? OPENAI_URL, apiKey: openaiKey, insecure: env.AI_INSECURE }, 'AI_BASE_URL'), model: env.AI_MODEL }
 }
 
-const CALLS = {
+export const CALLS = {
   transcribe: { url: 'AI_AUDIO_URL', key: 'AI_AUDIO_KEY', model: 'AI_TRANSCRIBE_MODEL', what: 'speech to text' },
   speak: { url: 'AI_AUDIO_URL', key: 'AI_AUDIO_KEY', model: 'AI_SPEECH_MODEL', what: 'text to speech' },
   embed: { url: 'AI_EMBED_URL', key: 'AI_EMBED_KEY', model: 'AI_EMBED_MODEL', what: 'embeddings' },
 } as const
 
-const DEFAULT_CALL_TIMEOUT = '2m'
-const MAX_TIMER_MS = 2 ** 31 - 1
-
 export type Call = keyof typeof CALLS
-
-export interface CallOptions {
-  model?: string | undefined
-  provider?: Provider | undefined
-  signal?: AbortSignal | undefined
-  timeout?: Duration | undefined
-}
 
 function sameOrigin(a: string, b: string): boolean {
   return URL.canParse(a) && URL.canParse(b) && new URL(a).origin === new URL(b).origin
 }
 
 // The provider a call other than an ask goes to: the server its own variable names, else the one `ask` uses when it has the call; under `bun test` the fake.
-function chooseFor(call: Call): Chosen & { voice: string | undefined } {
+export function chooseFor(call: Call): Chosen & { voice: string | undefined } {
   if (process.env.NODE_ENV === 'test')
     return { provider: fakeAi, model: fakeAi.model, voice: undefined }
 
@@ -144,24 +131,4 @@ function chooseFor(call: Call): Chosen & { voice: string | undefined } {
     throw configError('ai', 'baseUrl', `${provider.name} has no ${what}; set ${url} to an OpenAI-compatible server`)
 
   return { provider, model: provider === fakeAi ? fakeAi.model : env[model], voice: env.AI_VOICE }
-}
-
-// What a `transcribe`, `speak` or `embed` call is sent with: the provider and its method, the model, the voice the environment names, how long it may take and what stops it.
-export function setUp<C extends Call>(call: C, options: CallOptions) {
-  const hit = options.model === undefined ? undefined : named(options.model)
-  const handmade = options.provider ?? hit?.provider
-  const chosen = handmade === undefined ? chooseFor(call) : { provider: given(handmade), model: undefined, voice: undefined }
-  const model = hit?.model ?? options.model ?? chosen.model
-  const method = chosen.provider[call]
-
-  if (model === undefined)
-    throw configError('ai', 'model', `no model for ${call}(); set ${CALLS[call].model} or pass { model }`)
-
-  if (method === undefined)
-    throw new AiError('unsupported', `${chosen.provider.name} has no ${CALLS[call].what}`)
-
-  const timeout: Duration = `${Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(options.timeout ?? DEFAULT_CALL_TIMEOUT, `${call}({ timeout })`) * 1000))}ms`
-  const signals = [currentRequest()?.signal, options.signal].filter(signal => signal !== undefined)
-
-  return { send: method as NonNullable<Provider[C]>, model, voice: chosen.voice, timeout, signal: AbortSignal.any(signals) }
 }

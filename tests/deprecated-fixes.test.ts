@@ -3,8 +3,9 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
-import { applySafeFixes } from '../src/check/fixes'
+import { aiLanguage } from '../src/check/ai-language'
 
+import { applySafeFixes } from '../src/check/fixes'
 import { localState } from '../src/check/local-state'
 import { persistedStorage } from '../src/check/persisted-storage'
 import { renamedPackages } from '../src/check/renamed-packages'
@@ -19,6 +20,7 @@ type Name = keyof typeof DEPRECATED_LINTS
 
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
+  'deprecated-ai-language': aiLanguage,
   'deprecated-local-state': localState,
 
   'deprecated-persisted-storage': persistedStorage,
@@ -47,7 +49,7 @@ describe('every deprecated lint has a safe fix', () => {
   it('lists each lint\'s check, so a new one cannot go without', () => {
     const compiled = names.filter(name => !(name in SITE))
 
-    expect(compiled.sort()).toEqual(['deprecated-if-alias', 'deprecated-page-island', 'deprecated-script-fence', 'deprecated-ui-props'])
+    expect(compiled.sort()).toEqual(['deprecated-ai-labels', 'deprecated-if-alias', 'deprecated-page-island', 'deprecated-script-fence', 'deprecated-ui-props'])
     expect(Object.keys(NO_SAFE_FIX).filter(name => !names.includes(name as Name))).toEqual([])
   })
 

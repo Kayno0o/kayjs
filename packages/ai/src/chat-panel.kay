@@ -1,17 +1,17 @@
 ---
 import type { Snippet } from 'kay'
+import type { ChatLauncherLabelProps, ChatLauncherLabels } from './types'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { eventText } from './chat-events'
 
 const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
 
-const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange, hash = '#chat' } = props<{
+const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = labels.open ?? wording('ai.chat.open', 'Open the chat'), closeLabel = labels.close ?? wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = labels.new ?? wording('ai.chat.new', 'New conversation'), expandLabel = labels.expand ?? wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = labels.collapse ?? wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange, hash = '#chat' } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
-  // Name and tooltip of the button while the panel is closed, and while it is open.
-  openLabel?: string | undefined
-  closeLabel?: string | undefined
+  // The texts of the buttons, by key: `open` and `close` are the name and tooltip of the button while the panel is closed and while it is open, `new` clears the conversation, `expand` and `collapse` switch the size.
+  labels?: Pick<ChatLauncherLabels, 'open' | 'close' | 'new' | 'expand' | 'collapse'> | undefined
   // What the button and the panel's close button draw.
   icon: Snippet
   closeIcon: Snippet
@@ -19,16 +19,13 @@ const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.o
   newIcon: Snippet
   expandIcon: Snippet
   collapseIcon: Snippet
-  newLabel?: string | undefined
-  expandLabel?: string | undefined
-  collapseLabel?: string | undefined
   // Opens and closes the panel when the page sets it; the button, the close button and Escape work on their own, so it can be left out.
   open?: boolean | undefined
   // Called with the new state when the visitor opens or closes the panel, not when the page sets `open`.
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // The address fragment that opens the panel, on load and whenever it changes to it; `false` for none.
   hash?: string | false | undefined
-}>()
+} & Pick<ChatLauncherLabelProps, 'openLabel' | 'closeLabel' | 'newLabel' | 'expandLabel' | 'collapseLabel'>>()
 
 const open = signal(wanted === true)
 const large = signal(false)

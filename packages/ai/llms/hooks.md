@@ -21,7 +21,7 @@ ai({
 })
 ```
 
-The same names in `ask(prompt, { onSuccess })` add to the ones of `ai()` for that ask: the hooks of `ai()` run first, then the ask's, and for `beforeRequest` each sees the request the one before left.
+The same names in `ask(prompt, { onSuccess })`, and `onStep`, `onSuccess` and `onError` in the options of `describeImage`, `transcribe`, `speak` and `embed` too, add to the ones of `ai()` for that ask: the hooks of `ai()` run first, then the ask's, and for `beforeRequest` each sees the request the one before left.
 
 ## Reference
 

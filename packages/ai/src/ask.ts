@@ -56,7 +56,7 @@ function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[]
 const MAX_TIMER_MS = 2 ** 31 - 1
 
 function timeoutsOf(timeout: AskOptions['timeout']): Timeouts {
-  const { connect = DEFAULT_CONNECT_TIMEOUT, idle = DEFAULT_IDLE_TIMEOUT } = timeout ?? {}
+  const { connect = DEFAULT_CONNECT_TIMEOUT, idle = DEFAULT_IDLE_TIMEOUT } = typeof timeout === 'object' ? timeout : { connect: timeout, idle: timeout }
 
   return {
     connect: `${Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(connect, 'ask({ timeout }).connect') * 1000))}ms`,

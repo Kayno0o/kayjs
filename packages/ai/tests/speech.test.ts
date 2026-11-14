@@ -56,7 +56,7 @@ describe('transcribe', () => {
   it('answers from the fake under bun test, keeping what it heard', async () => {
     model.transcript('Bonjour')
 
-    expect(await transcribe(recording, { language: 'fr' })).toBe('Bonjour')
+    expect(await transcribe(recording, { locale: 'fr' })).toBe('Bonjour')
     expect(await transcribe(recording)).toBe('Fake transcript')
     expect(model.heard).toHaveLength(2)
     expect(model.heard[0]).toMatchObject({ provider: 'fake', model: 'fake', audio: recording, language: 'fr' })
@@ -68,7 +68,7 @@ describe('transcribe', () => {
     model.transcript(heard => `${heard.audio.size} bytes`)
 
     expect((await failure(transcribe(recording))).kind).toBe('unavailable')
-    expect(await transcribe(recording, { language: 'fr' })).toBe('in French')
+    expect(await transcribe(recording, { locale: 'fr-CA' })).toBe('in French')
     expect(await transcribe(recording)).toBe(`${recording.size} bytes`)
   })
 

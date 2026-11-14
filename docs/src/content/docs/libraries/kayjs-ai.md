@@ -134,17 +134,17 @@ A reply grounded in documents cites them as `[1]`, `[2]`. Give `ask` the documen
 ask(messages, { sources: documents.map((doc, index) => ({ n: index + 1, title: doc.title, href: doc.url })) }).progress()
 ```
 
-A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path of your site, an anchor or `mailto:`; any other is ignored. Return `.progress()`, as the sources travel with it. A number the model cites that no source has stays as text. The sources stay with the turn over `remember`, and `initial` takes a `sources` list on an assistant message. The list's title is the `sourcesLabel` prop.
+A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path of your site, an anchor or `mailto:`; any other is ignored. Return `.progress()`, as the sources travel with it. A number the model cites that no source has stays as text. The sources stay with the turn over `remember`, and `initial` takes a `sources` list on an assistant message. The list's title is `labels.sources`.
 
 Every text is looked up in the app's catalogs under an `ai.chat.<name>` key first (`ai.chat.send`, `ai.chat.greeting`, `ai.chat.open`, `ai.chat.running` and so on), and kayjs-ai ships the French of each, so a site on `lang: 'fr'` needs no setup; a key the app words in its own `src/messages/<locale>.ts` replaces it.
 
-Every label is also a prop, which replaces the message: `fieldLabel` (the name of the field, so it is not read like the message list, which `label` names), `startedLabel` (said to a screen reader when the conversation starts over), `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `waitingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel`. The wording keys keep their names, such as `ai.chat.error`.
+Every label is a key of the `labels` prop, which replaces the message, as in `labels={{ send: 'Go' }}`: `field` (the name of the field, so it is not read like the message list, which `label` names), `started` (said to a screen reader when the conversation starts over), `placeholder`, `send`, `stop`, `retry`, `thinking`, `stopped`, `table` (a reply with several tables numbers them), `greeting` (a prop) and `error`. The wording keys keep their names, such as `ai.chat.error`.
 
-The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`. A call held for the visitor's yes has `approvalLabel`, `allowLabel`, `denyLabel`, `allowedLabel` and `deniedLabel`.
+The status of a tool call and the two parts it opens to are labels too: `running`, `done`, `failed`, `arguments` and `result`. A call held for the visitor's yes has `approval`, `allow`, `deny`, `allowed` and `denied`. The `<key>Label` props of before 1.105 work until 1.108.
 
 The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
 
-The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `failureLabel`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kayjs/ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
+The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `labels.error`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kayjs/ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
 
 The chat posts its last 20 messages with each one; the `history` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
@@ -205,7 +205,7 @@ The button works from the keyboard: Enter or Space opens the panel and puts the 
 
 The panel has a fixed height, so it does not grow or shrink as the conversation fills or empties: the answers scroll inside it, the field stays at the bottom, and the greeting and suggestions sit above the field. On a short window it is as tall as the window leaves room for.
 
-Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `icons` replaces the icons by name (`open`, `close`, `new`, `expand`, `collapse`, `send` and `stop`), and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
+Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `labels.open` names the button and `labels.close` its close button, `labels.new`, `labels.expand` and `labels.collapse` name the two others, `icons` replaces the icons by name (`open`, `close`, `new`, `expand`, `collapse`, `send` and `stop`), and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
 
 `open` opens and closes the panel from your own button or after a navigation, and `onOpenChange(open)` tells you when the visitor does.
 
@@ -225,11 +225,11 @@ A chat can let the visitor ask again for the last reply with `regenerate`, and c
 
 <ReadMore href="/llms/kayjs-ai-chat-regenerate">What a regenerate or an edit drops, and the turns `replaces()` counts.</ReadMore>
 
-An edit stays open while the visitor sends something else, and Escape, Cancel and Save close it. Cancel and Escape put the focus back on the message's edit button, named `Edit the message: ` and the start of the message so each button differs. Save with nothing to send says `editEmptyLabel`, and Enter in the field while a reply is under way says `editBusyLabel`.
+An edit stays open while the visitor sends something else, and Escape, Cancel and Save close it. Cancel and Escape put the focus back on the message's edit button, named `Edit the message: ` and the start of the message so each button differs. Save with nothing to send says `labels.editEmpty`, and Enter in the field while a reply is under way says `labels.editBusy`.
 
 A chat that is the main content of a page, such as a page of its own for the assistant, takes the height of its container with `fill`: give the container a height (a flex column, a grid row, `h-dvh`) and the log scrolls inside it while the form stays at the bottom. Without `fill` the log stops growing at `32rem`.
 
-An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `newLabel` names it and `icons.new` replaces its plus. To start over from your own control instead, dispatch a `kai:chat-new` event on the `.kai-chat` element.
+An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `labels.new` names it and `icons.new` replaces its plus. To start over from your own control instead, dispatch a `kai:chat-new` event on the `.kai-chat` element.
 
 To let a reload of the tab find the conversation again, give `remember` a name, and it is kept in the tab's session storage under it. Nothing is kept by default, because the next person to use the tab after a sign-out would read it. On a site with sign-in, make the name per visitor, such as `` `kai-chat-${user.id}` ``.
 
@@ -255,7 +255,7 @@ A conversation belongs to the visitor your server names: the signed-in user kayj
 
 If your `ask` has `outlive: true`, a reply still running when the page reloads picks back up as with `remember`: the chat shows the stored turns and the message being answered, and the reply goes on streaming.
 
-When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
+When the visitor's session lapses, the chat keeps the conversation it shows, says so with `labels.signedOut`, and posts it whole from then on.
 
 The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/ai-conversations.sqlite`, unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice.
 
@@ -635,7 +635,7 @@ Three more calls work like `ask`. `transcribe(audio)` writes a recording down an
 ```ts
 import { embed, speak, transcribe } from '@kayjs/ai'
 
-const text = await transcribe(recording, { language: 'fr' })
+const text = await transcribe(recording, { locale: 'fr' })
 const audio = await speak('Your table is booked', { voice: 'nova' })
 const vectors = await embed(['first passage', 'second passage'], { dimensions: 768 })
 ```

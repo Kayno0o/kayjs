@@ -50,7 +50,7 @@ describe('describeImage', () => {
     fakeAi.reply({ data: { alt: '  A team at a table ' } })
 
     expect(await describeImage(new Blob([PNG]), { language: 'fr' })).toBe('A team at a table')
-    expect(fakeAi.last()!.system).toContain('language fr')
+    expect(fakeAi.last()!.system).toContain('language French')
     expect(fakeAi.last()!.messages[0]!.attachments![0]).toMatchObject({ kind: 'image', type: 'image/png' })
   })
 })

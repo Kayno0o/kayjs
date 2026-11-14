@@ -108,7 +108,7 @@ interface AskHooks
 type AskLimit = Omit<RateLimit, 'key'> & { hit?: never, enforce?: never }
 
 [.] AskOptions
-interface AskOptions extends AskHooks, Resilience
+interface AskOptions extends CallOptions, AskHooks
   approval?: Confirm | false | undefined
   beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   body?: Record<string, unknown> | undefined
@@ -132,7 +132,7 @@ interface AskOptions extends AskHooks, Resilience
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: undefined | {
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
   connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
   idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
 }
@@ -147,6 +147,21 @@ interface BudgetOptions
   tokens: number
   total?: number | undefined
   window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
+[.] CallOptions
+interface CallOptions extends Resilience, Pick<AskHooks, 'onStep' | 'onSuccess' | 'onError'>
+  fallback?: readonly FallbackModel[] | undefined
+  model?: string | undefined
+  onError?: Hook<ErrorHookCall> | undefined
+  onStep?: Hook<Step> | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
+  provider?: Provider | undefined
+  retry?: RetryOptions | false | undefined
+  signal?: AbortSignal | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
 
 [.] Calls
 interface Calls
@@ -172,8 +187,116 @@ type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
 [.] ChatIconValue
 type ChatIconValue = IconProps | (string & {})
 
+[.] ChatLabelProps
+type ChatLabelProps = FlatLabels<ChatLabels>
+
+[.] ChatLabels
+interface ChatLabels
+  allow?: string | undefined
+  allowed?: string | undefined
+  approval?: string | undefined
+  arguments?: string | undefined
+  attach?: string | undefined
+  attachFull?: string | undefined
+  attachRefused?: string | undefined
+  attachTooBig?: string | undefined
+  cancel?: string | undefined
+  changeFailed?: string | undefined
+  conflict?: string | undefined
+  conversations?: string | undefined
+  delete?: string | undefined
+  deleteConfirm?: string | undefined
+  denied?: string | undefined
+  deny?: string | undefined
+  done?: string | undefined
+  edit?: string | undefined
+  editBusy?: string | undefined
+  editEmpty?: string | undefined
+  error?: string | undefined
+  failed?: string | undefined
+  field?: string | undefined
+  loadFailed?: string | undefined
+  new?: string | undefined
+  reasoning?: string | undefined
+  record?: string | undefined
+  regenerate?: string | undefined
+  remove?: string | undefined
+  rename?: string | undefined
+  result?: string | undefined
+  retry?: string | undefined
+  running?: string | undefined
+  save?: string | undefined
+  send?: string | undefined
+  signedOut?: string | undefined
+  sources?: string | undefined
+  started?: string | undefined
+  stop?: string | undefined
+  stopped?: string | undefined
+  table?: string | undefined
+  thinking?: string | undefined
+  transcribeFailed?: string | undefined
+  transcribing?: string | undefined
+  unheard?: string | undefined
+  untitled?: string | undefined
+
 [.] ChatLauncherIcons
 type ChatLauncherIcons = ChatIcons & Partial<Record<'open' | 'close' | 'expand' | 'collapse', ChatIconValue>>
+
+[.] ChatLauncherLabelProps
+type ChatLauncherLabelProps = FlatLabels<ChatLauncherLabels>
+
+[.] ChatLauncherLabels
+interface ChatLauncherLabels extends ChatLabels
+  allow?: string | undefined
+  allowed?: string | undefined
+  approval?: string | undefined
+  arguments?: string | undefined
+  attach?: string | undefined
+  attachFull?: string | undefined
+  attachRefused?: string | undefined
+  attachTooBig?: string | undefined
+  cancel?: string | undefined
+  changeFailed?: string | undefined
+  close?: string | undefined
+  collapse?: string | undefined
+  conflict?: string | undefined
+  conversations?: string | undefined
+  delete?: string | undefined
+  deleteConfirm?: string | undefined
+  denied?: string | undefined
+  deny?: string | undefined
+  done?: string | undefined
+  edit?: string | undefined
+  editBusy?: string | undefined
+  editEmpty?: string | undefined
+  error?: string | undefined
+  expand?: string | undefined
+  failed?: string | undefined
+  field?: string | undefined
+  loadFailed?: string | undefined
+  new?: string | undefined
+  open?: string | undefined
+  reasoning?: string | undefined
+  record?: string | undefined
+  regenerate?: string | undefined
+  remove?: string | undefined
+  rename?: string | undefined
+  result?: string | undefined
+  retry?: string | undefined
+  running?: string | undefined
+  save?: string | undefined
+  send?: string | undefined
+  signedOut?: string | undefined
+  sources?: string | undefined
+  started?: string | undefined
+  stop?: string | undefined
+  stopped?: string | undefined
+  table?: string | undefined
+  thinking?: string | undefined
+  transcribeFailed?: string | undefined
+  transcribing?: string | undefined
+  unheard?: string | undefined
+  untitled?: string | undefined
 
 [.] ChatMessage
 interface ChatMessage
@@ -260,10 +383,21 @@ interface DeltasOptions
 function describeImage(image: AiAttachment, options?: DescribeImageOptions): Promise<string>
 
 [.] DescribeImageOptions
-interface DescribeImageOptions
-  language?: string | undefined
+interface DescribeImageOptions extends CallOptions
+  fallback?: readonly FallbackModel[] | undefined
+  /** @deprecated Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108. */ language?: string | undefined
+  locale?: string | undefined
   model?: string | undefined
+  onError?: Hook<ErrorHookCall> | undefined
+  onStep?: Hook<Step> | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
+  provider?: Provider | undefined
+  retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
 
 [.] embed
 function embed(text: string, options?: EmbedOptions | undefined): Promise<number[]>
@@ -279,10 +413,18 @@ interface Embedded
 [.] EmbedOptions
 interface EmbedOptions extends CallOptions
   dimensions?: number | undefined
+  fallback?: readonly FallbackModel[] | undefined
   model?: string | undefined
+  onError?: Hook<ErrorHookCall> | undefined
+  onStep?: Hook<Step> | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
+  retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
-  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
 
 [.] EmbedRequest
 interface EmbedRequest
@@ -540,13 +682,21 @@ function speak(text: string, options?: SpeakOptions): Promise<Blob>
 
 [.] SpeakOptions
 interface SpeakOptions extends CallOptions
+  fallback?: readonly FallbackModel[] | undefined
   format?: AudioFormat | undefined
   maxInputChars?: number | undefined
   model?: string | undefined
+  onError?: Hook<ErrorHookCall> | undefined
+  onStep?: Hook<Step> | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
+  retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
   speed?: number | undefined
-  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
   voice?: string | undefined
 
 [.] SpeakRequest
@@ -628,7 +778,7 @@ interface StructuredAskOptions<Spec extends Schema = Schema> extends AskOptions
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: undefined | {
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
   connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
   idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
 }
@@ -685,12 +835,21 @@ function transcribe(audio: Blob, options?: TranscribeOptions): Promise<string>
 
 [.] TranscribeOptions
 interface TranscribeOptions extends CallOptions
-  language?: string | undefined
+  fallback?: readonly FallbackModel[] | undefined
+  /** @deprecated Written `locale`, which takes a BCP 47 tag; `deprecated-ai-language` rewrites it. Removed in 1.108. */ language?: string | undefined
+  locale?: string | undefined
   maxSize?: number | string | undefined
   model?: string | undefined
+  onError?: Hook<ErrorHookCall> | undefined
+  onStep?: Hook<Step> | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
   provider?: Provider | undefined
+  retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
-  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
 
 [.] TranscribeRequest
 interface TranscribeRequest
@@ -741,39 +900,14 @@ component default
   accept?: string | undefined
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
-  allowLabel?: string | undefined
-  allowedLabel?: string | undefined
-  approvalLabel?: string | undefined
-  argumentsLabel?: string | undefined
   attach?: boolean | undefined
-  attachFullLabel?: string | undefined
-  attachLabel?: string | undefined
-  attachRefusedLabel?: string | undefined
-  attachTooBigLabel?: string | undefined
   call?: ((call: AiToolCall) => Element) | undefined
-  cancelLabel?: string | undefined
-  changeFailedLabel?: string | undefined
   class?: string | undefined
-  closeLabel?: string | undefined
-  collapseLabel?: string | undefined
-  conflictLabel?: string | undefined
   conversations?: boolean | undefined
-  conversationsLabel?: string | undefined
-  deleteConfirmLabel?: string | undefined
-  deleteLabel?: string | undefined
-  deniedLabel?: string | undefined
-  denyLabel?: string | undefined
   disclosure?: string | undefined
-  doneLabel?: string | undefined
-  editBusyLabel?: string | undefined
-  editEmptyLabel?: string | undefined
-  editLabel?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  expandLabel?: string | undefined
-  failedLabel?: string | undefined
-  failureLabel?: string | undefined
-  fieldLabel?: string | undefined
+  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -784,12 +918,11 @@ component default
   initial?: ChatTurn[] | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
+  labels?: ChatLauncherLabels | undefined
   layout?: "bubble" | "plain" | undefined
-  loadFailedLabel?: string | undefined
   maxChars?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
-  newLabel?: string | undefined
   note?: Element
   onEdit?: ((text: string) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
@@ -801,41 +934,20 @@ component default
   onSuggestion?: ((text: string) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
   open?: boolean | undefined
-  openLabel?: string | undefined
   placeholder?: string | undefined
-  reasoningLabel?: string | undefined
-  recordLabel?: string | undefined
   regenerate?: boolean | undefined
-  regenerateLabel?: string | undefined
   remember?: string | undefined
-  removeLabel?: string | undefined
-  renameLabel?: string | undefined
-  resultLabel?: string | undefined
-  retryLabel?: string | undefined
-  runningLabel?: string | undefined
-  saveLabel?: string | undefined
-  sendLabel?: string | undefined
   showReasoning?: boolean | undefined
-  signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
-  sourcesLabel?: string | undefined
-  startedLabel?: string | undefined
-  stopLabel?: string | undefined
-  stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
-  tableLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
-  transcribeFailedLabel?: string | undefined
-  transcribingLabel?: string | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
-  unheardLabel?: string | undefined
-  untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
-  waitingLabel?: string | undefined
+  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
 [./chat-launcher.kay] island
 const island: { readonly persist: true; readonly hydrate: "idle"; }
@@ -856,19 +968,15 @@ component default
   glyph?: string | undefined;
 }
   closeIcon: Element
-  closeLabel?: string | undefined
   collapseIcon: Element
-  collapseLabel?: string | undefined
   expandIcon: Element
-  expandLabel?: string | undefined
   hash?: false | string | undefined
   icon: Element
   label?: string | undefined
+  labels?: Pick<ChatLauncherLabels, "close" | "collapse" | "expand" | "new" | "open"> | undefined
   newIcon: Element
-  newLabel?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
-  openLabel?: string | undefined
 
 [./chat-sources.kay] default
 component default
@@ -883,18 +991,8 @@ component default
   accept?: string | undefined
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
-  allowLabel?: string | undefined
-  allowedLabel?: string | undefined
-  approvalLabel?: string | undefined
-  argumentsLabel?: string | undefined
   attach?: boolean | undefined
-  attachFullLabel?: string | undefined
-  attachLabel?: string | undefined
-  attachRefusedLabel?: string | undefined
-  attachTooBigLabel?: string | undefined
   call?: ((call: AiToolCall) => Element) | undefined
-  cancelLabel?: string | undefined
-  changeFailedLabel?: string | undefined
   class?: string | undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
@@ -972,24 +1070,12 @@ component default
     root?: string | undefined;
   };
 }
-  conflictLabel?: string | undefined
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined
-  conversationsLabel?: string | undefined
-  deleteConfirmLabel?: string | undefined
-  deleteLabel?: string | undefined
-  deniedLabel?: string | undefined
-  denyLabel?: string | undefined
   disclosure?: string | undefined
-  doneLabel?: string | undefined
-  editBusyLabel?: string | undefined
-  editEmptyLabel?: string | undefined
-  editLabel?: string | undefined
   editable?: boolean | undefined
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
-  failedLabel?: string | undefined
-  failureLabel?: string | undefined
-  fieldLabel?: string | undefined
+  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -999,14 +1085,13 @@ component default
   initial?: ChatTurn[] | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
+  labels?: ChatLabels | undefined
   layout?: "bubble" | "plain" | undefined
   links?: "apart" | "here" | undefined
-  loadFailedLabel?: string | undefined
   maxChars?: number | undefined
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
-  newLabel?: string | undefined
   onEdit?: ((text: string) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined
@@ -1016,39 +1101,19 @@ component default
   onSuggestion?: ((text: string) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
   placeholder?: string | undefined
-  reasoningLabel?: string | undefined
-  recordLabel?: string | undefined
   regenerate?: boolean | undefined
-  regenerateLabel?: string | undefined
   remember?: string | undefined
-  removeLabel?: string | undefined
-  renameLabel?: string | undefined
-  resultLabel?: string | undefined
-  retryLabel?: string | undefined
-  runningLabel?: string | undefined
-  saveLabel?: string | undefined
-  sendLabel?: string | undefined
   showReasoning?: boolean | undefined
-  signedOutLabel?: string | undefined
   size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
-  sourcesLabel?: string | undefined
-  startedLabel?: string | undefined
-  stopLabel?: string | undefined
-  stoppedLabel?: string | undefined
   suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
-  tableLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined
   transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
-  transcribeFailedLabel?: string | undefined
-  transcribingLabel?: string | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
-  unheardLabel?: string | undefined
-  untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
-  waitingLabel?: string | undefined
+  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
 [./pg] conversationTable
 const conversationTable: "kay_ai_conversations"

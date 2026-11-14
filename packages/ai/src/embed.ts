@@ -1,6 +1,6 @@
-import type { CallOptions } from './config'
+import type { CallOptions } from './types'
 import { configError } from 'kay/library'
-import { setUp } from './config'
+import { setUp } from './call'
 import { billed } from './limits'
 
 export interface EmbedOptions extends CallOptions {
@@ -17,13 +17,13 @@ export async function embed(input: string | readonly string[], options: EmbedOpt
   if (dimensions !== undefined && !(Number.isInteger(dimensions) && dimensions >= 1))
     throw configError('ai', 'dimensions', `embed({ dimensions }) is ${dimensions}; it takes a whole number of 1 or more`)
 
-  const { send, model, timeout, signal } = setUp('embed', options)
+  const { send, signal } = setUp('embed', options)
   const texts = typeof input === 'string' ? [input] : [...input]
 
   if (texts.length === 0)
     return []
 
-  const vectors = await billed(texts.reduce((sum, text) => sum + text.length, 0), signal, async () => send({ input: texts, model, dimensions, timeout }, signal), () => 0)
+  const vectors = await billed(texts.reduce((sum, text) => sum + text.length, 0), signal, async () => send({ input: texts, dimensions }), () => 0)
 
   return typeof input === 'string' ? vectors[0]! : vectors
 }

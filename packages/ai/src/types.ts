@@ -16,6 +16,97 @@ export type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
 // A `ChatLauncher` adds the icons of its button and its panel's header.
 export type ChatLauncherIcons = ChatIcons & Partial<Record<'open' | 'close' | 'expand' | 'collapse', ChatIconValue>>
 
+// The texts of a `Chat`, keyed as its messages are (`ai.chat.<key>`), each left to its message when not given: `labels={{ send: 'Go', stop: 'Halt' }}` words this chat, and the `wording` catalog every chat of the site.
+export interface ChatLabels {
+  // Names the field the visitor writes in, so it is not read as the message list is.
+  field?: string | undefined
+  // Said to screen readers when `newButton` or the panel's header button starts the conversation over.
+  started?: string | undefined
+  // The names and tooltips of the send and stop buttons, and of the one that asks a failed reply again.
+  send?: string | undefined
+  stop?: string | undefined
+  retry?: string | undefined
+  // Said, and read out, while the first words of a reply are awaited: `Thinking…` by default.
+  thinking?: string | undefined
+  // Shown when the call is refused or the stream breaks off.
+  error?: string | undefined
+  // The title of the list of cited sources under a reply.
+  sources?: string | undefined
+  // Marks a reply cut short by Stop.
+  stopped?: string | undefined
+  // Names a table of a reply, which scrolls sideways inside its bubble when it is wider; a reply with several numbers them, `Table 1`, `Table 2`.
+  table?: string | undefined
+  // The title the model's thinking folds under, when `showReasoning` shows it.
+  reasoning?: string | undefined
+  // The status of a tool call, and the names of its two parts.
+  running?: string | undefined
+  done?: string | undefined
+  failed?: string | undefined
+  arguments?: string | undefined
+  result?: string | undefined
+  // A tool that changes something waits for the visitor: the line naming it (`Needs your approval`), its two buttons, and the start of the message each posts (`Allowed:` then the tool and its arguments, `Denied:` then the tool).
+  approval?: string | undefined
+  allow?: string | undefined
+  deny?: string | undefined
+  allowed?: string | undefined
+  denied?: string | undefined
+  // The name of the button `newButton` shows beside the field, and of the one that starts a conversation in the list `conversations` shows.
+  new?: string | undefined
+  // The attach button's name and tooltip, the name of each file's remove button, and what a refused file says: a type that is not accepted, a file past `maxSize` and a message already holding `maxFiles`.
+  attach?: string | undefined
+  remove?: string | undefined
+  attachRefused?: string | undefined
+  attachTooBig?: string | undefined
+  attachFull?: string | undefined
+  // The buttons' names and tooltips, and the two buttons of the field an edit opens. Each message's edit button adds the start of the message to `edit`, `Edit the message: Hello`, so no two share a name. `editEmpty` is said when Save finds no text and no file, and `editBusy` when Enter in the field finds a reply under way.
+  regenerate?: string | undefined
+  edit?: string | undefined
+  save?: string | undefined
+  cancel?: string | undefined
+  editEmpty?: string | undefined
+  editBusy?: string | undefined
+  // The microphone button's name and tooltip, what is said while `transcribe` writes, and what a recording that gave no text and one that failed say. The microphone's own troubles are worded by kayjs-ui's `ui.recordButton.*`.
+  record?: string | undefined
+  transcribing?: string | undefined
+  unheard?: string | undefined
+  transcribeFailed?: string | undefined
+  // The list's name, the title of a conversation that opened on files alone, the names of the rename and delete buttons (followed by the conversation's title) and the question a delete asks before it deletes.
+  conversations?: string | undefined
+  untitled?: string | undefined
+  rename?: string | undefined
+  delete?: string | undefined
+  deleteConfirm?: string | undefined
+  // Said when another tab wrote to the conversation first, which is then shown as stored with the message back in the field, when it could not be loaded, and when a rename or a delete failed.
+  conflict?: string | undefined
+  loadFailed?: string | undefined
+  changeFailed?: string | undefined
+  // Said when the visitor's session lapsed while a conversation was kept on the server: the chat keeps what it shows and posts it whole from then on.
+  signedOut?: string | undefined
+}
+
+// A `ChatLauncher` adds the texts of its button and its panel's header: the button's name and tooltip while the panel is closed and while it is open, and the header's two size buttons.
+export interface ChatLauncherLabels extends ChatLabels {
+  open?: string | undefined
+  close?: string | undefined
+  expand?: string | undefined
+  collapse?: string | undefined
+}
+
+// The flat props a component took before `labels`, one `<key>Label` each; `waitingLabel` and `failureLabel` are `thinking` and `error`. They still work, and win over `labels`.
+type FlatLabels<Labels> = {
+  /** @deprecated Written in `labels`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
+  [Key in Exclude<keyof Labels, 'thinking' | 'error'> & string as `${Key}Label`]?: string | undefined
+} & {
+  /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
+  waitingLabel?: string | undefined
+  /** @deprecated Written `labels.error`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */
+  failureLabel?: string | undefined
+}
+
+export type ChatLabelProps = FlatLabels<ChatLabels>
+
+export type ChatLauncherLabelProps = FlatLabels<ChatLauncherLabels>
+
 // A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
 export type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile
 
@@ -319,10 +410,20 @@ export interface Resilience {
   fallback?: readonly FallbackModel[] | undefined
 }
 
-export interface AskOptions extends AskHooks, Resilience {
-  system?: string | undefined
-  // The model for this reply: its id, or a name from `ai({ models })`; `ai({ default })` or `AI_MODEL` when left out.
+// What every call to a model takes, `ask`, `describeImage`, `transcribe`, `speak` and `embed` alike: which model on which provider, what stops it, how long it may take, how a failure is asked again or falls back, and the hooks that watch it. The hooks of `ai()` run for each of them, before the call's own.
+export interface CallOptions extends Resilience, Pick<AskHooks, 'onStep' | 'onSuccess' | 'onError'> {
+  // The model for this call: its id, or a name from `ai({ models })`; `ai({ default })` or `AI_MODEL` when left out of an ask, the environment's own variable for the others.
   model?: string | undefined
+  // Calls this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.
+  provider?: Provider | undefined
+  // Stops the call when it aborts, as the request being answered does on its own.
+  signal?: AbortSignal | undefined
+  // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default); a stall past either fails the call with a `timeout` error. A single duration sets both of an ask, and is the limit of the whole call for `describeImage`, `transcribe`, `speak` and `embed` once the answer is whole: `connect` and `idle` of one add up to it, 2 minutes by default. Each step of a tool loop counts them anew, and each retry.
+  timeout?: Duration | { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
+}
+
+export interface AskOptions extends CallOptions, AskHooks {
+  system?: string | undefined
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
   // Left out of an Anthropic request that thinks (`effort` of `'low'`, `'medium'` or `'high'`), which refuses one; models since 4.7 refuse any temperature, with their own message.
@@ -333,14 +434,10 @@ export interface AskOptions extends AskHooks, Resilience {
   cache?: boolean | '1h' | undefined
   // Fields to add to the provider's request body as they are, such as `{ top_p: 0.9, seed: 7 }`, so a parameter kayjs-ai does not model needs no release. They are added to what the provider was built with in `body`, this ask's winning field by field (top level only), and a field kayjs-ai settles itself (`model`, `messages`, `stream`, the token limit, and when it sets them `tools`, the schema's output format, `temperature`, `reasoning` and `cache`) wins over them. A server refusing a field fails the reply with its own message.
   body?: Record<string, unknown> | undefined
-  // Stops the reply when it aborts, as the request being answered does on its own.
-  signal?: AbortSignal | undefined
   // Lets the reply finish on the server after the request being answered aborts, a visitor who reloaded or left: the provider request, the tool loop and every reader go on, and a `Chat` with `remember` shows the finished turn after the reload. Only `reply.stop()`, `signal` and the Chat's Stop end it, and a reader leaving early no longer does.
   outlive?: boolean | undefined
   // The documents the model was given, numbered as it cites them (`[1]`): `reply.progress()` carries them beside the text, and a `Chat` links each `[n]` to its source and lists the cited ones under the turn.
   sources?: readonly Source[] | undefined
-  // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
-  timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, and whose conversation a `Chat` with `keepOnServer` keeps, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
   key?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with an action called outside one throws.
@@ -356,9 +453,6 @@ export interface AskOptions extends AskHooks, Resilience {
   maxInputChars?: number | undefined
   // The most bytes one attachment may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails the reply with a `too-long` error before the provider is called.
   maxSize?: ByteSize | undefined
-
-  // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.
-  provider?: Provider | undefined
 }
 
 // The options of an ask for an object.

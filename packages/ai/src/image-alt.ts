@@ -1,7 +1,7 @@
 import type { CacheSlot } from 'kay/library'
 import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
 // Alt text drafted for the imported images of a page: one model call per image file and locale, kept under `.kay/cache`, written into the HTML as a page is built or served.
-import type { AiAttachment, AiMessage } from './types'
+import type { AiAttachment, AiMessage, CallOptions } from './types'
 import { readdir } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import process from 'node:process'
@@ -10,6 +10,7 @@ import { IMPORTED, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry
 import { ask } from './ask'
 import { choose } from './config'
 import { fakeAi } from './fake'
+import { languageName } from './locale'
 import { roleModel } from './models'
 
 const LIBRARY = 'kayjs-ai'
@@ -26,22 +27,23 @@ interface Draft {
   locale: string
 }
 
-export interface DescribeImageOptions {
-  // The language to write in, such as `fr`; the image's own context decides when left out.
+// `model` is a name from `ai({ models })` or an id, in place of the `imageAlt` one.
+export interface DescribeImageOptions extends CallOptions {
+  // The language to write in, a BCP 47 tag such as `fr` or `pt-BR`; the image's own context decides when left out.
+  locale?: string | undefined
+  /** @deprecated Written `locale`; `deprecated-ai-language` rewrites it. Removed in 1.108. */
   language?: string | undefined
-  // The model for this call, a name from `ai({ models })` or an id, in place of the `imageAlt` one.
-  model?: string | undefined
-  signal?: AbortSignal | undefined
 }
 
-function systemPrompt(language: string | undefined): string {
-  return `You write the alt attribute of an image for a screen reader. Answer with one short sentence of plain text saying what the image shows, no "image of" or "picture of", under ${MAX_ALT_CHARS} characters${language === undefined || language === '' ? '' : `, written in the language ${language}`}. An image that is only decoration, with nothing to say, gets an empty text.`
+function systemPrompt(locale: string | undefined): string {
+  return `You write the alt attribute of an image for a screen reader. Answer with one short sentence of plain text saying what the image shows, no "image of" or "picture of", under ${MAX_ALT_CHARS} characters${locale === undefined || locale === '' ? '' : `, written in the language ${languageName(locale, 'describeImage({ locale })')}`}. An image that is only decoration, with nothing to say, gets an empty text.`
 }
 
 // One short alt text for an image, over `ask` with a `schema`: the fake answers under `bun test`, and a provider that does not see images fails the call.
 export async function describeImage(image: AiAttachment, options: DescribeImageOptions = {}): Promise<string> {
   const messages: AiMessage[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
-  const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt', options.model), ...options.signal === undefined ? {} : { signal: options.signal } })
+  const { locale, language, model, ...call } = options
+  const { alt } = await ask(messages, { ...call, schema: ALT, system: systemPrompt(locale ?? language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt', model) })
 
   return alt.trim()
 }
@@ -151,7 +153,7 @@ async function make(place: Place): Promise<string | undefined> {
   const name = basename(place.path)
 
   try {
-    const alt = await describeImage(Bun.file(place.path), { language: place.locale })
+    const alt = await describeImage(Bun.file(place.path), { locale: place.locale })
 
     // Kept on disk before a render may write it, so a page never shows a draft the cache lacks; a failed write still keeps it for this process.
     try {

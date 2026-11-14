@@ -11,8 +11,9 @@ import { tell } from './hooks'
 import { named } from './models'
 
 const SLOT = Symbol.for('kayjs-ai.resilience')
+
 // What a provider says when it is down, busy or slow: asking again or elsewhere may help, which a refused key or request never does.
-const TRANSIENT = new Set<AiErrorKind>(['unavailable', 'rate-limited', 'timeout', 'network'])
+export const TRANSIENT = new Set<AiErrorKind>(['unavailable', 'rate-limited', 'timeout', 'network'])
 const DEFAULT_ATTEMPTS = 2
 const DEFAULT_BACKOFF = '500ms'
 const DEFAULT_MAX_WAIT = '10s'
@@ -20,13 +21,13 @@ const MAX_ATTEMPTS = 10
 // A wait is shortened by up to this share at random.
 const JITTER = 0.5
 
-interface Policy {
+export interface Policy {
   attempts: number
   backoff: number
   maxWait: number
 }
 
-interface Target {
+export interface Target {
   provider: Provider
   model: string
 }
@@ -97,7 +98,7 @@ export function planFor(options: Resilience, provider: Provider): Plan {
 }
 
 // How long to wait before asking the same model again, or undefined when waiting is no use: a rate limit asking for longer than `maxWait`.
-function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): number | undefined {
+export function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): number | undefined {
   if (error.retryAfter !== undefined) {
     const asked = error.retryAfter * 1000
 
@@ -193,14 +194,19 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
   }
 }
 
-// The provider an ask is sent through: the model asked, then each fallback, each retried as the plan says. A request that fails before the first piece of the reply is asked again; one that streamed something never is.
-export function resilient(provider: Provider, model: string, plan: Plan, hooks: Hooks): Streams {
-  const targets: Target[] = [{ provider, model }, ...plan.fallback.map((entry) => {
+// The model asked and then each fallback, a fallback on the same provider unless it names one.
+export function targetsOf(provider: Provider, model: string, plan: Plan): Target[] {
+  return [{ provider, model }, ...plan.fallback.map((entry) => {
     const chosen = named(entry.model)
     const own = entry.provider ?? chosen?.provider
 
     return { provider: own === undefined ? provider : given(own), model: chosen?.model ?? entry.model }
   })]
+}
+
+// The provider an ask is sent through: the model asked, then each fallback, each retried as the plan says. A request that fails before the first piece of the reply is asked again; one that streamed something never is.
+export function resilient(provider: Provider, model: string, plan: Plan, hooks: Hooks): Streams {
+  const targets = targetsOf(provider, model, plan)
 
   return { name: provider.name, stream: (request, signal) => attempting(targets, request, signal, plan.policy, hooks) }
 }

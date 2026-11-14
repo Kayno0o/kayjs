@@ -4,4 +4,4 @@ import { reply } from './chat.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---
 h1 Failure label
-Chat(action={reply} label="Given" failureLabel="Broke")
+Chat(action={reply} label="Given" labels={{ error: "Broke" }})

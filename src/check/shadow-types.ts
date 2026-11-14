@@ -33,16 +33,17 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
+import { aiLanguage } from './ai-language'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
 import { unguardedRoutes, unguardedTools } from './guards'
-
 import { islandOnlyComponents } from './island-only'
-import { largePublicImages } from './large-images'
 
+import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
@@ -162,6 +163,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => persistedStorage(root, options),
 
   async ({ root, options }) => schemaType(root, options),
+  async ({ root, options }) => aiLanguage(root, options),
   async ({ root, options }) => mailApi(root, options),
   async ({ root, options }) => testHelpers(root, options),
 ]
