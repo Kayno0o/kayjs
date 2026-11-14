@@ -67,7 +67,6 @@ Layout(preheader="Your account is ready")
   Button(href={url}) Confirm my address`
 
 const [create, sample, auth, mail, allComponents, { groups }] = await Promise.all([
-
   highlightCode(CREATE, 'bash', { highlight }),
   highlightCode(SAMPLE, 'kay', { highlight }),
   highlightCode(AUTH, 'kay', { highlight }),
