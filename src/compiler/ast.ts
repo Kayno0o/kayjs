@@ -1,6 +1,11 @@
 import type { UiEntry } from '../runtime/ui'
 import type { FormInfo } from './form-info'
+import { actionOf, componentAction } from './form-action'
 import { formTargets, initialHelpers } from './form-info'
+import { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
+
+export { actionOf, componentAction } from './form-action'
+export { childBlocks, someNode, visitNodes, walkNodes } from './template-walk'
 
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
@@ -212,23 +217,6 @@ export function modifiersOf(attribute: Attribute, source: string): string[] {
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
-
-// The `action={...}` an element is written with.
-function actionAttribute(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
-
-  return attribute?.kind === 'expression' ? attribute : undefined
-}
-
-// `form(action={add})`: the attribute naming the action a form posts to.
-export function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  return element.component || element.name !== 'form' ? undefined : actionAttribute(element, source)
-}
-
-// The `action={add}` a component is given, such as a Form: the fields in its content read that action's messages as the ones in a `form(action={add})` do.
-export function componentAction(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  return element.component ? actionAttribute(element, source) : undefined
-}
 
 // `a(href="/docs" section)` or `section={active}`: kay's own attribute marking a link current on the pages below it, read by the server markup and never written out.
 export function sectionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'boolean' | 'expression' }> | undefined {
@@ -564,7 +552,7 @@ export interface TemplateFacts {
   // What the form each node sits in carries beside its action.
   formInfos: Map<Node, FormInfo>
   // The helpers the fields filled from a form's record call.
-  initial: ('formInitial' | 'formInitialChecked')[]
+  initial: ('formInitial' | 'formInitialChecked' | 'formStart')[]
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
   // How the template names each prop the script types `Bindable<T>`, to its key, which only the script tells: set where the code is generated.
@@ -614,32 +602,6 @@ export function drawIcons(file: KayFile, icons: ReadonlySet<string>): void {
   })
 }
 
-// The node lists right under a node, in source order. Every template walker reaches nested nodes through this one switch, so a new kind of node fails to type-check here until it says what it holds.
-export function childBlocks(node: Node): Node[][] {
-  switch (node.kind) {
-    case 'element':
-    case 'slot':
-    case 'snippet':
-      return [node.children]
-    case 'text':
-      return [node.parts.filter(part => part.kind === 'element')]
-    case 'if':
-    case 'match':
-      return [...(node.kind === 'if' ? node.branches : node.cases).map(branch => branch.children), ...node.fallback ? [node.fallback.children] : []]
-    case 'for':
-      return [node.children, node.fallback ?? []]
-    case 'await':
-      return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
-    case 'try':
-      return [node.children, node.rejected?.children ?? []]
-    case 'pending':
-      return [node.children]
-    case 'const':
-    case 'error':
-      return []
-  }
-}
-
 // The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
 export function slotNames(template: readonly Node[], source: string): string[] {
   const names = new Set<string>()
@@ -650,26 +612,6 @@ export function slotNames(template: readonly Node[], source: string): string[] {
   })
 
   return [...names]
-}
-
-// Calls `each` on every node of a template, nested ones included, in source order.
-export function visitNodes(nodes: readonly Node[], each: (node: Node) => void): void {
-  walkNodes(nodes, undefined, each)
-}
-
-// Like `visitNodes`, handing each node the context its parent answered for its children.
-export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: Node, context: C) => C): void {
-  for (const node of nodes) {
-    const inner = each(node, context)
-
-    for (const block of childBlocks(node))
-      walkNodes(block, inner, each)
-  }
-}
-
-// Whether `found` holds for a node of the template, nested ones included.
-export function someNode(nodes: readonly Node[], found: (node: Node) => boolean): boolean {
-  return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))
 }
 
 export const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/

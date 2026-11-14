@@ -26,6 +26,7 @@ import { failedIds, idMark } from './uid'
 import { reportedUrl } from './url-report'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes as keepAttributes, styleText } from './values'
 
+export { formKey } from './action'
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 export { loadScope } from './load-scope'

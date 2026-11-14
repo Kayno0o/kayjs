@@ -344,7 +344,7 @@ class ModuleShell {
 
     // What fills a form's fields back in once a post was refused.
     if (runs && (facts.actionForm || (mode === 'html' && facts.scopedForm)))
-      kayHelpers.push('formValue', 'formChecked', mode === 'dom' ? 'formMarked' : 'formInvalid', 'formError', ...facts.initial)
+      kayHelpers.push('formValue', 'formChecked', mode === 'dom' ? 'formMarked' : 'formInvalid', 'formError', ...facts.initial.filter(helper => mode === 'dom' || helper !== 'formStart'))
 
     // An island toggles a refused field's message in its description, beside the ids a component wrote there.
     if (mode === 'dom' && errors !== undefined && errors.describing.size > 0)
@@ -1078,7 +1078,7 @@ function fillElement(block: SlotNode): ElementNode {
   return { kind: 'element', start: block.start, end: block.end, tag: { start: block.start, end: block.start }, name: 'KayFill', component: true, classes: [], attributes: [], children: block.children, fills: block.name }
 }
 
-type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formInitial' | 'formInitialChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'issueScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formInitial' | 'formInitialChecked' | 'formStart' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'issueScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

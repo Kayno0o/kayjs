@@ -143,9 +143,15 @@ form(action={save} values={todo})
     option(value="m") Medium
 ```
 
-A text or a number fills an `input` or a `textarea`, and a `Date` fills a date field. A boolean ticks a checkbox, a list ticks the checkboxes whose `value` it holds, and a text or a number ticks the radio button or picks the option it equals. A property that is missing, `null` or a function leaves the field as you wrote it.
+A text or a number fills an `input` or a `textarea`, and a `Date` fills a date field with its local day, a `datetime-local` field with its local minute and a `time` field with its time, in the zone of whoever renders the page.
 
-An `input` that writes its own `value` keeps it. Hidden, password, file and disabled fields are left as written. Give `values` a variable or a property rather than a function call, since each field reads it. When a post is refused, the page shows what the visitor sent, not the record, so their edits survive.
+`true` ticks a checkbox, a list ticks the checkboxes whose `value` it holds, and a text or a number ticks the radio button or picks the option it equals. A property that is missing, `null` or a function leaves the field as you wrote it, and any other truthy value, such as `'yes'`, ticks nothing.
+
+An `input` that writes its own `value` keeps it, while a `textarea` or a `select` takes the record over the text or the option you wrote. Hidden, password, file and disabled fields are left as written. Each field reads `values` on its own, so a function call in it is refused: work the record out once in the script and write its name. Reading a signal, `todo()`, is fine.
+
+In an island the record fills a field until the visitor changes it. If the record changes later, the fields the visitor has not touched follow it and the ones they edited keep what they typed.
+
+When a post is refused, the page shows what the visitor sent, not the record, so their edits survive. Several forms can post to one action, one per row of a list. Each form with `values` names itself in a hidden field, so after a refusal only the form that posted shows its values again and the others keep their records.
 
 ## Showing errors
 

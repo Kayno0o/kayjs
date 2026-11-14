@@ -3,14 +3,22 @@ import type { CodeBuilder } from './mapping'
 import { helperName } from './markup'
 import { staticAttributeText } from './plan'
 
-// A box the record decides: the element, and what writes the `value` it posts when ticked, if it wrote one.
+// A box the record decides: what writes the `value` it posts when ticked, if it wrote one.
 export interface InitialBox {
-  element: ElementNode
   value: (() => void) | undefined
 }
 
+const DATE_TYPES = new Set(['date', 'datetime-local', 'time'])
+
+// The `type` of an input that reads a date from the record, as its text: the only one the record's text depends on.
+export function dateTypeOf(element: ElementNode, src: string): string | undefined {
+  const type = staticAttributeText(element, 'type', src)?.toLowerCase()
+
+  return type !== undefined && DATE_TYPES.has(type) ? type : undefined
+}
+
 // What the record a form fills its fields from holds for a field, after the `separator` that makes it the last fallback: its text, or whether the box a `value` stands for is ticked. Writes nothing for a form with no record.
-export function addInitial(b: CodeBuilder, src: string, values: Span | undefined, name: string, box?: InitialBox, separator = ' ?? '): void {
+export function addInitial(b: CodeBuilder, src: string, element: ElementNode, values: Span | undefined, name: string, box?: InitialBox, separator = ' ?? '): void {
   if (!values)
     return
 
@@ -18,7 +26,13 @@ export function addInitial(b: CodeBuilder, src: string, values: Span | undefined
 
   if (box) {
     b.add(', ')
-    addBoxValue(b, src, box)
+    addBoxValue(b, src, element, box)
+  }
+  else {
+    const type = dateTypeOf(element, src)
+
+    if (type !== undefined)
+      b.add(`, ${JSON.stringify(type)}`)
   }
 
   b.add(')')
@@ -32,7 +46,7 @@ export function addFilled(b: CodeBuilder, src: string, element: ElementNode, { f
   // A radio button with no `value` posts `on`, as a checkbox does, but only the ticked one of its group.
   if (filled === 'checked') {
     b.add(', ')
-    addBoxValue(b, src, { element, value: box })
+    addBoxValue(b, src, element, { value: box })
   }
 
   b.add(')')
@@ -42,11 +56,11 @@ export function addFilled(b: CodeBuilder, src: string, element: ElementNode, { f
     own()
   }
 
-  addInitial(b, src, values, name, filled === 'checked' ? { element, value: box } : undefined)
+  addInitial(b, src, element, values, name, filled === 'checked' ? { value: box } : undefined)
   b.add(')')
 }
 
-function addBoxValue(b: CodeBuilder, src: string, { element, value }: InitialBox): void {
+function addBoxValue(b: CodeBuilder, src: string, element: ElementNode, { value }: InitialBox): void {
   if (value)
     value()
   else

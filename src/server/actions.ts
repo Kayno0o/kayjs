@@ -19,7 +19,7 @@ import type { Unmatched } from './page-routes'
 import type { ToolOutputs } from './tool-outputs'
 import { relative } from 'node:path'
 import { KayError } from '../compiler/errors'
-import { decodeCall, failure, FORM_CALL, isAction, isFailure, protectionFields } from '../runtime/action'
+import { decodeCall, failure, FORM_CALL, FORM_FIELD, isAction, isFailure, protectionFields } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
@@ -226,6 +226,11 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           // Before the schema reads the input: every attempt counts, a valid one or not.
           if (refusal)
             throw new Refusal(failed(context.request, new Headers(refusal.headers), cookieJar(context.request).cookies, { action: value.url, status: refusal.status, values: call ? {} : submittedValues(context.body), errors: { [refusal.field]: refusal.message } }, context.server, back))
+
+          const form = (context.body as Record<string, unknown> | null | undefined)?.[FORM_FIELD]
+
+          if (typeof form === 'string')
+            requestRecord(context.request).postedForm = form
 
           context.body = asForm ? formInput(value.schema, withFixedFields(withoutEmptyFiles(context.body), context.request)) : callInput(context.body)
         },
@@ -783,8 +788,12 @@ async function failed(request: Request, headers: Headers, cookies: CookieMap, fl
   for (const cookie of cookies.toSetCookieHeaders())
     headers.append('set-cookie', cookie)
 
-  if (!isCall(request))
-    return back(request, headers, flash, server)
+  if (!isCall(request)) {
+    const form = requestRecord(request).postedForm
+
+    // The refusal tells the form that posted from the others sharing its action; one that read no field has nothing to tell.
+    return back(request, headers, form !== undefined && Object.keys(flash.values).length > 0 ? { ...flash, values: { ...flash.values, [FORM_FIELD]: form } } : flash, server)
+  }
 
   headers.set('content-type', 'application/json')
   headers.set(FAILURE_HEADER, '1')

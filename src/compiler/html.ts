@@ -8,7 +8,9 @@ import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, failedBlockOf, marksServerIsland, sectionOf, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { addFieldDescribed, addInvalidAttribute } from './field-described'
+import { valuesOf } from './form-info'
 import { addFilled, addInitial } from './html-initial'
+import { Markup } from './html-parts'
 import { addRowItem, childItems, constDeclaration, contentOf, errorParagraphArguments, fixedSource, isDeclaration, rowKeying, slotValue, soleDynamic } from './items'
 import { END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { LOAD_KEY, PROPS, SUBJECT } from './names'
@@ -20,7 +22,7 @@ const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 // A number written in the template, `0` or `-1.5`, as an attribute's whole expression.
 const NUMBER_LITERAL = /^\s*-?\d+(?:\.\d+)?\s*$/
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'checkedMarkup', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'checkedMarkup', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'formKey', 'head', 'html', 'imageAttributes', 'innerMarkup', 'leadingNewline', 'linkHref', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'outsideLink', 'partClass', 'partHanded', 'partsClass', 'raw', 'rawData', 'rawTyped', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'spreadWith', 'style', 'untrack']
 
 // The helper writing an element's content expression that is not raw text: an `innerHTML` as the markup it is, anything else as text.
 function contentHelper(content: { property: string, raw: boolean } | undefined): string {
@@ -65,45 +67,6 @@ export interface HtmlOptions {
   located?: ((element: ElementNode) => string | undefined) | undefined
   // A refresh naming some of the page's loads leaves an element reading none of them to the page as it is: the group of each such element by where it starts, with the id it carries.
   kept?: { groups: ReadonlyMap<number, { group: number, id: string }> } | undefined
-}
-
-// Static parts gather into one string literal; each dynamic part is an expression of the markup it renders.
-class Markup {
-  private pending = ''
-  private parts = 0
-
-  constructor(private readonly b: CodeBuilder) {}
-
-  text(text: string): void {
-    this.pending += text
-  }
-
-  dynamic(emit: () => void): void {
-    this.flush()
-    this.separate()
-    emit()
-  }
-
-  end(): void {
-    this.flush()
-
-    if (this.parts === 0)
-      this.b.add('""')
-  }
-
-  private flush(): void {
-    if (this.pending === '')
-      return
-
-    this.separate()
-    this.b.add(JSON.stringify(this.pending))
-    this.pending = ''
-  }
-
-  private separate(): void {
-    if (this.parts++ > 0)
-      this.b.add(' + ')
-  }
 }
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
@@ -742,7 +705,7 @@ export class HtmlTemplate extends TemplateWriter {
           b.add(') ?? ')
           own ? own() : b.add('undefined')
 
-          addInitial(b, this.src, values, field.name)
+          addInitial(b, this.src, element, values, field.name)
         }
       }
     }
@@ -803,7 +766,7 @@ export class HtmlTemplate extends TemplateWriter {
             own()
           }
 
-          addInitial(b, this.src, values, field.name, undefined, own ? ', ' : ', undefined, ')
+          addInitial(b, this.src, element, values, field.name, undefined, own ? ', ' : ', undefined, ')
 
           b.add(')')
         })
@@ -814,7 +777,7 @@ export class HtmlTemplate extends TemplateWriter {
           this.markup(children, true)
           b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)})`)
 
-          addInitial(b, this.src, values, field.name)
+          addInitial(b, this.src, element, values, field.name)
           b.add(')')
         })
       }
@@ -858,21 +821,29 @@ export class HtmlTemplate extends TemplateWriter {
       })
     }
     else if (action && children.length > 0) {
-      // The components inside read the form's action as they render, to show a refused post's values again.
-      markup.dynamic(() => {
-        const inner = new Markup(b)
-
-        b.add(`${helperName('formScope')}((`).addSource(action.expression).add('), () => ')
-        body(inner)
-        inner.end()
-        b.add(')')
-      })
+      markup.dynamic(() => this.scopedContent(element, action.expression, body))
     }
     else {
       body(markup)
     }
 
     markup.text(`</${name}>`)
+  }
+
+  // The components inside a form read its action as they render, to show a refused post's values again. A form filled from a record names itself first, for a refusal to tell it from the others posting to the action.
+  private scopedContent(element: ElementNode, action: Span, body: (markup: Markup) => void): void {
+    const { b } = this
+    const inner = new Markup(b)
+    const keyed = valuesOf(element, this.src) !== undefined
+
+    b.add(`${helperName('formScope')}((`).addSource(action).add('), () => ')
+
+    if (keyed)
+      inner.dynamic(() => b.add(`${helperName('formKey')}(${this.options.hydratable ? 'true' : ''})`))
+
+    body(inner)
+    inner.end()
+    b.add(keyed ? `, false, ${element.start})` : ')')
   }
 
   // A link to the page being rendered says so, unless it says itself; an island's too, its markup claimed as the server wrote it, and the swap of a page keeping the island carries the next page's marks over.

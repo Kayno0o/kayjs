@@ -513,6 +513,9 @@ function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown, ow
 [./html] formConstraints
 function formConstraints(target: unknown, name: string, written: readonly string[]): string
 
+[./html] formKey
+function formKey(kept?: boolean): string
+
 [./html] head
 function head(tags: HeadTag[]): void
 
@@ -684,13 +687,16 @@ function formDescribed(element: Element, target: unknown, field: string, id: str
 function formError(target: unknown, field: string): string | undefined
 
 [./internal] formInitial
-function formInitial(values: unknown, name: string): string | undefined
+function formInitial(values: unknown, name: string, type?: string | undefined): string | undefined
 
 [./internal] formInitialChecked
 function formInitialChecked(values: unknown, name: string, value?: number | string | undefined): boolean
 
 [./internal] formInvalid
 function formInvalid(target: unknown, name: string): "true" | undefined
+
+[./internal] formKey
+function formKey(kept?: boolean): string
 
 [./internal] formMarked
 function formMarked(element: Element, target: unknown, field: string): void
@@ -699,7 +705,10 @@ function formMarked(element: Element, target: unknown, field: string): void
 function formProtection(target: unknown, kept?: boolean): string
 
 [./internal] formScope
-function formScope<Result>(target: unknown, render: () => Result, only?: boolean): Result
+function formScope<Result>(target: unknown, render: () => Result, only?: boolean, at?: number | undefined): Result
+
+[./internal] formStart
+function formStart(element: Element, initial: boolean | string): void
 
 [./internal] formValue
 function formValue(target: unknown, name: string): string | undefined

@@ -83,7 +83,7 @@ export const ERRORS = {
   },
   'form-misuse': {
     group: 'compile',
-    summary: 'A `field`, `pending` or `error` outside a form posting to an action, a `field` that is no text, or `field` with `name`. A string expression has a quick fix.',
+    summary: 'A `field`, `pending` or `error` outside a form posting to an action, a `field` that is no text, `field` with `name`, or a `values` that calls a function. A string expression has a quick fix.',
     fix: { file: 'llms/actions.md', heading: 'Forms' },
     quickFix: true,
   },

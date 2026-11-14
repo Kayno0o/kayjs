@@ -1,5 +1,6 @@
 import type { Attribute, ElementNode, Node, Span } from './ast'
-import { actionOf, componentAction, walkNodes } from './ast'
+import { actionOf, componentAction } from './form-action'
+import { walkNodes } from './template-walk'
 
 // What a form holds besides its action: the record `values={todo}` fills its fields from.
 export interface FormInfo {
@@ -14,6 +15,14 @@ export function valuesOf(element: ElementNode, source: string): Extract<Attribut
   const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'values')
 
   return attribute?.kind === 'expression' ? attribute : undefined
+}
+
+// A call with arguments, or a group: a signal read, `todo()`, is a call with none.
+const CALL = /\((?!\))/
+
+// Whether `attribute` is the `values` of a form and calls a function, which every field of the form would run: each reads the record on its own.
+export function valuesCall(element: ElementNode, attribute: Attribute, source: string): attribute is Extract<Attribute, { kind: 'expression' }> {
+  return attribute.kind === 'expression' && valuesOf(element, source) === attribute && CALL.test(source.slice(attribute.expression.start, attribute.expression.end))
 }
 
 // The action of the innermost `form(action={...})` each node sits in; a node outside every such form has none.
@@ -45,6 +54,6 @@ export function formTargets(nodes: readonly Node[], source: string): { targets: 
 }
 
 // The helpers a template calls to fill its fields from the record of a form.
-export function initialHelpers(infos: Map<Node, FormInfo>): ('formInitial' | 'formInitialChecked')[] {
-  return [...infos.values()].some(info => info.values !== undefined) ? ['formInitial', 'formInitialChecked'] : []
+export function initialHelpers(infos: Map<Node, FormInfo>): ('formInitial' | 'formInitialChecked' | 'formStart')[] {
+  return [...infos.values()].some(info => info.values !== undefined) ? ['formInitial', 'formInitialChecked', 'formStart'] : []
 }

@@ -571,7 +571,7 @@ export class DomTemplate extends TemplateWriter {
           own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(action.expression).add(`), "", ${JSON.stringify(described.id)}));`))
       }
 
-      own.push(...fieldBindings(b, this.src, node, element, plan, children.length > 0))
+      own.push(...fieldBindings(b, this.src, node, element, plan))
 
       // The template's own description stays as written, the effect adding and removing the message's id alone.
       if (described?.own !== undefined)

@@ -12,17 +12,23 @@ const SPACES = /\s+/
 // The actions the forms of the page being rendered post to, for the server to send their schemas along; set while it renders.
 let renderedForms: Set<Action<never, unknown>> | undefined
 
+// How many times each form of the template, by where it starts, rendered so far in this page, which numbers the ones a loop repeats.
+let renderedTimes: Map<number, number> | undefined
+
 export function collectForms<T>(render: () => T): { result: T, forms: Set<Action<never, unknown>> } {
   const forms = new Set<Action<never, unknown>>()
   const previous = renderedForms
+  const previousTimes = renderedTimes
 
   renderedForms = forms
+  renderedTimes = new Map()
 
   try {
     return { result: render(), forms }
   }
   finally {
     renderedForms = previous
+    renderedTimes = previousTimes
   }
 }
 
@@ -87,16 +93,53 @@ export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Ex
 // An action as the fields of a form posting to it read it, whatever its input.
 type FormTarget = Action<Record<string, unknown>, unknown>
 
-// What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.
-export function formValue(target: unknown, name: string): string | undefined {
-  if (!isAction(target) || name === honeypotField(target.protection))
-    return undefined
-
-  return untrack((target as FormTarget).failed)?.values[name]
-}
+// The field naming which of the forms sharing an action posted: a form filled from a record writes its key there, and the refusal brings it back.
+export const FORM_FIELD = 'kay_form'
 
 // The actions of the forms being rendered, the innermost last, which a component inside one reads to show a refused post's values again.
 const enclosing: unknown[] = []
+
+// The key of each of those forms, or undefined for one that has none.
+const keys: (string | undefined)[] = []
+
+// The refusal of the action `target` as the form being rendered shows it: undefined without one, and when the post came from another form sharing the action, which a form with a key tells from the key the refusal brought back.
+function refusalOf(target: unknown): ReturnType<FormTarget['failed']> {
+  const failed = isAction(target) ? untrack((target as FormTarget).failed) : undefined
+  const key = keys.at(-1)
+  const sent = failed?.values[FORM_FIELD]
+
+  return key === undefined || sent === undefined || sent === key ? failed : undefined
+}
+
+// The key of the form starting at `at`: where it starts, and how many times it rendered in this page, which tells the forms a loop repeats apart.
+function keyOf(at: number | undefined): string | undefined {
+  if (at === undefined)
+    return undefined
+
+  const time = (renderedTimes?.get(at) ?? 0) + 1
+
+  renderedTimes?.set(at, time)
+
+  return `${at}.${time}`
+}
+
+// The hidden field naming the form being rendered, for the refusal of its post to find it again; nothing for a form with no key.
+// `kept` is an island's, as `formProtection` takes it.
+export function formKey(kept = false): string {
+  const key = keys.at(-1)
+
+  if (key === undefined)
+    return ''
+
+  const markup = `<input type="hidden" name="${FORM_FIELD}" value="${escapeAttribute(key)}">`
+
+  return kept ? `<!--${KEPT_START}-->${markup}<!--${KEPT_END}-->` : markup
+}
+
+// What a refused post sent for a field of a form posting to `target`, to show it again; undefined without one, and for the honeypot.
+export function formValue(target: unknown, name: string): string | undefined {
+  return !isAction(target) || name === honeypotField(target.protection) ? undefined : refusalOf(target)?.values[name]
+}
 
 // What a record, such as the `values={todo}` of a form, holds for the field `name`.
 function held(values: unknown, name: string): unknown {
@@ -107,12 +150,38 @@ function held(values: unknown, name: string): unknown {
 
 const MIDNIGHT = 'T00:00:00.000Z'
 
-// The text a field starts with from the record its form fills it from: a text, a number or a date; undefined for a record without the field, `null`, a flag, a list or an object.
-export function formInitial(values: unknown, name: string): string | undefined {
-  // A refused post shows what it sent: a field it sent blank, which the body drops, stays blank rather than going back to the record.
-  const form = enclosing.at(-1)
+function pad(number: number, width = 2): string {
+  return String(number).padStart(width, '0')
+}
 
-  if (isAction(form) && untrack((form as FormTarget).failed))
+// A date as the field of this `type` reads it, in the local time of whoever renders it: the day, the day and minute, or the minute. Any other type reads a date at midnight UTC as its day, else its minute in UTC.
+function dateText(date: Date, type: string | undefined): string {
+  const day = `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`
+
+  if (type === 'date')
+    return day
+
+  if (type === 'datetime-local')
+    return `${day}T${time}`
+
+  if (type === 'time')
+    return time
+
+  const iso = date.toISOString()
+
+  return iso.endsWith(MIDNIGHT) ? iso.slice(0, 10) : iso.slice(0, 16)
+}
+
+// Whether the post of the form being rendered was refused: its fields show what it sent, not the record.
+function refused(): boolean {
+  return refusalOf(enclosing.at(-1)) !== undefined
+}
+
+// The text a field of this `type` starts with from the record its form fills it from: a text, a number or a date; undefined for a record without the field, `null`, a flag, a list or an object.
+export function formInitial(values: unknown, name: string, type?: string): string | undefined {
+  // A refused post shows what it sent: a field it sent blank, which the body drops, stays blank rather than going back to the record.
+  if (refused())
     return undefined
 
   const value = held(values, name)
@@ -123,44 +192,56 @@ export function formInitial(values: unknown, name: string): string | undefined {
   if (typeof value === 'number' || typeof value === 'bigint')
     return String(value)
 
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const iso = value.toISOString()
-
-    return iso.endsWith(MIDNIGHT) ? iso.slice(0, 10) : iso.slice(0, 16)
-  }
-
-  return undefined
+  return value instanceof Date && !Number.isNaN(value.getTime()) ? dateText(value, type) : undefined
 }
 
-// Whether a checkbox or radio button named `name` starts ticked from the record its form fills it from, `value` being the one it posts when ticked: a flag ticks the box with none, a list the boxes whose value it holds, a text or a number the box it equals.
+// Whether a checkbox or radio button named `name` starts ticked from the record its form fills it from, `value` being the one it posts when ticked: `true` ticks the box with none, a list the boxes whose value it holds, a text or a number the box it equals. A refused post decides instead.
 export function formInitialChecked(values: unknown, name: string, value?: string | number): boolean {
+  if (refused())
+    return false
+
   const kept = held(values, name)
 
   if (Array.isArray(kept))
     return kept.map(String).includes(value === undefined ? 'on' : String(value))
 
-  if (typeof kept === 'boolean')
-    return kept
+  return typeof kept === 'boolean' ? kept : value !== undefined && formInitial(values, name) === String(value)
+}
 
-  if (kept === undefined || kept === null)
-    return false
+// Starts a field from the record its form fills it from: the value, or whether it is ticked, that its markup would have given it, which the browser shows only until the visitor changes the field, so a record that changes later does not take back what was typed. A select picks the option of that value.
+// The server wrote it already for an island being claimed.
+export function formStart(element: Element, initial: string | boolean): void {
+  if (claimedHost())
+    return
 
-  return value === undefined ? kept !== 0 && kept !== '' && kept !== 'false' : formInitial(values, name) === String(value)
+  if (element instanceof HTMLSelectElement) {
+    for (const option of element.options)
+      option.defaultSelected = option.value === initial
+  }
+  else if (typeof initial === 'boolean') {
+    (element as HTMLInputElement).defaultChecked = initial
+  }
+  else {
+    (element as HTMLInputElement | HTMLTextAreaElement).defaultValue = initial
+  }
 }
 
 // Renders a form's content with the form's action as the one `postedValue`, `postedChecked` and `formErrors` read.
 // `only` is for a component given an `action`: a value that is no action (a snippet, a toast's action object) leaves the form around it in place, where a form's plain URL shadows it.
-export function formScope<Result>(target: unknown, render: () => Result, only = false): Result {
+// `at` is where a form filled from a record starts in its template, which keys it among the forms sharing its action: `FORM_FIELD` carries the key a refusal reads back.
+export function formScope<Result>(target: unknown, render: () => Result, only = false, at?: number): Result {
   if (only && !isAction(target))
     return render()
 
   enclosing.push(target)
+  keys.push(keyOf(at))
 
   try {
     return issueScope(target, render)
   }
   finally {
     enclosing.pop()
+    keys.pop()
   }
 }
 
@@ -280,7 +361,7 @@ export function postedValues(name: unknown, fallback?: readonly unknown[]): stri
     return (written.length === held.length && written.every(item => held.includes(item))) ? undefined : written
   }
 
-  const posted = typeof name === 'string' && name !== '' && isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
+  const posted = typeof name === 'string' && name !== '' ? refusalOf(target)?.values : undefined
 
   // A refusal that read no field, such as a body too large, has nothing to choose.
   if (!posted || Object.keys(posted).length === 0)
@@ -332,7 +413,7 @@ export function setStamper(sign: typeof stamper): void {
 
 // Whether a checkbox or radio button was ticked in a refused post; undefined without one. One with no `value` posts `on`, read as `true` by a boolean field.
 export function formChecked(target: unknown, name: string, value: unknown): boolean | undefined {
-  const posted = isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
+  const posted = refusalOf(target)?.values
 
   // A refusal that read no field, such as a body too large, has nothing to tick or untick.
   if (!posted || Object.keys(posted).length === 0)

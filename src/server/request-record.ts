@@ -77,6 +77,8 @@ export class RequestRecord {
   pageUrl: URL | undefined = undefined
   crossSite: { site: string | undefined, crossSite: boolean } | undefined = undefined
   postedFrom: string | null | undefined = undefined
+  // Which of the forms sharing the action posted, as the post named it before the schema dropped the field.
+  postedForm: string | undefined = undefined
   // The rate limit hits an action counted, which a call that started no work takes back, and the key each limit counted it under.
   refundableHits: { limiter: Limiter, key: string, resetAt: number }[] | undefined = undefined
   countedKeys: Map<object, string> | undefined = undefined

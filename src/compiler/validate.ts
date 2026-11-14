@@ -13,6 +13,7 @@ import { deprecatedImage } from './deprecated-image'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { shorthandProblems } from './head-shorthand'
+import { valuesCall } from './form-info'
 import { kayCtxImport } from './script-shared'
 import { AttributeFixes, FIELD_NAME, PART_NAME, PART_NAME_LIST } from './validate-fixes'
 
@@ -29,6 +30,7 @@ const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const WHITESPACE = /\s+/
+
 // A `class` member of a props type, as the text of the type: one of its own members, not of a type nested in it.
 const CLASS_MEMBER = /^(?:class|'class'|"class")\??\s*:/
 const MEMBER_START = /[\s{;,]/
@@ -561,6 +563,8 @@ class Validator {
         this.serverIsland(serverIsland, failedBlockOf(element, this.src))
       else if (name === FIELD_ATTRIBUTE && !element.component && FIELD_ELEMENTS.has(element.name))
         this.field(element, attribute)
+      else if (valuesCall(element, attribute, this.src))
+        this.error('form-misuse', attribute.expression, 'A call in `values` runs once for every field of the form', { note: 'each field reads the record on its own', help: 'compute it once in the script, `const todo = load(id)`, and write `values={todo}`' })
       else
         this.attribute(element, attribute, name)
     }
