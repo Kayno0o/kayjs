@@ -146,22 +146,30 @@ export async function persistedQuery(root: string, options: CheckOptions): Promi
       const { locals } = importsOf(ast, FROM_KAY, 'persisted')
       const others = [...locals].some(local => reads(ast, local) > hits.length || new RegExp(`\\b${local}\\b`).test(unparsed))
       const named = hits.filter(call => !spelled(call))
-      const imports = named.length === 0 ? [] : importEdits(ast, base, source, others ? [] : ['persisted'], 'queryParam')
+      const planned = hits.map(call => ({ call, own: queryEdits(source, base, call) }))
+      const everyFixable = planned.every(({ own }) => own !== null)
+      const imports = named.length === 0 ? [] : importEdits(ast, base, source, others || !everyFixable ? [] : ['persisted'], 'queryParam')
+      // Each diagnostic carries every call's rewrite and the import's, so the first fix applied does it all and the others overlap it.
+      const all = imports ? [...planned.flatMap(({ own }) => own ?? []), ...imports] : null
 
-      for (const call of hits) {
-        const [name, value, settings] = call.arguments
-        const plain = call.arguments.length >= 2 && call.arguments.length <= 3 && !call.arguments.some(argument => argument.type === 'SpreadElement')
-        const inner = settings?.type === 'ObjectExpression' && !settings.properties.some(property => property.type === 'SpreadElement') ? source.slice(base + settings.start + 1, base + settings.end - 1).trim().replace(TRAILING_COMMA, '') : undefined
-        const kept = keptSettings(source, base, settings, inner)
-        const text = plain ? `, { default: ${source.slice(base + value!.start, base + value!.end)}${kept} }` : undefined
-        const lost = plain && COMMENT.test(source.slice(base + name!.end, base + call.end))
-        const callee = spelled(call) ? `${source.slice(base + call.callee.start, base + call.callee.end).replace(QUERY_MEMBER, '')}.queryParam` : 'queryParam'
-        const edits = plain && !lost && imports ? [{ start: base + call.callee.start, end: base + call.callee.end, text: callee }, { start: base + name!.end, end: base + call.end - 1, text: text! }, ...(spelled(call) ? [] : imports)] : null
-
-        report(base + call.callee.start, base + call.callee.end, '`persisted.query()` is deprecated since 1.105: `queryParam()` is the one signal of a query param', 'call `queryParam(name, { default })`', edits)
-      }
+      for (const { call, own } of planned)
+        report(base + call.callee.start, base + call.callee.end, '`persisted.query()` is deprecated since 1.105: `queryParam()` is the one signal of a query param', 'call `queryParam(name, { default })`', own && all ? all : null)
     }
   })
+}
+
+// The edits that make `call`, a `persisted.query(name, value, options)`, a `queryParam(name, { default: value, ...options })`; `null` when the call cannot be rewritten without risk: a spread, a comment in it, or an `equals` option `queryParam` does not take.
+function queryEdits(source: string, base: number, call: Call): Edit[] | null {
+  const [name, value, settings] = call.arguments
+  const plain = call.arguments.length >= 2 && call.arguments.length <= 3 && !call.arguments.some(argument => argument.type === 'SpreadElement')
+  const inner = settings?.type === 'ObjectExpression' && !settings.properties.some(property => property.type === 'SpreadElement') ? source.slice(base + settings.start + 1, base + settings.end - 1).trim().replace(TRAILING_COMMA, '') : undefined
+  const kept = keptSettings(source, base, settings, inner)
+  const text = plain ? `, { default: ${source.slice(base + value!.start, base + value!.end)}${kept} }` : undefined
+  const lost = plain && COMMENT.test(source.slice(base + name!.end, base + call.end))
+  const callee = spelled(call) ? `${source.slice(base + call.callee.start, base + call.callee.end).replace(QUERY_MEMBER, '')}.queryParam` : 'queryParam'
+  const equals = settings?.type === 'ObjectExpression' && settings.properties.some(property => property.type === 'Property' && keyName(property.key) === 'equals')
+
+  return plain && !lost && !equals ? [{ start: base + call.callee.start, end: base + call.callee.end, text: callee }, { start: base + name!.end, end: base + call.end - 1, text: text! }] : null
 }
 
 // `navigate({ query })`, one name for two jobs: `navigate.query(changes)` changes the query of the current page, `navigate(href)` goes to another.
@@ -211,14 +219,22 @@ export async function navigationHooks(root: string, options: CheckOptions): Prom
       const blocked = hits.some(({ hook, local }) => local !== hook) || read !== callees.size || hits.some(({ local }) => new RegExp(`\\b${local}\\b`).test(unparsed)) || (mentions(text, 'navigation') && !importsOf(ast, FROM_KAY, 'navigation').locals.has('navigation'))
       const imports = blocked ? null : importEdits(ast, base, source, hits.map(({ hook }) => hook), 'navigation')
 
-      for (const callee of callees) {
-        if (callee.type !== 'Identifier')
-          continue
+      // Each diagnostic carries every call's rewrite and the import's, so the first fix applied does it all and the others overlap it.
+      const names = [...callees].filter(callee => callee.type === 'Identifier')
+      const all = imports ? [...names.map(callee => ({ start: base + callee.start, end: base + callee.end, text: `navigation.${callee.name}` })), ...imports] : null
 
-        report(base + callee.start, base + callee.end, `\`${callee.name}()\` is deprecated since 1.105: the hooks of \`navigation\` are its methods`, `call \`navigation.${callee.name}()\``, imports ? [{ start: base + callee.start, end: base + callee.end, text: `navigation.${callee.name}` }, ...imports] : null)
-      }
+      for (const callee of names)
+        report(base + callee.start, base + callee.end, `\`${callee.name}()\` is deprecated since 1.105: the hooks of \`navigation\` are its methods`, `call \`navigation.${callee.name}()\``, all)
     }
   })
+}
+
+// Whether `node` is `window`, `document` or a member read off one: `document.body`, `window.visualViewport`.
+function globalTarget(node: Node): boolean {
+  if (node.type === 'Identifier')
+    return node.name === 'window' || node.name === 'document'
+
+  return node.type === 'MemberExpression' && !node.computed && globalTarget(node.object)
 }
 
 // `listen(window, ...)`, a target read once: `listen(() => window, ...)` is the one form, which a `.ts` module runs on the server and a signal or a `ref` follows.
@@ -228,7 +244,8 @@ export async function listenTarget(root: string, options: CheckOptions): Promise
       eachCall(ast, calls(ast, 'listen'), (call) => {
         const [target] = call.arguments
 
-        if (!target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement')
+        // Only a global read once is wrapped: any other identifier is a signal or a `ref` already, which `listen` follows as the function form, and a `.kay` file's compiler reads it for the target.
+        if (!target || !globalTarget(target))
           return
 
         report(base + target.start, base + target.end, '`listen()` with a target given as a value is deprecated since 1.105: a function returning it is the one form', 'write `() => target`', [{ start: base + target.start, end: base + target.start, text: '() => ' }])
@@ -267,7 +284,8 @@ export async function movedImports(root: string, options: CheckOptions): Promise
           const kind = statement.importKind === 'type' ? 'import type' : 'import'
           const byHome = Map.groupBy(moved, specifier => homes[importedName(specifier)]!)
           const added = [...byHome].map(([home, specifiers]) => `${kind} { ${specifiers.map(specifier => source.slice(base + specifier.start, base + specifier.end)).join(', ')} } from '${home}'`).join('\n')
-          const rest = left.length === 0 ? '' : `${source.slice(base + statement.start, base + (left[0] as Node).start)}${left.map(specifier => source.slice(base + specifier.start, base + specifier.end)).join(', ')}${source.slice(base + (left.at(-1) as Node).end, base + statement.end)}`
+          const every = statement.specifiers as Node[]
+          const rest = left.length === 0 ? '' : `${source.slice(base + statement.start, base + every[0]!.start)}${left.map(specifier => source.slice(base + specifier.start, base + specifier.end)).join(', ')}${source.slice(base + every.at(-1)!.end, base + statement.end)}`
 
           edits.push({ start: base + statement.start, end: base + statement.end, text: rest === '' ? added : `${rest}\n${added}` })
         }

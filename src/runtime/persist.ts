@@ -45,7 +45,7 @@ export const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 // In a browser, unless `sync` is false, a value another tab writes reaches `write`: through the `storage` event for a web storage, a BroadcastChannel for a cookie. A sessionStorage belongs to one tab, so its event reaches only the windows sharing that session, such as the page's frames.
 export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration, values?: readonly unknown[], sync?: boolean, fallback?: T): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
-    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ .`)
+    throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted.cookie() a name of letters, digits and - _ .`)
 
   const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'

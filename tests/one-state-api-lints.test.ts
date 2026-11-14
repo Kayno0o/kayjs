@@ -88,3 +88,47 @@ it('moves an import from kay/mount and kay/server to its home', async () => {
   expect(text).toContain(`from 'kay/cache'`)
   expect(text).not.toContain('kay/mount')
 })
+
+it('rewrites every persisted.query call of a file at once, and keeps the import it still needs', async () => {
+  const { text } = await fixed(persistedQuery, `import { persisted } from 'kay'\nconst a = persisted.query('a', '')\nconst b = persisted.query('b', 1, { values: [1, 2] })\n`)
+
+  expect(text).toBe(`import { queryParam } from 'kay'\nconst a = queryParam('a', { default: '' })\nconst b = queryParam('b', { default: 1, values: [1, 2] })\n`)
+})
+
+it('leaves a persisted.query call with equals unfixed, keeping persisted imported', async () => {
+  const { text, fixable } = await fixed(persistedQuery, `import { persisted } from 'kay'\nconst a = persisted.query('a', '', { equals: false })\nconst b = persisted.query('b', '')\n`)
+
+  expect(fixable).toBe(1)
+  expect(text).toContain(`import { persisted, queryParam } from 'kay'`)
+  expect(text).toContain(`persisted.query('a', '', { equals: false })`)
+})
+
+it('moves both navigation hooks of a file with one fix', async () => {
+  const { text } = await fixed(navigationHooks, `import { onNavigate, onBeforeNavigate, signal } from 'kay'\nonBeforeNavigate(() => true)\nonNavigate(() => 1)\n`)
+
+  expect(text).toBe(`import { signal, navigation } from 'kay'\nnavigation.onBeforeNavigate(() => true)\nnavigation.onNavigate(() => 1)\n`)
+})
+
+it('moves one name out of an import that keeps others, before, between or after them', async () => {
+  const mixed = await fixed(movedImports, `import { defineEnv, s, sqliteCache } from 'kay/server'\n`)
+
+  expect(mixed.text).toBe(`import { defineEnv } from 'kay/server'\nimport { s } from 'kay'\nimport { sqliteCache } from 'kay/cache'\n`)
+
+  const before = await fixed(movedImports, `import { s, defineEnv, type RateLimit } from 'kay/server'\n`)
+
+  expect(before.text).toBe(`import { defineEnv } from 'kay/server'\nimport { s, type RateLimit } from 'kay'\n`)
+
+  const typed = await fixed(movedImports, `import type { RateLimit, Foo } from 'kay/server'\n`)
+
+  expect(typed.text).toBe(`import type { Foo } from 'kay/server'\nimport type { RateLimit } from 'kay'\n`)
+})
+
+it('wraps only window, document and members of them as a listen target', async () => {
+  const globals = await fixed(listenTarget, `import { listen } from 'kay'\nlisten(document.body, 'click', () => 1)\n`)
+
+  expect(globals.text).toContain(`listen(() => document.body, 'click'`)
+
+  const signal = await fixed(listenTarget, `import { listen, signal } from 'kay'\nconst panel = signal<HTMLElement>()\nlisten(panel, 'scroll', () => 1)\n`)
+
+  expect(signal.found).toBe(0)
+})

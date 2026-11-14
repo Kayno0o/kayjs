@@ -146,7 +146,7 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.105',
     site: true,
-    summary: '`listen(window, ...)`, `listen(() => window, ...)` since 1.105: the target is one form, a function returning it, which a `.ts` module can run on the server where `window` is not read, and which a signal or a `ref` follows as it changes. A target given as a value is read once. The old form works until 1.108. Found on a call of `listen` imported from `kay` whose first argument is not a function, in the TypeScript files and `.kay` files of the project. The fix wraps the target.',
+    summary: '`listen(window, ...)`, `listen(() => window, ...)` since 1.105: the target is one form, a function returning it, which a `.ts` module can run on the server where `window` is not read, and which a signal or a `ref` follows as it changes. A target given as a value is read once. The old form works until 1.108. Found on a call of `listen` imported from `kay` whose first argument is `window`, `document` or a member of one, in the TypeScript files and `.kay` files of the project. The fix wraps the target.',
     wrong: '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\n\nlisten(window, \'keydown\', event => key = event.key)\n---\np {key()}',
     right: '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\n\nlisten(() => window, \'keydown\', event => key = event.key)\n---\np {key()}',
   },

@@ -45,7 +45,7 @@ export function writePersisted(key: string, value: unknown, storage: WebStorage 
   area(storage).setItem(key, sendValue(value))
 }
 
-// A `Cookie` header value setting the cookie a `persisted(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
+// A `Cookie` header value setting the cookie a `persisted.cookie(name, initial)` signal keeps its value in, for `site.as(persistedCookie('scheme', 'light'))`: the first render of a page reads it.
 export function persistedCookie(name: string, value: unknown): string {
   if (!COOKIE_NAME.test(name))
     throw new TypeError(`kay: ${JSON.stringify(name)} cannot name a cookie; give persistedCookie() a name of letters, digits and - _ .`)

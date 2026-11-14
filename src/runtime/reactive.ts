@@ -433,8 +433,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 // Whether a page is being rendered on the server, where no effect runs.
 export const serverRenders = (): boolean => typeof KAY_BROWSER === 'undefined' && serverRendering > 0
 
-// Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
-// kept: free
+// Runs `fn` once the current render is done, then again whenever what it read changes; never on the server. `kay` exports the one of `core.ts`, which takes `{ signal }` too.
 // A function `fn` returns runs as its cleanup, as one passed to `onCleanup` does.
 export function effect(fn: () => void): void {
   createEffect(fn, 'effect')
@@ -461,8 +460,7 @@ export function renderEffect(fn: () => void): void {
   run(node)
 }
 
-// Runs once, after the component's markup is in place.
-// kept: free
+// Runs once, after the component's markup is in place. `kay` exports the one of `core.ts`.
 export function onMount(fn: () => void): void {
   createEffect(() => untrack(fn), 'onMount', fn)
 }
