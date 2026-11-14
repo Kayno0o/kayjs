@@ -7,6 +7,8 @@
 - Keep everything on one machine: `store: sqliteData('data/app.sqlite')`; files stay in `data/files`.
 - Share it between replicas: `store: { ...pgData(db), files: s3Files() }`, the bucket for files every replica reads.
 - Plug in a store of your own: give the key an object with the interface's methods below, plus `ping` and `close` when it holds a connection.
+- Keep a library's data elsewhere than the app's database: its extension takes `store`, `auth({ store: pgAuth(db) })`, `ai({ store: sqliteAi(path) })`, `mailer({ store: pgMail(db) })` (`{ lists, suppressions }` for a part alone). Each library's `/pg` entry has `pg<Lib>(db)` and `<lib>Tables` for an app's own pg-orm `ignoreTables`, its `/sqlite` entry `sqlite<Lib>(path)`; kayjs-cms's loaders are `pgCms` and `sqliteCms`.
+- With no `store` anywhere, sessions, jobs and every library share the one file `data/app.sqlite`; the file an older version made (`data/sessions.sqlite`, `data/jobs.sqlite`, `data/auth.sqlite`, `data/ai-conversations.sqlite`, `data/mail-list.sqlite`, `data/content.sqlite`) is still read when it exists.
 
 ## Reference
 

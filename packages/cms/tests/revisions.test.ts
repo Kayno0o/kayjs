@@ -6,7 +6,7 @@ import { registerCollections } from '../../../src/content/edit'
 import { changesBetween } from '../src/changes'
 import { editedMoment } from '../src/datetime'
 import { historyPath } from '../src/listing'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { restoreRevision, restoreTrashed } from '../src/restore'
 import { revisionsOf } from '../src/revisions'
 import { historyScreen, trashScreen } from '../src/screens'
@@ -23,7 +23,7 @@ function notes(seed?: { slug: string, data: Record<string, unknown> }[]): void {
   const table = `notes_${++count}`
 
   restore = registerCollections([
-    ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table, seed }), { schema, draft: 'draft' })],
+    ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table, seed }), { schema, draft: 'draft' })],
     ['plain', collection({ name: 'plain', load: () => [{ slug: 'a', data: { title: 'A' } }], save: () => undefined }, { schema })],
   ])
 }
@@ -298,7 +298,7 @@ describe('history details', () => {
     const withDefault = s.Object({ title: s.String(), tone: s.String({ default: 'calm' }) })
     const table = `notes_${++count}`
 
-    restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema: withDefault })]])
+    restore = registerCollections([['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table }), { schema: withDefault })]])
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await saveEntry({ ...ref, data: { title: 'One', tone: 'calm' } })
     expect((await revisionsOf(ref)).length).toBe(1)
@@ -340,7 +340,7 @@ describe('the trash, details', () => {
     const ordered = s.Object({ title: s.String(), position: s.Optional(s.Number()) })
     const table = `notes_${++count}`
 
-    restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema: ordered, order: 'position' })]])
+    restore = registerCollections([['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table }), { schema: ordered, order: 'position' })]])
     await saveEntry({ ...ref, data: { title: 'One', position: 3 } }, { create: true })
     await deleteEntry(ref)
 
@@ -368,7 +368,7 @@ function plainHidden(rows: Map<string, { slug: string, data: unknown, body?: str
 describe('history gaps', () => {
   test('a delete the loader fails leaves nothing in the trash', async () => {
     const table = `notes_${++count}`
-    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table })
+    const inner = sqliteCms({ name: 'notes', database: ':memory:', table })
 
     restore = registerCollections([['notes', collection({ ...inner, remove: async () => {
       throw new Error('disk full')
@@ -382,7 +382,7 @@ describe('history gaps', () => {
   test('a loader with a sibling but no get and no saveMany keeps revisions and a trash, saving the rows in turn', async () => {
     const history = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
     const trash = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
-    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` })
+    const inner = sqliteCms({ name: 'notes', database: ':memory:', table: `notes_${++count}` })
 
     restore = registerCollections([['notes', collection({ ...inner, sibling: kind => plainHidden({ history, trash }[kind] ?? new Map()) }, { schema })]])
     configure({ history: { revisions: 2 } })

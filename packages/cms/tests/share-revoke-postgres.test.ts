@@ -3,11 +3,11 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
-import { pgLoader } from '../src/loaders/pg'
+import { pgCms } from '../src/loaders/pg'
 import { configure } from '../src/settings'
 import { revokeShares, sharesRevokedAt } from '../src/share-revoke'
 
-// The revocation kept in the `shares` sibling of a pgLoader, skipped without TEST_DATABASE_URL.
+// The revocation kept in the `shares` sibling of a pgCms, skipped without TEST_DATABASE_URL.
 const url = process.env.TEST_DATABASE_URL ?? ''
 const skip = url === ''
 const admin = skip ? undefined : new SQL(Object.assign(new URL(url), { pathname: '/postgres' }).href)
@@ -24,7 +24,7 @@ if (admin !== undefined) {
 // A new loader over the same table, as a restarted server makes.
 function notes(): void {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
-  restore = registerCollections([['notes', collection(pgLoader({ name: 'notes', source: shared, table: 'notes_shares' }), { schema: s.Object({ title: s.String() }) })]])
+  restore = registerCollections([['notes', collection(pgCms({ name: 'notes', source: shared, table: 'notes_shares' }), { schema: s.Object({ title: s.String() }) })]])
 }
 
 beforeEach(() => {

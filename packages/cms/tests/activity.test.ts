@@ -4,7 +4,7 @@ import { collection, reference } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
 import { hiddenOf } from '../src/hidden'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { restoreTrashed } from '../src/restore'
 import { activityScreen } from '../src/screens'
 import { configure } from '../src/settings'
@@ -18,7 +18,7 @@ let restore: ReturnType<typeof registerCollections>
 
 function sites(): void {
   const table = `activity_${++count}`
-  const make = (name: string): [string, ReturnType<typeof collection>] => [name, collection(sqliteLoader({ name, database: ':memory:', table: `${table}_${name}` }), { schema, draft: 'draft' })]
+  const make = (name: string): [string, ReturnType<typeof collection>] => [name, collection(sqliteCms({ name, database: ':memory:', table: `${table}_${name}` }), { schema, draft: 'draft' })]
 
   restore = registerCollections([make('notes'), make('posts'), ['plain', collection({ name: 'plain', load: () => [{ slug: 'a', data: { title: 'A' } }], save: () => undefined }, { schema })]])
 }
@@ -111,7 +111,7 @@ describe('activity', () => {
   })
 
   test('reads a collection once for all its rows on a page', async () => {
-    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_reads` })
+    const inner = sqliteCms({ name: 'notes', database: ':memory:', table: `activity_${++count}_reads` })
     let reads = 0
 
     restore = registerCollections([['notes', collection({ ...inner, load: async (...args) => {
@@ -134,8 +134,8 @@ describe('activity', () => {
 
   test('records the rename above the updates it caused to the entries naming it', async () => {
     restore = registerCollections([
-      ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_n` }), { schema, draft: 'draft' })],
-      ['posts', collection(sqliteLoader({ name: 'posts', database: ':memory:', table: `activity_${count}_p` }), { schema: s.Object({ title: s.String(), note: reference('notes') }) })],
+      ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: `activity_${++count}_n` }), { schema, draft: 'draft' })],
+      ['posts', collection(sqliteCms({ name: 'posts', database: ':memory:', table: `activity_${count}_p` }), { schema: s.Object({ title: s.String(), note: reference('notes') }) })],
     ])
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await saveEntry({ collection: 'posts', slug: 'p', data: { title: 'P', note: 'first' } }, { create: true })
@@ -171,11 +171,11 @@ describe('activity', () => {
 
   test('skips rows another kind left in the same store, and the trash skips the activity', async () => {
     const store = new Map<string, { slug: string, data: unknown, body?: string | undefined }>()
-    const inner = sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${++count}_mixed` })
+    const inner = sqliteCms({ name: 'notes', database: ':memory:', table: `activity_${++count}_mixed` })
 
     restore = registerCollections([['notes', collection({ ...inner, sibling: (kind) => {
       return kind === 'history'
-        ? sqliteLoader({ name: 'notes', database: ':memory:', table: `activity_${count}_h` })
+        ? sqliteCms({ name: 'notes', database: ':memory:', table: `activity_${count}_h` })
         : {
           name: 'mixed',
           load: () => [...store.values()],

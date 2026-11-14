@@ -5,7 +5,7 @@ import { files, memoryFiles } from 'kay/server'
 import { registerCollections } from '../../../src/content/edit'
 import { setupStorage } from '../../../src/server/storage'
 import * as hidden from '../src/hidden'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { storeUpload } from '../src/media'
 import { deleteUnusedUploads, libraryUploads, unusedUploads } from '../src/orphans'
 import { restoreRevision, restoreTrashed } from '../src/restore'
@@ -36,7 +36,7 @@ async function unusedKeys(): Promise<string[]> {
 beforeEach(() => {
   setupStorage(memoryFiles(), '/nonexistent', undefined)
   configure({})
-  restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })]])
+  restore = registerCollections([['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })]])
 })
 
 afterEach(() => {

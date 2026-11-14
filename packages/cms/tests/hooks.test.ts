@@ -10,7 +10,7 @@ import { registerCollections, registerEditSite } from '../../../src/content/edit
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { setupStorage } from '../../../src/server/storage'
 import { activityOf } from '../src/activity'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { mediaIndex } from '../src/media'
 import { approveEntry, submitEntry } from '../src/reviewing'
 import { configure } from '../src/settings'
@@ -41,7 +41,7 @@ beforeEach(async () => {
   configure({})
   restore = registerCollections([
     ['posts', collection(join(dir, 'posts'), { schema, draft: 'draft' })],
-    ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `hooks_${++count}` }), { schema, draft: 'draft' })],
+    ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: `hooks_${++count}` }), { schema, draft: 'draft' })],
   ])
 })
 

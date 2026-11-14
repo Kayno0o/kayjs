@@ -7,7 +7,7 @@ import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
-import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
+import { sqliteCms } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
 import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
@@ -1363,7 +1363,7 @@ describe('the collections a CMS edits', () => {
 
   it('writes a real SQLite collection through save, saveEntries and remove, locales included', async () => {
     const schema = t.Object({ title: t.String(), order: t.Optional(t.Number()) })
-    const posts = collection(sqliteLoader({ name: 'sqlposts', database: ':memory:', seed: [{ slug: 'a', data: { title: 'A', order: 1 } }, { slug: 'b', data: { title: 'B', order: 2 } }] }), { schema, order: 'order' })
+    const posts = collection(sqliteCms({ name: 'sqlposts', database: ':memory:', seed: [{ slug: 'a', data: { title: 'A', order: 1 } }, { slug: 'b', data: { title: 'B', order: 2 } }] }), { schema, order: 'order' })
 
     await exporting([['sqlposts', posts]], async () => {
       expect((await posts.all()).map(post => post.slug)).toEqual(['a', 'b'])

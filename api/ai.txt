@@ -45,6 +45,7 @@ interface AiOptions extends AskHooks, Resilience, ModelsOptions
   onToolCall?: Hook<AiToolCall> | undefined
   rateLimit?: AskLimit | AskLimit[] | false | undefined
   retry?: RetryOptions | false | undefined
+  store?: ConversationStore | undefined
 
 [.] AiReply
 interface AiReply extends PromiseLike<string>, AsyncIterable<string>
@@ -1115,16 +1116,32 @@ component default
   variant?: "bubble" | "plain" | undefined
   /** @deprecated Written `labels.thinking`; `deprecated-ai-labels` rewrites it. Removed in 1.108. */ waitingLabel?: string | undefined
 
+[./pg] aiTables
+const aiTables: readonly ["kay_ai_conversations"]
+
 [./pg] conversationTable
+/** @deprecated Use `aiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 const conversationTable: "kay_ai_conversations"
 
+[./pg] createAiTables
+function createAiTables(source: PgSource): Promise<void>
+
 [./pg] createConversationTable
+/** @deprecated Use `createAiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 function createConversationTable(source: PgSource): Promise<void>
 
+[./pg] pgAi
+function pgAi(source: PgSource): ConversationStore & { close: () => Promise<void>; }
+
 [./pg] pgConversations
+/** @deprecated Use `pgAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 function pgConversations(source: PgSource): ConversationStore & { close: () => Promise<void>; }
 
+[./sqlite] sqliteAi
+function sqliteAi(path?: string): ConversationStore
+
 [./sqlite] sqliteConversations
+/** @deprecated Use `sqliteAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 function sqliteConversations(path?: string): ConversationStore
 
 [./test] aiTest

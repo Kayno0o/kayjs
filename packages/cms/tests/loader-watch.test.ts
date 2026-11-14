@@ -4,7 +4,7 @@ import { afterAll, afterEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, contentKey } from 'kay/content'
 import { onKeysInvalidated, refreshLocally, trackStore, untrackStore } from '../../../src/runtime/cache'
-import { pgLoader } from '../src/loaders/pg'
+import { pgCms } from '../src/loaders/pg'
 import { watcher } from '../src/loaders/shared'
 import { until } from './until'
 
@@ -200,7 +200,7 @@ describe('the postgres loader\'s watch', () => {
     await admin.unsafe(`CREATE DATABASE ${database}`)
     sql = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 2 })
 
-    const loader = pgLoader({ name: 'frozen', source: sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
+    const loader = pgCms({ name: 'frozen', source: sql, table: 'frozen', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] })
     let reads = 0
     const posts = collection({ ...loader, load: async (context) => {
       reads++
@@ -228,7 +228,7 @@ describe('the postgres loader\'s watch', () => {
     const heard: string[] = []
     const listener = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 1 })
     const registration = await listener.listen('kay_wake', payload => void heard.push(payload))
-    const loader = pgLoader({ name: 'notified', source: sql, table: 'notified', watch: false })
+    const loader = pgCms({ name: 'notified', source: sql, table: 'notified', watch: false })
 
     await loader.save!({ slug: 'a', data: { title: 'A' } })
     await loader.saveMany!([{ slug: 'a', data: { title: 'B' } }])

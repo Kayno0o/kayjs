@@ -37,7 +37,7 @@ export function contentSource(): SQL | string {
   const database = appDatabase()
 
   if (database?.kind !== 'pg')
-    throw configError('cms', 'pgLoader', 'pgLoader has no `source`, and the app\'s `store` names no Postgres: give the loader a connection URL, a Bun `SQL` or a pg-orm `Database`, or set `store: pgData(url)` in kay.config.ts')
+    throw configError('cms', 'pgCms', 'pgCms has no `source`, and the app\'s `store` names no Postgres: give the loader a connection URL, a Bun `SQL` or a pg-orm `Database`, or set `store: pgData(url)` in kay.config.ts')
 
   return database.source
 }
@@ -80,14 +80,15 @@ export interface Row {
 }
 
 const IDENTIFIER = /^[A-Z_]\w*$/i
-const DEFAULT_TABLE = 'kay_content'
+
+export const DEFAULT_TABLE = 'kay_content'
 
 // The table name, which goes into SQL text, so only a plain identifier is taken, quoted so a reserved word works.
 export function tableOf(table: string | undefined): string {
   const name = table ?? DEFAULT_TABLE
 
   if (!IDENTIFIER.test(name))
-    throw configError('cms', 'pgLoader', `the loader's table ${JSON.stringify(name)} is not a plain identifier`)
+    throw configError('cms', 'pgCms', `the loader's table ${JSON.stringify(name)} is not a plain identifier`)
 
   return `"${name}"`
 }

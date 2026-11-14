@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, reference } from 'kay/content'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { followingRenames } from '../src/references'
 import { restoreRevision } from '../src/restore'
 import { revisionsOf } from '../src/revisions'
@@ -13,7 +13,7 @@ import { collectionNamed, deleteEntry, entryOf, renameEntry, saveEntry } from '.
 let count = 0
 
 function register(): void {
-  const table = (name: string) => sqliteLoader({ name, database: ':memory:', table: `${name}_${++count}` })
+  const table = (name: string) => sqliteCms({ name, database: ':memory:', table: `${name}_${++count}` })
 
   registerEditSite({ urls: async () => undefined, locales: ['en', 'fr'], defaultLocale: 'en' })
   registerCollections([

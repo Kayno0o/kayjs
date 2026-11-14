@@ -2223,6 +2223,9 @@ function usernameProblem(username: string, rules?: CredentialRules): UsernamePro
 [./rules] UsernameProblem
 type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
+[./sqlite] sqliteAuth
+function sqliteAuth(path: string): StoreUrl
+
 [./test] authTest
 /** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
 function authTest(site: OAuthSite): AuthTest

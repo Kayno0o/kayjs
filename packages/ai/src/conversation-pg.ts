@@ -147,11 +147,11 @@ export function pgAi(source: PgSource): ConversationStore & { close: () => Promi
   }
 }
 
-/** @deprecated `aiTables`, since 1.105. */
+/** @deprecated Use `aiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 export const conversationTable = aiTables[0]
 
-/** @deprecated `createAiTables`, since 1.105. */
+/** @deprecated Use `createAiTables`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 export const createConversationTable = createAiTables
 
-/** @deprecated `pgAi`, since 1.105. */
+/** @deprecated Use `pgAi`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
 export const pgConversations = pgAi

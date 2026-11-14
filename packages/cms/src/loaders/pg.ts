@@ -3,11 +3,11 @@ import type { PgSource } from 'kay/library'
 import type { CmsSeedEntry, LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
 import { hear, wakeOf } from 'kay/library'
-import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
+import { contentSource, DEFAULT_TABLE, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { CmsSeedEntry, LoaderOptions }
 
-export interface PgLoaderOptions extends LoaderOptions {
+export interface PgCmsOptions extends LoaderOptions {
   // A connection URL, the Bun `SQL` the app already has or a pg-orm `Database`, as `pgData` takes it. The app's `store: pgData(url)` when left out.
   source?: PgSource | undefined
 }
@@ -35,8 +35,8 @@ function clientOf(source: PgSource): SQL {
   return client
 }
 
-// A collection's entries kept in one Postgres table of JSON entries: `collection(pgLoader({ name: 'posts', source: db, seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
-export function pgLoader(options: PgLoaderOptions): ContentLoader {
+// A collection's entries kept in one Postgres table of JSON entries: `collection(pgCms({ name: 'posts', source: db, seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
+export function pgCms(options: PgCmsOptions): ContentLoader {
   const { name, ttl } = options
   const table = tableOf(options.table)
   const key = seededKey(name)
@@ -132,7 +132,7 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
     name,
     ...ttl === undefined ? {} : { ttl },
     // Looked at by hand only, so no timer.
-    sibling: kind => pgLoader({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
+    sibling: kind => pgCms({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
     load: async () => {
       const sql = await database()
 
@@ -174,3 +174,12 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
     },
   }
 }
+
+// The table of every collection a `pgCms` loader keeps, `kay_content` unless a loader names its own `table`: `ignoreTables` of an app's own pg-orm `sync`.
+export const cmsTables = [DEFAULT_TABLE] as const
+
+/** @deprecated Use `pgCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
+export const pgLoader = pgCms
+
+/** @deprecated Use `PgCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
+export type PgLoaderOptions = PgCmsOptions

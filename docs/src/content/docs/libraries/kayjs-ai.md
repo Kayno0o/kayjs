@@ -257,7 +257,7 @@ If your `ask` has `outlive: true`, a reply still running when the page reloads p
 
 When the visitor's session lapses, the chat keeps the conversation it shows, says so with `labels.signedOut`, and posts it whole from then on.
 
-The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/ai-conversations.sqlite`, unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice.
+The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/app.sqlite` (`data/ai-conversations.sqlite` where it already exists), unless you give `ai({ store })` a store of your own, `pgAi(db)` or `sqliteAi(path)`. What they hold is personal data: name it in your privacy notice.
 
 A conversation not touched for a year is dropped. `ai({ conversationAge: '90d' })` changes that, and `false` keeps them.
 

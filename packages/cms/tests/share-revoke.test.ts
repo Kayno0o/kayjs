@@ -4,7 +4,7 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { configure } from '../src/settings'
 import { revokeShares, sharesRevokedAt } from '../src/share-revoke'
 
@@ -14,7 +14,7 @@ let restore: ReturnType<typeof registerCollections>
 
 beforeEach(() => {
   configure({})
-  restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: 'revoke_notes' }), { schema: s.Object({ title: s.String() }) })]])
+  restore = registerCollections([['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: 'revoke_notes' }), { schema: s.Object({ title: s.String() }) })]])
 })
 
 afterEach(() => {

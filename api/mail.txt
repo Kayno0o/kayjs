@@ -185,7 +185,7 @@ interface ListOptions
   pace?: undefined | { batch?: number | undefined; every?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   privacy?: string | undefined
   protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never, never, OutputSchema>, "maxSize" | "tool">) | undefined
-  store?: ListStore | undefined
+  store?: ListStore | MailStore | undefined
   title?: string | undefined
   view?: ((props: ListConfirmProps) => Element) | undefined
 
@@ -282,6 +282,7 @@ interface MailerOptions
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   smtp?: SmtpOverrides | undefined
+  store?: MailStore | undefined
   suppressionStore?: SuppressionStore | undefined
   to?: Address | Address[] | undefined
   transport?: Transport | undefined
@@ -306,6 +307,7 @@ interface MailExtensionOptions extends MailerOptions
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   server?: (() => Promise<Mailer>) | false | undefined
   smtp?: SmtpOverrides | undefined
+  store?: MailStore | undefined
   suppressionStore?: SuppressionStore | undefined
   to?: Address | Address[] | undefined
   transport?: Transport | undefined
@@ -697,11 +699,26 @@ function createMailListTables(source: PgSource): Promise<void>
 [./pg] createMailSuppressionTables
 function createMailSuppressionTables(source: PgSource): Promise<void>
 
+[./pg] createMailTables
+function createMailTables(source: PgSource): Promise<void>
+
 [./pg] mailListTableNames
 const mailListTableNames: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
 
+[./pg] MailStore
+interface MailStore
+  file?: string | undefined
+  lists?: ListStore | undefined
+  suppressions?: SuppressionStore | undefined
+
+[./pg] mailTables
+const mailTables: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
+
 [./pg] pgLists
 function pgLists(source: PgSource): ListStore & { close: () => Promise<void>; }
+
+[./pg] pgMail
+function pgMail(source: PgSource): Required<Pick<MailStore, "lists" | "suppressions">> & { close: () => Promise<void>; }
 
 [./pg] pgSuppressions
 function pgSuppressions(source: PgSource): SuppressionStore & { close: () => Promise<void>; }
@@ -717,6 +734,12 @@ component default
   align?: Align | undefined
   children?: Element
   style?: string | undefined
+
+[./sqlite] MailStore
+interface MailStore
+  file?: string | undefined
+  lists?: ListStore | undefined
+  suppressions?: SuppressionStore | undefined
 
 [./sqlite] openLists
 function openLists(path: string): {
@@ -749,6 +772,41 @@ function openLists(path: string): {
   sent: (broadcast: string, subscriber: string, now?: number) => Changes;
   release: (broadcast: string, subscriber: string, now?: number) => Changes;
 }
+
+[./sqlite] sqliteLists
+function sqliteLists(path: string): {
+  progress(broadcast: Broadcast): BroadcastProgress;
+  suppress(email: string, reason: SuppressionReason, source: string, now?: number): void;
+  suppressed: (emails: string[]) => StoredSuppression[];
+  lift: (email: string) => boolean;
+  close: () => void;
+  closed: boolean;
+  sweep(now?: number): void;
+  ask(list: string, email: string, id: string, locale: string, now?: number, proof?: Proof): Subscriber;
+  find(list: string, id: string): Subscriber | undefined;
+  confirm(list: string, id: string, now?: number, issuedAt?: number): boolean;
+  remove: {
+    (list: string, id: string): boolean;
+    deferred: (list: string, id: string) => boolean;
+    immediate: (list: string, id: string) => boolean;
+    exclusive: (list: string, id: string) => boolean;
+  };
+  removeEmail: (list: string, email: string) => boolean;
+  erase: (email: string) => number;
+  forEmail: (email: string) => Subscriber[];
+  subscribers: (list: string) => Subscriber[];
+  count: (list: string) => number;
+  addBroadcast(id: string, list: string, message: string, now?: number): void;
+  broadcast(id: string): Broadcast | undefined;
+  finish: (id: string, now?: number) => Changes;
+  next: (broadcast: Broadcast, limit: number) => Subscriber[];
+  claim: (broadcast: string, subscriber: string, now?: number) => boolean;
+  sent: (broadcast: string, subscriber: string, now?: number) => Changes;
+  release: (broadcast: string, subscriber: string, now?: number) => Changes;
+}
+
+[./sqlite] sqliteMail
+function sqliteMail(path: string): MailStore
 
 [./sqlite] sqliteSuppressions
 function sqliteSuppressions(path: string): SuppressionStore

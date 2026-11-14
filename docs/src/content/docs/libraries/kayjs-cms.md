@@ -609,14 +609,14 @@ A loader may also give `saveMany(entries)`, which writes the entries of one acti
 
 ## A live site with a database
 
-Editors saving on a running site need a loader with `save` and `remove`. kayjs-cms ships two, so you write none: `sqliteLoader` on `bun:sqlite` and `pgLoader` on Bun's own `SQL`. Each keeps its entries in one table of JSON, creates it when first used, and adds no dependency.
+Editors saving on a running site need a loader with `save` and `remove`. kayjs-cms ships two, so you write none: `sqliteCms` on `bun:sqlite` and `pgCms` on Bun's own `SQL`. Each keeps its entries in one table of JSON, creates it when first used, and adds no dependency.
 
 ```ts
 import { s } from 'kay'
 import { collection } from 'kay/content'
-import { sqliteLoader } from '@kayjs/cms/sqlite'
+import { sqliteCms } from '@kayjs/cms/sqlite'
 
-export const posts = collection(sqliteLoader({
+export const posts = collection(sqliteCms({
   name: 'posts',
 
   seed: [{ slug: 'hello', data: { title: 'Hello', order: 1 }, body: 'First post.' }],
@@ -626,7 +626,7 @@ export const posts = collection(sqliteLoader({
 })
 ```
 
-The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgLoader` from `@kayjs/cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `source`, a connection URL, a Bun `SQL` or a pg-orm `Database` (`sql` is its deprecated name).
+The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgCms` from `@kayjs/cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `source`, a connection URL, a Bun `SQL` or a pg-orm `Database` (`sql` is its deprecated name).
 
 A pg-orm app passes its own database, `source: db`, and adds the table to pg-orm's `ignoreTables` (`kay_content` unless you pass `table`), or pg-orm sees it as a table to drop.
 
@@ -656,7 +656,7 @@ A collection whose entries come from a loader of your own has no database to loo
 
 ### Bringing back an older version or a deleted entry
 
-A collection kept by `sqliteLoader` or `pgLoader` remembers what editors save. Each entry has a History button: it lists the last 50 saves, newest first, with who made each one, when, and which fields it changed. Restore saves an older version again as a new one, so nothing is lost and the history keeps growing.
+A collection kept by `sqliteCms` or `pgCms` remembers what editors save. Each entry has a History button: it lists the last 50 saves, newest first, with who made each one, when, and which fields it changed. Restore saves an older version again as a new one, so nothing is lost and the history keeps growing.
 
 You declare nothing for this. The versions sit in the same table as the entries, out of sight of your pages, lists and searches. The collection's list has a Trash button too: an entry you delete is kept there for 30 days, and Restore writes it back under its slug (a draft, for a role that may not publish). A restore is refused if someone saved the entry after you opened it, and a role that may not publish restores without publishing or unpublishing the entry.
 

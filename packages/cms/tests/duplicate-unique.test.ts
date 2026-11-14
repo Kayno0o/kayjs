@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, unique } from 'kay/content'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { configure } from '../src/settings'
 import { duplicateEntry, entryOf, saveEntry } from '../src/store'
 import { withFreeUniques } from '../src/unique'
@@ -10,7 +10,7 @@ import { withFreeUniques } from '../src/unique'
 let count = 0
 
 beforeEach(() => {
-  const table = (name: string) => sqliteLoader({ name, database: ':memory:', table: `${name}_${++count}` })
+  const table = (name: string) => sqliteCms({ name, database: ':memory:', table: `${name}_${++count}` })
 
   registerEditSite({ urls: async () => undefined, locales: ['en', 'fr'], defaultLocale: 'en' })
   registerCollections([

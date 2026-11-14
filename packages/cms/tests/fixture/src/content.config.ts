@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { blocks as blockList, collection, customField, fieldInput, imageField } from 'kay/content'
-import { sqliteLoader } from '../../../src/loaders/sqlite'
+import { sqliteCms } from '../../../src/loaders/sqlite'
 import { sections as blocks, footerDown, partners as friends, ledgerRows, outage, shop as shelf, products as stock } from './products'
 
 export const posts = collection('content/posts', {
@@ -103,7 +103,7 @@ export const ledger = collection({
 })
 
 // A loaded collection in SQLite, which keeps the history of its entries.
-export const journal = collection(sqliteLoader({ name: 'journal', database: ':memory:' }), {
+export const journal = collection(sqliteCms({ name: 'journal', database: ':memory:' }), {
   schema: s.Object({ title: s.String({ minLength: 1 }) }),
 })
 
@@ -122,6 +122,6 @@ export const guides = collection('content/guides', {
 })
 
 // A loaded collection in SQLite that opts out of the history, the trash and the activity log.
-export const scratch = collection(sqliteLoader({ name: 'scratch', database: ':memory:' }), {
+export const scratch = collection(sqliteCms({ name: 'scratch', database: ':memory:' }), {
   schema: s.Object({ title: s.String({ minLength: 1 }) }),
 })

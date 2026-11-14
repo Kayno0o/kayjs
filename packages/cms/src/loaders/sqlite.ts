@@ -7,13 +7,13 @@ import { contentFile, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEn
 
 export type { CmsSeedEntry, LoaderOptions }
 
-export interface SqliteLoaderOptions extends LoaderOptions {
+export interface SqliteCmsOptions extends LoaderOptions {
   // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened. The file of the app's `store: sqliteData(path)` when left out, else `data/app.sqlite`.
   database?: string | Database | undefined
 }
 
-// A collection's entries kept in one SQLite table of JSON entries: `collection(sqliteLoader({ name: 'posts', seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
-export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
+// A collection's entries kept in one SQLite table of JSON entries: `collection(sqliteCms({ name: 'posts', seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
+export function sqliteCms(options: SqliteCmsOptions): ContentLoader {
   const { name, ttl } = options
   const table = tableOf(options.table)
   const key = seededKey(name)
@@ -117,7 +117,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     name,
     ...ttl === undefined ? {} : { ttl },
     // Looked at by hand only, so no timer.
-    sibling: kind => sqliteLoader({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
+    sibling: kind => sqliteCms({ ...options, name: siblingName(name, kind), seed: undefined, watch: false }),
     load: async () => {
       const db = await database()
 
@@ -184,3 +184,9 @@ function connect(path: string): Database {
 
   return db
 }
+
+/** @deprecated Use `sqliteCms`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
+export const sqliteLoader = sqliteCms
+
+/** @deprecated Use `SqliteCmsOptions`. Removed in 1.108.0; `deprecated-store-names` rewrites it. */
+export type SqliteLoaderOptions = SqliteCmsOptions

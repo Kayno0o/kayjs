@@ -7,8 +7,8 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
 import { collection, ContentChangedError } from 'kay/content'
 import { scratchDir } from 'kay/test'
-import { pgLoader } from '../src/loaders/pg'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { pgCms } from '../src/loaders/pg'
+import { sqliteCms } from '../src/loaders/sqlite'
 
 const seed: CmsSeedEntry[] = [
   { slug: 'a', data: { title: 'A', order: 1 }, body: 'about a' },
@@ -127,10 +127,10 @@ function contract(label: string, make: (options: { name: string, seed?: CmsSeedE
   })
 }
 
-contract('sqliteLoader', (options) => {
+contract('sqliteCms', (options) => {
   const handle = sharedSqlite()
 
-  return sqliteLoader({ ...options, database: handle })
+  return sqliteCms({ ...options, database: handle })
 }, test)
 
 let db: Database | undefined
@@ -141,10 +141,10 @@ function sharedSqlite(): Database {
   return db
 }
 
-describe('sqliteLoader files', () => {
+describe('sqliteCms files', () => {
   test('creates the file with its folder', async () => {
     const path = join(await scratchDir('loader-'), 'nested/content.db')
-    const loader = sqliteLoader({ name: 'posts', database: path, seed })
+    const loader = sqliteCms({ name: 'posts', database: path, seed })
 
     expect((await loader.load({ preview: false })).length).toBe(3)
     expect(await Bun.file(path).exists()).toBe(true)
@@ -153,10 +153,10 @@ describe('sqliteLoader files', () => {
 
 const postgresTest = test.skipIf(skipPostgres)
 
-contract('pgLoader', (options) => {
+contract('pgCms', (options) => {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-  return pgLoader({ ...options, source: { sql: shared } })
+  return pgCms({ ...options, source: { sql: shared } })
 }, postgresTest)
 
 if (admin !== undefined) {
@@ -203,7 +203,7 @@ const swapped = [{ slug: 'a', data: { title: 'A', order: 2 }, expect: { field: '
 describe('a move meeting a writer of another connection', () => {
   test('sqlite waits for the commit of the writer and keeps its save, writing only the order', async () => {
     const path = join(await scratchDir('loader-'), 'move.db')
-    const mine = sqliteLoader({ name: 'posts', table: 'moves', database: connected(path), seed })
+    const mine = sqliteCms({ name: 'posts', table: 'moves', database: connected(path), seed })
 
     await mine.load({ preview: false })
 
@@ -219,7 +219,7 @@ describe('a move meeting a writer of another connection', () => {
 
   test('sqlite refuses the move, and writes nothing, when the writer moved the entry', async () => {
     const path = join(await scratchDir('loader-'), 'moved.db')
-    const mine = sqliteLoader({ name: 'posts', table: 'moves', database: connected(path), seed })
+    const mine = sqliteCms({ name: 'posts', table: 'moves', database: connected(path), seed })
 
     await mine.load({ preview: false })
 
@@ -235,7 +235,7 @@ describe('a move meeting a writer of another connection', () => {
   postgresTest('postgres waits for the open transaction on the row and keeps its save, writing only the order', async () => {
     shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-    const mine = pgLoader({ name: 'posts', table: 'moves_pg', source: shared, seed })
+    const mine = pgCms({ name: 'posts', table: 'moves_pg', source: shared, seed })
 
     await mine.load({ preview: false })
 
@@ -263,7 +263,7 @@ describe('a move meeting a writer of another connection', () => {
 
 describe('as a collection', () => {
   test('reads the seeded entries through kay, typed from the schema', async () => {
-    const posts = collection(sqliteLoader({ name: 'posts', database: ':memory:', seed }), { schema: s.Object({ title: s.String(), order: s.Optional(s.Number()) }), order: 'order' })
+    const posts = collection(sqliteCms({ name: 'posts', database: ':memory:', seed }), { schema: s.Object({ title: s.String(), order: s.Optional(s.Number()) }), order: 'order' })
 
     expect((await posts.all()).map(post => post.data.title)).toEqual(['A', 'B', 'X'])
   })
@@ -309,12 +309,12 @@ async function readsDuring(loader: ContentLoader, run: () => Promise<void>): Pro
 describe('a loader watching its database', () => {
   test('sqlite follows a save and a hand edit made through another connection, and not its own', async () => {
     const path = join(await scratchDir('loader-'), 'watch.db')
-    const posts = collection(sqliteLoader({ name: 'watched-sqlite', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
+    const posts = collection(sqliteCms({ name: 'watched-sqlite', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
 
     expect((await posts.all()).map(post => post.data.title)).toEqual(['A'])
 
     const other = new Database(path)
-    const elsewhere = sqliteLoader({ name: 'watched-sqlite', database: other })
+    const elsewhere = sqliteCms({ name: 'watched-sqlite', database: other })
 
     await elsewhere.save!({ slug: 'b', data: { title: 'B' } })
     expect(await titlesBecome(posts, ['A', 'B'])).toEqual(['A', 'B'])
@@ -323,7 +323,7 @@ describe('a loader watching its database', () => {
     other.run(`DELETE FROM kay_content WHERE collection = 'watched-sqlite' AND place = 'b'`)
     expect(await titlesBecome(posts, ['Edited'])).toEqual(['Edited'])
 
-    const own = sqliteLoader({ name: 'watched-own', database: path, watch: '40ms' })
+    const own = sqliteCms({ name: 'watched-own', database: path, watch: '40ms' })
 
     expect(await readsDuring(own, async () => own.save!({ slug: 'x', data: { title: 'X' } }))).toBe(1)
     other.close()
@@ -331,7 +331,7 @@ describe('a loader watching its database', () => {
 
   test('sqlite sees a row moved to another collection leave the first, and a write made before the triggers existed', async () => {
     const path = join(await scratchDir('loader-'), 'moved.db')
-    const posts = collection(sqliteLoader({ name: 'moved-from', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }] }), { schema })
+    const posts = collection(sqliteCms({ name: 'moved-from', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }] }), { schema })
 
     expect((await posts.all()).map(post => post.data.title).toSorted()).toEqual(['A', 'B'])
 
@@ -348,22 +348,22 @@ describe('a loader watching its database', () => {
     expect(await titlesBecome(posts, ['B'])).toEqual(['B'])
 
     // A newer kay process opens the file and installs the triggers again.
-    expect(await sqliteLoader({ name: 'moved-from', database: path, watch: false }).count!({ preview: false })).toBe(2)
+    expect(await sqliteCms({ name: 'moved-from', database: path, watch: false }).count!({ preview: false })).toBe(2)
     expect(await titlesBecome(posts, ['B', 'C'])).toEqual(['B', 'C'])
     other.close()
   })
 
   test('a write to another collection of the file invalidates nothing', async () => {
     const path = join(await scratchDir('loader-'), 'two.db')
-    const pages = sqliteLoader({ name: 'two-pages', database: path, watch: '40ms' })
-    const posts = sqliteLoader({ name: 'two-posts', database: new Database(path) })
+    const pages = sqliteCms({ name: 'two-pages', database: path, watch: '40ms' })
+    const posts = sqliteCms({ name: 'two-posts', database: new Database(path) })
 
     expect(await readsDuring(pages, async () => posts.save!({ slug: 'p', data: { title: 'P' } }))).toBe(1)
   })
 
   test('watch: false looks no more', async () => {
     const path = join(await scratchDir('loader-'), 'quiet.db')
-    const quiet = sqliteLoader({ name: 'quiet', database: path, watch: false })
+    const quiet = sqliteCms({ name: 'quiet', database: path, watch: false })
 
     expect(await readsDuring(quiet, async () => {
       const other = new Database(path)
@@ -376,21 +376,21 @@ describe('a loader watching its database', () => {
   postgresTest('postgres follows a save and a hand edit made through another connection, and not its own', async () => {
     shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-    const posts = collection(pgLoader({ name: 'watched-pg', source: shared, table: 'watched', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
+    const posts = collection(pgCms({ name: 'watched-pg', source: shared, table: 'watched', watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }] }), { schema })
 
     expect((await posts.all()).map(post => post.data.title)).toEqual(['A'])
 
     const other = new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 1 })
 
     try {
-      await pgLoader({ name: 'watched-pg', source: other, table: 'watched' }).save!({ slug: 'b', data: { title: 'B' } })
+      await pgCms({ name: 'watched-pg', source: other, table: 'watched' }).save!({ slug: 'b', data: { title: 'B' } })
       expect(await titlesBecome(posts, ['A', 'B'])).toEqual(['A', 'B'])
       await other.unsafe(`UPDATE watched SET data = '{"title":"Edited"}' WHERE collection = 'watched-pg' AND place = 'a'`)
       expect(await titlesBecome(posts, ['B', 'Edited'])).toEqual(['B', 'Edited'])
       await other.unsafe(`DELETE FROM watched WHERE collection = 'watched-pg' AND place = 'b'`)
       expect(await titlesBecome(posts, ['Edited'])).toEqual(['Edited'])
 
-      const own = pgLoader({ name: 'watched-pg-own', source: shared, table: 'watched', watch: '40ms' })
+      const own = pgCms({ name: 'watched-pg-own', source: shared, table: 'watched', watch: '40ms' })
 
       expect(await readsDuring(own, async () => own.save!({ slug: 'x', data: { title: 'X' } }))).toBe(1)
     }

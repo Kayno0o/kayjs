@@ -159,6 +159,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { s } from \'kay/server\'\n\nconst Form = s.Object({ name: s.String() })\n---\np x',
     right: '---\nimport { s } from \'kay\'\n\nconst Form = s.Object({ name: s.String() })\n---\np x',
   },
+  'deprecated-store-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The store and table names of kayjs-ai, kayjs-mail and kayjs-cms, which one naming took over in 1.105: `ai({ conversations })` is `ai({ store })`, `pgConversations`, `sqliteConversations`, `createConversationTable` and `conversationTable` of `@kayjs/ai` are `pgAi`, `sqliteAi`, `createAiTables` and `aiTables`, `openLists`, `createMailListTables` and `mailListTableNames` of `@kayjs/mail` are `sqliteLists`, `createMailTables` and `mailTables`, `listStore` and `suppressionStore` of `mailer()` are `store: { lists, suppressions }`, and `pgLoader` and `sqliteLoader` of `@kayjs/cms` are `pgCms` and `sqliteCms`. The old names work until 1.108. Found in imports from the `/pg` and `/sqlite` entries and in the options written in a call of `ai` or `mailer`, in the TypeScript files and `.kay` files of the project. The fix renames the imports and their uses and the `conversations` key, and moves a lone `listStore` or `suppressionStore` under `store`; both together, a spread or a `store` already there are reported with no fix.',
+    wrong: '// kay.config.ts\nimport { ai } from \'@kayjs/ai\'\nimport { pgConversations } from \'@kayjs/ai/pg\'\n\nexport default { extensions: [ai({ conversations: pgConversations(db) })] }',
+    right: '// kay.config.ts\nimport { ai } from \'@kayjs/ai\'\nimport { pgAi } from \'@kayjs/ai/pg\'\n\nexport default { extensions: [ai({ store: pgAi(db) })] }',
+  },
   'deprecated-cms-options': {
     level: 'warn',
     group: 'deprecated',

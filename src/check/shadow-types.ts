@@ -37,15 +37,15 @@ import { aiLanguage } from './ai-language'
 import { cmsOptions } from './cms-options'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
-
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 
+import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
+import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
+
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
@@ -57,6 +57,7 @@ import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
+import { storeNames } from './store-names'
 import { testHelpers } from './test-helpers'
 import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
@@ -178,6 +179,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => scheduleCalls(root, options),
   async ({ root, options }) => jobOptions(root, options),
   async ({ root, options }) => diskFilesCalls(root, options),
+  async ({ root, options }) => storeNames(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

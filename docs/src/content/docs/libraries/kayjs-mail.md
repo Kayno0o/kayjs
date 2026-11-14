@@ -343,7 +343,7 @@ The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`m
 
 ## A mailing list
 
-`mail.list()` is the site's mailing list. It keeps its subscribers in your app's own database, the Postgres of `pgData` or the SQLite file of `sqliteData`, else the file `data/mail-list.sqlite` (kept where it exists), so there is nothing to declare and no adapter to write. A site with several lists gives each a name, `mail.list('news')`.
+`mail.list()` is the site's mailing list. It keeps its subscribers in your app's own database, the Postgres of `pgData` or the SQLite file of `sqliteData`, else the file `data/app.sqlite` (`data/mail-list.sqlite` where it already exists), so there is nothing to declare and no adapter to write. A site with several lists gives each a name, `mail.list('news')`.
 
 ```kay
 --- server
@@ -384,11 +384,11 @@ A restart or a deploy in the middle carries on where it stopped, and nobody gets
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 
-An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ listStore: pgLists(db) })` (from `@kayjs/mail/pg`), where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
+An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ store: pgMail(db) })` (from `@kayjs/mail/pg`), where `db` is what `pgData` takes, or `sqliteMail(path)` (from `@kayjs/mail/sqlite`) for a SQLite file. A single list can name its own with `mail.list('news', { store })`. The same `kay_mail_*` tables are created when missing.
 
-If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTableNames` in pg-orm's `ignoreTables`.
+If your database role cannot create tables, the owner runs `createMailTables(db)` once, and you list `mailTables` in pg-orm's `ignoreTables`.
 
-With `listStore` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
+With a `store` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
 
 To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it. `mail.subscriptions(address)` lists what the address is on, pending rows included, for a person asking for their data. With kayjs-auth, deleting an account and exporting its data call both for you, for a verified address.
 
@@ -410,7 +410,7 @@ From then on a mail to that address is skipped and logged, from a form, the queu
 
 A complaint is about the mail it reported, so it stops only bulk mail: a list's and any mail sent with `unsubscribe`. A password reset or a sign-in code still reaches the address. A bounce stops every mail. A skipped mail is not an error: the queue does not retry it. `mail.suppression(address)` says why an address is not mailed (`{ email, reason, source, suppressedAt }`, a `Date`), `mail.unsuppress(address)` mails it again, and `mail.erase(address)` clears it with the rest of a person.
 
-Suppressions are kept with the mailing lists, or in your app's database (else `data/mail-list.sqlite`) when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ suppressionStore: pgSuppressions(db) })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
+Suppressions are kept with the mailing lists, or in your app's database (else `data/app.sqlite`) when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ store: { suppressions: pgSuppressions(db) } })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
 
 A store's `suppressed` answers `StoredSuppression` rows with `suppressedAt` in milliseconds.
 

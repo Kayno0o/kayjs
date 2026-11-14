@@ -7,7 +7,7 @@ import { setupStore } from '../../../src/server/app-store'
 import { activityOf } from '../src/activity'
 import * as activity from '../src/activity'
 import { hiddenOf, SWEEP_MARKER } from '../src/hidden'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { restoreTrashed } from '../src/restore'
 import { eraseHistory, forgetEditor, startSweeping, sweepHistory } from '../src/retention'
 import { reviewsOf, writeReview } from '../src/review'
@@ -26,7 +26,7 @@ let count = 0
 let restore: ReturnType<typeof registerCollections>
 
 function notes(): void {
-  restore = registerCollections([['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })]])
+  restore = registerCollections([['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })]])
 }
 
 async function rowCount(kind: 'history' | 'trash' | 'activity'): Promise<number> {

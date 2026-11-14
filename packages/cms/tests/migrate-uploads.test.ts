@@ -10,7 +10,7 @@ import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { encodePng } from '../../../src/server/png'
 import { setupStorage } from '../../../src/server/storage'
 import { SaveConflictError, workingTree } from '../src/files'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { MEDIA_FOLDER, mediaIndex, renameUpload } from '../src/media'
 import { migrateUploads } from '../src/migrate-uploads'
 import * as orphans from '../src/orphans'
@@ -38,7 +38,7 @@ beforeEach(async () => {
   restore = registerCollections([
     ['posts', collection(join(dir, 'posts'), { schema })],
     ['pages', collection(join(dir, 'pages'), { schema, localized: true })],
-    ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })],
+    ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table: `notes_${++count}` }), { schema })],
   ])
   configure({ files: workingTree() })
 })

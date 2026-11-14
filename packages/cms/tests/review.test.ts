@@ -7,7 +7,7 @@ import { notifications } from 'kay/server'
 import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { readReview, reviewsOf, viewOf, writeReview } from '../src/review'
 import { approveEntry, sendBackEntry, submitEntry } from '../src/reviewing'
 import { revisionsOf } from '../src/revisions'
@@ -37,7 +37,7 @@ beforeEach(async () => {
 
   restore = registerCollections([
     ['posts', collection(join(dir, 'posts'), { schema, draft: 'draft' })],
-    ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema, draft: 'draft' })],
+    ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table }), { schema, draft: 'draft' })],
     ['nodraft', collection(join(dir, 'plain'), { schema })],
     ['bare', collection({ name: 'bare', load: () => [{ slug: 'a', data: { title: 'A' } }], save: () => undefined }, { schema, draft: 'draft' })],
   ])

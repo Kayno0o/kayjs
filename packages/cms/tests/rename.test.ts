@@ -11,7 +11,7 @@ import { registerCollections, registerEditSite } from '../../../src/content/edit
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { knowRuntimeRules } from '../../../src/server/runtime-redirect-api'
 import { fileVersion, SaveConflictError, workingTree } from '../src/files'
-import { sqliteLoader } from '../src/loaders/sqlite'
+import { sqliteCms } from '../src/loaders/sqlite'
 import { revisionsOf } from '../src/revisions'
 import { configure } from '../src/settings'
 import { deleteEntry, entryOf, renameEntry, saveEntry } from '../src/store'
@@ -56,7 +56,7 @@ beforeEach(async () => {
     ['spots', collection(join(dir, 'spots'), { schema: spotSchema, localized: true })],
     ['visits', collection(join(dir, 'visits'), { schema: visitSchema })],
     ['guides', collection(join(dir, 'guides'), { schema: s.Object({ title: s.String(), spot: s.Optional(reference('spots')) }), localized: true })],
-    ['notes', collection(sqliteLoader({ name: 'notes', database: ':memory:', table }), { schema, url: entry => `/rn-notes/${entry.slug}` })],
+    ['notes', collection(sqliteCms({ name: 'notes', database: ':memory:', table }), { schema, url: entry => `/rn-notes/${entry.slug}` })],
   ]
   restore = registerCollections(registered)
   configure({ files: workingTree() })
