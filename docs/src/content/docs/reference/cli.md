@@ -516,6 +516,8 @@ When that raise crosses a major version (a 0.x minor counts as one), `kay upgrad
 
 When the project is a git working tree with uncommitted changes to tracked files, `kay upgrade` warns that the rewrite will mix with them and goes on: commit or stash first to review the upgrade alone.
 
+An optional peer of kay (`typescript7`, `axe-core`, `@happy-dom/global-registrator`, `@kaynooo/pg-orm`) that your `node_modules` held before the upgrade without your `package.json` listing it is added to `devDependencies` at the range of the new kay, so `kay check` and the accessibility tests still find it after a fresh install. One that was not installed is left out. `--dry-run` says which it would add.
+
 If the install leaves an npm `bun` package older than the Bun kay needs, as the peer of `bun-plugin-tailwind` can, it runs `bun update bun` so kay does not refuse to start.
 
 An app coming from kay 1.96 or older has no `typescript7` and `axe-core` of its own, which kay installed for it until 1.97: the first `kay check` of the upgrade adds both to `devDependencies`.

@@ -1,4 +1,5 @@
 import type { Command, ProblemFormat } from './command'
+import type { PeerManifest } from './upgrade-peers'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -9,6 +10,9 @@ import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compil
 import { isKayPackage, RENAMED_IN, renamePackages } from '../package-names'
 import { done, formatOption, printDocument, printFailure, projectRoot } from './command'
 import { majorWarning } from './upgrade-majors'
+import { readManifest } from './upgrade-manifest'
+import { installFailed, wouldMove } from './upgrade-messages'
+import { addPeers, undeclaredPeers } from './upgrade-peers'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
 export interface UpgradeDeps {
@@ -215,24 +219,12 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
   const manifest = join(root, 'package.json')
 
-  if (!existsSync(manifest)) {
-    printFailure('upgrade', `${root} has no package.json`, format)
+  const read = await readManifest(manifest, root, format)
 
+  if (read === undefined)
     return 1
-  }
 
-  const original = await Bun.file(manifest).text()
-  let packageJson: Record<string, unknown>
-
-  try {
-    packageJson = JSON.parse(original)
-  }
-  catch (error) {
-    printFailure('upgrade', `package.json does not parse: ${error instanceof Error ? error.message : String(error)}`, format)
-
-    return 1
-  }
-
+  const { original, packageJson } = read
   const found = kayDependencies(packageJson)
   const kay = found.find(isKay)
 
@@ -242,6 +234,8 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     return 1
   }
 
+  // The optional peers the app has installed without declaring them, which an older kay installed for it and the new one no longer does.
+  const hadPeers = await undeclaredPeers(await findInstalled(root, 'kay'), packageJson, async name => await findInstalled(root, name) !== undefined)
   const latest = await latestVersions(root, kay, found, deps)
 
   if (typeof latest === 'string') {
@@ -292,8 +286,20 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     return false
   }
 
+  // Adds the peers the app had to its devDependencies, or only says so on a dry run; false when that failed.
+  const keepPeers = async () => addPeers(await findInstalled(root, 'kay'), hadPeers, {
+    dryRun,
+    manifest,
+    install: async changes => deps.install(root, changes),
+    moved: changes => moved(result, changes),
+    say: (verb, rest) => say(verb, rest, dryRun),
+    snapshot: async () => ({ source: await Bun.file(manifest).text(), locks: await readLocks(root) }),
+    restore: async settled => restore(manifest, settled),
+    fail: message => printFailure('upgrade', message, format),
+  })
+
   if (phases.every(phase => phase.changes.length === 0)) {
-    if (!await raiseAndInstall({ source: original, locks: await readLocks(root) }))
+    if (!await raiseAndInstall({ source: original, locks: await readLocks(root) }) || !await keepPeers())
       return finish(1)
 
     say('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`, true)
@@ -302,12 +308,13 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   if (dryRun) {
-    for (const { version, changes, stone } of phases) {
-      moved(result, changes)
-
-      for (const { name, spec } of changes)
-        say('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}${stone ? ` (kay ${version} still rewrites forms the next minors drop)` : ''}`, true)
+    for (const phase of phases) {
+      moved(result, phase.changes)
+      wouldMove(phase, (verb, rest) => say(verb, rest, true))
     }
+
+    if (!await keepPeers())
+      return finish(1)
 
     say('dry run', 'nothing written; run `kay upgrade` to install them and rewrite the old forms', true)
 
@@ -377,9 +384,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     }
 
     if (outcome === 'failed') {
-      printFailure('upgrade', behind === from
-        ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
-        : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, format)
+      printFailure('upgrade', installFailed(phase.version, behind, from), format)
 
       return 1
     }
@@ -397,7 +402,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     settled = { source: phase.source, locks: await readLocks(root) }
   }
 
-  if (!await raiseAndInstall(settled))
+  if (!await raiseAndInstall(settled) || !await keepPeers())
     return finish(1)
 
   step('checking', 'what is left')
@@ -530,7 +535,7 @@ function describeRaise({ change, held, wanted, rewritten }: Raise, kay: string):
 }
 
 // The manifest of a package as `node_modules` holds it from the app's folder up, as a hoisted install or a workspace puts it, never above the project: the first folder with `workspaces`, a lockfile or `.git`. Undefined when none is found.
-async function findInstalled(root: string, name: string): Promise<{ dir: string, version?: string, dependencies?: Record<string, string>, repository?: string | { url?: string } } | undefined> {
+async function findInstalled(root: string, name: string): Promise<({ dir: string, version?: string, dependencies?: Record<string, string>, repository?: string | { url?: string } } & PeerManifest) | undefined> {
   for (let dir = root; ; dir = dirname(dir)) {
     try {
       const folder = join(dir, 'node_modules', name)
@@ -584,7 +589,7 @@ async function readLocks(root: string): Promise<{ path: string, content: Uint8Ar
 }
 
 // One install of the upgrade: the ranges `source` holds once its `changes` are written, and the version of kay then installed.
-interface Phase {
+export interface Phase {
   version: string
   source: string
   changes: DependencyChange[]

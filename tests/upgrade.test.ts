@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
-import { dependencies as kayDependencies } from '../package.json'
+import { dependencies as kayDependencies, peerDependencies } from '../package.json'
 import { addMissingPeers } from '../src/commands/add-peers'
 import { registryDepsFor, steppingStones, stoneFallbacks, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
@@ -27,13 +27,13 @@ const MANIFEST = `{
 }
 `
 
-// A project whose installed kay is a link to this checkout's, so the install the fakes stand in for leaves one to run.
+// A project whose installed kay is a link to this checkout's, so the install the fakes stand in for leaves one to run; a .git file ends the search for installed packages, which would else reach this checkout's own.
 async function project(manifest = MANIFEST, files: Record<string, string> = {}): Promise<string> {
   const root = await scratchDir('upgrade-')
 
   await mkdir(join(root, 'node_modules'), { recursive: true })
   await symlink(join(import.meta.dir, '..'), join(root, 'node_modules/kay'))
-  await Promise.all(Object.entries({ 'package.json': manifest, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+  await Promise.all(Object.entries({ 'package.json': manifest, '.git': '', ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
 }
@@ -362,6 +362,46 @@ describe('kay upgrade', () => {
       expect(await upgradeProject(root, deps)).toBe(0)
       expect(await Bun.file(join(root, 'package.json')).text()).toBe(manifest.replace('^1.4.0', `^${floor}`))
       expect(calls.installs).toEqual([[{ name: 'elysia', spec: `^${floor}`, section: 'dependencies' }]])
+    }
+    finally {
+      log.mockRestore()
+      await rm(dry, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('adds the optional peers the app had installed to its devDependencies at kay\'s ranges, or lists them under --dry-run and --format json', async () => {
+    const latest = { '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.40.2' }
+    // One installed and declared, one installed only, one not installed: only the second is added.
+    const installed = (name: string) => ({ [`node_modules/${name}/package.json`]: JSON.stringify({ name, version: '1.0.0' }) })
+    const files = { ...installed('typescript7'), ...installed('axe-core') }
+    const manifest = MANIFEST.replace('"kay": "npm:@kaynooo/kayjs@~1.40.1"', '"axe-core": "^4.14.0",\n    "kay": "npm:@kaynooo/kayjs@~1.40.1"')
+    const dry = await project(manifest, files)
+    const root = await project(manifest, files)
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const typescript7 = { name: 'typescript7', spec: peerDependencies.typescript7, section: 'devDependencies' }
+
+    try {
+      const would = fakes(latest)
+
+      expect(await upgradeProject(dry, would.deps, { dryRun: true })).toBe(0)
+      expect(log.mock.calls.map(call => call.join(' ')).join('\n')).toContain(`would add typescript7@${peerDependencies.typescript7} to devDependencies`)
+      expect(await Bun.file(join(dry, 'package.json')).text()).toBe(manifest)
+      expect(would.calls.installs).toEqual([])
+
+      const { deps, calls } = fakes(latest)
+
+      expect(await upgradeProject(root, deps)).toBe(0)
+      expect((JSON.parse(await Bun.file(join(root, 'package.json')).text()) as { devDependencies: object }).devDependencies).toEqual({ 'axe-core': '^4.14.0', 'kay': 'npm:@kaynooo/kayjs@~1.40.1', 'typescript7': peerDependencies.typescript7 })
+      expect(calls.installs).toEqual([[typescript7]])
+      expect(log.mock.calls.map(call => call.join(' ')).join('\n')).toContain('added typescript7@')
+
+      const json = await project(manifest, files)
+
+      log.mockClear()
+      expect(await upgradeProject(json, fakes(latest).deps, { dryRun: true, format: 'json' })).toBe(0)
+      expect((JSON.parse(String(log.mock.calls.at(-1)![0])) as { changed: object[] }).changed).toContainEqual(typescript7)
+      await rm(json, { recursive: true, force: true })
     }
     finally {
       log.mockRestore()
