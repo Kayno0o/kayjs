@@ -42,18 +42,18 @@ export function valuesCall(element: ElementNode, attribute: Attribute, source: s
   return attribute.kind === 'expression' && valuesOf(element, source) === attribute && CALL.test(source.slice(attribute.expression.start, attribute.expression.end))
 }
 
-// The static `field="title"` a component is given: the name its bare controls take.
-function fieldOfComponent(element: ElementNode, source: string): FieldContent | undefined {
-  if (!element.component)
-    return undefined
+// The `field` a component is given: the name its bare controls take when it is static text, none when it is computed, and `fallback` when it has none.
+function fieldOfComponent(element: ElementNode, source: string, fallback: FieldContent | undefined): FieldContent | undefined {
+  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === FIELD_ATTRIBUTE)
 
-  const attribute = element.attributes.find(candidate => candidate.kind === 'static' && source.slice(candidate.name.start, candidate.name.end) === FIELD_ATTRIBUTE)
+  if (!attribute)
+    return fallback
 
-  return attribute?.kind === 'static' ? { name: attribute.text, at: attribute } : undefined
+  return attribute.kind === 'static' ? { name: attribute.text, at: attribute } : undefined
 }
 
 // The static `field="..."` or `name="..."` of an element.
-function writtenName(element: ElementNode, source: string, ...attributes: string[]): string | undefined {
+export function writtenName(element: ElementNode, source: string, ...attributes: string[]): string | undefined {
   const found = element.attributes.find(candidate => candidate.kind === 'static' && attributes.includes(source.slice(candidate.name.start, candidate.name.end)))
 
   return found?.kind === 'static' ? found.text : undefined
@@ -65,26 +65,17 @@ function labelledFields(element: ElementNode, source: string): ReadonlyMap<strin
   const controls: string[] = []
 
   visitNodes(element.children, (node) => {
-    if (node.kind !== 'element')
+    if (node.kind !== 'element' || node.component)
       return
 
-    if (node.component) {
-      const name = writtenName(node, source, FIELD_ATTRIBUTE)
-
-      if (name !== undefined) {
-        visitNodes(node.children, (inner) => {
-          if (inner.kind === 'element' && isBareControl(inner, source))
-            controls.push(name)
-        })
-      }
-    }
-    else if (node.name === 'label') {
+    if (node.name === 'label') {
       const name = writtenName(node, source, FIELD_ATTRIBUTE)
 
       if (name !== undefined)
         labels.add(name)
     }
-    else if (FIELD_ELEMENTS.has(node.name)) {
+    // A control with a spread takes no id, nor does its `field` write a `name`, so it is none of the field's.
+    else if (FIELD_ELEMENTS.has(node.name) && !node.attributes.some(attribute => attribute.kind === 'spread')) {
       const name = writtenName(node, source, 'name', FIELD_ATTRIBUTE)
 
       if (name !== undefined)
@@ -129,8 +120,19 @@ export function formTargets(nodes: readonly Node[], source: string): { targets: 
     if (form)
       return { target: form.expression, loose: node.component, info: { values: valuesOf(node, source)?.expression, labelled: labelledFields(node, source) }, field: undefined }
 
-    return found && node.component ? { ...found, field: fieldOfComponent(node, source) ?? found.field } : found
+    if (found && node.name === 'form' && !node.component)
+      return { ...found, field: undefined }
+
+    return found && node.component ? { ...found, field: fieldOfComponent(node, source, found.field) } : found
   })
+
+  // A bare control a component names counts for that name in its form, as one written with it does.
+  for (const [node, content] of inherited) {
+    const labelled = infos.get(node)?.labelled as Map<string, number> | undefined
+
+    if (node.kind === 'element' && isBareControl(node, source) && labelled?.has(content.name))
+      labelled.set(content.name, labelled.get(content.name)! + 1)
+  }
 
   return { targets, loose, infos, inherited }
 }

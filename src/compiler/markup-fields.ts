@@ -1,8 +1,8 @@
 import type { ElementNode, ErrorMessages, TemplateFacts } from './ast'
 import type { FieldContent } from './form-info'
 import type { PlannedAttribute, PlannedKind } from './markup'
-import { FIELD_ELEMENTS, formFieldOf } from './ast'
-import { fieldIdOf, isBareControl } from './form-info'
+import { FIELD_ATTRIBUTE, FIELD_ELEMENTS } from './ast'
+import { fieldIdOf, isBareControl, writtenName } from './form-info'
 
 // The field a bare control takes from the component around it: `FormField(field="title")` names the `input` in it, whichever twin wires that component's form.
 export function inheritedField(element: ElementNode, source: string, facts: TemplateFacts): FieldContent | undefined {
@@ -17,7 +17,8 @@ export function inheritedAttributes(inherited: FieldContent | undefined): Planne
 // The id of a control, which a `label(field=...)` of its form points at when it is the one control of that field and writes no id; else the one a message that describes it was given.
 export function controlId(element: ElementNode, source: string, facts: TemplateFacts, inherited: FieldContent | undefined, errors: ErrorMessages | undefined): string | undefined {
   const action = facts.forms.get(element)
-  const name = action && !element.attributes.some(attribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'id') ? formFieldOf(element, source, inherited?.name)?.name : undefined
+  const written = FIELD_ELEMENTS.has(element.name) && !element.component ? writtenName(element, source, 'name', FIELD_ATTRIBUTE) ?? inherited?.name : undefined
+  const name = action && !element.attributes.some(attribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'id') ? written : undefined
 
   return action && name !== undefined && facts.formInfos.get(element)?.labelled.get(name) === 1 ? fieldIdOf(source.slice(action.start, action.end), name) : errors?.ids.get(element)
 }

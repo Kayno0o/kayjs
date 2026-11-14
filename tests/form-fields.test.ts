@@ -60,6 +60,14 @@ describe('a bare control in a component given a field', () => {
     expect(component.match(/name=\\"title\\"/g)).toBeNull()
   })
 
+  it('stops at any nested form and at a component with a computed field', () => {
+    const plain = compile('form(action={save})\n  Wrap(field="title")\n    form(method="get")\n      input\n', 'html').tsx
+    const computed = compile('form(action={save})\n  Wrap(field="title")\n    Wrap(field={other})\n      input\n', 'html').tsx
+
+    expect(plain.match(/name=\\"title\\"/g)).toBeNull()
+    expect(computed.match(/name=\\"title\\"/g)).toBeNull()
+  })
+
   it('names nothing outside a form', () => {
     expect(compile('Wrap(field="title")\n  input\n', 'html').tsx).not.toContain('name=')
   })
@@ -87,6 +95,18 @@ describe('a label given a field', () => {
     expect(messages('form(action={save})\n  label(field="title") T\n  input(field="title" id="x")\n').some(message => message.includes('gives this field its id'))).toBe(true)
     expect(messages('form(action={save})\n  label(field="title" for="x") T\n  input(field="title")\n')).toContain('A label has `field` or `for`, not both')
     expect(messages('label(field="title") T\n')).toContain('`field` on a label names a field of a form posting to an action, so it sits inside one')
+  })
+
+  it('gives the id to a control with a computed type or a spread, and counts the innermost component\'s bare control once', () => {
+    const typed = compile('form(action={save})\n  label(field="title") T\n  input(field="title" type={kind})\n', 'html').tsx
+    const spread = compile('form(action={save})\n  label(field="title") T\n  input(field="title" {...rest})\n', 'html').tsx
+    const nested = compile('form(action={save})\n  label(field="title") T\n  Wrap(field="done")\n    Wrap(field="title")\n      input\n', 'html').tsx
+
+    expect(typed).toContain('id=\\"save-title\\"')
+    expect(spread).not.toContain('id=\\"save-title\\"')
+    expect(messages('form(action={save})\n  label(field="title") T\n  input(field="title" {...rest})\n')).toContain('A label\'s `field` points at the one control of that field, and this form has 0')
+    expect(nested).toContain('id=\\"save-title\\"')
+    expect(messages('form(action={save})\n  label(field="title") T\n  Wrap(field="done")\n    Wrap(field="title")\n      input\n')).not.toContain('A label\'s `field` points at the one control of that field, and this form has 2')
   })
 
   it('points the same on a page under a base path', async () => {
