@@ -16,6 +16,8 @@ export const visitors = live(0)
 export const room = live((id: string) => ({ id, users: 0 }))
 ```
 
+`live(initial, { key: true })` is the same keyed value with every key starting from `initial`, a function of the key giving each its own start.
+
 ```kay
 ---
 import { room, visitors } from '../live'
@@ -28,10 +30,11 @@ p {visitors()} online, {room(id).users} in {id}
 ```ts
 // an action, a job, a route or a server fence
 visitors.set(n => n + 1)
-room.set('lobby', { id: 'lobby', users: 3 })
+room.set({ id: 'lobby', users: 3 }, { key: 'lobby' })
 ```
 
 - Read by calling it, in a template or an island, as a signal is; `room(id)` reads one key. A keyed value is followed only for the keys the island's render read: one read only in an effect, which the server does not run, is not followed, and `kay dev` warns in the browser console; show it in the template, such as a `data-stamp` attribute, for the page to follow it. A component reading one is an island, so a page reading none ships no JS and opens no connection.
+- `onData({ value })` (and `key` of a keyed value) tells each value the connection delivers, `onError({ error })` each attempt of it that failed, in a browser; both return what stops them, and a render on the server tells neither.
 - Written with `set` on the server only: a `.set` or `.delete` outside a server fence is a compile error, an assignment too, and in a browser it throws.
 - Every handle (plain, keyed and a user's own) carries the `status()`, `pending()`, `error()` and `retry()` of every island source ([Island sources](island-sources.md)), those of the page's one connection, shared by all the live values: `idle` while no island reads one and on the server, `connecting` while it is made or waits to be made again, `open`, and `failed` after an `error` event from the server. A refused connection (a 403 once the proofs were renewed, a 5xx) keeps retrying, so it reads `connecting` with `error()` an `ApiError` of the route's status, kept until it opens. A hidden tab, or a page that follows nothing, is `idle` again. `button(onClick={visitors.retry} disabled={visitors.pending()}) Retry` works as for a `resource`. Those four names are the handle's own in a template, so a field of the value by one of them is read as `visitors().status`.
 - Declare it as `export const name = live(...)` at the top of a module; the build names it from its path, so the server and the browser agree.
@@ -54,10 +57,10 @@ p {unread()} unread
 
 ```ts
 // an action, a job, a route or a server fence
-unread.set(user.id, n => n + 1)
+unread.set(n => n + 1, { user: user.id })
 ```
 
-- `unread()` reads the signed-in visitor's value, in a template or an island, and gives `initial` for nobody, which no page follows. `set(user, next)` and `delete(user)` write one user's, on the server only.
+- `unread()` reads the signed-in visitor's value, in a template or an island, and gives `initial` for nobody, which no page follows. `set(next, { user })` and `delete(user)` write one user's, on the server only.
 - `user` is the id the library signing users in names to `userOf` of `kay/library`, which kayjs-auth does with the user's id (a guest has none); a value is kept under it, in memory or the `store` of kay.config.ts as any live value.
 - The page's proof names the user it was rendered for, signed with the keys it read, and `POST /_kay/live` takes the proof only from a request that is that user's own: the user is never read off the request body or the page. Details in [Live values](#live-values).
 
@@ -112,7 +115,7 @@ On an `api()` chain only, a message failing `body` is dropped, with no reply or 
 - A collection with `live: true` ([content](content.md)) is followed the same way by a page that reads it directly, with no `cached` around it: its key is `kay:content:<name>`, which `posts.invalidate()` and a CMS save drop.
 ### Presence
 
-- `presence(room, member)` from `kay` in an island lists who else has a room open, with no route, socket or store line: `const here = presence(`entry:${entry.id}`, me)`, then `here.others()` (the distinct members besides the visitor's own, in join order, so their other tabs are left out) and `here.count()` (the other tabs in the room, the visitor's own included) are reactive. `presence()` is the page's own room, its path under `base` without a trailing slash (a locale prefix stays), with an anonymous member: `count()` is the other tabs on the page.
+- `presence({ room, member })` from `kay` in an island lists who else has a room open, with no route, socket or store line: `const here = presence({ room: `entry:${entry.id}`, member: me })`, then `here.others()` (the distinct members besides the visitor's own, in join order, so their other tabs are left out) and `here.count()` (the other tabs in the room, the visitor's own included) are reactive. `presence()`, or `presence({ member })`, is the page's own room, its path under `base` without a trailing slash (a locale prefix stays), with an anonymous member: `count()` is the other tabs on the page.
 - `member` is any value that crosses as island props do, compared as JSON; hand it in from the page's server fence (`me={{ name: user.name }}`), so what a visitor is listed as is what the server gave. Room and member are at most 256 characters together as JSON, a `RangeError` where `presence` is called (a long path included, for `presence()`).
 - The island's server render notes them as a keyed live read of `kay:presence`, so the page's signed proof covers exactly them: a room or member the render did not note, forged or edited in the browser, or an expired proof, gets a 403 and joins nothing, and a guard on the page covers who sees the members. Like any live read the page renders per request (`export-server-render` on a static export) with the members as they stood, and a `--- client` island notes nothing, so has no presence.
 - A tab joins when its live connection opens (`POST /_kay/live` first sends the room's members besides its own, then a changed list on each join and leave) and leaves when it ends: tab closed, page swapped to one without the room, connection dropped (a dead socket is found by the 5 second heartbeat) or the proof's hour out. A leave waits 3 seconds and a tab keeps one id across its connections, so a reconnect, a proof renewal or a swap to the same room shows the others no leave.

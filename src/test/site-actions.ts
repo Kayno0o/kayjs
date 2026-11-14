@@ -14,7 +14,7 @@ import { NativeFormData } from './natives'
 import { ORIGIN } from './site-scope'
 
 // The URL the form posting to `action` carries on a page, which the browser posts to.
-export function formUrl(page: PageReading, action: Pick<Action<never, unknown>, 'url'>): URL | undefined {
+export function formUrl(page: PageReading, action: Pick<Action, 'url'>): URL | undefined {
   const target = page.find('form').map(form => form.attributes.action).find(url => url !== undefined && new URL(url, ORIGIN).pathname.endsWith(action.url))
 
   return target === undefined ? undefined : new URL(target, ORIGIN)
@@ -26,7 +26,7 @@ export function renderedStamp(page: PageReading, url: URL): string | undefined {
 }
 
 // The stamp `minTime` reads, as the browser sends the form it was rendered in: dated `openedFor` ago when given, else the page's own made no younger than the action asks, so a test about something else is not refused as too fast.
-function postedStamp(action: Action<never, unknown> & { protection?: ResolvedProtection }, rendered: string | undefined, openedFor: Duration | 0 | undefined): string | undefined {
+function postedStamp(action: Action & { protection?: ResolvedProtection }, rendered: string | undefined, openedFor: Duration | 0 | undefined): string | undefined {
   if (openedFor !== undefined)
     return signStamp(action.url, Date.now() - (openedFor === 0 ? 0 : durationSeconds(openedFor, 'openedFor') * 1000))
 
@@ -42,7 +42,7 @@ function postedStamp(action: Action<never, unknown> & { protection?: ResolvedPro
 }
 
 // The solution kay's script sends to an action with `proofOfWork`, to a challenge signed here, as a test posts without a page's script.
-function workHeaders(action: Action<never, unknown>): Record<string, string> {
+function workHeaders(action: Action): Record<string, string> {
   const work = proofOfWork(action)
 
   return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
@@ -96,7 +96,7 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
 
   return {
     call,
-    submit: async (action: Action<never, unknown>, fields: Record<string, FormValue | FormValue[] | undefined> = {}, init: SubmitInit = {}) => {
+    submit: async (action: Action, fields: Record<string, FormValue | FormValue[] | undefined> = {}, init: SubmitInit = {}) => {
       const page = typeof init.from === 'object' ? init.from : undefined
       const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
       const url = page && formUrl(page, action)

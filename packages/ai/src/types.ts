@@ -300,7 +300,7 @@ export interface EmbedRequest {
 }
 
 // Any action exported by a page module, whatever its input and honeypot.
-export type ToolAction = Action<never, unknown>
+export type ToolAction = Action
 
 // What a function tool receives besides the input the model gave.
 export interface FunctionToolContext {

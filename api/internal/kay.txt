@@ -663,7 +663,7 @@ function localizedHref(href: string): string
 function noteLinkPayload(payload: LinkPayload): void
 
 [./internal] actionStub
-function actionStub(url: string): Action<unknown, unknown, never>
+function actionStub(url: string, fixed?: Record<string, unknown> | undefined): Action<unknown, unknown, never>
 
 [./internal] autoDefer
 function autoDefer<T>(value: T): T

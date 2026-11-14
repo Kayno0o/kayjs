@@ -5,7 +5,7 @@ import { effect, untrack } from 'kay'
 // Reports how a form posting to `action` went to the app, drawing nothing. ContactForm and SubscribeForm render it only when given `onSend` or `onError`, so a form that asks for neither stays static and ships no JavaScript.
 // The callbacks are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which the forms rendering this would then be even with no callback given.
 const { action, whenSent, whenRefused } = props<{
-  action: Action<never, unknown>
+  action: Action
   whenSent?: ((event: { data: unknown }) => unknown) | undefined
   whenRefused?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
 }>()

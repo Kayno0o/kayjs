@@ -3,7 +3,7 @@ function action<Output, const Honeypot extends string = never, Shape extends Out
 function action<Spec extends Schema, Output, const Honeypot extends string = never, Shape extends OutputSchema = OutputSchema>(schema: Spec, handler: (input: Static<Spec>, ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof Static<Spec>, string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot, Success<Settled<Output>>, Shape> | undefined): ServerAction<Spec, Settled<Output>, Honeypot>
 
 [.] Action
-interface Action<Input, Output, Honeypot extends string = never>
+interface Action<Input = never, Output = unknown, Honeypot extends string = never>
   data: () => Final<Exclude<Output, Failure<unknown>>> | undefined
   error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
@@ -572,24 +572,31 @@ function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(t
 function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
   user: true;
 }): LiveOwn<T>
+function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
+  key: true;
+}): LiveByKey<string, T>
 function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options?: LiveOptions<Ttl> | undefined): Live<T>
 function live<K extends LiveKey, T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
 
 [.] Live
-interface Live<T> extends Source<ConnectionStatus>
+interface Live<T> extends LiveSource<{ value: T }>
   error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   pending: () => boolean
   retry: () => void
   set: Setter<T>
   status: () => ConnectionStatus
 
 [.] LiveByKey
-interface LiveByKey<K extends LiveKey, T> extends Source<ConnectionStatus>
+interface LiveByKey<K extends LiveKey, T> extends LiveSource<{ value: T, key: K }>
   delete: (key: K) => void
   error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: T; key: K; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   pending: () => boolean
   retry: () => void
-  set: (key: K, next: ((current: T) => T) | T) => void
+  set: { (next: Next<T>, options: { key: K; }): void; (key: K, next: Next<T>): void; }
   status: () => ConnectionStatus
 
 [.] LiveKey
@@ -597,16 +604,19 @@ type LiveKey = string
 
 [.] LiveOptions
 interface LiveOptions<Ttl extends Duration = Duration>
+  key?: boolean
   ttl?: Ttl & PositiveDuration<Ttl>
   user?: boolean
 
 [.] LiveOwn
-interface LiveOwn<T> extends Source<ConnectionStatus>
+interface LiveOwn<T> extends LiveSource<{ value: T }>
   delete: (user: string) => void
   error: () => ApiError<unknown> | undefined
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
   pending: () => boolean
   retry: () => void
-  set: (user: string, next: ((current: T) => T) | T) => void
+  set: { (next: Next<T>, options: { user: string; }): void; (user: string, next: Next<T>): void; }
   status: () => ConnectionStatus
 
 [.] LoadStatus
@@ -918,8 +928,9 @@ type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefine
 }
 
 [.] presence
-function presence(options?: PresenceOptions | undefined): Presence<null>
-function presence<Member = null>(room: string, member?: Member | undefined, options?: PresenceOptions | undefined): Presence<Member>
+/** @deprecated Written `presence(room, member)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
+function presence<Member = null>(options?: PresenceOptions<Member> | undefined): Presence<Member>
+function presence<Member = null>(room: string, member?: Member | undefined, options?: Pick<PresenceOptions<null>, "signal"> | undefined): Presence<Member>
 
 [.] Presence
 interface Presence<Member>
@@ -927,7 +938,9 @@ interface Presence<Member>
   others: () => Member[]
 
 [.] PresenceOptions
-interface PresenceOptions
+interface PresenceOptions<Member = null>
+  member?: Member | undefined
+  room?: string | undefined
   signal?: AbortSignal | undefined
 
 [.] previewing
@@ -1447,7 +1460,7 @@ type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, 
 type Success<Output> = Exclude<Output, Failure<unknown>>
 
 [.] SuccessOf
-type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
+type SuccessOf<Target> = Target extends Action ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
 
 [.] TemplateContext
 type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
@@ -4474,11 +4487,11 @@ interface TestSite
   query?: Record<string, unknown>;
 }) & CallBody<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
   as: (who: Record<string, string> | string) => TestSite
-  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
+  call: <Target extends Action>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   close: () => Promise<void>
   content: TestContent
   cookies: CookieMap
-  expectRefused: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
+  expectRefused: <Target extends Action>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
   from?: string;
 }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   fetch: (path: string, init?: (Omit<RequestInit, "headers"> & VisitInit) | undefined) => Promise<Response>
@@ -4493,7 +4506,7 @@ interface TestSite
   call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>;
 }
   open: (path: string, options?: BrowserOptions | undefined) => Promise<TestPage>
-  /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */ refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
+  /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */ refusal: <Target extends Action>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
   from?: string;
 }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   runJobs: () => Promise<number>

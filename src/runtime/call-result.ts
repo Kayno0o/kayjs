@@ -13,7 +13,7 @@ export type CallResult<Data, Failed>
 type Refusal = { ok: false } & ErrorShape
 
 // The callbacks a tracked call takes in its options, and as methods of the same names: `onX` after a transition, one object argument, `input` the first argument of the call. One that throws is logged and leaves the call alone.
-// `input` is `unknown`, so an action of any input still passes where another is expected, as `Action<never, unknown>` stands for any.
+// `input` is `unknown`, so an action of any input still passes where another is expected, as `Action` stands for any.
 export interface TrackHooks<Data> {
   // A call succeeded, `value` what it answered; for a streaming action, once the stream is open.
   onData?: ((event: { value: Data, input: unknown }) => void) | undefined

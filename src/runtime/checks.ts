@@ -239,7 +239,7 @@ type IsSerializable<T, Seen = never> = unknown extends T ? true : Serializes<T, 
 
 type Serializes<T, Seen> = true extends IsMarkup<T>
   ? true
-  : T extends Sendable | Action<never, unknown>
+  : T extends Sendable | Action
     ? true
     : T extends ((...args: never[]) => unknown) | symbol
       ? false
@@ -289,7 +289,7 @@ type FunctionPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends
   ? never
   : true extends IsMarkup<T>
     ? never
-    : T extends Sendable | symbol | Action<never, unknown>
+    : T extends Sendable | symbol | Action
       ? never
       : T extends ((...args: never[]) => unknown)
         ? Prefix

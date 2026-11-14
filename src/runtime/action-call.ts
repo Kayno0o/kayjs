@@ -149,8 +149,8 @@ export function setRequestOutcome(read: () => Outcome | null | undefined): void 
 }
 
 // What a browser build exports in place of a server action.
-export function actionStub(url: string): Action<unknown, unknown> {
-  const { call, reads } = callable(() => url)
+export function actionStub(url: string, fixed?: Record<string, unknown>): Action<unknown, unknown> {
+  const { call, reads } = callable(() => url, fixed)
 
   warmCode()
 
@@ -163,7 +163,11 @@ export function actionStub(url: string): Action<unknown, unknown> {
 
 // Called by the lazy chunk a page handing an island an action loads, so the props revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
 export function reviveActions(): void {
-  serverWritten[ACTION_TYPE] = (url: string) => typeof url === 'string' && url.startsWith(ACTION_PREFIX) ? actionStub(url) : malformed(url, ACTION_TYPE)
+  serverWritten[ACTION_TYPE] = (sent: string | [string, Record<string, unknown>]) => {
+    const [url, fields] = Array.isArray(sent) ? sent : [sent]
+
+    return typeof url === 'string' && url.startsWith(ACTION_PREFIX) && (fields === undefined || (typeof fields === 'object' && fields !== null && !Array.isArray(fields))) ? actionStub(url, fields) : malformed(sent, ACTION_TYPE)
+  }
 }
 
 function succeededOf(found: Outcome | undefined): { data: unknown } | undefined {
@@ -198,7 +202,32 @@ function lazySignal<T>(value: T): [read: () => T, write: (next: T) => void, peek
 
 // Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
-export function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
+// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does.
+function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): unknown {
+  if (fixed === undefined)
+    return input
+
+  if (!(input instanceof FormData))
+    return { ...input as object | undefined, ...fixed }
+
+  const copy = new FormData()
+
+  for (const [name, value] of input) {
+    if (!(name in fixed))
+      copy.append(name, value)
+  }
+
+  for (const [name, value] of Object.entries(fixed)) {
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item !== undefined && item !== null)
+        copy.append(name, item instanceof Date ? item.toISOString() : String(item))
+    }
+  }
+
+  return copy
+}
+
+export function callable(url: () => string, fixed?: Record<string, unknown>): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
   const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
   const [progress, setProgress] = lazySignal<number | undefined>(undefined)
@@ -410,7 +439,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
     }
   }
 
-  const call = async (input: unknown, options?: CallOptions) => run(actionLane, input, options)
+  const call = async (input: unknown, options?: CallOptions) => run(actionLane, withFixed(input, fixed), options)
 
   return {
     call,
@@ -441,7 +470,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       track: read((handle?: { queue?: CallQueue } & TrackHooks<never>) => {
         const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
 
-        return tracked(async (input, options) => run(lane, input, options), url, handle)
+        return tracked(async (input, options) => run(lane, withFixed(input, fixed), options), url, handle)
       }),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },

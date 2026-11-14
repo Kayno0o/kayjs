@@ -676,7 +676,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const posts = client.entry !== undefined && client.navigation === true
       const polish = typographyFor(localeState()?.locale ?? options.lang ?? DEFAULT_LANG, options.client?.typography)
       const settled = await Promise.all(islands.html.map(async (html) => {
-        const forms = new Set<Action<never, unknown>>()
+        const forms = new Set<Action>()
         const markup = await settleBlocks(html, deferred, within, (rendered) => {
           const unrevivable = unrevivableAction(rendered.islands, client)
 

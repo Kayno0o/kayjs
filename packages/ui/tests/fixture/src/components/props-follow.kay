@@ -28,7 +28,7 @@ const action = Object.assign(async () => undefined, {
   data: () => undefined,
   failed: () => undefined,
   error: () => undefined,
-}) as unknown as Action<never, unknown>
+}) as unknown as Action
 const trail = (count: number) => Array.from({ length: count }, (_, index) => ({ label: `Page ${index}`, href: `/p${index}` }))
 ---
 button#go(type="button" onClick={() => later = true}) Go

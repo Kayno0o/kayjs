@@ -11,11 +11,11 @@ const { room, member } = props<{ room: string, member: CmsMember }>()
 const onPage = member.page === true
 const open = openRoom(room)
 const nameless: CmsMember = onPage ? member : { name: '' }
-const everyone = presence(open, nameless)
+const everyone = presence({ room: open, member: nameless })
 // Also listed in the rooms a list watches the entry through, which nothing here shows: a room is joined by reading it.
-const watchedBy = presence(watchRoom(open), nameless)
-const named = presence(room, member)
-const namedWatchedBy = presence(watchRoom(room), member)
+const watchedBy = presence({ room: watchRoom(open), member: nameless })
+const named = presence({ room, member })
+const namedWatchedBy = presence({ room: watchRoom(room), member })
 
 effect(() => void watchedBy.count())
 effect(() => void namedWatchedBy.count())

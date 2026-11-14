@@ -8,8 +8,8 @@ import { editorsOf, entryRoom, openRoom, watchRoom } from '../room'
 // Every editor is in the room that names them, which the server strips of names for who the guard did not let in, and in the one that holds none.
 const { collection, entry } = props<{ collection: string, entry: EntryRef }>()
 const { room, member } = entryRoom(collection, entry, { name: '', watching: true })
-const here = presence(watchRoom(room), member)
-const onPage = presence(watchRoom(openRoom(room)), member)
+const here = presence({ room: watchRoom(room), member })
+const onPage = presence({ room: watchRoom(openRoom(room)), member })
 const editors = memo(() => editorsOf(here.others(), here.count(), member))
 const text = memo(() => {
   if (editors().names.length > 0)

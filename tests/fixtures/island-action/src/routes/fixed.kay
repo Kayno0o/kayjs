@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const move = action(t.Object({ id: t.Number(), to: t.Number() }), ({ id, to }) => `${id}:${to}`)
+export const move = action(t.Object({ id: t.Number(), name: t.String() }), ({ id, name }) => `${id}:${name}`)
 --- script
 import Caller from '../components/caller.kay'
 ---

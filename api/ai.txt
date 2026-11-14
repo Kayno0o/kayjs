@@ -825,7 +825,7 @@ interface Timeouts
 function tool<const Spec extends Schema>(options: FunctionToolOptions<Spec>): FunctionTool
 
 [.] ToolAction
-type ToolAction = Action<never, unknown>
+type ToolAction = Action
 
 [.] ToolOutcome
 interface ToolOutcome

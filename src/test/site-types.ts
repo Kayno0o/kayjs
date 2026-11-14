@@ -51,7 +51,7 @@ export interface Visit extends PageReading {
   // The CSS the page carries: its inline `<style>` blocks and every stylesheet it links, fetched from the site, as the app builds it. Needs `testSite({ styles: true })` or `browser`, else it throws.
   css: () => Promise<string>
   // The stamp the form posting to `action` rendered with, which `submit` takes as its `stamp`; `undefined` for a page with no such form or a form with no stamp.
-  stamp: (action: Pick<Action<never, unknown>, 'url'>) => string | undefined
+  stamp: (action: Pick<Action, 'url'>) => string | undefined
 }
 
 export interface VisitInit {
@@ -90,11 +90,11 @@ export interface TestSite {
   }
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirectError` when it redirects. `from` names the page it is made on, whose params the action reads.
   // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
-  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
+  call: <Target extends Action>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
-  expectRefused: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
+  expectRefused: <Target extends Action>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
   /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
-  refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
+  refusal: <Target extends Action>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
   mcp: {
     // The tools `tools/list` gives.

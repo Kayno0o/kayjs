@@ -40,13 +40,13 @@ A page or layout with a `--- server` fence passes an action it declares or impor
 
 A production build carries the code reviving an action only when the app's own sources call `action(` (or import it as another name) or use a kay library. A page handing an island an action created only in a package outside the app fails with an error naming this; call `action(` in one of the app's files, as `export const greet = action(...)` in a route, to keep it.
 
-Type the prop with `Action` from `kay` (`ServerAction` counts too): `Action<never, unknown>` takes any action, `NoInputAction<unknown>` any declared without a schema, and `Action<{ name: string }, string>` keeps its input and output types (the output is the success one, so a handler that can `ctx.fail` fits: `Action<{ dossier: string }, AsyncGenerator<string>>`). The type is only for the types: an island typing the prop as a plain function, `(input: { name: string }) => Promise<string>`, is handed the action all the same, the code reviving it loading in the browser only for a page that passes an island one, and shipped only by an app that calls `action(` in its own sources or uses a kay library: an action declared by a package outside the app that is no kay library makes the page fail, as above. The action crosses as its URL, so it must be an export of a route module, declared in the page or imported. `move.with({ id })` and an action no route exports fail the render: pass the plain action, the fields as input.
+Type the prop with `Action` from `kay` (`ServerAction` counts too): `Action`, with no parameters, takes any action, `NoInputAction<unknown>` any declared without a schema, and `Action<{ name: string }, string>` keeps its input and output types (`Action<never, unknown>`, the old spelling of the bare one, works until 1.108 and `deprecated-action-type` rewrites it) (the output is the success one, so a handler that can `ctx.fail` fits: `Action<{ dossier: string }, AsyncGenerator<string>>`). The type is only for the types: an island typing the prop as a plain function, `(input: { name: string }) => Promise<string>`, is handed the action all the same, the code reviving it loading in the browser only for a page that passes an island one, and shipped only by an app that calls `action(` in its own sources or uses a kay library: an action declared by a package outside the app that is no kay library makes the page fail, as above. The action crosses as its URL, so it must be an export of a route module, declared in the page or imported; one no route exports fails the render. `move.with({ id })` crosses with its fields: the island's calls send them over the input they are given, as a form posting to it does, and its `track()`, `pending()` and `error()` are those of the action. Typed `Action` as any other.
 
 ```kay
 ---
 import type { Action, NoInputAction } from 'kay'
 
-const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action<never, unknown> }>()
+const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action }>()
 ---
 form(action={signOut})
   button Sign out

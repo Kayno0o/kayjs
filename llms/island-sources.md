@@ -6,7 +6,7 @@ Everything an island reads from the server, a `resource`, a `stream`, a `socket`
 
 ### Show any source's data, loading, failure and retry
 
-Every source has `data()`, `status()`, `pending()`, `error()` and `retry()`, and tells them with `onData` and `onError` (the `Reader` type from `kay`; a `live()` value is the value itself and has no `data()`):
+Every source has `data()`, `status()`, `pending()`, `error()` and `retry()`, and tells them with `onData` and `onError` (the `Reader` type from `kay`; a `live()` value is the value itself and has no `data()`, and `onData` tells its changes):
 
 - `data()` is what it read last, `undefined` before the first: a `resource`'s answer, a stream's or a socket's last value, a collection's rows, what the last call of a `track()` handle succeeded with, what an action's last call returned. It is kept while the source reads again or fails, but an action's `data()` is the outcome of its last call, so it is empty while a later call is in flight or after one failed.
 - `status()` says where it stands. A value read once is a `LoadStatus`: `idle`, `loading`, `ready` or `failed`, for a `resource`, a `track()` handle, an action and a `local` collection alike. A connection is a `ConnectionStatus`: `idle`, `connecting`, `open`, `done`, `failed` or `closed`, for a stream, a socket and a `live()` handle.
@@ -48,12 +48,12 @@ A failure is an `ApiError` from `kay` whatever raised it: `status`, `message`, `
 | `track()`, `call.track` | what the last success answered | `idle`, `loading`, `ready`, `failed` | `onData`, `onError` |
 | an action | what the last call or form post returned | `idle`, `loading`, `ready`, `failed` | none, see `track()` |
 | `local` | the rows held | `loading`, `ready`, `failed` | `onData`, `onIssue`, `onError` |
-| `live()` handle | none, the value is the handle | `idle`, `connecting`, `open`, `failed` | none |
+| `live()` handle | none, the value is the handle | `idle`, `connecting`, `open`, `failed` | `onData`, `onError` |
 | `navigation` | none | `idle`, `loading`, `swapping` | `navigation.onNavigate`, `navigation.onBeforeNavigate` |
 | `infiniteList` (kayjs-ui) | the rows loaded | `loading`, `ready`, `failed` | `load` and `onError` props, see kayjs-ui `infiniteList` |
 
 - `local` reads `loading` until the browser's copy is read, then `ready`, or `failed` while `error()` is set (a read of the server failed, or the browser keeps no IndexedDB); `pending()` is true while it loads. What a collection has more is its sync with the server, under `sync`: `sync.status()` reads `loading`, `synced`, `unsynced`, `offline`, `signed-out` or `unavailable`, `sync.queued()` the count of writes the server has not taken, and `sync()` sends the queue and reads again ([Local collections](local-collections.md)).
-- A `live()` handle reads the page's one connection, shared by every live value: `idle` while no island reads one and on the server, `connecting` while it is made or waits (a refused connection keeps retrying, with `error()` set), `failed` after an `error` event.
+- A `live()` handle reads the page's one connection, shared by every live value: `idle` while no island reads one and on the server, `connecting` while it is made or waits (a refused connection keeps retrying, with `error()` set), `failed` after an `error` event. Its `onData({ value })` (`{ value, key }` for a keyed value) is told each value the connection delivers and its `onError({ error })` each attempt that failed, in a browser; a render tells neither ([live values](live-values.md)).
 - A stream or a socket fails on a refusal, an `error` event, a close with a code from 4000 to 4999 (`error().status` is the code minus 4000) or a source that threw. Any other drop reconnects with a backoff that sleeps while the page is hidden or offline. A socket is never `idle`.
 - A stream and a socket also have `on(listener)` and `close()`; a stream has `start()` and `ended()`.
 - A `track()` handle's `onData({ value, input })` is told each success, `value` what the call answered and `input` what it was given. An action's `data()` and `status()` read the outcome of its last call, or of the form post a page rendered for, on the server too.

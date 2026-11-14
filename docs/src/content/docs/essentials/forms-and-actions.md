@@ -328,7 +328,7 @@ A page with a `server` fence can also hand an action to a component as a prop, s
 
 A production build ships the code that brings an action to life in an island only when your own files call `action(` or you use a kay library. If a page hands an island an action created only in a package outside your app, the page fails with an error saying so. Call `action(` in one of your files, such as `export const greet = action(...)` in a route, to fix it.
 
-Type the prop with `Action` from `kay`. `Action<never, unknown>` takes any action. `NoInputAction<unknown>` takes one declared without a schema, such as a sign-out that ends in a redirect. To keep the input and output types, write them: `Action<{ name: string }, string>`. A handler that can `ctx.fail` still fits: the prop names what it returns on success, `Action<{ name: string }, string>`, and a stream is typed `Action<{ dossier: string }, AsyncGenerator<string>>`.
+Type the prop with `Action` from `kay`. `Action` alone takes any action, one with fields fixed by `.with()` included. `NoInputAction<unknown>` takes one declared without a schema, such as a sign-out that ends in a redirect. To keep the input and output types, write them: `Action<{ name: string }, string>`. A handler that can `ctx.fail` still fits: the prop names what it returns on success, and a stream is typed `Action<{ dossier: string }, AsyncGenerator<string>>`.
 
 ```kay
 ---

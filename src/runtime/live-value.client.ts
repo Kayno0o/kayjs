@@ -1,5 +1,7 @@
+import type { ApiError } from './api-error'
 import type { Handle, LiveKey, LivePage, LiveRequest, LiveUpdate } from './live-value.shared'
 import { withBase } from './base'
+import { listenerSet } from './listener-set'
 import { readEvents } from './live'
 import { initialOf, keyText, LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
 import { EAGER_ISLANDS } from './markers'
@@ -38,9 +40,15 @@ interface BrowserSlot {
   initial: unknown
   keyed: boolean
   entries: Map<string, Entry>
+  // Told each value the connection delivers.
+  data: ReturnType<typeof listenerSet<{ value: unknown, key?: string }>>
 }
 
 const browserSlots = new Map<string, BrowserSlot>()
+
+// Told each attempt of the page's connection that failed, whichever value an island reads.
+let told: ReturnType<typeof listenerSet<{ error: ApiError }>> | undefined
+const failures = () => told ??= listenerSet()
 
 // The keys the open connection carries, and the ones the islands read now.
 export const wanted = new Map<string, number>()
@@ -282,6 +290,19 @@ function sync(): void {
   }, true, false, true)
 
   reader.on(apply)
+  // Reconnecting never ends the connection as failed, so the attempts that failed are told from the two ways one fails.
+  const { fail, lost } = reader.link
+
+  reader.link.fail = (failure) => {
+    fail(failure)
+    failures().emit({ error: failure })
+  }
+  reader.link.lost = (failure) => {
+    lost(failure)
+
+    if (failure)
+      failures().emit({ error: failure })
+  }
   current = { keys, reader }
   followedReader[1](reader)
 
@@ -314,6 +335,10 @@ function apply(updates: LiveUpdate[]): void {
     if (entry) {
       entry.delivered = { rendered: renderedValue(id, key) }
       entry.write(value)
+
+      const slot = browserSlots.get(id)!
+
+      slot.data.emit(slot.keyed ? { value, key } : { value })
     }
   }
 }
@@ -342,7 +367,7 @@ const connectionOf = {
 export function browserLive(id: string, initial: unknown): Handle {
   const keyed = typeof initial === 'function'
   const known = browserSlots.get(id)
-  const slot: BrowserSlot = known ?? { id, initial, keyed, entries: new Map() }
+  const slot: BrowserSlot = known ?? { id, initial, keyed, entries: new Map(), data: listenerSet() }
 
   if (known) {
     known.initial = initial
@@ -379,5 +404,5 @@ export function browserLive(id: string, initial: unknown): Handle {
     throw new TypeError(`kay: the live value ${id} is changed on the server, not in a browser`)
   }
 
-  return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }, connectionOf) as unknown as Handle
+  return Object.assign(keyed ? (key: LiveKey) => read(keyText(key)) : () => read(''), { set: refuse, ...keyed && { delete: refuse } }, connectionOf, { onData: slot.data.on, onError: (listener: (event: { error: ApiError }) => void) => failures().on(listener) }) as unknown as Handle
 }

@@ -3526,7 +3526,7 @@ describe.concurrent('kay check, an action passed as a prop', () => {
         '---',
         'import type { Action, NoInputAction } from \'kay\'',
         '',
-        'const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action<never, unknown> }>()',
+        'const { signOut, run } = props<{ signOut: NoInputAction<unknown>, run: Action }>()',
         '---',
         'header',
         '  form(action={signOut})',

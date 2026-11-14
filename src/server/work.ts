@@ -9,7 +9,7 @@ const MARK = new RegExp(`"${WORK_MARK}([^:"]*):(\\d+):(\\d+)"`, 'g')
 // Each action's `proofOfWork`, read once: `action()` refused one it cannot read.
 const works = new WeakMap<object, ReturnType<typeof workOf>>()
 
-export function proofOfWork(action: Action<never, unknown>): ReturnType<typeof workOf> {
+export function proofOfWork(action: Action): ReturnType<typeof workOf> {
   const { protection } = action as { protection?: Parameters<typeof workOf>[0] }
 
   if (!protection)
@@ -71,7 +71,7 @@ export async function workRefusal(url: string, solution: string | null, store: R
 }
 
 // The challenges of the actions with `proofOfWork` a page's forms post to, which kay's script solves; a prerendered page holds a mark the server fills in per visit.
-export function workScript(forms: Set<Action<never, unknown>>, prerendered: boolean): string {
+export function workScript(forms: Set<Action>, prerendered: boolean): string {
   const challenges: Record<string, string> = {}
 
   for (const action of forms) {

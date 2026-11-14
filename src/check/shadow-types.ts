@@ -33,6 +33,7 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
+import { actionType } from './action-type'
 import { aiLanguage } from './ai-language'
 import { authRateLimits } from './auth-rate-limits'
 import { cmsOptions } from './cms-options'
@@ -55,6 +56,7 @@ import { islandOnlyComponents } from './island-only'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 import { largePublicImages } from './large-images'
 
+import { liveApi } from './live-api'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
@@ -172,6 +174,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => sourceReaders(root, options),
+  async ({ root, options }) => liveApi(root, options),
+  async ({ root, options }) => actionType(root, options),
   async ({ root, options, served }) => unusedStatusPages(root, options, served),
 
   async ({ root, options }) => persistedCall(root, options),

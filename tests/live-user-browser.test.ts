@@ -26,6 +26,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
   let live: Values
   // Who the front says is signed in, by the `as` query of the page the request comes from, until a test overrides it for everyone: a cookie or a session that changed.
   let session: string | null | undefined
+  // The front answers the connection with a 503, as a server restarting does.
+  let unavailable = false
   const cut = new Set<() => void>()
   // How many connections the front answered, and how many of them it let through.
   let connections = 0
@@ -59,6 +61,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
           headers.delete('x-user')
         else if (user !== undefined)
           headers.set('x-user', user)
+
+        if (unavailable && new URL(request.url).pathname.endsWith('/_kay/live'))
+          return new Response('down', { status: 503 })
 
         const reply = await site.handle(new Request(request.url, { method: request.method, headers, body: request.method === 'GET' || request.method === 'HEAD' ? null : await request.arrayBuffer(), redirect: 'manual' }))
 
@@ -116,6 +121,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
       tab.close()
 
     session = undefined
+    unavailable = false
     live.unread.set('alice', 3)
     live.unread.set('bob', 5)
   })
@@ -150,6 +156,25 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     expect(await unread(alice)).toBe('4 unread')
     expect(alice.errors).toEqual([])
     expect(bob.errors).toEqual([])
+  })
+
+  it('tells onData each value the connection delivers, and onError each attempt that failed', async () => {
+    const tab = await open('alice')
+
+    await tab.waitUntil(...shows(3))
+    await tab.waitUntil(() => document.querySelector('p.told')?.textContent === '3', { timeout: '8s' })
+    await untilHolds(() => cut.size === 1)
+    live.unread.set('alice', 4)
+    await tab.waitUntil(() => document.querySelector('p.told')?.textContent === '4', { timeout: '8s' })
+    expect(await tab.text('p.failed')).toBe('')
+
+    const answered = connections
+
+    unavailable = true
+    drop()
+    await untilHolds(() => connections > answered)
+    await tab.waitUntil(() => document.querySelector('p.failed')?.textContent === '503', { timeout: '8s' })
+    expect(tab.errors).toEqual([])
   })
 
   it('sends a tab nothing once its user signed out', async () => {

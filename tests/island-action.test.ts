@@ -58,10 +58,12 @@ describe('an action as an island prop', () => {
     expect(html).toContain(greet.url)
   })
 
-  it('refuses an action fixing fields with `with()`, which would lose them on the way', async () => {
+  it('sends an action fixing fields with `with()` as its URL and its fields', async () => {
     const response = await site.fetch('/fixed')
+    const html = await response.text()
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(200)
+    expect(propsOf(html).some(props => props.includes('"Action"') && props.includes('/fixed.kay/move') && props.includes('"id"'))).toBe(true)
   })
 
   it('refuses an action that is no export of a route module, which has no URL', async () => {
@@ -87,11 +89,23 @@ describe('the wire of an action', () => {
     expect(actionStub('/_kay/action/a/b').url).toBe('/_kay/action/a/b')
   })
 
-  it('refuses, as a prop an island cannot take, a `with()` action and one no route module exports, so a component passing one still renders as an island', () => {
+  it('refuses, as a prop an island cannot take, an action no route module exports, so a component passing one still renders as an island', () => {
     const Dialog = island('dialog.kay', (_props: { run: unknown }) => null)
 
     expect(() => child(Dialog({ run: actionStub('') }))).toThrow(IslandPropsError)
-    expect(() => child(Dialog({ run: (greet as unknown as { with: (fields: object) => unknown }).with({ name: 'Ann' }) }))).toThrow('with()')
+    expect(() => child(Dialog({ run: (greet as unknown as { with: (fields: object) => unknown }).with({ name: 'Ann' }) }))).not.toThrow()
+  })
+
+  it('revives an action with the fields it was fixed with, and refuses fields that are no object', () => {
+    reviveActions()
+
+    const fixed = (greet as unknown as { with: (fields: object) => unknown }).with({ id: 3, tags: ['a', 'b'] })
+    const stub = decodeValue(encodeValue({ run: fixed }, true), serverWritten) as { run: Action<unknown, unknown> }
+
+    expect(stub.run.url).toBe(greet.url)
+    expect(typeof stub.run).toBe('function')
+    expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', 'x'], serverWritten)).toThrow(/malformed/)
+    expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', ['x']], serverWritten)).toThrow(/malformed/)
   })
 
   it('renders an island passed an action whatever its props are typed as, in production and in dev, a promoted one included', async () => {
@@ -142,6 +156,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await page.click('button.count')
     await page.waitFor('p.last', { text: '3' })
+    expect(page.errors).toEqual([])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island passed an action fixing fields with `with()`', () => {
+  it('sends the fields with the input it is called with', async () => {
+    const page = await site.open('/fixed', { path })
+
+    await page.click('#go-Go')
+    await page.waitFor('#answer-Go', { text: '1:Go' })
     expect(page.errors).toEqual([])
   })
 })

@@ -12,7 +12,7 @@ const rulesCache = new WeakMap<object, Map<string, FormRules | null>>()
 
 // The schemas of the actions a page's forms post to, for the page swap to check a form before posting it; a page whose forms post to none gets nothing.
 // Under `kay dev` the rules are read again each time, as a messages file may have changed the text a function returns.
-export function formsScript(forms: Set<Action<never, unknown>>, dev?: boolean): string {
+export function formsScript(forms: Set<Action>, dev?: boolean): string {
   const rules = new Map<string, string>()
 
   for (const action of forms) {

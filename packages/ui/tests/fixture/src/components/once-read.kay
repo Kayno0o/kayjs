@@ -12,7 +12,7 @@ const { onIndexChange } = props<{ onIndexChange: (index: number) => void }>()
 const later = signal(false)
 const slides = ['a', 'b', 'c'].map(name => ({ src: `/${name}.png`, alt: name }))
 const rows = Array.from({ length: 200 }, (_, index) => ({ id: index }))
-const stub = (schema?: object) => Object.assign(async () => undefined, { url: '/_kay/action/mail/form', pending: () => false, succeeded: () => false, status: () => 'idle', data: () => undefined, failed: () => false, error: () => undefined, schema }) as unknown as Action<never, unknown>
+const stub = (schema?: object) => Object.assign(async () => undefined, { url: '/_kay/action/mail/form', pending: () => false, succeeded: () => false, status: () => 'idle', data: () => undefined, failed: () => false, error: () => undefined, schema }) as unknown as Action
 const plain = stub()
 const consenting = stub({ properties: { consent: { 'x-kay-consent': true } } })
 ---

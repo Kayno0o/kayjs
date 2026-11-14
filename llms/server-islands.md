@@ -23,7 +23,9 @@ Contact(action={contact} token={token})
 ```kay
 ---
 // src/components/contact.kay
-const { action, token } = props<{ action: string, token: string }>()
+import type { Action } from 'kay'
+
+const { action, token } = props<{ action: Action, token: string }>()
 ---
 Section(title="Contact")
   p Write to us
@@ -54,7 +56,9 @@ Contact(action={contact} token={token})
 ```kay
 ---
 // src/components/contact.kay
-const { action, token } = props<{ action: string, token: string }>()
+import type { Action } from 'kay'
+
+const { action, token } = props<{ action: Action, token: string }>()
 ---
 Section(title="Contact")
   p Write to us

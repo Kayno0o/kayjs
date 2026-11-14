@@ -1,6 +1,6 @@
 import type { Entries, Handle, LiveKey, LiveStore } from './live-value.shared'
 import type { ServerScope } from './reactive'
-import { initialOf, keyText } from './live-value.shared'
+import { initialOf, keyText, writeArguments } from './live-value.shared'
 import { kayLog } from './log'
 import { currentServerScope } from './reactive'
 import { decodeServerValue, encodeValue } from './wire'
@@ -557,8 +557,8 @@ function datedTogether(id: string): void {
   kept.dating.add(id)
 }
 
-// A render opens no connection, so a handle reads `idle`.
-const NO_CONNECTION = { status: () => 'idle', pending: () => false, error: () => undefined, retry: () => undefined }
+// A render opens no connection, so a handle reads `idle` and tells nothing.
+const NO_CONNECTION = { status: () => 'idle', pending: () => false, error: () => undefined, retry: () => undefined, onData: () => () => undefined, onError: () => () => undefined }
 
 export function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined, own: boolean): Handle {
   if (own && typeof initial === 'function')
@@ -673,9 +673,11 @@ export function serverLive(id: string, initial: unknown, name: string | undefine
     notify(slot, keyText(key))
   }
 
+  const what = `the live value ${slot.name ?? id}`
+
   return Object.assign(handle, keyed || own
     ? {
-      set: (key: LiveKey, next: unknown) => write(keyText(key), next),
+      set: (...args: unknown[]) => write(...writeArguments(args, own ? 'user' : 'key', what)),
       delete: remove,
     }
     : { set: (next: unknown) => write('', next) }, NO_CONNECTION) as unknown as Handle

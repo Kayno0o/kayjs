@@ -1,0 +1,16 @@
+---
+import { signal } from 'kay'
+import { unread } from '../live'
+
+const told = signal('')
+const failed = signal('')
+
+unread.onData(({ value }) => {
+  told = String(value)
+})
+unread.onError(({ error }) => {
+  failed = String(error.status)
+})
+---
+p.told {told()}
+p.failed {failed()}

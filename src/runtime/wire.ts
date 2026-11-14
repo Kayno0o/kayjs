@@ -13,6 +13,9 @@ export const ACTION_PREFIX = '/_kay/action/'
 export const FIELDS_PREFIX = '/_kay/fields/'
 const ACTION_MARK = Symbol.for('kay.action')
 
+// Read off an action `with()` fixed fields of: the fields, which cross beside its URL.
+export const FIXED_FIELDS = Symbol.for('kay.fixed')
+
 // `actions` lets a function that is an action through, as island props do, as its URL: anywhere else it stays unsendable.
 export function encodeValue(value: unknown, actions = false): string {
   return stringify(value, {
@@ -21,8 +24,14 @@ export function encodeValue(value: unknown, actions = false): string {
   })
 }
 
-function sendableAction(value: unknown): string | false {
-  return typeof value === 'function' && ACTION_MARK in value ? (value as unknown as { url: string }).url : false
+// An action as its URL, and with the fields `with()` fixed when it has some.
+function sendableAction(value: unknown): string | [url: string, fields: object] | false {
+  if (typeof value !== 'function' || !(ACTION_MARK in value))
+    return false
+
+  const { url, [FIXED_FIELDS]: fields } = value as unknown as { url: string, [FIXED_FIELDS]?: object }
+
+  return fields === undefined ? url : [url, fields]
 }
 
 // The revivers for text the server wrote, island props, action results and event streams: the only text whose `SafeHtml` entries vouch for markup. What the browser sends, a cookie and localStorage are read without them, so no caller can vouch for its own text.

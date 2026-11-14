@@ -41,7 +41,11 @@ function pagePath(): string {
   return path.replace(NON_ROOT_TRAILING_SLASH, '')
 }
 
-export interface PresenceOptions {
+export interface PresenceOptions<Member = null> {
+  // The room to join, such as `entry:${id}`; the page's own when left out.
+  room?: string | undefined
+  // What the others see the visitor as, any value that crosses as island props do; none by default.
+  member?: Member | undefined
   // Stops listening when aborted, as calling the result does.
   signal?: AbortSignal | undefined
 }
@@ -52,15 +56,16 @@ function holdConnection(): void {
   hold.tab ??= randomId(12)
 }
 
-// Who else has a room open, in an island: `presence(`entry:${id}`, { name })` lists the others' members, `presence()` counts the tabs on the page.
+// Who else has a room open, in an island: `presence({ room: `entry:${id}`, member: { name } })` lists the others' members, `presence()` counts the tabs on the page.
 // The page proves the room and the member as it does any live read, so what a visitor is listed as comes from the server fence that passed it, and the page is rendered per request.
 // A member is any value that crosses as island props do, compared as JSON; a room and its member take at most 256 characters as JSON.
 // kept: request
-export function presence(options?: PresenceOptions): Presence<null>
-export function presence<Member = null>(room: string, member?: Member, options?: PresenceOptions): Presence<Member>
-export function presence(first?: string | PresenceOptions, member?: unknown, extra?: PresenceOptions): Presence<unknown> {
-  const room = typeof first === 'string' ? first : undefined
-  const options = typeof first === 'object' ? first : extra
+export function presence<Member = null>(options?: PresenceOptions<Member>): Presence<Member>
+/** @deprecated Written `presence(room, member)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
+export function presence<Member = null>(room: string, member?: Member, options?: Pick<PresenceOptions, 'signal'>): Presence<Member>
+export function presence(first?: string | PresenceOptions<unknown>, second?: unknown, extra?: PresenceOptions): Presence<unknown> {
+  const options = typeof first === 'object' ? first : { room: first, member: second, signal: extra?.signal }
+  const { room, member } = options
   const key = JSON.stringify([room ?? pagePath(), member ?? null])
 
   if (key.length > MAX_PRESENCE_KEY)

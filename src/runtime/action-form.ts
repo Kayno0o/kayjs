@@ -6,17 +6,18 @@ import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
 import { KEPT_END, KEPT_START } from './markers'
 import { untrack } from './reactive'
+import { FIXED_FIELDS } from './wire'
 
 const SPACES = /\s+/
 
 // The actions the forms of the page being rendered post to, for the server to send their schemas along; set while it renders.
-let renderedForms: Set<Action<never, unknown>> | undefined
+let renderedForms: Set<Action> | undefined
 
 // How many times each form of the template, by where it starts, rendered so far in this page, which numbers the ones a loop repeats.
 let renderedTimes: Map<number, number> | undefined
 
-export function collectForms<T>(render: () => T): { result: T, forms: Set<Action<never, unknown>> } {
-  const forms = new Set<Action<never, unknown>>()
+export function collectForms<T>(render: () => T): { result: T, forms: Set<Action> } {
+  const forms = new Set<Action>()
   const previous = renderedForms
   const previousTimes = renderedTimes
 
@@ -65,6 +66,9 @@ export function withFields<Target extends object>(target: Target, fields: Record
       if (key === 'with')
         return (more: Record<string, unknown>) => withFields(target, { ...fields, ...more })
 
+      if (key === FIXED_FIELDS)
+        return fields
+
       return key === 'formUrl' ? `${(target as { url: string }).url}?${PAYLOAD_PARAM}=${encodeURIComponent(query)}` : Reflect.get(target, key)
     },
     apply: (_, self, args: unknown[]): unknown => Reflect.apply(target as unknown as () => unknown, self, args),
@@ -72,7 +76,7 @@ export function withFields<Target extends object>(target: Target, fields: Record
   })
 }
 
-export function formAction(target: string | Action<never, unknown>): string {
+export function formAction(target: string | Action): string {
   if (typeof target === 'string')
     return target
 

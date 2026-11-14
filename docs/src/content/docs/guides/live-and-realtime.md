@@ -49,12 +49,12 @@ if visitors.error() then error
 
 ### Values per key
 
-Give `live()` a function to get one value per key, a string. Read one with `room(id)`, write it with `room.set(id, value)`, and put it back to what the function gives with `room.delete(id)`.
+Give `live()` a function to get one value per key, a string, or `{ key: true }` to start every key from the same value. Read one with `room(id)`, write it with `room.set(value, { key: id })`, and put it back to what the function gives with `room.delete(id)`.
 
 ```ts
 export const room = live((id: string) => ({ id, users: 0 }))
 
-room.set('lobby', { id: 'lobby', users: 3 })
+room.set({ id: 'lobby', users: 3 }, { key: 'lobby' })
 ```
 
 ```kay
@@ -75,7 +75,7 @@ Give the declaration `{ user: true }` for a value that is one signed-in user's o
 ```ts
 export const unread = live(0, { user: true })
 
-unread.set(user.id, n => n + 1)
+unread.set(n => n + 1, { user: user.id })
 ```
 
 ```kay
@@ -162,14 +162,14 @@ A `resource` follows too. If the route's handler reads a `cached` value with `li
 
 ### Who else is here
 
-An island can show who else has a page open, or an entry being edited. Call `presence` with a room name and who the visitor is.
+An island can show who else has a page open, or an entry being edited. Call `presence` with the room and who the visitor is.
 
 ```kay
 ---
 import { presence } from 'kay'
 
 const { entry, me } = props<{ entry: { id: string }, me: { name: string } }>()
-const here = presence(`entry:${entry.id}`, me)
+const here = presence({ room: `entry:${entry.id}`, member: me })
 ---
 p(if={here.others().length > 0}) Also editing: {here.others().map(other => other.name).join(', ')}
 ```

@@ -1,3 +1,4 @@
+import type { ApiError } from './api-error'
 import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import type { Setter } from './index'
@@ -9,25 +10,45 @@ import type { StoreBase } from './store-base'
 // What a keyed value is read by.
 export type LiveKey = string
 
-// A value the server changes and every open page shows: read by calling it, as a signal is, and written with `set` on the server only. `status()`, `pending()`, `error()` and `retry()` are those of the page's one connection, which every live value shares (`idle` while no island reads one, and on the server).
-export interface Live<T> extends Source<ConnectionStatus> {
+// What every live value tells in a browser, beside the page's one connection state: `onData` for each value the connection delivered, `onError` for each failed attempt to connect; both return what stops them, and a render on the server tells neither.
+export interface LiveHooks<Event> {
+  onData: (listener: (event: Event) => void) => () => void
+  onError: (listener: (event: { error: ApiError }) => void) => () => void
+}
+
+// What every live value reads of the page's one connection, which all of them share (`idle` while no island reads one, and on the server).
+export interface LiveSource<Event> extends Source<ConnectionStatus>, LiveHooks<Event> {}
+
+// What `set` takes besides the options: the next value, or a function of the current one.
+type Next<T> = T | ((current: T) => T)
+
+// A value the server changes and every open page shows: read by calling it, as a signal is, and written with `set` on the server only. `status()`, `pending()`, `error()`, `retry()`, `onData` and `onError` are those of the page's one connection.
+export interface Live<T> extends LiveSource<{ value: T }> {
   (): T
   // Changes the value for every page showing it; a function gets the current value. Throws in a browser, which only reads.
   set: Setter<T>
 }
 
-// A value of each user, declared `live(initial, { user: true })`: read by calling it, which gives the signed-in visitor's own and `initial` for nobody; the server writes one user's with `set(user, next)`, `user` being the id the library that signs them in names (`userOf` of `kay/library`, which kayjs-auth does).
-export interface LiveOwn<T> extends Source<ConnectionStatus> {
+// A value of each user, declared `live(initial, { user: true })`: read by calling it, which gives the signed-in visitor's own and `initial` for nobody; the server writes one user's with `set(next, { user })`, `user` being the id the library that signs them in names (`userOf` of `kay/library`, which kayjs-auth does).
+export interface LiveOwn<T> extends LiveSource<{ value: T }> {
   (): T
-  set: (user: string, next: T | ((current: T) => T)) => void
+  set: {
+    (next: Next<T>, options: { user: string }): void
+    /** @deprecated Written `set(user, next)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
+    (user: string, next: Next<T>): void
+  }
   // Puts a user's value back to `initial`, and frees what is kept for it.
   delete: (user: string) => void
 }
 
-// A live value per key, `room(id)` reading one: what the declaration's function gives a key nothing was set for.
-export interface LiveByKey<K extends LiveKey, T> extends Source<ConnectionStatus> {
+// A live value per key, `room(id)` reading one: what the declaration gives a key nothing was set for. The event of `onData` names the key.
+export interface LiveByKey<K extends LiveKey, T> extends LiveSource<{ value: T, key: K }> {
   (key: K): T
-  set: (key: K, next: T | ((current: T) => T)) => void
+  set: {
+    (next: Next<T>, options: { key: K }): void
+    /** @deprecated Written `set(key, next)`; `deprecated-live-api` rewrites it. Removed in 1.108. */
+    (key: K, next: Next<T>): void
+  }
   // Puts a key back to what the declaration gives it, and frees what is kept for it.
   delete: (key: K) => void
 }
@@ -46,6 +67,8 @@ export interface LiveOptions<Ttl extends Duration = Duration> {
   ttl?: Ttl & PositiveDuration<Ttl>
   // One value for each signed-in user, which only they are sent: see `LiveOwn`.
   user?: boolean
+  // One value for each key, every one starting from `initial`: see `LiveByKey`. A function of the key as `initial` is the same, with a start of its own per key.
+  key?: boolean
 }
 
 // Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine, `pgData(db).live` for replicas on Postgres. A value is its text, as `encodeValue` writes it.
@@ -101,4 +124,18 @@ export function initialOf(slot: { keyed: boolean, initial: unknown }, key: strin
 
 export function keyText(key: LiveKey): string {
   return String(key)
+}
+
+// What `set` of a value per key or per user was given, as `set(next, { key })`, or `set(key, next)` as before 1.105 wrote it: the key and the next value.
+// The options are a second argument holding only `field`, so a next value that is such an object, written in the old order, reads as options.
+export function writeArguments(args: unknown[], field: 'key' | 'user', what: string): [key: string, next: unknown] {
+  const [first, second] = args
+
+  if (args.length < 2)
+    throw new TypeError(`kay: ${what} is one value for each ${field}: \`set(next, { ${field} })\``)
+
+  if (typeof second === 'object' && second !== null && Object.keys(second).length === 1 && field in second)
+    return [keyText((second as Record<string, string>)[field]!), first]
+
+  return [keyText(first as string), second]
 }

@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
+import { actionType } from '../src/check/action-type'
 import { aiLanguage } from '../src/check/ai-language'
 import { authRateLimits } from '../src/check/auth-rate-limits'
 import { cmsOptions } from '../src/check/cms-options'
@@ -14,6 +15,7 @@ import { hookNames } from '../src/check/hook-names'
 
 import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
+import { liveApi } from '../src/check/live-api'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
 import { rateEnforce } from '../src/check/rate-enforce'
@@ -40,6 +42,8 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-job-options': jobOptions,
   'deprecated-disk-files': diskFilesCalls,
   'deprecated-source-readers': sourceReaders,
+  'deprecated-live-api': liveApi,
+  'deprecated-action-type': actionType,
 
   'deprecated-persisted-call': persistedCall,
   'deprecated-persisted-query': persistedQuery,

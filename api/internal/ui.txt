@@ -1291,7 +1291,7 @@ interface AccordionItem
   open?: boolean | undefined
 
 [./lib/index] ActionSource
-type ActionSource<Row, Target extends Action<never, unknown>> = {
+type ActionSource<Row, Target extends Action> = {
   action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter;
   `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after. input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined // What `attempt` toasts when the call fails. failure: string | AttemptOptions load?: undefined
 } & RowsOf<Row, Target>
@@ -1460,7 +1460,7 @@ interface IconQuery extends OptionsQuery
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'more' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/index] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/index] InfiniteList
 interface InfiniteList<Row> extends Source<LoadStatus>
@@ -1482,7 +1482,7 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   status: () => LoadStatus
 
 [./lib/index] InfiniteListOptions
-type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
+type InfiniteListOptions<Row, Target extends Action = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
 
 [./lib/index] InfinitePage
 type InfinitePage<Row> = Row[] | undefined
@@ -1951,13 +1951,13 @@ interface UiSettings
   icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
 
 [./lib/infinite-list] ActionSource
-type ActionSource<Row, Target extends Action<never, unknown>> = {
+type ActionSource<Row, Target extends Action> = {
   action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter;
   `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after. input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined // What `attempt` toasts when the call fails. failure: string | AttemptOptions load?: undefined
 } & RowsOf<Row, Target>
 
 [./lib/infinite-list] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/infinite-list] InfiniteList
 interface InfiniteList<Row> extends Source<LoadStatus>
@@ -1979,7 +1979,7 @@ interface InfiniteList<Row> extends Source<LoadStatus>
   status: () => LoadStatus
 
 [./lib/infinite-list] InfiniteListOptions
-type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
+type InfiniteListOptions<Row, Target extends Action = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
 
 [./lib/infinite-list] InfinitePage
 type InfinitePage<Row> = Row[] | undefined

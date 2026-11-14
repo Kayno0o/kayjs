@@ -44,15 +44,15 @@ export interface LoadSource<Row> {
 }
 
 // What an action answers, once it went through.
-type Answered<Target extends Action<never, unknown>> = Awaited<ReturnType<Target>>
+type Answered<Target extends Action> = Awaited<ReturnType<Target>>
 
 // The part of an action source that reads the rows out of its answer: left out when the answer is the rows.
-type RowsOf<Row, Target extends Action<never, unknown>> = [Answered<Target>] extends [Row[]]
+type RowsOf<Row, Target extends Action> = [Answered<Target>] extends [Row[]]
   ? { rows?: ((answer: Answered<Target>) => Row[]) | undefined }
   : { rows: (answer: Answered<Target>) => Row[] }
 
 // An action as the source: each page calls it with `{ refresh: false }` through `attempt`, so a failure toasts `failure` and fails the page.
-export type ActionSource<Row, Target extends Action<never, unknown>> = {
+export type ActionSource<Row, Target extends Action> = {
   action: Target
   // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter; `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after.
   input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined
@@ -61,7 +61,7 @@ export type ActionSource<Row, Target extends Action<never, unknown>> = {
   load?: undefined
 } & RowsOf<Row, Target>
 
-export type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
+export type InfiniteListOptions<Row, Target extends Action = never> = InfiniteListBase<Row> & PageLimit & (LoadSource<Row> | ActionSource<Row, Target>)
 
 export interface InfiniteList<Row> extends Source<LoadStatus> {
   // The rows loaded so far, the first page first.
@@ -131,7 +131,7 @@ function sameRow(a: unknown, b: unknown): boolean {
 const filterOf = (given: Partial<ListFilter> | undefined): ListFilter => ({ text: given?.text ?? '', fields: given?.fields ?? {} })
 
 // The page loader of an action source.
-function loadFromAction<Row, Target extends Action<never, unknown>>(source: ActionSource<Row, Target>, size: number): (at: PageAt<Row>) => Promise<InfinitePage<Row>> {
+function loadFromAction<Row, Target extends Action>(source: ActionSource<Row, Target>, size: number): (at: PageAt<Row>) => Promise<InfinitePage<Row>> {
   const call = source.action as unknown as (input: object, options: CallOptions) => Promise<unknown>
   const { input } = source
   const rowsOf = source.rows as ((answer: unknown) => Row[]) | undefined
@@ -156,7 +156,7 @@ function loadFromAction<Row, Target extends Action<never, unknown>>(source: Acti
 
 // The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `limit` ends the list, one call runs at a time and a failed page loads no other until `retry`.
 // In an island marked `persist`, the list starts over when the next page changes what it was made from: the first rows when they are given as a function (`() => rows`, which reads the props), and what an action source's `input` function reads, which starts it over from the first page that input asks for.
-export function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
+export function infiniteList<Row, Target extends Action = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
   const { key, limit: size } = options
   const first = typeof given === 'function' ? untrack(given) : given
   const unloaded = typeof (options as { failure?: unknown }).failure === 'string' ? (options as { failure: string }).failure : ((options as { failure?: AttemptOptions }).failure?.failure ?? 'The page could not be loaded.')

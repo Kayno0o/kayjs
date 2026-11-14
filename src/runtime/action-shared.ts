@@ -257,7 +257,7 @@ export type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionS
 // What a plain form post reads back: the last value of an async iterable, which is undefined when it gave none.
 export type Final<Output> = Output extends AsyncIterable<infer Value> ? Value | undefined : Output
 
-// Unknown for an action of any output, so any action passes where `Action<never, unknown>` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
+// Unknown for an action of any output, so any action passes where `Action` is expected, and for one whose output names no `Failure`, so a handler that can `ctx.fail` passes where only its success output is typed.
 export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
 
 // What a page reads back through `action.failed()` after a plain form post failed.
@@ -290,7 +290,7 @@ export interface FormSuccess<Output> {
   data: Output
 }
 
-export type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
+export type SuccessOf<Target> = Target extends Action ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
 
 // How a post to an action went: a refusal, or what its handler returned.
 export type Outcome
@@ -393,7 +393,7 @@ export interface TrackedCall<Input, Result> extends Reader<Result extends { ok: 
 }
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
-export interface Action<Input, Output, Honeypot extends string = never> {
+export interface Action<Input = never, Output = unknown, Honeypot extends string = never> {
   // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. First, so a call matching neither is reported against the typed input below, naming its wrong field, and `Parameters<typeof add>` reads that one.
   (form: FormData, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
   (input: Input, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
@@ -417,7 +417,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // This action for a form to post with fixed fields, as hidden inputs would carry them: `form(action={move.with({ id, to: 2 })})`. They travel in the form's action URL, so the form needs no inputs for them and posts them with or without JavaScript.
   // eslint-disable-next-line ts/method-signature-style
   with(fields: Partial<Input>): Action<Input, Output, Honeypot>
-  // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
+  // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action` is expected.
   // eslint-disable-next-line ts/method-signature-style
   error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
   // Checks a form in the browser against this action's schema, as the server would, writing what it refuses into `error(field)` (and `failed()`) in place of the last outcome: every field, or `field` alone, the other fields' messages kept. Resolves whether the checked fields are accepted. Nothing is posted and no bubble shows; a page whose forms hold no schema for the action accepts all.

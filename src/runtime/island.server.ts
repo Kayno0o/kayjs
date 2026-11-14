@@ -355,12 +355,7 @@ function refusedAction(value: unknown): string | undefined {
   if (!isAction(value))
     return undefined
 
-  const { url, formUrl } = value as { url: string, formUrl?: string }
-
-  if (formUrl !== undefined)
-    return 'an action fixing fields with `with()`, which would lose them on the way: pass the plain action and the fields as its input'
-
-  return url.startsWith(ACTION_PREFIX) ? undefined : 'an action no route module exports, which has no URL to reach the browser by'
+  return (value as { url: string }).url.startsWith(ACTION_PREFIX) ? undefined : 'an action no route module exports, which has no URL to reach the browser by'
 }
 
 // `what` names the island and why it is one.

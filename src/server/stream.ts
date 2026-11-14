@@ -25,7 +25,7 @@ export interface Rendered {
   islands: RenderedIslands
   deferred: PendingBlock[]
   // The actions the forms of a streamed block post to.
-  forms?: Set<Action<never, unknown>>
+  forms?: Set<Action>
 }
 
 // What the shell already sent, which a streamed block does not send again.
@@ -33,7 +33,7 @@ export interface Shipped {
   // The hydration script, which queues the events islands miss before they hydrate.
   hydration?: boolean
   // The actions whose schemas the shell's forms script holds.
-  forms?: Set<Action<never, unknown>> | undefined
+  forms?: Set<Action> | undefined
   // Whether the `kay.invalid.*` messages went with the locale.
   words?: boolean
   // Whether the page's locale went, which the first messages script carries.
@@ -59,7 +59,7 @@ export function renderBlock(view: () => unknown, salt?: string, chunks?: Record<
 }
 
 // What a block settled inside a server island sends for its forms, as the shell of a page would: the schemas, the challenges and the words the browser's check uses; the browser merges every such script it finds.
-export function formChecks(forms: Set<Action<never, unknown>>, dev: boolean | undefined, entry: string | undefined): string {
+export function formChecks(forms: Set<Action>, dev: boolean | undefined, entry: string | undefined): string {
   const checked = formsScript(forms, dev)
   const worked = workScript(forms, false)
 

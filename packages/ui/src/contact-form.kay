@@ -14,7 +14,7 @@ const look = recipe({ parts: { root: 'kui-contact-form flex flex-col items-start
 
 const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact.form.name', 'Name')), emailLabel = wording('ui.contactForm.email', wording('mail.contact.form.email', 'Email')), messageLabel = wording('ui.contactForm.message', wording('mail.contact.form.message', 'Message')), submitLabel = wording('ui.contactForm.submit', wording('mail.contact.form.submit', 'Send')), sentLabel = wording('ui.contactForm.sent', wording('mail.contact.form.sent', 'Thank you, your message has been sent.')), consentLabel = wording('ui.contactForm.consent', wording('mail.contact.form.consent', 'I agree that my details are used to answer my message.')), privacyLabel = wording('ui.contactForm.privacy', wording('mail.contact.form.privacy', 'Privacy policy')), privacy, consent, rows = 6, onSend, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
   // The action `contactForm()` from kayjs-mail gives, or any with a `name`, an `email` and a `message` field.
-  action: Action<never, unknown>
+  action: Action
   // The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language, English and French, which these replace.
   nameLabel?: string | undefined
   emailLabel?: string | undefined

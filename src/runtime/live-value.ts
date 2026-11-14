@@ -14,12 +14,14 @@ export { LIVE_ROUTE, LIVE_SCRIPT, PROOF_LIFETIME_MS } from './live-value.shared'
 declare const KAY_BROWSER: true | undefined
 
 // A value the server changes and every page showing it follows: `export const visitors = live(0)` in a module, read in a template as `{visitors()}`, written on the server with `visitors.set(n => n + 1)`.
-// Given a function of a key it is one value per key, `export const room = live((id: string) => ({ users: 0 }))`, read as `room(id)` and written as `room.set(id, ...)`.
+// With `key: true`, or given a function of a key, it is one value per key, `export const room = live({ users: 0 }, { key: true })` or `live((id: string) => ({ users: 0 }))`, read as `room(id)` and written as `room.set(next, { key: id })`.
 // The build gives each declaration its id, so it is written as `export const name = live(...)` at the top of a module.
 // `live(0, { ttl: '7d' })` forgets the value, in every store, that long after its last write.
-// `live(0, { user: true })` is one value for each signed-in user, sent only to that user's own pages: `unread()` reads the visitor's, `unread.set(userId, 3)` writes one user's.
+// `live(0, { user: true })` is one value for each signed-in user, sent only to that user's own pages: `unread()` reads the visitor's, `unread.set(3, { user: userId })` writes one user's.
+// In a browser every value takes `onData({ value })` and `onError({ error })`, as every island source does.
 // kept: request
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { user: true }): LiveOwn<T>
+export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { key: true }): LiveByKey<LiveKey, T>
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options?: LiveOptions<Ttl>): Live<T>
 export function live<K extends LiveKey, T, const Ttl extends Duration = Duration>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl>): LiveByKey<K, T>
 // The build adds the id and the name after the value, before the options when there are some, so a browser reads the id second without looking for the options it has no use for.
@@ -27,7 +29,16 @@ export function live(initial: unknown, id?: unknown, name?: unknown, options?: u
   if (typeof id !== 'string')
     throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, typeof name === 'string' ? name : undefined, ttlOf(id, name, options), declaredOptions(name, options)?.user === true) : browserLive(id, initial)
+  const declared = declaredOptions(name, options)
+  const own = declared?.user === true
+
+  if (own && declared?.key === true)
+    throw new TypeError('kay: live() with `user: true` is one value for each user, so it takes no `key`')
+
+  // A value per key declared with a plain starting value starts every key from a copy of it.
+  const start = declared?.key === true && typeof initial !== 'function' ? () => (typeof initial === 'object' && initial !== null ? structuredClone(initial) : initial) : initial
+
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, start, typeof name === 'string' ? name : undefined, ttlOf(id, name, options), own) : browserLive(id, start)
 }
 
 // The options of a declaration, which follow the id, or the name when there is one.

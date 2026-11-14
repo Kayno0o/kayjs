@@ -1,5 +1,7 @@
 ---
 import Inbox from '../components/inbox.kay'
+import Probe from '../components/probe.kay'
 ---
 h1 Inbox
 Inbox
+Probe

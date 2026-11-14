@@ -99,6 +99,7 @@ kay [.] TrackedApi.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, w
 kay [.] TrackedCall.onSuccess	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `data`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] onBeforeNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onBeforeNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
 kay [.] onNavigate	1.108.0	deprecated-navigation-hooks	Call `navigation.onNavigate(fn)`, the hooks of a source being its methods. Removed in 1.108.0; `deprecated-navigation-hooks` rewrites it.
+kay [.] presence	1.108	deprecated-live-api	Written `presence(room, member)`; `deprecated-live-api` rewrites it. Removed in 1.108.
 mail [./test] mailTest	1.108.0	deprecated-test-helpers	`test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 mail [.] ContactOptions.onSend	1.108	deprecated-hook-names	Written `afterSend`; `deprecated-hook-names` rewrites it. Removed in 1.108.
 mail [.] ListOptions.onBroadcast	1.108	deprecated-hook-names	Written `afterBroadcast`; `deprecated-hook-names` rewrites it. Removed in 1.108.
