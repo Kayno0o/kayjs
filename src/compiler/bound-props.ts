@@ -8,6 +8,14 @@ function changeName(prop: string): string {
   return `on${prop[0]!.toUpperCase()}${prop.slice(1)}Change`
 }
 
+// The callback of the prop a `bind:` writes that the bind cannot compose, which it does only for one plain expression: one with a modifier, written as text, or one of several.
+export function unusableChange(element: ElementNode, source: string, prop: string): NamedAttribute | undefined {
+  const name = changeName(prop)
+  const changes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === name)
+
+  return changes.find(change => changes.length > 1 || change.kind !== 'expression' || change.modifiers !== undefined)
+}
+
 // The callback written beside a `bind:` of the prop, an expression with no modifier, which the bind calls after its own write.
 export function changeOf(element: ElementNode, source: string, prop: string): ExpressionAttribute | undefined {
   const name = changeName(prop)
@@ -41,7 +49,7 @@ export function addBoundWrites(b: CodeBuilder, name: string, separate: () => voi
   write()
 
   if (beside)
-    b.add('; (').addSource(beside.expression).add(')(kayValue, ...kayRest)')
+    b.add('; (').addSource(beside.expression).add(')?.(kayValue, ...kayRest)')
 
   b.add(' }')
 }

@@ -136,8 +136,20 @@ describe('bind: on a component with a value and change pair', () => {
   it('keeps an onChange written beside it, called after the write with every argument', () => {
     const dom = compile(`${dialog}Dialog(bind:open={open} onOpenChange={(opened, index) => log(opened, index)})\n`, 'dom').tsx
 
-    expect(dom).toContain('"onOpenChange"(kayValue, ...kayRest) { (open).set(kayValue); ((opened, index) => log(opened, index))(kayValue, ...kayRest) }')
+    expect(dom).toContain('"onOpenChange"(kayValue, ...kayRest) { (open).set(kayValue); ((opened, index) => log(opened, index))?.(kayValue, ...kayRest) }')
     expect(dom.match(/onOpenChange/g)).toHaveLength(1)
+  })
+
+  it('refuses a callback beside the bind that is written with a modifier, as text, or twice', () => {
+    for (const written of ['onOpenChange|once={log}', 'onOpenChange="x"', 'onOpenChange={log} onOpenChange={log}']) {
+      expect(compile(`${dialog}Dialog(bind:open={open} ${written})\n`, 'dom').diagnostics.map(d => d.message)).toContainEqual(expect.stringContaining('single plain expression'))
+    }
+  })
+
+  it('calls a callback that may be undefined only when it is set', () => {
+    const forwarded = '---\nimport { signal } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst open = signal(false)\nconst { onOpenChange } = props<{ onOpenChange?: (open: boolean) => void }>()\n---\nDialog(bind:open={open} onOpenChange={onOpenChange})\n'
+
+    expect(compile(forwarded, 'dom').tsx).toContain(')?.(kayValue, ...kayRest)')
   })
 
   it('names the callback after the prop, whatever it is', () => {
