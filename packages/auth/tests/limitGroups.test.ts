@@ -37,3 +37,9 @@ describe('rateLimit grouped by feature', () => {
     expect(() => resolveLimits({ forgot: 3 } as never)).toThrow('rateLimit.forgot is 3; give it { ip, account } or a limit')
   })
 })
+
+describe('rateLimit left off', () => {
+  test('false on a feature or a group skips it as before', () => {
+    expect(resolveLimits({ signIn: false, forgot: null } as never).signIn[0]).toEqual(DEFAULT_LIMITS.signIn)
+  })
+})

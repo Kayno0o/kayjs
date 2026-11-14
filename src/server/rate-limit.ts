@@ -44,7 +44,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
 
   const count: RateLimiter['count'] = async (from, server, weight = 1) => {
     if (!Number.isSafeInteger(weight) || weight < 1)
-      throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
+      throw new KayError('config-invalid', `kay: rateLimit('${name}')'s weight is ${weight}; it takes a whole number of at least 1`)
 
     return hit(typeof from === 'string' ? `key:${from}` : rateKey(clientAddress(from, server)), weight, typeof from === 'string' ? undefined : from)
   }

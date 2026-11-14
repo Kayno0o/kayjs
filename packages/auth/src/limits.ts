@@ -130,7 +130,7 @@ function bucketsOf(given: LimitsOption | undefined): [keyof Limits, LimitOption 
   for (const [name, value] of Object.entries(given ?? {}) as [string, unknown][]) {
     const group = Object.hasOwn(LIMIT_GROUPS, name) ? LIMIT_GROUPS[name]! : undefined
 
-    if (group === undefined || value === undefined || Array.isArray(value) || (typeof value === 'object' && value !== null && 'max' in value)) {
+    if (group === undefined || !value || Array.isArray(value) || (typeof value === 'object' && value !== null && 'max' in value)) {
       // A bare limit on a feature with a group is its first part, as it was before the groups.
       buckets.push([(group ? Object.values(group)[0]! : name) as keyof Limits, value as LimitOption | undefined, `rateLimit.${name}`])
 

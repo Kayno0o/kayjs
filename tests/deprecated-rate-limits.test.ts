@@ -74,3 +74,13 @@ describe('deprecated-auth-rate-limits', () => {
     expect(found.every(one => one.fixes === undefined)).toBe(true)
   })
 })
+
+describe('deprecated-auth-rate-limits comments', () => {
+  it('reports without a fix an object holding a comment', async () => {
+    const root = await project({ 'src/a.ts': 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { /* keep */ signInAccount: { max: 2, window: \'1h\' } } } as never)\n' })
+    const found = await authRateLimits(root, {})
+
+    expect(found).toHaveLength(1)
+    expect(found[0]!.fixes).toBeUndefined()
+  })
+})

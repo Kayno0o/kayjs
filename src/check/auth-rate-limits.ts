@@ -9,6 +9,7 @@ import { scan } from './renamed-exports'
 const NEEDLE = /\brateLimit\b/
 const FROM_AUTH = (source: string) => renamePackages(source) === '@kayjs/auth'
 const CALLS = ['auth', 'authCore']
+const PUNCTUATION = /^[\s,{}]*$/
 const HELP = 'group the limit under its feature, `signIn: { ip, account }`'
 
 type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
@@ -99,6 +100,14 @@ function isOld(property: Property): boolean {
 // The object written grouped, or undefined where it cannot be done without reading what a value is.
 function regrouped(object: NodeOfType<'ObjectExpression'>, text: string): string | undefined {
   const entries = new Map<string, string | Map<string, string>>()
+  let rest = text.slice(object.start, object.end)
+
+  for (const property of object.properties)
+    rest = rest.replace(text.slice(property.start, property.end), '')
+
+  // A comment between the properties would be lost.
+  if (!PUNCTUATION.test(rest))
+    return undefined
 
   for (const property of object.properties) {
     if (property.type !== 'Property' || property.computed || property.shorthand || property.method || property.kind !== 'init')

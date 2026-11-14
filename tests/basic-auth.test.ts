@@ -298,3 +298,11 @@ describe('basicAuth failures', () => {
     expect((await get('/free', '10.0.6.1', right)).status).toBe(200)
   })
 })
+
+describe('basicAuth rate limit validation', () => {
+  it('refuses a key, a bad store and a bad max at boot', () => {
+    expect(() => basicAuth({ user: 'a', password: 'b', rateLimit: { max: 1, window: '1m', key: () => 'x' } as never })).toThrow('rateLimit.key')
+    expect(() => basicAuth({ user: 'a', password: 'b', rateLimit: { max: 1, window: '1m', store: {} as never } })).toThrow('rateLimit.store')
+    expect(() => basicAuth({ user: 'a', password: 'b', rateLimit: { max: 0, window: '1m' } })).toThrow('rateLimit.max')
+  })
+})

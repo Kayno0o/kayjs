@@ -2,6 +2,7 @@ import type { RateLimit } from '../runtime/action'
 import type { Guard } from '../runtime/core'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
+import { rateLimitOf } from './config-limits'
 import { clientAddress, limiter, rateKey } from './protection'
 import { refused } from './rate-refusal'
 import { sameText } from './seal'
@@ -60,6 +61,10 @@ export function basicAuth(options: BasicAuthOptions): Guard {
   const challenge = `Basic realm="${realm.replace(/["\\]/g, '\\$&')}", charset="UTF-8"`
   const configured = user !== undefined && user !== '' && password !== undefined && password !== ''
   let warned = false
+
+  if (rateLimit !== false)
+    rateLimitOf('basicAuth', rateLimit, FAILURES.max)
+
   const failures = rateLimit === false ? undefined : limiter({ max: rateLimit.max, window: rateLimit.window, store: rateLimit.store, name: `basicAuth:${realm}` })
 
   return async ({ request, headers, deny }) => {
@@ -112,6 +117,13 @@ export function basicAuth(options: BasicAuthOptions): Guard {
 
     const window = await failures.peek(client)
 
-    return window && window.count >= failures.max ? tooMany(window) : undefined
+    if (window && window.count >= failures.max) {
+      if (rateLimit !== false)
+        refused(`basicAuth:${realm}`, rateLimit, { key: client, wait: Math.max(1, Math.ceil((window.resetAt - Date.now()) / 1000)), request })
+
+      return tooMany(window)
+    }
+
+    return undefined
   }
 }
