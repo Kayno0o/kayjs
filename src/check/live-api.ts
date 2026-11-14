@@ -9,8 +9,9 @@ import { scan } from './renamed-exports'
 
 type Kind = 'plain' | 'key' | 'user' | 'unknown'
 
-const NEEDLE = /\blive\b|\bpresence\b/
-const LIVE_CALL = /\blive\(/
+const LIVE_CALL = /\blive\s*[(<]/
+const PROJECT_SOURCE = /^(?:[./#~]|@\/)/
+const SPECIAL = /[$.*+?^{}()|[\]\\]/g
 
 // What a declaration `live(initial, options)` is: a value per key given a function of it or `key: true`, per user given `user: true`, and unknown when the options are no object written there.
 function kindOf(call: Node): Kind {
@@ -70,13 +71,17 @@ export async function liveApi(root: string, options: CheckOptions): Promise<Chec
     }
   })
 
-  return scan(root, options, 'deprecated-live-api', NEEDLE, ({ parsed, report }) => {
+  // A file is read when it names a live value declared in the project, whatever else it holds, as `live` is written where it is declared.
+  const named = [...everywhere.keys()].map(name => name.replace(SPECIAL, String.raw`\$&`))
+  const needle = new RegExp(`\\b(?:live|presence${named.map(name => `|${name}`).join('')})\\b`)
+
+  return scan(root, options, 'deprecated-live-api', needle, ({ parsed, report }) => {
     for (const { ast, base, text } of parsed) {
       const receivers = declared(ast)
       const names = bindings(ast)
 
       for (const statement of ast.body) {
-        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || statement.source.value === 'kay')
+        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || !PROJECT_SOURCE.test(statement.source.value))
           continue
 
         for (const specifier of statement.specifiers) {
@@ -103,7 +108,7 @@ export async function liveApi(root: string, options: CheckOptions): Promise<Chec
 
           const [first, second] = args as [Node, Node]
 
-          report(base + callee.property.start, base + callee.property.end, `\`${callee.object.name}.set(${kind}, next)\` of a live value per ${kind} is \`set(next, { ${kind} })\` since 1.105, as one \`set\` writes every live value; the old order works until 1.108`, `write \`set(next, { ${kind} })\``, [{ start: base + first.start, end: base + second.end, text: `${text.slice(second.start, second.end)}, { ${property(kind, first, text)} }` }])
+          report(base + callee.property.start, base + callee.property.end, `\`${callee.object.name}.set(${kind}, next)\` of a live value per ${kind} is \`set(next, { ${kind} })\` since 1.105, as one \`set\` writes every live value; the old order works until 1.108`, `write \`set(next, { ${kind} })\``, first.type === 'SequenceExpression' || second.type === 'SequenceExpression' ? null : [{ start: base + first.start, end: base + second.end, text: `${text.slice(second.start, second.end)}, { ${property(kind, first, text)} }` }])
 
           return
         }
@@ -115,7 +120,10 @@ export async function liveApi(root: string, options: CheckOptions): Promise<Chec
         const parts = [property('room', room, text), ...member ? [property('member', member, text)] : []]
         let fix: Edit[] | null = null
 
-        if (extra === undefined || extra.type === 'ObjectExpression') {
+        // A lone argument that is no string was the options of the old form, as `presence(options)`.
+        const written = args.length > 1 || room.type === 'Literal' || room.type === 'TemplateLiteral'
+
+        if (written && !args.some(argument => argument.type === 'SequenceExpression') && (extra === undefined || extra.type === 'ObjectExpression')) {
           if (extra !== undefined && extra.properties.length > 0)
             parts.push(text.slice(extra.properties[0]!.start, extra.properties.at(-1)!.end))
 

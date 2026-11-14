@@ -4,6 +4,7 @@ import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { actionStub } from '../src/runtime/action'
 import { reviveActions } from '../src/runtime/action-call'
+import { formAction } from '../src/runtime/action-form'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
 import { decodeValue, encodeValue, serverWritten, unflattenValue } from '../src/runtime/wire'
@@ -103,6 +104,8 @@ describe('the wire of an action', () => {
     const stub = decodeValue(encodeValue({ run: fixed }, true), serverWritten) as { run: Action<unknown, unknown> }
 
     expect(stub.run.url).toBe(greet.url)
+    expect(formAction(stub.run)).toBe(formAction(fixed as Action<unknown, unknown>))
+    expect(formAction(stub.run)).toContain('id%3D3')
     expect(typeof stub.run).toBe('function')
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', 'x'], serverWritten)).toThrow(/malformed/)
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', ['x']], serverWritten)).toThrow(/malformed/)

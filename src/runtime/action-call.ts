@@ -154,11 +154,14 @@ export function actionStub(url: string, fixed?: Record<string, unknown>): Action
 
   warmCode()
 
-  return Object.defineProperties(call, {
+  const stub = Object.defineProperties(call, {
     ...reads,
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
   }) as unknown as Action<unknown, unknown>
+
+  // A form of the island posts to the URL carrying the fixed fields, as it does on the server.
+  return fixed === undefined ? stub : withFields(stub, fixed)
 }
 
 // Called by the lazy chunk a page handing an island an action loads, so the props revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
@@ -200,33 +203,34 @@ function lazySignal<T>(value: T): [read: () => T, write: (next: T) => void, peek
   }, () => current]
 }
 
-// Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
-// How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
-// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does.
+// A call of an action `with()` fixed fields of is made with them, over the ones it is given, as a form posting to its URL does: a field fixed to `null` or `undefined` is left out there, so the given one stays.
 function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): unknown {
   if (fixed === undefined)
     return input
 
-  if (!(input instanceof FormData))
-    return { ...input as object | undefined, ...fixed }
+  const set = Object.entries(fixed).filter(([, value]) => value !== undefined && value !== null)
 
+  if (!(input instanceof FormData))
+    return { ...input as object | undefined, ...Object.fromEntries(set) }
+
+  const names = new Set(set.map(([name]) => name))
   const copy = new FormData()
 
   for (const [name, value] of input) {
-    if (!(name in fixed))
+    if (!names.has(name))
       copy.append(name, value)
   }
 
-  for (const [name, value] of Object.entries(fixed)) {
-    for (const item of Array.isArray(value) ? value : [value]) {
-      if (item !== undefined && item !== null)
-        copy.append(name, item instanceof Date ? item.toISOString() : String(item))
-    }
+  for (const [name, value] of set) {
+    for (const item of Array.isArray(value) ? value : [value])
+      copy.append(name, item instanceof Date ? item.toISOString() : String(item))
   }
 
   return copy
 }
 
+// Posts a call, counting the ones in flight; a call that redirects rejects with `ActionRedirectError` once the browser is on its way, so the action stops being pending.
+// How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 export function callable(url: () => string, fixed?: Record<string, unknown>): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight, flying] = lazySignal(0)
   const [last, setLast] = lazySignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)

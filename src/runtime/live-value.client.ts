@@ -293,14 +293,21 @@ function sync(): void {
   // Reconnecting never ends the connection as failed, so the attempts that failed are told from the two ways one fails.
   const { fail, lost } = reader.link
 
+  // A failure after the app closed the connection is not told.
   reader.link.fail = (failure) => {
+    const open = reader.status() !== 'closed'
+
     fail(failure)
-    failures().emit({ error: failure })
+
+    if (open)
+      failures().emit({ error: failure })
   }
   reader.link.lost = (failure) => {
+    const open = reader.status() !== 'closed'
+
     lost(failure)
 
-    if (failure)
+    if (failure && open)
       failures().emit({ error: failure })
   }
   current = { keys, reader }

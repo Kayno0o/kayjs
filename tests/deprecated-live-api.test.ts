@@ -55,6 +55,35 @@ describe('deprecated-live-api', () => {
     }
   })
 
+  it('finds an importer that never writes live, a generic declaration, and leaves a package and a sequence alone', async () => {
+    const { root, found, read } = await fixed(liveApi, {
+      'src/state.ts': 'import { live } from \'kay\'\n\nexport const tags = live<string[], \'1d\'>([], { key: true })\n',
+      'src/use.ts': 'import { tags } from \'./state\'\nimport { room } from \'some-package\'\n\ntags.set(id, [])\nroom.set(id, 1)\ntags.set(id, (a, b))\n',
+    })
+
+    try {
+      expect(found).toHaveLength(2)
+      expect(found.filter(one => one.fixes === undefined)).toHaveLength(1)
+      expect(await read('src/use.ts')).toBe('import { tags } from \'./state\'\nimport { room } from \'some-package\'\n\ntags.set([], { key: id })\nroom.set(id, 1)\ntags.set(id, (a, b))\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('writes no fix for presence given one variable, which was its options before 1.105', async () => {
+    const { root, found, read } = await fixed(liveApi, { 'src/script.ts': 'import { presence } from \'kay\'\n\nconst a = presence(options)\n' })
+
+    try {
+      expect(found).toHaveLength(1)
+      expect(found[0]!.fixes).toBeUndefined()
+      expect(await read('src/script.ts')).toContain('presence(options)')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('writes the arguments of presence as one object, its options spread into it', async () => {
     const script = 'import { presence } from \'kay\'\n\nconst a = presence(\'lobby\')\nconst b = presence(room, member)\nconst c = presence(`entry:${id}`, { name }, { signal })\nconst d = presence(\'x\', null, options)\nconst e = presence({ room: \'y\' })\nconst f = presence()\n'
     const { root, found, read } = await fixed(liveApi, { 'src/script.ts': script, 'src/c.kay': '---\nimport { presence } from \'kay\'\n\nconst here = presence(room, me)\n---\np {here.count()}\n' })
