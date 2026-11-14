@@ -1,6 +1,87 @@
 # Upgrading, older releases
 
-What each minor release before 1.98 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.102 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.101.0
+
+### The `hotkey` of Toaster and CommandPalette 1.97 deprecated is gone
+
+`deprecated-ui-hotkey` goes with it: run `kay upgrade` on 1.100 first. `hotkey` is ignored now, so a Toaster or CommandPalette that still has one loses its key: `hotkey="j"` is `shortcut="alt+j"` on a Toaster and `shortcut="mod+j"` on a CommandPalette, and `hotkey={null}` is `shortcut={null}`.
+
+### The `template-invalid` error code is split by problem
+
+`kay check --format json`, `kay build --format json` and the `code` of a thrown compile error no longer say `template-invalid`: each problem has its own code, `head-invalid`, `slot-invalid`, `duplicate-attribute`, `attribute-invalid`, `attribute-ineffective`, `element-invalid`, `part-invalid`, `form-misuse`, `server-island-invalid`, `fallback-invalid`, `bind-misuse` or `event-name`. A template `const` or snippet named like a name already declared is `name-clash` (it was `signal-misuse`). Messages that the old code covered and a fence rule fits better moved to `fence-invalid` (a name imported twice in the two fences, type parameters, a recipe or props on a page, `ctx` read in an island), `part-invalid` (the `class` prop or recipe of a component with parts) and `page-settings-invalid` (a `query` outside a page or a layout). Match on the new codes, or on the `compile` group; `kay explain <code>` says what each covers, and no `// kay-allow` comment reaches any of them, as before.
+### `apiUrl(module, path)` checks the path against the module
+
+The path must be one of the module's routes and its params are required, so `kay check` reports a path typed as `string`, a mistyped or removed route and a missing param. Write the path as a literal, or cast a dynamic one (`path as '/:id'`) or the module (`module as unknown`); fix a mistyped path. `apiUrl(request, path)` and a module typed `unknown` take any path. No deprecation lint: the type error is the report, and the runtime is unchanged.
+
+### `persisted()` takes no `storage`: each storage has its own entry
+
+`persisted(name, value, { storage: 'local' })` is `persisted.local(name, value)`, `{ storage: 'query' }` is `persisted.query(name, value)` (with `values` and `history` as options), and `{ storage: 'cookie' }` or none is `persisted(name, value)` or `persisted.cookie(name, value)`; `persisted.session()` is new. Each entry takes only the options its storage can use. The old form works until 1.104, and `kay upgrade` rewrites it (`deprecated-persisted-storage`); a call whose `storage` is not a literal, or that is read through another name than the `persisted` import, is changed by hand.
+
+### A `for` with no key matches rows by `id` or the object, never by position
+
+Rows of objects with no `id` used to be paired with the row left in their place when an edit, a removal or an insertion replaced them with copies, and a list of fresh objects reused the rows by position. Now a `for` with no `key` matches a row by `item.id` when it has one and by the item itself otherwise, so a copy of an object with no `id` is a new row: it redraws its markup and loses its fields and focus, as the row of a new object always did. `unkeyed-rows` reports such a `for` in an island, where the rows are matched again (`kay check`, a warning), and offers `key={i}`, which matches by position as a list of copies was matched before, without applying it; an `id` on the rows, or a `key` naming them such as `key={row.slug}`, keeps their nodes across copies and across a removal. No lint can tell a list of copies from a list of the same objects, so `kay upgrade` leaves it.
+
+### kayjs-auth on Postgres gains a `delete_at` column
+
+`kay_users` has a nullable `delete_at` column and its index, written on every new user whether `account.deleteAfter` is set or not. `db.sync()` adds them; an app that ships migrations generates one before deploying (`bunx pg-orm generate`, then `bunx pg-orm apply`), or sign-up fails with `column "delete_at" of relation "kay_users" does not exist`.
+
+## 1.100.0
+
+### The `permanent` of a redirect 1.96 deprecated is gone
+
+`deprecated-redirect-permanent` goes with it: run `kay upgrade` on 1.99 first. A redirect with `permanent` fails with `redirect-invalid` where it was a 308 or 307: `permanent: false` is `status: 307`, and `permanent: true` is dropped, as 308 is the default. A static export lists `status: 307` as 307 in `_redirects`.
+
+### Errors kay raises while serving are `KayError`s
+
+A refused redirect, a live value or action result that cannot reach the browser, and an API answer kay cannot send throw a `KayError` with a `code` (`redirect-target-invalid`, `live-value-invalid`, `api-answer-invalid`) where they threw a `TypeError`, and a response failing its schema is a `KayError` coded `response-schema-mismatch`, Elysia's error as its `cause`. No lint can find a check on the error's class: an app testing `instanceof TypeError` on one of them tests `error.code` instead.
+
+### kayjs-auth mails follow the site's locales
+
+`email.locales` defaults to the site's `i18n.locales` (English only before), so a reader whose language the site serves now gets the mail in it, in kayjs-auth's French or else English texts, and a reader whose language is none of them gets the default locale's mail. Set `email: { locales: ['en'] }` to keep English only.
+
+### kayjs-ui Dialog and SidePanel ask before dropping typed text
+
+Once something is typed in a modal Dialog or SidePanel, Escape, a click outside and the close button no longer do nothing (with a footer) or close it (without one): they ask "Discard changes?" through `confirm()`. `discard={{ title, message, confirmLabel, cancelLabel }}` words the question, and `discard={false}` keeps the old lock. `autosave` and `dirty` behave as before.
+
+### kayjs-ui TreeView and Bell items: `key`, `label`, `href`
+
+A TreeNode's `id` is `key`, and a Bell or BellInbox item's `id`, `title` and `url` are `key`, `label` and `href`, as in every other list (`onRead` and `onSelectedChange` still carry the key). What `notifications.inbox()` answers and `notify()` takes is unchanged, `{ id, title, url }`: the Bell maps it, so an `@item(note)` block reads `note.key`, `note.label` and `note.href` with the old three still there.
+
+### kayjs-ui: `infiniteList({ limit })`, and a count is `total`
+
+`infiniteList(rows, { pageSize: 20, ... })` is `limit: 20`: the rows a full page holds are the `limit` of the window each page asks for, as `pageFields()` and `PageInput` name it, while `pageSize` stays for a list paged by number (`paginate()`, `Pagination`, a Table).
+
+`CollectionInfo`, what `collectionInfo()` and `collections()` of `kay/content` answer, reports the number of entries as `total` in place of `count`, the word every list result uses (`pageOf`, kayjs-auth's `ListUsersResult`, kayjs-cms's `ListScreen`). A field an app reads cannot be found by `kay check`, so there is no lint: an app reading `info.count` writes `info.total`.
+
+### kayjs-cms test helpers: `cmsTest(site)`
+
+`cmsSignInAs(site, role)`, `cmsSignInWith(site, password)` and `cmsSignOut(site)` of `@kaynooo/kayjs-cms/test` are `cmsTest(site).signInAs(role)`, `.signInWith(password)` and `.signOut()`, as `auth.test(site)` signs in and out.
+
+## 1.99.0
+
+### Storage keys are `<lib>:<name>`
+
+`kay-reloaded`, `kay-push-posted`, `kay-push-refused`, `kay_editor-refused`, `kay-dev`, `kay-dev-layout`, `kai-chat-conversation:<url>` and `kcms-editor` are `kay:reloaded`, `kay:push-posted`, `kay:push-refused`, `kay:editor-refused`, `kay:dev`, `kay:dev-layout`, `kai:chat-conversation:<url>` and `kcms:editor`. The push record, the chat's shown conversation and the editor's layout move from the old key the first time they are read; the others start again. An app reading one of these keys by name reads the new one.
+
+### RowsField's `@cell` block gets `index` as a function
+
+The third argument of `@cell(column, row, index, set, issue)` is `index()`, the row's place (from 0), so a cell is drawn once per row and no longer again when a row above it is removed: `aria-label={`${column.label} ${index + 1}`}` becomes `${index() + 1}`. `kay check` flags arithmetic and comparisons on `index`, but not a bare `${index}` in a template, so no `deprecated` lint can carry it.
+
+## 1.98.0
+
+### Stat and Chat write `data-layout`, not `data-variant`
+
+`Stat` and `Chat` (and the `ChatLauncher` chat) take `layout` in place of `variant` and mark their root `data-layout`: CSS on `[data-variant=tile]` (Stat) or `[data-variant=plain]` (Chat) reads `[data-layout=tile]` and `[data-layout=plain]` now. The `variant` prop still works, rewritten by `deprecated-ui-props`.
+
+### kayjs-ui popover panels carry a role
+
+A Popover panel, which had no role unless given one, is `role="dialog"` by default (its new `role` prop), and so is MultiSelect's panel, `role="group"` before; Menu, AppSwitcher and Bell panels are `role="none"` around their own list. A test or CSS selecting a panel by `[role="group"]` selects `[role="dialog"]` now.
+
+### A disabled IconButton stays focusable
+
+An IconButton with a `label` shows it as a tooltip, so a disabled one is `aria-disabled="true"` with no `disabled` attribute, to stay reachable for its tooltip (since 1.80): a test reading `button.disabled` reads `aria-disabled` instead.
 
 ## 1.97.0
 
@@ -123,42 +204,4 @@ With `requireGuards` unset, a site that declares a guard of its own (a `_guard.t
 
 A cookie set with `ctx.cookies.set` (a page, endpoint, guard or action) or by an `api()` route is now `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, where it was Bun's plain `Path=/` with neither `HttpOnly` nor `Secure`, unless the call gives the option itself. No lint can see it. A cookie a script reads from `document.cookie` needs `{ httpOnly: false }` on its `set`; to keep the old headers for every cookie, set `security: { cookies: false }` in kay.config.ts. A scaffolded `security: { cookies: {} }` is now the default and can go ([server](server.md#sessions)).
 
-## 1.94.0
-
-### The old names and import paths 1.90 deprecated are gone
-
-`kay check` no longer flags them, so run `kay upgrade` on 1.93 first if an app still has any. `context` of `kay` is `createContext`; `dataTables`, `jobTables` (of `kay/server`, the table names; `kay/pg-orm`'s `jobTables` is unchanged), `EveryOptions` and `ApiRateLimit` of `kay/server` are `dataTableNames`, `jobTableNames`, `ScheduleEveryOptions` and `RateLimit`; kayjs-mail's `cssColours`, `Reply`, `Attachment` and `WaitOptions` are `cssColors`, `MailReply`, `MailAttachment` and `MailWaitOptions`; kayjs-ai's `Reply`, `Attachment`, `ToolCall`, `Message` and `LimitOptions` are `AiReply`, `AiAttachment`, `AiToolCall`, `AiMessage` and `AskLimit`; kayjs-cms's `Action`, `DraftEntry`, `Member` of `/room` and `SeedEntry` of `/pg` and `/sqlite` are `CmsAction`, `CmsDraftEntry`, `CmsMember` and `CmsSeedEntry`; kayjs-auth's `guard`, `Member`, `ProofOfWorkOptions` and `Limit` are `authGuard`, `AuthMember`, `AuthProofOfWorkOptions` and `AuthRateLimit`; kayjs-ui's `editing` and `Editing` are `rowEditing` and `RowEditing`. kayjs-auth's credential rules are imported from `@kaynooo/kayjs-auth/rules` and kayjs-cms's `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, as their roots no longer repeat them. `kay env` no longer warns about `KAYJS_AUTH_DATABASE_URL` and `MAIL_INBOUND_SECRET`.
-
-### The kayjs-ui and kayjs-ai names 1.90 deprecated are gone
-
-Their lints (`deprecated-ui-actions`, `deprecated-ui-failures`, `deprecated-open-change`, `deprecated-chat-icons`, `deprecated-size-limits`) go with them: run `kay upgrade` on 1.93 first and it rewrites every one that has a safe fix. On 1.94 the old names are type errors, or ignored where a block has no type.
-
-- `@head` of Card, `@action` of FormField, `@end` of AppHeader, `@trailing` of TreeView and `@toolbarExtra` of MarkdownEditor are `@actions`; ConfirmDelete's `trigger` string is `triggerLook`.
-- `failure` of CopyButton, ConfirmDelete, FormDialog, RecordButton, SaveForm and AudioPlayer, `errorLabel` of IconPicker and ImageCropper and `errorMessage` of Chat are `failureLabel`; CopyButton's `onFail(error)` is `onError({ error })`.
-- `onToggle` of Table and TreeView is `onOpenChange`.
-- Chat and ChatLauncher draw their buttons' icons from `icons={{ send: SendIcon }}`, no longer from `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon`, `@recordIcon`, `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`.
-- `maxAttachmentBytes` of `ask` and `maxFileSize` of Chat are `maxSize`; an extension's `maxSize` map is `maxSizeByPath`.
-
-### kayjs-auth and kayjs-mail drop what 1.90 and 1.91 deprecated
-
-- `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` and `createAuth()`, and `pages` of `auth()`, no longer take `true`: leave the option out, as it is on by default, or write `false` or an object. `deprecated-auth-options` is gone, so `kay upgrade` no longer drops them, and a `true` is a type error.
-- `KAYJS_AUTH_DATABASE_URL` and `MAIL_INBOUND_SECRET` are no longer read: set `AUTH_DATABASE_URL` and `MAIL_EVENTS_INBOUND`.
-
-### kayjs-mail views get the site's origin as `site` everywhere
-
-The confirmation view of a list got the origin, its footer got the host: both now get `site` as the origin and `host` as the host, as the contact view's `site` already was. A view of your own that reads `site` from the footer and shows it as a name reads `host` instead; no lint can see a changed value.
-
-### An unused `for` loop index is an `unread-name` error
-
-`for x, i of xs` with `i` read nowhere is reported by `unread-name`, as an unused `const` is, whatever `noUnusedParameters` says. `kay upgrade` (or `kay check --fix`) drops the `, i` and keeps the item and the `key`; to keep an index nothing reads, write it `_i`.
-
-## 1.93.0
-
-### The kayjs-ui prop names 1.89 deprecated are gone
-
-Their `deprecated-ui-props` lint goes with them: run `kay upgrade` on 1.92 first and it rewrites every one. On 1.93 the old names are type errors.
-
-- `isDisabled` on DateInput and DateRangeInput, the per-day predicate, is `disabledDay`.
-- Widget's `isEmpty` is `empty`, and its `@empty` block is `@emptyState`.
-
-Releases before 1.93 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.95 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
