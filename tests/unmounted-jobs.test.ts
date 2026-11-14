@@ -23,7 +23,7 @@ describe('the unmounted-jobs lint', () => {
 
     expect(found).toHaveLength(1)
     expect(found[0]).toMatchObject({ code: 'unmounted-jobs', severity: 'warning', line: 1 })
-    expect(found[0]!.help).toContain('src/jobs/*.ts')
+    expect(found[0]!.help).toContain('move the queues to `src/jobs/')
   })
 
   it('accepts src/jobs.ts mounted by a plugin or by src/server.ts', async () => {

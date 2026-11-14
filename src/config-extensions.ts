@@ -5,7 +5,6 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { Elysia } from 'elysia'
 import { KayError } from './compiler/errors'
 import { appStore } from './server/app-store'
 import { bundled, importModule } from './server/bundle'
@@ -170,7 +169,9 @@ export function extensionServerModules(root: string, extensions: KayExtension[] 
 }
 
 // The jobs a module exports by name as one plugin. A job is a plugin, which an app that exported it twice (`export default` beside its name, or from another file of `src/jobs`) mounts once, and anything else the file exports is its own.
-function jobsOf(loaded: Record<string, unknown>, mounted: Set<unknown>): AnyElysia {
+// Elysia loads here, not at the top, so `kay check` and the editor's server, which read this file's directory helpers, leave the server stack out.
+async function jobsOf(loaded: Record<string, unknown>, mounted: Set<unknown>): Promise<AnyElysia> {
+  const { Elysia } = await import('elysia')
   const server = new Elysia()
 
   for (const [name, value] of Object.entries(loaded)) {
