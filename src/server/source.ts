@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { outputDir, testWorker } from '../build/assets'
 import { KayError } from '../compiler/errors'
-import { pluginFiles } from '../config-extensions'
+import { jobFiles, pluginFiles } from '../config-extensions'
 import { mergeConfig, withConfig } from '../config-loader'
 import { cacheDir, clientOptionsOf, modeOf, PRODUCTION } from '../project'
 import { kayLog } from '../runtime/log'
@@ -40,6 +40,8 @@ export interface ProjectSource {
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The file names under `src/plugins`: an executable holds the ones it was built with.
   plugins: (root: string) => string[]
+  // The paths under `src/jobs`, held as `plugins` is.
+  jobs: (root: string) => string[]
   // The catalogs the extensions give a locale, of `files`, those the extensions name where the server runs.
   extensionCatalogs: (locale: string, files: string[]) => string[]
   // The editor an extension gives, which a page in edit mode renders.
@@ -97,6 +99,7 @@ const DISK: ProjectSource = {
   api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
   endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),
   plugins: root => pluginFiles(root),
+  jobs: root => jobFiles(root),
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),
   editor: (root, config) => extensionEditor(root, config.extensions),
   runtimeRoot: root => root,
@@ -140,6 +143,7 @@ export function embeddedSource(bundle: Bundle): ProjectSource {
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     endpoints: async () => bundle.endpoints ?? [],
     plugins: () => bundle.plugins ?? [],
+    jobs: () => bundle.jobs ?? [],
     // An extension names its catalogs under the executable's own path, so the build's are kept.
     extensionCatalogs: locale => bundle.extensionMessages?.[locale] ?? [],
     // The build resolved it where the extension was, under the path the executable holds its module by.

@@ -18,12 +18,12 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 describe('the unmounted-jobs lint', () => {
-  it('reports a src/jobs.ts nothing imports, pointing at src/plugins/jobs.ts', async () => {
+  it('reports a src/jobs.ts nothing imports, pointing at src/jobs/', async () => {
     const found = unmountedJobs(await project({ 'src/jobs.ts': queues }), {})
 
     expect(found).toHaveLength(1)
     expect(found[0]).toMatchObject({ code: 'unmounted-jobs', severity: 'warning', line: 1 })
-    expect(found[0]!.help).toContain('src/plugins/jobs.ts')
+    expect(found[0]!.help).toContain('src/jobs/*.ts')
   })
 
   it('accepts src/jobs.ts mounted by a plugin or by src/server.ts', async () => {

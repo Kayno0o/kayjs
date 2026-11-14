@@ -40,7 +40,7 @@ A JPEG, PNG, WebP, AVIF or HEIC is stored without the metadata a camera or phone
 A hook that throws is logged and reported with the source `files.onWrite` or `files.onDelete`, and the call still succeeds. A file written straight to the store tells nothing. Writes and deletes are counted in `kay_file_events_total`.
 
 ```ts
-store: { files: diskFiles('data/files', { onWrite: ({ key, size }) => audit.record('upload', key, size) }) }
+store: { files: diskFiles({ dir: 'data/files', onWrite: ({ key, size }) => audit.record('upload', key, size) }) }
 ```
 
 ### Replacing and deleting

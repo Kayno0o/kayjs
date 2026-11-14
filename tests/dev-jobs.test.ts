@@ -1,4 +1,4 @@
-import type { JobStore } from '../src/server'
+import type { JobContext, JobStore } from '../src/server'
 import type { JobView, QueueView } from '../src/server/job-admin'
 import type { MaintenanceView } from '../src/server/maintenance'
 import { join } from 'node:path'
@@ -91,7 +91,7 @@ describe('the dev tool\'s jobs endpoints', () => {
 
 describe.each(kinds)('the Jobs tab\'s queues on a $name store', ({ name, open }) => {
   // A queue whose handler fails while `broken`, made with the store of the case.
-  async function made(label: string, handler?: (payload: { n: number }, signal: AbortSignal) => unknown) {
+  async function made(label: string, handler?: (payload: { n: number }, ctx: JobContext) => unknown) {
     const state = { broken: true }
     const store = await open()
     const jobs = queue<{ n: number }>(`${name}-${label}`, handler ?? (() => {
@@ -285,7 +285,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
 
   async function flowOf(label: string) {
     const queueName = `${name}-${label}`
-    const flow = workflow<undefined, { paid: number }>(queueName, async ({ step }) => {
+    const flow = workflow<undefined, { paid: number }>(queueName, async (_, { step }) => {
       await step.run('charge', () => 1)
       await step.sleep('1h')
       await step.waitFor('paid')
@@ -342,7 +342,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
   it('sends the event with the data typed as JSON, none when empty, and refuses data that is not JSON', async () => {
     const queueName = `${name}-data`
     const got: unknown[] = []
-    const flow = workflow<undefined, { paid: { amount: number } | undefined }>(queueName, async ({ step }) => {
+    const flow = workflow<undefined, { paid: { amount: number } | undefined }>(queueName, async (_, { step }) => {
       const paid = await step.waitFor('paid')
 
       await step.run('log', () => void got.push(paid))
@@ -370,7 +370,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
 
   it('cancels the failed run of the row clicked, not a live run started under the same id', async () => {
     const queueName = `${name}-twin`
-    const flow = workflow<boolean, Record<string, unknown>>(queueName, async ({ input, step }) => {
+    const flow = workflow<boolean, Record<string, unknown>>(queueName, async (input, { step }) => {
       if (input)
         throw new GiveUpError('boom')
 
@@ -397,7 +397,7 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
 
   it('lists the last steps of a long run, cut, with how many are kept', async () => {
     const queueName = `${name}-long`
-    const flow = workflow<undefined, Record<string, unknown>>(queueName, async ({ step }) => {
+    const flow = workflow<undefined, Record<string, unknown>>(queueName, async (_, { step }) => {
       for (let index = 0; index < 30; index++)
         await step.run(`step ${index} ${'x'.repeat(300)}`, () => index)
 

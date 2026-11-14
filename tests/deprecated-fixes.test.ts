@@ -7,6 +7,7 @@ import { aiLanguage } from '../src/check/ai-language'
 import { cmsOptions } from '../src/check/cms-options'
 
 import { applySafeFixes } from '../src/check/fixes'
+import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
@@ -23,6 +24,10 @@ type Name = keyof typeof DEPRECATED_LINTS
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-ai-language': aiLanguage,
+  'deprecated-job-handler': jobHandlers,
+  'deprecated-schedule-call': scheduleCalls,
+  'deprecated-job-options': jobOptions,
+  'deprecated-disk-files': diskFilesCalls,
   'deprecated-local-state': localState,
 
   'deprecated-persisted-call': persistedCall,

@@ -36,7 +36,7 @@ async function serve(store: FileStore) {
 
 describe('files', () => {
   it('stores a file under a new key naming its folder, its extension and an image\'s size', async () => {
-    const get = await serve(diskFiles(join(dir, 'keys')))
+    const get = await serve(diskFiles({ dir: join(dir, 'keys') }))
     const key = await files.put(await hero(), { folder: 'covers/2026' })
 
     expect(key).toMatch(/^covers\/2026\/[\da-f]{20}\.1000x600\.png$/)
@@ -51,7 +51,7 @@ describe('files', () => {
   })
 
   it('names a key by the id it is given, the same one twice giving one file', async () => {
-    await serve(diskFiles(join(dir, 'ids')))
+    await serve(diskFiles({ dir: join(dir, 'ids') }))
     const id = 'a'.repeat(20)
     const first = await files.put(flat(), { folder: 'media', id })
     const again = await files.put(flat(), { folder: 'media', id, replace: first })
@@ -120,7 +120,7 @@ describe('files', () => {
 
 describe('FileStore.delete', () => {
   it('resolves with whether there was a file, memory and disk alike, and an absent key is no error', async () => {
-    for (const store of [memoryFiles(), diskFiles(join(dir, 'deleted'))]) {
+    for (const store of [memoryFiles(), diskFiles({ dir: join(dir, 'deleted') })]) {
       await store.write('a.txt', new Blob(['x']))
       expect(await store.delete('a.txt')).toBe(true)
       expect(await store.delete('a.txt')).toBe(false)
@@ -418,7 +418,7 @@ describe('stored images', () => {
 
   it('are read in place from a store on this disk', async () => {
     const store = join(dir, 'in-place')
-    const get = await serve(diskFiles(store))
+    const get = await serve(diskFiles({ dir: store }))
     const key = await files.put(await hero())
 
     expect((await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=320`)).status).toBe(200)
@@ -434,7 +434,7 @@ describe('a static export', () => {
     const locked = await files.put(await hero(), { private: true })
 
     try {
-      linkStoredFiles(diskFiles(join(dir, 'static')))
+      linkStoredFiles(diskFiles({ dir: join(dir, 'static') }))
       expect(() => files.url(key)).toThrow('give the store a publicUrl')
       linkStoredFiles({ ...memoryFiles(), publicUrl: 'https://cdn.example/files/' })
       expect(files.url(key)).toBe(`https://cdn.example/files/${key}`)
@@ -458,7 +458,7 @@ describe('a static export', () => {
 
 describe('files.list', () => {
   it('gives the files of a disk store or a memory one with when they were written, those directly in a folder alone when asked, and nothing for stray files', async () => {
-    for (const store of [diskFiles(join(dir, 'listed')), memoryFiles()]) {
+    for (const store of [diskFiles({ dir: join(dir, 'listed') }), memoryFiles()]) {
       setupStorage(store, join(dir, 'cache'))
 
       const cover = await files.put(await hero(), { folder: 'covers/2026' })
@@ -488,7 +488,7 @@ describe('files.list', () => {
 
   it.skipIf(process.getuid?.() === 0)('skips a file whose stat fails instead of failing the listing', async () => {
     const root = await scratchDir('unreadable-')
-    const store = diskFiles(root)
+    const store = diskFiles({ dir: root })
 
     await store.write('open/a.txt', new Blob(['a']))
     await store.write('shut/b.txt', new Blob(['b']))
@@ -503,7 +503,7 @@ describe('files.list', () => {
   })
 
   it('lists an empty disk store that was never written to', async () => {
-    setupStorage(diskFiles(join(dir, 'never-written')), join(dir, 'cache'))
+    setupStorage(diskFiles({ dir: join(dir, 'never-written') }), join(dir, 'cache'))
     expect(await files.list()).toEqual([])
     setupStorage(memoryFiles(), join(dir, 'cache'))
   })

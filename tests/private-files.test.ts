@@ -146,7 +146,7 @@ describe('privateDir and the old shared cache', () => {
 describe('diskFiles', () => {
   it('writes private files at 0600 in folders at 0700 under a umask of 000, public ones as before', async () => {
     const root = await scratchDir('private-disk-')
-    const store = diskFiles(root)
+    const store = diskFiles({ dir: root })
     const nested = `private/photos/${'c'.repeat(20)}.txt`
 
     await openUmask(async () => {
@@ -165,7 +165,7 @@ describe('diskFiles', () => {
   it('writes a key in any case of private into the folder of that case', async () => {
     const root = await scratchDir('private-disk-')
 
-    await diskFiles(root).write(`Private/${'e'.repeat(20)}.txt`, new Blob(['secret']))
+    await diskFiles({ dir: root }).write(`Private/${'e'.repeat(20)}.txt`, new Blob(['secret']))
     expect(await readdir(root)).toEqual(['Private'])
     expect(await modeOf(join(root, 'Private'))).toBe(0o700)
   })
@@ -177,7 +177,7 @@ describe('diskFiles', () => {
     await mkdir(join(root, 'private'), { recursive: true })
     await chmod(join(root, 'private'), 0o755)
     await writeFile(old, 'old')
-    await diskFiles(root).write(KEY, new Blob(['secret']))
+    await diskFiles({ dir: root }).write(KEY, new Blob(['secret']))
     expect(await modeOf(join(root, 'private'))).toBe(0o700)
     expect((await stat(old)).size).toBe(3)
   })

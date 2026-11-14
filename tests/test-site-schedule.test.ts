@@ -16,7 +16,7 @@ async function failing() {
 const site = await testSite({
   dirs: { routes, api },
   islands: false,
-  use: [new Elysia().use(schedule('@hourly', hourly)).use(schedule('30s', quick)).use(schedule('@daily', failing))],
+  use: [new Elysia().use(schedule({ cron: '@hourly' }, hourly)).use(schedule({ every: '30s' }, quick)).use(schedule({ cron: '@daily' }, failing))],
 })
 const bare = await testSite({ dirs: { routes, api }, islands: false })
 
@@ -53,7 +53,7 @@ describe('site.advance()', () => {
   it('moves the clock and fires a schedule at every instant it fell due, with the clock at that instant', async () => {
     setSystemTime(new Date('2030-01-01T00:10:00Z'))
     const stamps: number[] = []
-    const timed = await testSite({ dirs: { routes, api }, islands: false, use: [schedule('15m', async () => void stamps.push(Date.now()))] })
+    const timed = await testSite({ dirs: { routes, api }, islands: false, use: [schedule({ every: '15m' }, async () => void stamps.push(Date.now()))] })
 
     expect(await timed.advance('1h')).toBe(4)
     expect(stamps.map(at => new Date(at).toISOString())).toEqual([

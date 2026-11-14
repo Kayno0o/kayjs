@@ -35,7 +35,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('runs each step once and passes the results of the steps before', async () => {
     const store = await open()
     const calls: string[] = []
-    const flow = workflow<{ to: string }>(named(), async ({ input, step }) => {
+    const flow = workflow<{ to: string }>(named(), async (input, { step }) => {
       const code = await step.run('code', () => {
         calls.push('code')
 
@@ -56,7 +56,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const calls: string[] = []
     let fail = true
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('one', () => void calls.push('one'))
       await step.run('two', () => {
         calls.push('two')
@@ -82,7 +82,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const keys: string[] = []
     let fail = true
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('same name', (_signal, { key }) => void keys.push(key))
       await step.run('same name', (_signal, { key }) => {
         keys.push(key)
@@ -104,7 +104,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('does not spend its attempts across steps', async () => {
     const store = await open()
     const seen = new Set<string>()
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       for (const name of ['a', 'b', 'c']) {
         await step.run(name, () => {
           if (!seen.has(name)) {
@@ -131,7 +131,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const name = named()
     const calls: string[] = []
     const stuck = Promise.withResolvers<void>()
-    const first = workflow<undefined>(name, async ({ step }) => {
+    const first = workflow<undefined>(name, async (_, { step }) => {
       await step.run('one', () => void calls.push('one'))
       await step.run('two', async () => {
         stuck.resolve()
@@ -151,10 +151,10 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     while ((await first.status(id))?.error === undefined)
       await Bun.sleep(20)
 
-    expect(await first.status(id)).toMatchObject({ status: 'sleeping', steps: 1, error: 'it ran past lostAfter, 300 ms' })
+    expect(await first.status(id)).toMatchObject({ status: 'sleeping', steps: 1, error: 'it ran past its timeout, 300 ms' })
     later(MINUTE)
 
-    const second = workflow<undefined>(name, async ({ step }) => {
+    const second = workflow<undefined>(name, async (_, { step }) => {
       await step.run('one', () => void calls.push('one again'))
       await step.run('two', () => void calls.push('two'))
     }, { store })
@@ -167,7 +167,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('sleeps without a process and wakes when its time comes', async () => {
     const store = await open()
     const calls: string[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('before', () => void calls.push('before'))
       await step.sleep('3d')
       await step.run('after', () => void calls.push('after'))
@@ -189,7 +189,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('wakes a waiting run with an event and its data', async () => {
     const store = await open()
     const got: unknown[] = []
-    const flow = workflow<undefined, { paid: { amount: number }, other: undefined }>(named(), async ({ step }) => {
+    const flow = workflow<undefined, { paid: { amount: number }, other: undefined }>(named(), async (_, { step }) => {
       got.push(await step.waitFor('paid'))
       await step.run('done', () => void got.push('done'))
     }, { store })
@@ -207,7 +207,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('keeps an event sent before the run waits for it, even one sent right after start', async () => {
     const store = await open()
     const got: unknown[] = []
-    const flow = workflow<undefined, { paid: number, other: string }>(named(), async ({ step }) => {
+    const flow = workflow<undefined, { paid: number, other: string }>(named(), async (_, { step }) => {
       await step.sleep('1h')
       await step.run('log', () => void got.push(['slept']))
 
@@ -228,7 +228,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('wakes a run after a suspension even when the claims share a millisecond', async () => {
     const store = await open()
     const got: unknown[] = []
-    const flow = workflow<undefined, { go: number }>(named(), async ({ step }) => {
+    const flow = workflow<undefined, { go: number }>(named(), async (_, { step }) => {
       got.push(await step.waitFor('go'))
       await step.run('after', () => void got.push('after'))
     }, { store })
@@ -245,7 +245,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('starts no step once its run lost the hold', async () => {
     const store = await open()
     const calls: string[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('slow', async () => Bun.sleep(450))
       await step.run('next', () => void calls.push('next'))
     }, { store, lostAfter: '300ms' })
@@ -259,7 +259,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const warn = spyOn(console, 'warn').mockImplementation(noop)
     const store = await open()
     const name = named()
-    const flow = workflow<undefined, { other: number, go: number }>(name, async ({ step }) => {
+    const flow = workflow<undefined, { other: number, go: number }>(name, async (_, { step }) => {
       await step.waitFor('go')
     }, { store })
     const id = await flow.start()
@@ -279,7 +279,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('times a wait out, and an event after that is dropped', async () => {
     const store = await open()
     const got: unknown[] = []
-    const flow = workflow<undefined, { verified: string }>(named(), async ({ step }) => {
+    const flow = workflow<undefined, { verified: string }>(named(), async (_, { step }) => {
       const first = await step.waitFor('verified', { timeout: '3d' })
 
       await step.run('first', () => void got.push(first))
@@ -306,7 +306,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('wakes only once when an event and a timeout race', async () => {
     const store = await open()
     const got: unknown[] = []
-    const flow = workflow<undefined, { go: number }>(named(), async ({ step }) => {
+    const flow = workflow<undefined, { go: number }>(named(), async (_, { step }) => {
       got.push(await step.waitFor('go', { timeout: '1h' }))
     }, { store })
     const id = await flow.start()
@@ -325,7 +325,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('keeps one live run per id, and starts again once it ended', async () => {
     const store = await open()
     const ran: string[] = []
-    const flow = workflow<string>(named(), async ({ id, input, step }) => {
+    const flow = workflow<string>(named(), async (input, { job: { id }, step }) => {
       await step.run('go', () => void ran.push(`${id}:${input}`))
     }, { store })
 
@@ -342,7 +342,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('starts after a delay', async () => {
     const store = await open()
     const ran: number[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => step.run('go', () => void ran.push(1)), { store })
+    const flow = workflow<undefined>(named(), async (_, { step }) => step.run('go', () => void ran.push(1)), { store })
 
     await flow.start(undefined, { delay: '1h' })
     await flow.drain()
@@ -357,7 +357,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const ran: string[] = []
     const gate = Promise.withResolvers<void>()
     const waiting = Promise.withResolvers<void>()
-    const flow = workflow<string>(named(), async ({ input, step }) => {
+    const flow = workflow<string>(named(), async (input, { step }) => {
       if (input === 'running') {
         await step.run('wait', async () => {
           waiting.resolve()
@@ -393,7 +393,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('fails a run whose steps changed under it, and keeps it as failed with the error', async () => {
     const store = await open()
     const name = named()
-    const before = workflow<undefined>(name, async ({ step }) => {
+    const before = workflow<undefined>(name, async (_, { step }) => {
       await step.run('one', () => undefined)
       await step.sleep('1h')
     }, { store })
@@ -403,7 +403,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     forgetQueue(before)
 
     const failures: string[] = []
-    const after = workflow<undefined>(name, async ({ step }) => {
+    const after = workflow<undefined>(name, async (_, { step }) => {
       await step.run('renamed', () => undefined)
     }, { store, onError: ({ error }) => void failures.push((error as Error).message) })
 
@@ -416,7 +416,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('keeps a run whose results come just under the limit going', async () => {
     const store = await open()
     const done: string[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('large', () => 'x'.repeat(PAYLOAD_LIMIT - 100_000))
       await step.run('after', () => void done.push('after'))
     }, { store })
@@ -438,7 +438,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
           return store.update!(id, change, guard)
         },
       }
-      const flow = workflow<undefined>(named(), async ({ step }) => {
+      const flow = workflow<undefined>(named(), async (_, { step }) => {
         for (let index = 0; index < count; index++)
           await step.run('work', () => `${index}:${'x'.repeat(200)}`)
 
@@ -467,7 +467,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     delete (store as { steps?: unknown }).steps
 
     const seen: string[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       seen.push(await step.run('a', () => 'one'))
       await step.sleep('1h')
       seen.push(await step.run('b', () => 'two'))
@@ -485,7 +485,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const errors = spyOn(console, 'error').mockImplementation(noop)
     const store = await open()
     const failures: string[] = []
-    const flow = workflow<string>(named(), async ({ step }) => {
+    const flow = workflow<string>(named(), async (_, { step }) => {
       await step.run('one', () => 'a')
     }, { store, onError: ({ error }) => void failures.push((error as Error).message) })
     const id = await flow.start('x'.repeat(PAYLOAD_LIMIT))
@@ -494,7 +494,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(failures[0]).toContain('past the')
     expect(await flow.status(id)).toMatchObject({ status: 'failed' })
 
-    const events = workflow<undefined>(named(), async ({ step }) => {
+    const events = workflow<undefined>(named(), async (_, { step }) => {
       await step.run('one', () => 'a')
       await step.sleep('1h')
       await step.run('two', () => 'b')
@@ -515,7 +515,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const calls: string[] = []
     const seen: string[] = []
     let crash = true
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       seen.push(await step.run('one', () => {
         calls.push('one')
 
@@ -546,7 +546,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const calls: string[] = []
     let fail = true
     const name = named()
-    const flow = workflow<undefined>(name, async ({ step }) => {
+    const flow = workflow<undefined>(name, async (_, { step }) => {
       await step.run('one', () => void calls.push('one'))
       await step.run('two', () => {
         if (fail)
@@ -570,7 +570,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('keeps a run\'s results as rows of the store, the payload staying small, and drops them with the run', async () => {
     const store = await open()
     const name = named()
-    const flow = workflow<undefined>(name, async ({ step }) => {
+    const flow = workflow<undefined>(name, async (_, { step }) => {
       for (let index = 0; index < 30; index++)
         await step.run(`s${index}`, () => 'x'.repeat(1000))
 
@@ -596,7 +596,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const name = named()
     const calls: string[] = []
-    const flow = workflow<undefined>(name, async ({ step }) => {
+    const flow = workflow<undefined>(name, async (_, { step }) => {
       const first = await step.run('first', () => 1)
 
       calls.push(`got ${first}`)
@@ -619,7 +619,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const name = named()
     const got: unknown[] = []
-    const flow = workflow<undefined, { go: number }>(name, async ({ step }) => {
+    const flow = workflow<undefined, { go: number }>(name, async (_, { step }) => {
       await step.run('first', () => 1)
       got.push(await step.waitFor('go'))
     }, { store })
@@ -636,7 +636,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const failures: string[] = []
     let runs = 0
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       runs++
       await step.run('small', () => 'a')
       await step.run('large', () => 'x'.repeat(PAYLOAD_LIMIT))
@@ -655,7 +655,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('takes a try around a step as no way to swallow a sleep', async () => {
     const store = await open()
     const calls: string[] = []
-    const flow = workflow<undefined>(named(), async ({ step }) => {
+    const flow = workflow<undefined>(named(), async (_, { step }) => {
       try {
         await step.sleep('1h')
       }
@@ -677,7 +677,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
   it('refuses a step result devalue cannot keep, and two steps at once', async () => {
     const store = await open()
     const failures: string[] = []
-    const flow = workflow<number>(named(), async ({ input, step }) => {
+    const flow = workflow<number>(named(), async (input, { step }) => {
       if (input === 1)
         await step.run('fn', () => () => 1)
       else
@@ -709,7 +709,7 @@ describe('a workflow\'s admin send', () => {
   it('applies only while the run waits for that event, where send keeps the event for a later wait', async () => {
     const name = named()
     const got: unknown[] = []
-    const flow = workflow<undefined, { first: number, second: number }>(name, async ({ step }) => {
+    const flow = workflow<undefined, { first: number, second: number }>(name, async (_, { step }) => {
       const first = await step.waitFor('first')
 
       await step.run('first', () => void got.push(first))
@@ -757,7 +757,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
 
   it('lets the other connection take a run after its sleep', async () => {
     const calls: string[] = []
-    const { first, second } = await pair(async ({ step }) => {
+    const { first, second } = await pair(async (_, { step }) => {
       await step.run('before', () => void calls.push('before'))
       await step.sleep('1h')
       await step.run('after', () => void calls.push('after'))
@@ -775,7 +775,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
 
   it('wakes a run waiting on one connection with a send from the other, once, against its timeout', async () => {
     const got: unknown[] = []
-    const { first, second } = await pair(async ({ step }) => {
+    const { first, second } = await pair(async (_, { step }) => {
       got.push(await step.waitFor('go', { timeout: '1h' }))
     })
     const id = await first.start()
@@ -802,7 +802,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
     const calls: string[] = []
     let hang = true
     const stuck = Promise.withResolvers<void>()
-    const { first, second } = await pair(async ({ step }) => {
+    const { first, second } = await pair(async (_, { step }) => {
       await step.run('one', () => void calls.push('one'))
       await step.run('two', async () => {
         if (hang) {

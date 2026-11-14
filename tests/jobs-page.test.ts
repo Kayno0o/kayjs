@@ -223,7 +223,7 @@ describe('the production jobs page for a workflow run', () => {
   it('shows its state and steps without script, sends its event and cancels it', async () => {
     const site = await app({ jobs: { guard: allow } })
     const name = `page-flow-${++counter}`
-    const flow = workflow<undefined, { paid: number }>(name, async ({ step }) => {
+    const flow = workflow<undefined, { paid: number }>(name, async (_, { step }) => {
       await step.run('charge <b>', () => 1)
       await step.waitFor('paid')
     }, { store: memoryJobs() })

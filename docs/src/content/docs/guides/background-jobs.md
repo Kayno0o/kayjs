@@ -16,20 +16,20 @@ Four tools run work outside a request, each for its own kind of job.
 
 ## Scheduled jobs
 
-`schedule(cron, job)` from `kay/server` is an Elysia plugin. The server runs the job from the server listening until it stops.
+`schedule({ cron }, job)` from `kay/server` is an Elysia plugin. The server runs the job from the server listening until it stops.
 
 ```ts
 import { Elysia } from 'elysia'
 import { pages, schedule } from 'kay/server'
 
 new Elysia()
-  .use(schedule('@hourly', purgeExpiredCarts))
-  .use(schedule('30 2 * * MON', sendWeeklyReport, { timeZone: 'Europe/Paris' }))
-  .use(schedule('30s', collectMetrics))
+  .use(schedule({ cron: '@hourly' }, purgeExpiredCarts))
+  .use(schedule({ cron: '30 2 * * MON', timeZone: 'Europe/Paris' }, sendWeeklyReport))
+  .use(schedule({ every: '30s' }, collectMetrics))
   .use(await pages())
 ```
 
-Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts. Servers starting within the same minute usually run it once, and a restart later runs it again.
+Put the jobs of a file in `src/jobs/`, where every schedule, queue, workflow and `background` job a file exports is mounted with no `.use`. Pass several jobs in one call, as a list for one schedule or a table of schedules. `boot: true` also runs them once as the server starts. Servers starting within the same minute usually run it once, and a restart later runs it again.
 
 ```ts
 app.use(schedule({
@@ -39,7 +39,7 @@ app.use(schedule({
 }, { boot: true }))
 ```
 
-A cron has five fields or a nickname such as `@daily`. A cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. `timeZone` applies to the crons and not to the lengths, and a cron without it is read in the `timeZone` of kay.config.ts.
+`{ every: '30s' }` runs every so long and `{ cron }` on a cron; a table of schedules to jobs takes its options as a second argument. A cron has five fields or a nickname such as `@daily`. A cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `every: '30s'` or `'1h'` runs at each multiple of it. `timeZone` applies to the crons and not to the lengths, and a cron without it is read in the `timeZone` of kay.config.ts.
 
 Runs never overlap. A run that throws is logged without stopping the next.
 
@@ -53,11 +53,11 @@ The upkeep kay and its libraries run on a timer works the same way: expired sess
 
 Each counts in `kay_job_runs_total` as `maintenance:<name>`, shows in the dev tool's Jobs tab, and stops with the server. What belongs to one host stays per process: the sqlite session and notification stores, image variants and loader watchers.
 
-An app running one process sets `KAY_LOCK_SCHEDULES=false` once, and no schedule locks unless it names a `lock`. `{ enabled: false }` on a schedule or on `background(work, { enabled })` adds nothing, so a job that needs an optional service is switched by its setting, `{ enabled: ZIGBEE_URL !== undefined }`, with no conditional plugin around it.
+An app running one process sets `KAY_LOCK_SCHEDULES=false` once, and no schedule locks unless it names a `lock`. `{ enabled: false }` on a schedule, `background(work, { enabled })`, a queue or a workflow starts nothing, so a job that needs an optional service is switched by its setting, `{ enabled: ZIGBEE_URL !== undefined }`, with no conditional plugin around it.
 
 A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 3 seconds, less with a short `serve.shutdownTimeout`, for a run that ignores it.
 
-The job is called with the signal, so a job with an optional first parameter gets it. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
+A job is `(run, ctx)`: `run` is `{ schedule, boot }`, and `ctx.signal` aborts at the timeout and when the server stops, beside `ctx.job`, `ctx.log` and `ctx.locale`. `timeout: false` sets no limit.
 
 A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 
@@ -72,7 +72,7 @@ Every schedule matching the text runs, and a job a schedule enqueued runs at the
 ```ts
 import { background } from 'kay/server'
 
-app.use(background(async (signal) => {
+app.use(background(async (_, { signal }) => {
   while (!signal.aborted)
     await handleNextEmail(signal)
 }))
@@ -83,7 +83,7 @@ app.use(background(async (signal) => {
 A queue holds jobs that must not be lost. An action enqueues one and answers at once. The server runs the job after the response, or after a restart or a deploy if it has to.
 
 ```ts
-// src/plugins/jobs.ts
+// src/jobs/mail.ts
 import { queue } from 'kay/server'
 
 export const welcomeMails = queue(
@@ -91,13 +91,11 @@ export const welcomeMails = queue(
   async ({ to }: { to: string }) => sendWelcome(to),
   { attempts: 5, backoff: '30s', onError: reportFailedMail },
 )
-
-export default welcomeMails
 ```
 
-`src/plugins/jobs.ts` is the one home of jobs, and the server runs what it exports by default. With several queues, export `new Elysia().use(welcomeMails).use(scans)`. `.use(welcomeMails)` before `pages()` in `src/server.ts` also works, and `kay check` reports a `src/jobs.ts` that nothing imports. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
+`src/jobs/*.ts` is the one home of jobs: the server runs every queue a file there exports by name, with no default export and no `.use`. Nested folders are read, a name starting with `_` is not. `.use(welcomeMails)` before `pages()` in `src/server.ts` also works, and `kay check` reports a `src/jobs.ts` that nothing imports. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 
-A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onError` as `{ id, payload, attempts, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onError` as `{ id, payload, attempts, error }`. So is a run outlasting `timeout`, 10 minutes by default, or one whose process died each time.
 
 `onStart`, `onSuccess` and `onRetry` tell the other moments of a run, and a schedule takes `onStart`, `onSuccess` and `onError` too. A hook that throws is logged and reported, and never fails the job. Queue and workflow runs are counted in `kay_queue_runs_total`.
 
@@ -125,12 +123,12 @@ The job comes back after the wait, as often as the handler throws it, and is nev
 
 ### Progress
 
-A handler takes the job as its third argument. `job.progress(value)` reports how far the run is, and `job(key)` on the queue reads it back while the job runs.
+A handler takes `(payload, ctx)`, and `ctx.job` is the job. `ctx.job.progress(value)` reports how far the run is, and `job(key)` on the queue reads it back while the job runs.
 
 ```ts
 export const sync = queue<{ provider: string }, { processed: number, total: number }>(
   'sync',
-  async ({ provider }, signal, job) => {
+  async ({ provider }, { signal, job }) => {
     const items = await list(provider)
 
     for (const [index, item] of items.entries()) {
@@ -151,7 +149,7 @@ export const syncState = action(async () => sync.job('anilist'))
 
 A failed job keeps the last value it reported. The next run of a retried job starts with none. A report made after the run ended is dropped.
 
-The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `lostAfter`.
+`ctx.signal` is an `AbortSignal`. It aborts when the run passes `timeout`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `timeout`.
 
 A queue made with `lazy: true` starts no worker with the server. The first `enqueue`, or a call to `activate()`, starts it. Use it for a queue an app may never need, so it costs no idle poll.
 
@@ -194,7 +192,7 @@ Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less o
 A page can list the jobs a queue holds and follow them as they are added, start, finish or fail. Give the queue `live`, then read `jobs` from `kay` in an island.
 
 ```ts
-// src/plugins/jobs.ts
+// src/jobs/scans.ts
 export const scans = queue('scans', scan, {
   live: ({ target }: { target: string }) => ({ target }),
 })
@@ -309,10 +307,10 @@ export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore
 A `workflow` is a flow of steps that survives restarts, sleeps for days without holding a process and waits for an event. `step.run` runs a step once and keeps its result, `step.sleep` lets the run go for a while, and `step.waitFor` waits for an event.
 
 ```ts
-// src/plugins/jobs.ts
+// src/jobs/onboarding.ts
 import { workflow } from 'kay/server'
 
-export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async ({ input, step }) => {
+export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async (input, { step }) => {
   await step.run('welcome', () => sendWelcome(input.userId))
 
   const visit = await step.waitFor('visited', { timeout: '3d' })
@@ -322,14 +320,14 @@ export const onboarding = workflow<{ userId: string }, { visited: undefined }>('
 })
 ```
 
-Use it like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`. An action starts a run with one call and sends it an event with another. The `key` names the run, as it names a queue's job, so an app can use its own, a user's id say: while a run with that key is live, starting it again starts nothing. `id` still works in its place until 2.0, and `kay upgrade` renames it.
+Use it like a queue: export it from a file of `src/jobs/`, or `.use(onboarding)` before `pages()` in `src/server.ts`. The handler is `(input, ctx)`, with `ctx.step` and `ctx.job.id`, the run's id. An action starts a run with one call and sends it an event with another. The `key` names the run, as it names a queue's job, so an app can use its own, a user's id say: while a run with that key is live, starting it again starts nothing.
 
 ```ts
 await onboarding.start({ userId }, { key: userId })
 await onboarding.send(userId, 'visited')
 ```
 
-The run is a job of the queue `workflow:onboarding` in the same store as your queues: memory, SQLite or Postgres, shared by every process. Its results are kept in that job after each step, so after a restart the run goes on at the first step with no result. A stop hands the run back at once. A process that died holds it until `lostAfter`, 10 minutes by default.
+The run is a job of the queue `workflow:onboarding` in the same store as your queues: memory, SQLite or Postgres, shared by every process. Its results are kept in that job after each step, so after a restart the run goes on at the first step with no result. A stop hands the run back at once. A process that died holds it until `timeout`, 10 minutes by default.
 
 The function runs again from its top each time the run is taken, and a finished step returns its kept result, so what lies between steps must give the same answer every time. Await each step before the next. Renaming or reordering steps under a run that is waiting fails that run at once, with an error naming the step. Results go through devalue, as a queue's payload does.
 
@@ -345,9 +343,9 @@ await step.run('charge', async (_signal, { key }) => stripe.charges.create({ amo
 
 A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
 
-The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `failedTtl`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }`; `onRetry` and `onError` also get `attempts` and `error`, `onRetry` the `wait` in ms too.
+The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `timeout`, `enabled`, `idlePoll` and `failedTtl`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }`; `onRetry` and `onError` also get `attempts` and `error`, `onRetry` the `wait` in ms too.
 
-`onStart` is told once per run, not after each sleep, wait or retry. A stop during the first attempt, before any step is kept, may tell it again, as may a run stored by an older kay. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
+`onStart` is told once per run, not after each sleep, wait or retry. A stop during the first attempt, before any step is kept, may tell it again, as may a run stored by an older kay. `timeout` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
 
 The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them. Each result is written once, as a row of its own, so a step in a long run costs no more than one in a short run.
 

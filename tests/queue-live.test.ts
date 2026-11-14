@@ -218,7 +218,7 @@ describe('what a queue with live sends', () => {
   // A job that failed its first run with a secret in its error, waiting for its retry under a secret key, with a progress report.
   async function failedOnce(live: QueueOptions<{ n: number }>['live']): Promise<string> {
     const name = `live-${++queues}`
-    const listed = queue<{ n: number }>(name, async (_, __, job) => {
+    const listed = queue<{ n: number }>(name, async (_, { signal: __, job }) => {
       job.progress({ done: 1 })
       await Bun.sleep(5)
 

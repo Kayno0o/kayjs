@@ -1,6 +1,7 @@
 import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
 import type { Hook } from './hooks'
+import type { JobContext } from './job-context'
 import type { KayPlugin } from './plugin'
 import type { JobStore } from './queue'
 import process from 'node:process'
@@ -9,10 +10,11 @@ import { KayError } from '../compiler/errors'
 import { countJobRun } from '../runtime/counters'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { timeZone } from '../runtime/i18n'
-import { kayLog } from '../runtime/log'
+import { kayLog, logFrom } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
+import { runContext } from './job-context'
 import { kayPlugin } from './plugin'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
@@ -39,7 +41,14 @@ export interface ScheduleOptions {
   onError?: Hook<{ schedule: string, boot: boolean, duration: number, error: unknown }> | undefined
 }
 
-type Job = (signal: AbortSignal) => unknown
+// What a schedule hands its job as input: the schedule's text, `every 30s` or the cron, and whether this is the boot run, as its hooks are told.
+export interface ScheduleRun {
+  schedule: string
+  boot: boolean
+}
+
+export type ScheduleJob = (run: ScheduleRun, ctx: JobContext) => unknown
+type Job = ScheduleJob
 type Jobs = Job | readonly Job[]
 
 // What a table's key must be: a positive length, or a cron that comes some day.
@@ -112,16 +121,24 @@ export function scheduledOf(app: { event?: { start?: readonly unknown[] | undefi
   return found
 }
 
-// Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
-// A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `timeZone` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
+const noop = () => undefined
+
+// What a schedule written as an options object names: how often it runs, a length or a cron, and the options `ScheduleOptions` lists.
+export type ScheduleEvery<Every extends Duration = Duration> = { every: Every & PositiveDuration<Every>, cron?: never } & ScheduleEveryOptions
+export type ScheduleCron<Cron extends string = string> = { cron: Cron & CronSchedule<Cron>, every?: never } & ScheduleOptions
+
+// Runs `job` on a cron schedule, `{ cron: '@hourly' }` or `{ cron: '30 2 * * MON', timeZone: 'Europe/Paris' }`, or every so long, `{ every: '30s' }` or `{ every: 30 }` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time. A job is `(run, ctx)`, `run` naming the schedule and whether it is the boot run.
+// A list of jobs, or a table of schedules to jobs, `schedule({ '@hourly': report, '30s': [warm, sweep] }, { lock: 'upkeep' })`, gives each job a schedule of its own in one plugin, a table's `timeZone` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
-export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): KayPlugin
-export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): KayPlugin
+export function schedule<const Every extends Duration>(options: ScheduleEvery<Every>, jobs: Jobs): KayPlugin
+export function schedule<const Cron extends string>(options: ScheduleCron<Cron>, jobs: Jobs): KayPlugin
 export function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key> }, options?: ScheduleOptions): KayPlugin
-export function schedule(first: Duration | string | Record<string, Jobs>, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
-  const table = typeof first === 'object'
-  const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
-  const options = (table ? second : third) as ScheduleOptions | undefined ?? {}
+/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
+export function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions): KayPlugin
+/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
+export function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions): KayPlugin
+export function schedule(first: Duration | string | Record<string, Jobs> | ScheduleEvery | ScheduleCron, second?: Jobs | ScheduleOptions, third?: ScheduleOptions) {
+  const { entries, options } = scheduled(first, second, third)
 
   if ('tz' in options)
     throw new KayError('config-invalid', 'kay: schedule takes timeZone, not tz, which 1.102 dropped')
@@ -129,6 +146,7 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
   if (options.enabled === false)
     return kayPlugin(new Elysia())
 
+  const table = typeof first === 'object' && !('every' in first || 'cron' in first)
   const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map((job, place) => [when, job, place] as const))
   const plugins = jobs.map(([when, job, place]) => {
     if (typeof job !== 'function')
@@ -144,6 +162,22 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
   })
 
   return kayPlugin(plugins.length === 1 ? plugins[0]! : plugins.reduce((app, plugin) => app.use(plugin), new Elysia()))
+}
+
+// The schedules and the options of a call, whichever of its three shapes it is: an options object with `every` or `cron` and the jobs, a table of schedules to jobs and its options, or, before 1.105, the schedule, the jobs and the options.
+function scheduled(first: unknown, second: unknown, third: unknown): { entries: (readonly [Duration | string, Jobs])[], options: ScheduleOptions } {
+  if (typeof first !== 'object' || first === null)
+    return { entries: [[first as Duration | string, second as Jobs]], options: third as ScheduleOptions | undefined ?? {} }
+
+  if (!('every' in first || 'cron' in first))
+    return { entries: Object.entries(first as Record<string, Jobs>), options: second as ScheduleOptions | undefined ?? {} }
+
+  const { every, cron, ...options } = first as { every?: Duration, cron?: string } & ScheduleOptions
+
+  if (every !== undefined && cron !== undefined)
+    throw new KayError('config-invalid', 'kay: a schedule runs `every` so long or on a `cron`, not both')
+
+  return { entries: [[(every ?? cron)!, second as Jobs]], options }
 }
 
 function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
@@ -284,6 +318,7 @@ async function taken(lock: string, boot: boolean, slotMs: number, options: Sched
 export function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const timeout = options.timeout === false ? undefined : durationSeconds(options.timeout ?? DEFAULT_TIMEOUT, `the timeout of the schedule ${label}`) * 1000
   const active = new Set<AbortController>()
+  const log = logFrom(`schedule ${label}`)
 
   const run = async (boot = false) => {
     const controller = new AbortController()
@@ -329,7 +364,7 @@ export function scheduledRun(label: string, slotMs: number, job: Job, options: S
       begun = true
       await dispatch('schedule.onStart', [options.onStart], { schedule: label, boot })
       began = performance.now()
-      await Promise.race([job(controller.signal), limit])
+      await Promise.race([job({ schedule: label, boot }, runContext(controller.signal, { id: crypto.randomUUID(), attempts: 1, progress: noop }, log)), limit])
       // The run is over: its timeout and stop grace must not fire while the hook is told.
       clearTimeout(timer)
       clearTimeout(grace)
@@ -367,9 +402,9 @@ export interface BackgroundOptions {
   enabled?: boolean | undefined
 }
 
-// Starts `work` with the server, for a queue consumer or anything else that runs the whole time; on stop, its signal aborts and the server waits for it to return.
+// Starts `work` with the server, `(input, ctx)` with no input, for a queue consumer or anything else that runs the whole time; on stop, `ctx.signal` aborts and the server waits for it to return.
 // Work that throws is logged; it is not started again.
-export function background(work: (signal: AbortSignal) => unknown, options: BackgroundOptions = {}): KayPlugin {
+export function background(work: (input: undefined, ctx: JobContext) => unknown, options: BackgroundOptions = {}): KayPlugin {
   if (options.enabled === false)
     return kayPlugin(new Elysia())
 
@@ -386,7 +421,7 @@ export function background(work: (signal: AbortSignal) => unknown, options: Back
       controller = started
       running = (async () => {
         try {
-          await work(started.signal)
+          await work(undefined, runContext(started.signal, { id: crypto.randomUUID(), attempts: 1, progress: noop }, logFrom('background')))
         }
         catch (error) {
           if (!started.signal.aborted) {

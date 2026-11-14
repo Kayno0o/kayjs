@@ -1,5 +1,5 @@
 import type { BeforeHook, Hook } from 'kay/library'
-import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, KayPlugin, QueueOptions } from 'kay/server'
+import type { EnqueueOptions, ExtensionApp, FailedJob, JobContext, KayExtension, KayPlugin, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
@@ -744,7 +744,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const ownerOf = (queuedBy: string | undefined): Owner => queuedBy === undefined || queuedBy === via ? owner : MAILERS.get(queuedBy)?.deref() ?? owner
   // A queue hook goes to the mailer that queued the mail, with the mail as it was sent.
   const told = (hook: 'onStart' | 'onSuccess' | 'onRetry' | 'onError') => async ({ payload: { via: queuedBy, ...mail }, context: _, ...event }: QueueEvent & { payload: Queued, context: unknown }) => ownerOf(queuedBy).told(hook, { ...event, payload: mail })
-  const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, signal: AbortSignal): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
+  const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, { signal }: JobContext): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
   const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
     failedTtl: queueOptions.failedTtl ?? FAILED_KEPT,
@@ -761,7 +761,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
-  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, signal) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
+  const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, { signal }) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)

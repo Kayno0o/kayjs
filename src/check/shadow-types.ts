@@ -43,6 +43,7 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
+import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { largePublicImages } from './large-images'
 import { localState } from './local-state'
@@ -173,6 +174,10 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => mailApi(root, options),
   async ({ root, options }) => testHelpers(root, options),
   async ({ root, options }) => cmsOptions(root, options),
+  async ({ root, options }) => jobHandlers(root, options),
+  async ({ root, options }) => scheduleCalls(root, options),
+  async ({ root, options }) => jobOptions(root, options),
+  async ({ root, options }) => diskFilesCalls(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

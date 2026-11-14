@@ -168,6 +168,42 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ role: \'editor\', uploads: [\'image/*\'] })] }',
     right: '// kay.config.ts\nimport { cms } from \'@kayjs/cms\'\n\nexport default { extensions: [cms({ access: \'editor\', uploads: { types: [\'image/*\'] } })] }',
   },
+  'deprecated-job-handler': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'A job handler that takes its signal and its job as arguments of their own, `(input, ctx)` since 1.105 for a queue, a workflow, a schedule and a background job alike, `ctx` holding `signal`, `job`, `log`, `locale` and a workflow\'s `step`. `queue(name, (payload, signal, job) => ...)` is `(payload, { signal, job })`, `workflow(name, ({ id, input, step }) => ...)` is `(input, { step, job: { id } })`, and `schedule(...)` and `background` jobs written `(signal) => ...` are `(_, { signal })`, their first argument being the run (`{ schedule, boot }`) or nothing. A queue handler written the old way still runs until 1.108, as the second argument it gets is the signal carrying the context; a workflow\'s, a schedule\'s and a background job\'s do not, so `kay check` types them as errors too. Found on a call of `queue`, `workflow`, `schedule` or `background` imported from `kay/server`, the handler written in the call with plain parameter names, in the TypeScript files and `.kay` files of the project. The fix destructures the parameters off the context, so the body reads them under the names it had; a handler passed by name, or one whose parameters are annotated or have defaults, is reported with no fix.',
+    wrong: '---\nimport { queue } from \'kay/server\'\n\nexport const mails = queue(\'mails\', (to: string, signal) => fetch(to, { signal }))\n---\np x',
+    right: '---\nimport { queue } from \'kay/server\'\n\nexport const mails = queue(\'mails\', (to: string, { signal }) => fetch(to, { signal }))\n---\np x',
+  },
+  'deprecated-schedule-call': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`schedule(when, job, options)`, `schedule({ cron | every, ...options }, job)` since 1.105: the schedule and its options are one object, as the options of `queue` and `workflow` are, with `every` for a length (`\'30s\'`, `30`) and `cron` for a cron. The table form, `schedule({ \'@hourly\': job }, options)`, stays. The old call still works until 1.108. Found on a call of `schedule` imported from `kay/server` whose first argument is a string or number literal, in the TypeScript files and `.kay` files of the project. The fix writes the object and spreads the options after it; one holding a comment is reported with no fix.',
+    wrong: '---\nimport { schedule } from \'kay/server\'\n\nexport const upkeep = schedule(\'@hourly\', sweep, { lock: \'sweep\' })\n---\np x',
+    right: '---\nimport { schedule } from \'kay/server\'\n\nexport const upkeep = schedule({ cron: \'@hourly\', lock: \'sweep\' }, sweep)\n---\np x',
+  },
+  'deprecated-job-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`lostAfter` in the options of `queue()` or `workflow()`, `timeout` since 1.105: the one name of how long a run may take, which a schedule\'s option has. The old name works until 1.108. Found on a call of `queue` or `workflow` imported from `kay/server`, in the options written in the call, in the TypeScript files and `.kay` files of the project. The fix renames the key; one beside a `timeout` is reported with no fix.',
+    wrong: '---\nimport { queue } from \'kay/server\'\n\nexport const mails = queue(\'mails\', send, { lostAfter: \'5m\' })\n---\np x',
+    right: '---\nimport { queue } from \'kay/server\'\n\nexport const mails = queue(\'mails\', send, { timeout: \'5m\' })\n---\np x',
+  },
+  'deprecated-disk-files': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`diskFiles(dir, hooks)`, `diskFiles({ dir, ...hooks })` since 1.105: the options of every file store are one object, as `s3Files({ ...settings, onWrite })` and `memoryFiles({ onWrite })` take them, `dir` being `data/files` when left out. The old call works until 1.108. Found on a call of `diskFiles` imported from `kay/server` whose first argument is not an object, in the TypeScript files and `.kay` files of the project. The fix writes the object, spreading hooks that are not written in the call; one holding a comment is reported with no fix.',
+    wrong: '---\nimport { diskFiles } from \'kay/server\'\n\nexport const files = diskFiles(\'data/uploads\', { onWrite: audit })\n---\np x',
+    right: '---\nimport { diskFiles } from \'kay/server\'\n\nexport const files = diskFiles({ dir: \'data/uploads\', onWrite: audit })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

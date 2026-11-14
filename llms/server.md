@@ -22,13 +22,13 @@ The entry never calls `listen`: `kay dev`, `kay start` and the executable listen
 
 ### Mount a server plugin
 
-Each `src/plugins/<name>.ts` default-exports an Elysia plugin, or a function building one, and `pages()` uses it before the pages in the order of the file names, with no `src/server.ts` and no `export const app`: `ctx.locals` is typed from them.
+Each `src/plugins/<name>.ts` default-exports an Elysia plugin, or a function building one, and `pages()` uses it before the pages in the order of the file names, with no `src/server.ts` and no `export const app`: `ctx.locals` is typed from them. Queues, workflows and schedules need none: every one a file of `src/jobs/` exports is mounted ([Queues](queues.md)).
 
 ```ts
-// src/plugins/jobs.ts
+// src/plugins/metrics.ts
 import { schedule } from 'kay/server'
 
-export default schedule('30s', collectMetrics)
+export default schedule({ every: '30s' }, collectMetrics)
 ```
 
 `pages()`, `api()`, `session()`, `schedule()`, `background()`, `queue()`, `workflow()` and a library's mailer return a `KayPlugin` (`kay/server`): an Elysia instance in kay 1.x, so `new Elysia().use(session())` types as ever, and the type an app names. A function taking a plugin takes a `PluginInput`, a `KayPlugin` or any Elysia instance, as `KayExtension`'s `server`, `shutdown(app)` and a test site's `use` do. Code that must call Elysia itself reads `plugin.elysia`, the instance behind it: that type follows the Elysia kay is built on, so it is not part of kay's stable API, and Elysia is an implementation detail of kay's own signatures.

@@ -318,7 +318,7 @@ describe('a queue\'s hook context', () => {
       seen.push('ran')
     }, {
       store: memoryJobs(),
-      lostAfter: '300ms',
+      timeout: '300ms',
       attempts: 1,
       onStart: async () => Bun.sleep(400),
       onSuccess: () => void seen.push('success'),
@@ -340,7 +340,7 @@ describe('a queue\'s hook context', () => {
 describe('a workflow\'s run hooks', () => {
   it('tells onStart once with the run and its input, onSuccess when the flow ends, not for each wake', async () => {
     const seen: unknown[] = []
-    const flow = workflow<{ to: string }>(named('flow'), async ({ step }) => {
+    const flow = workflow<{ to: string }>(named('flow'), async (_, { step }) => {
       await step.run('one', () => undefined)
       await step.sleep('1h')
       await step.run('two', () => undefined)
@@ -365,7 +365,7 @@ describe('a workflow\'s run hooks', () => {
 
   it('tells onStart once for a run whose first step is a sleep', async () => {
     const seen: string[] = []
-    const flow = workflow<undefined>(named('flow'), async ({ step }) => {
+    const flow = workflow<undefined>(named('flow'), async (_, { step }) => {
       await step.sleep('1h')
     }, { store: memoryJobs(), onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success') })
 
@@ -414,7 +414,7 @@ describe('a workflow\'s started flag', () => {
     const [logged, warned] = quiet()
     const seen: unknown[] = []
     let failed = false
-    const flow = workflow<undefined>(named('flow'), async ({ step }) => {
+    const flow = workflow<undefined>(named('flow'), async (_, { step }) => {
       await step.run('one', () => undefined)
 
       if (!failed) {
@@ -448,7 +448,7 @@ describe('a workflow\'s started flag', () => {
     const seen: string[] = []
     const store = memoryJobs()
     const name = named('flow')
-    const flow = workflow<undefined>(name, async ({ step }) => {
+    const flow = workflow<undefined>(name, async (_, { step }) => {
       await step.sleep('1h')
       await step.sleep('1h')
     }, { store, onStart: () => void seen.push('start') })
@@ -490,7 +490,7 @@ describe('a schedule\'s run hooks', () => {
     }) as unknown as typeof Bun.cron)
     Object.assign(Bun.cron, { parse })
 
-    const app = new Elysia().use(schedule('21 * * * *', job, options)).listen(0)
+    const app = new Elysia().use(schedule({ cron: '21 * * * *', ...options }, job)).listen(0)
 
     try {
       await Promise.all(fired.map(async handler => handler()))
@@ -588,11 +588,11 @@ describe('a schedule\'s run hooks', () => {
     }) as unknown as typeof Bun.cron)
     Object.assign(Bun.cron, { parse: parseCron })
 
-    const app = new Elysia().use(schedule('22 * * * *', async () => {
+    const app = new Elysia().use(schedule({ cron: '22 * * * *', onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success'), onError: () => void seen.push('error') }, async () => {
       seen.push('run')
       // Ignores the signal, so the stop's grace ends the run.
       await new Promise(() => undefined)
-    }, { onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success'), onError: () => void seen.push('error') })).listen(0)
+    })).listen(0)
 
     try {
       const running = Promise.all(fired.map(async handler => handler()))

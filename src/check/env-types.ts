@@ -95,7 +95,8 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
   const app = await exportsApp(paths.entry) ? modulePath(paths.entry) : undefined
-  const serverExts = serverExtensions(root, options.extensions)
+  // The jobs of `src/jobs` add no locals, so they are left out.
+  const serverExts = serverExtensions(root, options.extensions, undefined, [])
   const servers = serverExts.some(extension => extension.server !== undefined || extension.serverModule !== undefined)
   // The modules extensions take their server plugin from, which the check types the locals off, skipping one that does not resolve (the build reports it).
   const serverModules = serverExts.flatMap(({ serverModule }) => {

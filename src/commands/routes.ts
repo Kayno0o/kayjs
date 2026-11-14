@@ -13,7 +13,7 @@ import { checkContent } from '../check/project'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { extensionApps, PLUGINS_DIR, serverExtensions } from '../config-extensions'
+import { extensionApps, JOBS_DIR, PLUGINS_DIR, serverExtensions } from '../config-extensions'
 import { loadConfigWithin } from '../config-loader'
 import { isRouteOf } from '../content/claims'
 import { projectPaths } from '../project'
@@ -183,7 +183,7 @@ function pluginRoutes(config: KayConfig): Listed[] {
 // What adds routes no file or setting tells of: the server entry, and the extensions' server plugins given as a function or a module.
 function unlistedServers(root: string, config: KayConfig): string[] {
   const entry = projectPaths(root, config).entry
-  const built = serverExtensions(root, config.extensions).filter(({ server, serverModule }) => typeof server === 'function' || serverModule !== undefined).map(({ name }) => name.startsWith(`${PLUGINS_DIR}/`) ? name : `the extension ${name}'s server plugin`)
+  const built = serverExtensions(root, config.extensions).filter(({ server, serverModule }) => typeof server === 'function' || serverModule !== undefined).map(({ name }) => name.startsWith(`${PLUGINS_DIR}/`) || name.startsWith(`${JOBS_DIR}/`) ? name : `the extension ${name}'s server plugin`)
 
   return [...existsSync(entry) ? [shown(entry)] : [], ...built]
 }

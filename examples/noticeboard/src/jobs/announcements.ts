@@ -20,5 +20,3 @@ export const announcements = queue('announcements', async ({ noticeId }: { notic
   for (const user of users.filter(each => each.id !== notice.author_id && each.email !== null))
     await mail.enqueue({ to: user.email!, subject: `New notice: ${notice.title}`, view: Announcement, props: { title: notice.title, author, url: siteUrl(`/notices/${notice.id}`) } })
 }, { attempts: 3 })
-
-export default announcements

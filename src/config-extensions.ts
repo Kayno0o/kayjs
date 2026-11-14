@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { Elysia } from 'elysia'
 import { KayError } from './compiler/errors'
 import { appStore } from './server/app-store'
 import { bundled, importModule } from './server/bundle'
@@ -13,6 +14,11 @@ import { bundled, importModule } from './server/bundle'
 export const PLUGINS_DIR = 'src/plugins'
 const PLUGIN_FILE = /^[^_.][^.]*\.ts$/
 
+// The directory of the app's jobs: every queue, workflow, schedule and background job a file under it exports is mounted, with no default export and no `.use`.
+export const JOBS_DIR = 'src/jobs'
+// The `export` of a server module that stands for every plugin the module exports by name, mounted once each.
+const JOBS_EXPORT = '*'
+
 // The file names of the app's server plugins, in the order they are used.
 export function pluginFiles(root: string): string[] {
   const dir = join(root, PLUGINS_DIR)
@@ -20,9 +26,26 @@ export function pluginFiles(root: string): string[] {
   return existsSync(dir) ? readdirSync(dir).filter(name => PLUGIN_FILE.test(name)).sort() : []
 }
 
-// The app's `src/plugins/*.ts` as extensions carrying a server module, then the config's extensions: every server plugin `pages()` mounts, in the order it mounts them. An executable gives the `files` it was built with, as it holds no such directory.
-export function serverExtensions(root: string, extensions: KayExtension[] | undefined, files = pluginFiles(root)): KayExtension[] {
-  return [...files.map(name => ({ name: `${PLUGINS_DIR}/${name}`, serverModule: { path: `./${PLUGINS_DIR}/${name}` } })), ...extensions ?? []]
+// The paths under `src/jobs` of the files whose exports are jobs, in the order of their names: nested folders are read, and a name starting with `_` or `.` is left alone, as under `src/routes`.
+export function jobFiles(root: string): string[] {
+  const dir = join(root, JOBS_DIR)
+
+  if (!existsSync(dir))
+    return []
+
+  return readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .map(name => name.split(sep).join('/'))
+    .filter(name => name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.split('/').some(part => part.startsWith('_') || part.startsWith('.')) && statSync(join(dir, name)).isFile())
+    .sort()
+}
+
+// The app's `src/plugins/*.ts` as extensions carrying a server module, then its `src/jobs` files, which mount every job they export, then the config's extensions: every server plugin `pages()` mounts, in the order it mounts them. An executable gives the `files` it was built with, as it holds no such directory.
+export function serverExtensions(root: string, extensions: KayExtension[] | undefined, files = pluginFiles(root), jobs = jobFiles(root)): KayExtension[] {
+  return [
+    ...files.map(name => ({ name: `${PLUGINS_DIR}/${name}`, serverModule: { path: `./${PLUGINS_DIR}/${name}` } })),
+    ...jobs.map(name => ({ name: `${JOBS_DIR}/${name}`, serverModule: { path: `./${JOBS_DIR}/${name}`, export: JOBS_EXPORT } })),
+    ...extensions ?? [],
+  ]
 }
 
 const testSites = new AsyncLocalStorage<Bun.CookieMap>()
@@ -143,10 +166,31 @@ export function extensionServerModules(root: string, extensions: KayExtension[] 
   return (extensions ?? []).flatMap(({ serverModule }) => serverModule === undefined ? [] : [resolve(root, serverModule.path)])
 }
 
+// The jobs a module exports by name as one plugin. A job is a plugin, which an app that exported it twice (`export default` beside its name) mounts once, and anything else the file exports is its own.
+function jobsOf(loaded: Record<string, unknown>): AnyElysia {
+  const mounted = new Set<unknown>()
+  const server = new Elysia()
+
+  for (const [name, value] of Object.entries(loaded)) {
+    if (name === 'default' || typeof value !== 'object' || value === null || !('handle' in value) || mounted.has(value))
+      continue
+
+    mounted.add(value)
+    server.use(value as AnyElysia)
+  }
+
+  return server
+}
+
 // The plugin a module exports, what a function it exports builds, or the `plugin` of an object it exports; an executable reads it from the copy it holds, keyed by where the build found the file.
 async function serverFromModule(name: string, { path, export: exported = 'default', prepare }: NonNullable<KayExtension['serverModule']>, root: string): Promise<AnyElysia> {
   const file = resolve(bundled()?.root ?? root, path)
-  const value = (await importModule<Record<string, unknown>>(file))[exported]
+  const loaded = await importModule<Record<string, unknown>>(file)
+
+  if (exported === JOBS_EXPORT)
+    return jobsOf(loaded)
+
+  const value = loaded[exported]
 
   await prepare?.(value)
 

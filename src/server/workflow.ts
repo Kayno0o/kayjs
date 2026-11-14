@@ -1,8 +1,9 @@
 import type { ErrorShape } from '../runtime/api-error'
 import type { Duration } from '../runtime/duration'
 import type { Hook } from './hooks'
+import type { JobContext, JobRef } from './job-context'
 import type { KayPlugin } from './plugin'
-import type { JobContext, JobStore, QueueOptions, RunHold } from './queue'
+import type { JobStore, QueueOptions, RunHold } from './queue'
 import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
@@ -38,14 +39,12 @@ export interface WorkflowStep<Known extends Events> {
   }
 }
 
-export interface WorkflowRun<Input, Known extends Events> {
-  // The run's id: the `key` it started with, else one made for it.
-  id: string
-  input: Input
+// What a flow gets after its input: the context of every job, its `job.id` the run's id (the `key` it started with, else one made for it), and the steps.
+export interface WorkflowContext<Known extends Events = Events> extends JobContext {
   step: WorkflowStep<Known>
 }
 
-export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl'> {
+export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'lostAfter' | 'enabled' | 'idlePoll' | 'failedTtl'> {
   // Told once, when a worker first takes the run: not for the runs after a sleep, a wait or a retry.
   onStart?: Hook<{ id: string, input: Input }> | undefined
   // Told once the flow function ended, after its last step.
@@ -255,14 +254,23 @@ function woke(store: JobStore, payload: Payload<unknown>, entry: Entry, runAt: n
   }
 }
 
+// The job of a flow's context: its `id` is the run's, as the store keeps the job under its own, and its attempts are read as they stand.
+function runOf(job: JobRef<unknown>, id: string): JobRef<unknown> {
+  return { get id() {
+    return id
+  }, get attempts() {
+    return job.attempts
+  }, progress: job.progress }
+}
+
 // A flow of steps that survives restarts, sleeps without holding a process and waits for events: `start` it from an action, `app.use(flow)` in the server to run it, `send` it an event.
 // The function runs again from its top each time the run is taken, and each finished step gives its kept result back, so what lies between steps must give the same answer every time. The run is one job of the queue `workflow:<name>` kept under its id, and its results are kept in that job after each step.
-export function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options: WorkflowOptions<Input> = {}): Workflow<Input, Known> {
+export function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (input: Input, ctx: WorkflowContext<Known>) => unknown, options: WorkflowOptions<Input> = {}): Workflow<Input, Known> {
   const queueName = `${WORKFLOW_PREFIX}${name}`
   const { onStart, onSuccess, onRetry, onError, store: own, ...rest } = options
   const storeOf = () => own ?? defaultJobStore()
 
-  const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>, hold: RunHold) => {
+  const handler = async (payload: Payload<Input>, { signal, job, log, locale }: JobContext, hold: RunHold) => {
     const store = storeOf()
     const { update, release } = needs(store, name)
     const { until } = hold
@@ -402,7 +410,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     const run = (async () => {
       try {
-        await flow({ id: payload.run, input: payload.input, step })
+        await flow(payload.input, { signal, job: runOf(job, payload.run), log, locale, step })
       }
       catch (error) {
         if (!halted)

@@ -11,9 +11,9 @@ describe('KayPlugin', () => {
     const plugins = [
       api(),
       session(),
-      schedule('1h', () => undefined),
-      schedule('1h', () => undefined, { enabled: false }),
-      schedule('@hourly', [() => undefined, () => undefined]),
+      schedule({ every: '1h' }, () => undefined),
+      schedule({ every: '1h', enabled: false }, () => undefined),
+      schedule({ cron: '@hourly' }, [() => undefined, () => undefined]),
       schedule({ '@hourly': () => undefined, '30s': () => undefined }),
       background(() => undefined),
       background(() => undefined, { enabled: false }),

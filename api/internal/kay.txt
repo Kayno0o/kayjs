@@ -743,6 +743,7 @@ interface Bundle
   endpoints?: Endpoint[]
   extensionMessages?: Record<string, string[]>
   fallback: SpecialPages
+  jobs?: string[]
   modules: Record<string, unknown>
   name?: string | undefined
   plugins?: string[]

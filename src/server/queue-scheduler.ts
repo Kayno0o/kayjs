@@ -26,6 +26,8 @@ interface SchedulerOptions {
   // The same while the store's notifications are known to arrive.
   listenedPoll: number
   lazy: boolean
+  // False for a queue switched off: its workers never start.
+  enabled: boolean
   store: () => JobStore
   // Claims one due job and runs it, false when none was due.
   run: (scheduler: Scheduler) => Promise<boolean>
@@ -89,6 +91,9 @@ export class Scheduler {
 
   // The server started: the workers start unless the queue waits to be activated.
   serve(): void {
+    if (!this.#options.enabled)
+      return
+
     if (!this.#serving)
       serverStarted()
 

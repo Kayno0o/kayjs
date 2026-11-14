@@ -3,6 +3,7 @@ import type { KayErrorOptions } from '../compiler/errors'
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
+import type { JobContext, JobRef } from './job-context'
 import type { KayPlugin } from './plugin'
 import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
@@ -13,12 +14,13 @@ import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { countQueueRun } from '../runtime/counters'
 import { durationSeconds } from '../runtime/duration'
-import { kayLog } from '../runtime/log'
+import { kayLog, logFrom } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { cappedError, MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
 import { dispatch } from './hooks'
+import { lostAfterText, runContext } from './job-context'
 import { statusOf } from './job-status'
 import { stepsQueue } from './job-steps'
 import { memoryJobs } from './memory-jobs'
@@ -108,8 +110,12 @@ export interface QueueOptions<Payload> {
   backoff?: Duration | undefined
   // Jobs of this queue one process runs at once. 1 by default.
   concurrency?: number | undefined
-  // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
+  // How long a run may take: past it, the run counts as failed, its signal aborts and its worker is freed, and another process takes a job its dead process held as lost. 10 minutes by default, the name a schedule's limit has too.
+  timeout?: Duration | undefined
+  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */
   lostAfter?: Duration | undefined
+  // `false` runs nothing: the queue starts no worker, so a job needing an optional service is switched by its setting, `enabled: url !== undefined`, as a schedule is. A job enqueued meanwhile waits in the store for a process that runs the queue.
+  enabled?: boolean | undefined
   // The longest an idle queue waits between looks at the store, 10 seconds by default.
   // After a job it looks again within 1 second, then waits twice as long after each empty look up to this, and starts over once a job runs, so a job another process enqueued is noticed within this at worst; one enqueued in this process, or due at a time the store knows, still runs at once. One worker of a queue looks for all of them.
   // `'1s'` is the poll every second the queue made before.
@@ -137,15 +143,6 @@ export interface EnqueueOptions {
   delay?: Duration | undefined
   // Names the job: while one of this queue with the key is waiting or running, enqueue keeps nothing and resolves with its id, so a sync asked for twice runs once; once it completed or failed the key is free. `job(key)` reads it back.
   key?: string | undefined
-}
-
-// What a handler gets besides its payload and signal.
-export interface JobContext<Progress> {
-  id: string
-  // Runs started so far, this one included.
-  attempts: number
-  // Reports how far the run is, any value devalue keeps, for `job()` to read back while it runs and after it fails; the latest report wins, written in the background, and a report after the run ended is dropped.
-  progress: (value: Progress) => void
 }
 
 // Where a job stands, as the app reads it back.
@@ -400,11 +397,6 @@ export function sqliteJobs(path: string): JobStore {
 interface JobRow { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null, job_key: string | null, progress: string | null }
 type StateRow = JobRow & { failed: number, held_until: number | null }
 
-// What a run that outlasted `lostAfter` fails with, in milliseconds below a second.
-function lostAfterText(milliseconds: number): string {
-  return `it ran past lostAfter, ${milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${Math.round(milliseconds / 1000)} s`}`
-}
-
 const JOB_COLUMNS = 'id, queue, payload, attempts, run_at, error, job_key, progress'
 
 function toJob(row: JobRow): StoredJob {
@@ -475,18 +467,18 @@ export function defaultJobStore(): JobStore {
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onError`.
-export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
-  // Wrapped, so an app's handler never gets the run's hold as a fourth argument.
-  return jobQueue<Payload, Progress>(name, (payload, signal, job) => handler(payload, signal, job), options).queued
+export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
+  // The run's job is also the third argument, which a handler written `(payload, signal, job)` before 1.105 reads.
+  return jobQueue<Payload, Progress>(name, (payload, ctx) => (handler as (payload: Payload, ctx: JobContext<Progress>, job: JobRef<Progress>) => unknown)(payload, ctx, ctx.job), options).queued
 }
 
 const REMOVED_OPTIONS = { onFailed: '`onError`, which also gets `id` and `attempts`', keepFailed: '`failedTtl`' }
 
 // `queue` for `workflow`: its handler also gets the hold of its run, and the admin it returns is what the workflow wakes its own queue and attaches its calls with.
-export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
+export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress> & AbortSignal, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
-  const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
+  const lostAfter = durationSeconds(options.timeout ?? options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s timeout`) * 1000
   const concurrency = options.concurrency ?? 1
   const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.failedTtl === false ? undefined : durationSeconds(options.failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000
@@ -702,7 +694,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
-    const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
+    const context: JobRef<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
     let handedBack = false
     const hold: RunHold = {
       until: held,
@@ -716,7 +708,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
       if (performance.now() - claimedAt >= lostAfter - Math.min(1000, lostAfter / 10))
         throw new Error(lostAfterText(lostAfter))
 
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), claimedAt, ended)
+      await withinLostAfter(handler(parse(job.payload) as Payload, runContext(ended.signal, context, logFrom(name)), hold), claimedAt, ended)
       await reports.settle()
       succeeded = true
     }
@@ -840,7 +832,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
   }
 
-  const scheduler = new Scheduler({ name, concurrency, idlePoll, listenedPoll: options.idlePoll === undefined ? LISTENED_IDLE_POLL : idlePoll, lazy: options.lazy === true, store, run: runOne, purge: purgeFailed })
+  const scheduler = new Scheduler({ name, concurrency, idlePoll, listenedPoll: options.idlePoll === undefined ? LISTENED_IDLE_POLL : idlePoll, lazy: options.lazy === true, enabled: options.enabled !== false, store, run: runOne, purge: purgeFailed })
 
   // Unnamed, so Elysia never takes two queues for one plugin.
   const plugin = new Elysia()

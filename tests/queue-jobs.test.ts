@@ -40,7 +40,7 @@ async function nextWrite(): Promise<void> {
 const made: { drain: () => Promise<number> }[] = []
 
 // Every queue made here leaves what `drainQueues` runs with its test, as its store's database goes with its file.
-function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress> {
+function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress> {
   const created = makeQueue<Payload, Progress>(name, handler, options)
 
   made.push(created)
@@ -297,7 +297,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     it('is written by the handler and read back typed, dates and maps included, while the job runs', async () => {
       const store = watched(await open())
       const reads: unknown[] = []
-      const jobs = queue<number, { processed: number, total: number, since: Date }>(named(), async (_payload, _signal, job) => {
+      const jobs = queue<number, { processed: number, total: number, since: Date }>(named(), async (_payload, { job }) => {
         job.progress({ processed: 3, total: 40, since: new Date(0) })
         reads.push((await seen(jobs, 'k', progress => progress?.processed === 3))?.progress)
       }, { store })
@@ -312,7 +312,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       const errors = spyOn(console, 'error').mockImplementation(noop)
       const warns = spyOn(console, 'warn').mockImplementation(noop)
       const starts: unknown[] = []
-      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+      const jobs = queue<number, number>(named(), async (_payload, { job }) => {
         starts.push((await jobs.job('k'))?.progress)
         job.progress(job.attempts * 10)
         await seen(jobs, 'k', progress => progress === job.attempts * 10)
@@ -342,7 +342,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
           await store.progress!(id, until, progress)
         },
       }
-      const last = queue<number, number>(named(), async (_payload, _signal, job) => {
+      const last = queue<number, number>(named(), async (_payload, { job }) => {
         for (let step = 1; step <= 500; step++)
           job.progress(step)
 
@@ -358,7 +358,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     it('drops a report made after the run ended, and never throws it at the handler', async () => {
       const store = watched(await open())
       let late: (() => void) | undefined
-      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+      const jobs = queue<number, number>(named(), async (_payload, { job }) => {
         late = () => job.progress(99)
         job.progress(1)
       }, { store, attempts: 1 })
@@ -384,7 +384,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       const warns = spyOn(console, 'warn').mockImplementation(noop)
       const store: JobStore = { ...(watched(await open())), progress: async () => Promise.reject(new Error('locked')) }
       let finished = false
-      const jobs = queue<number, number>(named(), async (_payload, _signal, job) => {
+      const jobs = queue<number, number>(named(), async (_payload, { job }) => {
         job.progress(1)
         await Bun.sleep(20)
         finished = true
@@ -399,7 +399,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
     it('logs a report devalue cannot serialize instead of throwing it at the handler, and keeps the last good one', async () => {
       const warns = spyOn(console, 'warn').mockImplementation(noop)
-      const jobs = queue<number, unknown>(named(), async (_payload, _signal, job) => {
+      const jobs = queue<number, unknown>(named(), async (_payload, { job }) => {
         job.progress(1)
         await seen(jobs, 'k', progress => progress === 1)
         job.progress(() => 2)
@@ -414,7 +414,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
     it('says once that a store without progress keeps none, and runs the job', async () => {
       const warns = spyOn(console, 'warn').mockImplementation(noop)
       const store: JobStore = { ...(watched(await open())), progress: undefined }
-      const jobs = queue<number, number>(named(), (_payload, _signal, job) => {
+      const jobs = queue<number, number>(named(), (_payload, { job }) => {
         job.progress(1)
         job.progress(2)
       }, { store })
@@ -428,7 +428,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
     it('hands the handler its job id and the run it is on', async () => {
       const got: unknown[] = []
-      const jobs = queue<number>(named(), (_payload, _signal, job) => void got.push({ id: job.id, attempts: job.attempts }), { store: watched(await open()) })
+      const jobs = queue<number>(named(), (_payload, { job }) => void got.push({ id: job.id, attempts: job.attempts }), { store: watched(await open()) })
       const id = await jobs.enqueue(1)
 
       await jobs.drain()

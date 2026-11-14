@@ -3,6 +3,7 @@ import type { Action, ActionError, FailuresOf, NoInputAction, ResultOf, STAMP_FI
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
+import type { ScheduleJob } from '../server/jobs'
 import type { LogEntry } from '../server/log'
 import type { PluginInput } from '../server/plugin'
 import type { TestContent } from './content'
@@ -123,7 +124,7 @@ export interface TestSite {
   // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
   runJobs: () => Promise<number>
   // Fires the `schedule()` jobs of the app once each, now, whatever their time: those given the schedule text (`'@hourly'`, `'30s'`) or the job function, or every one without an argument; waits for each run and resolves with how many it fired, failing when none matches. A run that throws is reported as in production, not thrown here.
-  runSchedule: (which?: string | number | ((signal: AbortSignal) => unknown)) => Promise<number>
+  runSchedule: (which?: string | number | ScheduleJob) => Promise<number>
   // Moves the clock forward by a duration with `setSystemTime` from `bun:test`, firing each schedule at every instant it falls due on the way, in order with the clock at that instant, then runs the queue jobs now due; resolves with how many scheduled runs it fired. Sessions, rate-limit windows, caches and sleeps read the moved clock. Restore it with `setSystemTime()`.
   advance: (by: Duration | number) => Promise<number>
   // Signs the site in for every library whose `test(site)` joined it: kayjs-auth reads `email` or `username` (with the `createUser` fields and the app's user `data`), kayjs-cms a `role`, or none for a guard holding one password. A second call switches member. Answers what each library signed in as.

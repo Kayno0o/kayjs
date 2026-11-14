@@ -25,7 +25,7 @@ function aliases(root: string): { prefix: string, dir: string }[] {
   }
 }
 
-// A `src/jobs.ts` that no server plugin and no `src/server.ts` imports directly: the queues in it are mounted by nothing, so none runs. An import through a third module is not followed. The one home of jobs is `src/plugins/jobs.ts`, where a queue is defined and mounted at once.
+// A `src/jobs.ts` that no server plugin and no `src/server.ts` imports directly: the queues in it are mounted by nothing, so none runs. An import through a third module is not followed. The one home of jobs is `src/jobs/*.ts`, where kay mounts every queue, workflow and schedule a file exports.
 export function unmountedJobs(root: string, options: CheckOptions): CheckDiagnostic[] {
   const level = lintLevel('unmounted-jobs', options.lints)
   const file = join(root, 'src/jobs.ts')
@@ -56,7 +56,7 @@ export function unmountedJobs(root: string, options: CheckOptions): CheckDiagnos
     line: 1,
     column: 1,
     message: 'No server plugin imports this file, so the queues in it are mounted by nothing and none runs',
-    help: 'define and mount the queues in `src/plugins/jobs.ts`, the one home of jobs: `export default` the queue, and an action imports it from there to `enqueue`; or `export { queue as default } from \'../jobs\'` in a plugin',
+    help: 'move the queues to `src/jobs/*.ts`, the one home of jobs, which mounts every queue, workflow and schedule a file exports by name: no default export and no `.use`, and an action imports the queue from there to `enqueue`',
     code: 'unmounted-jobs',
     severity: level === 'warn' ? 'warning' : 'error',
   }]

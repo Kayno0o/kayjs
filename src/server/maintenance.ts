@@ -54,7 +54,7 @@ const locking = (options: MaintenanceOptions) => options.lock !== false && proce
 export function maintenance(name: string, every: number, work: (signal: AbortSignal) => unknown, options: MaintenanceOptions = {}): Maintenance {
   const lock = `maintenance:${name}`
   const entry: Entry = { name, every, last: undefined, stop: () => undefined }
-  const run = scheduledRun(lock, every, async (signal) => {
+  const run = scheduledRun(lock, every, async (_, { signal }) => {
     try {
       await work(signal)
       entry.last = { at: Date.now() }

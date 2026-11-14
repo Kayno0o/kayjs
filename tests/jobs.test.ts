@@ -1,5 +1,5 @@
 import type { Duration } from '../src/runtime'
-import type { JobStore } from '../src/server'
+import type { JobContext, JobStore, ScheduleRun } from '../src/server'
 import { mkdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -83,7 +83,7 @@ describe('schedule', () => {
   it('starts with the server, once, and stops with it, waiting for the run in progress', async () => {
     const cron = fakeCron()
     const runs: string[] = []
-    const app = new Elysia().use(schedule('@hourly', async () => {
+    const app = new Elysia().use(schedule({ cron: '@hourly' }, async () => {
       runs.push('start')
       await Bun.sleep(20)
       runs.push('end')
@@ -109,7 +109,7 @@ describe('schedule', () => {
   it('logs a run that throws and keeps the schedule', async () => {
     const cron = fakeCron()
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
-    const app = new Elysia().use(schedule('*/5 * * * *', () => {
+    const app = new Elysia().use(schedule({ cron: '*/5 * * * *' }, () => {
       throw new Error('feed down')
     })).listen(0)
 
@@ -132,11 +132,11 @@ describe('schedule', () => {
 
     setSystemTime(new Date('2026-01-01T12:00:00Z'))
 
-    const ok = new Elysia().use(schedule('11 * * * *', () => undefined)).listen(0)
-    const failing = new Elysia().use(schedule('12 * * * *', () => {
+    const ok = new Elysia().use(schedule({ cron: '11 * * * *' }, () => undefined)).listen(0)
+    const failing = new Elysia().use(schedule({ cron: '12 * * * *' }, () => {
       throw new Error('feed down')
     })).listen(0)
-    const process = () => new Elysia().use(schedule('13 * * * *', () => undefined, { lock: 'counted', store: sqliteJobs(path) })).listen(0)
+    const process = () => new Elysia().use(schedule({ cron: '13 * * * *', lock: 'counted', store: sqliteJobs(path) }, () => undefined)).listen(0)
     const first = process()
     const second = process()
 
@@ -167,27 +167,27 @@ describe('schedule', () => {
   it('types a literal schedule, refusing a nickname, a field count or a day its month never has', () => {
     const typed = (_build: () => unknown) => true
 
-    expect(typed(() => [schedule('@hourly', () => undefined), schedule('30  2 * * MON', () => undefined), schedule('0 0 31 */2 *', () => undefined), schedule('0 0 30 2 MON', () => undefined), schedule('0 0 30 jan *', () => undefined), schedule('@DAILY', () => undefined), schedule('0\t0\t*\t*\t*', () => undefined)])).toBe(true)
+    expect(typed(() => [schedule({ cron: '@hourly' }, () => undefined), schedule({ cron: '30  2 * * MON' }, () => undefined), schedule({ cron: '0 0 31 */2 *' }, () => undefined), schedule({ cron: '0 0 30 2 MON' }, () => undefined), schedule({ cron: '0 0 30 jan *' }, () => undefined), schedule({ cron: '@DAILY' }, () => undefined), schedule({ cron: '0\t0\t*\t*\t*' }, () => undefined)])).toBe(true)
     // @ts-expect-error -- no such nickname
-    expect(typed(() => schedule('@minutely', () => undefined))).toBe(true)
+    expect(typed(() => schedule({ cron: '@minutely' }, () => undefined))).toBe(true)
     // @ts-expect-error -- six fields
-    expect(typed(() => schedule('* * * * * *', () => undefined))).toBe(true)
+    expect(typed(() => schedule({ cron: '* * * * * *' }, () => undefined))).toBe(true)
     // @ts-expect-error -- February has no 30th
-    expect(typed(() => schedule('0 0 30 feb *', () => undefined))).toBe(true)
+    expect(typed(() => schedule({ cron: '0 0 30 feb *' }, () => undefined))).toBe(true)
     // @ts-expect-error -- April has no 31st
-    expect(typed(() => schedule('0 0 31 04 *', () => undefined))).toBe(true)
+    expect(typed(() => schedule({ cron: '0 0 31 04 *' }, () => undefined))).toBe(true)
   })
 
-  it('refuses a job whose first parameter is not the AbortSignal it is called with', () => {
+  it('refuses a job whose parameters are not the run and the context it is called with', () => {
     const typed = (_build: () => unknown) => true
-    const signed = (_signal: AbortSignal) => undefined
-    const optional = (_signal?: AbortSignal) => undefined
+    const both = (_run: ScheduleRun, _ctx: JobContext) => undefined
+    const runOnly = (_run: ScheduleRun) => undefined
 
-    expect(typed(() => [schedule('@hourly', signed), schedule('@hourly', optional), schedule('@hourly', () => undefined), background(signed)])).toBe(true)
-    // @ts-expect-error -- called with the signal, which is no Date
-    expect(typed(() => schedule('@hourly', (_now?: Date) => undefined))).toBe(true)
-    // @ts-expect-error -- called with the signal, which is no Date
-    expect(typed(() => background((_now?: Date) => undefined))).toBe(true)
+    expect(typed(() => [schedule({ cron: '@hourly' }, both), schedule({ cron: '@hourly' }, runOnly), schedule({ cron: '@hourly' }, () => undefined), background((_input: undefined, ctx: JobContext) => ctx.signal)])).toBe(true)
+    // @ts-expect-error -- called with the run, which is no Date
+    expect(typed(() => schedule({ cron: '@hourly' }, (_now?: Date) => undefined))).toBe(true)
+    // @ts-expect-error -- called with no input, as a signal of the old shape would meet
+    expect(typed(() => background((_signal: AbortSignal) => undefined))).toBe(true)
   })
 
   it('types a table entry\'s list with a conditional spread anywhere in it', () => {
@@ -201,7 +201,7 @@ describe('schedule', () => {
       schedule({ '* * * * *': [...(on ? [] : [a]), a] }),
       schedule({ '* * * * *': [b, ...(on ? [] : [a])] }),
       schedule({ '* * * * *': [a, ...(on ? [] : [b]), a], '30s': [...(on ? [] : [b])], '@daily': a }),
-      schedule('* * * * *', [...(on ? [] : [a]), b]),
+      schedule({ cron: '* * * * *' }, [...(on ? [] : [a]), b]),
     ])).toBe(true)
   })
 
@@ -235,7 +235,7 @@ describe('schedule', () => {
 
     setSystemTime(new Date('2026-01-01T12:00:00Z'))
 
-    const process = (name: string) => new Elysia().use(schedule('@hourly', [() => runs.push(`${name}-a`), () => runs.push(`${name}-b`)], { lock: 'report', store: sqliteJobs(path) })).listen(0)
+    const process = (name: string) => new Elysia().use(schedule({ cron: '@hourly', lock: 'report', store: sqliteJobs(path) }, [() => runs.push(`${name}-a`), () => runs.push(`${name}-b`)])).listen(0)
     const first = process('first')
     const second = process('second')
 
@@ -257,11 +257,11 @@ describe('schedule', () => {
 
     setSystemTime(new Date('2026-01-01T12:00:00Z'))
 
-    const app = new Elysia().use(schedule('@daily', async () => {
+    const app = new Elysia().use(schedule({ cron: '@daily', boot: true, lock: 'boot', store: sqliteJobs(path) }, async () => {
       await Bun.sleep(20)
       runs.push('cron')
-    }, { boot: true, lock: 'boot', store: sqliteJobs(path) }))
-    const other = new Elysia().use(schedule('@hourly', () => runs.push('other'), { boot: true, lock: 'boot', store: sqliteJobs(path) }))
+    }))
+    const other = new Elysia().use(schedule({ cron: '@hourly', boot: true, lock: 'boot', store: sqliteJobs(path) }, () => runs.push('other')))
 
     try {
       app.listen(0)
@@ -282,12 +282,12 @@ describe('schedule', () => {
     const cron = fakeCron()
     let active = 0
     let overlapped = false
-    const app = new Elysia().use(schedule('@hourly', async () => {
+    const app = new Elysia().use(schedule({ cron: '@hourly', boot: true }, async () => {
       active++
       overlapped ||= active > 1
       await Bun.sleep(30)
       active--
-    }, { boot: true })).listen(0)
+    })).listen(0)
 
     try {
       await cron.fired[0]!.handler()
@@ -306,7 +306,7 @@ describe('schedule', () => {
 
     setSystemTime(new Date('2026-01-01T11:59:40Z'))
 
-    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { boot: true, lock: 'report', store: sqliteJobs(path) })).listen(0)
+    const app = new Elysia().use(schedule({ cron: '@hourly', boot: true, lock: 'report', store: sqliteJobs(path) }, () => runs.push('run'))).listen(0)
 
     try {
       await shutdown(app)
@@ -323,7 +323,7 @@ describe('schedule', () => {
 
   it.each([
     ['a list in a table', () => schedule({ '@hourly': ['purge'] as unknown as (() => void)[] }), '@hourly'],
-    ['a list', () => schedule('@hourly', ['purge'] as unknown as (() => void)[]), '@hourly'],
+    ['a list', () => schedule({ cron: '@hourly' }, ['purge'] as unknown as (() => void)[]), '@hourly'],
     ['a string in a table', () => schedule({ '@hourly': 'purge' as unknown as () => void }), '@hourly'],
     ['a string beside a function in a table', () => schedule({ '@hourly': () => undefined, '30s': 'purge' as unknown as () => void }), '30s'],
   ])('refuses a job that is no function when the schedule is built: %s', (_name, build, scheduled) => {
@@ -346,10 +346,10 @@ describe('schedule', () => {
     setSystemTime(new Date('2026-01-01T12:00:00Z'))
 
     const apps = [
-      new Elysia().use(schedule('@hourly', [job, job], { lock: 'list', store })),
+      new Elysia().use(schedule({ cron: '@hourly', lock: 'list', store }, [job, job])),
       new Elysia().use(schedule({ '@hourly': job, '@daily': [job, job] }, { lock: 'table', store })),
-      new Elysia().use(schedule('@hourly', [job, job], { lock: 'boots', boot: true, store })),
-      new Elysia().use(schedule('@hourly', job, { lock: 'single', boot: true, store })),
+      new Elysia().use(schedule({ cron: '@hourly', lock: 'boots', boot: true, store }, [job, job])),
+      new Elysia().use(schedule({ cron: '@hourly', lock: 'single', boot: true, store }, job)),
     ]
 
     try {
@@ -381,7 +381,7 @@ describe('schedule', () => {
   it('runs a job at boot only when asked to', async () => {
     const cron = fakeCron()
     const runs: string[] = []
-    const app = new Elysia().use(schedule({ '@daily': () => runs.push('daily') })).use(schedule('30s', () => runs.push('every'), { boot: true })).listen(0)
+    const app = new Elysia().use(schedule({ '@daily': () => runs.push('daily') })).use(schedule({ every: '30s', boot: true }, () => runs.push('every'))).listen(0)
 
     try {
       await shutdown(app)
@@ -412,8 +412,8 @@ describe('schedule', () => {
     // A slot is a minute rounded, so a clock reaching :30 between the two claims, as on a busy machine, would name two slots.
     setSystemTime(new Date('2026-01-01T12:00:00Z'))
     // Two processes, each with its own connection to the store.
-    const first = new Elysia().use(schedule('@hourly', () => runs.push('first'), { lock: 'report', store: sqliteJobs(path) })).listen(0)
-    const second = new Elysia().use(schedule('@hourly', () => runs.push('second'), { lock: 'report', store: sqliteJobs(path) })).listen(0)
+    const first = new Elysia().use(schedule({ cron: '@hourly', lock: 'report', store: sqliteJobs(path) }, () => runs.push('first'))).listen(0)
+    const second = new Elysia().use(schedule({ cron: '@hourly', lock: 'report', store: sqliteJobs(path) }, () => runs.push('second'))).listen(0)
 
     try {
       await Promise.all(cron.fired.map(async entry => entry.handler()))
@@ -467,7 +467,7 @@ describe('schedule', () => {
 
     it('runs once across the processes of a production server', async () => {
       const runs: string[] = []
-      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`${name}-report`), { store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule({ cron: '@hourly', store }, () => runs.push(`${name}-report`)))])
 
       try {
         await world.fire()
@@ -484,7 +484,7 @@ describe('schedule', () => {
 
       process.env.KAY_LOCK_SCHEDULES = 'false'
 
-      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`${name}-report`), { store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule({ cron: '@hourly', store }, () => runs.push(`${name}-report`)))])
 
       try {
         await world.fire()
@@ -504,8 +504,8 @@ describe('schedule', () => {
       const runs: string[] = []
       const send = (kind: string, name: string) => () => runs.push(`${name}-${kind}`)
       const world = await twoProcesses('production', (name, store, schedule) => [
-        new Elysia().use(schedule('@hourly', () => runs.push(`${name}-digest`), { store })).use(schedule('@hourly', () => runs.push(`${name}-purge`), { store })),
-        new Elysia().use(schedule('@hourly', send('a', name), { store })).use(schedule('@hourly', send('b', name), { store })),
+        new Elysia().use(schedule({ cron: '@hourly', store }, () => runs.push(`${name}-digest`))).use(schedule({ cron: '@hourly', store }, () => runs.push(`${name}-purge`))),
+        new Elysia().use(schedule({ cron: '@hourly', store }, send('a', name))).use(schedule({ cron: '@hourly', store }, send('b', name))),
         new Elysia().use(schedule({ '@daily': [send('c', name), send('d', name)] }, { store })),
       ])
 
@@ -520,7 +520,7 @@ describe('schedule', () => {
 
     it('locks an every-so-long schedule and its boot run by default too', async () => {
       const runs: string[] = []
-      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule({ every: '30s', boot: true, store }, () => runs.push(name)))])
 
       try {
         await until(() => runs.length > 0)
@@ -535,7 +535,7 @@ describe('schedule', () => {
 
     it('runs a boot run once across the processes starting together', async () => {
       const runs: string[] = []
-      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule({ every: '30s', boot: true, store }, () => runs.push(name)))])
 
       try {
         await until(() => runs.length > 0)
@@ -590,7 +590,7 @@ describe('schedule', () => {
 
     it('keeps one process per schedule outside production, and with lock false', async () => {
       const runs: string[] = []
-      const dev = await twoProcesses('development', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`dev-${name}`), { store }))])
+      const dev = await twoProcesses('development', (name, store, schedule) => [new Elysia().use(schedule({ cron: '@hourly', store }, () => runs.push(`dev-${name}`)))])
 
       try {
         await dev.fire()
@@ -599,7 +599,7 @@ describe('schedule', () => {
         await dev.done()
       }
 
-      const off = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`off-${name}`), { lock: false, store }))])
+      const off = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule({ cron: '@hourly', lock: false, store }, () => runs.push(`off-${name}`)))])
 
       try {
         await off.fire()
@@ -662,7 +662,7 @@ describe('schedule', () => {
 
       try {
         for (let boot = 0; boot < 2; boot++) {
-          const app = new Elysia().use(schedule('@hourly', () => undefined, { store })).listen(0)
+          const app = new Elysia().use(schedule({ cron: '@hourly', store }, () => undefined)).listen(0)
 
           await cron.fired.at(-1)!.handler()
           await shutdown(app)
@@ -682,12 +682,12 @@ describe('schedule', () => {
       const cron = fakeCron()
       const logged = spyOn(console, 'error').mockImplementation(() => undefined)
       const signals: AbortSignal[] = []
-      const app = new Elysia().use(schedule('@hourly', async (signal) => {
+      const app = new Elysia().use(schedule({ cron: '@hourly', timeout: '30ms' }, async (_, { signal }) => {
         signals.push(signal)
 
         if (signals.length === 1)
           await new Promise(() => undefined)
-      }, { timeout: '30ms' })).listen(0)
+      })).listen(0)
 
       try {
         await cron.fired[0]!.handler()
@@ -708,10 +708,10 @@ describe('schedule', () => {
       const cron = fakeCron()
       const logged = spyOn(console, 'error').mockImplementation(() => undefined)
       let signal: AbortSignal | undefined
-      const app = new Elysia().use(schedule('@hourly', async (given) => {
+      const app = new Elysia().use(schedule({ cron: '@hourly', timeout: '40ms' }, async (_, { signal: given }) => {
         signal = given
         await new Promise(() => undefined)
-      }, { timeout: '40ms' })).listen(0)
+      })).listen(0)
 
       try {
         void cron.fired[0]!.handler()
@@ -733,7 +733,7 @@ describe('schedule', () => {
       const cron = fakeCron()
       const logged = spyOn(console, 'error').mockImplementation(() => undefined)
       let started = false
-      const app = new Elysia().use(schedule('@hourly', async (signal) => {
+      const app = new Elysia().use(schedule({ cron: '@hourly' }, async (_, { signal }) => {
         started = true
         await new Promise(resolve => signal.addEventListener('abort', resolve))
 
@@ -755,8 +755,8 @@ describe('schedule', () => {
     })
 
     it('refuses a timeout that is not a duration at boot, and takes false for no limit', () => {
-      expect(() => schedule('@hourly', () => undefined, { timeout: '0s' })).toThrow('the timeout of the schedule @hourly is \'0s\'')
-      expect(() => schedule('@hourly', () => undefined, { timeout: false })).not.toThrow()
+      expect(() => schedule({ cron: '@hourly', timeout: '0s' }, () => undefined)).toThrow('the timeout of the schedule @hourly is \'0s\'')
+      expect(() => schedule({ cron: '@hourly', timeout: false }, () => undefined)).not.toThrow()
     })
   })
 
@@ -764,7 +764,7 @@ describe('schedule', () => {
     const cron = fakeCron()
 
     try {
-      const app = new Elysia().use(schedule('@hourly', () => undefined)).use(schedule('@daily', () => undefined)).listen(0)
+      const app = new Elysia().use(schedule({ cron: '@hourly' }, () => undefined)).use(schedule({ cron: '@daily' }, () => undefined)).listen(0)
 
       expect(cron.fired).toHaveLength(2)
       void shutdown(app)
@@ -787,7 +787,7 @@ describe('schedule every so long', () => {
 
     const runs: number[] = []
     let finish: (() => void) | undefined
-    const app = new Elysia().use(schedule('30s', async () => {
+    const app = new Elysia().use(schedule({ every: '30s' }, async () => {
       runs.push(Date.now())
       await new Promise<void>((resolve) => {
         finish = resolve
@@ -838,7 +838,7 @@ describe('schedule every so long', () => {
       return lock(name, slot)
     }
 
-    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { lock: 'busy', store })).listen(0)
+    const app = new Elysia().use(schedule({ cron: '@hourly', lock: 'busy', store }, () => runs.push('run'))).listen(0)
 
     try {
       setSystemTime(new Date('2026-01-01T12:00:00Z'))
@@ -871,7 +871,7 @@ describe('schedule every so long', () => {
       return lock(name, slot)
     }
 
-    const app = new Elysia().use(schedule('@hourly', async () => new Promise<void>(() => undefined), { lock: 'late', store })).listen(0)
+    const app = new Elysia().use(schedule({ cron: '@hourly', lock: 'late', store }, async () => new Promise<void>(() => undefined))).listen(0)
 
     try {
       const fired = cron.fired.map(async entry => entry.handler())
@@ -919,8 +919,8 @@ describe('schedule every so long', () => {
 
     const store = memoryJobs()
     const runs: string[] = []
-    const first = new Elysia().use(schedule('2s', () => runs.push('first'), { lock: 'sync', store })).listen(0)
-    const second = new Elysia().use(schedule('2s', () => runs.push('second'), { lock: 'sync', store })).listen(0)
+    const first = new Elysia().use(schedule({ every: '2s', lock: 'sync', store }, () => runs.push('first'))).listen(0)
+    const second = new Elysia().use(schedule({ every: '2s', lock: 'sync', store }, () => runs.push('second'))).listen(0)
 
     try {
       for (let tick = 0; tick < 3; tick++) {
@@ -942,14 +942,14 @@ describe('schedule every so long', () => {
     const computed = (every: number) => every
 
     expect(() => schedule(computed(0) as never, () => undefined)).toThrow('the schedule 0 is 0; it takes a positive duration')
-    expect(() => schedule('30s', () => undefined, { tz: 'UTC' } as object)).toThrow('takes timeZone, not tz')
-    expect(() => schedule('@hourly', () => undefined, { tz: 'UTC' } as object)).toThrow('takes timeZone, not tz')
-    expect(() => schedule('30s', () => undefined, { timeZone: 'UTC' } as object)).toThrow('the schedule 30s takes no timeZone')
-    expect(typed(() => [schedule('30s', () => undefined), schedule('1.5h', () => undefined), schedule('1d', () => undefined, { lock: 'daily' })])).toBe(true)
+    expect(() => schedule({ every: '30s', ...{ tz: 'UTC' } as object }, () => undefined)).toThrow('takes timeZone, not tz')
+    expect(() => schedule({ cron: '@hourly', ...{ tz: 'UTC' } as object }, () => undefined)).toThrow('takes timeZone, not tz')
+    expect(() => schedule({ every: '30s', ...{ timeZone: 'UTC' } as object }, () => undefined)).toThrow('the schedule 30s takes no timeZone')
+    expect(typed(() => [schedule({ every: '30s' }, () => undefined), schedule({ every: '1.5h' }, () => undefined), schedule({ every: '1d', lock: 'daily' }, () => undefined)])).toBe(true)
     // @ts-expect-error -- not positive
-    expect(typed(() => schedule('0s', () => undefined))).toBe(true)
+    expect(typed(() => schedule({ every: '0s' }, () => undefined))).toBe(true)
     // @ts-expect-error -- a time zone means nothing to a schedule running from the epoch
-    expect(typed(() => schedule('30s', () => undefined, { timeZone: 'UTC' }))).toBe(true)
+    expect(typed(() => schedule({ every: '30s', timeZone: 'UTC' }, () => undefined))).toBe(true)
   })
 })
 
@@ -957,7 +957,7 @@ describe('background', () => {
   it('adds nothing with enabled: false', async () => {
     const steps: string[] = []
     const cron = fakeCron()
-    const app = new Elysia().use(background(() => steps.push('started'), { enabled: false })).use(schedule('@hourly', () => steps.push('ran'), { enabled: false })).use(schedule({ '@daily': () => steps.push('ran') }, { enabled: false })).use(schedule('30s', () => steps.push('ran'), { enabled: false })).listen(0)
+    const app = new Elysia().use(background(() => steps.push('started'), { enabled: false })).use(schedule({ cron: '@hourly', enabled: false }, () => steps.push('ran'))).use(schedule({ '@daily': () => steps.push('ran') }, { enabled: false })).use(schedule({ every: '30s', enabled: false }, () => steps.push('ran'))).listen(0)
 
     try {
       expect(cron.fired).toEqual([])
@@ -971,7 +971,7 @@ describe('background', () => {
 
   it('runs from start to stop, its signal aborting on stop and the server waiting for it', async () => {
     const steps: string[] = []
-    const app = new Elysia().use(background(async (signal) => {
+    const app = new Elysia().use(background(async (_, { signal }) => {
       steps.push('started')
       await new Promise(resolve => signal.addEventListener('abort', resolve))
       await Bun.sleep(10)
@@ -1001,7 +1001,7 @@ describe('errors outside a request', () => {
 
     try {
       const app = new Elysia()
-        .use(schedule('@hourly', () => { throw new Error('nightly failed') }))
+        .use(schedule({ cron: '@hourly' }, () => { throw new Error('nightly failed') }))
         .use(background(() => { throw new Error('consumer failed') }))
         .onStop(() => { throw new Error('stop failed') })
 
@@ -1560,7 +1560,7 @@ describe('queue', () => {
   it('runs again a job whose process died running it, once it counts as lost', async () => {
     const store = memoryJobs()
     const runs: string[] = []
-    const lost = queue('lost', (name: string) => void runs.push(name), { store, lostAfter: '5m' })
+    const lost = queue('lost', (name: string) => void runs.push(name), { store, timeout: '5m' })
 
     try {
       await lost.enqueue('report')
@@ -1581,7 +1581,7 @@ describe('queue', () => {
     const store = memoryJobs()
     const runs: string[] = []
     const gaveUp: string[] = []
-    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onError: ({ payload: name, error }) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
+    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, timeout: '1m', onError: ({ payload: name, error }) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
 
     try {
       await crashing.enqueue('huge import')
@@ -1606,11 +1606,11 @@ describe('queue', () => {
   it('aborts the signal of a run at lostAfter, so a handler that listens stops before another process retries the job', async () => {
     const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
     const events: string[] = []
-    const slow = queue('mails', async (name: string, signal: AbortSignal) => {
+    const slow = queue('mails', async (name: string, { signal }) => {
       events.push(`start ${name}`)
       await new Promise(resolve => signal.addEventListener('abort', resolve))
       events.push(`stopped ${name}`)
-    }, { store: memoryJobs(), lostAfter: '300ms', attempts: 2 })
+    }, { store: memoryJobs(), timeout: '300ms', attempts: 2 })
 
     try {
       await slow.enqueue('digest')
@@ -1698,7 +1698,7 @@ describe('queue', () => {
     // A queue on a store two processes share, started like a server, its handler waiting on its signal.
     async function stopping(store: JobStore, handler: (signal: AbortSignal) => unknown) {
       let started = false
-      const mails = queue('mails', async (_payload: string, signal: AbortSignal) => {
+      const mails = queue('mails', async (_payload: string, { signal }) => {
         started = true
 
         return handler(signal)
@@ -1864,14 +1864,14 @@ describe('queue', () => {
 
       if (name === 'stuck')
         await new Promise(() => undefined)
-    }, { store: memoryJobs(), lostAfter: '1s', attempts: 1 })
+    }, { store: memoryJobs(), timeout: '1s', attempts: 1 })
 
     try {
       await slow.enqueue('stuck')
       await slow.enqueue('next')
       expect(await slow.drain()).toBe(2)
       expect(runs).toEqual(['stuck', 'next'])
-      expect(await slow.failed()).toEqual([{ id: expect.any(String), payload: 'stuck', attempts: 1, error: 'it ran past lostAfter, 1 s' }])
+      expect(await slow.failed()).toEqual([{ id: expect.any(String), payload: 'stuck', attempts: 1, error: 'it ran past its timeout, 1 s' }])
     }
     finally {
       logged.mockRestore()

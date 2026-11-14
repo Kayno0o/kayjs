@@ -165,7 +165,7 @@ describe('FileStore onWrite and onDelete', () => {
   it('tells onWrite with the key, size and privacy after files.put stored it, for every built-in store', async () => {
     const dir = await scratchDir('file-hooks-')
 
-    for (const make of [(hooks: object) => memoryFiles(hooks), (hooks: object) => diskFiles(dir, hooks)]) {
+    for (const make of [(hooks: object) => memoryFiles(hooks), (hooks: object) => diskFiles({ dir, ...hooks })]) {
       const seen: unknown[] = []
       const store = make({ onWrite: ({ key, size, private: isPrivate, context }: { key: string, size: number, private: boolean, context: object }) => void seen.push([key, size, isPrivate, typeof context]) })
 

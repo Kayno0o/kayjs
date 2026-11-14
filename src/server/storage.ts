@@ -97,8 +97,12 @@ const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 let current: { store: FileStore | undefined, cacheDir: string | undefined, variantsDir?: string | undefined, exported: boolean } = { store: undefined, cacheDir: undefined, exported: false }
 let defaultStore: FileStore | undefined
 
-// Files in a directory of this machine, `data/files` by default, relative to where the server runs.
-export function diskFiles(dir: string = DEFAULT_DIR, hooks: FileHooks = {}): FileStore {
+// Files in a directory of this machine, `data/files` by default, relative to where the server runs: `diskFiles({ dir, onWrite, onDelete })`, as `s3Files` and `memoryFiles` take their options.
+export function diskFiles(options?: FileHooks & { dir?: string | undefined }): FileStore
+/** @deprecated `diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it. */
+export function diskFiles(dir: string, hooks?: FileHooks): FileStore
+export function diskFiles(first: string | (FileHooks & { dir?: string | undefined }) = {}, second: FileHooks = {}): FileStore {
+  const { dir = DEFAULT_DIR, ...hooks } = typeof first === 'string' ? { dir: first, ...second } : first
   const path = (key: string) => join(resolve(dir), key)
 
   return {

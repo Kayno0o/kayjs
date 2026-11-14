@@ -7,7 +7,7 @@ kay reads some files and folders of a project by name, and serves some routes un
 
 ## Naming rule
 
-A file kay reads for one thing is singular: `server.ts`, `auth.ts`, `mail.ts`, `ui.ts`, `context.ts`, `env.ts`, `theme.ts`. A folder holding one file per page, plugin, template, matcher or catalog is plural: `routes/`, `plugins/`, `mails/`, `messages/`, `params/`. A mass noun or an acronym stays as it is: `api/`, `content/`, `db/`. A file inside a plural folder is named after what it holds, as `plugins/jobs.ts` or `mails/welcome.kay`.
+A file kay reads for one thing is singular: `server.ts`, `auth.ts`, `mail.ts`, `ui.ts`, `context.ts`, `env.ts`, `theme.ts`. A folder holding one file per page, plugin, template, matcher or catalog is plural: `routes/`, `plugins/`, `mails/`, `messages/`, `params/`. A mass noun or an acronym stays as it is: `api/`, `content/`, `db/`. A file inside a plural folder is named after what it holds, as `plugins/metrics.ts` or `mails/welcome.kay`.
 
 A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/card`, and a folder of files is `/_kay/<nouns>/`, such as `/_kay/assets/`. The image resizer sits beside its variants under one prefix, `/_kay/images` for the endpoint and `/_kay/images/<file>` for the files `kay build` wrote.
 
@@ -20,7 +20,8 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | `public/` | files served as they are, from the site root |
 | `data/` | the SQLite files and stored files of the default stores, ignored by git and docker |
 | `src/api/` | API modules |
-| `src/plugins/` | server plugins, one per file; `plugins/jobs.ts` is the one home of queues, workflows and schedules |
+| `src/plugins/` | server plugins, one per file |
+| `src/jobs/` | queues, workflows, schedules and background jobs: each one a file exports is mounted, with no default export and no `.use` |
 | `src/messages/` | one catalog per locale, `<locale>.ts` |
 | `src/params/` | route param matchers, `<name>.ts` |
 | `src/content/` and `src/content.config.ts` | Markdown collections and their schemas |

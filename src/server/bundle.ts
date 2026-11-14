@@ -18,6 +18,8 @@ export interface Bundle {
   api?: ApiModule[]
   // The file names under `src/plugins`, whose plugins `pages()` uses before the pages.
   plugins?: string[]
+  // The paths under `src/jobs`, whose exported jobs `pages()` mounts after the plugins.
+  jobs?: string[]
   // The endpoint files under the routes directory, `llms.txt.ts` and the like.
   endpoints?: Endpoint[]
   modules: Record<string, unknown>

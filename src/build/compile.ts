@@ -6,7 +6,7 @@ import { rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
-import { extensionAppFiles, extensionContexts, extensionServerModules, pluginFiles, serverExtensions } from '../config-extensions'
+import { extensionAppFiles, extensionContexts, extensionServerModules, jobFiles, pluginFiles, serverExtensions } from '../config-extensions'
 import { implicitPlugins } from '../config-loader'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
@@ -95,7 +95,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new KayError('executable-invalid', `kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
-  const { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules, publicModules } = await serverParts(project)
+  const { routes, fallback, api, plugins, jobs, endpoints, editor, extensionMessages, modules, publicModules } = await serverParts(project)
   const configFile = join(root, CONFIG_FILE)
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
@@ -150,6 +150,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `  api: ${JSON.stringify(api)},`,
     `  endpoints: ${JSON.stringify(endpoints)},`,
     `  plugins: ${JSON.stringify(plugins)},`,
+    `  jobs: ${JSON.stringify(jobs)},`,
     `  extensionMessages: ${JSON.stringify(extensionMessages)},`,
     ...editor === undefined ? [] : [`  editor: ${JSON.stringify(editor)},`],
     `  publicModules: ${JSON.stringify(publicModules)},`,
@@ -220,6 +221,7 @@ export async function serverParts(project: Project) {
   // The API modules too, with their guards, which `pages()` mounts from the list rather than the directory.
   const api = await projectApi(root, config)
   const plugins = pluginFiles(root)
+  const jobs = jobFiles(root)
   const endpoints = await scanEndpoints(routesDir, mounts)
   const editor = extensionEditor(root, config.extensions)
   // The modules declaring `s.Public` run at boot, and an executable cannot scan for them.
@@ -229,9 +231,9 @@ export async function serverParts(project: Project) {
     throw new KayError('config-invalid', publicInFenceMessage(inFence))
 
   const publicModules = publicEnvModules(root).map(file => join(root, file))
-  const modules = [...new Set([...publicModules, ...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  const modules = [...new Set([...publicModules, ...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins, jobs)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
 
-  return { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules, publicModules }
+  return { routes, fallback, api, plugins, jobs, endpoints, editor, extensionMessages, modules, publicModules }
 }
 
 // Every module a route renders or runs: its page, layouts, special pages and guards, its layouts' own included.
