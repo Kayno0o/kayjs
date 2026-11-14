@@ -13,7 +13,7 @@ import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAN
 import { browserReads } from './browser'
 import { wrapActionButtons } from './button-forms'
 import { generate, isInteractive, islandCause, lineOf } from './codegen'
-import { deprecatedIslandAttributes, deprecatedIslandForms } from './deprecated-island'
+import { deprecatedIslandAttributes, deprecatedIslandForms, fenceBesideCall } from './deprecated-island'
 import { deprecatedPageSettings } from './deprecated-page'
 import { spelledOutScriptFence } from './deprecated-script-fence'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -382,6 +382,8 @@ export function compileKay(original: string, filename: string, options: CompileO
   if (file.server && options.component === true && !basename(filename).startsWith('_')) {
     diagnostics.push({ ...file.serverFence!, code: 'fence-invalid', message: 'A component has no `--- server` fence', note: 'only a page or a layout runs on the server for each request, and a component would take its values as required props', help: 'compute the value in the page or layout and pass it as a prop, or read it in an action' })
   }
+
+  diagnostics.push(...fenceBesideCall(file))
 
   if (file.client && pageFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot render in the browser only', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `island({ render: \'client\' })`' })

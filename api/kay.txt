@@ -538,7 +538,7 @@ interface IslandOptions
   fallback?: Element
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
-  render?: "client" | undefined
+  render?: unknown
 
 [.] IslandProp
 type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown

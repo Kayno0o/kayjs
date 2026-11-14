@@ -18,7 +18,7 @@ export interface IslandDeclaration {
   asks: string | undefined
 }
 
-export const ISLAND_CALL = /^island[ \t]*\(/m
+export const ISLAND_CALL = /\bisland[ \t]*\(/
 const RENDERS: ReadonlySet<string> = new Set(['island', 'client', 'static'])
 const HYDRATE_TIMINGS = new Set(['load', 'idle', 'visible', 'interaction'])
 const KEYS = ['render', 'hydrate', 'persist', 'interactive', 'plain']

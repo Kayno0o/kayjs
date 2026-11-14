@@ -89,6 +89,32 @@ describe('deprecated-island-fence', () => {
   })
 })
 
+describe('what the review found', () => {
+  it('keeps a comment closing the exported object from swallowing the call', () => {
+    const source = '--- module\nexport const island = {\n  hydrate: \'idle\' // when\n}\n--- island\n---\nbutton Go\n'
+    const fixed = apply(source, lints(source, 'deprecated-island-fence')[0]!)
+
+    expect(checked(fixed).diagnostics.filter(diagnostic => diagnostic.code === 'fence-syntax')).toEqual([])
+    expect(parseKay(fixed).island?.hydrate).toBe('idle')
+  })
+
+  it('reads an indented call, and a module fence below the script, as the call says', () => {
+    expect(parseKay('---\n  island({ render: \'client\' })\nconst a = 1\n---\np {a}\n').client).toBeDefined()
+
+    const below = '--- island\nconst a = 1\n--- module\nexport const island = { hydrate: \'idle\' }\n--- style\np{}\n---\nbutton {a}\n'
+
+    expect(apply(below, lints(below, 'deprecated-island-fence')[0]!)).not.toContain('--- script\nisland')
+  })
+
+  it('reports a fence line beside the call, which would win over it', () => {
+    const both = '--- static\nisland({ render: \'client\' })\n---\np hi\n'
+
+    expect(lints(both, 'fence-invalid').map(diagnostic => diagnostic.message)).toEqual(['A fence line and `island()` both say how the component renders'])
+    expect(apply(both, lints(both, 'fence-invalid')[0]!)).toBe('---\nisland({ render: \'client\' })\n---\np hi\n')
+    expect(lints('---\nisland({ render: \'client\' })\n---\np hi\n', 'fence-invalid')).toEqual([])
+  })
+})
+
 describe('render="client" and defer at a use', () => {
   const card = (attributes: string) => `---\nimport Card from './card.kay'\n---\nCard(${attributes})\n`
 

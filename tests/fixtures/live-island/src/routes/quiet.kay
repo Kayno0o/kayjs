@@ -12,4 +12,4 @@ head
   title Quiet
 h1 Quiet
 a.home(href="/") Home
-Stock(server="defer" count={note.length})
+Stock(server defer count={note.length})

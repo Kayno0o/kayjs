@@ -6,6 +6,8 @@ import { islandExport } from './island-arguments'
 const FENCE_WORD = /^---([ \t]+)(client|island|static)\b/
 const LABELED_LINE = /^---[ \t]*[a-z<]/
 const TRAILING_COMMA = /,$/
+// A `//` comment closing the text, which would swallow what a call writes after it on the same line.
+const LINE_COMMENT_END = /\/\/[^\n]*$/
 
 // The object an `export const island = { ... }` of the module fence gives, without its `as const`: its properties as written, and the statement to take out.
 function exportedObject(script: ScriptAnalysis): { properties: string, statement: { start: number, end: number } } | undefined {
@@ -38,6 +40,18 @@ export function wordEdit(line: Span, wordEnd: number, before: string): Fix['edit
   return before.trim() === '' ? { start: line.start + 3, end: wordEnd, text: '' } : { start: line.start + 4, end: wordEnd, text: 'script' }
 }
 
+// A fence line naming a role beside an `island()` call: the two say it twice, and the fence line would win over the call. The fix drops the word, which may change the role the call says.
+export function fenceBesideCall(file: KayFile): Diagnostic[] {
+  const island = file.island
+  const line = file.scriptLine
+  const fence = [file.client !== island?.span ? file.client : undefined, file.pin?.start !== island?.span.start ? file.pin : undefined].find(span => span !== undefined)
+
+  if (island === undefined || line === undefined || fence === undefined)
+    return []
+
+  return [{ ...fence, code: 'fence-invalid', message: 'A fence line and `island()` both say how the component renders', help: 'keep `island()` and write `---` for the fence line', fixes: [{ title: 'Drop the fence word', safe: false, edits: [wordEdit(line, fence.end, file.source.slice(0, line.start))] }] }]
+}
+
 // The `--- island`, `--- static` and `--- client` fence lines, and `export const island = { ... }` in a `--- module` fence, since 1.105: the script declares `island({ render, hydrate, persist })` as it declares `props<T>()`, one place for what a component says of its role. The fix moves each into the call; none when the file has no script fence line to put it in.
 export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Diagnostic[] {
   const line = file.scriptLine
@@ -63,7 +77,8 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
     // A fence holding nothing else goes with its line, when a labeled line closes it and the next fence does not need it.
     if (rest.trim() === '' && labeled && file.source.slice(header, module.start).trim() === '--- module') {
       edits.push({ start: header, end: module.end, text: '' })
-      before = file.source.slice(0, header) + file.source.slice(module.end, line.start)
+      // A module fence below the script line changes nothing above it.
+      before = header < line.start ? file.source.slice(0, header) + file.source.slice(module.end, line.start) : before
     }
     else {
       edits.push({ start: exported.statement.start, end: exported.statement.end + own, text: '' })
@@ -76,7 +91,7 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
   const properties = [render === undefined ? '' : `render: '${render}'`, exported?.properties ?? ''].filter(each => each !== '')
 
   // The call goes first in the script, which a `--- client` or `--- island` fence line no longer opens.
-  edits.push({ start: file.script.start, end: file.script.start, text: `island(${properties.length === 0 ? '' : `{ ${properties.join(', ')} }`})\n` })
+  edits.push({ start: file.script.start, end: file.script.start, text: `island(${properties.length === 0 ? '' : `{ ${properties.join(', ')}${LINE_COMMENT_END.test(properties.at(-1)!) ? '\n' : ' '}}`})\n` })
 
   const at = word === null ? exported!.statement : { start: line.start + 3 + word[1]!.length, end: line.start + 3 + word[1]!.length + word[2]!.length }
 
