@@ -12,7 +12,7 @@ export interface Recording {
 
 export interface RecordOptions {
   // What was said once `stop` ended the recording or `maxMs` ran out, or why there is nothing: the microphone went away (`lost`), the browser failed (`failed`) or no sound came (`empty`).
-  onEnd: (result: File | RecordProblem) => void
+  onEnd: (event: { result: File | RecordProblem }) => void
   // How long a recording runs before it stops as if `stop` was called.
   maxMs: number
 }
@@ -86,7 +86,7 @@ export async function startRecording(options: RecordOptions): Promise<Recording 
   // Told once, as a recorder may fire `error` and then `stop`.
   function report(result: File | RecordProblem) {
     if (!reported)
-      options.onEnd(result)
+      options.onEnd({ result })
 
     reported = true
   }

@@ -39,10 +39,10 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   // The unread count of a custom source; the unread items of `items` by default.
   unread?: number | undefined
   // Called with the key of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
-  onRead?: ((id: string | undefined) => unknown) | undefined
+  onRead?: ((event: { id: string | undefined }) => unknown) | undefined
   // Shows the list when the page sets it; the button, a click outside and Escape open and close it on their own.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Draws each row in place of its dot and title: `@item(note)`.
   item?: Snippet<[note: Item & ReturnType<typeof bellItem>]> | undefined
   // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is a function returning the count (a function, so the app's element is updated in place and keeps focus), to draw a badge of your own (the one over the default button is not drawn).
@@ -104,7 +104,7 @@ async function send(id?: string) {
   }
 
   try {
-    await onRead?.(id)
+    await onRead?.({ id })
   }
   catch (error) {
     console.error('kayjs-ui: a Bell could not run its onRead', error)

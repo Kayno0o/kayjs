@@ -12,9 +12,9 @@ export interface DropTargetsOptions<Item extends Id, Target extends Id> {
   // Whether `item` may land on `target`; a target refusing it is neither marked nor dropped on.
   accepts?: (item: Item, target: Target) => boolean
   // Applies a drop. No other drag starts until a returned promise settles, and a rejection goes unhandled, so wrap the call in `attempt`.
-  onDrop: (item: Item, target: Target) => unknown
+  onDrop: (event: { item: Item, target: Target }) => unknown
   // Runs once the pointer has rested on an accepting target for a moment, such as to open a collapsed folder under it.
-  onLinger?: (target: Target) => unknown
+  onLinger?: (event: { target: Target }) => unknown
 }
 
 interface Drag<Item> {
@@ -120,7 +120,7 @@ export class DropTargets<Item extends Id = Id, Target extends Id = Id> {
     if (target !== null && onLinger) {
       drag.linger = setTimeout(() => {
         if (this.#drag === drag && this.over() === target)
-          onLinger(target)
+          onLinger({ target })
       }, LINGER_MS)
     }
   }
@@ -168,7 +168,7 @@ export class DropTargets<Item extends Id = Id, Target extends Id = Id> {
     this.#dropping = true
 
     try {
-      await this.#options.onDrop(item, target)
+      await this.#options.onDrop({ item, target })
     }
     finally {
       this.#dropping = false

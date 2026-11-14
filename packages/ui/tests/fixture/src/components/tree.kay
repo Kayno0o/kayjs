@@ -17,6 +17,6 @@ function select(id: string, node: TreeNode) {
   onSelect(id, node)
 }
 ---
-TreeView#tree(nodes={nodes()} label="Folders" selected={picked()} onSelectedChange={select})
+TreeView#tree(nodes={nodes()} label="Folders" selected={picked()} onSelectedChange={({ id, node }) => select(id, node)})
 button#pick-api(type="button" onClick={() => picked = 'api'}) API
 button#rename(type="button" onClick={() => nodes.set(shown => shown.map(node => node.key === 'inbox' ? { ...node, label: 'Mail' } : node))}) Rename

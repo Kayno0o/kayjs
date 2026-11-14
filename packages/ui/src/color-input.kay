@@ -24,12 +24,12 @@ const { value = '#000000', label, showLabel = true, invalid, onInput, onChange, 
   // Marks the swatch as refused, its keyline in the danger colour, with `aria-invalid`. A FormField showing a message marks it on its own.
   invalid?: boolean | undefined
   // Called with each shade the picker is dragged over, as `#rrggbb`, and with the colour put back after a refused change or a form reset: the live value, which a preview follows. It is not held back by a pending `onChange`.
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // Runs once with the colour chosen as `#rrggbb`, when the picker commits it and after a form reset that moved it, not on each shade dragged over.
   // The place for a slow answer, such as a colour sent to a bulb that takes seconds to confirm it.
   // A promise holds the input busy until it settles, and puts the previous colour back when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
 }>()
 
 // The input only holds lowercase `#rrggbb`, and turns anything else into black.
@@ -43,8 +43,8 @@ const { shown, busy, ref: boxRef, move, change: chosen } = controlledInput<strin
   control: 'ColorInput',
   value: () => normal(sent ?? value),
   start: input => keepInvalid(input, () => invalid),
-  onChange: () => onChange,
-  restored: next => onInput?.(next),
+  onChange: () => onChange && ((value: string) => onChange?.({ value })),
+  restored: next => onInput?.({ value: next }),
   read: input => input.value,
   write: (input, next) => {
     input.value = next
@@ -61,7 +61,7 @@ function moved(event: Event) {
   const input = event.currentTarget as HTMLInputElement
 
   if (move(input))
-    onInput?.(input.value)
+    onInput?.({ value: input.value })
 }
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.

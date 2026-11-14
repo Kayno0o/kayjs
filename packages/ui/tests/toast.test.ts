@@ -262,7 +262,7 @@ describe('attempt', () => {
 
   test('hands a refusal to `onRefused` without toasting, and still toasts a failure that is no refusal', async () => {
     const seen: unknown[] = []
-    const onRefused = (data: unknown) => seen.push(data)
+    const onRefused = ({ data }: { data: unknown }) => seen.push(data)
     const reject = (error: Error) => async () => Promise.reject(error)
 
     expect(await attempt(reject(new ActionError(400, '', {}, { output: 'nginx: [emerg] bad directive' })), { failure: 'Could not apply', onRefused })).toBeUndefined()
@@ -512,7 +512,7 @@ describe('onDismiss', () => {
 
     try {
       const heard: string[] = []
-      const onDismiss = (reason: string) => heard.push(`${reason}:${toasts().length}`)
+      const onDismiss = ({ reason }: { reason: string }) => heard.push(`${reason}:${toasts().length}`)
 
       toast.info('timed', { duration: '1s', onDismiss })
       jest.advanceTimersByTime(1000)
@@ -679,7 +679,7 @@ describe('toast.promise outcome', () => {
 
   test('keeps onDismiss, once, and drops the loading description and action unless the outcome gives its own', async () => {
     const heard: string[] = []
-    const onDismiss = (reason: string) => heard.push(reason)
+    const onDismiss = ({ reason }: { reason: string }) => heard.push(reason)
     const done = toast.promise(Promise.resolve(1), { loading: 'Saving', description: 'wait', action, onDismiss, success: 'Saved', error: 'Failed' })
 
     expect(toasts()[0]).toMatchObject({ description: 'wait', action })
@@ -703,7 +703,7 @@ describe('toast.promise outcome', () => {
   test('when the reader closed the loading toast, the new outcome follows the same rule and onDismiss is not heard twice', async () => {
     const heard: string[] = []
     const { promise, resolve } = Promise.withResolvers<number>()
-    const done = toast.promise(promise, { loading: 'Saving', description: 'wait', action, onDismiss: reason => heard.push(reason), success: 'Saved', error: 'Failed' })
+    const done = toast.promise(promise, { loading: 'Saving', description: 'wait', action, onDismiss: ({ reason }) => heard.push(reason), success: 'Saved', error: 'Failed' })
 
     dismissToast(toasts()[0]!.id, 'user')
     resolve(1)

@@ -8,7 +8,7 @@ const { onInput, onChange } = props<{ onInput?: (value: number) => void, onChang
 const delay = signal(40)
 ---
 form#form
-  Slider#delay(label="Delay" name="delay" min={0} max={100} step={10} value={delay()} formatValue={value => `${value} ms`} onInput={(value: number) => { delay = value; onInput?.(value) }} onChange={onChange})
+  Slider#delay(label="Delay" name="delay" min={0} max={100} step={10} value={delay()} formatValue={value => `${value} ms`} onInput={({ value }) => { delay = value; onInput?.(value) }} onChange={({ value }) => onChange?.(value)})
   Slider#named(label="Pause" name="named" min={0} max={10} value={2} aria-label="Pause between two sends")
   Slider#locked(label="Locked" name="locked" min={0} max={10} value={5} disabled)
   Slider#quiet(label="Quiet" name="quiet" min={0} max={10} value={3} showValue={false})

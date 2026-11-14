@@ -1,7 +1,7 @@
 ---
 import { onCleanup, onMount } from 'kay'
 
-const { onOpenChange } = props<{ onOpenChange: (open: boolean) => unknown }>()
+const { onOpenChange } = props<{ onOpenChange: (event: { open: boolean }) => unknown }>()
 
 let mark: HTMLElement | undefined
 
@@ -19,7 +19,7 @@ onMount(() => {
       return
 
     shown = details.open
-    onOpenChange(shown)
+    onOpenChange({ open: shown })
   }
 
   details.addEventListener('toggle', listener)

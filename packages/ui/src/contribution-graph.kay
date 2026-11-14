@@ -18,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActive, active, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActiveChange, onActive, active, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -30,12 +30,14 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   // Names each month above the week it starts in, placing every cell by hand.
   months?: boolean | undefined
   // Makes every cell a button handing back its day; with `href` too, a cell that has an address stays a link and a plain click goes to this.
-  onSelect?: ((day: ContributionDay) => unknown) | undefined
+  onSelect?: ((event: { item: ContributionDay }) => unknown) | undefined
   // The address a cell links to, or `undefined` for none.
   href?: ((day: ContributionDay) => string | undefined) | undefined
   // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
   // Hears the index of the cell the pointer or the focus is on, `null` when it leaves.
+  onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
+  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onActive?: ((index: number | null) => unknown) | undefined
   // The cell to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
@@ -44,7 +46,7 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   empty?: Snippet | undefined
 }>()
 
-const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
 
 function link(day: ContributionDay) {
   const to = href?.(day)
@@ -58,7 +60,7 @@ function pressed(event: MouseEvent, day: ContributionDay) {
     return
 
   event.preventDefault()
-  void onSelect(day)
+  void onSelect({ item: day })
 }
 
 function focused(event: FocusEvent, index: number) {
@@ -115,6 +117,6 @@ else
       if markKind(link(day)?.href, onSelect !== undefined) === 'link'
         a(part="cell" {...link(day)} data-kind="link" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={event => pressed(event, day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
       else if onSelect
-        button(part="cell" type="button" data-kind="button" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={() => void onSelect?.(day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+        button(part="cell" type="button" data-kind="button" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={() => void onSelect?.({ item: day })} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
       else
         span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})

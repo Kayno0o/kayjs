@@ -47,7 +47,7 @@ async function convert(value: string) {
 .html-converter
   label.html-converter-input
     span HTML
-    Textarea(rows={12} spellcheck={false} placeholder="Paste HTML here" value={html()} onInput={value => void convert(value)} onFocus={() => void preload()})
+    Textarea(rows={12} spellcheck={false} placeholder="Paste HTML here" value={html()} onInput={({ value }) => void convert(value)} onFocus={() => void preload()})
   .code.html-converter-output
     .code-bar
       span kay

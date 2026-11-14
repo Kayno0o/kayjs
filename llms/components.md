@@ -76,7 +76,7 @@ if open()
   p Details
 ```
 
-`bind:` also takes any prop that has an `on<Prop>Change` callback beside it, which is how kayjs-ui's controls report their state: `Dialog(bind:open={open})` is `Dialog(open={open()} onOpenChange={v => open = v})`, and a component of your own with `{ open?: boolean, onOpenChange?: (open: boolean) => unknown }` takes it the same. The long form stays; an `onOpenChange` written beside the bind is called after the write, with the callback's every argument. `kay check` types the bind by the callback's first parameter. Only one plain `onOpenChange={handler}` may sit beside the bind, with no modifier. A spread carrying `open` or `onOpenChange` is merged after the bind and overrides it, and the callback reaches a component that does not declare it as a prop it ignores.
+`bind:` also takes any prop that has an `on<Prop>Change` callback beside it, which is how kayjs-ui's controls report their state: `Dialog(bind:open={open})` is `Dialog(open={open()} onOpenChange={({ open: v }) => open = v})`, and a component of your own with `{ open?: boolean, onOpenChange?: (open: boolean) => unknown }` takes it the same. The long form stays; an `onOpenChange` written beside the bind is called after the write, with the callback's every argument. `kay check` types the bind by the callback's first parameter. Only one plain `onOpenChange={handler}` may sit beside the bind, with no modifier. A spread carrying `open` or `onOpenChange` is merged after the bind and overrides it, and the callback reaches a component that does not declare it as a prop it ignores.
 
 ### Run code when a value changes, on a timer or on an event
 

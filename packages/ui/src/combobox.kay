@@ -64,14 +64,14 @@ const { size = 'md', invalid, icon, id, options, value = '', valueLabel, label, 
   disabled?: boolean | undefined
   // Shows the list when the page sets it; focus, typing, Escape, a pick and focus leaving open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
-  onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
+  onChange?: ((event: { value: Value | '', option: ComboboxOption<Value> | undefined }) => unknown) | undefined
   // Called with the text of a created option, once it is picked.
-  onCreate?: ((text: string) => unknown) | undefined
+  onCreate?: ((event: { text: string }) => unknown) | undefined
   // Called with the text in the input on every edit of it, for a filter or analytics kept beside the combobox.
-  onInput?: ((text: string) => unknown) | undefined
+  onInput?: ((event: { text: string }) => unknown) | undefined
   // Called with the options a function answered and the text it was asked for, for the latest question only: an answer that arrives after a newer key press is not reported.
-  onLoad?: ((options: readonly ComboboxOption<Value>[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly ComboboxOption<Value>[], query: string }) => unknown) | undefined
   // Called with `{ error, query }`, what a function rejected with and the text it was asked for, for the latest question only; `failureLabel` still shows.
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Draws each row in place of its label and description: `@option(option)`. The row stays named by the option's `label`, and the input shows the label once it is picked.
@@ -97,9 +97,9 @@ const active = signal(-1)
 // The text the answers held in `found` are for. Only the latest question lands: an answer arriving after a newer key press is dropped.
 const { found, answered, failed, load, stale } = searchOptions<ComboboxOption<Value>>(() => options, {
   minLength: () => minLength,
-  onLoad: (answer, query) => {
+  onLoad: (loaded) => {
     active = -1
-    onLoad?.(answer, query)
+    onLoad?.(loaded)
   },
   onError,
   label: 'Combobox',
@@ -198,7 +198,7 @@ effect(() => {
     return
 
   told = now
-  untrack(() => onOpenChange?.(now))
+  untrack(() => onOpenChange?.({ open: now }))
 })
 
 // The search waits for a pause in typing; a list filters at once.
@@ -211,14 +211,14 @@ function type(next: string) {
   text = next
   active = -1
   failed.set(false)
-  onInput?.(next)
+  onInput?.({ text: next })
 
   if (remote)
     found.set([])
 
   if (picked()) {
     picked = undefined
-    onChange?.('', undefined)
+    onChange?.({ value: '', option: undefined })
   }
 }
 
@@ -235,9 +235,9 @@ function pick(index: number) {
   active = -1
 
   if (!row)
-    onCreate?.(option.label)
+    onCreate?.({ text: option.label })
 
-  onChange?.(option.value, option)
+  onChange?.({ value: option.value, option })
 }
 
 // Typing a label whole is a pick, for the visitor who never reaches for the list.
@@ -252,7 +252,7 @@ function adopt(): boolean {
 
   picked = option
   text = option.label
-  onChange?.(option.value, option)
+  onChange?.({ value: option.value, option })
 
   return true
 }
@@ -320,7 +320,7 @@ function keyDown(event: KeyboardEvent) {
         picked = undefined
 
         if (had)
-          onChange?.('', undefined)
+          onChange?.({ value: '', option: undefined })
       }
 
       break

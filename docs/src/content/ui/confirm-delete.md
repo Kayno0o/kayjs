@@ -52,7 +52,7 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 
 ## A message read when it opens
 
-`onOpenChange` is called with `true` when the trigger is pressed and with `false` once the dialog goes. Use it when `message` depends on something you must ask for first, such as a request: set a signal when `open` is true and pass that signal as `message`.
+`onOpenChange({ open })` is called with `true` when the trigger is pressed and with `false` once the dialog goes. Use it when `message` depends on something you must ask for first, such as a request: set a signal when `open` is true and pass that signal as `message`.
 
 ## Look and cancel label
 
@@ -60,11 +60,11 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 
 ## Opened by the app
 
-`open` shows the dialog or the armed pair when your code sets it, so a [Menu](/ui/menu) entry, a context menu or a shortcut can ask for the confirmation. With `triggerLook="none"` the component draws no trigger of its own. `onOpenChange(false)` follows a cancel, Escape and a delete that went through, to set `open` back to `false`; it does not run for a change your code made. An inline ask opened this way gives the focus back to the element that held it before.
+`open` shows the dialog or the armed pair when your code sets it, so a [Menu](/ui/menu) entry, a context menu or a shortcut can ask for the confirmation. With `triggerLook="none"` the component draws no trigger of its own. `onOpenChange({ open: false })` follows a cancel, Escape and a delete that went through, to set `open` back to `false`; it does not run for a change your code made. An inline ask opened this way gives the focus back to the element that held it before.
 
 ```kay
 Menu(label="Row" icon="menu" items={[{ label: 'Delete', tone: 'danger', onSelect: () => asking = true }]})
-ConfirmDelete(triggerLook="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failureLabel="Could not delete" onConfirm={remove})
+ConfirmDelete(triggerLook="none" open={asking()} onOpenChange={({ open }) => asking = open} message="Delete this row?" failureLabel="Could not delete" onConfirm={remove})
 ```
 
 ## Attributes

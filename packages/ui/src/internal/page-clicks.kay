@@ -8,8 +8,8 @@ const look = recipe({ parts: { root: '' } })
 
 // The handlers are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which a Pagination would then be on every page. The Pagination's other props arrive as they were given, and `rest` holds the attributes it takes for its nav.
 const { whenPage, whenSize, of, page, offset, rest, pages, total, pageSize, limit, more, url, param, siblings, step, sizes, limitParam, sizeLabel, rangeLabel, label, previousLabel, nextLabel } = props<{
-  whenPage?: ((page: number, event: MouseEvent) => unknown) | undefined
-  whenSize?: ((size: number, event: MouseEvent) => unknown) | undefined
+  whenPage?: ((event: { page: number, event: MouseEvent }) => unknown) | undefined
+  whenSize?: ((event: { size: number, event: MouseEvent }) => unknown) | undefined
   of?: PagedList | undefined
   page?: number | undefined
   offset?: number | undefined
@@ -49,13 +49,14 @@ function pick(event: MouseEvent) {
     return
 
   const size = link.dataset.size !== undefined
-  const handler = size ? whenSize : whenPage
   const value = Number(link.dataset.size ?? link.dataset.page)
 
-  if (!handler || Number.isNaN(value))
+  if (Number.isNaN(value))
     return
 
-  if (handler(value, event) === false)
+  const told = size ? whenSize?.({ size: value, event }) : whenPage?.({ page: value, event })
+
+  if ((size ? whenSize : whenPage) === undefined || told === false)
     return
 
   event.preventDefault()

@@ -29,7 +29,7 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'c
   required?: boolean | undefined
   // A promise holds the box busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: ((checked: boolean) => unknown) | undefined
+  onChange?: ((event: { checked: boolean }) => unknown) | undefined
 }>()
 
 // Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
@@ -53,7 +53,7 @@ const issuesId = shown ? uid() : ''
 const { on, busy, ref, change } = controlledCheckbox({
   control: 'Checkbox',
   checked: () => sent ?? given.checked ?? false,
-  onChange: () => given.onChange,
+  onChange: () => given.onChange && ((checked: boolean) => given.onChange?.({ checked })),
   start: (element) => {
     box = element
     element.indeterminate = untrack(() => given.indeterminate ?? false)

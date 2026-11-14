@@ -12,7 +12,7 @@ const PLAIN = 'label="x" options={options} value={held}'
 
 // One scratch copy of the fixture holds a component per case, checked in one `kay check` run, so the shared fixture never meets a type error.
 const CASES = [
-  { name: 'ok', held: '\'a\' as \'a\' | null', options: withNull, props: `${PLAIN} onChange={(value: 'a' | null) => value}` },
+  { name: 'ok', held: '\'a\' as \'a\' | null', options: withNull, props: `${PLAIN} onChange={({ value }: { value: 'a' | null }) => value}` },
   { name: 'non-nullable', held: '\'a\' as \'a\'', options: withNull, props: PLAIN },
   { name: 'empty-and-null', held: '\'\' as \'\' | \'a\' | null', options: withBoth, props: PLAIN },
 ]

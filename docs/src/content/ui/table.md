@@ -6,7 +6,7 @@ description: A table of rows described by columns, with sortable headers and an 
 
 ## Sorting
 
-Give a column a `sortValue` to make its header sortable: `true` sorts by the row's own value at `key`, a function sorts by what it returns. `defaultDirection` sets the first click's direction, and `onSort` reports each sort. With `serverSort`, the table only reflects the sort in its headers and your data source orders the rows. `sortable={false}` removes every sortable header, `numeric` columns included, for rows loaded page by page that a click would sort alone.
+Give a column a `sortValue` to make its header sortable: `true` sorts by the row's own value at `key`, a function sorts by what it returns. `defaultDirection` sets the first click's direction, and `onSortChange({ sort })` reports each sort. With `serverSort`, the table only reflects the sort in its headers and your data source orders the rows. `sortable={false}` removes every sortable header, `numeric` columns included, for rows loaded page by page that a click would sort alone.
 
 For rows loaded page by page, `list={list}` from `infiniteList` is better: the table sorts on the server instead, see [LoadMore](load-more.md). A table takes `rows` or `list`, one of the two, and `kay check` fails one with neither.
 
@@ -22,7 +22,7 @@ With a `@cell(row, column)` block, every column is drawn by it, except one marke
 
 `selectable` puts a checkbox on each row and a select-all box above the rows, ticked, indeterminate or empty, reading `N selected` once rows are picked. It sits outside the table, so rows stacked as cards have it too.
 
-`selected` gives the keys to start from and `onSelectedChange(keys, rows)` hears every change: the keys, as `selected` takes them, and the rows they stand for, both in the rows' order. A key whose row left `rows` is dropped from the selection, which is what an infinite list's rows or a reload need; with a `filter`, select-all picks only the rows it shows.
+`selected` gives the keys to start from and `onSelectedChange({ keys, rows })` hears every change: the keys, as `selected` takes them, and the rows they stand for, both in the rows' order. A key whose row left `rows` is dropped from the selection, which is what an infinite list's rows or a reload need; with a `filter`, select-all picks only the rows it shows.
 
 The `@bulk(keys, clear)` block draws the page's bulk actions beside the count while something is picked, and `clear()` empties the selection. The keys have the type of the `rowKey` field, so a table keyed by a string field hands a `string[]` to an action with no conversion. `selectAllLabel`, `selectedLabel(count)` and `selectRowLabel(row)` replace the texts, for another language.
 
@@ -32,7 +32,7 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 `expandable` puts a toggle on each row that opens the `@detail(row)` block in a full-width row under it, or under its card when the rows are stacked. Rows start closed. The toggle carries `aria-expanded` and `aria-controls`, and is named `Details of <first column's text>`; `expandLabel(row)` replaces the words.
 
-`expanded` gives the keys of the rows to start open (a new list from the parent is followed) and `onOpenChange(key, open)` hears each toggle. A table cannot be both `expandable` and `virtual`.
+`expanded` gives the keys of the rows to start open (a new list from the parent is followed) and `onOpenChange({ key, open })` hears each toggle. A table cannot be both `expandable` and `virtual`.
 
 <Demo name="table/expandable" />
 
@@ -40,11 +40,11 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 `rows` also takes a function returning the rows or a promise of them. An array is drawn by the server. A function is called in the browser only, so it may use `window`, and a promise's answer lands there too; the server draws `skeletonRows` (5) skeleton rows for both. A refresh keeps the rows shown, dimmed, and a failure keeps them beside `failureLabel` with a retry that calls the function again (a bare promise gets none).
 
-`onLoad(rows)` and `onError({ error })` hear each answer, and `loadingLabel`, `failureLabel` and `retryLabel` replace the words. `busy` draws the skeleton for rows the page loads itself, and a table over a `list` shows it while the first page is on its way.
+`onLoad({ rows })` and `onError({ error })` hear each answer, and `loadingLabel`, `failureLabel` and `retryLabel` replace the words. `busy` draws the skeleton for rows the page loads itself, and a table over a `list` shows it while the first page is on its way.
 
 ## Rows as links
 
-`rowHref(row)` makes each row a link and `onRowClick(row, event)` a button, or hears the click of a link row. The first cell holds a real anchor or button stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`), so middle click and open in a new tab work. The checkbox, the toggle and the links and buttons the cells draw stay clickable above it, so ticking a row never navigates.
+`rowHref(row)` makes each row a link and `onRowClick({ row, event })` a button, or hears the click of a link row. The first cell holds a real anchor or button stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`), so middle click and open in a new tab work. The checkbox, the toggle and the links and buttons the cells draw stay clickable above it, so ticking a row never navigates.
 
 The link covers the row, so its text cannot be selected with the mouse and a `tooltip` on the row's own content does not show; put them on a control.
 
@@ -68,7 +68,7 @@ When the page holds only a part of the rows, give `exportable` an address: the b
 
 ## Pages
 
-`pageSize` draws the rows a page at a time with a Pagination under them: a summary such as `21–40 of 134` beside the pages. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. `pageSizes` adds links that change the size, and `onPageChange(page, size)` hears each change.
+`pageSize` draws the rows a page at a time with a Pagination under them: a summary such as `21–40 of 134` beside the pages. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first. `pageSizes` adds links that change the size, and `onPageChange({ page, size })` hears each change.
 
 The page and size are kept in the address, `?page=` and `?limit=` (`pageParam` and `limitParam` rename them), so the server draws the page a link or a shared URL names. Give `page` to hold the page yourself: the table then leaves the address alone and you set `page` from `onPageChange`. A table over a `list` or a `virtual` one cannot take a `pageSize`, as they page or window their rows themselves.
 
@@ -88,8 +88,8 @@ Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labell
 
 A column takes `width` and `minWidth` (a number is pixels, a string any CSS length), `sticky` (`start` or `end`, one column per edge, kept in view while the table scrolls sideways), `hidden`, `class` for its header and cells, and `footer`, a line in the foot of the table. Narrow cards ignore the widths and `sticky`.
 
-`@header(column)` draws a header in place of the text, and `@footer(column)` the cells of the foot. `columnToggle` adds a Columns button with a checkbox per column to show and hide them; `hiddenColumns` sets the hidden ones from the page and `onHiddenColumnsChange(keys)` hears the reader's choice.
+`@header(column)` draws a header in place of the text, and `@footer(column)` the cells of the foot. `columnToggle` adds a Columns button with a checkbox per column to show and hide them; `hiddenColumns` sets the hidden ones from the page and `onHiddenColumnsChange({ keys })` hears the reader's choice.
 
 ## Name and scrolling
 
-`label` adds a caption only screen readers see, naming the table. When the table is wider or taller than its box it scrolls, and its box then takes the focus so a keyboard can scroll it, as a region named by `aria-label` or else by `label`. A table that fits adds no focus stop, and `onScrollChange(scrolls)` hears when that changes.
+`label` adds a caption only screen readers see, naming the table. When the table is wider or taller than its box it scrolls, and its box then takes the focus so a keyboard can scroll it, as a region named by `aria-label` or else by `label`. A table that fits adds no focus stop, and `onScrollChange({ scrolls })` hears when that changes.

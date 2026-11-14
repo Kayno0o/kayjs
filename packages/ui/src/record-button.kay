@@ -28,11 +28,11 @@ const look = recipe({
 
 const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failureLabel, maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onCancel' | 'onError'> & {
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
-  onRecord: (audio: File) => unknown
+  onRecord: (event: { audio: File }) => unknown
   // Called once the microphone is open and the recording runs: to dim the page, stop a player.
   onStart?: (() => unknown) | undefined
   // Called when the recording ends, before `onRecord`: `press` when the visitor stopped it, `limit` when `maxDuration` ran out.
-  onStop?: ((reason: RecordStop) => unknown) | undefined
+  onStop?: ((event: { reason: RecordStop }) => unknown) | undefined
   // Called when Escape drops the recording.
   onCancel?: (() => unknown) | undefined
   // Called with `{ problem }`, why nothing was recorded, the code of the Notice shown (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost`, `empty`), or `send` with the rejection as `error` when `onRecord` rejected. The Notice still shows.
@@ -40,7 +40,7 @@ const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChan
   // Whether it records, set by the app: `true` starts a recording as a press would (and asks for the microphone), `false` stops it and hands it over. Left out, the button keeps it itself.
   recording?: boolean | undefined
   // Called with `true` as a recording starts (the microphone is asked for) and `false` once it is over, however it ended: stopped, cancelled, out of time, refused or lost.
-  onRecordingChange?: ((recording: boolean) => unknown) | undefined
+  onRecordingChange?: ((event: { recording: boolean }) => unknown) | undefined
   // Names the button, which stays pressed while it records: a press starts, the next stops and hands the recording over, and Escape drops it.
   label?: string | undefined
   // Said when the promise of `onRecord` rejects.
@@ -50,7 +50,7 @@ const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChan
   maxDuration?: Duration | undefined
 }>()
 
-const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure: failureLabel ?? wording('ui.recordButton.failure', 'The recording could not be sent.'), maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
+const voice = recorder({ onAudio: ({ audio }) => onRecord({ audio }), words: recordWords(), failure: failureLabel ?? wording('ui.recordButton.failure', 'The recording could not be sent.'), maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
 
 // Follows `recording` when the app sets it; only its changes act, so a recording that ended on its own is not started again.
 effect(() => {

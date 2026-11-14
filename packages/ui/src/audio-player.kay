@@ -61,9 +61,9 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   cues?: readonly AudioCue[] | undefined
   // Seconds played; a player whose parent passes another follows it, and `onPositionChange` reports the playing.
   position?: number | undefined
-  onPositionChange?: ((seconds: number) => unknown) | undefined
+  onPositionChange?: ((event: { seconds: number }) => unknown) | undefined
   // Gets the index of the chapter now playing, or -1 before the first.
-  onChapterChange?: ((index: number) => unknown) | undefined
+  onChapterChange?: ((event: { index: number }) => unknown) | undefined
   // Called when the audio starts playing, by the button, a chapter, a cue or the lock screen.
   onPlay?: (() => unknown) | undefined
   // Called when it pauses.
@@ -145,7 +145,7 @@ function report(seconds: number) {
 
   lastTold = seconds
   told.set(seconds, now)
-  onPositionChange?.(seconds)
+  onPositionChange?.({ seconds })
 }
 
 effect(() => {
@@ -159,7 +159,7 @@ effect(() => {
   const now = current()
 
   if (reported !== undefined && now !== reported)
-    onChapterChange?.(now)
+    onChapterChange?.({ index: now })
 
   reported = now
 })

@@ -22,11 +22,11 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
   // Below `md`, whether the detail pane takes the list's place.
   detailOpen?: boolean | undefined
   // Called with `false` when the back button above the detail, drawn below `md` when this is passed, closes it, for the parent to set `detailOpen` back to false.
-  onDetailOpenChange?: ((open: boolean) => unknown) | undefined
+  onDetailOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Below `md`, whether the sidebar covers the layout; its back button calls `onSidebarOpenChange(false)` for the parent to set it back to false.
   sidebarOpen?: boolean | undefined
   // Called with `false` when the back button closes the sidebar.
-  onSidebarOpenChange?: ((open: boolean) => unknown) | undefined
+  onSidebarOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
   resizableList?: boolean | undefined
   // The name of the cookie the list's width is kept in, from one visit to the next, which the server reads, so the saved width is drawn from the first paint with no jump.
@@ -94,11 +94,11 @@ followFocus(() => sidebarOpen, () => sidebarPane)
 followFocus(() => detailOpen, () => detailPane)
 
 function closeSidebar() {
-  onSidebarOpenChange?.(false)
+  onSidebarOpenChange?.({ open: false })
 }
 
 function closeDetail() {
-  onDetailOpenChange?.(false)
+  onDetailOpenChange?.({ open: false })
 }
 
 function clampWidth(px: number): number {

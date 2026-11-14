@@ -32,6 +32,6 @@ ThemeToggle(modes={['light', { value: 'dark', label: 'Night' }]} label="Appearan
 
 ## Holding the choice yourself
 
-`value` makes the app the holder, such as a saved preference of a signed-in visitor. The toggle follows it and writes no cookie. `onChange(mode, option)` hears each pick, and may return a promise as on Segmented: the toggle is busy until it settles, and a pick that resolves to `false` or rejects is put back and not kept.
+`value` makes the app the holder, such as a saved preference of a signed-in visitor. The toggle follows it and writes no cookie. `onValueChange({ value, option })` hears each pick, and may return a promise as on Segmented: the toggle is busy until it settles, and a pick that resolves to `false` or rejects is put back and not kept.
 
 `cookie="appearance"` keeps the choice under another name; the layout must then call `scheme('appearance')`, or it reads the default cookie.

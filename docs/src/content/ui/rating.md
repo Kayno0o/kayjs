@@ -29,10 +29,10 @@ The stars are inline, so a rating sits next to a count or a name like any text.
 `onChange` or `name` turns the stars into a picker over real radios: a click, the arrow keys and a form reset pick, a hover previews, and the rating posts under `name` inside a form. `value` is then a whole number, 0 for none, and `label` names the group, such as `Your rating`.
 
 ```kay
-Rating(value={rating()} label="Your rating" name="rating" onChange={value => rating = value ?? 0} allowClear)
+Rating(value={rating()} label="Your rating" name="rating" onChange={({ value }) => rating = value ?? 0} allowClear)
 ```
 
-`onChange` hears `null` for a rating cleared (`allowClear` makes a click on the star already picked clear it) and for a reset to none. A promise from it holds the group busy and puts the previous rating back when it resolves to `false`, rejects or throws, as [Segmented](/ui/segmented) does. `disabled` keeps the rating as it is.
+`onChange({ value })` hears `null` for a rating cleared (`allowClear` makes a click on the star already picked clear it) and for a reset to none. A promise from it holds the group busy and puts the previous rating back when it resolves to `false`, rejects or throws, as [Segmented](/ui/segmented) does. `disabled` keeps the rating as it is.
 
 ## Another glyph
 

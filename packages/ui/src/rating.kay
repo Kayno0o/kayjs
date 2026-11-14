@@ -31,7 +31,7 @@ const { value = 0, max = 5, label, showLabel = false, onChange, name, invalid, r
   showLabel?: boolean | undefined
   // Turns the stars into a picker over real radios: a click, the arrow keys and a form reset pick, and a hover previews. A promise holds the group busy until it settles and puts the previous rating back when it resolves to false, rejects or throws (logged), as Segmented's does.
   // Hears `null` for a rating cleared, and for a reset to none.
-  onChange?: ((value: number | null) => unknown) | undefined
+  onChange?: ((event: { value: number | null }) => unknown) | undefined
   // Turns the stars into a picker as `onChange` does, and posts the rating under this name inside a form.
   name?: string | undefined
   // The glyph of a star, a slot of the app's icon set or an imported icon.
@@ -68,7 +68,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   options: () => places().map(place => ({ value: place + 1 })),
   value: whole,
   name: () => name,
-  onChange: () => onChange && ((next: string | number | null) => onChange?.(next as number | null)),
+  onChange: () => onChange && (({ value }: { value: string | number | null }) => onChange?.({ value: value as number | null })),
   appRef: rest.ref,
 })
 

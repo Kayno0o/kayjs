@@ -9,7 +9,7 @@ const { listId, open, onOpenChange } = props<{
   // Shows the list when the page sets it; the toggle, a press outside and Escape open and close it on their own.
   open?: boolean | undefined
   // Called with the new state whenever the list shows or hides, however it did.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 
 const find = () => document.getElementById(listId)
@@ -36,7 +36,7 @@ onMount(() => {
   if (!list)
     return
 
-  const toggled = (event: Event) => onOpenChange?.((event as ToggleEvent).newState === 'open')
+  const toggled = (event: Event) => onOpenChange?.({ open: (event as ToggleEvent).newState === 'open' })
 
   list.addEventListener('toggle', toggled)
   onCleanup(() => list.removeEventListener('toggle', toggled))

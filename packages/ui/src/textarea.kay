@@ -17,9 +17,9 @@ const { size = 'md', invalid, value, onInput, onChange, onBlur, writeFocused = f
   invalid?: boolean | undefined
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // Called once the value is committed, on blur, after `onInput`.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
   // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat clearing its draft or putting a refused message back.
   writeFocused?: boolean | undefined
 }>()
@@ -36,7 +36,7 @@ const { heard, sync } = controlledValue({
   writable: element => writeFocused || document.activeElement !== element,
   report: (element) => {
     heard(element.value)
-    ;(onInput ?? onChange)?.(element.value)
+    ;(onInput ?? onChange)?.({ value: element.value })
   },
 })
 
@@ -52,4 +52,4 @@ const ref = fieldRef<HTMLTextAreaElement>((element) => {
 }, rest.ref)
 
 ---
-textarea({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={sent ?? untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={sent ?? untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.({ value: event.currentTarget.value }) }} onChange={event => { heard(event.currentTarget.value); onChange?.({ value: event.currentTarget.value }) }} onBlur={event => { sync(true); onBlur?.(event) }})

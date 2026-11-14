@@ -84,14 +84,14 @@ const { action, initial = [], labels = {}, label = wording('ai.chat.label', 'Cha
   // Questions offered in the empty chat; a click sends one. A function gives them per page or per visitor: it returns the list, or a promise of it, and is called once when the chat is drawn; a promise that rejects shows none.
   suggestions?: string[] | (() => string[] | Promise<string[]>) | undefined
   // What the app hears, each called once per transition, in this order for a send: `onSuggestion(text)`, `onRegenerate()` or `onEdit(text)` as the visitor presses the button, then `onSend({ messages })` with the messages posted, `onToolCall(call)` each time a call starts or ends (`reply.progress()` actions), and last one of `onReply(turn)` with the finished turn, `onStop()` (called when the visitor presses Stop, whatever has arrived) or `onError({ message, status })` for a refused call or a stream that broke off. A throw, or a rejected promise, is logged and leaves the chat alone. A reply asked for again after a reload skips `onSend`.
-  onSend?: ((sent: { messages: ChatMessage[] }) => unknown) | undefined
-  onReply?: ((turn: ChatTurnView) => unknown) | undefined
+  onSend?: ((event: { messages: ChatMessage[] }) => unknown) | undefined
+  onReply?: ((event: { turn: ChatTurnView }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
-  onToolCall?: ((call: AiToolCall) => unknown) | undefined
+  onToolCall?: ((event: { call: AiToolCall }) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined
-  onEdit?: ((text: string) => unknown) | undefined
-  onSuggestion?: ((text: string) => unknown) | undefined
+  onEdit?: ((event: { text: string }) => unknown) | undefined
+  onSuggestion?: ((event: { text: string }) => unknown) | undefined
   // What the tools of a reply are called in the one line they fold into, by tool name such as `{ search_docs: 'Searched the docs' }`; a tool without one shows its own name, and a tool called more than once adds `x2`.
   toolLabels?: Record<string, string> | undefined
   // What the round buttons draw, by name, in place of the library's own: an icon of the app's set or one imported from `~icons/<prefix>/<name>`, as `Icon` takes it. Only the names given change.
@@ -183,12 +183,12 @@ const session = createChatSession({
   get loadFailedMessage() { return loadFailedLabel },
   get signedOutMessage() { return signedOutLabel },
   onSend: sent => onSend?.(sent),
-  onReply: turn => onReply?.(viewOf(turn)),
+  onReply: ({ turn }) => onReply?.({ turn: viewOf(turn) }),
   onStop: () => onStop?.(),
   onError: failed => onError?.(failed),
-  onToolCall: call => onToolCall?.(call),
+  onToolCall: ({ call }) => onToolCall?.({ call }),
   onRegenerate: () => onRegenerate?.(),
-  onEdit: text => onEdit?.(text),
+  onEdit: ({ text }) => onEdit?.({ text }),
 })
 const { history, draft, partial, thought, thoughtOpen, calls, code, found, spoken, failure, takenBack, busy, send, stop } = session
 const { attached, problem: attachProblem } = attachments
@@ -340,7 +340,7 @@ function sendFrom(event: Event) {
 }
 
 // The microphone of `transcribe`, which is only created for a chat taking one: the recorder's own chunk loads only then.
-const voice = transcribe === undefined ? undefined : recorder({ onAudio: heard, words: recordWords(), failure: transcribeFailedLabel, sending: transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
+const voice = transcribe === undefined ? undefined : recorder({ onAudio: ({ audio }) => heard(audio), words: recordWords(), failure: transcribeFailedLabel, sending: transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
 const voiceBusy = () => voice?.state() === 'asking' || voice?.state() === 'sending'
 
 async function heard(audio: File) {
@@ -519,7 +519,7 @@ function ask(question: string) {
 }
 
 function suggest(question: string) {
-  onSuggestion?.(question)
+  onSuggestion?.({ text: question })
   ask(question)
 }
 
@@ -719,7 +719,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         for item of session.conversations() key={item.id}
           li(part="conversation" data-current={shownParam?.() === item.id ? '' : undefined})
             if renaming() === item.id
-              TextInput(part="renameField" maxlength="120" ref={element => { queueMicrotask(() => element.focus()) }} value={renameDraft()} onInput={value => { renameDraft = value }} aria-label={`${renameLabel}: ${titled(item.title)}`} onKeyDown={event => renameKey(event, item.id)} onBlur={() => { if (renaming() === item.id) void saveRename(item.id) }})
+              TextInput(part="renameField" maxlength="120" ref={element => { queueMicrotask(() => element.focus()) }} value={renameDraft()} onInput={({ value }) => { renameDraft = value }} aria-label={`${renameLabel}: ${titled(item.title)}`} onKeyDown={event => renameKey(event, item.id)} onBlur={() => { if (renaming() === item.id) void saveRename(item.id) }})
             else if deleting() === item.id
               div(part="deleteConfirm" role="group" aria-label={`${deleteLabel}: ${titled(item.title)}`} onKeyDown={event => deleteKey(event, item.id)})
                 span {titled(item.title)}: {deleteConfirmLabel}
@@ -748,7 +748,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     for turn, index of history() key={turn.id}
       article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined})
         if editing() === turn.id
-          Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
+          Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={({ value }) => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
           if filesOf(turn).length > 0
             ul(part="files")
               for file of filesOf(turn) key={fileKey(file)}
@@ -854,7 +854,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       input(type="file" hidden tabindex="-1" aria-hidden="true" accept={accept} multiple disabled={busy()} ref={element => { picker = element }} onChange={picked})
       BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={() => picker?.click()})
         Icon(icon={iconOf('attach', 'plus')})
-    Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" onPaste={pasted} aria-label={fieldLabel} placeholder={placeholder} onKeyDown={keyDown})
+    Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={({ value }) => { draft = value }} rows="1" onPaste={pasted} aria-label={fieldLabel} placeholder={placeholder} onKeyDown={keyDown})
     if voice
       BareIconButton(part="record" variant="inline" label={recordLabel} aria-pressed={voice.state() === 'recording' ? 'true' : 'false'} aria-busy={voiceBusy() ? 'true' : undefined} onClick={() => { void voice.press() }} onKeyDown={recordKey})
         if voiceBusy()

@@ -1524,7 +1524,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types bind: on a component against a prop and its change callback', async () => {
-    const panel = '---\nconst { open = false, index = 0, label, onOpenChange, onIndexChange } = props<{ open?: boolean | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined, index?: number | undefined, onIndexChange?: ((index: number, open: boolean) => unknown) | undefined, label?: string | undefined }>()\n---\nbutton(onClick={() => onOpenChange?.(!open)}) {label} {index}\nbutton(onClick={() => onIndexChange?.(index + 1, open)}) next\n'
+    const panel = '---\nconst { open = false, index = 0, label, onOpenChange, onIndexChange } = props<{ open?: boolean | undefined, onOpenChange?: ((event: { open: boolean }) => unknown) | undefined, index?: number | undefined, onIndexChange?: ((event: { index: number, open: boolean }) => unknown) | undefined, label?: string | undefined }>()\n---\nbutton(onClick={() => onOpenChange?.({ open: !open })}) {label} {index}\nbutton(onClick={() => onIndexChange?.({ index: index + 1, open })}) next\n'
 
     const page = [
       '---',
@@ -1537,12 +1537,12 @@ describe.concurrent('kay check, edge cases', () => {
       'const plain = false',
       '---',
       'Panel(bind:open={open} bind:index={count})',
-      'Panel(bind:open={open} onOpenChange={opened => console.log(opened)})',
+      'Panel(bind:open={open} onOpenChange={event => console.log(event.open)})',
       'Panel(bind:open={count})',
       'Panel(bind:label={name})',
       'Panel(bind:open={plain})',
       'Panel(bind:missing={open})',
-      'Panel(open={open()} onOpenChange={opened => open = opened})',
+      'Panel(open={open()} onOpenChange={event => open = event.open})',
       '',
     ].join('\n')
 

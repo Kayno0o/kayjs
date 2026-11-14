@@ -14,7 +14,7 @@ interface Options {
   options: () => readonly { value: Held }[]
   value: () => Held
   name: () => string | undefined
-  onChange: () => ((value: Held, option: { value: Held } | undefined) => unknown) | undefined
+  onChange: () => ((event: { value: Held, option: { value: Held } | undefined }) => unknown) | undefined
   // The ref the app put on the group, which gets the root too.
   appRef?: unknown
 }
@@ -73,7 +73,7 @@ export function controlledRadios({ control, input, options, value, name, onChang
     picked.set(next)
 
     // Put back unless the parent set `value` meanwhile, which has the last word.
-    if (!(await changeAccepted(control, () => onChange()?.(next, options().find(option => option.value === next)), busy.set)) && synced === syncedBefore) {
+    if (!(await changeAccepted(control, () => onChange()?.({ value: next, option: options().find(option => option.value === next) }), busy.set)) && synced === syncedBefore) {
       picked.set(before)
       check(before)
     }

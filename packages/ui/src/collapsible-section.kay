@@ -20,7 +20,7 @@ const { title, level, open = false, boxed = false, disabled = false, meta, onOpe
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
   meta?: Snippet
   // Called with the new state whenever the section folds or unfolds, however it did. Passing it makes the section an island, as any handler does.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.

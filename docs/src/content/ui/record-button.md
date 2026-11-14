@@ -4,7 +4,7 @@ description: A microphone button that records the visitor's voice and hands the 
 
 <Demo name="record-button/basic" />
 
-`onRecord` takes what was said as a `File`, `recording.webm` in Chrome and Firefox and `recording.m4a` in Safari, which an action's `s.File()` field takes as it is: `RecordButton(onRecord={audio => transcribe({ audio })})`. `label` names the button, `Record` by default.
+`onRecord({ audio })` takes what was said as a `File`, `recording.webm` in Chrome and Firefox and `recording.m4a` in Safari, which an action's `s.File()` field takes as it is: `RecordButton(onRecord={({ audio }) => transcribe({ audio })})`. `label` names the button, `Record` by default.
 
 A press asks the browser for the microphone, which prompts the visitor the first time, and starts recording. The button is then pressed, draws a stop icon and shows the time beside it. The next press stops and hands the recording over. While the promise `onRecord` returns is pending the button is busy, and a rejection says `failureLabel`. `maxDuration`, `5m` by default and a duration with its unit, stops a recording left running as if pressed, so it stays within the action's `maxSize`.
 

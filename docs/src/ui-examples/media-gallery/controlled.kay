@@ -24,6 +24,6 @@ const current = signal(1)
     items={items}
     index={1}
     ratio="1 / 1"
-    onIndexChange={current.set}
+    onIndexChange={({ index }) => current = index}
   )
   p.text-muted Showing picture {current() + 1}.

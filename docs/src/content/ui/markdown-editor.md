@@ -6,7 +6,7 @@ description: A markdown textarea that writes like an editor, with a toolbar, sho
 
 ## Shortcuts
 
-Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link, Enter continues a list and Tab indents a list item. Escape then Tab leaves the field from a list item too, which `keysHint` tells screen readers. A page pasted as HTML turns into markdown. `onInput` reports the text after every change.
+Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link, Enter continues a list and Tab indents a list item. Escape then Tab leaves the field from a list item too, which `keysHint` tells screen readers. A page pasted as HTML turns into markdown. `onInput({ value })` reports the text after every change.
 
 ## Toolbar
 
@@ -50,15 +50,15 @@ The editor puts the HTML through `sanitizeHtml` (images and tables kept), so a s
 
 `previewHtml` takes the preview of the starting `value`, such as `markdownHtml(body)` computed on the server. The pane then shows it in the server render, where `preview` would leave it empty until the page hydrated, and keeps it until the text is edited, when `preview` answers in its place. A page opened with `previewing` loads with the text rendered and nothing shifts.
 
-`previewing` shows or hides the preview from the page, and `onPreviewChange(previewing)` hears each toggle, so a page driving `previewing` can set it back.
+`previewing` shows or hides the preview from the page, and `onPreviewChange({ previewing })` hears each toggle, so a page driving `previewing` can set it back.
 
 ## Image uploads
 
-With `onImage(file)`, a pasted or dropped image is embedded behind a placeholder at once and swapped for its url once the function resolves. If it throws, the placeholder is removed and `uploadFailure` is toasted. `name` submits the text in a plain form.
+With `onImage({ file })`, a pasted or dropped image is embedded behind a placeholder at once and swapped for its url once the function resolves. If it throws, the placeholder is removed and `uploadFailure` is toasted. `name` submits the text in a plain form.
 
 <Demo name="markdown-editor/upload" />
 
-`onImageError(file, error)` is called when an upload fails, besides the toast, with what `onImage` threw (`undefined` for a refusal of the whole call), once the placeholder is gone.
+`onImageError({ file, error })` is called when an upload fails, besides the toast, with what `onImage` threw (`undefined` for a refusal of the whole call), once the placeholder is gone.
 
 ## Start text
 

@@ -39,7 +39,7 @@ const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'chec
   required?: boolean | undefined
   // A promise holds the switch busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: ((checked: boolean) => unknown) | undefined
+  onChange?: ((event: { checked: boolean }) => unknown) | undefined
 }>()
 
 // Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
@@ -58,7 +58,7 @@ const messages = () => found().map(item => item.message)
 const marked = () => given.invalid === true || messages().length > 0
 const issuesId = shown ? uid() : ''
 
-const { on, busy, ref, change } = controlledCheckbox({ control: 'Toggle', checked: () => sent ?? given.checked ?? false, onChange: () => given.onChange, start: (element) => {
+const { on, busy, ref, change } = controlledCheckbox({ control: 'Toggle', checked: () => sent ?? given.checked ?? false, onChange: () => given.onChange && ((checked: boolean) => given.onChange?.({ checked })), start: (element) => {
   if (checking)
     keepInvalid(element, marked)
 }, appRef: rest.ref })

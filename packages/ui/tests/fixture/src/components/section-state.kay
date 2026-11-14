@@ -11,9 +11,9 @@ const items = [{ key: 'mars', label: 'Mars', meta: '2 moons' }, { key: 'venus', 
 ---
 button#open(type="button" onClick={() => open = true}) Open
 button#pick(type="button" onClick={() => value = ['mars']}) Pick
-CollapsibleSection#section(title="Older" open={open()} onOpenChange={now => { calls.push(`toggle ${now}`); open = now }})
+CollapsibleSection#section(title="Older" open={open()} onOpenChange={({ open: now }) => { calls.push(`toggle ${now}`); open = now }})
   p Deimos
-Accordion#accordion(items={items} multiple={multiple} value={controlled ? value() : undefined} onChange={next => { calls.push(`change ${next.join(',')}`); if (controlled) value = next }})
+Accordion#accordion(items={items} multiple={multiple} value={controlled ? value() : undefined} onValueChange={({ value: next }) => { calls.push(`change ${next.join(',')}`); if (controlled) value = next }})
   @panel(name)
     p {name}
   @title(name)

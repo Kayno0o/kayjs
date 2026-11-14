@@ -6,13 +6,13 @@ import { effect, untrack } from 'kay'
 // The callbacks are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which the forms rendering this would then be even with no callback given.
 const { action, whenSent, whenRefused } = props<{
   action: Action<never, unknown>
-  whenSent?: ((data: unknown) => unknown) | undefined
+  whenSent?: ((event: { data: unknown }) => unknown) | undefined
   whenRefused?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
 }>()
 
 effect(() => {
   if (action.status() === 'ready')
-    untrack(() => whenSent?.(action.data()))
+    untrack(() => whenSent?.({ data: action.data() }))
 })
 
 effect(() => {

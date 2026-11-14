@@ -21,10 +21,10 @@ const action = Object.assign(async () => undefined, {
 ---
 button#sent(onClick={() => { failed = undefined; done = { data: 'ok' } }}) Sent
 button#refused(onClick={() => { done = undefined; failed = { status: 422, message: 'Invalid', values: {}, errors: { email: 'Invalid' } } }}) Refused
-ContactForm(action={action} onSend={onSend} onError={onError})
+ContactForm(action={action} onSend={({ data }) => onSend(data)} onError={onError})
   @sent
     p#custom-sent Custom
-SubscribeForm(action={action} onSend={onSubscribed} onError={onSubscribeError})
+SubscribeForm(action={action} onSend={({ data }) => onSubscribed?.(data)} onError={onSubscribeError})
   @sent
     p#subscribed Subscribed
   input#extra(name="extra")

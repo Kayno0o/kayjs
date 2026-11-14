@@ -8,7 +8,7 @@ const tabs = [
 ]
 const shown = signal('write')
 ---
-Tabs(tabs={tabs} value={shown()} label="Editor" onChange={shown.set})
+Tabs(tabs={tabs} value={shown()} label="Editor" onValueChange={({ value }) => shown = value})
   @panel(tab)
     if tab === 'write'
       textarea.w-full.rounded-lg.border.border-muted.bg-surface.p-2(

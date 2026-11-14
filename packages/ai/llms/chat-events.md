@@ -12,7 +12,7 @@ island()
 import { reply } from '../routes/chat.kay'
 import Chat from '@kayjs/ai/chat.kay'
 ---
-Chat(action={reply} label="Assistant" onSend={({ messages }) => track('ask', messages.length)} onReply={turn => save(turn.content)} onError={failure => report(failure.status)})
+Chat(action={reply} label="Assistant" onSend={({ messages }) => track('ask', messages.length)} onReply={({ turn }) => save(turn.content)} onError={failure => report(failure.status)})
 ```
 
 ### Open the launcher from the page
@@ -28,7 +28,7 @@ import ChatLauncher from '@kayjs/ai/chat-launcher.kay'
 const open = signal(false)
 ---
 button(type="button" onClick={() => { open = true }}) Ask the assistant
-ChatLauncher(action={reply} open={open()} onOpenChange={value => { open = value }})
+ChatLauncher(action={reply} open={open()} onOpenChange={({ open: value }) => { open = value }})
 ```
 
 ### Start a question from outside
@@ -41,7 +41,7 @@ document.dispatchEvent(new CustomEvent('kai:chat-draft', { detail: { text: 'Tell
 
 ### Open the launcher from a link
 
-The launcher opens whenever the address fragment is its `hash` (`#chat` by default, written with the `#`), on load and on every change to it, and on a click on any link to that fragment (a second click, or a link to another page), so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai:chat-open` event on `document` opens it too. All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
+The launcher opens whenever the address fragment is its `hash` (`#chat` by default, written with the `#`), on load and on every change to it, and on a click on any link to that fragment (a second click, or a link to another page), so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai:chat-open` event on `document` opens it too. All of these count as the visitor opening it: `onOpenChange({ open: true })` is called, unless the panel was open already.
 
 ```ts
 document.dispatchEvent(new CustomEvent('kai:chat-open'))
@@ -61,16 +61,16 @@ Chat(action={reply} suggestions={async () => fetchSuggestions(page)})
 
 Each is called once per transition, with a throw or a rejected promise logged and the chat left alone. The order for one send:
 
-1. `onSuggestion(text)` when a suggestion is pressed, `onRegenerate()` when Regenerate is, `onEdit(text)` when an edit is saved (the new text).
+1. `onSuggestion({ text })` when a suggestion is pressed, `onRegenerate()` when Regenerate is, `onEdit({ text })` when an edit is saved (the new text).
 2. `onSend({ messages })` with the messages posted. Try again calls it again; a reply asked for again after a reload does not.
-3. `onToolCall(call)` each time a tool call starts and each time it ends (`reply.progress()` actions), with the `AiToolCall`.
-4. One of `onReply(turn)` with the finished `ChatTurnView`, `onStop()` as the visitor presses Stop (called then, whatever has arrived), or `onError({ message, status, error })` for a refused call (its HTTP status and what it threw) or a stream that broke off (neither), `message` being what the chat shows.
+3. `onToolCall({ call })` each time a tool call starts and each time it ends (`reply.progress()` actions), with the `AiToolCall`.
+4. One of `onReply({ turn })` with the finished `ChatTurnView`, `onStop()` as the visitor presses Stop (called then, whatever has arrived), or `onError({ message, status, error })` for a refused call (its HTTP status and what it threw) or a stream that broke off (neither), `message` being what the chat shows.
 
 A reply that ends because the chat left its conversation (a new conversation, another one loaded) calls none of the last. `ChatLauncher` takes them all, and `suggestions`, and passes them on.
 
 ### The launcher's `open`
 
 - `open` is read live: set it to `true` to open the panel and `false` to close it. A panel set open on the server is drawn open.
-- `onOpenChange(open)` is called when the visitor opens it (button) or closes it (button, close button, Escape), not when the app sets `open`, so the app's state needs no guard against an echo.
+- `onOpenChange({ open })` is called when the visitor opens it (button) or closes it (button, close button, Escape), not when the app sets `open`, so the app's state needs no guard against an echo.
 - Keep `open` in sync through `onOpenChange`: the panel only follows `open` when it changes, so an app ignoring `onOpenChange` after the visitor closed it must set `false` then `true` to open it again. A throw in `onOpenChange` is logged.
 - The focus moves to the field on the visitor's opening, and back to the button on their closing. An app setting `open` leaves the focus where it is.

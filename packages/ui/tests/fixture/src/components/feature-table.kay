@@ -16,6 +16,6 @@ const columns: Column<Planet>[] = [
   { key: 'id', header: 'Id', hidden: true },
 ]
 ---
-Table(columns={columns} rows={rows} rowKey="id" label={label} aria-label={named} columnToggle={columnToggle} hiddenColumns={hiddenColumns} onHiddenColumnsChange={onHiddenColumnsChange})
+Table(columns={columns} rows={rows} rowKey="id" label={label} aria-label={named} columnToggle={columnToggle} hiddenColumns={hiddenColumns} onHiddenColumnsChange={({ keys }) => onHiddenColumnsChange?.(keys)})
   @header(column)
     em {column.header}

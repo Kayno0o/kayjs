@@ -19,6 +19,6 @@ const pick = (point: { label: string, x: number, y: number }) =>
     points={points}
     x={{ label: 'Hours' }}
     y={{ label: 'Score' }}
-    onSelect={pick}
+    onSelect={({ item }) => pick(item)}
   )
   p.rounded.border.border-muted.bg-surface.px-3.py-2 {picked()}

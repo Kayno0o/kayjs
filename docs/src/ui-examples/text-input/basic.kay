@@ -8,8 +8,8 @@ const saved = signal('Moons of Jupiter')
 .flex.max-w-sm.flex-col.gap-2
   TextInput(
     value={title()}
-    onInput={title.set}
-    onChange={saved.set}
+    onInput={({ value }) => title = value}
+    onChange={({ value }) => saved = value}
     aria-label="Title"
   )
   p.text-muted Typed: {title()}. Saved on blur or Enter: {saved()}.

@@ -33,14 +33,14 @@ button#open-switcher(onClick={() => switcher = true}) Open switcher
 
 button#anchor(onClick={event => anchor = event.currentTarget}) Anchor
 button#clear(onClick={() => anchor = null}) Clear
-MultiSelect(id="multi" label="Planets" options={planets} open={multi()} onOpenChange={shown => { calls.push(`multi ${shown}`); multi = shown }})
-DateInput(id="date" aria-label="Day" open={date()} onOpenChange={shown => { calls.push(`date ${shown}`); date = shown }})
-DateRangeInput(label="Stay" onOpenChange={(shown, box) => calls.push(`range ${box} ${shown}`)})
-DateRangeInput(label="Held" open={range()} onOpenChange={(shown, box) => { calls.push(`held ${box} ${shown}`); if (!shown) range = false }})
-Combobox(label="Planet" options={planets} open={combo()} onOpenChange={shown => { calls.push(`combo ${shown}`); combo = shown }})
-AppSwitcher(id="switcher" apps={apps} open={switcher()} onOpenChange={shown => { calls.push(`switcher ${shown}`); switcher = shown }} data-testid="switch" aria-describedby="hint" style="color: red")
+MultiSelect(id="multi" label="Planets" options={planets} open={multi()} onOpenChange={({ open: shown }) => { calls.push(`multi ${shown}`); multi = shown }})
+DateInput(id="date" aria-label="Day" open={date()} onOpenChange={({ open: shown }) => { calls.push(`date ${shown}`); date = shown }})
+DateRangeInput(label="Stay" onOpenChange={({ open: shown, box }) => calls.push(`range ${box} ${shown}`)})
+DateRangeInput(label="Held" open={range()} onOpenChange={({ open: shown, box }) => { calls.push(`held ${box} ${shown}`); if (!shown) range = false }})
+Combobox(label="Planet" options={planets} open={combo()} onOpenChange={({ open: shown }) => { calls.push(`combo ${shown}`); combo = shown }})
+AppSwitcher(id="switcher" apps={apps} open={switcher()} onOpenChange={({ open: shown }) => { calls.push(`switcher ${shown}`); switcher = shown }} data-testid="switch" aria-describedby="hint" style="color: red")
 
-HoverCard#card(anchor={anchor()} onOpenChange={shown => calls.push(`card ${shown}`)}) Detail
+HoverCard#card(anchor={anchor()} onOpenChange={({ open: shown }) => calls.push(`card ${shown}`)}) Detail
 Menu(id="menu" label="Actions" icon="plus" items={[{ label: 'One' }]} data-testid="menu" style="color: blue")
 ConfirmDelete(message="Sure?" failureLabel="No" onConfirm={() => undefined} data-testid="confirm")
 Toaster(data-testid="toaster")

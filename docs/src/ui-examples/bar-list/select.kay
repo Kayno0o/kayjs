@@ -9,4 +9,4 @@ const rows = [
 ]
 ---
 .max-w-md
-  BarList(rows={rows} onSelect={row => toast.info(row.label)})
+  BarList(rows={rows} onSelect={({ item }) => toast.info(item.label)})

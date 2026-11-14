@@ -35,10 +35,10 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showLabel 
   // Words the value for the display and for screen readers, such as `value => `${value} ms``.
   formatValue?: ((value: number) => string) | undefined
   // Runs on every move of the thumb, with the number, and after a form reset with the value it went back to.
-  onInput?: ((value: number) => unknown) | undefined
+  onInput?: ((event: { value: number }) => unknown) | undefined
   // Runs once with the value let go of: when the pointer is released, on each key press (arrows, Home, End, PageUp, PageDown), and after a form reset that moved the thumb.
   // A promise holds the slider busy until it settles, and puts the thumb back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
-  onChange?: ((value: number) => unknown) | undefined
+  onChange?: ((event: { value: number }) => unknown) | undefined
 }>()
 
 // A slider with no callback is plain: a refused post of its form, which the server renders it for, gives its figure back in place of its own.
@@ -51,7 +51,7 @@ const posted = Number(sent)
 const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<number>({
   control: 'Slider',
   value: () => sent !== undefined && Number.isFinite(posted) ? posted : figure(),
-  onChange: () => onChange,
+  onChange: () => onChange && ((value: number) => onChange?.({ value })),
   read: input => Number(input.value),
   write: (input, next) => {
     input.value = String(next)
@@ -61,7 +61,7 @@ const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<
     input.defaultValue = String(next)
   },
   // The app that follows `onInput` is told the value put back, as after a reset.
-  restored: next => onInput?.(next),
+  restored: next => onInput?.({ value: next }),
   start: element => keepInvalid(element, () => invalid),
   appRef: rest.ref,
 })
@@ -72,7 +72,7 @@ function moved(event: Event) {
   const input = event.currentTarget as HTMLInputElement
 
   if (move(input))
-    onInput?.(Number(input.value))
+    onInput?.({ value: Number(input.value) })
 }
 
 const STEPS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])

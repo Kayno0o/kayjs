@@ -6,7 +6,7 @@ export interface ExpandInput<Row, Key extends RowKey<Row>> {
   tableId: string
   rowKey: Key
   expanded: () => RowKeyValue<Row, Key>[] | undefined
-  onOpenChange: () => ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+  onOpenChange: () => ((event: { key: RowKeyValue<Row, Key>, open: boolean }) => unknown) | undefined
 }
 
 // What a Table with `expandable` holds: the keys of the rows open, which follow `expanded`.
@@ -27,7 +27,7 @@ export function expanding<Row, Key extends RowKey<Row>>(input: ExpandInput<Row, 
     const open = !openSet().has(key)
 
     opened.set(open ? [...opened(), key] : opened().filter(other => other !== key))
-    input.onOpenChange()?.(key, open)
+    input.onOpenChange()?.({ key, open })
   }
 
   return { openSet, detailId, toggleRow }

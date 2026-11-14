@@ -51,10 +51,10 @@ const { rows = NONE, style, columns, label, showLabel = false, name, invalid, si
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
   name?: string | undefined
   // Gets the new rows after every edit, an added row and a removed one. Called without a wait: it can store the rows, not refuse a change.
-  onChange?: ((rows: Row[]) => unknown) | undefined
+  onChange?: ((event: { rows: Row[] }) => unknown) | undefined
   // Called with the row an Add button appended and its place, and with the row a Remove button took out and the place it had, besides `onChange`.
-  onAdd?: ((row: Row, index: number) => unknown) | undefined
-  onRemove?: ((row: Row, index: number) => unknown) | undefined
+  onAdd?: ((event: { row: Row, index: number }) => unknown) | undefined
+  onRemove?: ((event: { row: Row, index: number }) => unknown) | undefined
   // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; `index` is a function of the row's place (from 0): name the control by `${column.label} ${index() + 1}` for screen readers, and the name follows the row when one above it is removed, and read its value off `row[column.key]`.
   // The cell is drawn once per row and keeps its control while the row is edited: `issue` (`invalid`, `message` and the `id` of the message under the row, for `aria-describedby`) reads the same way, and `row` reads the current row where it is used, as in `value={row.unit}`, so read it in a prop or an expression, not once at the top of the block. The block is not drawn again for a row that stays, whatever happens to the rows around it.
   cell?: Snippet<[column: { key: string, label: string, name: string | undefined, size: FieldSize }, row: Row, index: () => number, set: (value: string) => void, issue: { readonly invalid: boolean, readonly message: string | undefined, readonly id: string | undefined }]> | undefined
@@ -187,7 +187,7 @@ const boxes = () => [...root?.querySelectorAll<HTMLElement>('[data-part=row]') ?
 
 function commit(next: readonly Row[]) {
   current = next
-  onChange?.([...next])
+  onChange?.({ rows: [...next] })
 }
 
 function edit(index: number, key: string, text: string) {
@@ -208,7 +208,7 @@ function add() {
   commit([...current(), row])
   flush()
   boxes().at(-1)?.querySelector<HTMLElement>(FIELD)?.focus()
-  onAdd?.(row, current().length - 1)
+  onAdd?.({ row, index: current().length - 1 })
   announce(wording('ui.rowsField.added', 'Row {n} added', { n: current().length }))
 }
 
@@ -220,7 +220,7 @@ function drop(index: number) {
 
   ids = ids().filter((_, at) => at !== index)
   commit(current().filter((_, at) => at !== index))
-  onRemove?.(removed, index)
+  onRemove?.({ row: removed, index })
   flush()
 
   // Focus goes to the row that took its place, else the one before it, else the Add button.
@@ -256,9 +256,9 @@ snippet editor()
           if column.cell === true && cell
             | {drawCell(id, column)}
           else if column.type === 'number'
-            TextInput(part="input" type="number" name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={figure => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
+            TextInput(part="input" type="number" name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={({ value: figure }) => edit(placeOf(id), column.key, figure === null ? '' : String(figure))})
           else
-            TextInput(part="input" type={column.type} name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={text => edit(placeOf(id), column.key, text)})
+            TextInput(part="input" type={column.type} name={postName(column)} size={size} invalid={refusedCell(id, column)} aria-label={`${column.label} ${placeOf(id) + 1}`} aria-describedby={issueOf(id) === undefined ? undefined : `${issuesBase}_${id}`} placeholder={column.placeholder ?? column.label} value={textOf(id, column.key)} onInput={({ value }) => edit(placeOf(id), column.key, value)})
         IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(placeOf(id))} disabled={current().length <= min} onClick={() => drop(placeOf(id))})
         p(part="issue" id={`${issuesBase}_${id}`} aria-live="polite" hidden={issueOf(id) === undefined})
           for item of messagesOf(id) key={item.key ?? item.message}

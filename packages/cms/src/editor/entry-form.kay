@@ -277,7 +277,7 @@ PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3}
       .kcms-entry-more
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.data()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
         if answer.collection.review && !answer.seeded
-          EntryReview(review={stages.review()} draft={isDraft()} denied={can.data()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={stages.sendBack})
+          EntryReview(review={stages.review()} draft={isDraft()} denied={can.data()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={({ note }) => stages.sendBack(note)})
   EntryPresence(room={room.room} member={room.member})
   if stages.review() then stage
     EntryReviewLog(review={stage} draft={isDraft()})

@@ -15,9 +15,9 @@ form#form
   RadioGroup#none(name="none" label="None" options={choices} value={null})
   Select#switching(name="switching" options={choices} value={held()})
   RadioGroup#switching-radios(name="switching-radios" label="Switching" options={choices} value={held()})
-  Select#async(name="async" options={later} onChange={value => onHear('async', value)})
+  Select#async(name="async" options={later} onChange={({ value }) => onHear('async', value)})
   Select#refused(name="refused" options={choices} param="refused" onChange={() => false})
-  Rating#stars(name="stars" label="Stars" onChange={value => onHear('stars', value)})
-  ChipGroup#chips(name="chips" label="Chips" options={choices} onChange={value => onHear('chips', value)})
+  Rating#stars(name="stars" label="Stars" onChange={({ value }) => onHear('stars', value)})
+  ChipGroup#chips(name="chips" label="Chips" options={choices} onChange={({ value }) => onHear('chips', value)})
   button#hold(type="button" onClick={() => held = 'c'}) Hold
   button#reset(type="reset") Reset

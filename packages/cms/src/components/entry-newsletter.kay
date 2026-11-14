@@ -65,7 +65,7 @@ if denied.publish !== undefined || dirtyReason() !== undefined
   Refused(label={wording('cms.newsletter.open', 'Newsletter')} reason={denied.publish ?? dirtyReason()})
 else
   Button(label={wording('cms.newsletter.open', 'Newsletter')} disabled={form.saving()} onClick={() => { open = true }})
-Dialog(open={open()} title={wording('cms.newsletter.title', 'Send to the mailing list')} size="lg" dirty={busy()} onOpenChange={shown => { open = shown }})
+Dialog(open={open()} title={wording('cms.newsletter.title', 'Send to the mailing list')} size="lg" dirty={busy()} onOpenChange={({ open: shown }) => { open = shown }})
   @footer
     Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={busy()} onClick={() => { open = false }})
     Button(label={wording('cms.newsletter.test', 'Send me a test')} disabled={busy() || preview() === undefined} onClick={async () => { await run(async () => testNewsletter(ref())) }})

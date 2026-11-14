@@ -71,7 +71,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   // Opens the menu at this point of the window with no trigger of its own, such as the click of a context menu; the page shows it with `open` and learns of its closing in `onOpenChange`. The browser flips it to stay inside the window, and focus goes back to where it was when it closes. A button still held when `open` is set, the right one on Linux where `contextmenu` fires on the press, delays the opening to its release.
   at?: { x: number, y: number } | undefined
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Replaces the icon button that opens the menu, such as a labelled Button or a user name with an avatar: `@trigger(attributes)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup="menu"` and the anchor style, and `icon`, `size`, `variant` and `tone` then have nothing to style.
   trigger?: Snippet<[attributes: MenuTriggerProps]> | undefined
   // Draws an entry's content in place of its icon and label: `@item(entry)`. The entry keeps its role, its keys and its link or button.
@@ -280,7 +280,7 @@ function toggle(entry: MenuCheckbox, index: number) {
   if (entry.checked === undefined)
     kept = { ...kept(), [`check:${entry.id ?? index}`]: next }
 
-  pick(entry, () => entry.onCheckedChange?.(next))
+  pick(entry, () => entry.onCheckedChange?.({ checked: next }))
 }
 
 function choose(entry: MenuRadio, index: number) {
@@ -291,11 +291,11 @@ function choose(entry: MenuRadio, index: number) {
 
   pick(entry, () => {
     if (!was)
-      entry.onCheckedChange?.(entry.value)
+      entry.onCheckedChange?.({ checked: true, value: entry.value })
   })
 }
 ---
-Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} role="none" open={open} part="menu" onOpenChange={opened => {
+Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} role="none" open={open} part="menu" onOpenChange={({ open: opened }) => {
   if (opened && waits())
     void load()
   else if (opened && !openedByPointer())
@@ -304,7 +304,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
   if (!opened)
     document.getElementById(menuId)?.removeAttribute('data-pointer')
 
-  onOpenChange?.(opened)
+  onOpenChange?.({ open: opened })
 }})
   @trigger(attributes)
     if trigger

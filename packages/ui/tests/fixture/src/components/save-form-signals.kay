@@ -27,6 +27,6 @@ async function commit() {
 SaveForm(dirty={changed()} save={commit} saved="Saved." status={status} cancelHref={cancelHref} confirm={confirm} saveDisabled={saveDisabled} onDiscard={() => { name = saved(); onDiscard() }})
   button#edit(type="button" onClick={() => name = 'Grace'}) Edit
   FormField(label="Title" name="title")
-    TextInput#title(name="title" value={name()} onInput={name.set})
+    TextInput#title(name="title" value={name()} onInput={({ value }) => name = value})
   p#name {name()}
 Toaster

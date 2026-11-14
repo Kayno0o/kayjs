@@ -28,8 +28,8 @@ type Marked<T> = 0 extends 1 & T ? false : [T] extends [never] ? false : typeof 
 // The callback a prop reports its changes through: `open` and `onOpenChange`.
 type ChangeKey<Key> = `on${Capitalize<Key & string>}Change`
 
-// What the change callback of a prop takes first, when the component has one.
-type ChangedValue<Props, Key> = ChangeKey<Key> extends keyof Props ? NonNullable<Props[ChangeKey<Key>]> extends (value: infer Value, ...rest: never[]) => unknown ? Value : never : never
+// What the change callback of a prop reports under the prop's name, `{ open }` for `onOpenChange`, when the component has one.
+type ChangedValue<Props, Key> = ChangeKey<Key> extends keyof Props ? NonNullable<Props[ChangeKey<Key>]> extends (event: infer Event, ...rest: never[]) => unknown ? Key extends keyof Event ? Event[Key] : never : never : never
 
 // The props `bind:` takes: those typed `Bindable`, and those with an `on<Prop>Change` callback beside them.
 export type BindableKeys<Tag> = { [Key in keyof PropsOfComponent<Tag>]-?: Marked<NonNullable<PropsOfComponent<Tag>[Key]>> extends true ? Key : [ChangedValue<PropsOfComponent<Tag>, Key>] extends [never] ? never : Key }[keyof PropsOfComponent<Tag>]

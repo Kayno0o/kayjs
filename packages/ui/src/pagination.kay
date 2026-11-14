@@ -90,13 +90,13 @@ const { of, page, pages, total, pageSize, offset, limit, more, url, param, sibli
   // Draws the content of Previous and Next in place of their words, such as an icon: `@step(direction)`, `direction` being `'previous'` or `'next'`. The labels still name the links.
   step?: Snippet<[direction: 'previous' | 'next']> | undefined
   // For a list the app pages in the browser, with no address to change: called with the page a plain click on a link picks, or with the offset it starts at for a list paged by offset, and the click event. Each link keeps its real address, so a middle click or a new tab still opens it, and a handler returning `false` lets the browser follow the link too. The page on screen is kept by the component and follows `page` when the app changes it, or is the app's alone by setting `page` in the handler. Passed from an island, as any handler is.
-  onPage?: ((page: number, event: MouseEvent) => unknown) | undefined
+  onPage?: ((event: { page: number, event: MouseEvent }) => unknown) | undefined
   // The page sizes to offer beside a `total`, a link each that sets `limitParam` and drops the page: `sizes={[10, 25, 50]}`. The size on screen is `pageSize`, which the page reads from the same parameter.
   sizes?: readonly number[] | undefined
   // The query parameter holding the page size, `limit` by default.
   limitParam?: string | undefined
   // Called with the size a plain click on a size link picks and the event, as `onPage` is for a page.
-  onSize?: ((size: number, event: MouseEvent) => unknown) | undefined
+  onSize?: ((event: { size: number, event: MouseEvent }) => unknown) | undefined
   // Names the sizes for screen readers, `Rows per page` by default.
   sizeLabel?: string | undefined
   // The summary beside a `total`: a string filling `{from}`, `{to}` and `{total}`, or a function of `{ from, to, total }`.

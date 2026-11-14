@@ -26,4 +26,4 @@ The grid is one tab stop, on today's cell. The up and down arrows step a day, le
 
 ## Pressing and linking
 
-`onSelect` makes every cell a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActive` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.
+`onSelect` makes every cell a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActiveChange({ index })` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.

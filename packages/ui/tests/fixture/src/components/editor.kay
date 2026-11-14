@@ -12,15 +12,15 @@ const enabled = signal(false)
 ---
 if labelled
   FormField(label="Body")
-    MarkdownEditor#editor(value={value} onInput={onInput} onChange={onChange} onImage={onImage} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
+    MarkdownEditor#editor(value={value} onInput={({ value }) => onInput(value)} onChange={({ value }) => onChange?.(value)} onImage={onImage ? ({ file }) => onImage!(file) : undefined} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
 else if plain
   label
     span.kui-label-text Outer
-    MarkdownEditor#editor(value={value} onInput={onInput} onChange={onChange})
+    MarkdownEditor#editor(value={value} onInput={({ value }) => onInput(value)} onChange={({ value }) => onChange?.(value)})
 else if late
-  MarkdownEditor#editor(value={value} onInput={onInput} onChange={onChange} toolbar={enabled()})
+  MarkdownEditor#editor(value={value} onInput={({ value }) => onInput(value)} onChange={({ value }) => onChange?.(value)} toolbar={enabled()})
 else
-  MarkdownEditor#editor(value={value} onInput={onInput} onChange={onChange} onImage={onImage} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
+  MarkdownEditor#editor(value={value} onInput={({ value }) => onInput(value)} onChange={({ value }) => onChange?.(value)} onImage={onImage ? ({ file }) => onImage!(file) : undefined} toolbar={toolbar} preview={preview} previewTrusted={previewTrusted} previewClass={previewClass})
 input#title(aria-label="Title")
 Toaster
 if late

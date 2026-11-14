@@ -41,11 +41,11 @@ const { items: given, list, caption, index = 0, onIndexChange, open = false, onO
   caption?: Snippet<[item: Item, index: number]> | undefined
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
-  onIndexChange?: ((index: number) => unknown) | undefined
+  onIndexChange?: ((event: { index: number }) => unknown) | undefined
   // Shows the lightbox on the current item when the page sets it; a click on the picture, Escape and a click outside open and close it on their own.
   open?: boolean | undefined
   // Called with the lightbox's new state and the index of the item on it, whenever a visitor opens or closes it; a change the page set through `open` is not echoed.
-  onOpenChange?: ((open: boolean, index: number) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean, index: number }) => unknown) | undefined
   // The stage's CSS `aspect-ratio`.
   ratio?: string | undefined
   // What the gallery reads with no items.
@@ -90,13 +90,13 @@ function go(next: number) {
   const target = stepIndex(next, 0, all().length)
 
   shown = target
-  onIndexChange?.(target)
+  onIndexChange?.({ index: target })
 }
 
 // A change of the lightbox the visitor made, which the page hears of; one the page set through `open` it knows already.
 function zoom(next: boolean) {
   zoomed = next
-  onOpenChange?.(next, active())
+  onOpenChange?.({ open: next, index: active() })
 }
 
 function step(delta: number) {

@@ -40,10 +40,10 @@ With no labels, the chart reads `emptyLabel` instead, `No data yet.` by default.
 
 `marks` takes the same events as LineChart's: `marks={[{ at: 'Tue', title: 'Schedule changed', href: '/changes/42' }]}` draws a dashed rule over the column at `at` (a label or an index into `labels`), its `title` joining that column's tooltip and what screen readers read. With an `href` the rule is a link and a tab stop beside the columns.
 
-`onMark(mark, index)` makes a mark without an `href` a button, as in LineChart. An `at` that is no label is left out, and several on one column stand side by side.
+`onMark({ mark, index })` makes a mark without an `href` a button, as in LineChart. An `at` that is no label is left out, and several on one column stand side by side.
 
 ## Pressing and linking
 
-`onSelect` makes every column a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActive` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.
+`onSelect` makes every column a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActiveChange({ index })` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.
 
 A `@tooltip` block replaces the built-in tooltip with the app's own content, shown over the mark the pointer or focus is on.

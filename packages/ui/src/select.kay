@@ -30,7 +30,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   // The text a function `options` is asked for, such as a search box beside the select: the select asks again each time it changes. The answer replaces the options, so it should keep the option picked.
   query?: string | undefined
   // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`, and the option itself as a second argument, `undefined` for the empty one.
-  onChange?: ((value: Value | (Empty extends string | true ? '' : never), option: SelectOption<Value> | undefined) => unknown) | undefined
+  onChange?: ((event: { value: Value | (Empty extends string | true ? '' : never), option: SelectOption<Value> | undefined }) => unknown) | undefined
   // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option, or left out for the empty option, and every other param kept. Left without `value`, the select shows the option the address names, else `paramDefault`. The select takes it as its name, so a GET form around it sends it without JavaScript.
   param?: string | undefined
   // The value the page shows while `param` is left out: picking it leaves the param out.
@@ -44,7 +44,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   loadingLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `options` and the `query` it was asked for, and with what it rejected with.
-  onLoad?: ((options: readonly SelectOption<Value>[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly SelectOption<Value>[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
 }>()
 
@@ -101,7 +101,7 @@ function report(select: HTMLSelectElement) {
   const choice = list().find(option => String(option.value) === select.value)
 
   // No option matches only the empty one, which the type allows exactly when there is one.
-  onChange?.(choice === undefined ? '' as never : choice.value, choice)
+  onChange?.({ value: choice === undefined ? '' as never : choice.value, option: choice })
 }
 
 // Holding a query param: a pick goes through the move, the select busy meanwhile and put back where the page is when the move is refused, as Segmented is.
@@ -113,7 +113,7 @@ async function move(select: HTMLSelectElement) {
   touched = true
   heard(select.value)
 
-  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value, choice), moving.set)) {
+  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.({ value: choice === undefined ? '' as never : choice.value, option: choice }), moving.set)) {
     accepted = select.value
 
     return

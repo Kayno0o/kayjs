@@ -54,7 +54,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => formatNumber(value), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, marks, onMark, eventsLabel = wording('ui.lineChart.events', 'Events'), onSelect, href, newTab, onActiveChange, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -76,20 +76,22 @@ const { labels, series, formatValue = (value: number) => formatNumber(value), fo
   // Merged over the defaults, for what the props do not cover.
   options?: LineChartPresetOptions | undefined
   // Lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
-  onRange?: ((from: number, to: number) => unknown) | undefined
+  onRange?: ((event: { from: number, to: number }) => unknown) | undefined
   // Events marked on the x axis, such as a change applied between two readings: a dashed rule at `at` (a label, or an index into `labels`), its `title` in the tooltip at that point and in what screen readers read, and a link to `href` when given, a tab stop of its own beside the slider. An `at` that is no label is left out, and several on one label stand side by side.
   marks?: ChartEvent[] | undefined
   // Makes each mark a button handing back the mark and its place in `marks`; a mark with an `href` stays a link, and a plain click on it goes to `onMark` too. A mark with neither stays a plain rule.
-  onMark?: ((mark: ChartEvent, index: number) => unknown) | undefined
+  onMark?: ((event: { mark: ChartEvent, index: number }) => unknown) | undefined
   // Names the events in the table screen readers get.
   eventsLabel?: string | undefined
   // Hears the point a click without a drag lands on, or Enter with no span being picked, as `{ index, label, values }`.
-  onSelect?: ((mark: ChartMark) => unknown) | undefined
+  onSelect?: ((event: { item: ChartMark }) => unknown) | undefined
   // The address a point goes to, or `undefined` for none: a click without a drag on a point that has one, or Enter on it, follows it. The plot is one element, not a link per point, so unlike the other charts there is no middle click or "copy link", the address is read out with the point, and `onSelect`, when given, hears the press in its place.
   href?: ((mark: ChartMark) => string | undefined) | undefined
   // Opens the address of `href` in a new tab (`true`), the same one (`false`), or a new one when it leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
   // Hears the index of the point the pointer or the keyboard is on, `null` when it leaves.
+  onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
+  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onActive?: ((index: number | null) => unknown) | undefined
   // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
   active?: number | null | undefined
@@ -230,7 +232,7 @@ const eventStyle = (item: PlacedEvent) => {
 const markLink = (item: PlacedEvent) => ({ href: item.event.href ?? '', ...tabOf(item.event.href, newTab) })
 
 function markPressedAt(item: PlacedEvent) {
-  void (uses('onMark') ? onMark : undefined)?.(item.event, item.source)
+  void (uses('onMark') ? onMark : undefined)?.({ mark: item.event, index: item.source })
 }
 
 // A plain click on a mark link goes to `onMark` when the app gave one; a modified or middle click is left to the browser.
@@ -239,7 +241,7 @@ function markPressed(event: MouseEvent, item: PlacedEvent) {
     return
 
   event.preventDefault()
-  void onMark(item.event, item.source)
+  void onMark({ mark: item.event, index: item.source })
 }
 
 const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '', values: series.map(item => item.values[index] ?? null) })
@@ -249,7 +251,7 @@ function choose(index: number) {
   const picked = mark(index)
 
   if (uses('onSelect') && onSelect) {
-    void onSelect(picked)
+    void onSelect({ item: picked })
 
     return
   }
@@ -283,7 +285,7 @@ effect(() => {
     return
 
   lastActive = index
-  void untrack(() => onActive?.(index))
+  void untrack(() => { onActiveChange?.({ index }); onActive?.(index) })
 })
 
 const cursor = () => {
@@ -585,7 +587,7 @@ function finishSpan() {
   pressedAt = null
 
   if (span && span.from !== span.to)
-    void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
+    void onRange?.({ from: Math.min(span.from, span.to), to: Math.max(span.from, span.to) })
   else if (pressed !== null && (hovered() === null || hovered()!.index === pressed))
     choose(pressed)
 }

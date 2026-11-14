@@ -65,11 +65,11 @@ export function renderedOpen(open: boolean, modal: boolean, closeHref: string | 
 }
 
 // However the overlay closed: it goes to its `closeHref` when that is all it has, else tells the app.
-export function leave(closeHref: string | undefined, onOpenChange: ((open: boolean) => unknown) | undefined): void {
+export function leave(closeHref: string | undefined, onOpenChange: ((event: { open: boolean }) => unknown) | undefined): void {
   if (followsHref(closeHref, onOpenChange))
     void navigate(closeHref)
   else
-    onOpenChange?.(false)
+    onOpenChange?.({ open: false })
 }
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

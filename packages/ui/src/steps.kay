@@ -31,7 +31,7 @@ const { steps: given, current, url, done = [], param = 'step', label, doneLabel 
   retryLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `steps`, and with what it rejected with.
-  onLoad?: ((steps: readonly StepItem[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly StepItem[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
   current: string
@@ -49,7 +49,7 @@ const { steps: given, current, url, done = [], param = 'step', label, doneLabel 
   errorLabel?: string | undefined
   skippedLabel?: string | undefined
   // Called with the key of the step a plain click picks, for a wizard an island drives with no navigation. With a `url` the step stays a link, so a middle click or a new tab still opens its address, and a plain click calls this instead of following it, unless it returns `false`.
-  onSelect?: ((key: string) => unknown) | undefined
+  onSelect?: ((event: { key: string }) => unknown) | undefined
   // Draws a step in place of its `label`: `@step(step, state)`; the number, the state words and the link around it stay.
   step?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
   // The text of a step in place of its `label`, from the step and its state. A block drawing markup is `@step`; `@stepLabel` as a block works until 1.92.
@@ -70,7 +70,7 @@ function pick(event: MouseEvent, key: string) {
   if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
     return
 
-  if (onSelect(key) !== false)
+  if (onSelect({ key }) !== false)
     event.preventDefault()
 }
 ---
@@ -97,7 +97,7 @@ nav(part="root" {...rest} aria-label={label} aria-busy={source.loading() ? 'true
           a(part="link" {...target(step)} onClick={event => pick(event, step.key)})
             {body(step, index, state(index, step.key))}
         else if reached(step, index) && onSelect
-          button(part="link" type="button" onClick={() => void onSelect?.(step.key)})
+          button(part="link" type="button" onClick={() => void onSelect?.({ key: step.key })})
             {body(step, index, state(index, step.key))}
         else
           span(part="link" aria-current={step.key === current ? 'step' : undefined})

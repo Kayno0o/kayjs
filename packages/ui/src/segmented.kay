@@ -38,7 +38,7 @@ const { options, value, label, showLabel = false, name, invalid, required, param
   retryLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `options`, and with what it rejected with.
-  onLoad?: ((options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it. Left out, the first option that is not disabled when the group is drawn starts picked, which a form reset goes back to.
   value?: Held | undefined
@@ -64,7 +64,7 @@ const { options, value, label, showLabel = false, name, invalid, required, param
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
   // Gets the option picked as a second argument, `undefined` for a reset to none with no null option.
-  onChange?: ((value: Value | (null extends Held ? null : never), option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined } | undefined) => unknown) | undefined
+  onChange?: ((event: { value: Value | (null extends Held ? null : never), option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined } | undefined }) => unknown) | undefined
   // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
   option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
@@ -85,7 +85,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   options: list,
   value: () => sentOption(sent, list(), start()),
   name: () => name ?? param,
-  onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null, option: unknown) => unknown) | undefined),
+  onChange: () => paramChange(param, paramDefault, onChange as ((event: { value: string | number | null, option: unknown }) => unknown) | undefined),
   appRef: rest.ref,
 })
 

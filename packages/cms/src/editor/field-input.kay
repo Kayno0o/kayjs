@@ -412,7 +412,7 @@ function leaveJson(): void {
   const current = field
   match current.kind
     when 'boolean'
-      Toggle(label={current.label} checked={value() === true} aria-describedby={noteId} aria-invalid={issue() === undefined ? undefined : 'true'} onChange={set})
+      Toggle(label={current.label} checked={value() === true} aria-describedby={noteId} aria-invalid={issue() === undefined ? undefined : 'true'} onChange={({ checked }) => set(checked)})
       div(data-part="issues" class={FIELD_MESSAGE.issues} id={noteId} aria-live="polite")
         if current.hint
           span(data-part="hint" class={FIELD_MESSAGE.hint}) {current.hint}
@@ -425,11 +425,11 @@ function leaveJson(): void {
             .kcms-list-tools
               if !atMax()
                 if current.blocks
-                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstAria', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu disabled={held()} onChange={(type) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
+                  Select(value="" options={blockOptions()} emptyOption={wording('cms.blocks.addFirst', 'Add at the top…')} aria-label={wording('cms.blocks.addFirstAria', 'Add a block at the top of {list}', { list: current.label })} data-kcms-block-menu disabled={held()} onChange={({ value: type }) => { if (type !== '') { prepend(type); resetMenu('[data-kcms-block-menu]') } }})
                 else
                   Button(label={wording('cms.list.addFirst', 'Add at the top')} icon="plus" variant="ghost" size="sm" disabled={held()} onClick={() => prepend()})
               if count() >= JUMP_FROM
-                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpAria', 'Go to an item of {list}', { list: current.label })} onChange={(at) => { if (at !== '') jump(at) }})
+                Select(value="" options={titles()} emptyOption={wording('cms.list.jump', 'Go to item…')} data-kcms-jump aria-label={wording('cms.list.jumpAria', 'Go to an item of {list}', { list: current.label })} onChange={({ value: at }) => { if (at !== '') jump(at) }})
           .kcms-list-items(ref={element => rows = element})
             for item, i of items() key={i}
               .kcms-list-item(data-kcms-row data-compact={isCompact(current) ? '' : undefined} onKeyDown={event => itemKey(event, i)})
@@ -478,21 +478,21 @@ function leaveJson(): void {
           FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
     when 'lines'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-        Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={typedLines} onBlur={() => touched = true})
+        Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={({ value }) => typedLines(value)} onBlur={() => touched = true})
     when 'textarea'
       FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
-        Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
+        Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={({ value }) => typed(value)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
       FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
-        MarkdownEditor(toolbar={markdown.toolbar} previewClass={markdown.previewClass} preview={source => previewMarkdown(source, entry)} previewTrusted value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
+        MarkdownEditor(toolbar={markdown.toolbar} previewClass={markdown.previewClass} preview={source => previewMarkdown(source, entry)} previewTrusted value={text()} onInput={({ value }) => typed(value)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async ({ file }) => (await uploadFile(entry.collection, file)).path : undefined})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
-          TextInput(ref={element => numberBox = element} type="number" step={current.kind === 'integer' ? '1' : 'any'} inputmode={current.kind === 'integer' ? 'numeric' : 'decimal'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} placeholder={current.placeholder} value={text()} onInput={entered} onKeyDown={digits} onWheel={wheel} onBlur={() => touched = true})
+          TextInput(ref={element => numberBox = element} type="number" step={current.kind === 'integer' ? '1' : 'any'} inputmode={current.kind === 'integer' ? 'numeric' : 'decimal'} required={starred()} min={current.limits?.minimum} max={current.limits?.maximum} placeholder={current.placeholder} value={text()} onInput={({ value }) => entered(value)} onKeyDown={digits} onWheel={wheel} onBlur={() => touched = true})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         .kcms-adorned
-          DateInput(aria-label={current.label} required={starred()} value={text().slice(0, 10)} onChange={next => set(next === '' ? cleared : next)})
+          DateInput(aria-label={current.label} required={starred()} value={text().slice(0, 10)} onChange={({ value: next }) => set(next === '' ? cleared : next)})
           Button(label={wording('cms.field.today', 'Today')} variant="inline" onClick={() => set(today())})
           if text() !== '' && !starred()
             Button(label={wording('cms.field.clear', 'Clear')} variant="inline" onClick={() => set(cleared)})
@@ -503,31 +503,31 @@ function leaveJson(): void {
     when 'select'
       if current.options.length > SEARCH_FROM
         FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
-          TextInput(type="search" aria-label={wording('cms.field.search', 'Search {field}', { field: current.label })} placeholder={wording('cms.field.search', 'Search {field}', { field: current.label })} value={search()} onInput={next => search = next})
-          Select(aria-label={current.label} required={starred()} value={text()} options={matching(current.options)} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
+          TextInput(type="search" aria-label={wording('cms.field.search', 'Search {field}', { field: current.label })} placeholder={wording('cms.field.search', 'Search {field}', { field: current.label })} value={search()} onInput={({ value: next }) => search = next})
+          Select(aria-label={current.label} required={starred()} value={text()} options={matching(current.options)} emptyOption={!current.required || value() === undefined} onChange={({ value: next }) => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
       else
         FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
-          Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
+          Select(required={starred()} value={text()} options={current.options} emptyOption={!current.required || value() === undefined} onChange={({ value: next }) => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
     when 'image', 'file'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
         FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} upload={current.upload} alt={altOf()} sizeIssues={sizeIssues()} onAlt={setAlt} onChange={setFile})
     when 'reference'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         if choices() === null || current.collection === ''
-          TextInput(placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()})
+          TextInput(placeholder={current.placeholder} value={text()} onInput={({ value }) => typed(value)} onBlur={() => touched = true} required={starred()})
         else
-          Select(required={starred()} value={text()} options={picks()} busy={choices() === undefined} emptyOption={!current.required || value() === undefined} onChange={next => set(next === '' ? cleared : next)})
+          Select(required={starred()} value={text()} options={picks()} busy={choices() === undefined} emptyOption={!current.required || value() === undefined} onChange={({ value: next }) => set(next === '' ? cleared : next)})
     when 'custom'
       const Kind = kindOf(current.name)
       if Kind
         Kind(value={value()} onChange={set} label={current.label} hint={current.hint} issue={issue()} required={starred()})
       else
         FormField(label={current.label} hint={[current.hint, development ? wording('cms.field.noKind', 'No editor for the {kind} kind: add src/cms/fields/{kind}.kay. Edited as JSON until then.', { kind: current.name }) : undefined].filter(Boolean).join(' ')} issue={issue()} required={starred()})
-          Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
+          Textarea.kcms-json(rows="4" value={jsonShown()} onInput={({ value }) => setJson(value)} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
-        Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
+        Textarea.kcms-json(rows="4" value={jsonShown()} onInput={({ value }) => setJson(value)} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     else
       FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
-          TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={htmlPattern(current.limits?.pattern)})
+          TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={({ value }: { value: string }) => typed(value)} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={htmlPattern(current.limits?.pattern)})

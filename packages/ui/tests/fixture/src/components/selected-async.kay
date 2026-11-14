@@ -16,5 +16,5 @@ const rows = new Promise<Row[]>((resolve) => {
 })
 const heard = signal<string[]>([])
 ---
-Table(columns={columns} rows={rows} rowKey="id" selectable selected={[2]} onSelectedChange={keys => heard = [...heard(), `[${keys.join(',')}]`]})
+Table(columns={columns} rows={rows} rowKey="id" selectable selected={[2]} onSelectedChange={({ keys }) => heard = [...heard(), `[${keys.join(',')}]`]})
 p#heard {heard().join(' | ')}

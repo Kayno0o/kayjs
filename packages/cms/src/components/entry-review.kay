@@ -20,7 +20,7 @@ const { review, draft, denied = {}, dirty, busy, onSubmit, onApprove, onSendBack
   busy: boolean
   onSubmit: () => unknown
   onApprove: () => unknown
-  onSendBack: (note: string) => Promise<boolean>
+  onSendBack: (event: { note: string }) => Promise<boolean>
 }>()
 
 const asking = signal(false)
@@ -37,7 +37,7 @@ async function sendBack(): Promise<void> {
   sending = true
 
   try {
-    if (await onSendBack(note())) {
+    if (await onSendBack({ note: note() })) {
       asking = false
       note = ''
     }
@@ -72,11 +72,11 @@ if waiting()
   else
     Button(label={wording('cms.review.approve', 'Approve')} tone="accent" disabled={busy} onClick={onApprove})
     Button(label={wording('cms.review.sendBack', 'Send back')} disabled={busy} onClick={() => { asking = true }})
-Dialog(open={asking()} title={wording('cms.review.sendBackTitle', 'Send back to the writer')} dirty={sending()} onOpenChange={shown => { asking = shown }})
+Dialog(open={asking()} title={wording('cms.review.sendBackTitle', 'Send back to the writer')} dirty={sending()} onOpenChange={({ open: shown }) => { asking = shown }})
   @footer
     Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={sending()} onClick={() => { asking = false }})
     Button(label={wording('cms.review.sendBack', 'Send back')} tone="accent" busy={sending()} disabled={sending() || note().trim() === ''} onClick={sendBack})
   // The dialog may sit inside the entry's form, whose own submit saves the edits: this one must not reach it.
   form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void sendBack() }})
     FormField(label={wording('cms.review.note', 'What to change')})
-      Textarea(autofocus rows="4" value={note()} onInput={text => { note = text }} maxlength="1000")
+      Textarea(autofocus rows="4" value={note()} onInput={({ value: text }) => { note = text }} maxlength="1000")

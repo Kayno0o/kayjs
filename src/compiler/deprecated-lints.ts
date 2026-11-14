@@ -112,6 +112,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} sendLabel="Go" stopLabel="Halt")',
     right: '---\nimport Chat from \'@kayjs/ai/chat.kay\'\nimport { send } from \'./send\'\n---\nChat(action={send} labels={{ send: "Go", stop: "Halt" }})',
   },
+  'deprecated-ui-callbacks': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'A kayjs-ui prop under the name it had before 1.105, when its callback took positional arguments: `onChange` on an Accordion, Tabs or ThemeToggle is `onValueChange`, on a ZoomPane `onPlateChange`, `onSort` on a Table `onSortChange`, and `onActive` on a BarChart, LineChart, ScatterChart, Sparkline or ContributionGraph `onActiveChange`, each name saying what changed and its callback taking one event object (`{ value, tab }`, `{ plate }`, `{ sort }`, `{ index }`). The old names work until 1.108 with their old arguments. Found on a component bound to the library\'s file in a template. The fix writes the new name and, for an inline arrow function with plain parameter names, destructures the event under them; any other value is renamed by an unsafe fix, which `kay upgrade` leaves to you, since the callback has to take the event. The other callbacks that took positional arguments (`onChange` of a TextInput, `onOpenChange` of a Dialog) keep their names and take the event object with no old form to find: `kay check` reports each call.',
+    wrong: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(tabs={[{ value: \'a\', label: \'A\' }]} label="Product" onChange={value => console.log(value)})',
+    right: '---\nimport Tabs from \'@kayjs/ui/tabs.kay\'\n---\nTabs(tabs={[{ value: \'a\', label: \'A\' }]} label="Product" onValueChange={({ value }) => console.log(value)})',
+  },
   'deprecated-ai-language': {
     level: 'warn',
     group: 'deprecated',

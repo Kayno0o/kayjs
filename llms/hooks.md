@@ -155,5 +155,5 @@ A library extends it with what it knows. `hookContext()` builds it from the requ
 
 ### kayjs-ui
 
-- `onSave(result)` of Form, FormDialog and SaveForm (was `onSaved`), `onSend(data)` of ContactForm and SubscribeForm (was `onSent`), `onEnd()` of AudioPlayer (was `onEnded`) and `onError({ error })` of CopyButton (was `onFail`, since 1.90) are base-form `onX` props, told what they were told before. A component prop takes the transition's value directly, as the DOM and `onOpenChange` do; the object with a `context` belongs to server hooks.
+- `onSave({ data })` of Form, FormDialog and SaveForm (was `onSaved`), `onSend({ data })` of ContactForm and SubscribeForm (was `onSent`), `onEnd()` of AudioPlayer (was `onEnded`) and `onError({ error })` of CopyButton (was `onFail`, since 1.90) are base-form `onX` props. A component prop takes one event object holding what it reports (`onOpenChange({ open })`, [conventions](component-library-conventions.md)); the object with a `context` belongs to server hooks.
 - SaveForm's `onSave` hears the `action`'s result; the call that does the save for an editor with no `action` is `save`.

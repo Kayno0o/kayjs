@@ -45,7 +45,7 @@ FormDialog(
   action={rename}
   submitLabel="Rename"
   failureLabel="Could not rename"
-  onSave={saved => title = saved.title}
+  onSave={({ data }) => title = data.title}
   onOpenChange={() => editing = false}
 )
   input(type="hidden" name="id" value={post.id})

@@ -15,5 +15,5 @@ async function send(colour: string) {
 }
 ---
 .flex.max-w-sm.flex-col.gap-2
-  ColorInput(label="Light" value={light()} onChange={send})
+  ColorInput(label="Light" value={light()} onChange={({ value }) => send(value)})
   p Sent: {light()}.

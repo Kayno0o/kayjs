@@ -6,7 +6,7 @@ import { signal } from 'kay'
 const rows = signal([{ id: 1, name: 'Read' }, { id: 2, name: 'Run' }, { id: 3, name: 'Write' }])
 
 const sortable = new Sortable({
-  onReorder: (from, to) => rows.set((list) => {
+  onReorder: ({ from, to }) => rows.set((list) => {
     const next = [...list]
     const [moved] = next.splice(from, 1)
 

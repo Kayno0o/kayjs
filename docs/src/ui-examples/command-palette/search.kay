@@ -34,7 +34,7 @@ const entries: PaletteEntry[] = [
   p.text-muted Try "csv" or "invoice".
 CommandPalette(
   open={open()}
-  onOpenChange={open.set}
+  onOpenChange={({ open: next }) => open = next}
   entries={entries}
   groups={['Actions', 'Pages']}
 )

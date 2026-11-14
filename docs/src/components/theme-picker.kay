@@ -9,6 +9,6 @@ Popover(class="flex flex-col gap-2 p-3" label="Theme" placement="bottom-end")
   @trigger(attributes)
     IconButton({...attributes} icon={Palette} label="Theme" variant="ghost")
   p.theme-picker-label Theme
-  Segmented(class="grid grid-cols-2" options={THEMES} value={palette()} label="Theme" onChange={picked => pickTheme({ palette: picked })})
+  Segmented(class="grid grid-cols-2" options={THEMES} value={palette()} label="Theme" onChange={({ value }) => pickTheme({ palette: value })})
   p.theme-picker-label Scheme
-  Segmented(options={SCHEMES} value={scheme()} label="Scheme" onChange={picked => pickTheme({ scheme: picked })})
+  Segmented(options={SCHEMES} value={scheme()} label="Scheme" onChange={({ value }) => pickTheme({ scheme: value })})

@@ -13,7 +13,7 @@ const kind = signal('')
   Select(
     value={kind()}
     options={KINDS}
-    onChange={kind.set}
+    onChange={({ value }) => kind = value}
     emptyOption="Any kind"
     aria-label="Kind"
   )

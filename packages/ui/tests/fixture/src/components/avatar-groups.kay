@@ -14,7 +14,7 @@ const ask = async () => {
   return people
 }
 ---
-AvatarGroup#popover(avatars={people} max={2} size="sm" label="Team" onOpenChange={onOpenChange})
+AvatarGroup#popover(avatars={people} max={2} size="sm" label="Team" onOpenChange={({ open }) => onOpenChange(open)})
 AvatarGroup#linked(avatars={people} max={3} moreHref="/team" moreLabel={count => `See ${count} more`})
 AvatarGroup#fractional(avatars={people} max={2.7})
 AvatarGroup#nan(avatars={people} max={Number.NaN})
@@ -26,7 +26,7 @@ AvatarGroup#custom(avatars={people} max={1})
     b.mine {person.name}
   @rest(rest)
     p.rest {rest.length} others
-AvatarGroup#remote(avatars={async () => people} max={2} onLoad={list => onLoad(list.length)})
+AvatarGroup#remote(avatars={async () => people} max={2} onLoad={({ options: list }) => onLoad(list.length)})
 AvatarGroup#failing(avatars={ask} max={2} onError={failure => onError(failure.error)})
 AvatarGroup#pending(avatars={new Promise<typeof people>(() => undefined)} loadingLabel="Un instant")
 button#heal(onClick={() => failing = false}) Heal

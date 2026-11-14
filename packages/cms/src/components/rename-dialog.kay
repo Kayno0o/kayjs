@@ -14,7 +14,7 @@ import './rename-dialog.css'
 // `blocked` is why Rename cannot go ahead whatever is typed, as edits not saved yet. `referrers` are the entries that name the entry, which the rename points at the new slug. `rename` answers true once renamed, and tells `onRefused` what the server refused it for.
 const { open, onOpenChange, slug, hasPage, report, referrers, blocked, rename } = props<{
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (event: { open: boolean }) => void
   slug: string
   hasPage: boolean
   report: (typed: string) => SlugReport | undefined
@@ -72,7 +72,7 @@ async function submit(): Promise<void> {
 
   try {
     if (await rename(clean(), message => refusal = message))
-      onOpenChange(false)
+      onOpenChange({ open: false })
   }
   finally {
     pending = false
@@ -81,7 +81,7 @@ async function submit(): Promise<void> {
 ---
 Dialog(open={open} title={wording('cms.entry.renameTitle', 'Rename {slug}', { slug })} dirty={pending()} onOpenChange={onOpenChange})
   @footer
-    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => onOpenChange(false)})
+    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={pending()} onClick={() => onOpenChange({ open: false })})
     if reason() !== undefined
       Refused(label={wording('cms.entry.rename', 'Rename')} reason={reason()} tone="accent")
     else
@@ -89,6 +89,6 @@ Dialog(open={open} title={wording('cms.entry.renameTitle', 'Rename {slug}', { sl
   // The dialog may sit inside the entry's form, whose own submit saves the edits: this one must not reach it.
   form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void submit() }})
     FormField(label={wording('cms.entry.renameSlug', 'New slug')} hint={hint()} issue={reason() ?? refusal()})
-      TextInput(autofocus value={typed()} onInput={type} class="w-[32ch]")
+      TextInput(autofocus value={typed()} onInput={({ value }) => type(value)} class="w-[32ch]")
     if referrers.length > 0
       p.kcms-rename-referrers {wording('cms.entry.renameReferrers', 'Referred to by {names}, which follow the new slug where they can', { names: referrers.join(', ') })}

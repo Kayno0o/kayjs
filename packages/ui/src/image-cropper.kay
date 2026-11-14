@@ -43,11 +43,11 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   // The crop in the image's natural pixels, to start from and to follow: it is clamped to the image and to `ratio` once the image has decoded (`onCrop` then hears the clamped crop when it differs), and a changed value moves the crop. Left out, the crop is centred; give back what `onCrop` or `onCropEnd` reported to control it.
   crop?: CropRect | undefined
   // The crop in the image's natural pixels, ready for a canvas draw, after every change, a drag's every move included.
-  onCrop?: ((crop: CropRect) => unknown) | undefined
+  onCrop?: ((event: { crop: CropRect }) => unknown) | undefined
   // The crop once a drag that moved it is released, after each arrow press, and after the footer's `reset()`: the moment to save it.
-  onCropEnd?: ((crop: CropRect) => unknown) | undefined
+  onCropEnd?: ((event: { crop: CropRect }) => unknown) | undefined
   // The image's natural size, once it has decoded.
-  onLoad?: ((size: ImageSize) => unknown) | undefined
+  onLoad?: ((event: { size: ImageSize }) => unknown) | undefined
   // Called with `{ event }` (the image's error event) or `{ error }` (the decode's rejection) when the image does not load; the stage then shows `fallback` or `failureLabel`, until `src` changes.
   onError?: ((failure: { event?: Event | undefined, error?: unknown }) => unknown) | undefined
   failureLabel?: string | undefined
@@ -73,7 +73,7 @@ const scale = () => stageSize.width() / (size()?.width || 1)
 
 function set(next: CropRect) {
   crop = next
-  onCrop?.(next)
+  onCrop?.({ crop: next })
 }
 
 function reset() {
@@ -120,7 +120,7 @@ effect(() => {
     }
 
     crop = next
-    onCrop?.(next)
+    onCrop?.({ crop: next })
   })
 })
 
@@ -138,7 +138,7 @@ function loaded() {
 
   broken = false
   size = next
-  onLoad?.(next)
+  onLoad?.({ size: next })
 }
 
 function failed(event?: Event, error?: unknown) {
@@ -212,7 +212,7 @@ function end(event: PointerEvent) {
   stage?.releasePointerCapture(event.pointerId)
 
   if (moved)
-    onCropEnd?.(crop())
+    onCropEnd?.({ crop: crop() })
 }
 
 // Arrows move the crop, Shift with the arrows resizes it from its bottom-right corner, and Alt takes bigger steps.
@@ -231,13 +231,13 @@ function keyDown(event: KeyboardEvent) {
   set(event.shiftKey
     ? resizeCrop(crop(), (x + y) * step, ratio, 'se', known.width, known.height, minSize)
     : moveCrop(crop(), x * step, y * step, known.width, known.height))
-  onCropEnd?.(crop())
+  onCropEnd?.({ crop: crop() })
 }
 
 // What the footer's reset does: the crop centred again, as a commit.
 function resetCrop() {
   reset()
-  onCropEnd?.(crop())
+  onCropEnd?.({ crop: crop() })
 }
 
 const area = () => {

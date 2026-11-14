@@ -48,8 +48,8 @@ ConfirmDelete(message="Tone?" failureLabel="Could not" onConfirm={onDelete} tone
 ConfirmDelete(message="Tone?" failureLabel="Could not" onConfirm={onDelete} triggerLook="button" variant="ghost" class="n-button")
 ConfirmDelete(message="Release it?" failureLabel="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason: string }) => data.reason.toUpperCase()} class="release")
 p#states {states().join(',')}
-ConfirmDelete(message="Watch it?" failureLabel="Could not" onConfirm={onDelete} onOpenChange={open => states = [...states(), open ? 'open' : 'closed']} label="Watched" class="watched")
-ConfirmDelete(message="Watch it inline?" failureLabel="Could not" onConfirm={onDelete} ask="inline" onOpenChange={open => states = [...states(), open ? 'inline-open' : 'inline-closed']} label="Watched inline" class="watched-inline")
+ConfirmDelete(message="Watch it?" failureLabel="Could not" onConfirm={onDelete} onOpenChange={({ open }) => states = [...states(), open ? 'open' : 'closed']} label="Watched" class="watched")
+ConfirmDelete(message="Watch it inline?" failureLabel="Could not" onConfirm={onDelete} ask="inline" onOpenChange={({ open }) => states = [...states(), open ? 'inline-open' : 'inline-closed']} label="Watched inline" class="watched-inline")
 Toaster
 button#open-bare(onClick={() => bareOpen = true}) Open bare
 Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen = false})

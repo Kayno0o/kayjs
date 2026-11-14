@@ -32,12 +32,12 @@ function told<Value>(control: string, keep: (value: Value) => void) {
 }
 ---
 form#form
-  Checkbox(name="agree" label="I agree" hint="v2" checked={agreed()} onChange={told('checkbox', agreed.set)})
-  ChipGroup#decks(label="Decks" name="decks" options={options} value={decks()} onChange={told('chips', decks.set)})
-  Toggle(name="published" label="Published" checked={published()} onChange={told('toggle', published.set)})
-  Segmented#sharing(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={told('segmented', sharing.set)})
+  Checkbox(name="agree" label="I agree" hint="v2" checked={agreed()} onChange={({ checked }) => told('checkbox', agreed.set)(checked)})
+  ChipGroup#decks(label="Decks" name="decks" options={options} value={decks()} onChange={({ value }) => told('chips', decks.set)(value)})
+  Toggle(name="published" label="Published" checked={published()} onChange={({ checked }) => told('toggle', published.set)(checked)})
+  Segmented#sharing(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={({ value }) => told('segmented', sharing.set)(value)})
   Checkbox#all(label="Select all" indeterminate={mixed()} onChange={() => mixed = false})
   button#mix(type="button" onClick={() => mixed = true}) Mix
   Checkbox#kept(label="Some" indeterminate)
-Segmented#zoom(label="Zoom" name="zoom" options={ranges} value={zoom()} onChange={zoom.set})
+Segmented#zoom(label="Zoom" name="zoom" options={ranges} value={zoom()} onChange={({ value }) => zoom = value})
 button#unzoom(type="button" onClick={() => zoom = null}) Unzoom

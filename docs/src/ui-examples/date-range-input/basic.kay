@@ -6,5 +6,5 @@ import type { DateRange } from '@kayjs/ui'
 const stay = signal<DateRange>(['2026-10-02', null])
 ---
 .flex.flex-col.items-start.gap-2
-  DateRangeInput(label="Stay" value={stay()} onChange={stay.set})
+  DateRangeInput(label="Stay" value={stay()} onChange={({ value }) => stay = value})
   p.text-muted From {stay()[0] ?? 'any day'} to {stay()[1] ?? 'any day'}.

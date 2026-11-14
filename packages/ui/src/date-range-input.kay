@@ -47,11 +47,11 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, s
   // Shows the calendar of that box when the page sets it, and none for `false`; left out, the buttons, a click outside and Escape work on their own. `onOpenChange` reports each change, so a page driving `open` can set it back.
   open?: 'from' | 'to' | false | undefined
   // Called as either calendar shows or hides, with the box it belongs to.
-  onOpenChange?: ((open: boolean, box: 'from' | 'to') => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean, box: 'from' | 'to' }) => unknown) | undefined
   // Called with the month on show as `YYYY-MM` as either calendar opens on it or moves to another, with the box it belongs to.
-  onMonthChange?: ((month: string, box: 'from' | 'to') => unknown) | undefined
+  onMonthChange?: ((event: { month: string, box: 'from' | 'to' }) => unknown) | undefined
   // Runs once a date is set, with the pair in order, and only when the range changed.
-  onChange?: ((value: DateRange) => unknown) | undefined
+  onChange?: ((event: { value: DateRange }) => unknown) | undefined
 }>()
 
 // A range with no callback is plain: a refused post of its form, which the server renders it for, gives its two dates back in place of its own.
@@ -75,7 +75,7 @@ onFormReset(() => root, () => {
     return
 
   pair = start
-  onChange?.(start)
+  onChange?.({ value: start })
 }, true)
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
@@ -88,16 +88,16 @@ function commit(from: string, to: string) {
     return
 
   pair = next
-  onChange?.(next)
+  onChange?.({ value: next })
 }
 // The heading's id while `showLabel` writes it, which then names the control in place of `aria-label`.
 const heading = showLabel && label ? uid() : undefined
 ---
 snippet range()
   div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']})
-    DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'from')} open={open === undefined ? undefined : open === 'from'} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+    DateInput(size={size} invalid={invalid} name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'from' })} open={open === undefined ? undefined : open === 'from'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'from' })} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={({ value }) => commit(value, pair()[1] ?? '')})
     span(part="separator" aria-hidden="true") -
-    DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={month => onMonthChange?.(month, 'to')} open={open === undefined ? undefined : open === 'to'} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+    DateInput(size={size} invalid={invalid} name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} disabledDay={disabledDay} day={day} onMonthChange={({ month }) => onMonthChange?.({ month, box: 'to' })} open={open === undefined ? undefined : open === 'to'} onOpenChange={({ open }) => onOpenChange?.({ open, box: 'to' })} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={({ value }) => commit(pair()[0] ?? '', value)})
 if heading
   div(part="field")
     span(part="heading" id={heading}) {label}

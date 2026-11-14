@@ -3,7 +3,7 @@ import { signal } from 'kay'
 import RadioGroup from '@kayjs/ui/radio-group.kay'
 import FormField from '@kayjs/ui/form-field.kay'
 
-const { onChange } = props<{ onChange: (value: number) => unknown }>()
+const { onChange } = props<{ onChange: (value: number, option?: unknown) => unknown }>()
 
 const plans = [{ value: 1, label: 'Free', description: 'Up to 3 sites' }, { value: 2, label: 'Pro', disabled: true }, { value: 3, label: 'Team' }] as const
 const away = signal<'evening' | null>(null)
@@ -11,7 +11,7 @@ const awayOptions = [{ value: null, label: 'Nothing' }, { value: 'evening', labe
 ---
 form#form
   FormField(label="Plan" name="plan" issue="Pick a plan" group)
-    RadioGroup(name="plan" options={plans} value={1 as 1 | 2 | 3} onChange={onChange})
-  RadioGroup(name="away" label="Away" options={awayOptions} value={away()} onChange={(value: 'evening' | null) => away = value})
+    RadioGroup(name="plan" options={plans} value={1 as 1 | 2 | 3} onChange={({ value, option }) => onChange(value, option)})
+  RadioGroup(name="away" label="Away" options={awayOptions} value={away()} onChange={({ value }) => away = value})
   p#away {JSON.stringify(away())}
   button#reset(type="reset") Reset

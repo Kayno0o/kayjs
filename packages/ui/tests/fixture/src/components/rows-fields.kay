@@ -11,7 +11,7 @@ const headers = signal([{ name: 'X-Frame-Options', value: 'DENY' }, { name: 'Cac
 const columns = [{ key: 'name', label: 'Header' }, { key: 'value', label: 'Value', placeholder: 'Value of the header' }]
 const action = Object.assign(async (form: FormData) => save(form), { pending: signal(false), url: '/_kay/action/form/rows' }) as unknown as Action<never, void>
 ---
-RowsField#editor(rows={headers()} columns={columns} label="Response headers" addLabel="Add header" max={3} min={1} removeLabel={index => `Remove header ${index + 1}`} onChange={headers.set})
+RowsField#editor(rows={headers()} columns={columns} label="Response headers" addLabel="Add header" max={3} min={1} removeLabel={index => `Remove header ${index + 1}`} onChange={({ rows }) => headers = rows})
 p#out {JSON.stringify(headers())}
 form#plain
   RowsField#posted(rows={[{ name: 'A', value: '1' }]} columns={columns} name="header" label="Posted headers" ref={element => held?.push(element)})

@@ -8,7 +8,7 @@ const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
 ZoomPane(
   label="Grid with its scale"
   least={0.5}
-  onChange={plate.set}
+  onPlateChange={({ plate: next }) => plate = next}
   class="h-56 w-full rounded-lg border border-muted bg-surface"
 )
   svg(viewBox="0 0 100 60" width="100%" height="100%")

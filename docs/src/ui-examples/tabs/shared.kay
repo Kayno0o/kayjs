@@ -11,6 +11,6 @@ const range = signal('week')
 ---
 .flex.flex-col.gap-3
   p.font-semibold Sales over the last {range()}
-  Tabs(tabs={tabs} value={range()} label="Range" onChange={range.set})
+  Tabs(tabs={tabs} value={range()} label="Range" onValueChange={({ value }) => range = value})
     @panel(tab)
       p Figures for the {tab}.

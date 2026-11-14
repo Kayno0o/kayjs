@@ -10,7 +10,7 @@ The pointer can move onto the card: when your code clears the anchor, the card w
 
 ## Hearing it close
 
-`onOpenChange(open)` is called with `true` as the card shows and `false` as it hides. It also runs when the card hides itself, on Escape or when the anchor left the page, while your code still holds the anchor. Clear the anchor there, so your state says "closed" and the same element can show the card again.
+`onOpenChange({ open })` is called with `true` as the card shows and `false` as it hides. It also runs when the card hides itself, on Escape or when the anchor left the page, while your code still holds the anchor. Clear the anchor there, so your state says "closed" and the same element can show the card again.
 
 ## Placement
 

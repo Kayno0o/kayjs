@@ -37,9 +37,9 @@ const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OS
   center?: MapPoint | undefined
   zoom?: number | undefined
   // Called with the marker and its place in `markers` as a click, Enter or Space presses it, besides opening its popup.
-  onMarkerClick?: ((marker: MapMarker, index: number) => unknown) | undefined
+  onMarkerClick?: ((event: { marker: MapMarker, index: number }) => unknown) | undefined
   // Called with `{ center, zoom }` once the visitor has moved or zoomed the map, not for a fit the map makes itself nor for a `center` or `zoom` the parent set.
-  onMove?: ((view: { center: MapPoint, zoom: number }) => unknown) | undefined
+  onMove?: ((event: { center: MapPoint, zoom: number }) => unknown) | undefined
   // Draws the content of a marker's popup in place of its `popup` text, such as a link or a button; it is moved into the popup while open, and an empty block leaves that marker with none.
   popup?: Snippet<[marker: MapMarker, index: number]> | undefined
   // Describes the map for screen readers.
@@ -259,7 +259,7 @@ onMount(() => {
         if (opens)
           dot.togglePopup()
 
-        onMarkerClick?.(marker, index)
+        onMarkerClick?.({ marker, index })
 
         return
       }
@@ -324,7 +324,7 @@ onMount(() => {
         dot.bindPopup(textNode(leaflet, marker.popup))
 
       if (clicked)
-        dot.on('click', () => clicked(marker, index))
+        dot.on('click', () => clicked({ marker, index }))
 
       if (live)
         focusable(dot, marker, index, stops.length, map, opens)

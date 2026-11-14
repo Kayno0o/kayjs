@@ -4,7 +4,7 @@ description: A labelled list of radios to pick one option from, each with an opt
 
 <Demo name="radio-group/basic" />
 
-`value` is the option picked to start with, or `null` for none, and a group whose parent passes another follows it. `onChange` gets the picked option's own value, a number for a number option. An option carries a `label`, an optional `description` under it that screen readers read after the label, and may be `disabled`. Inside a form, the group posts the picked option under `name`, with no JavaScript.
+`value` is the option picked to start with, or `null` for none, and a group whose parent passes another follows it. `onChange({ value, option })` gets the picked option's own value, a number for a number option, and the option. An option carries a `label`, an optional `description` under it that screen readers read after the label, and may be `disabled`. Inside a form, the group posts the picked option under `name`, with no JavaScript.
 
 When `value` is typed to allow `null`, an option may carry `value: null` for a "none" choice of its own. It is checked while the group holds `null`, tells `onChange` `null` when picked, and posts an empty string in a form.
 
@@ -22,7 +22,7 @@ Put the group in a [FormField](/ui/form-field) with `group` and the same `name`:
 
 ## Options from an action
 
-`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad({ options, query })` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
 
 ## Async change
 

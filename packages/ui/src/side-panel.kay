@@ -66,7 +66,7 @@ const { open, trigger, title, label, heading, level = 2, actions, header, close,
   // Keeps the size the grip settled on in a cookie of this name, from one visit to the next, and draws it on the server, so the saved width shows from the first paint with no jump. A `size` given wins over it.
   sizeKey?: string | undefined
   // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
-  onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
+  onSizeChange?: ((event: { size: number, settled: boolean }) => unknown) | undefined
   resizeLabel?: string | undefined
   // When this value changes the body scrolls back to the top, for a panel kept in place (a `persist` island) while its content changes under it, as the next item of a list.
   scrollKey?: string | number | undefined
@@ -75,7 +75,7 @@ const { open, trigger, title, label, heading, level = 2, actions, header, close,
   | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
   | { closeHref: string, onOpenChange?: undefined, launcher: string, launcherHref: string }
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link too: the link navigates and `onOpenChange(true)` is called as well.
-  | { closeHref?: string | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined, launcherHref?: string | undefined }
+  | { closeHref?: string | undefined, onOpenChange?: ((event: { open: boolean }) => unknown) | undefined, launcherHref?: string | undefined }
 )>()
 
 // A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
@@ -96,7 +96,7 @@ function change(next: boolean) {
     inner = next
   }
 
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as const
@@ -220,7 +220,7 @@ function resizeTo(next: number, settled: boolean) {
   if (settled && kept)
     kept = clamped
 
-  onSizeChange?.(clamped, settled)
+  onSizeChange?.({ size: clamped, settled })
 }
 
 // Dragging the inner edge toward the page grows the panel.

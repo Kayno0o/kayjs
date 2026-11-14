@@ -5,5 +5,5 @@ import MarkdownEditor from '@kayjs/ui/markdown-editor.kay'
 const body = signal('A **bold** start.\n\n- first\n- second')
 ---
 .flex.max-w-xl.flex-col.gap-2
-  MarkdownEditor(value={body()} onInput={body.set} rows={6})
+  MarkdownEditor(value={body()} onInput={({ value }) => body = value} rows={6})
   p.text-muted {body().length} characters.

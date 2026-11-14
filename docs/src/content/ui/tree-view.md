@@ -10,7 +10,7 @@ description: Nested nodes, such as folders, with branches that open and close an
 
 `selected` marks a node. The branches holding it are drawn open from the server's HTML on. A tree whose parent passes another follows it, opening those branches.
 
-`expanded` lists the branches open to start with. `onSelectedChange(id, node)` runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes, so `onSelectedChange={folder.set}` keeps the pick, and the node. The chevron opens or closes its branch alone.
+`expanded` lists the branches open to start with. `onSelectedChange({ id, node })` runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes, so `onSelectedChange={({ id }) => folder = id}` keeps the pick; `node` is the node. The chevron opens or closes its branch alone.
 
 ## Links
 
@@ -40,4 +40,4 @@ A node's `children` may be a function returning the nodes below it, or a promise
 
 ## Which branches are open
 
-`expanded` lists the branches open. The tree follows it when the page passes a new list, and the reader opens and closes branches from then on. `onOpenChange(id, open, node)` is called whenever the reader opens or closes a branch, by a click or a key, so a page can keep the open branches in a URL or a cookie.
+`expanded` lists the branches open. The tree follows it when the page passes a new list, and the reader opens and closes branches from then on. `onOpenChange({ id, open, node })` is called whenever the reader opens or closes a branch, by a click or a key, so a page can keep the open branches in a URL or a cookie.

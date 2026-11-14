@@ -30,7 +30,7 @@ export function askOptions<Option, Query extends OptionsQuery = OptionsQuery>(so
 export interface OptionsHooks<Option> {
   // Text the source is asked for; read in an effect, so a change asks again. Left out, the source is asked once.
   query?: (() => string) | undefined
-  onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly Option[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The control's name, in the log of a failure.
   label: string
@@ -91,7 +91,7 @@ export function loadOptions<Option>(given: () => OptionsSource<Option>, hooks: O
 
       loaded.set(found)
       loading.set(false)
-      safely(() => untrack(() => hooks.onLoad?.(found, q)), `kayjs-ui: a ${hooks.label} onLoad`)
+      safely(() => untrack(() => hooks.onLoad?.({ options: found, query: q })), `kayjs-ui: a ${hooks.label} onLoad`)
     }
     catch (error) {
       if (mine !== request)
@@ -148,7 +148,7 @@ export interface SearchedOptions<Option> {
 }
 
 // What Combobox and MultiSelect ask on each pause in typing: the same question as `loadOptions`, but driven by the control, which decides when to ask, so the state is handed back to be reset between questions.
-export function searchOptions<Option>(given: () => OptionsSource<Option>, hooks: { minLength: () => number, onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined, onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined, label: string }): SearchedOptions<Option> {
+export function searchOptions<Option>(given: () => OptionsSource<Option>, hooks: { minLength: () => number, onLoad?: ((event: { options: readonly Option[], query: string }) => unknown) | undefined, onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined, label: string }): SearchedOptions<Option> {
   const found = signal<readonly Option[]>(NONE)
   const answered = signal<string | undefined>(undefined)
   const failed = signal(false)
@@ -174,7 +174,7 @@ export function searchOptions<Option>(given: () => OptionsSource<Option>, hooks:
       found.set(answer)
       answered.set(query)
       failed.set(false)
-      safely(() => hooks.onLoad?.(answer, query), `kayjs-ui: a ${hooks.label} onLoad`)
+      safely(() => hooks.onLoad?.({ options: answer, query }), `kayjs-ui: a ${hooks.label} onLoad`)
     }
     catch (error) {
       if (mine === request) {

@@ -10,11 +10,11 @@ A function `icons` is handed `{ q, limit, offset }` and returns the matching ico
 
 <Demo name="icon-picker/more" />
 
-`onSearch` is called with the query each time a new search starts, not when Show more adds a page. `onLoad` is called with the icons of each page and the query. `onError` is called with `{ error, query }`, what the search rejected with, for the latest search only, while `failureLabel` still shows and the last grid stays.
+`onSearch({ query })` is called with the query each time a new search starts, not when Show more adds a page. `onLoad({ options, query })` is called with the icons of each page and the query. `onError` is called with `{ error, query }`, what the search rejected with, for the latest search only, while `failureLabel` still shows and the last grid stays.
 
 ## In a form
 
-`name` submits the chosen name inside a plain form, and an `input` event tells the form about each pick. Without a form, `value` is the chosen name and `onChange` gets the new name, or an empty string when the pick is cleared.
+`name` submits the chosen name inside a plain form, and an `input` event tells the form about each pick. Without a form, `value` is the chosen name and `onChange({ value, choice })` gets the new name, or an empty string when the pick is cleared.
 
 <Demo name="icon-picker/form" />
 

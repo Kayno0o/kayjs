@@ -52,7 +52,7 @@ test('Select passes the option, and undefined for the empty one', async () => {
 
   await settle()
 
-  expect(calls.onSelect).toEqual([['b', { value: 'b', label: 'Beta' }], ['', undefined]])
+  expect(calls.onSelect).toEqual([[{ value: 'b', option: { value: 'b', label: 'Beta' } }], [{ value: '', option: undefined }]])
 })
 
 test('Segmented with a param passes the option to a refusing onChange, and goes back', async () => {
@@ -61,7 +61,7 @@ test('Segmented with a param passes the option to a refusing onChange, and goes 
   click(root.querySelector('#segmented input[value="b"]'))
   await settle()
 
-  expect(calls.onSegment).toEqual([['b', expect.objectContaining({ value: 'b', label: 'Beta' })]])
+  expect(calls.onSegment).toEqual([[{ value: 'b', option: expect.objectContaining({ value: 'b', label: 'Beta' }) }]])
   expect(root.querySelector<HTMLInputElement>('#segmented input[value="a"]')!.checked).toBe(true)
 })
 
@@ -73,7 +73,7 @@ test('a Select with a param and no value passes the option to a refusing onChang
   select.dispatchEvent(new Event('change', { bubbles: true }))
   await settle()
 
-  expect(calls.onMoved).toEqual([['b', { value: 'b', label: 'Beta' }]])
+  expect(calls.onMoved).toEqual([[{ value: 'b', option: { value: 'b', label: 'Beta' } }]])
   expect(select.value).toBe('a')
 })
 
@@ -84,7 +84,7 @@ test('ChipGroup passes the picked options in order', async () => {
   click(root.querySelector('#chips input[value="a"]'))
   await settle()
 
-  expect(calls.onChips.map(args => (args[1] as { value: string }[]).map(option => option.value))).toEqual([['b'], ['a', 'b']])
+  expect(calls.onChips.map(args => (args[0] as { options: { value: string }[] }).options.map(option => option.value))).toEqual([['b'], ['a', 'b']])
 })
 
 test('MultiSelect lines options up with values, a never loaded one standing in as itself', async () => {
@@ -93,7 +93,7 @@ test('MultiSelect lines options up with values, a never loaded one standing in a
   click(root.querySelector('#multi [data-part=option] input[type=checkbox]'))
   await settle()
 
-  const [values, options] = calls.onMulti[0] as [string[], { value: string, label: string }[]]
+  const { value: values, options } = calls.onMulti[0]![0] as { value: string[], options: { value: string, label: string }[] }
 
   expect(options.map(option => option.value)).toEqual(values)
   expect(options.find(option => option.value === 'ghost')).toEqual({ value: 'ghost', label: 'ghost' })
@@ -107,7 +107,7 @@ test('IconPicker passes the choice, and undefined once cleared', async () => {
   click(root.querySelector('#icon [data-part=clear]'))
   await settle()
 
-  expect(calls.onIcon).toEqual([['tabler:home', expect.objectContaining({ name: 'tabler:home' })], ['', undefined]])
+  expect(calls.onIcon).toEqual([[{ value: 'tabler:home', choice: expect.objectContaining({ name: 'tabler:home' }) }], [{ value: '', choice: undefined }]])
 })
 
 test('TimeInput onInput hears every edit, empty ones too, and a required box hears the empty edit as well', async () => {

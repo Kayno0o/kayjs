@@ -8,7 +8,7 @@ description: A vertical navigation with group headings, a collapsible rail and a
 
 ## Collapsing
 
-The toggle at the bottom narrows the nav to a rail of icons. A link with no icon shows its first letter, and the text stays there for screen readers, with a tooltip for everyone else. `collapsedKey` keeps the state in a cookie the server reads, so the rail is right from the first paint. Give `collapsed` to control it yourself, and listen to `onCollapsedChange(collapsed)`. `collapsible={false}` leaves the toggle out.
+The toggle at the bottom narrows the nav to a rail of icons. A link with no icon shows its first letter, and the text stays there for screen readers, with a tooltip for everyone else. `collapsedKey` keeps the state in a cookie the server reads, so the rail is right from the first paint. Give `collapsed` to control it yourself, and listen to `onCollapsedChange({ collapsed })`. `collapsible={false}` leaves the toggle out.
 
 ## Narrow screens
 

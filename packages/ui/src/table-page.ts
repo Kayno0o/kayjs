@@ -8,7 +8,7 @@ export interface PagingInput<Row> {
   page: () => number | undefined
   pageParam: () => string
   limitParam: () => string
-  onPageChange: () => ((page: number, size: number) => unknown) | undefined
+  onPageChange: () => ((event: { page: number, size: number }) => unknown) | undefined
   shown: () => Row[]
   // Reads what starts the pages over when it changes: the sort, the typed filter and its fields.
   restarts: () => void
@@ -47,7 +47,7 @@ export function paging<Row>(input: PagingInput<Row>) {
       if (input.page() === undefined)
         keptPage?.set('')
 
-      input.onPageChange()?.(1, sizeNow())
+      input.onPageChange()?.({ page: 1, size: sizeNow() })
     })
   })
 
@@ -60,7 +60,7 @@ export function paging<Row>(input: PagingInput<Row>) {
     if (input.page() === undefined)
       keptPage?.set(next > 1 ? String(next) : '')
 
-    input.onPageChange()?.(next, sizeNow())
+    input.onPageChange()?.({ page: next, size: sizeNow() })
   }
 
   function resize(next: number) {
@@ -69,7 +69,7 @@ export function paging<Row>(input: PagingInput<Row>) {
     if (input.page() === undefined)
       keptPage?.set('')
 
-    input.onPageChange()?.(1, next)
+    input.onPageChange()?.({ page: 1, size: next })
   }
 
   return { pageShown, paged, pageRows, sizeNow, goTo, resize }

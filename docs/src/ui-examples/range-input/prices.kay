@@ -27,7 +27,7 @@ const shown = memo(() =>
     step={5}
     unit="EUR"
     value={range()}
-    onChange={range.set}
+    onChange={({ value }) => range = value}
   )
   ul.text-muted
     for item of shown() key={item.name}

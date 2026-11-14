@@ -182,7 +182,7 @@ A component using signals or handlers becomes an island: see [Islands](/essentia
 
 A prop is always a value: a parent hands a signal's value, `Toggle(open={open()})`, and the prop follows it. A child that writes the parent's state types the prop `Bindable<boolean>`, read and assigned as a plain name. The parent binds it with `bind:open={open}`, and the child's assignment writes the parent's signal. Given a plain value instead, the assignment stays in the child. A child passes it on with `bind:open={open}`, through any number of levels, and a bind makes the parent an island.
 
-`bind:` also takes a prop with an `onOpenChange`-style callback beside it, so `Dialog(bind:open={open})` does what `Dialog(open={open()} onOpenChange={v => open = v})` does, on kayjs-ui's controls and on a component of your own alike.
+`bind:` also takes a prop with an `onOpenChange`-style callback beside it, so `Dialog(bind:open={open})` does what `Dialog(open={open()} onOpenChange={({ open: v }) => open = v})` does, on kayjs-ui's controls and on a component of your own alike.
 
 Handed to a parameter typed `unknown` or `any`, as in `String(count)`, a signal is an error, `uncalled-signal`. Call it there.
 

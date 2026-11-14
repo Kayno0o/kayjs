@@ -51,14 +51,14 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   // Draws the inside of a day's button in place of its number, which the block writes itself (`{Number(iso.slice(8))}`), for a price or a dot under it; the button, its `aria-label` and the selection stay.
   day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined
   // Called with the month on show as `YYYY-MM` each time the calendar opens on it or moves to another, so an app can load that month's availability.
-  onMonthChange?: ((month: string) => unknown) | undefined
+  onMonthChange?: ((event: { month: string }) => unknown) | undefined
   // Shows the calendar when the page sets it; the button, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Called with the box's date on every edit, `''` and a half-typed one included, a date the app refuses too: the live value.
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
 }>()
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its date back in place of its own.
@@ -111,17 +111,17 @@ function flag(next: string): boolean {
   return refused
 }
 
-function heard(next: string) {
+function heard({ value: next }: { value: string }) {
   if (flag(next) || next === current())
     return
 
   current = next
-  onChange?.(next)
+  onChange?.({ value: next })
 }
 
-function live(next: string) {
-  onInput?.(next)
-  heard(next)
+function live(event: { value: string }) {
+  onInput?.(event)
+  heard(event)
 }
 
 // A parent handing another date moves the box through TextInput, which then reports it back as the same date.
@@ -152,7 +152,7 @@ effect(() => {
     return
 
   announced = month
-  untrack(() => onMonthChange?.(month))
+  untrack(() => onMonthChange?.({ month }))
 })
 
 // The nearest day of the month of `iso` that can be chosen, `iso` itself when none can.
@@ -174,9 +174,9 @@ function nearest(iso: string): string {
   return target
 }
 
-function toggled(isOpen: boolean) {
+function toggled({ open: isOpen }: { open: boolean }) {
   opened = isOpen
-  onOpenChange?.(isOpen)
+  onOpenChange?.({ open: isOpen })
 
   if (!isOpen)
     return

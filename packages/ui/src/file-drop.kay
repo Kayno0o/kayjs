@@ -52,11 +52,11 @@ const { accept, multiple = false, paste = false, disabled = false, invalid, name
   // Lists the files kept under the zone, each with a button removing it. A zone with a `name` or a `list` keeps its files: `multiple` adds to them, where a single zone replaces them.
   list?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list. Optional, as a form posting the files by `name` needs no callback.
-  onFiles?: ((files: File[]) => unknown) | undefined
+  onFiles?: ((event: { files: File[] }) => unknown) | undefined
   // The files the zone keeps, after a pick, a removal or a form reset; only a zone that keeps its files calls it.
-  onChange?: ((files: File[]) => unknown) | undefined
+  onChange?: ((event: { files: File[] }) => unknown) | undefined
   // The files dropped or picked that were left out, with why: `type` for those missing `accept`, `size` for those past `maxSize`, `count` for the matching ones beyond `maxFiles` or, without `multiple`, the first. One call per reason; never called for pasted files, which may be anything on the clipboard.
-  onReject?: ((files: File[], reason: Reason) => unknown) | undefined
+  onReject?: ((event: { files: File[], reason: Reason }) => unknown) | undefined
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone. Left out, the zone shows a button opening the picker beside a line about dropping.
   content?: Snippet<[zone: { open: () => void, dragging: () => boolean }]> | undefined
   chooseLabel?: string | undefined
@@ -114,7 +114,7 @@ function sync() {
 function keep(next: File[]) {
   chosen = next
   sync()
-  onChange?.(next)
+  onChange?.({ files: next })
 }
 
 function sameFile(a: File, b: File): boolean {
@@ -138,7 +138,7 @@ function take(files: Iterable<File>, reporting = true): boolean {
   if (reporting) {
     for (const [group, reason] of [[wrongType, 'type'], [tooBig, 'size'], [fitting.slice(room), 'count']] as [File[], Reason][]) {
       if (group.length > 0)
-        onReject?.(group, reason)
+        onReject?.({ files: group, reason })
     }
   }
 
@@ -148,7 +148,7 @@ function take(files: Iterable<File>, reporting = true): boolean {
   if (keeping())
     keep(multiple ? [...chosen(), ...taken] : taken)
 
-  onFiles?.(taken)
+  onFiles?.({ files: taken })
 
   return true
 }

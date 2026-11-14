@@ -53,12 +53,12 @@ export interface ChatSessionOptions {
   readonly signedOutMessage?: string | undefined
   // What the app hears, each called once per transition. A throw is logged and leaves the chat alone.
   readonly onSend?: ((sent: { messages: ChatMessage[] }) => unknown) | undefined
-  readonly onReply?: ((turn: Turn) => unknown) | undefined
+  readonly onReply?: ((event: { turn: Turn }) => unknown) | undefined
   readonly onStop?: (() => unknown) | undefined
   readonly onError?: ((failure: ChatFailure) => unknown) | undefined
-  readonly onToolCall?: ((call: AiToolCall) => unknown) | undefined
+  readonly onToolCall?: ((event: { call: AiToolCall }) => unknown) | undefined
   readonly onRegenerate?: (() => unknown) | undefined
-  readonly onEdit?: ((text: string) => unknown) | undefined
+  readonly onEdit?: ((event: { text: string }) => unknown) | undefined
 }
 
 // What a Chat's `transcribe` action answers: the text, or `{ text }`.
@@ -353,7 +353,7 @@ export function createChatSession(options: ChatSessionOptions) {
         continue
 
       told.set(call.id, call.status)
-      safely(() => options.onToolCall?.(call), 'kayjs-ai: a Chat onToolCall')
+      safely(() => options.onToolCall?.({ call }), 'kayjs-ai: a Chat onToolCall')
       said.push({ id: nextId++, text: options.say(call) })
     }
 
@@ -480,7 +480,7 @@ export function createChatSession(options: ChatSessionOptions) {
     if (state === 'failed')
       safely(() => options.onError?.({ message: options.errorMessage, status: undefined }), 'kayjs-ai: a Chat onError')
     else if (state === 'done' && added !== undefined)
-      safely(() => options.onReply?.(added), 'kayjs-ai: a Chat onReply')
+      safely(() => options.onReply?.({ turn: added }), 'kayjs-ai: a Chat onReply')
   }
 
   // Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
@@ -808,7 +808,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
       // The edit field is gone, and the edit button too while the reply is under way.
       options.focus()
-      safely(() => options.onEdit?.(content), 'kayjs-ai: a Chat onEdit')
+      safely(() => options.onEdit?.({ text: content }), 'kayjs-ai: a Chat onEdit')
       replacement = { header: `edit:${turns.length - index}`, before: turns }
       history.set([...turns.slice(0, index), { id: nextId++, role: 'user', content, ...files.length > 0 && { attachments: files } }])
       void post(true)

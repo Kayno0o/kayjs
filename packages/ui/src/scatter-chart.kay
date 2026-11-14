@@ -24,7 +24,7 @@ const look = recipe({
   },
 })
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActive, active, tooltip, emptyLabel, empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActiveChange, onActive, active, tooltip, emptyLabel, empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -32,12 +32,14 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onAct
   quadrant?: { x: number, y: number } | undefined
   corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string } | undefined
   // Makes every dot a button handing back its point.
-  onSelect?: ((point: Point) => unknown) | undefined
+  onSelect?: ((event: { item: Point }) => unknown) | undefined
   // The address a dot links to, or `undefined` for none: a dot that has one is a link, and a plain click goes to `onSelect` when the app gave one.
   href?: ((point: Point) => string | undefined) | undefined
   // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
   // Hears the index of the dot the pointer or the focus is on, `null` when it leaves.
+  onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
+  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onActive?: ((index: number | null) => unknown) | undefined
   // The dot to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
@@ -80,7 +82,7 @@ function keyDown(event: KeyboardEvent) {
   target?.focus()
 }
 
-const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
 // The features a chart's call sites leave out (onSelect, href, tooltip) are left out of its island (`uses`).
 const tip = uses('tooltip') ? chartTooltip() : undefined
 
@@ -96,7 +98,7 @@ function pressed(event: MouseEvent, point: Point) {
     return
 
   event.preventDefault()
-  void onSelect(point)
+  void onSelect({ item: point })
 }
 
 function focused(event: FocusEvent, at: number) {
@@ -133,7 +135,7 @@ else
         if uses('href') && markKind(link(point)?.href, onSelect !== undefined) === 'link'
           a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else if uses('onSelect') && onSelect
-          button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.({ item: point })} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else
           span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
       if uses('tooltip') && tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]

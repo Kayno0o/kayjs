@@ -122,7 +122,7 @@ describe('bind: on a component with a value and change pair', () => {
     const dom = compile(`${dialog}Dialog(bind:open={open})\n`, 'dom').tsx
     const html = compile(`${dialog}Dialog(bind:open={open})\n`, 'html').tsx
 
-    expect(dom).toContain('get "open"() { return (open)() }, set "open"(kayValue) { (open).set(kayValue) }, "onOpenChange"(kayValue) { (open).set(kayValue) }')
+    expect(dom).toContain('get "open"() { return (open)() }, set "open"(kayValue) { (open).set(kayValue) }, "onOpenChange"(kayChange) { const { "open": kayValue } = kayChange; (open).set(kayValue) }')
     expect(html).toContain('{ "open": (open)() }')
     expect(html).not.toContain('onOpenChange')
   })
@@ -130,13 +130,13 @@ describe('bind: on a component with a value and change pair', () => {
   it('writes the Bindable prop of the component it is passed on from', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nDialog(bind:open={open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('"onOpenChange"(kayValue) { __props["open"] = kayValue }')
+    expect(compile(middle, 'dom').tsx).toContain('"onOpenChange"(kayChange) { const { "open": kayValue } = kayChange; __props["open"] = kayValue }')
   })
 
-  it('keeps an onChange written beside it, called after the write with every argument', () => {
-    const dom = compile(`${dialog}Dialog(bind:open={open} onOpenChange={(opened, index) => log(opened, index)})\n`, 'dom').tsx
+  it('keeps an onChange written beside it, called after the write with the whole event', () => {
+    const dom = compile(`${dialog}Dialog(bind:open={open} onOpenChange={event => log(event)})\n`, 'dom').tsx
 
-    expect(dom).toContain('"onOpenChange"(kayValue, ...kayRest) { (open).set(kayValue); ((opened, index) => log(opened, index))?.(kayValue, ...kayRest) }')
+    expect(dom).toContain('"onOpenChange"(kayChange) { const { "open": kayValue } = kayChange; (open).set(kayValue); (event => log(event))?.(kayChange) }')
     expect(dom.match(/onOpenChange/g)).toHaveLength(1)
   })
 
@@ -147,13 +147,13 @@ describe('bind: on a component with a value and change pair', () => {
   })
 
   it('calls a callback that may be undefined only when it is set', () => {
-    const forwarded = '---\nimport { signal } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst open = signal(false)\nconst { onOpenChange } = props<{ onOpenChange?: (open: boolean) => void }>()\n---\nDialog(bind:open={open} onOpenChange={onOpenChange})\n'
+    const forwarded = '---\nimport { signal } from \'kay\'\nimport Dialog from \'./Dialog.kay\'\nconst open = signal(false)\nconst { onOpenChange } = props<{ onOpenChange?: (event: { open: boolean }) => void }>()\n---\nDialog(bind:open={open} onOpenChange={onOpenChange})\n'
 
-    expect(compile(forwarded, 'dom').tsx).toContain(')?.(kayValue, ...kayRest)')
+    expect(compile(forwarded, 'dom').tsx).toContain(')?.(kayChange)')
   })
 
   it('names the callback after the prop, whatever it is', () => {
-    expect(compile(`${dialog}Dialog(bind:index={open})\n`, 'dom').tsx).toContain('"onIndexChange"(kayValue) { (open).set(kayValue) }')
+    expect(compile(`${dialog}Dialog(bind:index={open})\n`, 'dom').tsx).toContain('"onIndexChange"(kayChange) { const { "index": kayValue } = kayChange; (open).set(kayValue) }')
   })
 })
 

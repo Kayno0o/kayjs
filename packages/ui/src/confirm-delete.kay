@@ -34,7 +34,7 @@ const { message, details, onConfirm, open, onOpenChange, failureLabel, success, 
   // Shows the dialog or the armed pair when the app sets it, such as from a Menu entry, a context menu or a shortcut; left out, the component keeps it itself. Given, `onOpenChange` is how the app learns of a cancel, a confirmed delete or Escape, to set it back to `false`.
   open?: boolean | undefined
   // Called with `true` when the trigger is pressed, for a message that is read then rather than at render, and with `false` once the dialog or the armed pair goes, as the `onOpenChange` of Dialog.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
   failureLabel?: string | undefined
 
@@ -95,7 +95,7 @@ function setOpen(next: boolean) {
   if (open === undefined)
     inner = next
 
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 function start(event: MouseEvent) {

@@ -30,7 +30,7 @@ const { action, refused, saved, onSave, onError, onDiscard, dirty, save, status,
   // Toasted as a success once the action has run.
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
-  onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  onSave?: ((event: { data: Answer<Success<Output>> }) => unknown) | undefined
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. For logging, or to scroll to the first bad field.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
@@ -250,7 +250,7 @@ async function submit(event: SubmitEvent) {
     toast.success(saved)
 
   if (!run)
-    onSave?.(done.result as Answer<Success<Output>>)
+    onSave?.({ data: done.result as Answer<Success<Output>> })
 }
 
 // The form's methods are called through its prototype, as a control named `requestSubmit` or `reset` takes their place on the form.

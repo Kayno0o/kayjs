@@ -14,5 +14,5 @@ function hold(value: 's' | 'm' | 'l') {
 }
 ---
 form
-  Segmented(label="Size" name="size" options={sizes} value="m" onChange={hold})
+  Segmented(label="Size" name="size" options={sizes} value="m" onChange={({ value }) => hold(value as 's' | 'm' | 'l')})
   button#release(type="button" onClick={() => release()}) Release

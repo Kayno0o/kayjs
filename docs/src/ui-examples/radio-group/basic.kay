@@ -10,5 +10,5 @@ const plans = [
 ]
 ---
 .flex.flex-col.items-start.gap-2
-  RadioGroup(label="Plan" name="plan" options={plans} value={plan()} onChange={plan.set})
+  RadioGroup(label="Plan" name="plan" options={plans} value={plan()} onChange={({ value }) => plan = value})
   p The {plan()} plan.

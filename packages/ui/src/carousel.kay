@@ -40,7 +40,7 @@ const { slides: given, slide, list, index = 0, onIndexChange, loop = true, perVi
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
   // Called with the index of the first slide shown, on each turn: a button, a dot, an arrow key, a swipe or the autoplay.
-  onIndexChange?: ((index: number) => unknown) | undefined
+  onIndexChange?: ((event: { index: number }) => unknown) | undefined
   // Whether the slides go round: past the last one comes the first, and the other way. `false` stops at either end, with the button of that side disabled.
   loop?: boolean | undefined
   // How many slides are in view at once, each a share of the width; a turn moves one slide, and a dot stands for each place the first one can be. A whole number from 1.
@@ -125,7 +125,7 @@ const none = () => all().length === 0 && (list === undefined || (list.ended() &&
 
 function go(next: number) {
   shown = next
-  onIndexChange?.(next)
+  onIndexChange?.({ index: next })
 }
 
 function step(delta: number) {

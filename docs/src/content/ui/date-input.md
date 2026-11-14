@@ -22,7 +22,7 @@ The button, month and Today labels read the `ui.dateInput.*` messages, or `openL
 
 ## Opened by the app
 
-`open` shows the calendar when your code sets it, and `onOpenChange(open)` is called whenever it shows or hides: the button, a click outside, Escape or a pick. When you drive `open`, set your own value back in `onOpenChange`. `DateRangeInput` takes `onOpenChange(open, box)` too, `box` being `'from'` or `'to'`.
+`open` shows the calendar when your code sets it, and `onOpenChange({ open })` is called whenever it shows or hides: the button, a click outside, Escape or a pick. When you drive `open`, set your own value back in `onOpenChange`. `DateRangeInput` takes `onOpenChange({ open, box })` too, `box` being `'from'` or `'to'`.
 
 ## Closed days and a day cell
 
@@ -37,14 +37,14 @@ import DateInput from '@kayjs/ui/date-input.kay'
 const closed = new Set(['2026-12-24', '2026-12-25'])
 const prices: Record<string, number> = { '2026-12-23': 90 }
 ---
-DateInput(aria-label="Arrival" name="arrival" disabledDay={iso => closed.has(iso)} onMonthChange={month => console.log(month)})
+DateInput(aria-label="Arrival" name="arrival" disabledDay={iso => closed.has(iso)} onMonthChange={({ month }) => console.log(month)})
   @day(iso, state)
     span {Number(iso.slice(8))}
     if !state.disabled
       small {prices[iso] ?? 60}
 ```
 
-`onMonthChange(month)` hears the month on show as `YYYY-MM`, on opening and on each move, so an app can load that month's availability. `DateRangeInput` takes the same three, `onMonthChange(month, box)` with the box.
+`onMonthChange({ month })` hears the month on show as `YYYY-MM`, on opening and on each move, so an app can load that month's availability. `DateRangeInput` takes the same three, `onMonthChange({ month, box })` with the box.
 
 
 ## Size and invalid

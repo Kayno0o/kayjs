@@ -14,7 +14,7 @@ const saved = signal(200)
     name="delay"
     value={delay()}
     formatValue={value => `${value} ms`}
-    onInput={delay.set}
-    onChange={saved.set}
+    onInput={({ value }) => delay = value}
+    onChange={({ value }) => saved = value}
   )
   p.text-sm Let go at {saved()} ms

@@ -26,7 +26,7 @@ const { id, open = false, placement = 'bottom-start', role = 'dialog', label, tr
   // Opens the panel at this point of the window (`clientX` and `clientY`) instead of against a trigger, which then need not be given: a zero-size fixed anchor stands there, so `placement` and the browser's flip keep the panel inside the window. The page shows it with `open`.
   at?: { x: number, y: number } | undefined
   // Called with the new state whenever the panel shows or hides, however it did.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 
 trackPointer()
@@ -75,7 +75,7 @@ const triggerProps: PopoverTriggerProps = {
 function toggled(event: ToggleEvent) {
   const opened = event.newState === 'open'
   shown = opened
-  onOpenChange?.(opened)
+  onOpenChange?.({ open: opened })
 }
 ---
 if at

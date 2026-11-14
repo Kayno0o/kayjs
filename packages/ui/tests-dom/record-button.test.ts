@@ -106,7 +106,7 @@ function later() {
 async function mount(props: Record<string, unknown> = {}) {
   const given: File[] = []
 
-  mounted = await mountComponent(RecordButton, { onRecord: (audio: File) => given.push(audio), ...props })
+  mounted = await mountComponent(RecordButton, { onRecord: ({ audio }: { audio: File }) => given.push(audio), ...props })
 
   const root = mounted.root
   const button = root.querySelector('button')!
@@ -127,7 +127,7 @@ async function mount(props: Record<string, unknown> = {}) {
 test('a press records, the next hands the recording over as a file, busy and said stopped while onRecord pends, and the microphone is released', async () => {
   const sending = later()
   const given: File[] = []
-  const { button, look } = await mount({ label: 'Speak', onRecord: async (audio: File) => {
+  const { button, look } = await mount({ label: 'Speak', onRecord: async ({ audio }: { audio: File }) => {
     given.push(audio)
     await sending.promise
   } })
@@ -286,7 +286,7 @@ test('a RecordButton removed while it records releases the microphone', async ()
 test('reports the start, how a recording stopped before onRecord, a cancel and each problem', async () => {
   const logged = spyOn(console, 'error').mockImplementation(() => undefined)
   const events: unknown[] = []
-  const hear = (name: string) => (...args: unknown[]) => events.push([name, ...args])
+  const hear = (name: string) => (event?: { reason?: string }) => events.push(event?.reason === undefined ? [name] : [name, event.reason])
 
   try {
     const { button } = await mount({
@@ -326,7 +326,7 @@ test('reports the start, how a recording stopped before onRecord, a cancel and e
 
 test('onStop says press for the press that stopped a recording, then onRecord follows', async () => {
   const events: string[] = []
-  const { button } = await mount({ onStart: () => events.push('start'), onStop: (reason: string) => events.push(`stop:${reason}`), onRecord: () => events.push('record') })
+  const { button } = await mount({ onStart: () => events.push('start'), onStop: ({ reason }: { reason: string }) => events.push(`stop:${reason}`), onRecord: () => events.push('record') })
 
   click(button)
   await settle()
@@ -338,7 +338,7 @@ test('onStop says press for the press that stopped a recording, then onRecord fo
 
 test('onRecordingChange says true as a press asks for the microphone and false once the recording ends, however it ended', async () => {
   const changes: boolean[] = []
-  const { button } = await mount({ onRecordingChange: (recording: boolean) => changes.push(recording) })
+  const { button } = await mount({ onRecordingChange: ({ recording }: { recording: boolean }) => changes.push(recording) })
 
   click(button)
   await settle()
@@ -375,7 +375,7 @@ test('onRecordingChange says true as a press asks for the microphone and false o
 
 test('a controlled recording starts as a press would, stops and hands over when set false, and a recording that ended on its own is not started again', async () => {
   const changes: boolean[] = []
-  const { given, look } = await mount({ recording: false, onRecordingChange: (recording: boolean) => changes.push(recording) })
+  const { given, look } = await mount({ recording: false, onRecordingChange: ({ recording }: { recording: boolean }) => changes.push(recording) })
 
   expect(recorders.length).toBe(0)
 
@@ -400,7 +400,7 @@ test('a controlled recording starts as a press would, stops and hands over when 
 test('a recording set false while the microphone is still being asked for stops once it opens', async () => {
   const opened = later()
   const changes: boolean[] = []
-  const { given } = await mount({ recording: false, onRecordingChange: (recording: boolean) => changes.push(recording) })
+  const { given } = await mount({ recording: false, onRecordingChange: ({ recording }: { recording: boolean }) => changes.push(recording) })
 
   microphone(async () => {
     await opened.promise
@@ -436,7 +436,7 @@ test('a recording set false then true again while the microphone is asked for ke
 
 test('onRecordingChange says false when maxDuration ends a recording and when the button goes mid-recording', async () => {
   const changes: boolean[] = []
-  const { button } = await mount({ maxDuration: '30ms', onRecordingChange: (recording: boolean) => changes.push(recording) })
+  const { button } = await mount({ maxDuration: '30ms', onRecordingChange: ({ recording }: { recording: boolean }) => changes.push(recording) })
 
   click(button)
   await settle()
@@ -448,7 +448,7 @@ test('onRecordingChange says false when maxDuration ends a recording and when th
   mounted!.unmount()
 
   const gone: boolean[] = []
-  const second = await mount({ onRecordingChange: (recording: boolean) => gone.push(recording) })
+  const second = await mount({ onRecordingChange: ({ recording }: { recording: boolean }) => gone.push(recording) })
 
   click(second.button)
   await settle()

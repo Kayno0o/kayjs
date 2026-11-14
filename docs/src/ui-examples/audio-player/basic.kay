@@ -19,5 +19,5 @@ const cues: AudioCue[] = [
 const at = signal(0)
 ---
 .flex.flex-col.gap-2.max-w-xl
-  AudioPlayer(src={SILENCE} title="Episode 12" artist="The show" chapters={chapters} cues={cues} position={at()} onPositionChange={at.set})
+  AudioPlayer(src={SILENCE} title="Episode 12" artist="The show" chapters={chapters} cues={cues} position={at()} onPositionChange={({ seconds }) => at = seconds})
   p At {Math.floor(at())} seconds.

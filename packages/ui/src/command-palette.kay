@@ -49,13 +49,13 @@ const look = recipe({
 const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = [], onRecentChange, shortcut: keys, siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
   // Shows the palette; the shortcut opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   entries: PaletteEntry[]
   // The order groups are listed in; the rest follow as they come.
   groups?: string[] | undefined
   // Hrefs of the links followed from it, most recent first, listed on top while the query is empty; `onRecentChange` hands the new list over for the app to keep.
   recent?: string[] | undefined
-  onRecentChange?: ((recent: string[]) => unknown) | undefined
+  onRecentChange?: ((event: { recent: string[] }) => unknown) | undefined
   // The keys that open and close it from anywhere, `mod+k` (Ctrl or Cmd with K) by default, unless something handled the key first; `false` or `null` leaves opening to the app. Written as kay's `shortcut` takes them.
   shortcut?: string | false | null | undefined
   // Searches the text of the site's pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `limit` of them, after the entries it matches, under `siteSearchLabel`. Read once, as the palette is set up.
@@ -210,7 +210,7 @@ function setShown(next: boolean) {
     return
 
   shown = next
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 // A close event lands a task after the dialog closed, so one the shortcut has already reopened it past is stale.
@@ -231,7 +231,7 @@ function followed(link: PaletteLink, found: boolean) {
     const next = withRecent(followedRecently(), link.href)
 
     followedRecently = next
-    onRecentChange?.(next)
+    onRecentChange?.({ recent: next })
   }
 
   dialog?.close()

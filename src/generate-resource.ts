@@ -339,7 +339,7 @@ import { create } from '../routes/${names.folder}/_actions.kay'
 const writing = signal(false)
 ---
 Button(label="New ${label}" tone="accent" icon="plus" onClick={() => writing = true})
-FormDialog(open={writing()} title="New ${label}" action={create} submitLabel="Create" failureLabel="Could not create the ${label}" onOpenChange={open => writing = open})
+FormDialog(open={writing()} title="New ${label}" action={create} submitLabel="Create" failureLabel="Could not create the ${label}" onOpenChange={({ open }) => writing = open})
 ${controls(fields, true, undefined, 1).join('\n')}
 `
 }

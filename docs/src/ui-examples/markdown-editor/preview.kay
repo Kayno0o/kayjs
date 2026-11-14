@@ -12,4 +12,4 @@ async function render(markdown: string): Promise<string> {
 }
 ---
 .flex.max-w-3xl.flex-col.gap-2
-  MarkdownEditor(value={body()} onInput={body.set} preview={render})
+  MarkdownEditor(value={body()} onInput={({ value }) => body = value} preview={render})

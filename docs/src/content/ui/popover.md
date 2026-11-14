@@ -14,7 +14,7 @@ The panel is a `dialog` by default, and `role` changes it: `menu`, `listbox`, `t
 
 ## Controlled
 
-`open` shows or hides the panel from the page, and `onOpenChange(open)` runs however it changed. A page driving `open` sets its own value back there.
+`open` shows or hides the panel from the page, and `onOpenChange({ open })` runs however it changed. A page driving `open` sets its own value back there.
 
 <Demo name="popover/controlled" />
 

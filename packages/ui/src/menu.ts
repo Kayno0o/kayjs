@@ -31,7 +31,7 @@ export interface MenuCheckbox extends MenuItemBase {
   id?: string | undefined
   checked?: boolean | undefined
   defaultChecked?: boolean | undefined
-  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: boolean }) => unknown) | undefined
 }
 
 // A `role="menuitemradio"` entry: an entry with a `radioGroup` is one, and of the entries sharing it one is checked. The app holds the state with `checked` on each, or leaves it out and the menu keeps the group's value, starting from the entry with `defaultChecked`: with neither, nothing is checked until one is picked. `onCheckedChange` hears the `value` of the entry that became the checked one.
@@ -40,7 +40,7 @@ export interface MenuRadio extends MenuItemBase {
   value: string
   checked?: boolean | undefined
   defaultChecked?: boolean | undefined
-  onCheckedChange?: ((value: string) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: true, value: string }) => unknown) | undefined
 }
 
 // The entries a menu draws: a list, a function returning one or a promise of one.
@@ -55,7 +55,7 @@ export interface MenuSubmenu {
   items: MenuSource
   // Shows the submenu when the page sets it, and `onOpenChange` hears it open and close, as the menu's own do; left out, the menu opens and closes it.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }
 
 // A title over the entries that follow it.

@@ -32,7 +32,7 @@ export function recordWords(): RecordWords {
 
 export interface RecorderOptions {
   // Takes what was said; a promise it returns holds `state` at `sending` until it settles, and a rejection sets `problem` to `failure`.
-  onAudio: (audio: File) => unknown
+  onAudio: (event: { audio: File }) => unknown
   words: RecordWords
   failure: string
   // What `said` reads while `onAudio`'s promise is pending, `words.stopped` by default; it is emptied once the promise settles, so a status region read later does not say the work is still under way.
@@ -42,13 +42,13 @@ export interface RecorderOptions {
   // Called once the microphone is open and the recording runs.
   onStart?: (() => unknown) | undefined
   // Called when a recording ends and is handed to `onAudio`: `press` when the visitor stopped it, `limit` when `maxMs` ran out. Before `onAudio`.
-  onStop?: ((reason: RecordStop) => unknown) | undefined
+  onStop?: ((event: { reason: RecordStop }) => unknown) | undefined
   // Called when the recording under way is dropped (Escape).
   onCancel?: (() => unknown) | undefined
   // Called with `{ problem }`, why nothing was recorded (the microphone's problem), or `send` with the rejection as `error` when `onAudio` rejected.
   onError?: ((failure: RecordFailure) => unknown) | undefined
   // Called with `true` when a press (or `start`) begins asking for the microphone, and with `false` once the recording is over however it ended: stopped, cancelled, out of time, refused or lost. Once per change.
-  onRecordingChange?: ((recording: boolean) => unknown) | undefined
+  onRecordingChange?: ((event: { recording: boolean }) => unknown) | undefined
 }
 
 // What ended a recording that was handed over.
@@ -96,7 +96,7 @@ export function recorder(options: RecorderOptions): Recorder {
       return
 
     live = next
-    options.onRecordingChange?.(next)
+    options.onRecordingChange?.({ recording: next })
   }
 
   // Fetched as the component mounts, so the first press does not wait on it.
@@ -144,12 +144,12 @@ export function recorder(options: RecorderOptions): Recorder {
       return
     }
 
-    options.onStop?.(pressed ? 'press' : 'limit')
+    options.onStop?.({ reason: pressed ? 'press' : 'limit' })
     state.set('sending')
     said.set(options.sending ?? words.stopped)
 
     try {
-      await options.onAudio(result)
+      await options.onAudio({ audio: result })
     }
     catch (error) {
       console.error('kayjs-ui: a recording\'s onRecord failed', error)
@@ -175,7 +175,7 @@ export function recorder(options: RecorderOptions): Recorder {
     try {
       const { startRecording } = await load()
 
-      started = await startRecording({ onEnd: result => void ended(result), maxMs: options.maxMs })
+      started = await startRecording({ onEnd: ({ result }) => void ended(result), maxMs: options.maxMs })
     }
     catch (error) {
       console.error('kayjs-ui: the recorder could not be loaded', error)

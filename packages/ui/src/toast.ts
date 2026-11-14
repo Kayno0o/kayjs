@@ -25,7 +25,7 @@ export interface Toast {
   /** @internal The outcome of a `toast.promise`: a danger one is announced politely, as the reader just waited for it, not as an alert. */
   outcome?: boolean | undefined
   // Called once the toast has gone, with why.
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason }) => unknown) | undefined
   tone: ToastTone
 }
 
@@ -33,7 +33,7 @@ export interface ToastOptions {
   // A second line under the message, such as the detail of what happened.
   description?: string | undefined
   // Called once the toast has gone, with why: `timeout`, `user`, `action` or `api`. One that throws is logged.
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason }) => unknown) | undefined
   // How long it stays, such as `'3s'`: 6 seconds by default, an error until the reader dismisses it, as it asks them to act. `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does.
   duration?: Duration | false | undefined
   // One button before the close button, such as Retry or Undo. An error already open with the same words is shown once, whatever action the second asks.
@@ -90,7 +90,7 @@ export function dismissToast(id: number, reason: ToastDismissReason = 'api'): vo
     return
 
   try {
-    closing.onDismiss(reason)
+    closing.onDismiss({ reason })
   }
   catch (error) {
     console.error('kayjs-ui: the `onDismiss` of a toast threw', error)
@@ -176,7 +176,7 @@ export interface ToastPatch {
   duration?: Duration | false | undefined
   loading?: boolean | undefined
   outcome?: boolean | undefined
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | null | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason }) => unknown) | null | undefined
 }
 
 // Changes an open toast in place, answering false when `id` is not open (it went already).
@@ -288,7 +288,7 @@ export interface AttemptOptions<Data = unknown> {
   // The button of a refusal's toast, read from the same data as `refused`, and not used with `onRefused`, which shows no toast: `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`. Only a refusal gets it, not `failure`.
   refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   // Handed what a refusal carries, an action's `ctx.fail` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
-  onRefused?: ((data: Data) => unknown) | undefined
+  onRefused?: ((event: { data: Data }) => unknown) | undefined
 }
 
 // What a call that went through resolves to: what it returned, or `true` when it returned nothing, so `undefined` only ever means it failed.
@@ -324,7 +324,7 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     else {
       // The app shows the refusal itself, so a handler that throws or rejects leaves `failure` and the console.
       try {
-        await onRefused(data.value)
+        await onRefused({ data: data.value })
       }
       catch (handlerError) {
         console.error('kayjs-ui: the `onRefused` of an attempt threw', handlerError)

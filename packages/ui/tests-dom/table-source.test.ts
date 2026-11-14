@@ -39,7 +39,7 @@ describe('Table rows from a source', () => {
     const wait = deferred<Planet[]>()
     const loaded: Planet[][] = []
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows: wait.promise, rowKey: 'id', skeletonRows: 3, onLoad: (rows: Planet[]) => loaded.push(rows) })
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: wait.promise, rowKey: 'id', skeletonRows: 3, onLoad: ({ rows }: { rows: Planet[] }) => loaded.push(rows) })
 
     const { root } = mounted
 
@@ -105,7 +105,7 @@ describe('Table rows from a source', () => {
       calls.push(1)
 
       return PLANETS
-    }, rowKey: 'id', onLoad: (rows: Planet[]) => calls.push(rows.length) })
+    }, rowKey: 'id', onLoad: ({ rows }: { rows: Planet[] }) => calls.push(rows.length) })
     await settle()
 
     expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
@@ -143,12 +143,12 @@ describe('Table rows as links and buttons', () => {
   test('onRowClick alone makes each row a button, and a link row hears its click too', async () => {
     const clicked: number[] = []
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id', onRowClick: (row: Planet) => clicked.push(row.id) })
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id', onRowClick: ({ row }: { row: Planet }) => clicked.push(row.id) })
     click(mounted.root.querySelectorAll('[data-part="rowButton"]')[1] ?? null)
     expect(clicked).toEqual([2])
     mounted.unmount()
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id', rowHref: (row: Planet) => row.id === 1 ? '/one' : undefined, onRowClick: (row: Planet, event: Event) => {
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id', rowHref: (row: Planet) => row.id === 1 ? '/one' : undefined, onRowClick: ({ row, event }: { row: Planet, event: Event }) => {
       event.preventDefault()
       clicked.push(row.id * 10)
     } })
@@ -180,7 +180,7 @@ describe('VirtualList items from a source', () => {
     const wait = deferred<string[]>()
     const loaded: string[][] = []
 
-    mounted = await mountComponent(VirtualList, { items: wait.promise, label: 'Planets', item: (name: string) => name, skeletonItems: 2, onLoad: (rows: string[]) => loaded.push(rows) })
+    mounted = await mountComponent(VirtualList, { items: wait.promise, label: 'Planets', item: (name: string) => name, skeletonItems: 2, onLoad: ({ items: rows }: { items: string[] }) => loaded.push(rows) })
 
     expect(mounted.root.querySelectorAll('[data-part="skeleton"]')).toHaveLength(2)
     expect(mounted.root.querySelector('[role="list"]')?.getAttribute('aria-busy')).toBe('true')
@@ -217,7 +217,7 @@ describe('VirtualList items from a source', () => {
   test('itemHref and onItemClick put a stretched link or button in each item', async () => {
     const clicked: number[] = []
 
-    mounted = await mountComponent(VirtualList, { items: ['Mars', 'Earth'], label: 'Planets', item: (name: string) => name, itemHref: (_: string, index: number) => index === 0 ? '/mars' : undefined, onItemClick: (_: string, index: number) => clicked.push(index) })
+    mounted = await mountComponent(VirtualList, { items: ['Mars', 'Earth'], label: 'Planets', item: (name: string) => name, itemHref: (_: string, index: number) => index === 0 ? '/mars' : undefined, onItemClick: ({ index }: { index: number }) => clicked.push(index) })
 
     expect(mounted.root.querySelectorAll('[data-part="itemLink"]')).toHaveLength(1)
     expect(mounted.root.querySelector('[data-part="itemLink"]')?.getAttribute('aria-label')).toBe('Open item 1')
@@ -338,7 +338,7 @@ describe('Table source races and refreshes', () => {
     const loaded: number[] = []
     let call = 0
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows: async () => waits[call++]!.promise, rowKey: 'id', onLoad: (rows: Planet[]) => loaded.push(rows.length) })
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: async () => waits[call++]!.promise, rowKey: 'id', onLoad: ({ rows }: { rows: Planet[] }) => loaded.push(rows.length) })
     await settle()
 
     waits[0]!.reject(new Error('first failed'))

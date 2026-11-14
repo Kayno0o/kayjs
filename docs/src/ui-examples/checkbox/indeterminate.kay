@@ -14,7 +14,7 @@ function set(name: string, on: boolean) {
 }
 ---
 .flex.flex-col.items-start.gap-2
-  Checkbox(label="All moons" checked={ticked() === moons().length} indeterminate={ticked() > 0 && ticked() < moons().length} onChange={setAll})
+  Checkbox(label="All moons" checked={ticked() === moons().length} indeterminate={ticked() > 0 && ticked() < moons().length} onChange={({ checked }) => setAll(checked)})
   .flex.flex-col.gap-1.pl-6
     for moon of moons() key={moon.name}
-      Checkbox(label={moon.name} checked={moon.on} onChange={on => set(moon.name, on)})
+      Checkbox(label={moon.name} checked={moon.on} onChange={({ checked }) => set(moon.name, checked)})

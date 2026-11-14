@@ -6,8 +6,8 @@ description: A drop zone that takes files dropped, picked or pasted.
 
 ## The zone
 
-The zone draws whatever the `@content(zone)` block holds. `zone.open()` opens the file picker and `zone.dragging()` reads whether files hover the zone. `onFiles` receives the files that match `accept`, one unless `multiple` is set, and never an empty list.
-`onReject(files, reason)` receives the dropped or picked files left out, once per reason: `type` for those that miss `accept`, `size` for those past `maxSize`, `count` for the matching ones beyond `maxFiles` or, without `multiple`, the first.
+The zone draws whatever the `@content(zone)` block holds. `zone.open()` opens the file picker and `zone.dragging()` reads whether files hover the zone. `onFiles({ files })` hears the files that match `accept`, one unless `multiple` is set, never none.
+`onReject({ files, reason })` receives the dropped or picked files left out, once per reason: `type` for those that miss `accept`, `size` for those past `maxSize`, `count` for the matching ones beyond `maxFiles` or, without `multiple`, the first.
 
 Without an `@content` block, the zone shows a button that opens the picker and a line about dropping, so the keyboard reaches it.
 

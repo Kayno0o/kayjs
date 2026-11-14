@@ -30,7 +30,7 @@ The tooltip, the keyboard announcements and the table for screen readers still r
 
 ## Picking a span
 
-`onRange(from, to)` lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span and hands over the indices of its first and last points, such as to zoom in on them; Escape drops a span under way, and `rangeHint` is what screen readers are told about the keys. A `null` value in a series leaves a gap in the line.
+`onRange({ from, to })` lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span and hands over the indices of its first and last points, such as to zoom in on them; Escape drops a span under way, and `rangeHint` is what screen readers are told about the keys. A `null` value in a series leaves a gap in the line.
 
 <Demo name="line-chart/range" />
 
@@ -56,7 +56,7 @@ Give the chart a signal or a store and it updates in place on each change. The S
 
 With an `href` the rule is a link, so a middle click or a new tab works, and a tab stop of its own: the plot's slider keeps its arrows.
 
-`onMark(mark, index)` makes a mark without an `href` a button handing back the mark and its place in `marks`, and hears a plain click on a link; a mark with neither stays a plain rule. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
+`onMark({ mark, index })` makes a mark without an `href` a button handing back the mark and its place in `marks`, and hears a plain click on a link; a mark with neither stays a plain rule. A mark whose `at` matches no label is left out, and several on one label stand side by side. The same prop works on BarChart.
 
 ## Data and axes
 
@@ -66,4 +66,4 @@ With an `href` the rule is a link, so a middle click or a new tab works, and a t
 
 `href` answers the address a point goes to, from `{ index, label, values }`, or `undefined` for none. A click without a drag on it, or Enter, follows it, in a new tab when it leaves the site; `onSelect`, when given, hears the press in its place, as on the other charts.
 
-`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActive` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no tooltip block yet.
+`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActiveChange({ index })` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no tooltip block yet.

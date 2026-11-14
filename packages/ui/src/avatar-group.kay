@@ -42,12 +42,12 @@ const { avatars, max = 4, size = 'md', label, moreLabel, moreHref, placement = '
   placement?: PopoverPlacement | undefined
   // Shows the popover when the page sets it; the chip, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   loadingLabel?: string | undefined
   retryLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `avatars`, and with what it rejected with.
-  onLoad?: ((avatars: readonly GroupedAvatar[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly GroupedAvatar[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Replaces the avatar drawn for a person, in the stack and in the list: `@avatar(person)`.
   avatar?: Snippet<[person: GroupedAvatar]> | undefined

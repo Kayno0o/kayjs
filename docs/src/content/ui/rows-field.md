@@ -17,7 +17,7 @@ Without `onChange` the field keeps its rows itself. Give it a `name` and each co
 `invalid` marks every box of the field. When the editor checks its rows itself, pass `rowIssues`, a function of the row's place (from 0) or a record by place, returning the message for a bad row: that row's boxes turn invalid and the message shows under the row, linked to its boxes with `aria-describedby`. A `@cell` block gets the same as its fifth argument, `issue`, with `invalid`, `message` and the `id` of the message, so a custom control marks itself too.
 
 ```kay
-RowsField(rows={addresses()} columns={columns} label="Addresses" rowIssues={index => problems()[index]} onChange={addresses.set})
+RowsField(rows={addresses()} columns={columns} label="Addresses" rowIssues={index => problems()[index]} onChange={({ rows }) => addresses = rows})
 ```
 
 Inside a Form, FormDialog or SaveForm you pass nothing: an action's refusal of a cell is read from the form and shown under its row instead of as a toast.
@@ -46,7 +46,7 @@ const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity'
 ---
 RowsField(rows={[{ name: 'Cable', qty: '2', unit: 'm' }]} columns={columns} name="line" label="Quote")
   @cell(column, row, index, set)
-    Select(name={column.name} aria-label={`${column.label} ${index() + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
+    Select(name={column.name} aria-label={`${column.label} ${index() + 1}`} options={units} value={row.unit || 'm'} onChange={({ value }) => set(String(value))})
 ```
 
-`onAdd(row, index)` and `onRemove(row, index)` are called besides `onChange`, with the row added or removed and its place.
+`onAdd({ row, index })` and `onRemove({ row, index })` are called besides `onChange`, with the row added or removed and its place.

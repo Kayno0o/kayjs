@@ -14,9 +14,9 @@ const { value, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['
   // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   // Called with the box's time on every edit, `''` and a half-typed one included: the live value.
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // Called with the new time, or `''` once emptied, as soon as the box holds a whole time. With `required` it never hears `''`: the box goes back to the last time when it is left empty.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
 }>()
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its time back in place of its own.
@@ -31,15 +31,15 @@ effect(() => {
     last = value
 })
 
-function heard(next: string) {
-  onInput?.(next)
+function heard({ value: next }: { value: string }) {
+  onInput?.({ value: next })
 
   if (next !== '')
     last = next
   else if (rest.required)
     return
 
-  onChange?.(next)
+  onChange?.({ value: next })
 }
 
 // Cleared digit by digit, the box reads empty on the way to a new time, so it is only put back once left.

@@ -64,7 +64,7 @@ function button(root: ParentNode, label: string): HTMLButtonElement {
 function listOf(answer: () => void | Promise<void> = () => undefined) {
   const moves: [from: number, to: number][] = []
   const sortable = new Sortable({
-    onReorder: async (from, to) => {
+    onReorder: async ({ from, to }) => {
       moves.push([from, to])
 
       return answer()
@@ -620,7 +620,7 @@ describe('Board, from the keyboard', () => {
 describe('DropTargets, by pointer', () => {
   test('marks the innermost accepting target under a dragged item, and drops onto it', async () => {
     const drops: [string, string][] = []
-    const targets = new DropTargets<string, string>({ accepts: (_, target) => target !== 'locked', onDrop: (item, target) => void drops.push([item, target]) })
+    const targets = new DropTargets<string, string>({ accepts: (_, target) => target !== 'locked', onDrop: ({ item, target }) => void drops.push([item, target]) })
     const area = stage()
 
     area.innerHTML = '<div id="folder"><div id="inner"></div></div><div id="locked"></div><div id="note">Note</div>'

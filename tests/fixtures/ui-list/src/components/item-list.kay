@@ -41,7 +41,7 @@ Table(columns={COLUMNS} rows={rows()} rowKey="id" pageSize={20} filter={row => [
         ConfirmDelete(message={`Delete ${row.name}?`} failureLabel="Could not delete" onConfirm={async () => remove(row)})
   @empty
     EmptyState(title="No item yet")
-Dialog(open={editing() !== undefined} title="Edit item" onOpenChange={(open: boolean) => { if (!open) editing = undefined }})
+Dialog(open={editing() !== undefined} title="Edit item" onOpenChange={({ open }) => { if (!open) editing = undefined }})
   FormField(label="Name" name="name")
     TextInput(name="name" value={editing()?.name ?? ''})
   FormField(label="State" name="state")

@@ -8,7 +8,7 @@ export interface SelectionInput<Row, Key extends RowKey<Row>> {
   rows: () => Row[]
   kept: () => Row[]
   selected: () => RowKeyValue<Row, Key>[] | undefined
-  onChange: () => ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
+  onChange: () => ((event: { keys: RowKeyValue<Row, Key>[], rows: Row[] }) => unknown) | undefined
   enabled: () => boolean
   // Whether the rows are still on their way or failed to come: the selection is held then.
   settling: () => boolean
@@ -46,7 +46,7 @@ export function selection<Row, Key extends RowKey<Row>>(input: SelectionInput<Ro
 
     const wanted = new Set(keys)
 
-    notify(keys, input.rows().filter(row => wanted.has(rowKeyOf(row, input.rowKey))))
+    notify({ keys, rows: input.rows().filter(row => wanted.has(rowKeyOf(row, input.rowKey))) })
   }
 
   function pick(key: Value, on: boolean) {

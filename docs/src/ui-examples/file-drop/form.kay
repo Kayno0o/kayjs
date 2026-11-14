@@ -12,7 +12,7 @@ form(method="post" enctype="multipart/form-data")
     list
     maxSize="2mb"
     maxFiles={4}
-    onReject={(files, reason) => rejected = `${files.length} left out: ${reason}`}
+    onReject={({ files, reason }) => rejected = `${files.length} left out: ${reason}`}
   )
   if rejected()
     p.text-danger {rejected()}

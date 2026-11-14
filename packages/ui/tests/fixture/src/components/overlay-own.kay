@@ -5,7 +5,7 @@ import SidePanel from '@kayjs/ui/side-panel.kay'
 // A Dialog and a SidePanel that leave `open` out: each keeps its own state, opened by its trigger; `onOpenChange` is optional.
 const { onOpenChange } = props<{ onOpenChange?: ((name: string, open: boolean) => unknown) | undefined }>()
 
-const heard = (name: string) => (open: boolean) => onOpenChange?.(name, open)
+const heard = (name: string) => ({ open }: { open: boolean }) => onOpenChange?.(name, open)
 ---
 Dialog#dialog(title="Own" onOpenChange={heard('dialog')})
   @trigger(attributes)

@@ -19,5 +19,5 @@ form#form
   Rating(name="stars" label="Stars")
   Segmented(name="seg" label="Seg" options={sizes})
   ChipGroup(name="chips" label="Chips" options={sizes})
-  Select#heard(name="heard" options={sizes.map(size => ({ ...size, disabled: false }))} onChange={onPick})
+  Select#heard(name="heard" options={sizes.map(size => ({ ...size, disabled: false }))} onChange={({ value }) => onPick?.(value)})
   button#reset(type="reset") Reset

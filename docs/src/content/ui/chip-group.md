@@ -4,7 +4,7 @@ description: A row of chips to pick several options from, drawn over real checkb
 
 <Demo name="chip-group/basic" />
 
-`value` lists the options picked to start with, and a group whose parent passes others follows them. `onChange` gets every picked option, in the order of `options`. An option may carry an `icon` and be `disabled`. Inside a form, the group posts each picked option under `name`. Use [Segmented](/ui/segmented) when only one option may be picked.
+`value` lists the options picked to start with, and a group whose parent passes others follows them. `onChange({ value, options })` gets every picked value in the order of `options`, and the options they stand for. An option may carry an `icon` and be `disabled`. Inside a form, the group posts each picked option under `name`. Use [Segmented](/ui/segmented) when only one option may be picked.
 
 ## Numbers
 
@@ -18,7 +18,7 @@ A `value` may be numbers, such as weekdays from `Date.getDay()`: `onChange` hear
 
 ## Options from an action
 
-`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad({ options, query })` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
 
 ## Async change
 

@@ -7,6 +7,6 @@ const { onChange, value = 'venus', disabledFirst = false, orientation, activatio
 // kay-allow once-read-prop: a fixture mounted with props it does not change
 const tabs = [{ value: 'mars', label: 'Mars', disabled: disabledFirst }, { value: 'venus', label: 'Venus', disabled: disabledFirst && value === 'venus' }, { value: 'earth', label: 'Earth' }] as const
 ---
-Tabs#tabs(tabs={tabs} value={value} label="Planets" orientation={orientation} activation={activation} lazy={lazy} onChange={onChange})
+Tabs#tabs(tabs={tabs} value={value} label="Planets" orientation={orientation} activation={activation} lazy={lazy} onValueChange={({ value }) => onChange?.(value)})
   @panel(planet)
     input(name={planet} value={planet})

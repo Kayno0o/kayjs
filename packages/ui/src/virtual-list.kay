@@ -51,13 +51,13 @@ const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, 
   failureLabel?: string | undefined
   retryLabel?: string | undefined
   // Called with the items each time an `items` function or promise answers.
-  onLoad?: ((items: Item[]) => unknown) | undefined
+  onLoad?: ((event: { items: Item[] }) => unknown) | undefined
   // Called with `{ error }` when an `items` function or promise rejects.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Makes each item a link: its address, or undefined for one that leads nowhere. An anchor named `itemLabel` is stretched over the item, the links and buttons the item draws staying clickable above it.
   itemHref?: ((item: Item, index: number) => string | undefined) | undefined
   // Makes each item a button, or hears the click of a link item (call `event.preventDefault()` to follow the link yourself).
-  onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined
+  onItemClick?: ((event: { item: Item, index: number, event: MouseEvent }) => unknown) | undefined
   // Names an item's link or button; `Open item <position>` without one.
   itemLabel?: ((item: Item, index: number) => string) | undefined
   // What the list reads with no item; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
@@ -65,7 +65,7 @@ const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, 
   empty?: Snippet | undefined
 } & ({ items: RowsSource<Item>, list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
-const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer), onError: failure => onError?.(failure) })
+const loaded = asyncRows<Item>(() => given, { onLoad: ({ rows }) => onLoad?.({ items: rows }), onError: failure => onError?.(failure) })
 const items = () => source ? source.rows() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0
@@ -113,8 +113,8 @@ div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0
         | {item(entry.row, entry.index)}
         if linked()
           if itemHref?.(entry.row, entry.index) then href
-            a(part="itemLink" href={href} aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})
+            a(part="itemLink" href={href} aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.({ item: entry.row, index: entry.index, event })})
           else if onItemClick
-            button(part="itemButton" type="button" aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})
+            button(part="itemButton" type="button" aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.({ item: entry.row, index: entry.index, event })})
   if source
     LoadMore(list={source})

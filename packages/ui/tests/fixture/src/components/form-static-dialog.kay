@@ -9,5 +9,5 @@ const { claim, validate = false } = props<{ claim: Action<never, string>, valida
 const open = signal(false)
 ---
 button#open(onClick={() => open = true}) Open
-FormDialog(open={open()} title="Claim" action={claim} validate={validate} submitLabel="Claim" onOpenChange={shown => open = shown})
+FormDialog(open={open()} title="Claim" action={claim} validate={validate} submitLabel="Claim" onOpenChange={({ open: shown }) => open = shown})
   slot

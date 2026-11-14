@@ -64,7 +64,7 @@ else if form.ends() then at
     if !form.collection.single
       EntryRename(form={form} denied={denied})
     if form.collection.review
-      EntryReview(review={form.review()} draft={form.isDraft()} denied={denied} dirty={form.dirty()} busy={form.saving() || form.reviewing()} onSubmit={form.submit} onApprove={form.approve} onSendBack={form.sendBack})
+      EntryReview(review={form.review()} draft={form.isDraft()} denied={denied} dirty={form.dirty()} busy={form.saving() || form.reviewing()} onSubmit={form.submit} onApprove={form.approve} onSendBack={({ note }) => form.sendBack(note)})
     EntryState(draftField={form.collection.draftField} draft={form.isDraft()} dirty={form.dirty()} saving={form.saving()} denied={denied} title={form.name} url={entry.url} referrers={form.referrers()} deletable={!form.collection.single} onPublish={form.publish} onUnpublish={form.unpublish} onRemove={form.remove} onAskReferrers={form.askReferrers})
   if form.dirty()
     ResetButton(disabled={form.saving()} onReset={form.reset})

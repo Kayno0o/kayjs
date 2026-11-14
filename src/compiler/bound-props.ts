@@ -58,18 +58,18 @@ export function calledByBinds(element: ElementNode, source: string): Set<Attribu
   return called
 }
 
-// What a component takes of a `bind:` besides the value: a setter, for a prop typed `Bindable`, and the write through its change callback, for a prop that holds the value as it is and reports a change.
+// What a component takes of a `bind:` besides the value: a setter, for a prop typed `Bindable`, and the write through its change callback, for a prop that holds the value as it is and reports a change. The callback takes one event object carrying the prop under its own name, `onOpenChange({ open })`, which a callback written beside the bind receives whole.
 export function addBoundWrites(b: CodeBuilder, name: string, separate: () => void, write: () => void, beside: ExpressionAttribute | undefined): void {
   separate()
   b.add(`set ${JSON.stringify(name)}(kayValue) { `)
   write()
   b.add(' }')
   separate()
-  b.add(`${JSON.stringify(changeName(name))}(kayValue${beside ? ', ...kayRest' : ''}) { `)
+  b.add(`${JSON.stringify(changeName(name))}(kayChange) { const { ${JSON.stringify(name)}: kayValue } = kayChange; `)
   write()
 
   if (beside)
-    b.add('; (').addSource(beside.expression).add(')?.(kayValue, ...kayRest)')
+    b.add('; (').addSource(beside.expression).add(')?.(kayChange)')
 
   b.add(' }')
 }

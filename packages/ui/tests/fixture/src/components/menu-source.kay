@@ -23,7 +23,7 @@ function answer(entries: MenuEntry[] | Error) {
   waiting.shift()?.(entries)
 }
 ---
-Menu#source(items={projects} label="Move to" icon="plus" open={opened()} onOpenChange={now => opened = now})
+Menu#source(items={projects} label="Move to" icon="plus" open={opened()} onOpenChange={({ open: now }) => opened = now})
 button#show(type="button" onClick={() => opened = true}) Show
 button#hide(type="button" onClick={() => opened = false}) Hide
 button#answer(type="button" onClick={() => answer([{ label: 'Alpha', onSelect: () => calls.push('Alpha') }, { label: 'Beta', onSelect: () => undefined }])}) Answer

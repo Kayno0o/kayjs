@@ -37,7 +37,7 @@ const { open, trigger, title, label, heading, action, submitLabel, savingLabel =
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
-  onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  onSave?: ((event: { data: Answer<Success<Output>> }) => unknown) | undefined
 
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. The dialog stays open.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
@@ -59,7 +59,7 @@ const { open, trigger, title, label, heading, action, submitLabel, savingLabel =
   autosave?: boolean | undefined
   closeLabel?: string | undefined
   // Called with `true` when `trigger` opens it and with `false` however the dialog closes, saved or not.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 
 const formId = id ?? uid()
@@ -77,7 +77,7 @@ function setOpen(next: boolean) {
   if (open === undefined)
     inner = next
 
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 const opener = { 'onClick': () => setOpen(true), 'aria-haspopup': 'dialog' } as const
@@ -118,7 +118,7 @@ async function submit(event: SubmitEvent) {
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
   // The dialog closes whatever the hooks do: the save went through.
   try {
-    onSave?.(done.result)
+    onSave?.({ data: done.result })
   }
   finally {
     setOpen(false)
@@ -146,7 +146,7 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
 if trigger
   | {trigger(opener)}
-Dialog({...rest} open={isOpen()} title={title} label={label} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} autosave={autosave} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && setOpen(false)})
+Dialog({...rest} open={isOpen()} title={title} label={label} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} autosave={autosave} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={({ open: shown }) => !shown && setOpen(false)})
   @footer
     div(part="footer")
       | {extra}

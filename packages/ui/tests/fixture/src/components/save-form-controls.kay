@@ -29,12 +29,12 @@ const planets = [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Ear
 const choices = [{ value: 'x', label: 'X' }, { value: 'y', label: 'Y' }, { value: 'z', label: 'Z' }] as const
 ---
 SaveForm(action={save} failureLabel="Could not save")
-  Checkbox(name="agree" label="Agree" checked={agree()} onChange={agree.set})
-  Toggle(name="power" label="Power" checked={power()} onChange={power.set})
-  ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
-  Select#level(name="level" options={levels} value={level()} onChange={level.set})
-  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} search onChange={tags.set})
+  Checkbox(name="agree" label="Agree" checked={agree()} onChange={({ checked }) => agree = checked})
+  Toggle(name="power" label="Power" checked={power()} onChange={({ checked }) => power = checked})
+  ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={({ value }) => decks = value})
+  Select#level(name="level" options={levels} value={level()} onChange={({ value }) => level = value})
+  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} search onChange={({ value }) => tags = value})
   Combobox#planet(name="planet" label="Planet" options={planets} value="mars")
   IconPicker(name="icon" value="star" icons={({ q, limit }) => find(q, limit)})
-  TextInput#title(name="title" value={title()} onInput={title.set})
+  TextInput#title(name="title" value={title()} onInput={({ value }) => title = value})
 p#state {JSON.stringify({ agree: agree(), power: power(), decks: decks(), level: level(), tags: tags(), title: title() })}

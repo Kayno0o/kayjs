@@ -8,4 +8,4 @@ form#form
   if plain
     FileDrop#drop(name="photo")
   else
-    FileDrop#drop(name="photos" multiple list maxSize="1kb" maxFiles={3} issue={issue} onChange={files => onChange(files.map(file => file.name))} onReject={(files, reason) => onReject(reason, files.map(file => file.name))})
+    FileDrop#drop(name="photos" multiple list maxSize="1kb" maxFiles={3} issue={issue} onChange={({ files }) => onChange(files.map(file => file.name))} onReject={({ files, reason }) => onReject(reason, files.map(file => file.name))})

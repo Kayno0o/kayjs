@@ -10,7 +10,7 @@ description: An icon button opening a menu of actions.
 
 ## Options, groups and submenus
 
-An entry with `checked` and `onCheckedChange(checked)` is a check item (`role="menuitemcheckbox"`). Hold its state in the page and set `checked`, or leave `checked` out and the menu keeps it, starting from `defaultChecked`. Entries sharing a `radioGroup` are radio items (`role="menuitemradio"`), each with a `value`: set `checked` on each, or let the menu keep the group, starting from the entry with `defaultChecked`, and `onCheckedChange(value)` hears the one that became checked.
+An entry with `checked` and `onCheckedChange({ checked })` is a check item (`role="menuitemcheckbox"`). Hold its state in the page and set `checked`, or leave it out and the menu keeps it, starting from `defaultChecked`. Entries sharing a `radioGroup` are radio items (`role="menuitemradio"`), each with a `value`: set `checked` on each, or let the menu keep the group, starting from the entry with `defaultChecked`, and `onCheckedChange({ checked: true, value })` hears the one that became checked.
 
 An entry is a checkbox when it carries `checked`, `defaultChecked` or `onCheckedChange`, and a radio when it has a `radioGroup`; the menu keeps the state of a checkbox left uncontrolled under its `id`, else its position in the list, and an uncontrolled radio group shows nothing checked until one is picked or an entry has `defaultChecked`.
 
@@ -36,7 +36,7 @@ An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "co
 
 ## At a point
 
-`at={{ x, y }}` opens the menu at a point of the window, such as the `clientX` and `clientY` of a click, with no trigger of its own and no `icon`. `open` shows it and `onOpenChange(open)` runs however it closed. It opens at `bottom-start` of the point, the browser flips it to stay inside the window, and Escape or a click outside closes it and gives focus back.
+`at={{ x, y }}` opens the menu at a point of the window, such as the `clientX` and `clientY` of a click, with no trigger of its own and no `icon`. `open` shows it and `onOpenChange({ open })` runs however it closed. It opens at `bottom-start` of the point, the browser flips it to stay inside the window, and Escape or a click outside closes it and gives focus back.
 
 ## Trigger and placement
 

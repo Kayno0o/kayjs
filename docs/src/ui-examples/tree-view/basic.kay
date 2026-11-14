@@ -11,5 +11,5 @@ const nodes: TreeNode[] = [
 ]
 ---
 .flex.flex-col.gap-2.max-w-xs
-  TreeView(nodes={nodes} label="Folders" selected={folder()} onSelectedChange={folder.set})
+  TreeView(nodes={nodes} label="Folders" selected={folder()} onSelectedChange={({ id }) => folder = id})
   p Showing {folder()}.

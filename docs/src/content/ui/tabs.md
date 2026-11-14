@@ -24,7 +24,7 @@ Tabs(tabs={sections} value="details" orientation="vertical" label="Product")
 
 ## Choosing a tab by hand
 
-With `activation="manual"` the arrows, Home and End only move the focus, and Enter or Space shows the focused tab, for panels that are costly to switch to. `onChange` runs when a tab is shown, not as the focus moves.
+With `activation="manual"` the arrows, Home and End only move the focus, and Enter or Space shows the focused tab, for panels that are costly to switch to. `onValueChange({ value, tab })` runs when a tab is shown, not as the focus moves.
 
 ## Lazy panels
 
@@ -38,11 +38,11 @@ Tabs(tabs={sections} value="details" lazy label="Product")
 
 ## Following the selected tab
 
-`value` is the tab shown, and tabs whose parent passes another follow it. `onChange` reports each switch, so the rest of the page can follow it.
+`value` is the tab shown, and tabs whose parent passes another follow it. `onValueChange({ value, tab })` reports each switch, so the rest of the page can follow it.
 
 <Demo name="tabs/shared" />
 
-A `value` that names no enabled tab, such as an unknown one read from a URL or a disabled tab, shows the first enabled tab, so a tab is always in the tab order. `onChange` hears nothing for that fallback.
+A `value` that names no enabled tab, such as an unknown one read from a URL or a disabled tab, shows the first enabled tab, so a tab is always in the tab order. `onValueChange({ value, tab })` hears nothing for that fallback.
 
 ## Tabs of a query param
 
@@ -54,11 +54,11 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
     ProductPanel(tab={tab})
 ```
 
-`paramDefault` is the tab shown while the param is left out, and picking it leaves the param out. Without it the first enabled tab is shown, and picking it sets the param like any other. `onChange` still runs on each pick. The page must be rendered per request, not once at build time.
+`paramDefault` is the tab shown while the param is left out, and picking it leaves the param out. Without it the first enabled tab is shown, and picking it sets the param like any other. `onValueChange({ value, tab })` still runs on each pick. The page must be rendered per request, not once at build time.
 
 ## Tabs from a source
 
-`tabs` can be a promise or a function returning one, such as an action, in place of a list. The tabs are asked in the browser: the component says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad(tabs)` and `onError({ error })` follow the answer. The `@panel` block is still yours, drawn once for each tab that arrives.
+`tabs` can be a promise or a function returning one, such as an action, in place of a list. The tabs are asked in the browser: the component says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad({ options })` and `onError({ error })` follow the answer. The `@panel` block is still yours, drawn once for each tab that arrives.
 
 ```kay
 Tabs(tabs={() => loadSections()} value="details" label="Product")

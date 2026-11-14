@@ -11,9 +11,9 @@ const decks = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Gam
 const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'l', label: 'L' }] as const
 ---
 form#form
-  Checkbox(name="agree" label="Agree" checked onChange={value => answer('agree', value)})
-  Toggle(name="power" label="Power" onChange={value => answer('power', value)})
-  ChipGroup(label="Decks" name="decks" options={decks} value={['films']} onChange={value => answer('decks', value)})
-  Segmented(label="Size" name="size" options={sizes} value="m" onChange={(value: 's' | 'm' | 'l') => answer('size', value)})
-  Segmented(label="Sort" name="sort" options={sizes} value={null} onChange={(value: 's' | 'm' | 'l' | null) => answer('sort', value)})
+  Checkbox(name="agree" label="Agree" checked onChange={({ checked: value }) => answer('agree', value)})
+  Toggle(name="power" label="Power" onChange={({ checked: value }) => answer('power', value)})
+  ChipGroup(label="Decks" name="decks" options={decks} value={['films']} onChange={({ value }) => answer('decks', value)})
+  Segmented(label="Size" name="size" options={sizes} value="m" onChange={({ value }) => answer('size', value)})
+  Segmented(label="Sort" name="sort" options={sizes} value={null} onChange={({ value }) => answer('sort', value)})
   button#reset(type="reset") Reset

@@ -15,11 +15,11 @@ button#shut-dialog(onClick={() => dialog = false}) Shut dialog
 button#shut-panel(onClick={() => panel = false}) Shut panel
 button#show-popover(onClick={() => popover = true}) Show popover
 button#hide-popover(onClick={() => popover = false}) Hide popover
-Dialog#dialog(open={dialog()} title="Dialog" onOpenChange={shown => { calls.push(`dialog onOpenChange ${shown}`); dialog = shown }})
+Dialog#dialog(open={dialog()} title="Dialog" onOpenChange={({ open: shown }) => { calls.push(`dialog onOpenChange ${shown}`); dialog = shown }})
   p Dialog body
-SidePanel#panel(open={panel()} title="Panel" onOpenChange={shown => { calls.push(`panel onOpenChange ${shown}`); panel = shown }})
+SidePanel#panel(open={panel()} title="Panel" onOpenChange={({ open: shown }) => { calls.push(`panel onOpenChange ${shown}`); panel = shown }})
   p Panel body
-Popover(id="popover" open={popover()} onOpenChange={shown => { calls.push(`popover onOpenChange ${shown}`); popover = shown }})
+Popover(id="popover" open={popover()} onOpenChange={({ open: shown }) => { calls.push(`popover onOpenChange ${shown}`); popover = shown }})
   @trigger(attributes)
     button#popover-trigger({...attributes}) Trigger
   p Popover body

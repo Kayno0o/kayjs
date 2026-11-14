@@ -62,10 +62,10 @@ effect(() => {
 if !form.stored && !form.collection.single
   .kcms-field(id={fieldId(form.entry, 's')})
     FormField(label={wording('cms.entry.slug', 'Slug')} hint={hintOf()} issue={slugIssue()} required)
-      TextInput(value={form.slug()} onInput={form.typeSlug} required)
+      TextInput(value={form.slug()} onInput={({ value }) => form.typeSlug(value)} required)
     if writable
-      Checkbox.kcms-slug-suggest(checked={form.suggestsSlug()} onChange={on => form.suggestsSlug.set(on)} label={wording('cms.slug.suggest', 'Write it from the title')})
+      Checkbox.kcms-slug-suggest(checked={form.suggestsSlug()} onChange={({ checked }) => form.suggestsSlug.set(checked)} label={wording('cms.slug.suggest', 'Write it from the title')})
   if form.collection.localized
     .kcms-field(id={fieldId(form.entry, 'l')})
       FormField(label={wording('cms.entry.locale', 'Locale')} issue={issueOf('locale')} required)
-        Select(value={form.newLocale()} options={(form.collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={(code) => { form.newLocale.set(code); form.drafts.dismissWhere(form.entry, issue => issue.key === 'locale') }})
+        Select(value={form.newLocale()} options={(form.collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={({ value: code }) => { form.newLocale.set(code); form.drafts.dismissWhere(form.entry, issue => issue.key === 'locale') }})

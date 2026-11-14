@@ -16,7 +16,7 @@ const planet = signal('')
     label="Planet"
     options={planets}
     value={planet()}
-    onChange={planet.set}
+    onChange={({ value }) => planet = value}
     placeholder="Type a planet"
     create
   )

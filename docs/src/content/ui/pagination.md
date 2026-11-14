@@ -34,7 +34,7 @@ Give `total` and `pageSize` in place of `pages` and the pages follow from the ro
 
 ## In the browser
 
-A list an island pages in memory has no address to change. Give `onPage` and the links answer a click instead: a plain click calls it with the page, or with the offset for a list paged by offset, and the event, and the browser does not navigate.
+A list an island pages in memory has no address to change. Give `onPage` and the links answer a click instead: a plain click calls it with `{ page, event }`, `page` being the offset for a list paged by offset, and the browser does not navigate.
 
 Each link keeps its real address, so a middle click or a new tab still opens it, and a handler returning `false` lets the browser follow the link too. The component keeps the page on screen itself and follows `page` when you change it, so setting `page` in the handler is optional:
 
@@ -49,7 +49,7 @@ const page = signal(1)
 ul
   for row of rows.slice((page() - 1) * 10, page() * 10) key={row}
     li {row}
-Pagination(page={page()} total={rows.length} pageSize={10} onPage={next => page = next})
+Pagination(page={page()} total={rows.length} pageSize={10} onPage={({ page: next }) => page = next})
 ```
 
 `onSize` does the same for the page size links. Only an island can pass a handler, and `url` can be left out. A table does all of this itself with its `pageSize`.

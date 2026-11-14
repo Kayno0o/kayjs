@@ -63,7 +63,7 @@ const { id, links, groups, link, heading, header, footer, current, label, collap
   // `false` leaves out the toggle that collapses the nav.
   collapsible?: boolean | undefined
   // Called with the new state whenever the toggle collapses or expands the nav.
-  onCollapsedChange?: ((collapsed: boolean) => unknown) | undefined
+  onCollapsedChange?: ((event: { collapsed: boolean }) => unknown) | undefined
   // Names the toggle while the nav is expanded.
   collapseLabel?: string | undefined
   // Names the toggle while the nav is collapsed.
@@ -81,7 +81,7 @@ const { id, links, groups, link, heading, header, footer, current, label, collap
   // Shows the panel of a narrow screen when the page sets it; the button, a click on a link, a press outside and Escape open and close it on their own.
   open?: boolean | undefined
   // Called with the panel's new state whenever it shows or hides, however it did.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 
 const navId = id ?? uid()
@@ -146,7 +146,7 @@ function fold() {
       own = next
   }
 
-  onCollapsedChange?.(next)
+  onCollapsedChange?.({ collapsed: next })
 }
 
 // The panel reports its own close after a link closed it: each transition is passed on once.
@@ -160,7 +160,7 @@ function setOpen(next: boolean) {
     return
 
   reported = next
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 // Following a link of the panel closes it: the page swap keeps the island, so it would stay over the new page.
@@ -228,7 +228,7 @@ div(part="root" {...rest})
   if panel && !empty()
     button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} aria-haspopup="dialog" data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
       Icon(icon="menu")
-    SidePanel(open={panelOpen()} title={label} onOpenChange={setOpen})
+    SidePanel(open={panelOpen()} title={label} onOpenChange={({ open }) => setOpen(open)})
       // kay-allow unreachable-click -- the click comes from a link inside, which the keyboard follows
       div(part="panel" onClick={followed})
         | {lists(true)}

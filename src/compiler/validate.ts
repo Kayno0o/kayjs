@@ -9,9 +9,9 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { componentBindProblem } from './bound-props'
-import { deprecatedAiLabels } from './deprecated-ai-labels'
 import { deprecatedImage } from './deprecated-image'
-import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
+import { deprecatedLibrary } from './deprecated-library'
+import { libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { valuesCall } from './form-info'
 import { shorthandProblems } from './head-shorthand'
@@ -463,8 +463,7 @@ class Validator {
     const library = this.options.check && element.component ? this.libraryComponents.get(element.name) : undefined
 
     if (library !== undefined) {
-      deprecatedUiProps(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ui-props', message, details))
-      deprecatedAiLabels(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ai-labels', message, details))
+      deprecatedLibrary(element, library, span => this.text(span), (span, code, message, details) => this.lint(span, code, message, details))
     }
 
     if (this.options.check && !element.component && element.name === 'img')

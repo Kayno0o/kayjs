@@ -22,7 +22,7 @@ const columns: Column<Moon>[] = [
 
 const sort = signal<SortState>()
 ---
-Table(columns={columns} rows={moons} rowKey="id" onSort={sort.set})
+Table(columns={columns} rows={moons} rowKey="id" onSortChange={({ sort: next }) => sort = next})
   @cell(moon)
     strong {moon.name}
 if sort() then current

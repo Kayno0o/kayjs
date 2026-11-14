@@ -26,4 +26,4 @@ if denied.redirects !== undefined || dirtyReason() !== undefined
   Refused(label={wording('cms.entry.rename', 'Rename')} reason={denied.redirects ?? dirtyReason()})
 else
   Button(label={wording('cms.entry.rename', 'Rename')} disabled={form.saving()} onClick={start})
-RenameDialog(open={open()} onOpenChange={shown => { open = shown }} slug={entry?.slug ?? ''} hasPage={Boolean(entry?.url)} report={form.slugReport} referrers={form.referrers()} blocked={dirtyReason()} rename={form.rename})
+RenameDialog(open={open()} onOpenChange={({ open: shown }) => { open = shown }} slug={entry?.slug ?? ''} hasPage={Boolean(entry?.url)} report={form.slugReport} referrers={form.referrers()} blocked={dirtyReason()} rename={form.rename})

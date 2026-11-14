@@ -40,7 +40,7 @@ test('searchOptions answers none below minLength, keeps only the latest question
   const loads: string[] = []
   const search = searchOptions<number>(() => async ({ q }) => new Promise<number[]>((resolve) => {
     waiting.push({ q, resolve })
-  }), { minLength: () => 2, onLoad: (options, query) => loads.push(`${query}:${options.length}`), label: 'Test' })
+  }), { minLength: () => 2, onLoad: ({ options, query }) => loads.push(`${query}:${options.length}`), label: 'Test' })
 
   await search.load('a')
   expect(search.answered()).toBe('a')

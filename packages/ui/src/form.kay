@@ -21,7 +21,7 @@ const { action, refused, saved, onSave, onError, onFocusOut, failureLabel, valid
   // Toasted as a success once the action has run.
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows.
-  onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  onSave?: ((event: { data: Answer<Success<Output>> }) => unknown) | undefined
 
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
@@ -56,7 +56,7 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  onSave?.(done.result)
+  onSave?.({ data: done.result })
 }
 
 async function leave(event: FocusEvent) {

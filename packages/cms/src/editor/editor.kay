@@ -803,14 +803,14 @@ effect(() => {
 })
 
 ---
-SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === undefined ? undefined : dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={resized} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} launcher={wording('cms.editor.open', 'Edit this page')} launcherLayer={EDITOR_LAYER} style={`z-index: ${EDITOR_LAYER}${ready() ? '' : '; visibility: hidden'}`} onOpenChange={shown => open = shown})
+SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === undefined ? undefined : dock() === 'bottom' ? 'bottom' : 'right'} size={dock() === 'side' ? side() : bottom()} onSizeChange={({ size: next, settled }) => resized(next, settled)} resizeLabel={wording('cms.editor.resize', 'Resize the editor')} closeLabel={wording('cms.editor.hide', 'Hide the editor')} title={wording('cms.editor.title', 'Edit this page')} launcher={wording('cms.editor.open', 'Edit this page')} launcherLayer={EDITOR_LAYER} style={`z-index: ${EDITOR_LAYER}${ready() ? '' : '; visibility: hidden'}`} onOpenChange={({ open: shown }) => open = shown})
   @actions
     Button(label={leaving() ? wording('cms.editor.leaving', 'Leaving…') : wording('cms.editor.stop', 'Stop editing')} busy={leaving()} onClick={askStop})
     if dock() && canSide(room().width)
       IconButton(icon={dock() === 'side' ? layoutBottom : layoutSide} label={dock() === 'side' ? wording('cms.editor.dockBottom', 'Dock the editor to the bottom') : wording('cms.editor.dockSide', 'Dock the editor to the side')} variant="ghost" onClick={() => chosen = dock() === 'side' ? 'bottom' : 'side'})
     IconButton(icon={outline} label={wording('cms.editor.markingOn', 'Outline every field of the page')} variant={marking() ? 'solid' : 'ghost'} aria-pressed={marking()} onClick={toggleMarking})
     IconButton(icon={browse} label={wording('cms.editor.browseOn', 'Browse the page: links and menus work')} variant={browsing() ? 'solid' : 'ghost'} aria-pressed={browsing()} onClick={() => browsing = !browsing()})
-  Dialog(open={confirming()} title={wording('cms.editor.stop', 'Stop editing')} size="sm" onOpenChange={shown => confirming = shown})
+  Dialog(open={confirming()} title={wording('cms.editor.stop', 'Stop editing')} size="sm" onOpenChange={({ open: shown }) => confirming = shown})
     @footer
       Button(label={wording('cms.editor.keepEditing', 'Keep editing')} onClick={() => confirming = false})
       Button(label={wording('cms.editor.discard', 'Drop them and stop')} tone="danger" onClick={stopEditing})
@@ -837,7 +837,7 @@ SidePanel#kcms-editor.kcms-editor(open={open()} modal={false} dock={dock() === u
     p.kcms-editor-empty {wording('cms.editor.empty', 'Nothing on this page comes from a collection.')}
 // Keyed by the question, so a choice that asks another one mounts a menu that opens afresh.
 for question of asked() key={question}
-  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={shown => !shown && choosing() === question && (choosing = undefined)})
+  Menu(id={MARKER_MENU} label={question.label} at={{ x: question.x, y: question.y }} open items={question.choices.map(choice => ({ label: choice.label, onSelect: choice.run }))} onOpenChange={({ open: shown }) => !shown && choosing() === question && (choosing = undefined)})
 PageImageTools(bar={imageBar()} onPick={(bar, file) => void replaceImage(drafts, bar, file)})
 PageListTools(bars={settling() ? [] : bars()} onMove={(bar, direction) => moveOne(bar.target, bar.index!, direction)} onAdd={(bar, event) => addTo(bar.target, bar.index === undefined ? 0 : bar.index + 1, { event })} onRemove={bar => removeOne(bar.target, bar.index!)})
 Toaster

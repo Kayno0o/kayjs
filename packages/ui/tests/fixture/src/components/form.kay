@@ -39,7 +39,7 @@ const add = Object.assign(async (form: FormData) => {
   error: (field = '') => last()?.errors[field],
 }) as unknown as Action<{ title: string }, string | Failure<never>>
 ---
-Form(action={add} failureLabel="Could not add" saved="Added." onSave={onSave} onError={onError} refused={refused})
+Form(action={add} failureLabel="Could not add" saved="Added." onSave={({ data }) => onSave(data)} onError={onError} refused={refused})
   FormField(label="Title" name="title")
     input#title(name="title")
   FormField(label="Slug" name="slug")

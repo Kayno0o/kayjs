@@ -20,7 +20,7 @@ const look = recipe({
 const { rows, onSelect, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row without an `href` a button handing back the row it was pressed on.
-  onSelect?: ((row: Row) => unknown) | undefined
+  onSelect?: ((event: { item: Row }) => unknown) | undefined
   // What the list reads with no rows.
   emptyLabel?: string | undefined
   // Replaces `emptyLabel` with the app's own markup, such as a link to add the first one: an `@empty` block.
@@ -46,7 +46,7 @@ else
     for row of rows key={row.key}
       li(part="item")
         if onSelect && !row.href
-          button(part="row" type="button" data-interactive onClick={() => onSelect?.(row)})
+          button(part="row" type="button" data-interactive onClick={() => onSelect?.({ item: row })})
             span(part="label") {row.label}
             span(part="value") {row.display ?? row.value}
             span(part="track")

@@ -8,7 +8,7 @@ The field is a native `input type="color"`, so the browser draws its own picker 
 
 ## Reading it
 
-`onChange` runs once with the colour the picker commits, in lowercase `#rrggbb`, and after a form reset that moved it. It does not run on each shade the pointer passes over: the swatch follows those on its own.
+`onChange({ value })` runs once with the colour the picker commits, in lowercase `#rrggbb`, and after a form reset that moved it. It does not run on each shade the pointer passes over: the swatch follows those on its own.
 
 ## Async change
 

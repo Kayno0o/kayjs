@@ -8,7 +8,7 @@ const query = signal('')
   TextInput(
     type="search"
     value={query()}
-    onInput={query.set}
+    onInput={({ value }) => query = value}
     placeholder="Search"
     aria-label="Search"
   )

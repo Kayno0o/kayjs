@@ -47,4 +47,4 @@ if denied.redirects !== undefined
   Refused(label={wording('cms.entry.rename', 'Rename')} reason={denied.redirects})
 else
   Button(label={wording('cms.entry.rename', 'Rename')} aria-label={wording('cms.table.rename', 'Rename {title}', { title: row.title })} onClick={start})
-RenameDialog(open={open()} onOpenChange={shown => { open = shown }} slug={row.slug} hasPage={row.url !== undefined} report={report} referrers={referrers()} blocked={undefined} rename={rename})
+RenameDialog(open={open()} onOpenChange={({ open: shown }) => { open = shown }} slug={row.slug} hasPage={row.url !== undefined} report={report} referrers={referrers()} blocked={undefined} rename={rename})

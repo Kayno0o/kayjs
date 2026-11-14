@@ -176,7 +176,7 @@ function pick(path: string, event: Event): void {
   if image && alt && value !== '' && !many
     label.kcms-file-alt
       span.kcms-file-alt-label {wording('cms.file.alt', 'Alt text')}
-      TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} aria-describedby={alt.issue === undefined ? undefined : `${alt.id}-issue`} onInput={text => onAlt?.(text)})
+      TextInput(id={alt.id} value={alt.value} placeholder={wording('cms.file.altHint', 'What the image shows, for people who cannot see it')} aria-required={alt.required ? 'true' : undefined} aria-invalid={alt.issue === undefined ? undefined : 'true'} aria-describedby={alt.issue === undefined ? undefined : `${alt.id}-issue`} onInput={({ value: text }) => onAlt?.(text)})
     if alt.issue
       p.kcms-file-error(id={`${alt.id}-issue`} role="alert") {alt.issue}
   // The width and height of the image are not fields of the form, so their refusal shows here, where the path that left them blank was set.
@@ -184,7 +184,7 @@ function pick(path: string, event: Event): void {
     for issue of sizeIssues key={issue.id}
       p.kcms-file-error(id={issue.id} role="alert") {issue.message}
   // A disabled zone is a div, so the tooltip is reachable by hover and keyboard where a disabled button's would not be.
-  FileDrop.kcms-file-drop(size="sm" accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={disabled || sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
+  FileDrop.kcms-file-drop(size="sm" accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={disabled || sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={({ files }) => send(files)} onReject={({ files }) => reject(files)})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} disabled={disabled || denied() !== undefined} onClick={zone.open})
       if sent() !== undefined
@@ -212,4 +212,4 @@ function pick(path: string, event: Event): void {
   if !many && !stays()
     details.kcms-file-path
       summary {wording('cms.file.path', 'Path')}
-      TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.path', 'Path')} onInput={text => onChange(text)})
+      TextInput(value={value} placeholder={wording('cms.file.pathHint', 'Or a path the site serves')} aria-label={wording('cms.file.path', 'Path')} onInput={({ value: text }) => onChange(text)})

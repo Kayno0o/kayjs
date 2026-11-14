@@ -23,7 +23,7 @@ const { id, anchor, placement = 'top', onOpenChange, style, ...rest } = props<Om
   // Which side of the anchor it sits on, flipped by the browser when there is no room there.
   placement?: HoverCardPlacement | undefined
   // Called with `true` as the card shows and `false` as it hides, also when it hides on its own (Escape, or an anchor that left the page) while the page still holds the anchor: clear it there, and the same element can show the card again.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
 }>()
 
 const panelId = id ?? uid()
@@ -47,7 +47,7 @@ function report(open: boolean) {
     return
 
   reported = open
-  untrack(() => onOpenChange?.(open))
+  untrack(() => onOpenChange?.({ open }))
 }
 
 // The card's id is listed in the anchor's `aria-describedby` while it is open, beside whatever ids the app put there.

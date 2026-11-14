@@ -9,14 +9,14 @@ const quantity = signal<number | null>(1)
   TextInput(
     type="email"
     value={email()}
-    onInput={email.set}
+    onInput={({ value }) => email = value}
     placeholder="you@example.com"
     aria-label="Email"
   )
   TextInput(
     type="number"
     value={quantity()}
-    onInput={quantity.set}
+    onInput={({ value }) => quantity = value}
     min="1"
     aria-label="Quantity"
   )

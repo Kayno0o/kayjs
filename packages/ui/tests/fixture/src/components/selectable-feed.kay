@@ -11,5 +11,5 @@ const { onLoad, onSelect } = props<{
 const feed = infiniteList([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }], { limit: 2, key: row => row.id, load: ({ offset }) => onLoad(offset) })
 ---
 button.more(type="button" onClick={feed.more}) More
-Table(columns={[{ key: 'name', header: 'Name' }]} rows={feed.data()} rowKey="id" selectable onSelectedChange={onSelect})
+Table(columns={[{ key: 'name', header: 'Name' }]} rows={feed.data()} rowKey="id" selectable onSelectedChange={({ keys }) => onSelect(keys)})
 LoadMore(list={feed})

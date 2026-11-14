@@ -10,7 +10,7 @@ const groups = [
   { links: [{ href: 'https://example.com/docs', label: 'Docs', children: [{ href: 'https://example.com/docs/a', label: 'Alpha' }] }, { href: 'https://example.com/locked', label: 'Locked', disabled: true }] },
 ] as const
 ---
-SideNav#plain(groups={groups} links={[{ href: 'https://example.com/flat', label: 'Flat' }]} current="https://example.com/docs/a" label="Plain" panel={false} onCollapsedChange={onCollapsedChange})
+SideNav#plain(groups={groups} links={[{ href: 'https://example.com/flat', label: 'Flat' }]} current="https://example.com/docs/a" label="Plain" panel={false} onCollapsedChange={({ collapsed }) => onCollapsedChange(collapsed)})
 SideNav#rail(groups={groups} current="https://example.com/home" label="Rail" panel={false} collapsed={true})
 SideNav#block(groups={groups} current="https://example.com/home" label="Block" panel={false} collapsible={false})
   @link(link)
@@ -21,7 +21,7 @@ SideNav#block(groups={groups} current="https://example.com/home" label="Block" p
     p header
   @footer
     p footer
-SideNav#panel(groups={groups} current="https://example.com/home" label="Panel" onOpenChange={onOpenChange})
+SideNav#panel(groups={groups} current="https://example.com/home" label="Panel" onOpenChange={({ open }) => onOpenChange(open)})
 SideNav#later(groups={async () => groups} current="https://example.com/home" label="Later" panel={false})
 SideNav#broken(links={async () => { throw new Error('no') }} current="https://example.com/home" label="Broken" panel={false})
 SideNav#folded(groups={groups} current="https://example.com/home" label="Folded" collapsed={true})

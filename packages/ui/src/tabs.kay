@@ -36,7 +36,7 @@ const look = recipe({
   },
 })
 
-const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), orientation = 'horizontal', activation = 'auto', lazy = false, onLoad, onError, onValueChange, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onValueChange' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
   tabs: OptionsSource<{ value: Value } & NavItem>
@@ -44,7 +44,7 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   retryLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `tabs`, and with what it rejected with.
-  onLoad?: ((tabs: readonly ({ value: Value } & NavItem)[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly ({ value: Value } & NavItem)[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Names the tab list for screen readers.
   label: string
@@ -55,6 +55,8 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   // Draws a panel on the first showing of its tab and keeps it from then on, so a heavy panel, or one that fetches, costs nothing until read. The panel is empty until then.
   lazy?: boolean | undefined
   // Gets the tab shown as a second argument.
+  onValueChange?: ((event: { value: Value, tab: { value: Value } & NavItem }) => unknown) | undefined
+  // @deprecated Since 1.105, `onValueChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onChange?: ((value: Value, tab: { value: Value } & NavItem) => unknown) | undefined
   // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the tab. The icon and the badge it names are still drawn around it; `label` is still the string the data holds.
   tab?: Snippet<[tab: { value: Value } & NavItem]> | undefined
@@ -63,12 +65,12 @@ const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('
   panel: Snippet<[value: Value]>
 } & (
   {
-    // The tab shown to start with; tabs whose parent passes another follow it. A value naming no enabled tab shows the first enabled one, with no `onChange` for the fallback.
+    // The tab shown to start with; tabs whose parent passes another follow it. A value naming no enabled tab shows the first enabled one, with no `onValueChange` for the fallback.
     value: Value
     param?: undefined
     paramDefault?: undefined
   } | {
-    // Holds the shown tab in a query param of the page with no island of the app's, in place of `value`: the server draws that tab from the first paint, and a pick rewrites the address without a navigation (every panel is already drawn), the other params kept and the current history entry replaced. `onChange` still runs.
+    // Holds the shown tab in a query param of the page with no island of the app's, in place of `value`: the server draws that tab from the first paint, and a pick rewrites the address without a navigation (every panel is already drawn), the other params kept and the current history entry replaced. `onValueChange` still runs.
     param: string
     // The tab the page shows while `param` is left out: picking it leaves the param out. Without it the first enabled tab is shown, and picking it sets the param like any other.
     paramDefault?: Value | undefined
@@ -125,7 +127,10 @@ function show(next: Value) {
   else
     shown = next
 
-  onChange?.(next, tabs().find(entry => entry.value === next)!)
+  const tab = tabs().find(entry => entry.value === next)!
+
+  onValueChange?.({ value: next, tab })
+  onChange?.(next, tab)
 }
 
 // Moving with the keys focuses the tab it lands on, and shows it unless `activation` is manual: only the shown tab is in the page's tab order.

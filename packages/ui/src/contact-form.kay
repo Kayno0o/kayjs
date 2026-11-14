@@ -25,7 +25,7 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
   // Replaces the success notice, whatever `sentLabel` says.
   sent?: Snippet
   // Called once the message went out, with what the action returned: for an analytics conversion, closing a dialog around the form or a redirect.
-  onSend?: ((data: unknown) => unknown) | undefined
+  onSend?: ((event: { data: unknown }) => unknown) | undefined
 
   // Called when the post was refused or failed, with the messages by field (the whole form's under ''), the status and the failure's data; the notice and the field messages still show.
   onError?: ((failure: FormFailure<never, unknown>) => unknown) | undefined

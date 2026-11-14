@@ -509,8 +509,8 @@ test('the app hears a send, a tool call, then the finished reply, each once and 
   const reply = fakeStream()
   const { session } = chat([answer(reply.stream)], {
     onSend: ({ messages }) => heard.push(`send ${messages.map(message => message.content).join('|')}`),
-    onToolCall: call => heard.push(`call ${call.name} ${call.status}`),
-    onReply: turn => heard.push(`reply ${turn.content}`),
+    onToolCall: ({ call }) => heard.push(`call ${call.name} ${call.status}`),
+    onReply: ({ turn }) => heard.push(`reply ${turn.content}`),
     onStop: () => heard.push('stop'),
     onError: () => heard.push('error'),
   })
@@ -562,7 +562,7 @@ test('the app hears a regenerate and an edit before the request they send', asyn
   const { session } = chat([answer(first.stream), answer(second.stream), answer(third.stream)], {
     onSend: ({ messages }) => heard.push(`send ${messages.at(-1)?.content}`),
     onRegenerate: () => heard.push('regenerate'),
-    onEdit: text => heard.push(`edit ${text}`),
+    onEdit: ({ text }) => heard.push(`edit ${text}`),
   })
 
   await session.send('hi')

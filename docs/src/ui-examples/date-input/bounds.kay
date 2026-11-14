@@ -11,6 +11,6 @@ const day = signal('')
     max="2026-11-20"
     firstDay={1}
     value={day()}
-    onChange={day.set}
+    onChange={({ value }) => day = value}
   )
   p.text-muted {day() ? `Booked for ${day()}.` : 'Pick a day between 5 October and 20 November.'}

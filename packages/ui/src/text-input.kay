@@ -25,9 +25,9 @@ const look = recipe({
 type AsText = Field & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // Called once the value is committed, on blur or Enter, after `onInput`.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
 }
 
@@ -35,8 +35,8 @@ type AsText = Field & {
 type AsNumber = Field & {
   type: 'number'
   value?: number | string | null | undefined
-  onInput?: ((value: number | null) => unknown) | undefined
-  onChange?: ((value: number | null) => unknown) | undefined
+  onInput?: ((event: { value: number | null }) => unknown) | undefined
+  onChange?: ((event: { value: number | null }) => unknown) | undefined
 }
 
 const { size = 'md', invalid, icon, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
@@ -73,12 +73,12 @@ function read(input: HTMLInputElement): string | number | null {
 }
 
 // Each shape's callback takes what its own box reads, so either is handed `read`.
-function report(callback: ((value: never) => unknown) | undefined, input: HTMLInputElement) {
+function report(callback: ((event: never) => unknown) | undefined, input: HTMLInputElement) {
   if (halfTyped(input))
     return
 
   controlled.heard(input.value)
-  callback?.(read(input) as never)
+  callback?.({ value: read(input) } as never)
 }
 
 // Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed. An empty side matches only another, `Number('')` being 0.

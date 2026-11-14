@@ -11,7 +11,7 @@ An option is `{ value, label, disabled? }`; a `disabled` one cannot be picked. A
 `value` and `onChange` take the type of the options' values. A union of strings stays that union, and a number option hands back a number. With `emptyOption`, they take the empty string too, so hold the value as `Kind | ''`.
 
 ```kay
-Select(value={kind()} options={KINDS} onChange={kind.set} emptyOption="Any kind" aria-label="Kind")
+Select(value={kind()} options={KINDS} onChange={({ value }) => kind = value} emptyOption="Any kind" aria-label="Kind")
 ```
 
 ## Loading options
@@ -42,14 +42,14 @@ A pick with the mouse submits at once. Some browsers report a change on every ar
 
 ## Options from an action
 
-`options` can be a promise of the options or a function returning them, such as an action: it is called with `{ q }`. It is asked when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad(options, query)` and `onError({ error, query })` follow each answer, as on Combobox and MultiSelect.
+`options` can be a promise of the options or a function returning them, such as an action: it is called with `{ q }`. It is asked when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad({ options, query })` and `onError({ error, query })` follow each answer, as on Combobox and MultiSelect.
 
 ## Searching the options
 
 A native select has no search box, so give it the text from one of your own: `query={text()}`. The function is asked again each time `query` changes, and only the latest answer is shown. The answer replaces the options, so it should still list the option that is picked.
 
 ```kay
-TextInput(value={text()} onInput={text.set} aria-label="Search planets")
+TextInput(value={text()} onInput={({ value }) => text = value} aria-label="Search planets")
 Select(options={({ q }) => findPlanets(q)} query={text()} aria-label="Planet")
 ```
 

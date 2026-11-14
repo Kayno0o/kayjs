@@ -19,6 +19,6 @@ const describe = (rect: { x: number, y: number, w: number, h: number }) =>
     src={photo}
     ratio={16 / 9}
     alt="A pink and blue gradient"
-    onCrop={rect => crop = describe(rect)}
+    onCrop={({ crop: rect }) => crop = describe(rect)}
   )
   p.text-muted Crop: {crop() || 'not loaded yet'}.

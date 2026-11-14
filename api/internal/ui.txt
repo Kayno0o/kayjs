@@ -642,6 +642,9 @@ function xAxisOptions(labels: string[], times: null | number[], showLabels: bool
 [./lib/chart-marks] activeMarks
 function activeMarks(options: {
   active: () => null | number | undefined;
+  onActiveChange: () => ((event: {
+    index: null | number;
+  }) => unknown) | undefined;
   onActive: () => ((index: null | number) => unknown) | undefined;
 }): {
   current: () => null | number;
@@ -1015,8 +1018,8 @@ class DropTargets
 [./lib/dnd] DropTargetsOptions
 interface DropTargetsOptions<Item extends Id, Target extends Id>
   accepts?: (item: Item, target: Target) => boolean
-  onDrop: (item: Item, target: Target) => unknown
-  onLinger?: (target: Target) => unknown
+  onDrop: (event: { item: Item; target: Target; }) => unknown
+  onLinger?: (event: { target: Target; }) => unknown
 
 [./lib/dnd] Sortable
 class Sortable
@@ -1029,7 +1032,7 @@ class Sortable
   #layout: (drag: Drag) => void
   #move: (id: Id, from: number, to: number, kept?: number | undefined) => Promise<void>
   #moving: boolean
-  #onReorder: (from: number, to: number) => unknown
+  #onReorder: (event: { from: number; to: number; }) => unknown
   #ordered: () => HTMLElement[]
   #start: (id: Id, originY: number) => void
   #step: (id: Id, event: KeyboardEvent) => void
@@ -1039,7 +1042,7 @@ class Sortable
 
 [./lib/dnd] SortableOptions
 interface SortableOptions
-  onReorder: (from: number, to: number) => unknown
+  onReorder: (event: { from: number; to: number; }) => unknown
 
 [./lib/editing] rowEditing
 function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft>
@@ -1302,7 +1305,7 @@ type Attempted<T> = T extends void ? true : T
 [./lib/index] AttemptOptions
 interface AttemptOptions<Data = unknown>
   failure: string
-  onRefused?: ((data: Data) => unknown) | undefined
+  onRefused?: ((event: { data: Data; }) => unknown) | undefined
   refused?: ((data: Data) => string | undefined) | undefined
   refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   success?: string | undefined
@@ -1538,7 +1541,7 @@ interface MenuCheckbox extends MenuItemBase
   icon?: IconProps | IconSlot
   id?: string | undefined
   label: string
-  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: boolean; }) => unknown) | undefined
   shortcut?: string | undefined
   tone?: Tone | undefined
 
@@ -1569,7 +1572,7 @@ interface MenuRadio extends MenuItemBase
   disabled?: boolean
   icon?: IconProps | IconSlot
   label: string
-  onCheckedChange?: ((value: string) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: true; value: string; }) => unknown) | undefined
   radioGroup: string
   shortcut?: string | undefined
   tone?: Tone | undefined
@@ -1584,7 +1587,7 @@ interface MenuSubmenu
   icon?: IconProps | IconSlot
   items: MenuSource
   label: string
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
   tone?: Tone | undefined
 
@@ -1856,7 +1859,7 @@ interface Toast
   id: number
   loading?: boolean | undefined
   message: Element
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   outcome?: boolean | undefined
   tone: Tone
 
@@ -1874,7 +1877,7 @@ interface ToastOptions
   action?: ToastAction | undefined
   description?: string | undefined
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   tone?: Tone | undefined
 
 [./lib/index] ToastOutcome
@@ -1887,7 +1890,7 @@ interface ToastPatch
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   loading?: boolean | undefined
   message?: Element
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | null | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | null | undefined
   outcome?: boolean | undefined
   tone?: Tone | undefined
 
@@ -1898,7 +1901,7 @@ interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'>
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   error: ((error: unknown) => ToastOutcome) | ToastOutcome
   loading: string
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   success?: ((value: T) => ToastOutcome | undefined) | ToastOutcome | undefined
 
 [./lib/index] toasts
@@ -2215,7 +2218,7 @@ interface MenuCheckbox extends MenuItemBase
   icon?: IconProps | IconSlot
   id?: string | undefined
   label: string
-  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: boolean; }) => unknown) | undefined
   shortcut?: string | undefined
   tone?: Tone | undefined
 
@@ -2254,7 +2257,7 @@ interface MenuRadio extends MenuItemBase
   disabled?: boolean
   icon?: IconProps | IconSlot
   label: string
-  onCheckedChange?: ((value: string) => unknown) | undefined
+  onCheckedChange?: ((event: { checked: true; value: string; }) => unknown) | undefined
   radioGroup: string
   shortcut?: string | undefined
   tone?: Tone | undefined
@@ -2269,7 +2272,7 @@ interface MenuSubmenu
   icon?: IconProps | IconSlot
   items: MenuSource
   label: string
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
   tone?: Tone | undefined
 
@@ -2357,7 +2360,7 @@ function loadOptions<Option>(given: () => OptionsSource<Option, OptionsQuery>, h
 interface OptionsHooks<Option>
   label: string
   onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
-  onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly Option[]; query: string; }) => unknown) | undefined
   query?: (() => string) | undefined
 
 [./lib/options-source] OptionsQuery
@@ -2381,7 +2384,10 @@ interface SearchedOptions<Option>
 [./lib/options-source] searchOptions
 function searchOptions<Option>(given: () => OptionsSource<Option, OptionsQuery>, hooks: {
   minLength: () => number;
-  onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined;
+  onLoad?: ((event: {
+    options: readonly Option[];
+    query: string;
+  }) => unknown) | undefined;
   onError?: ((failure: {
     error: unknown;
     query: string;
@@ -2425,7 +2431,7 @@ function discardAndClose(dialog: HTMLDialogElement | undefined, discard: Pick<Co
 function followsHref(closeHref: string | undefined, onOpenChange: unknown): closeHref is string
 
 [./lib/overlay] leave
-function leave(closeHref: string | undefined, onOpenChange: ((open: boolean) => unknown) | undefined): void
+function leave(closeHref: string | undefined, onOpenChange: ((event: { open: boolean; }) => unknown) | undefined): void
 
 [./lib/overlay] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -2546,7 +2552,13 @@ function splitMatches(matches: PaletteEntry[], query: string): { strong: Palette
 function withRecent(recent: string[], href: string, limit?: number): string[]
 
 [./lib/param-change] paramChange
-function paramChange<Value extends string | null | number, Option = never>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((value: Value, option: Option) => unknown) | undefined): ((value: Value, option: Option) => unknown) | undefined
+function paramChange<Value extends string | null | number, Option = never>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((event: {
+  value: Value;
+  option: Option;
+}) => unknown) | undefined): ((event: {
+  value: Value;
+  option: Option;
+}) => unknown) | undefined
 
 [./lib/param-value] paramPick
 function paramPick<Choice extends string | null | number>(options: readonly {
@@ -2691,12 +2703,12 @@ interface Recorder
 interface RecorderOptions
   failure: string
   maxMs: number
-  onAudio: (audio: File) => unknown
+  onAudio: (event: { audio: File; }) => unknown
   onCancel?: (() => unknown) | undefined
   onError?: ((failure: RecordFailure) => unknown) | undefined
-  onRecordingChange?: ((recording: boolean) => unknown) | undefined
+  onRecordingChange?: ((event: { recording: boolean; }) => unknown) | undefined
   onStart?: (() => unknown) | undefined
-  onStop?: ((reason: RecordStop) => unknown) | undefined
+  onStop?: ((event: { reason: RecordStop; }) => unknown) | undefined
   sending?: string | undefined
   words: RecordWords
 
@@ -2723,7 +2735,7 @@ interface Recording
 [./lib/recording] RecordOptions
 interface RecordOptions
   maxMs: number
-  onEnd: (result: File | RecordProblem) => void
+  onEnd: (event: { result: File | RecordProblem; }) => void
 
 [./lib/recording] RecordProblem
 type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
@@ -2765,7 +2777,7 @@ interface AsyncRows<Row>
 [./lib/source] AsyncRowsHooks
 interface AsyncRowsHooks<Row>
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
-  onLoad?: ((rows: Row[]) => unknown) | undefined
+  onLoad?: ((event: { rows: Row[]; }) => unknown) | undefined
 
 [./lib/source] RowsSource
 type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
@@ -2957,7 +2969,7 @@ function expanding<Row, Key extends RowKey<Row>>(input: ExpandInput<Row, Key>): 
 [./lib/table-expand] ExpandInput
 interface ExpandInput<Row, Key extends RowKey<Row>>
   expanded: () => RowKeyValue<Row, Key>[] | undefined
-  onOpenChange: () => ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+  onOpenChange: () => ((event: { key: RowKeyValue<Row, Key>; open: boolean; }) => unknown) | undefined
   rowKey: Key
   tableId: string
 
@@ -3003,7 +3015,7 @@ function paging<Row>(input: PagingInput<Row>): {
 [./lib/table-page] PagingInput
 interface PagingInput<Row>
   limitParam: () => string
-  onPageChange: () => ((page: number, size: number) => unknown) | undefined
+  onPageChange: () => ((event: { page: number; size: number; }) => unknown) | undefined
   page: () => number | undefined
   pageParam: () => string
   pageSize: () => number | undefined
@@ -3027,7 +3039,7 @@ function selection<Row, Key extends RowKey<Row>>(input: SelectionInput<Row, Key>
 interface SelectionInput<Row, Key extends RowKey<Row>>
   enabled: () => boolean
   kept: () => Row[]
-  onChange: () => ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
+  onChange: () => ((event: { keys: RowKeyValue<Row, Key>[]; rows: Row[]; }) => unknown) | undefined
   rowKey: Key
   rows: () => Row[]
   selected: () => RowKeyValue<Row, Key>[] | undefined
@@ -3082,7 +3094,7 @@ type Attempted<T> = T extends void ? true : T
 [./lib/toast] AttemptOptions
 interface AttemptOptions<Data = unknown>
   failure: string
-  onRefused?: ((data: Data) => unknown) | undefined
+  onRefused?: ((event: { data: Data; }) => unknown) | undefined
   refused?: ((data: Data) => string | undefined) | undefined
   refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   success?: string | undefined
@@ -3115,7 +3127,7 @@ interface Toast
   id: number
   loading?: boolean | undefined
   message: Element
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   outcome?: boolean | undefined
   tone: Tone
 
@@ -3133,7 +3145,7 @@ interface ToastOptions
   action?: ToastAction | undefined
   description?: string | undefined
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   tone?: Tone | undefined
 
 [./lib/toast] ToastOutcome
@@ -3146,7 +3158,7 @@ interface ToastPatch
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   loading?: boolean | undefined
   message?: Element
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | null | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | null | undefined
   outcome?: boolean | undefined
   tone?: Tone | undefined
 
@@ -3157,7 +3169,7 @@ interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'>
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   error: ((error: unknown) => ToastOutcome) | ToastOutcome
   loading: string
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((event: { reason: ToastDismissReason; }) => unknown) | undefined
   success?: ((value: T) => ToastOutcome | undefined) | ToastOutcome | undefined
 
 [./lib/toast] toasts

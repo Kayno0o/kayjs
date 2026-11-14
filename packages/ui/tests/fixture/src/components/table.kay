@@ -16,7 +16,7 @@ const columns: Column<Planet>[] = [
   { key: 'id', header: 'Id' },
 ]
 ---
-Table(columns={columns} rows={rows} rowKey={planet => planet.id} sortable={sortable} sort={sort} serverSort={serverSort} onSort={onSort})
+Table(columns={columns} rows={rows} rowKey={planet => planet.id} sortable={sortable} sort={sort} serverSort={serverSort} onSortChange={({ sort }) => onSort?.(sort)})
   @cell(planet)
     strong {planet.name}
   @empty

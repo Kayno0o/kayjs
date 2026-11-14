@@ -26,7 +26,7 @@ interface Drag {
 
 export interface SortableOptions {
   // A move of the item at index `from` of the list to index `to`, by a drop or an arrow key. The list takes no other move until a returned promise settles, and a rejection goes unhandled, so wrap the call in `attempt`.
-  onReorder: (from: number, to: number) => unknown
+  onReorder: (event: { from: number, to: number }) => unknown
 }
 
 const CONTROLS = 'button,input,select,textarea,[role="button"]'
@@ -288,7 +288,7 @@ export class Sortable {
     this.#moving = true
 
     try {
-      await this.#onReorder(from, to)
+      await this.#onReorder({ from, to })
     }
     finally {
       this.#moving = false

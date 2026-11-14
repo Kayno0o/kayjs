@@ -22,7 +22,7 @@ const { labels = {}, label = wording('ai.chat.label', 'Chat'), openLabel = label
   // Opens and closes the panel when the page sets it; the button, the close button and Escape work on their own, so it can be left out.
   open?: boolean | undefined
   // Called with the new state when the visitor opens or closes the panel, not when the page sets `open`.
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // The address fragment that opens the panel, on load and whenever it changes to it; `false` for none.
   hash?: string | false | undefined
 } & Pick<ChatLauncherLabelProps, 'openLabel' | 'closeLabel' | 'newLabel' | 'expandLabel' | 'collapseLabel'>>()
@@ -60,7 +60,7 @@ function toggle(next: boolean) {
     hide()
 
   try {
-    const result = onOpenChange?.(next)
+    const result = onOpenChange?.({ open: next })
 
     if (result instanceof Promise)
       void logged(result)

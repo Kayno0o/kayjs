@@ -925,15 +925,15 @@ component default
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
   note?: Element
-  onEdit?: ((text: string) => unknown) | undefined
+  onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined
-  onReply?: ((turn: ChatTurnView) => unknown) | undefined
-  onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
+  onReply?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSend?: ((event: { messages: ChatMessage[]; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
-  onSuggestion?: ((text: string) => unknown) | undefined
-  onToolCall?: ((call: AiToolCall) => unknown) | undefined
+  onSuggestion?: ((event: { text: string; }) => unknown) | undefined
+  onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
   open?: boolean | undefined
   placeholder?: string | undefined
   regenerate?: boolean | undefined
@@ -973,7 +973,7 @@ component default
   label?: string | undefined
   labels?: Pick<ChatLauncherLabels, "close" | "collapse" | "expand" | "new" | "open"> | undefined
   newIcon: Element
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean; }) => unknown) | undefined
   open?: boolean | undefined
 
 [./chat-sources.kay] default
@@ -1090,14 +1090,14 @@ component default
   maxFiles?: number | undefined
   maxSize?: ByteSize | undefined
   newButton?: boolean | undefined
-  onEdit?: ((text: string) => unknown) | undefined
+  onEdit?: ((event: { text: string; }) => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined
-  onReply?: ((turn: ChatTurnView) => unknown) | undefined
-  onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
+  onReply?: ((event: { turn: ChatTurnView; }) => unknown) | undefined
+  onSend?: ((event: { messages: ChatMessage[]; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
-  onSuggestion?: ((text: string) => unknown) | undefined
-  onToolCall?: ((call: AiToolCall) => unknown) | undefined
+  onSuggestion?: ((event: { text: string; }) => unknown) | undefined
+  onToolCall?: ((event: { call: AiToolCall; }) => unknown) | undefined
   placeholder?: string | undefined
   regenerate?: boolean | undefined
   remember?: string | undefined

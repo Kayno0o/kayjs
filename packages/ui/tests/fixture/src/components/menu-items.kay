@@ -11,30 +11,30 @@ const sub = signal(false)
 
 const rich = (): MenuEntry[] => [
   { heading: 'Show' },
-  { label: 'Word wrap', checked: word(), shortcut: 'Alt+Z', closeOnSelect: false, onCheckedChange: (now: boolean) => { word = now; calls.push(`wrap ${now}`) } },
-  { label: 'Ruler', defaultChecked: true, onCheckedChange: (now: boolean) => calls.push(`ruler ${now}`) },
+  { label: 'Word wrap', checked: word(), shortcut: 'Alt+Z', closeOnSelect: false, onCheckedChange: ({ checked: now }: { checked: boolean }) => { word = now; calls.push(`wrap ${now}`) } },
+  { label: 'Ruler', defaultChecked: true, onCheckedChange: ({ checked: now }: { checked: boolean }) => calls.push(`ruler ${now}`) },
   'separator',
   { heading: 'Sort' },
-  { label: 'Name', radioGroup: 'sort', value: 'name', checked: sort() === 'name', onCheckedChange: (value: string) => { sort = value; calls.push(`sort ${value}`) } },
-  { label: 'Date', radioGroup: 'sort', value: 'date', checked: sort() === 'date', onCheckedChange: (value: string) => { sort = value; calls.push(`sort ${value}`) } },
+  { label: 'Name', radioGroup: 'sort', value: 'name', checked: sort() === 'name', onCheckedChange: ({ value }: { value: string }) => { sort = value; calls.push(`sort ${value}`) } },
+  { label: 'Date', radioGroup: 'sort', value: 'date', checked: sort() === 'date', onCheckedChange: ({ value }: { value: string }) => { sort = value; calls.push(`sort ${value}`) } },
   'separator',
   { label: 'Share', items: [{ label: 'Copy link', onSelect: () => calls.push('link') }, { label: 'Email', onSelect: () => calls.push('email') }] },
   { label: 'Save', shortcut: 'Ctrl+S', onSelect: () => calls.push('save') },
 ]
 const own: MenuEntry[] = [
   { label: 'Small', radioGroup: 'size', value: 's' },
-  { label: 'Large', radioGroup: 'size', value: 'l', defaultChecked: true, onCheckedChange: (value: string) => calls.push(`size ${value}`) },
+  { label: 'Large', radioGroup: 'size', value: 'l', defaultChecked: true, onCheckedChange: ({ value }: { value: string }) => calls.push(`size ${value}`) },
   { label: 'Apple', onSelect: () => undefined },
   { label: 'Banana', onSelect: () => undefined },
   { label: 'Avocado', onSelect: () => undefined },
 ]
 const twins: MenuEntry[] = [
-  { label: 'Same', onCheckedChange: (now: boolean) => calls.push(`first ${now}`) },
-  { label: 'Same', id: 'second', defaultChecked: true, onCheckedChange: (now: boolean) => calls.push(`second ${now}`) },
-  { label: 'Same', onCheckedChange: (now: boolean) => calls.push(`third ${now}`) },
+  { label: 'Same', onCheckedChange: ({ checked: now }: { checked: boolean }) => calls.push(`first ${now}`) },
+  { label: 'Same', id: 'second', defaultChecked: true, onCheckedChange: ({ checked: now }: { checked: boolean }) => calls.push(`second ${now}`) },
+  { label: 'Same', onCheckedChange: ({ checked: now }: { checked: boolean }) => calls.push(`third ${now}`) },
 ]
 ---
 Menu#rich(label="View" icon="plus" items={rich()})
 Menu#own(label="Own" icon="plus" items={own})
 Menu#twins(label="Twins" icon="plus" items={twins})
-Menu#ctl(label="Controlled" icon="plus" items={[{ label: 'More', open: sub(), onOpenChange: (now: boolean) => { sub = now; calls.push(`sub ${now}`) }, items: [{ label: 'Inner', onSelect: () => undefined }] }, { label: 'Other', onSelect: () => undefined }]})
+Menu#ctl(label="Controlled" icon="plus" items={[{ label: 'More', open: sub(), onOpenChange: ({ open: now }: { open: boolean }) => { sub = now; calls.push(`sub ${now}`) }, items: [{ label: 'Inner', onSelect: () => undefined }] }, { label: 'Other', onSelect: () => undefined }]})

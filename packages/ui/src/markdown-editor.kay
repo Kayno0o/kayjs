@@ -30,15 +30,15 @@ const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar =
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload: the live value.
-  onInput?: ((value: string) => unknown) | undefined
+  onInput?: ((event: { value: string }) => unknown) | undefined
   // The text once the field is left with another text than the last one reported or handed in, whatever edited it (typing, toolbar, shortcut, upload): the commit a draft saves on.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
   // Uploads a pasted or dropped image and returns the url to embed it by. Without it, images are left to the browser.
-  onImage?: ((file: File) => Promise<string>) | undefined
+  onImage?: ((event: { file: File }) => Promise<string>) | undefined
   // Toasted when an upload throws.
   uploadFailure?: string | undefined
   // Called with the file and what `onImage` threw or the refusal of the call (`undefined` when the call was refused without an error), besides the toast, once its placeholder is gone.
-  onImageError?: ((file: File, error: unknown) => unknown) | undefined
+  onImageError?: ((event: { file: File, error: unknown }) => unknown) | undefined
   // The buttons over the field, in order: `false` for none, else any of `bold`, `italic`, `heading`, `bulletList`, `numberedList`, `link` and `image`, all of them by default.
   // `image` opens the file picker when `onImage` is given, else writes an image to fill in.
   toolbar?: boolean | readonly ToolbarAction[] | undefined
@@ -53,7 +53,7 @@ const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar =
   previewHtml?: SafeHtml | undefined
   // Whether the preview shows, when the parent sets it; the Preview button toggles it on its own, and `onPreviewChange` reports each change so a parent driving `previewing` can set it back.
   previewing?: boolean | undefined
-  onPreviewChange?: ((previewing: boolean) => unknown) | undefined
+  onPreviewChange?: ((event: { previewing: boolean }) => unknown) | undefined
   // Classes for the HTML of the preview, so it takes the styles the page gives rendered Markdown, such as a prose class.
   previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
@@ -115,7 +115,7 @@ function left(event: FocusEvent & { currentTarget: HTMLTextAreaElement }) {
 
   if (now !== committed) {
     committed = now
-    onChange?.(now)
+    onChange?.({ value: now })
   }
 
   rest.onBlur?.(event as never)
@@ -161,7 +161,7 @@ const { heard } = controlledValue({
   report: (element) => {
     heard(element.value)
     text = element.value
-    onInput?.(element.value)
+    onInput?.({ value: element.value })
   },
 })
 
@@ -189,7 +189,7 @@ function togglePreview(): void {
   const next = !previewShown()
 
   previewShown = next
-  onPreviewChange?.(next)
+  onPreviewChange?.({ previewing: next })
 }
 
 
@@ -326,7 +326,7 @@ async function upload(files: File[]): Promise<void> {
     try {
       const url = await attempt(async () => {
         try {
-          return await send(file)
+          return await send({ file })
         }
         catch (error) {
           failure = error
@@ -354,7 +354,7 @@ async function upload(files: File[]): Promise<void> {
 // A callback of the app's that throws is a bug of the app's, not an upload that failed twice.
 async function failed(file: File, error: unknown): Promise<void> {
   try {
-    await onImageError?.(file, error)
+    await onImageError?.({ file, error })
   }
   catch (thrown) {
     console.error('kayjs-ui: the `onImageError` of a MarkdownEditor threw', thrown)
@@ -420,7 +420,7 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
   div(part="grid" data-preview={previewShown() ? '' : undefined})
-    textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onBlur={left} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+    textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.({ value: event.currentTarget.value }) }} onBlur={left} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if builtIn().length > 0 || preview || actions
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()

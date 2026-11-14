@@ -177,7 +177,7 @@ Chat(action={reply} label="Assistant")
 
 ### Hear what the chat does and control it
 
-`Chat` calls `onSend({ messages })`, `onReply(turn)` with the finished turn, `onStop()`, `onError({ message, status })`, `onToolCall(call)`, `onRegenerate()`, `onEdit(text)` and `onSuggestion(text)` as each happens, once each, so analytics or a save of the turn needs no wrapper around the action. A callback that throws is logged and leaves the chat alone. `suggestions` also takes a function, returning the list or a promise of it, for questions that depend on the page or the visitor.
+`Chat` calls `onSend({ messages })`, `onReply({ turn })` with the finished turn, `onStop()`, `onError({ message, status })`, `onToolCall({ call })`, `onRegenerate()`, `onEdit({ text })` and `onSuggestion({ text })` as each happens, once each, so analytics or a save needs no wrapper. A callback that throws is logged and leaves the chat alone. `suggestions` also takes a function, returning the list or a promise of it, for questions that depend on the page or the visitor.
 
 A `ChatLauncher` opens on a link to `#chat` (the `hash` prop changes the fragment, `false` turns it off) and on a `kai:chat-open` event on `document`.
 
@@ -207,7 +207,7 @@ The panel has a fixed height, so it does not grow or shrink as the conversation 
 
 Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `labels.open` names the button and `labels.close` its close button, `labels.new`, `labels.expand` and `labels.collapse` name the two others, `icons` replaces the icons by name (`open`, `close`, `new`, `expand`, `collapse`, `send` and `stop`), and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
 
-`open` opens and closes the panel from your own button or after a navigation, and `onOpenChange(open)` tells you when the visitor does.
+`open` opens and closes the panel from your own button or after a navigation, and `onOpenChange({ open })` tells you when the visitor does.
 
 <ReadMore href="/llms/kayjs-ai-chat-launcher">What the launcher takes of `Chat`, how its panel opens, closes and keeps the conversation, and its sizes.</ReadMore>
 

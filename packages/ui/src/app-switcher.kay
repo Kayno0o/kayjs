@@ -55,7 +55,7 @@ const { id, apps, current, label = wording('ui.appSwitcher.label', 'Apps'), icon
   placement?: PopoverPlacement | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Opens the tiles in a new tab, or only those leaving the site with `'auto'`. They stay in the same tab by default, unlike the other components with link entries, as the apps are one place to the visitor. An app's own `newTab` wins.
   newTab?: NewTab | undefined
   // Replaces the text under a tile's icon: `@tile(app)`.
@@ -80,9 +80,9 @@ function focusOpened(open: boolean) {
   ;(all.find(link => link.hasAttribute('aria-current')) ?? all[0])?.focus()
 }
 
-function opened(open: boolean) {
+function opened({ open }: { open: boolean }) {
   focusOpened(open)
-  onOpenChange?.(open)
+  onOpenChange?.({ open })
 }
 
 function keyDown(event: KeyboardEvent) {

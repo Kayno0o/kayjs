@@ -5,5 +5,5 @@ import RowsField from '@kayjs/ui/rows-field.kay'
 const headers = signal([{ name: 'Cache-Control', value: 'no-store' }])
 ---
 .flex.flex-col.items-stretch.gap-2
-  RowsField(rows={headers()} columns={[{ key: 'name', label: 'Header' }, { key: 'value', label: 'Value' }]} label="Response headers" addLabel="Add header" onChange={headers.set})
+  RowsField(rows={headers()} columns={[{ key: 'name', label: 'Header' }, { key: 'value', label: 'Value' }]} label="Response headers" addLabel="Add header" onChange={({ rows }) => headers = rows})
   p.text-muted {headers().length} headers.

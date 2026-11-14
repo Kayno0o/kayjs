@@ -12,7 +12,7 @@ const zone = useEditorZone()
 ---
 FormField(label={label} hint={[hint, wording('cms.field.zone', 'Time in {zone}', { zone: zone() ?? 'UTC' })].filter(Boolean).join(' ')} issue={issue} required={required} group)
   .kcms-adorned
-    TextInput(type="datetime-local" aria-label={label} required={required} value={inputValue(value, zone())} onInput={next => onChange(storedValue(next ?? '', zone()))})
+    TextInput(type="datetime-local" aria-label={label} required={required} value={inputValue(value, zone())} onInput={({ value: next }) => onChange(storedValue(next ?? '', zone()))})
     Button(label={wording('cms.field.now', 'Now')} variant="inline" onClick={() => onChange(thisMinute())})
     if value !== '' && !required
       Button(label={wording('cms.field.clear', 'Clear')} variant="inline" onClick={() => onChange(undefined)})

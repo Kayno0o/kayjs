@@ -30,4 +30,4 @@ Opening the panel focuses the current tile. The arrow keys move between tiles, t
 
 ## Opened by the app
 
-`open` shows the panel when your code sets it, and `onOpenChange(open)` is called whenever it shows or hides. When you drive `open`, set your own value back in `onOpenChange`. Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button.
+`open` shows the panel when your code sets it, and `onOpenChange({ open })` is called whenever it shows or hides. When you drive `open`, set your own value back in `onOpenChange`. Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button.

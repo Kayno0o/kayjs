@@ -112,7 +112,7 @@ async function remove(row: EntryRow): Promise<void> {
     await refresh()
 }
 ---
-Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}', { collection: collection.name })} columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSort={sortBy} selectable={bulkable})
+Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}', { collection: collection.name })} columns={columns} rows={rows} rowKey={keyOf} sort={sort} serverSort onSortChange={({ sort: next }) => sortBy(next)} selectable={bulkable})
   @bulk(keys, clear)
     EntryBulk(collection={collection} rows={rows.filter(row => keys.includes(keyOf(row)))} actions={actions} clear={clear} denied={denied})
   @cell(row, column)
@@ -176,7 +176,7 @@ Table.kcms-entries(label={wording('cms.table.entries', 'Entries of {collection}'
         if actions.has('delete') && deniedFor(row).delete !== undefined
           Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={deniedFor(row).delete} size="sm" variant="ghost")
         else if actions.has('delete')
-          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={open => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={({ open }) => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry matches the search and the filter.')})

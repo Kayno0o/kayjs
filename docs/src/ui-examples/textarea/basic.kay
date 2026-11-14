@@ -8,8 +8,8 @@ const saved = signal('Pack the telescope.')
 .flex.max-w-sm.flex-col.gap-2
   Textarea(
     value={note()}
-    onInput={note.set}
-    onChange={saved.set}
+    onInput={({ value }) => note = value}
+    onChange={({ value }) => saved = value}
     rows={4}
     aria-label="Note"
   )

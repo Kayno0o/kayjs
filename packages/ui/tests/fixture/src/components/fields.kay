@@ -26,22 +26,22 @@ const roster = signal('Ada\nGrace')
 // A message being written, which a send clears while the box is focused.
 const draft = signal('')
 ---
-TextInput#name(value={name()} onInput={value => name = value} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
+TextInput#name(value={name()} onInput={({ value }) => name = value} onChange={({ value }) => onCommit(value)} onBlur={event => onLeave?.(event.currentTarget.id)})
 p#echo {name()}
-TextInput#amount(type="number" value={amount()} onInput={amount.set} onChange={next => onPicked?.(next)})
+TextInput#amount(type="number" value={amount()} onInput={({ value }) => amount = value} onChange={({ value }) => onPicked?.(value)})
 p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
 button#reset(onClick={() => amount = null}) Reset
 button#clear(onClick={() => name = ''}) Clear
-Select#planet(value="mars" busy options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
-Select#level(value={1} options={LEVELS} onChange={level})
-Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={pickKind})
+Select#planet(value="mars" busy options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={({ value }) => onPlanet(value)})
+Select#level(value={1} options={LEVELS} onChange={({ value }) => level(value)})
+Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={({ value }) => pickKind(value)})
 TextInput#plain(name="email" aria-label="Email")
-Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={value => roster = value.split('\n').map(line => line.trim()).filter(Boolean).join('\n')})
+Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={({ value }) => roster = value.split('\n').map(line => line.trim()).filter(Boolean).join('\n')})
 p#names {roster()}
-Textarea#draft(aria-label="Draft" value={draft()} onInput={draft.set})
+Textarea#draft(aria-label="Draft" value={draft()} onInput={({ value }) => draft = value})
 button#send(onClick={() => draft = ''}) Send
 button#restore(onClick={() => draft = 'Back'}) Restore
-Textarea#live(aria-label="Live" writeFocused value={draft()} onInput={draft.set})
+Textarea#live(aria-label="Live" writeFocused value={draft()} onInput={({ value }) => draft = value})
 form#filters(method="get" onSubmit={event => { event.preventDefault(); onFilter?.(String(new FormData(event.currentTarget).get('period'))) }})
   FormField(label="Period" size="sm")
     Select(name="period" value="" emptyOption="Any" submit options={[{ value: '7d', label: '7 days' }]})

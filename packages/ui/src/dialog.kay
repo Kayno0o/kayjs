@@ -63,7 +63,7 @@ const { open, trigger, title, label, heading, level = 2, size = 'md', bare = fal
   // Makes the close control a link to this URL, for a dialog open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the dialog with no island of its own.
   | { closeHref: string, onOpenChange?: undefined }
   // Called with `true` when `trigger` opens it and with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
-  | { closeHref?: string | undefined, onOpenChange?: ((open: boolean) => unknown) | undefined }
+  | { closeHref?: string | undefined, onOpenChange?: ((event: { open: boolean }) => unknown) | undefined }
 )>()
 
 // The state of a dialog the app leaves to the component: `open` wins when given. Every close, the guarded ones too, ends in `closed()`, which comes here.
@@ -78,7 +78,7 @@ function change(next: boolean) {
     inner = next
   }
 
-  onOpenChange?.(next)
+  onOpenChange?.({ open: next })
 }
 
 const opener = { 'onClick': () => change(true), 'aria-haspopup': 'dialog' } as const

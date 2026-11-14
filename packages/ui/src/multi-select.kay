@@ -77,7 +77,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   // The labels of values picked before any answer lists them, for a function `options`, keyed by the value's string; a value no answer or label names reads as itself.
   valueLabels?: Readonly<Record<string, string>> | undefined
   // Called with each answer of a function `options` and the text it was asked for, and with what it rejected with.
-  onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly MultiSelectOption<Value>[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // What the trigger reads once several are picked, `3 selected` by default.
   selectedLabel?: string | ((count: number) => string) | undefined
@@ -91,9 +91,9 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   placement?: PopoverPlacement | undefined
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
-  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { open: boolean }) => unknown) | undefined
   // Gets the picked options as a second argument, a value never loaded and without a `valueLabels` entry gets `{ value, label: String(value) }`, so `options` always lines up with the values.
-  onChange?: ((value: Value[], options: MultiSelectOption<Value>[]) => unknown) | undefined
+  onChange?: ((event: { value: Value[], options: MultiSelectOption<Value>[] }) => unknown) | undefined
 }>()
 
 // A control with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own; a function of options leaves them as the text they were posted as.
@@ -121,9 +121,9 @@ const seen = signal<readonly MultiSelectOption<Value>[]>([])
 // The text the answer in `found` is for, and whether the last ask was rejected.
 const { found, answered, failed, load, stale } = searchOptions<MultiSelectOption<Value>>(() => options, {
   minLength: () => minLength,
-  onLoad: (answer, text) => {
-    seen = [...seen().filter(option => !answer.some(entry => entry.value === option.value)), ...answer]
-    onLoad?.(answer, text)
+  onLoad: (loaded) => {
+    seen = [...seen().filter(option => !loaded.options.some(entry => entry.value === option.value)), ...loaded.options]
+    onLoad?.(loaded)
   },
   onError,
   label: 'MultiSelect',
@@ -176,7 +176,7 @@ function set(next: Value[]) {
   picked = next
   const known = pool()
 
-  onChange?.(next, next.map(one => known.find(option => option.value === one) ?? { value: one, label: String(one) }))
+  onChange?.({ value: next, options: next.map(one => known.find(option => option.value === one) ?? { value: one, label: String(one) }) })
 }
 
 // What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.
@@ -202,7 +202,7 @@ onFormReset(() => root, () => {
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
-function toggled(isOpen: boolean) {
+function toggled({ open: isOpen }: { open: boolean }) {
   opened = isOpen
 
   if (isOpen) {
@@ -214,7 +214,7 @@ function toggled(isOpen: boolean) {
     answered.set(undefined)
   }
 
-  onOpenChange?.(isOpen)
+  onOpenChange?.({ open: isOpen })
 }
 
 // From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between enabled options, which Tab would walk one by one.

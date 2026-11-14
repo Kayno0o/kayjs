@@ -26,7 +26,7 @@ export function markKind(href: string | undefined, selectable: boolean): MarkKin
 }
 
 // The marks of a chart a pointer or the keyboard is on, besides the active one the app may set: `active` wins when the app gives it, `null` being none.
-export function activeMarks(options: { active: () => number | null | undefined, onActive: () => ((index: number | null) => unknown) | undefined }) {
+export function activeMarks(options: { active: () => number | null | undefined, onActiveChange: () => ((event: { index: number | null }) => unknown) | undefined, onActive: () => ((index: number | null) => unknown) | undefined }) {
   const inside = signal<number | null>(null)
   const anchor = signal<{ clientX: number, clientY: number } | null>(null)
 
@@ -35,6 +35,7 @@ export function activeMarks(options: { active: () => number | null | undefined, 
       return
 
     inside.set(index)
+    void options.onActiveChange()?.({ index })
     void options.onActive()?.(index)
   }
 

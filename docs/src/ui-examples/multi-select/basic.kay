@@ -16,6 +16,6 @@ const picked = signal(['mars'])
     label="Planets"
     options={planets}
     value={picked()}
-    onChange={picked.set}
+    onChange={({ value }) => picked = value}
   )
   p.text-muted Picked: {picked().join(', ') || 'none'}.

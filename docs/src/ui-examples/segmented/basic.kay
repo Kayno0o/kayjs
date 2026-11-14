@@ -14,6 +14,6 @@ const period = signal('week')
     options={PERIODS}
     value={period()}
     label="Period"
-    onChange={period.set}
+    onChange={({ value }) => period = value}
   )
   p Showing one {period()}.

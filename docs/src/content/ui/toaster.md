@@ -18,7 +18,7 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 ## A second line, markup and what happened to it
 
-`description` adds a quieter line under the message, and `message` may be markup instead of a string. `onDismiss(reason)` is called once a toast has gone, with `timeout`, `user` (the close button or Escape), `action` (its button ran) or `api` (`dismissToast(id)`, or `toast.update`): `toast.info('Exported', { description: '12 rows', onDismiss: reason => track(reason) })`.
+`description` adds a quieter line under the message, and `message` may be markup instead of a string. `onDismiss({ reason })` is called once a toast has gone, with `timeout`, `user` (the close button or Escape), `action` (its button ran) or `api` (`dismissToast(id)`, or `toast.update`): `toast.info('Exported', { description: '12 rows', onDismiss: reason => track(reason) })`.
 
 ## Changing a toast that is open
 

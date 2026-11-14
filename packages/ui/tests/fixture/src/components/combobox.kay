@@ -9,12 +9,12 @@ const { options, onChange, onCreate, onInput, onLoad, onError, minLength, create
 form#form
   if wrap === 'group'
     FormField(label="Planet" group)
-      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate} onInput={onInput} onLoad={onLoad} onError={onError})
+      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={({ value, option }) => onChange?.(value, option)} onCreate={({ text }) => onCreate?.(text)} onInput={({ text }) => onInput?.(text)} onLoad={({ options, query }) => onLoad?.(options, query)} onError={onError})
   else if wrap === 'label'
     label Planet
-      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate} onInput={onInput} onLoad={onLoad} onError={onError})
+      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={({ value, option }) => onChange?.(value, option)} onCreate={({ text }) => onCreate?.(text)} onInput={({ text }) => onInput?.(text)} onLoad={({ options, query }) => onLoad?.(options, query)} onError={onError})
   else if field
     FormField(label="Planet")
-      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate} onInput={onInput} onLoad={onLoad} onError={onError})
+      Combobox#combo(name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={({ value, option }) => onChange?.(value, option)} onCreate={({ text }) => onCreate?.(text)} onInput={({ text }) => onInput?.(text)} onLoad={({ options, query }) => onLoad?.(options, query)} onError={onError})
   else
-    Combobox#combo(label="Planet" name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={onChange} onCreate={onCreate} onInput={onInput} onLoad={onLoad} onError={onError})
+    Combobox#combo(label="Planet" name="planet" options={options} create={create} createLabel={createLabel} minLength={minLength} value={value} valueLabel={valueLabel} onChange={({ value, option }) => onChange?.(value, option)} onCreate={({ text }) => onCreate?.(text)} onInput={({ text }) => onInput?.(text)} onLoad={({ options, query }) => onLoad?.(options, query)} onError={onError})

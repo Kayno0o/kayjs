@@ -23,9 +23,9 @@ const items: MenuEntry[] = [
   { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: () => onAction('delete') },
 ]
 ---
-RangeInput#range(label="Hours" min={0} max={24} onChange={onRange})
-MultiSelect(id="planets" label="Planets" name="planet" options={planets} onChange={pickPlanets})
-FileDrop#drop(accept="image/*, .svg" paste={paste} onFiles={files => onFiles(files.map(file => file.name))} onReject={files => onReject?.(files.map(file => file.name))})
+RangeInput#range(label="Hours" min={0} max={24} onChange={({ value }) => onRange(value)})
+MultiSelect(id="planets" label="Planets" name="planet" options={planets} onChange={({ value }) => pickPlanets(value)})
+FileDrop#drop(accept="image/*, .svg" paste={paste} onFiles={({ files }) => onFiles(files.map(file => file.name))} onReject={({ files }) => onReject?.(files.map(file => file.name))})
   @content(zone)
     button#pick(type="button" onClick={zone.open}) {zone.dragging() ? 'Drop it' : 'Pick'}
 Menu(items={items} label="Actions" icon="plus" class="row-actions")

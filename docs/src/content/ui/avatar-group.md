@@ -14,7 +14,7 @@ description: A row of overlapping avatars with a +N chip for the people past a l
 
 ## Data from a function
 
-`avatars` also takes a promise of the list or a function answering it, such as an action, asked in the browser: the group is `aria-busy` until the answer lands, and shows `failureLabel` with a retry button when it fails. `onLoad(people, query)` and `onError({ error, query })` mark each answer.
+`avatars` also takes a promise of the list or a function answering it, such as an action, asked in the browser: the group is `aria-busy` until the answer lands, and shows `failureLabel` with a retry button when it fails. `onLoad({ options, query })` and `onError({ error, query })` mark each answer.
 
 ## Your own markup
 

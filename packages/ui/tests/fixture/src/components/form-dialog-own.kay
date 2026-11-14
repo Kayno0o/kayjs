@@ -7,7 +7,7 @@ const { onOpenChange } = props<{ onOpenChange?: ((open: boolean) => unknown) | u
 
 const save = Object.assign(async () => 'ok', { pending: () => false, url: '/_kay/action/form/own' }) as unknown as Action<never, string>
 ---
-FormDialog(title="Own" action={save} submitLabel="Save" onOpenChange={onOpenChange})
+FormDialog(title="Own" action={save} submitLabel="Save" onOpenChange={({ open }) => onOpenChange?.(open)})
   @trigger(attributes)
     button#open({...attributes}) Open
   input(name="name" value="Ada")

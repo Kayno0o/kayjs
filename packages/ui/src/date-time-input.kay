@@ -23,7 +23,7 @@ const { value, min, max, name, form, disabled, onChange, ...rest } = props<Omit<
   form?: string | undefined
   disabled?: boolean | undefined
   // Called with the new instant in that form, or `''` once emptied, however it was set: typed or reset by a form.
-  onChange?: ((value: string) => unknown) | undefined
+  onChange?: ((event: { value: string }) => unknown) | undefined
 }>()
 
 // The visitor's zone is only known once the island runs, so the server renders the empty box carrying the name, and the hidden field posting the instant takes the name over.
@@ -49,14 +49,14 @@ effect(() => {
 
 const ref = fieldRef<HTMLInputElement>(element => box = element, rest.ref)
 
-function heard(text: string) {
+function heard({ value: text }: { value: string }) {
   const next = zonedInstant(text)
 
   if (sameInstant(next, current()))
     return
 
   current = next
-  onChange?.(next)
+  onChange?.({ value: next })
 }
 
 // A controlled box shows what its parent holds once the zone is known.

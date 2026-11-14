@@ -4,7 +4,7 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 <Demo name="combobox/basic" />
 
-`options` is a list of `{ value, label, description?, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange(value, option)` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate(text)`.
+`options` is a list of `{ value, label, description?, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange({ value, option })` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate({ text })`.
 
 Values are strings or numbers, as Select's are: `onChange` hands back the option's own type, so a numeric id stays a number, and the form posts it as a string.
 
@@ -19,12 +19,12 @@ Give `options` a function or a promise instead of a list. A function is called w
 <Demo name="combobox/remote" />
 
 ```kay
-Combobox(label="Customer" options={searchCustomers} value={customer()} valueLabel={customerName} onChange={customer.set} name="customer")
+Combobox(label="Customer" options={searchCustomers} value={customer()} valueLabel={customerName} onChange={({ value }) => customer = value} name="customer")
 ```
 
 A `value` a remote list holds no label for yet, such as the saved id of a customer, leaves the input empty while the value is still posted. Give `valueLabel` the text to show, and the loader is not asked for it when the input takes focus. A fixed list shows the value itself.
 
-`onInput` is called with the text on every edit of it. `onLoad` is called with the options a function answered and the text it was asked for, and `onError` with `{ error, query }`, what it rejected with and that text, while `failureLabel` still shows. Only the latest question is reported: an answer that arrives after a newer key press is dropped, and so is its failure.
+`onInput({ text })` is called with the text on every edit of it. `onLoad({ options, query })` is called with the options a function answered and the text it was asked for, and `onError` with `{ error, query }`, what it rejected with and that text, while `failureLabel` still shows. Only the latest question is reported: an answer that arrives after a newer key press is dropped, and so is its failure.
 
 ## Rows with more than a label
 
@@ -61,7 +61,7 @@ Enter picks the active row, Escape closes the list, even one with no rows, and, 
 
 ## Opened by the app
 
-`open` shows the list when your code sets it, and `onOpenChange(open)` is called whenever the list opens or closes: focus, typing, Escape, a pick or focus leaving. When you drive `open`, set your own value back in `onOpenChange`.
+`open` shows the list when your code sets it, and `onOpenChange({ open })` is called whenever the list opens or closes: focus, typing, Escape, a pick or focus leaving. When you drive `open`, set your own value back in `onOpenChange`.
 
 
 ## Size and invalid

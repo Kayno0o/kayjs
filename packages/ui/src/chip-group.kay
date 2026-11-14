@@ -37,7 +37,7 @@ const { options, value = NONE, label, showLabel = false, name, invalid, required
   retryLabel?: string | undefined
   failureLabel?: string | undefined
   // Called with each answer of a function or promise `options`, and with what it rejected with.
-  onLoad?: ((options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string) => unknown) | undefined
+  onLoad?: ((event: { options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string }) => unknown) | undefined
   onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The options picked to start with, in any order, none when left out; a group whose parent passes others follows them.
   value?: readonly Value[] | undefined
@@ -58,7 +58,7 @@ const { options, value = NONE, label, showLabel = false, name, invalid, required
   // A promise holds the group busy until it settles, and puts the previous pick back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Gets the picked options as a second argument, in the same order.
-  onChange?: ((value: Value[], options: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]) => unknown) | undefined
+  onChange?: ((event: { value: Value[], options: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] }) => unknown) | undefined
   // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
   option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
@@ -111,7 +111,7 @@ async function pick(next: Value[]) {
   picked = next
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
-  if (!(await changeAccepted('ChipGroup', () => onChange?.(next, list().filter(one => next.includes(one.value))), busy.set)) && synced === syncedBefore) {
+  if (!(await changeAccepted('ChipGroup', () => onChange?.({ value: next, options: list().filter(one => next.includes(one.value)) }), busy.set)) && synced === syncedBefore) {
     picked = before
     check(before)
   }

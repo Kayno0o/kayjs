@@ -8,4 +8,4 @@ const { source, calls } = props<{ source: OptionsSource<{ value: string, label: 
 const text = signal('')
 ---
 input#search(aria-label="Search" value={text()} onInput={event => text = event.currentTarget.value})
-Select#planet(options={source} query={text()} aria-label="Planet" onLoad={(options, query) => calls.push(`load ${query}:${options.length}`)} onError={failure => calls.push(`error ${failure.query}`)})
+Select#planet(options={source} query={text()} aria-label="Planet" onLoad={({ options, query }) => calls.push(`load ${query}:${options.length}`)} onError={failure => calls.push(`error ${failure.query}`)})

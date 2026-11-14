@@ -18,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActiveChange, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
   values: readonly (number | null)[]
   // Colours every bar; `accent` by default.
@@ -28,12 +28,14 @@ const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive,
   // One note per bar, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
   hints?: readonly (string | undefined)[] | undefined
   // Makes every bar a button handing back its index and value; with `href` too, a bar that has an address stays a link and a plain click goes to this.
-  onSelect?: ((mark: SparkMark) => unknown) | undefined
+  onSelect?: ((event: { item: SparkMark }) => unknown) | undefined
   // The address a bar links to, or `undefined` for none.
   href?: ((mark: SparkMark) => string | undefined) | undefined
   // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
   newTab?: NewTab | undefined
   // Hears the index of the bar the pointer or the focus is on, `null` when it leaves.
+  onActiveChange?: ((event: { index: number | null }) => unknown) | undefined
+  // @deprecated Since 1.105, `onActiveChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onActive?: ((index: number | null) => unknown) | undefined
   // The bar to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
@@ -48,7 +50,7 @@ const finite = (value: number | null): value is number => value !== null && Numb
 const largest = memo(() => Math.max(0, ...values.filter(finite)))
 
 const mark = (at: number): SparkMark => ({ index: at, value: values[at] ?? null })
-const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const marks = activeMarks({ active: () => active, onActiveChange: () => onActiveChange, onActive: () => onActive })
 const interactive = () => onSelect !== undefined || href !== undefined
 const name = (at: number) => hints?.[at] ?? String(values[at] ?? '-')
 
@@ -91,7 +93,7 @@ function pressed(event: MouseEvent, at: number) {
     return
 
   event.preventDefault()
-  void onSelect(mark(at))
+  void onSelect({ item: mark(at) })
 }
 
 // Each bar's height against the largest value; a reading that is not a finite number leaves a hairline.
@@ -114,7 +116,7 @@ else
           a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
             {bar(value, at)}
         else if onSelect
-          button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.({ item: mark(at) })} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
             {bar(value, at)}
         else
           span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})

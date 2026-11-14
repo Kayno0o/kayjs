@@ -30,7 +30,7 @@ When `value` is typed to allow `null`, `onChange` is typed to hear `null` too, w
 
 ## Options from an action
 
-`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad({ options, query })` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
 
 ## Async change
 

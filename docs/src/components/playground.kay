@@ -196,7 +196,7 @@ onCleanup(() => {
 .playground
   label.playground-input
     span Component
-    Textarea(rows={14} spellcheck={false} writeFocused value={source()} onInput={value => edit(value)})
+    Textarea(rows={14} spellcheck={false} writeFocused value={source()} onInput={({ value }) => edit(value)})
   .playground-result(aria-busy={loading() || !ready()})
     span Result
     if held()

@@ -6,9 +6,9 @@ description: A modal dialog driven by an open flag, with a title, a close button
 
 ## Open and close
 
-`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onOpenChange`. `onOpenChange(false)` runs however the dialog closed, Escape and a click outside included. Every disclosure takes `open` and `onOpenChange`.
+`open` shows the dialog as a modal. The parent owns it: set it to true to open, and back to false in `onOpenChange`. `onOpenChange({ open: false })` runs however the dialog closed, Escape and a click outside included. Every disclosure takes `open` and `onOpenChange`.
 
-Leave `open` out and the dialog keeps its own state, opened by a `@trigger` block that spreads the attributes it is handed. `onOpenChange` is then optional, and still called with `true` on opening and `false` on every close.
+Leave `open` out and the dialog keeps its own state, opened by a `@trigger` block that spreads the attributes it is handed. `onOpenChange` is then optional, and still called with `{ open: true }` on opening and `{ open: false }` on every close.
 
 ```kay
 Dialog(title="Rename")
@@ -39,7 +39,7 @@ Set `dirty` for other work the dialog must not drop, such as a request in flight
 
 ## Close button, links and parts
 
-The head line holds the title, the `@actions` block and a close button, named `Close` or by `closeLabel`. The button closes through `onOpenChange(false)`, and is disabled while `dirty`. `@header` draws the whole head line yourself and `@close` replaces the button alone.
+The head line holds the title, the `@actions` block and a close button, named `Close` or by `closeLabel`. The button closes through `onOpenChange({ open: false })`, and is disabled while `dirty`. `@header` draws the whole head line yourself and `@close` replaces the button alone.
 
 `closeHref` makes the close button a link, so a dialog open on the server closes with no JavaScript. With it `onOpenChange` is optional: leave it out and Escape follows the link too. `modal={false}` shows the dialog over the page without blocking it, open on the server, as SidePanel does.
 

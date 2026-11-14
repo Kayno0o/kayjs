@@ -5,7 +5,7 @@ import { safely } from './safely'
 export type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
 
 export interface AsyncRowsHooks<Row> {
-  onLoad?: ((rows: Row[]) => unknown) | undefined
+  onLoad?: ((event: { rows: Row[] }) => unknown) | undefined
   onError?: ((failure: { error: unknown }) => unknown) | undefined
 }
 
@@ -94,7 +94,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
     if (Array.isArray(answer)) {
       loaded.set(answer)
       loading.set(false)
-      safely(() => untrack(() => hooks.onLoad?.(answer)), 'kayjs-ui: a rows onLoad')
+      safely(() => untrack(() => hooks.onLoad?.({ rows: answer })), 'kayjs-ui: a rows onLoad')
 
       return
     }
@@ -109,7 +109,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
 
       loaded.set(rows)
       loading.set(false)
-      safely(() => untrack(() => hooks.onLoad?.(rows)), 'kayjs-ui: a rows onLoad')
+      safely(() => untrack(() => hooks.onLoad?.({ rows })), 'kayjs-ui: a rows onLoad')
     }
     catch (error) {
       if (mine !== request)

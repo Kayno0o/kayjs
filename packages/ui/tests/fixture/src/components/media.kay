@@ -22,13 +22,13 @@ const items: MediaItem[] = [
   { key: 3, kind: 'image', thumb: '/c-thumb.png', preview: '/c.png' },
 ]
 ---
-MediaGallery#gallery(items={items} onIndexChange={onIndexChange})
+MediaGallery#gallery(items={items} onIndexChange={({ index }) => onIndexChange(index)})
 ZoomPane#zoom(label="Map")
   // kay-allow unsized-image
   img(src="/map.png" alt="")
   input#zoom-field(aria-label="Note")
 button#preset(type="button" onClick={() => controlled = { x: 40, y: 20, w: 100, h: 50 }}) Preset
-ImageCropper#cropper(src="/photo.png" ratio={2} crop={controlled()} onCrop={onCrop} onCropEnd={onCropEnd} onError={onCropError})
+ImageCropper#cropper(src="/photo.png" ratio={2} crop={controlled()} onCrop={({ crop }) => onCrop(crop)} onCropEnd={({ crop }) => onCropEnd?.(crop)} onError={onCropError})
   @footer(reset)
     button#reset(type="button" onClick={reset}) Reset
 Masonry#masonry(items={tiles()} key={item => item})

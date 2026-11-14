@@ -117,11 +117,11 @@ const look = recipe({
   },
 })
 
-const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, plain = false, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, plain = false, sortable = true, serverSort = false, onSortChange, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, pageSize, pageSizes, page, pageParam = 'page', limitParam = 'limit', onPageChange, virtual = false, expandable = false, expanded, onOpenChange, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
-  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
+  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSortChange` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
   list?: InfiniteList<Row> | undefined
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
@@ -133,6 +133,8 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
+  onSortChange?: ((event: { sort: SortState }) => unknown) | undefined
+  // @deprecated Since 1.105, `onSortChange` hears one event object: `deprecated-ui-callbacks` writes the new name, and this one works until 1.108.
   onSort?: ((sort: SortState) => unknown) | undefined
   // Names the table for screen readers, as a caption only they see, and its scroll box when it scrolls, unless an `aria-label` names that already.
   label?: string | undefined
@@ -147,9 +149,9 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   // The keys of the columns hidden, replacing each column's `hidden`; a table whose parent passes another list follows it.
   hiddenColumns?: string[] | undefined
   // Called with the keys of the columns hidden each time the reader shows or hides one.
-  onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined
+  onHiddenColumnsChange?: ((event: { keys: string[] }) => unknown) | undefined
   // Called with whether the table now scrolls, when that changes: its box takes the focus then, to scroll by keyboard.
-  onScrollChange?: ((scrolls: boolean) => unknown) | undefined
+  onScrollChange?: ((event: { scrolls: boolean }) => unknown) | undefined
   // Draws the cells of the columns it covers, see `Column.cell`.
   cell?: Snippet<[row: Row, column: Column<Row>]> | undefined
   // Shown in place of the rows when there are none.
@@ -178,7 +180,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   // The keys of the rows picked to start from, as `rowKey` reads them; a table whose parent passes another list follows it. A key whose row is no longer in `rows` leaves the selection.
   selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, as `selected` takes them, and the rows they stand for, both in the rows' order, each time the selection changes, a row leaving `rows` included.
-  onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
+  onSelectedChange?: ((event: { keys: RowKeyValue<Row, Key>[], rows: Row[] }) => unknown) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
   // Names the select-all box, and the column's header for screen readers.
@@ -200,7 +202,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   // The keys of the rows open to start from, as `rowKey` reads them; a table whose parent passes another list follows it.
   expanded?: RowKeyValue<Row, Key>[] | undefined
   // Called with a row's key and whether it is now open, each time a toggle is used.
-  onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+  onOpenChange?: ((event: { key: RowKeyValue<Row, Key>, open: boolean }) => unknown) | undefined
 
   // What an open row shows under it.
   detail?: Snippet<[row: Row]> | undefined
@@ -216,13 +218,13 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   failureLabel?: string | undefined
   retryLabel?: string | undefined
   // Called with the rows each time a `rows` function or promise answers.
-  onLoad?: ((rows: Row[]) => unknown) | undefined
+  onLoad?: ((event: { rows: Row[] }) => unknown) | undefined
   // Called with `{ error }` when a `rows` function or promise rejects.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Makes each row a link: the address of a row, or undefined for one that leads nowhere. The first cell holds an anchor stretched over the row, named `openRowLabel`, so a real link opens in a new tab and a click on the row follows it, while the checkbox, the toggle and the links and buttons of the cells stay clickable above it.
   rowHref?: ((row: Row) => string | undefined) | undefined
   // Makes each row a button, or hears the click of a link row (call `event.preventDefault()` to follow the link yourself).
-  onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined
+  onRowClick?: ((event: { row: Row, event: MouseEvent }) => unknown) | undefined
   // Draws the rows a page at a time, this many to a page, with a Pagination under them: its summary beside the pages, and `pageSizes` as links that change the size. The pages count the rows the filter keeps, and a sort or a typed filter starts again from the first, which `onPageChange` hears. The page and a size picked from `pageSizes` are kept in the address, under `pageParam` and `limitParam`, so the server draws the page a link or a shared URL names and the pager's links open it. `pageSizes` does nothing without a `pageSize`. Not for a `list` or a `virtual` table, which page or window their rows themselves.
   pageSize?: number | undefined
   // The sizes to offer under the rows of a table with a `pageSize`, such as `[10, 25, 50]`; the one on screen is marked, and one the address names is taken only when listed here.
@@ -233,7 +235,7 @@ const { columns: given, label, header, footer, columnToggle = false, columnsLabe
   pageParam?: string | undefined
   limitParam?: string | undefined
   // Called with the page and the size after each change to either, a click on a page or a size or a sort or a filter starting again from the first page; the page restarts at 1 when the size changes.
-  onPageChange?: ((page: number, size: number) => unknown) | undefined
+  onPageChange?: ((event: { page: number, size: number }) => unknown) | undefined
   // Names a row's link or button: `Open <first column's text>`.
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
@@ -340,7 +342,7 @@ function measure() {
     return
 
   scrolls = now
-  onScrollChange?.(now)
+  onScrollChange?.({ scrolls: now })
 }
 
 onMount(() => {
@@ -366,7 +368,7 @@ const showColumn = uses('columnToggle')
     if (hiddenColumns === undefined)
       hiddenKeys = next
 
-    onHiddenColumnsChange?.(next)
+    onHiddenColumnsChange?.({ keys: next })
   }
   : undefined
 
@@ -376,6 +378,7 @@ function toggle(column: Column<Row>) {
   current = next
   keptKey?.set(next.key)
   keptDirection?.set(next.direction)
+  onSortChange?.({ sort: next })
   onSort?.(next)
 }
 
@@ -410,7 +413,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         label(part="field")
           span.kui-label-text(part="filterLabel") {field.label}
           if field.options
-            Select(value={search!.values[index]!()} options={field.options} emptyOption onChange={search!.values[index]!.set})
+            Select(value={search!.values[index]!()} options={field.options} emptyOption onChange={({ value }) => search!.values[index]!.set(value)})
           else
             input.kui-field-input(part="filterInput" type="search" value={search!.values[index]!()} autocomplete="off" onInput={event => search!.values[index]!.set(event.currentTarget.value)})
     p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (search!.typed() ? counted(kept().length) : '')}
@@ -422,9 +425,9 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             Button({...attributes} label={columnsLabel} variant="ghost" size="sm")
           for column of columns() key={column.key}
             if column.header
-              Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={on => showColumn!(column.key, on)})
+              Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={({ checked }) => showColumn!(column.key, checked)})
       if uses('selectable') && selectable
-        Checkbox(label={selectAllLabel} checked={select!.allChosen()} indeterminate={select!.someChosen() && !select!.allChosen()} disabled={select!.visible().length === 0} onChange={select!.pickAll})
+        Checkbox(label={selectAllLabel} checked={select!.allChosen()} indeterminate={select!.someChosen() && !select!.allChosen()} disabled={select!.visible().length === 0} onChange={({ checked }) => select!.pickAll(checked)})
         p(part="selected" role="status") {select!.chosen().length > 0 ? countChosen(select!.chosen().length) : ''}
         if select!.chosen().length > 0 && bulk
           div(part="bulk")
@@ -485,7 +488,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           if uses('selectable') && selectable
             td(part="selectCell")
               div(part="cellBody")
-                Checkbox(checked={select!.chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => select!.pick(rowKeyOf(row, rowKey), on)})
+                Checkbox(checked={select!.chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={({ checked }) => select!.pick(rowKeyOf(row, rowKey), checked)})
           for column, columnIndex of shownColumns() key={column.key}
             td(part="cell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
               if narrow === 'stack' && column.header
@@ -497,9 +500,9 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   | {cellText(row, column)}
               if (uses('rowHref') || uses('onRowClick')) && columnIndex === 0 && linked()
                 if rowHref?.(row) then href
-                  a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
+                  a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.({ row, event })})
                 else if onRowClick
-                  button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
+                  button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.({ row, event })})
         if uses('expandable') && expandable && detail && expansion!.openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={expansion!.detailId(row)})
             td(part="detailCell" colspan={columnCount()})
@@ -539,6 +542,6 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
               else
                 | {column.footer ?? ''}
   if uses('pageSize') && pager!.paged() && !skeleton()
-    Pagination(part="pager" page={pager!.pageShown()} total={shown().length} pageSize={pager!.sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={pager!.goTo} onSize={pager!.resize})
+    Pagination(part="pager" page={pager!.pageShown()} total={shown().length} pageSize={pager!.sizeNow()} sizes={pageSizes} param={pageParam} limitParam={limitParam} onPage={({ page }) => pager!.goTo(page)} onSize={({ size }) => pager!.resize(size)})
   if uses('list') && list
     LoadMore(list={list})

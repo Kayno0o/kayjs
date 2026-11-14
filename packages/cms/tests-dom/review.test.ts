@@ -32,7 +32,7 @@ interface Given {
 
 // The review controls of an entry, with the steps they call recorded.
 async function open(given: Given) {
-  const steps = { onSubmit: mock(() => undefined), onApprove: mock(() => undefined), onSendBack: mock(async (_note: string) => true) }
+  const steps = { onSubmit: mock(() => undefined), onApprove: mock(() => undefined), onSendBack: mock(async (_event: { note: string }) => true) }
 
   mounted = await mountComponent(EntryReview, { review: undefined, draft: true, dirty: false, busy: false, ...given, ...steps })
   await settle()
@@ -139,7 +139,7 @@ test('Send back asks for a note and sends it', async () => {
   expect(send.disabled).toBe(false)
   send.click()
   await settle()
-  expect(steps.onSendBack).toHaveBeenCalledWith('Shorter title')
+  expect(steps.onSendBack).toHaveBeenCalledWith({ note: 'Shorter title' })
 })
 
 test('a draft sent back is badged Sent back, and its writer submits it again', async () => {
