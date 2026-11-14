@@ -1103,7 +1103,7 @@ describe('kay build checks the project first', () => {
 
   it('lints what the prerendered pages say of one another: a page nothing reaches, a redirect chain, a canonical to a redirect', async () => {
     const config = (lints: string) => `export default { site: 'https://example.com', favicon: false, seo: { description: 'The site' }, redirects: { '/old': '/mid', '/mid': '/about' }, lints: ${lints} }\n`
-    const page = (title: string, body: string, head = '') => `--- server\nexport const page = { prerender: true${body.startsWith('//') ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${head}${body.replace(/^\/\//, '')}`
+    const page = (title: string, body: string, head = '') => `--- server\nexport const page = { prerender: true${body.startsWith('//') ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${head}${body.replace(/^\/\//, '')}`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
       'kay.config.ts': config('{ \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }'),
@@ -1155,7 +1155,7 @@ describe('kay build checks the project first', () => {
   }, 60_000)
 
   it('reads the links of a site under a base with trailing slashes, and leaves the orphan lint to a site whose param pages it cannot all see', async () => {
-    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
+    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
       'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' } }\n',
@@ -1180,7 +1180,7 @@ describe('kay build checks the project first', () => {
   }, 60_000)
 
   it('keeps the orphan lint on a site mounting a library with pages rendered per request, which link within the library alone', async () => {
-    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', sitemap: false' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
+    const page = (title: string, body: string, unlisted = false) => `--- server\nexport const page = { prerender: true${unlisted ? ', seo: { sitemap: false }' : ''} }\n---\nhead\n  title ${title}\n  meta(name="description" content="${title} page")\n${body}`
     const files = {
       'tsconfig.json': tsconfig,
       'kay.config.ts': 'export default { site: \'https://example.com\', base: \'/docs\', trailingSlash: \'always\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\', \'unsized-share-image\': \'allow\' }, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/auth\' } }] }\n',

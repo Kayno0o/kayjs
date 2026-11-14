@@ -1,3 +1,3 @@
 import { defineConfig } from 'kay/server'
 
-export default defineConfig({ requireGuards: false })
+export default defineConfig({ guards: { default: 'open' } })

@@ -54,7 +54,7 @@ describe('a guards or layouts setting kay cannot read', () => {
   })
 
   it('is reported in a layout, at the setting', () => {
-    const source = '--- server\nconst open = false\nexport const page = { noindex: true, guards: open }\n---\nslot'
+    const source = '--- server\nconst open = false\nexport const page = { seo: { noindex: true }, guards: open }\n---\nslot'
     const [found] = compileKay(source, '_layout.kay', { check: true }).diagnostics
 
     expect(found?.message).toBe(SETTING('guards'))
@@ -68,7 +68,7 @@ describe('a guards or layouts setting kay cannot read', () => {
   it.each([
     'export const page = { guards: false }',
     'export const page = { guards: true, layouts: false }',
-    'const flag = true\nexport const page = { noindex: flag }',
+    'const flag = true\nexport const page = { prerender: flag }',
   ])('is not reported for %s', (fence) => {
     expect(messages(`--- server\n${fence}\n---\np x`)).toEqual([])
   })
