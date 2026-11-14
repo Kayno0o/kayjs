@@ -2636,7 +2636,7 @@ interface AppStore extends StoreBase
   vitals?: VitalsStore | undefined
 
 [./server] background
-function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): KayPlugin
+function background(work: (input: undefined, ctx: JobContext<unknown>) => unknown, options?: BackgroundOptions): KayPlugin
 
 [./server] BackgroundOptions
 interface BackgroundOptions
@@ -2735,7 +2735,9 @@ function defineEnv<Spec extends EnvSchema>(declared: Spec, source?: Record<strin
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
 
 [./server] diskFiles
-function diskFiles(dir?: string, hooks?: FileHooks): FileStore
+/** @deprecated `diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it. */
+function diskFiles(options?: (FileHooks & { dir?: string | undefined; }) | undefined): FileStore
+function diskFiles(dir: string, hooks?: FileHooks | undefined): FileStore
 
 [./server] editedEntry
 function editedEntry(request: Request, collection: string, slug: string): boolean
@@ -2851,7 +2853,14 @@ interface Inbox
 function inlineScriptHashes(options?: ScriptHashOptions): string[]
 
 [./server] JobContext
-interface JobContext<Progress>
+interface JobContext<Progress = unknown>
+  job: JobRef<Progress>
+  locale: string
+  log: Log
+  signal: AbortSignal
+
+[./server] JobRef
+interface JobRef<Progress>
   attempts: number
   id: string
   progress: (value: Progress) => void
@@ -3354,7 +3363,7 @@ interface PutOptions
   replace?: string | undefined
 
 [./server] queue
-function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress>
+function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, ctx: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress>
 
 [./server] Queue
 type Queue<Payload, Progress = unknown> = KayPlugin & {
@@ -3370,17 +3379,19 @@ interface QueueOptions<Payload>
   attempts?: number | undefined
   backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
+  enabled?: boolean | undefined
   failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   lazy?: boolean | undefined
   live?: ((payload: Payload, job: LiveJob) => unknown) | boolean | undefined
-  lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */ lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; }> | undefined
   onRetry?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
   onSuccess?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
   redact?: ((payload: Payload) => Payload) | undefined
   store?: JobStore | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] rateKey
 function rateKey(address: string): string
@@ -3583,14 +3594,26 @@ function s3Files(options?: S3Options & { publicUrl?: string | undefined; } & Fil
 function safePath(root: string, name: string): string | undefined
 
 [./server] schedule
-function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): KayPlugin
-function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): KayPlugin
+/** @deprecated `schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it. */
+function schedule<const Every extends Duration>(options: ScheduleEvery<Every>, jobs: Jobs): KayPlugin
+function schedule<const Cron extends string>(options: ScheduleCron<Cron>, jobs: Jobs): KayPlugin
 function schedule<const Table extends Record<string, Jobs>>(table: Table & {
   readonly [Key in keyof Table & string]: WhenOf<Key>;
 }, options?: ScheduleOptions | undefined): KayPlugin
+function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): KayPlugin
+function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): KayPlugin
+
+[./server] ScheduleCron
+type ScheduleCron<Cron extends string = string> = { cron: Cron & CronSchedule<Cron>, every?: never } & ScheduleOptions
+
+[./server] ScheduleEvery
+type ScheduleEvery<Every extends Duration = Duration> = { every: Every & PositiveDuration<Every>, cron?: never } & ScheduleEveryOptions
 
 [./server] ScheduleEveryOptions
 type ScheduleEveryOptions = Omit<ScheduleOptions, 'timeZone'>
+
+[./server] ScheduleJob
+type ScheduleJob = (run: ScheduleRun, ctx: JobContext) => unknown
 
 [./server] ScheduleOptions
 interface ScheduleOptions
@@ -3603,6 +3626,11 @@ interface ScheduleOptions
   store?: JobStore | undefined
   timeZone?: string | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+
+[./server] ScheduleRun
+interface ScheduleRun
+  boot: boolean
+  schedule: string
 
 [./server] ScriptHashOptions
 interface ScriptHashOptions
@@ -3849,31 +3877,35 @@ interface WorkChallengeOptions
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] workflow
-function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
+function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (input: Input, ctx: WorkflowContext<Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
 
 [./server] Workflow
 type Workflow<Input, Known extends Events> = KayPlugin & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string> // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped. send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean> // Where the run stands; undefined once it completed, was cancelled or never started. status: (id: string) => Promise<WorkflowStatus | undefined> // Ends a run: one not running goes at once, one running stops at its next step. Resolves with whether there was one. cancel: (id: string) => Promise<boolean> // Runs every run whose time has come, here and now, as `drain` of a queue does. drain: () => Promise<number> }
 
+[./server] WorkflowContext
+interface WorkflowContext<Known extends Events = Events> extends JobContext
+  job: JobRef<unknown>
+  locale: string
+  log: Log
+  signal: AbortSignal
+  step: WorkflowStep<Known>
+
 [./server] WorkflowOptions
-interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl'>
+interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'timeout' | 'lostAfter' | 'enabled' | 'idlePoll' | 'failedTtl'>
   attempts?: number | undefined
   backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
+  enabled?: boolean | undefined
   failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated `timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it. */ lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; input: Input; attempts: number; error: unknown; }> | undefined
   onRetry?: Hook<{ id: string; input: Input; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; input: Input; }> | undefined
   onSuccess?: Hook<{ id: string; input: Input; }> | undefined
   store?: JobStore | undefined
-
-[./server] WorkflowRun
-interface WorkflowRun<Input, Known extends Events>
-  id: string
-  input: Input
-  step: WorkflowStep<Known>
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] WorkflowStatus
 interface WorkflowStatus
@@ -4334,7 +4366,7 @@ interface TestSite
   from?: string;
 }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   runJobs: () => Promise<number>
-  runSchedule: (which?: ((signal: AbortSignal) => unknown) | number | string | undefined) => Promise<number>
+  runSchedule: (which?: ScheduleJob | number | string | undefined) => Promise<number>
   signInAs: (who: SignInFields) => Promise<SignedIn>
   signOut: () => void
   sitemap: (path?: string | undefined) => Promise<string[]>

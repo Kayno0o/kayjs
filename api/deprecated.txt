@@ -10,9 +10,13 @@ cms [./test] cmsTest	1.108.0	deprecated-test-helpers	`test(site)`, the same help
 kay [./compiler] CompileResult.why	2.0.0	-	Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. Removed in 2.0.0. No lint: a field of the compile result that tools read, nothing in an app's source.
 kay [./mount] Mounted	1.108.0	deprecated-import-path	Import `Mounted` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./mount] mount	1.108.0	deprecated-import-path	Import `mount` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] WorkflowOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
+kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it.
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
+kay [./server] schedule	1.108	deprecated-schedule-call	`schedule({ cron }, job)` or `schedule({ every }, job)`. Removed in 1.108; `deprecated-schedule-call` rewrites it.
 kay [./server] sqliteCache	1.108.0	deprecated-import-path	Import `sqliteCache` from `kay/cache`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./test] TestSite.refusal	1.108.0	deprecated-test-helpers	`site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
 kay [./test] TestSite.socketRefusal	1.108.0	deprecated-test-helpers	`site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it.
