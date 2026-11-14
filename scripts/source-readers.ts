@@ -8,6 +8,7 @@ export const SOURCE_CHANGE = /^(?:src|packages\/[^/]+\/src)\/.*\.(?:ts|kay)$/
 export const SOURCE_READERS = [
   'tests/api.test.ts',
   'tests/browsers.test.ts',
+  'tests/callbacks.test.ts',
   'tests/docs.test.ts',
   'tests/errors.test.ts',
   'tests/kept-pages.test.ts',
@@ -52,10 +53,10 @@ export const FIXTURE_WALK = /[`'"]tests\/fixtures(?:\/\*[^`'"]*)?[`'"]|findKayFi
 
 // Tests reading these folders as files, which an import graph does not show.
 export const READERS: [RegExp, string[]][] = [
-  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts', 'tests/api.test.ts', 'tests/packages.test.ts', 'tests/pack-links.test.ts', 'tests/privacy-storage.test.ts', 'tests/ui.test.ts']],
+  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts', 'tests/api.test.ts', 'tests/packages.test.ts', 'tests/pack-links.test.ts', 'tests/privacy-storage.test.ts', 'tests/ui.test.ts', 'tests/callbacks.test.ts']],
   [/^docs\//, ['tests/docs.test.ts', 'tests/examples.test.ts']],
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
-  [/^packages\/[^/]+\/llms(?:\/|\.txt$)/, ['tests/api.test.ts', 'tests/pack-links.test.ts']],
+  [/^packages\/[^/]+\/llms(?:\/|\.txt$)/, ['tests/api.test.ts', 'tests/pack-links.test.ts', 'tests/callbacks.test.ts']],
   [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
   // Tests globbing the kay and library sources.
   [SOURCE_CHANGE, SOURCE_READERS],
