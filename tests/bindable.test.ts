@@ -34,8 +34,8 @@ describe('bind: on a component', () => {
   it('hands on the default of an optional Bindable prop, and writes the props object', () => {
     const middle = '---\nimport { type Bindable } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst { open = false } = props<{ open?: Bindable<boolean> | undefined }>()\n---\nToggle(bind:open={open})\n'
 
-    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return ((__props.open !== undefined ? __props.open : __default_0())) }, set "open"(kayValue) { __props["open"] = kayValue } }')
-    expect(compile(middle, 'html').tsx).toContain('{ "open": ((__props.open !== undefined ? __props.open : __default_0())) }')
+    expect(compile(middle, 'dom').tsx).toContain('{ get "open"() { return ((__props.open !== undefined ? __props.open : false)) }, set "open"(kayValue) { __props["open"] = kayValue } }')
+    expect(compile(middle, 'html').tsx).toContain('{ "open": ((__props.open !== undefined ? __props.open : false)) }')
   })
 
   it('passes on the prop through the name of the props object', () => {

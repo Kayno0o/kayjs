@@ -181,21 +181,23 @@ describe('props', () => {
   })
 
   it('writes a literal default where the prop is read, and keeps a holder only for what has an identity or runs', () => {
-    const source = '---\nconst { size = \'md\', n = -1, ok = true, none = null, text = `a`, list = [1], run = `a${1}` } = props<{ size?: string, n?: number, ok?: boolean, none?: null, text?: string, list?: number[], run?: string }>()\n---\np {size} {n} {ok} {none} {text} {list} {run}'
+    const source = '---\nconst { size = \'md\', \'aria-label\': aria = \'x\', label: caption = \'y\', n = -1, ok = true, none = null, text = `a`, list = [1], run = `a${1}` } = props<{ size?: string, \'aria-label\'?: string, label?: string, n?: number, ok?: boolean, none?: null, text?: string, list?: number[], run?: string }>()\n---\np {size} {aria} {caption} {n} {ok} {none} {text} {list} {run}'
 
     for (const output of ['dom', 'html'] as const) {
       const code = compileKay(source, 'test.kay', { output }).tsx
 
       expect(code).toContain('__props.size : \'md\')')
+      expect(code).toContain('__props["aria-label"] !== undefined ? __props["aria-label"] : \'x\'')
+      expect(code).toContain('__props.label !== undefined ? __props.label : \'y\'')
       expect(code).toContain('__props.n : -1)')
       expect(code).toContain('__props.ok : true)')
       expect(code).toContain('__props.none : null)')
       expect(code).toContain('__props.text : "a")')
-      expect(code).toContain(`__props.list : ${defaultName(5)}())`)
-      expect(code).toContain(`__props.run : ${defaultName(6)}())`)
+      expect(code).toContain(`__props.list : ${defaultName(7)}())`)
+      expect(code).toContain(`__props.run : ${defaultName(8)}())`)
       expect(code).not.toContain(defaultName(0))
-      expect(code).not.toContain(defaultName(4))
-      expect(code).toContain(`${defaultName(5)}_made`)
+      expect(code).not.toContain(defaultName(6))
+      expect(code).toContain(`${defaultName(7)}_made`)
     }
 
     // Type checking keeps every holder, as it types the default through it.
