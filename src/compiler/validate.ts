@@ -9,6 +9,7 @@ import { WIDGET_ROLES } from './aria'
 import { childBlocks, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { componentBindProblem } from './bound-props'
 import { deprecatedAiLabels } from './deprecated-ai-labels'
+import { deprecatedImage } from './deprecated-image'
 import { deprecatedUiProps, libraryComponents } from './deprecated-ui-props'
 import { modifierProblems } from './event-modifiers'
 import { kayCtxImport } from './script-shared'
@@ -457,6 +458,9 @@ class Validator {
       deprecatedUiProps(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ui-props', message, details))
       deprecatedAiLabels(element, library, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-ai-labels', message, details))
     }
+
+    if (this.options.check && !element.component && element.name === 'img')
+      deprecatedImage(element, span => this.text(span), (span, message, details) => this.lint(span, 'deprecated-image-options', message, details))
 
     if (this.options.check && !element.component)
       this.accessibility(element)

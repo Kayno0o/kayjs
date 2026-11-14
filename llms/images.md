@@ -15,14 +15,13 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 
 ### Crop an image to a shape
 
-`image(src, { aspect })` from `kay/image` cuts the image to that shape on the server, its middle kept:
+`aspect` on an `img` cuts the image to that shape on the server, its middle kept:
 
 ```kay
 ---
-import { image } from 'kay/image'
 import hero from '../hero.jpg'
 ---
-img({...image(hero, { aspect: '1/1' })} alt="The workshop")
+img(src={hero} aspect="1/1" alt="The workshop")
 ```
 
 ### Set the image social sites show
@@ -107,9 +106,10 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - An image shows its mean color until it loads, `style="background-color:#c86432"` on the `img`, about 35 bytes and no script: kay reads it once per source image, at build for an imported image and for a relative image in a collection entry's Markdown body (kept in the entry's cache, and in the server bundle an executable embeds), and for an image of `images.dirs` or `images.remote` the first time the route reads that version of the file, so a page rendered before then has none.
 - An image with any transparency, even a corner, gets no color (it would show through), nor do an SVG, an animated GIF, an AVIF from `images.dirs` or `images.remote`, a stored file whose key holds none (`files.url(key)`: `files.put` keeps the colour in the key of a still, opaque image, [Stored files](files.md)) or an image `images.resolve` looks up, which may be private.
 - The color stays behind the loaded image, hidden by it, so `object-fit: contain` shows it beside the picture; an image an island creates in the browser has none, and the server's is left as it is when the island hydrates.
-- `no-placeholder` on an `img` (`img(src={hero} no-placeholder alt="")`, also after a spread, where it drops a `style` the spread brings as well), `image(src, { placeholder: false })` and an `img` with a `style` of its own, which is kept alone, leave the color out; `images: { placeholder: false }` in `kay.config.ts` does for every image, reading none for its color at build, and so does a site `security.csp` or `security.reportOnly` whose `style-src` (or `style-src-attr`) lacks `'unsafe-inline'`, as the browser would drop the attribute: a page's own `security` is not read for this.
-- `image(src, options)` from `kay/image` gives the same props to spread, for an element that is no `img` or an image kay did not import: `img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight, sizes: '100vw' })} alt="")`.
-- `image(hero, { aspect: '1/1' })` cuts the image to that shape, its middle kept, each variant cut on the server so a phone loads none of the pixels cut away, instead of CSS `object-fit: cover`: `width` and `height` are the largest box of that shape inside the image, and the variants stop at its width.
+- `placeholder={false}` on an `img` (`img(src={hero} placeholder={false} alt="")`, also after a spread, where it drops a `style` the spread brings as well), `image(src, { placeholder: false })` and an `img` with a `style` of its own, which is kept alone, leave the color out; `images: { placeholder: false }` in `kay.config.ts` does for every image, reading none for its color at build, and so does a site `security.csp` or `security.reportOnly` whose `style-src` (or `style-src-attr`) lacks `'unsafe-inline'`, as the browser would drop the attribute: a page's own `security` is not read for this.
+- An `img` takes the options of its imported or stored image as attributes: `sizes`, `aspect`, `quality` and `placeholder={false}`, written beside its `src`, `img(src={hero} sizes="50vw" aspect="1/1" quality={90} alt="")`; none is written to the page. Before 1.105 they went through `image(src, options)` from `kay/image`, `img({...image(hero, { aspect: '1/1' })})` and `no-placeholder`, which `kay upgrade` rewrites (`deprecated-image-options`).
+- `image(src, options)` from `kay/image` gives the same props to spread, for an element that is no `img` or an image kay did not import, which an `img` leaves as it is and so needs its `width` and `height` given to `image()`: `img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight, sizes: '100vw' })} alt="")`.
+- `aspect="1/1"` on an `img` (`image(hero, { aspect: '1/1' })` for a spread) cuts the image to that shape, its middle kept, each variant cut on the server so a phone loads none of the pixels cut away, instead of CSS `object-fit: cover`: `width` and `height` are the largest box of that shape inside the image, and the variants stop at its width.
 - The ratio is two whole numbers from 1 to 100, read in lowest terms.
 - It must be one `images.aspects` lists, `['1/1', '3/2', '2/3', '4/3', '3/4', '16/9', '9/16']` by default, since each one adds a variant per width the route makes on request.
 - An image that cannot be resized, such as an SVG, keeps its `src` alone.
@@ -136,7 +136,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 Images stored at runtime, images looked up by `images.resolve` and `images.guard`, and images on another host (`images.remote`) are in [Images uploaded at runtime and from other hosts](images-runtime-and-remote.md#runtime-and-remote-images).
 
 - `images.widths` in `kay.config.ts` sets the ladder, `[320, 640, 960, 1280, 1920, 2560]` by default, the default stops at its last width (add `3840` for screens that need it), a list of your own also gets each image's own size: whole numbers from 1 to 16384, at most 16, in any order; each is a file per image, so a short ladder builds fewer, and the route makes only those, plus the multiples of 16 below the first for an image drawn at a fixed width. `src` is the widest at or under 1280. A list that is empty, too long or holds anything else fails the boot.
-- `image(src, { quality: 90 })` sets the WebP quality of that image's variants over `images.quality`, its AVIF one the same step from `images.avif`'s quality (90 gives WebP 90 and AVIF 60 at the defaults), a multiple of 5 from 5 to 100, so the files one image turns into stay bounded; each quality an image is asked for is a file per width of its own (`?q=90` on the route, which refuses any other).
+- `quality={90}` on an `img` (`image(src, { quality: 90 })` for a spread) sets the WebP quality of that image's variants over `images.quality`, its AVIF one the same step from `images.avif`'s quality (90 gives WebP 90 and AVIF 60 at the defaults), a multiple of 5 from 5 to 100, so the files one image turns into stay bounded; each quality an image is asked for is a file per width of its own (`?q=90` on the route, which refuses any other).
 - `images.ttl` in `kay.config.ts` sets how long an unused variant stays on disk, `'30d'` by default.
 - `images.maxDensity` in `kay.config.ts` sets the most pixels per CSS pixel an image loads at, 2 by default, at least 1; `Infinity` leaves the browser's choice.
 - `kay check` warns (`unsized-image`) of an `img` with neither `width` and `height` nor a spread, such as `image()`'s, that may carry them; an imported raster image given as `src={name}` and a stored file's `src={files.url(key)}` alone are sized and left alone; an SVG, a path, a value from data, a `url()` with more joined to it, an image with its own `srcset` or one with only one of the two sizes still warns. An `img` whose static classes or `style` reserve its box is left alone: an `aspect-*` class (not `aspect-auto`) with a `width`/`height` attribute or a `w-*`/`h-*` class, `w-*` with `h-*`, `size-*`, or `aspect-ratio` in `style`; a variant such as `sm:aspect-video` does not count, and a class bound as an expression is not read, so it still warns.

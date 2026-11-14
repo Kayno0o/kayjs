@@ -1466,9 +1466,35 @@ describe('image placeholder', () => {
     expect(compiled('img(src={hero} no-placeholder alt="")', 'dom').tsx).toContain('KayImage(KayN0_0, (hero), false)')
   })
 
+  it('reads the options of an img as attributes, and never writes them', () => {
+    expect(compiled('img(src={hero} placeholder={false} alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, undefined, false)')
+    expect(compiled('img(src={hero} aspect="1/1" alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, undefined, undefined, "1/1")')
+    expect(compiled('img(src={hero} sizes="50vw" aspect={shape} quality={90} alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, "50vw", undefined, (shape), (90))')
+    expect(compiled('img(src={hero} placeholder={show} alt="")', 'html').tsx).toContain('KayImageAttributes((hero), false, undefined, (show))')
+    expect(compiled('img(src={hero} aspect="16/9" quality={85} alt="")', 'dom').tsx).toContain('KayImage(KayN0_0, (hero), false, undefined, "16/9", (85))')
+
+    for (const output of ['html', 'dom'] as const) {
+      const result = compiled('img(src={hero} aspect="1/1" quality={90} placeholder={false} alt="")', output)
+
+      expect(result.diagnostics).toEqual([])
+      expect(result.tsx).not.toContain('"aspect":')
+      expect(result.tsx).not.toContain('aspect=')
+    }
+
+    expect(errors(page('img(src={hero} aspect="1/1" quality={90} placeholder={false} alt="")'))).toEqual([])
+  })
+
+  it('unsets the style a spread brings for `placeholder={false}` as for `no-placeholder`', () => {
+    expect(compiled('img({...image(hero)} placeholder={false} alt="")', 'html').tsx).toContain('{ "style": undefined, "alt": "" }')
+  })
+
   it('unsets the style a spread brings for `no-placeholder` after it', () => {
     expect(compiled('img({...image(hero)} no-placeholder alt="")', 'html').tsx).toContain('{ "style": undefined, "alt": "" }')
     expect(compiled('img({...image(hero)} alt="")', 'html').tsx).not.toContain('"style"')
+  })
+
+  it('still reads the 1.104 attribute, and the lint rewrites it', () => {
+    expect(compileKay(page('img(src={hero} no-placeholder alt="")'), 'test.kay', { check: true }).diagnostics.map(one => one.code)).toContain('deprecated-image-options')
   })
 
   it('type-checks the attribute as any hyphenated one', () => {

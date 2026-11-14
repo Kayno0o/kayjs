@@ -274,15 +274,16 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 
 Every image a template or a collection entry's Markdown writes loads lazily and decodes off the main thread, unless it says otherwise. Give the hero image above the fold `loading="eager"` or `fetchpriority="high"`, so it does not show late.
 
-`image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element.
+`aspect` on an `img` cuts the variants to a shape instead of relying on `object-fit`. `sizes` and `quality` sit beside it.
 
 ```kay
 ---
-import { image } from 'kay/image'
 import hero from '../hero.jpg'
 ---
-img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
+img(src={hero} aspect="16/9" sizes="100vw" alt="The workshop")
 ```
+
+`image(hero, { aspect: '16/9' })` from `kay/image` gives the same as props to spread, for an element that is no `img`.
 
 ### A color while an image loads
 
@@ -296,10 +297,10 @@ An image with any transparency gets no color, as it would show through. Neither 
 ---
 import hero from '../hero.jpg'
 ---
-img(src={hero} no-placeholder alt="The workshop")
+img(src={hero} placeholder={false} alt="The workshop")
 ```
 
-`image(hero, { placeholder: false })` does the same for a spread, and an `img` with a `style` of its own keeps it. `images: { placeholder: false }` turns the colors off everywhere, and no image is read for its color at build. A content security policy that does not allow inline styles, `security.reportOnly` included, turns them off too, since the browser would drop them. Put after a spread, `no-placeholder` also drops a `style` the spread brings.
+`image(hero, { placeholder: false })` does the same for a spread, and an `img` with a `style` of its own keeps it. `images: { placeholder: false }` turns the colors off everywhere, and no image is read for its color at build. A content security policy that does not allow inline styles, `security.reportOnly` included, turns them off too, since the browser would drop them. Put after a spread, `placeholder={false}` also drops a `style` the spread brings.
 
 ### Density and shapes
 
@@ -317,7 +318,7 @@ export default defineConfig({
 
 An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `images.widths: [320, 960, 1920, 3840]`. `images.widths` sets another list, which also gets the image's own size: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
-`image(photo, { quality: 90 })` encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too; `images.webp: { quality }` sets the WebP variants alone, as `images.avif` does the AVIF ones. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
+`quality={90}` on an `img` (`image(photo, { quality: 90 })` for a spread) encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too; `images.webp: { quality }` sets the WebP variants alone, as `images.avif` does the AVIF ones. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 
 ```ts
 export default defineConfig({

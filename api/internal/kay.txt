@@ -438,7 +438,7 @@ function within<T>(parent: Node, value: T): T
 function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void
 
 [./dom-image] image
-function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
+function image(element: Element, src: unknown, sized: boolean, sizes?: unknown, aspect?: unknown, quality?: unknown): void
 
 [./dom-loop] loop
 function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T, index: number) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
@@ -524,7 +524,7 @@ interface Html
   t: string
 
 [./html] imageAttributes
-function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: boolean | undefined): string
+function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: unknown, aspect?: unknown, quality?: unknown): string
 
 [./html] innerMarkup
 function innerMarkup(value: unknown): string

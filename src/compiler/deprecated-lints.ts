@@ -222,6 +222,14 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(7_500_000)}',
     right: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(\'7500000ms\')}',
   },
+  'deprecated-image-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: 'The options of an `img` written the old way, as attributes since 1.105 like every other option of the image: `no-placeholder` is `placeholder={false}`, and `img({...image(hero, { aspect: \'1/1\', sizes: \'100vw\' })})` is `img(src={hero} aspect="1/1" sizes="100vw")`, `image()` staying for an element that is no `img`. The old forms work until 1.108. The fix rewrites the attribute, and the spread when it is the only one, the `src` and the options of the call are written in the call itself and the `img` writes none of them; a call with another shape is reported with no fix.',
+    wrong: '---\nimport hero from \'./hero.jpg\'\n---\nimg(src={hero} no-placeholder alt="The workshop")',
+    right: '---\nimport hero from \'./hero.jpg\'\n---\nimg(src={hero} placeholder={false} alt="The workshop")',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

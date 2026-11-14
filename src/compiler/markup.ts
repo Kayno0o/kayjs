@@ -1,5 +1,6 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode } from './ast'
+import type { ImageOptionAttributes } from './image-attributes'
 import type { CodeBuilder } from './mapping'
 import type { BindingPlan, ElementShape } from './plan'
 import { resolveClasses } from '../runtime/class-table'
@@ -9,6 +10,7 @@ import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE
 import { addBoundWrites, calledByBinds, changeOf } from './bound-props'
 import { addHandler } from './event-modifiers'
 import { decodeEntities, isFunctionAt } from './expression'
+import { IMAGE_OPTIONS, imageOptions, NO_PLACEHOLDER, placeholderOff, writeImageArguments } from './image-attributes'
 import { contentOf } from './items'
 import { PROPS } from './names'
 import { addGroupChecked, bindingOf, classMergeOf, formDefaultsOf, groupValue, shapeOf, shorthandClass, staticAttributeText, valueBoundBy, writesAttribute } from './plan'
@@ -24,8 +26,7 @@ const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
 // The attributes naming URLs of the site, which a path from its root in goes under its base.
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
-// The attribute of an `img` that leaves out the color it shows until it loads.
-const NO_PLACEHOLDER = 'no-placeholder'
+
 // A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
 const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
@@ -129,7 +130,7 @@ export type PlannedKind
   // The `style` attribute, written as text or an expression, with the `style:prop` values after it.
     | { kind: 'style', expression: Span | undefined, text: string | undefined, props: StyleProp[] }
   // An `img` source, which loads the size the image shows at.
-    | { kind: 'image', expression: Span, sized: boolean, placeholder: boolean }
+    | { kind: 'image', expression: Span, sized: boolean, placeholder: boolean, options: ImageOptionAttributes }
   // A `select`'s value, which picks its option.
     | { kind: 'selected', expression: Span }
     | { kind: 'binding', binding: BindingPlan }
@@ -246,7 +247,7 @@ export abstract class TemplateWriter {
       }
 
       // Read below with the image's source, and never written.
-      if (name === 'img' && attributeName === NO_PLACEHOLDER)
+      if (name === 'img' && (attributeName === NO_PLACEHOLDER || IMAGE_OPTIONS.has(attributeName)))
         continue
 
       // Read by `currentLink` on the server, and never written, a repeat of it included.
@@ -303,7 +304,9 @@ export abstract class TemplateWriter {
       }
       // An imported image loads the size it shows at, unless the template writes its own `srcset`.
       else if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
-        add({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: !this.named(element, 'style') && !this.named(element, NO_PLACEHOLDER) })
+        const { options, colour } = imageOptions(element, span => this.source(span))
+
+        add({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height'), placeholder: colour, options })
       }
       else {
         add({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute.expression === shape.action?.expression })
@@ -520,9 +523,10 @@ export abstract class TemplateWriter {
 
       const name = this.source(attribute.name)
 
-      // Takes the color a spread brings off the image, which the attributes after it cannot unset.
-      if (element.name === 'img' && name === NO_PLACEHOLDER) {
-        entry('style', () => b.add('undefined'), false)
+      if (element.name === 'img' && (name === NO_PLACEHOLDER || IMAGE_OPTIONS.has(name))) {
+        // Takes the color a spread brings off the image, which the attributes after it cannot unset.
+        if (name === NO_PLACEHOLDER || placeholderOff(attribute, span => this.source(span)))
+          entry('style', () => b.add('undefined'), false)
 
         continue
       }
@@ -841,11 +845,8 @@ export abstract class TemplateWriter {
     return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && attribute.kind !== 'boolean' && this.source(attribute.name) === 'sizes')
   }
 
-  protected sizesArgument(sizes: NamedAttribute | undefined): void {
-    if (sizes?.kind === 'static')
-      this.b.add(`, ${JSON.stringify(decodeEntities(sizes.text))}`)
-    else if (sizes?.kind === 'expression')
-      this.b.add(', (').addSource(sizes.expression).add(')')
+  protected imageArguments(plan: ElementPlan, attribute: Extract<PlannedAttribute, { kind: 'image' }>, server: boolean): void {
+    writeImageArguments(this.b, plan.sizes, attribute.options, attribute.placeholder, server)
   }
 
   protected named(element: ElementNode, name: string): boolean {

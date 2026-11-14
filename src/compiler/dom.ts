@@ -520,7 +520,7 @@ export class DomTemplate extends TemplateWriter {
           case 'image':
             own.push((variable) => {
               b.add(`KayEffect(() => KayImage(${variable(node)}, (`).addSource(attribute.expression).add(`), ${attribute.sized}`)
-              this.sizesArgument(plan.sizes)
+              this.imageArguments(plan, attribute, false)
               b.add('));')
             })
 

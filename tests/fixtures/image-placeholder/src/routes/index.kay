@@ -16,7 +16,7 @@ img.clear(src={clear} alt="Clear")
 img.motion(src={motion} alt="Motion")
 // kay-allow unsized-image
 img.icon(src={icon} alt="Icon")
-img.off(src={photo} no-placeholder alt="Off")
+img.off(src={photo} placeholder={false} alt="Off")
 img.styled(src={photo} style="border: 0" alt="Styled")
 img.optout({...image(photo, { placeholder: false })} alt="Optout")
 img.styledspread({...image(photo)} style="border: 0" alt="Styled spread")

@@ -656,11 +656,7 @@ export class HtmlTemplate extends TemplateWriter {
         case 'image':
           markup.dynamic(() => {
             b.add(`${helperName('imageAttributes')}((`).addSource(attribute.expression).add(`), ${attribute.sized}`)
-            this.sizesArgument(plan.sizes)
-
-            if (!attribute.placeholder)
-              b.add(`${plan.sizes ? '' : ', undefined'}, false`)
-
+            this.imageArguments(plan, attribute, true)
             b.add(')')
           })
 

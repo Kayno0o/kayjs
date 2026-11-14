@@ -490,14 +490,11 @@ function splitSizes(sizes: string): string[] {
 }
 
 // What `img(src={hero})` takes for an imported or stored image: its variants, its `sizes` capped, its size unless the template gives one, and the color it shows until it loads unless `placeholder` is false. Any other `src` goes as it is, `sizes` too.
-export function imageSource(src: unknown, sized: boolean, sizesAttribute?: unknown, placeholder?: boolean): ImageProps | { src: unknown, sizes?: unknown } {
+export function imageSource(src: unknown, sized: boolean, sizesAttribute?: unknown, placeholder?: unknown, aspect?: unknown, quality?: unknown): ImageProps | { src: unknown, sizes?: unknown } {
   if (typeof src !== 'string' || !(sizes.has(src) || storedSize(src)))
     return sizesAttribute == null ? { src } : { src, sizes: sizesAttribute }
 
-  const props = image(src, sizesAttribute == null ? {} : { sizes: String(sizesAttribute) })
-
-  if (typeof KAY_BROWSER === 'undefined' && placeholder === false)
-    delete props.style
+  const props = image(src, { ...sizesAttribute != null && { sizes: String(sizesAttribute) }, ...aspect != null && { aspect: String(aspect) }, ...quality != null && { quality: Number(quality) }, ...placeholder === false && { placeholder: false } })
 
   if (sized) {
     delete props.width

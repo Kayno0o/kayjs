@@ -198,7 +198,7 @@ interface EnumeratedAttributes {
   button: { type?: Keyword<'button' | 'submit' | 'reset'>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
   form: { autocomplete?: Autofill, method?: FormMethod, enctype?: FormEncoding, encoding?: FormEncoding, target?: BrowsingContext }
   iframe: { loading?: Keyword<'lazy' | 'eager'>, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
-  img: { loading?: Keyword<'lazy' | 'eager'>, decoding?: Keyword<'sync' | 'async' | 'auto'>, crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  img: { aspect?: string, quality?: number, placeholder?: boolean, loading?: Keyword<'lazy' | 'eager'>, decoding?: Keyword<'sync' | 'async' | 'auto'>, crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   input: { autocomplete?: Autofill, type?: Keyword<typeof INPUT_TYPES[number]>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
   link: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   ol: { type?: Keyword<'1' | 'a' | 'A' | 'i' | 'I'> | 1 }
