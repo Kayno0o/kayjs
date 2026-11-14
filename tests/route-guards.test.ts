@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { falseKeys, ownGuards, unreadSettings } from '../src/server/route-settings'
 import { scanEndpoints, scanRoutes } from '../src/server/routes'
+import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -177,6 +178,54 @@ describe('reading the guards of a route from its source', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('guards the scan cannot see in the source', () => {
+  const root = async (files: Record<string, string>) => {
+    const dir = await scratchDir('route-guards-unseen-')
+
+    await Promise.all(Object.entries({ 'lib/keys.ts': KEYS, ...files }).map(async ([file, text]) => Bun.write(join(dir, file), text)))
+
+    return dir
+  }
+
+  it('refuses a page whose settings are typed, never serves it with none of its guards', async () => {
+    const dir = await root({ 'routes/index.kay': '--- server\nimport type { PageSettings } from \'kay\'\nimport { needsKey } from \'../lib/keys\'\n\nexport const page: PageSettings = { guards: needsKey }\n---\np secret\n' })
+
+    try {
+      const app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
+
+      expect((await app.handle(new Request('http://localhost/'))).status).toBe(500)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('stops the boot on an endpoint or an API module whose guards are held in a variable', async () => {
+    const endpoint = await root({ 'routes/feed.json.ts': 'import { needsKey } from \'../lib/keys\'\n\nconst settings = { guards: needsKey }\nexport const page = settings\n\nexport function GET() {\n  return \'x\'\n}\n' })
+    const module = await root({ 'api/notes.ts': 'import { api } from \'kay/server\'\nimport { needsKey } from \'../lib/keys\'\n\nconst options = { guards: needsKey }\n\nexport default api(options).get(\'/\', () => [])\n' })
+
+    try {
+      await expect(pages({ root: endpoint, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
+      await expect(pages({ root: module, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })).rejects.toThrow('are not written where kay reads them')
+    }
+    finally {
+      await Promise.all([endpoint, module].map(async dir => rm(dir, { recursive: true, force: true })))
+    }
+  })
+
+  it('refuses to export a page that lists guards, as for one a _guard.ts covers', async () => {
+    const routes = join(await root({ 'routes/index.kay': PAGE('guards: needsKey', 'h1 Home').replace('../../lib', '../lib') }), 'routes')
+    const build = await scratchBuild({ dirs: { routes } })
+
+    try {
+      await expect(build.prerender({ dirs: { routes }, requireGuards: false }, { exportAll: true })).rejects.toThrow('a guard covers it')
+    }
+    finally {
+      await build.remove()
     }
   })
 })

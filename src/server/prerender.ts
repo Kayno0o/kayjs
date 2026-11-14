@@ -27,6 +27,7 @@ import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readMan
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { guardRequirement, requiredBy } from './guard-requirement'
+import { refuseUndeclared } from './guards'
 import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
@@ -596,6 +597,8 @@ function guardedPage(route: Route, required: GuardRequirement): boolean {
 
 // What only a server can do: a guard decides per request, and an action takes a post.
 function refuseServerOnly(route: Route, module: Record<string, unknown>, required: GuardRequirement): void {
+  refuseUndeclared(route.file, (module.page as { guards?: unknown } | undefined)?.guards, route.guards.some(guard => guard.own === true))
+
   if (route.guards.length > 0)
     throw new KayError('export-guard', 'kay: a guard covers it, and only a server can run one per request')
 

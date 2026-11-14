@@ -40,7 +40,7 @@ import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
 import { FLASH_COOKIE, flashForOther, flashName, flashPath, handedOverFlash, readFlash } from './flash'
 import { guardRuns } from './guard-runs'
-import { runGuards } from './guards'
+import { importChecked, runGuards } from './guards'
 import { DEFAULT_LANG } from './i18n'
 import { inLiveReads, retryForViewer } from './live'
 import { warnAboutLoads } from './load-budget'
@@ -1011,7 +1011,7 @@ async function importAll(files: string[], options: RenderOptions): Promise<PageM
   let modules = chainModules.get(files)
 
   if (!modules)
-    chainModules.set(files, modules = await Promise.all(files.map(async file => importModule<PageModule>(file))))
+    chainModules.set(files, modules = await Promise.all(files.map(async file => importChecked<PageModule>(file))))
 
   return modules
 }

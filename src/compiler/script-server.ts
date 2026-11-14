@@ -14,7 +14,7 @@ import { splitFence } from './script-split'
 import { traverse, walkScope } from './walk'
 
 // The values a page's `guards` may hold besides a literal `true` or `false`: a guard, a list or `{ load }`.
-const GUARD_VALUES = new Set(['Identifier', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'CallExpression', 'MemberExpression', 'ObjectExpression'])
+const GUARD_VALUES = new Set(['Identifier', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'CallExpression', 'MemberExpression', 'ObjectExpression', 'TSAsExpression', 'TSSatisfiesExpression', 'AwaitExpression'])
 
 export interface ServerData {
   name: string
@@ -194,7 +194,7 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
         }
 
         // The server reads `false` of these two from the source, so a value held in a variable would keep the guards and layouts with no message; `guards` may also be a guard, a list or `{ load }`, which its module holds.
-        if ((key === 'guards' || key === 'layouts') && !LITERAL_SETTING.test(text(property)) && !(key === 'guards' && GUARD_VALUES.has(property.value.type)))
+        if ((key === 'guards' || key === 'layouts') && !LITERAL_SETTING.test(text(property)) && !(key === 'guards' && GUARD_VALUES.has(property.value.type) && !(property.value.type === 'Identifier' && property.value.name === 'undefined')))
           analysis.diagnostics.push({ ...shift(property.value), ...unreadSettingReport(key) })
 
         settings.set(key, { key: shift(property.key), value: shift(property.value) })

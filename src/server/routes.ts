@@ -495,9 +495,13 @@ function settingsRead(source: string): Set<string> {
   return found
 }
 
+function listsGuards(file: string, read: LayoutsRead): boolean {
+  return setsFalse(file, OWN_GUARDS, read)
+}
+
 // The `_guard.ts` files of a directory, then the guards the file lists itself, which run after them.
 function withOwn(guards: GuardFile[], file: string, special: SpecialPages, read: LayoutsRead): GuardFile[] {
-  return setsFalse(file, OWN_GUARDS, read) ? [...guards, { file, special, own: true }] : guards
+  return listsGuards(file, read) ? [...guards, { file, special, own: true }] : guards
 }
 
 // The guards a layout's actions run, its own directory's and above whichever page it wraps; a library's are open, as its pages are.

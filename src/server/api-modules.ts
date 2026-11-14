@@ -180,7 +180,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath
 // The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module. A module setting `guards: false` runs none and leaves them as they are.
 export function sharedGuards(modules: ApiModule[]): string[] {
   const files = (module: ApiModule) => module.guards.filter(guard => guard.own !== true)
-  const [first, ...rest] = modules.filter(module => module.open !== true || module.guards.length > 0)
+  const [first, ...rest] = modules.filter(module => module.open !== true || files(module).length > 0)
   const shared: string[] = []
 
   for (const [index, guard] of first === undefined ? [] : files(first).entries()) {

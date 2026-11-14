@@ -31,7 +31,7 @@ import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflig
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from './cross-site'
 import { streamReporters } from './event-stream'
 import { refusedFields, validated } from './field-errors'
-import { keepOwnGuards, loadGuard, requiredGuards } from './guards'
+import { keepOwnGuards, loadApiGuards, requiredGuards } from './guards'
 import { handlerTiming } from './handler-timing'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -163,7 +163,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
     }
 
-    const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file, own }) => loadGuard({ file, special: {}, ...own && { own } }))), module, {}, options.requireGuards)
+    const guards = requiredGuards(await loadApiGuards(module, instance), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
     app.group(module.mount, (group) => {

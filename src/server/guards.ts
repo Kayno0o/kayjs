@@ -16,6 +16,33 @@ export function keepOwnGuards(instance: object, option: unknown): void {
     Object.defineProperty(instance, API_GUARDS, { value: option })
 }
 
+// The files whose scan found `guards` of their own in the source, which is where a route's guards are decided.
+const declared = new Set<string>()
+
+// A module holding guards the scan did not find would serve its route with none of them, such as a settings object that is no literal in the file, so it stops the request instead.
+export function refuseUndeclared(file: string, option: unknown, found: boolean): void {
+  if (option !== undefined && typeof option !== 'boolean' && !found)
+    throw new KayError('route-invalid', `kay: the guards in ${file} are not written where kay reads them, so none would run: set \`guards\` in the object literal of \`export const page = { ... }\` or of \`api({ ... })\` in the file itself`)
+}
+
+// A page module as the server imports it, refused when it holds guards the scan never saw.
+export async function importChecked<Module>(file: string): Promise<Module> {
+  const module = await importModule<Module>(file)
+
+  refuseUndeclared(file, (module as { page?: { guards?: unknown } }).page?.guards, declared.has(file))
+
+  return module
+}
+
+// The guards an API module runs: those of its directories, then the `api({ guards })` the instance keeps.
+export async function loadApiGuards(module: { file: string, guards: { file: string, own?: true | undefined }[] }, instance: object): Promise<LoadedGuard[]> {
+  const option = (instance as { [API_GUARDS]?: unknown })[API_GUARDS]
+
+  refuseUndeclared(module.file, option, module.guards.some(guard => guard.own === true))
+
+  return Promise.all(module.guards.map(async ({ file, own }) => own === true ? ownGuard({ file, special: {}, own }, () => option) : loadGuard({ file, special: {} })))
+}
+
 export interface LoadedGuard extends GuardFile {
   check: Guard
 }
@@ -51,8 +78,11 @@ export function requiredGuards(guards: LoadedGuard[], route: { file: string, ope
 }
 
 export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {
-  if (guard.own === true)
-    return ownGuard(guard)
+  if (guard.own === true) {
+    declared.add(guard.file)
+
+    return ownGuard(guard, async () => (await importModule<{ page?: { guards?: unknown } }>(guard.file)).page?.guards)
+  }
 
   const check = (await importModule<{ default?: unknown }>(guard.file)).default
 
@@ -79,20 +109,19 @@ export async function runGuards(guards: LoadedGuard[], ctx: GuardContext): Promi
   return undefined
 }
 
-// The `guards` a module lists itself, `export const page = { guards }` or `api({ guards })`, run after the files above it, each reading what the ones before it returned in `ctx.guard`. The module is imported when the first request asks, as its page is, and the list is built once per value it holds.
-function ownGuard(guard: GuardFile): LoadedGuard {
+// The `guards` a module lists itself, `export const page = { guards }` or `api({ guards })`, run after the files above it, each reading what the ones before it returned in `ctx.guard`. A page's module is imported when the first request asks, and the list is built once per value it holds.
+function ownGuard(guard: GuardFile, read: () => unknown): LoadedGuard {
   let given: unknown
   let list: Guard[] = []
 
   return {
     ...guard,
     async check(ctx) {
-      const module = await importModule<{ page?: { guards?: unknown }, default?: { [API_GUARDS]?: unknown } }>(guard.file)
-      const option = module.page?.guards ?? module.default?.[API_GUARDS]
+      const option = await read()
 
       if (option !== given) {
         if (!isGuardOption(option))
-          throw new KayError('route-invalid', `kay: the guards in ${guard.file} take a guard, a list of guards or { load } returning one; \`false\` skips the guards above and is read from the source as a literal`)
+          throw new KayError('route-invalid', `kay: the guards in ${guard.file} take a guard, a non-empty list of guards or { load } returning one; \`false\` skips the guards above and is read from the source as a literal`)
 
         given = option
         list = guardList(option)

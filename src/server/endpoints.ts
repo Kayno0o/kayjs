@@ -21,7 +21,7 @@ import { cookieJar } from './cookies'
 import { corsAdmits, corsRule, grantedByKay, preflight, withCors } from './cors'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from './cross-site'
 import { allowedVerbs, ENDPOINT_VERBS, isEndpointVerb } from './endpoint-verbs'
-import { loadGuard, requiredGuards } from './guards'
+import { loadGuard, refuseUndeclared, requiredGuards } from './guards'
 import { handlerTiming } from './handler-timing'
 import { answeringRequest } from './log'
 import { pageSetting } from './page-settings'
@@ -137,6 +137,9 @@ async function loadEndpoint(endpoint: Endpoint, required: GuardRequirement | und
     throw new KayError('route-invalid', `kay: ${endpoint.file} must export a handler for a method: ${ENDPOINT_VERBS.slice(0, -1).join(', ')} or ${ENDPOINT_VERBS.at(-1)}, as in export function GET(ctx) { return 'text' }; a route with its own Elysia plugin is an API module`)
 
   const settings = (module.page ?? {}) as EndpointSettings
+
+  refuseUndeclared(endpoint.file, settings.guards, endpoint.guards.some(guard => guard.own === true))
+
   const place = endpointPath(endpoint)
   const limits = [settings.rateLimit ?? []].flat().map((limit, index) => {
     const name = index === 0 ? place : `${place}#${index}`
