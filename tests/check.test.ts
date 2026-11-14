@@ -1529,7 +1529,7 @@ describe.concurrent('kay check, edge cases', () => {
     const page = [
       '---',
       'import { signal } from \'kay\'',
-      'import Panel from \'../Panel.kay\'',
+      'import Panel from \'./Panel.kay\'',
       '',
       'const open = signal(false)',
       'const count = signal(0)',
@@ -1546,7 +1546,8 @@ describe.concurrent('kay check, edge cases', () => {
       '',
     ].join('\n')
 
-    const root = await scratchProject({ 'src/Panel.kay': panel, 'src/routes/index.kay': page })
+    // A component, as a plain page holding signals is an island by mistake.
+    const root = await scratchProject({ 'src/Panel.kay': panel, 'src/Binds.kay': page })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code])).toEqual([[12, 'TS2322'], [12, 'TS2345'], [13, 'TS2345'], [14, 'TS2349'], [14, 'TS2339'], [15, 'TS2322'], [15, 'TS2345']])
