@@ -1,6 +1,6 @@
 import type { Feature } from '../src/new'
-import { describe, expect, it } from 'bun:test'
 import { dirname, resolve } from 'node:path'
+import { describe, expect, it } from 'bun:test'
 import { compile } from 'tailwindcss'
 import { PRESETS, projectFiles } from '../src/new'
 
@@ -41,7 +41,7 @@ describe('the starter', () => {
     const compiler = await compile(files['src/app.css']!, {
       base: root,
       loadStylesheet: async (id, base) => {
-        const path = id === 'tailwindcss' ? Bun.resolveSync('tailwindcss/index.css', root) : id.startsWith('.') ? resolve(base, id) : Bun.resolveSync(id, root)
+        const path = id.startsWith('.') ? resolve(base, id) : Bun.resolveSync(id === 'tailwindcss' ? 'tailwindcss/index.css' : id, root)
 
         return { path, base: dirname(path), content: await Bun.file(path).text() }
       },
