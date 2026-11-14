@@ -14,7 +14,7 @@ import './admin.css'
 const SCREENS_OF_CONTENT = /\/(?:collections|new)\//
 
 // The screens are the CMS's own: none of the app's layouts above wraps them, so the editor sees no header, nav or footer of the site, and none of its pages is indexed.
-export const page = { layouts: false, noindex: true }
+export const page = { layouts: false, seo: { noindex: true } }
 
 const { prefix } = settings()
 const logo = adminLogo(look.logo)

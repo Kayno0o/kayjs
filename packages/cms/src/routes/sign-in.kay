@@ -11,7 +11,7 @@ import { SESSION_COOKIE } from '../password'
 import { settings } from '../settings'
 
 // The one screen an anonymous visitor may open: the guard is the sign-in's own.
-export const page = { guards: false, noindex: true, sitemap: false }
+export const page = { guards: false, seo: { noindex: true, sitemap: false } }
 
 export const signIn = action(s.Object({
   password: s.String({ maxLength: 500 }),
