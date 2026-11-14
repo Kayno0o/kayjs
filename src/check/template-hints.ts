@@ -43,6 +43,8 @@ const UPPERCASE_METHODS = new Set(['"GET"', '"POST"', '"DIALOG"'])
 const KEYWORD_ALIAS = /^\w+<(.*)>$/
 const NAME_AT = /^[\w:-]+(?==)/
 const TAG_NAME = /^[\w$.:-]+$/
+const RICH_KEY_TYPE = /^Argument of type '[^']*' is not assignable to parameter of type '(?:\{ key: )?KeysOf</
+const RICH_CALL = /\bT\(\s*$/
 const NO_OVERLOAD = /^No overload matches this call\.\n {2}The last overload gave the following error\.\n {4}([\s\S]*)$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
@@ -470,9 +472,27 @@ export function lastOverload(diagnostic: TsgoDiagnostic, source: string, span: S
   if (found === null || span === undefined)
     return diagnostic
 
-  const line = source.slice(source.lastIndexOf('\n', span.start - 1) + 1).trimStart()
+  const lineStart = source.lastIndexOf('\n', span.start - 1) + 1
+  const line = source.slice(lineStart).trimStart()
+  const before = source.slice(lineStart, span.start)
+  // An error inside a `{...}` of the call is a call of its own, which keeps its overloads.
+  const nested = before.split('{').length !== before.split('}').length
 
-  return line.startsWith('@') || COMPONENT_CALL.test(line) ? { ...diagnostic, code: ASSIGNABILITY, message: found[1]!.replaceAll(/\n {2}/g, '\n') } : diagnostic
+  return !nested && (line.startsWith('@') || COMPONENT_CALL.test(line)) ? { ...diagnostic, code: ASSIGNABILITY, message: found[1]!.replaceAll(/\n {2}/g, '\n') } : diagnostic
+}
+
+// What `T('key')` and `T(id, values)` print of the props form's key type, `KeysOf<{...}>` with the whole catalog inlined, said in a line: the key is the first argument and a literal, and the values follow it.
+export function richCallHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined): TemplateHint | undefined {
+  if (span === undefined || diagnostic.code !== ARGUMENT || !RICH_KEY_TYPE.test(diagnostic.message) || !RICH_CALL.test(source.slice(0, span.start)))
+    return undefined
+
+  const props = diagnostic.message.includes('{ key:')
+
+  return {
+    span,
+    message: props ? '`T` needs the values of its message' : '`T` takes the key of a message as a literal',
+    help: props ? 'call it as `T(\'intro\', { name, about: text => ... })`: the placeholders and one block per tag of the message in one object, none when it holds neither' : 'write the key as a literal, so `kay check` can hold the values to its message and an island is sent the message; `T(id, values)` with `id` a string or a union is not checked or sent',
+  }
 }
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {

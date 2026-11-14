@@ -20,7 +20,7 @@ import { localePrefixes, localeSettings } from '../server/i18n'
 import { unknownNameHelp } from './export-homes'
 import { loopIndexFix, positionalKeyFix } from './loop-index-fix'
 import { sourceSpan } from './shadow'
-import { lastOverload, templateHint } from './template-hints'
+import { lastOverload, richCallHint, templateHint } from './template-hints'
 
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
 const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
@@ -164,7 +164,7 @@ export function diagnoseShadow(shadow: ShadowFile, reported: TsgoDiagnostic, lev
   if (blockHelp !== undefined)
     return { message: diagnostic.message, help: blockHelp, span }
 
-  const hint = templateHint(diagnostic, shadow.source, span, shadow.tsx)
+  const hint = richCallHint(diagnostic, shadow.source, span) ?? templateHint(diagnostic, shadow.source, span, shadow.tsx)
 
   if (hint === 'duplicate')
     return undefined

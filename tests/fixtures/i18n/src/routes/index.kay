@@ -32,4 +32,5 @@ p.intro
       strong {text}
     @docs(text)
       em {text}
+p.called {T('intro', { name: '<img src=x onerror=1>', about: text => `<b>${text}`, docs: text => text.toUpperCase() })}
 Counter

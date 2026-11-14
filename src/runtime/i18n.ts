@@ -87,11 +87,6 @@ export type RichText = [Messages] extends [never]
   }
 type Values<Value> = Params<Value> & Record<TagsOf<Value>, Block>
 type ValueArgs<Value> = [ParamsOf<Value> | TagsOf<Value>] extends [never] ? [values?: Values<Value>] : [values: Values<Value>]
-
-// `T('intro', { name, about })` is `T(key="intro" name=... @about)`: the key, then the placeholders and the blocks of the tags in one object.
-export function richProps(key: string | { key: string }, values: object | undefined): { key: string } {
-  return typeof key === 'string' ? { ...values, key } : key
-}
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
 // The site's `timeZone`, which a date is written in unless the call names another; the server installs it and the page carries it to the browser.
@@ -192,6 +187,11 @@ export function translate(translations: Translations, key: string, params: Recor
   const text = messageText(translations, key, params.count)
 
   return text === undefined ? missingMessage(key) : fill(translations.locale, text, params)
+}
+
+// `T('intro', { name, about })` is `T(key="intro" name=... @about)`: the key, then the placeholders and the blocks of the tags in one object.
+export function richProps(key: string | { key: string }, values: object | undefined): { key: string } {
+  return typeof key === 'string' ? { ...values, key } : key
 }
 
 // The message at `key` as text and the blocks its tags render through, each tag's text filled before its block gets it, so a value holding `<b>` stays text; a tag no block fills renders its text.

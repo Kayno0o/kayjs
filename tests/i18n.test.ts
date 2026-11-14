@@ -191,6 +191,8 @@ describe('locale prefixes', () => {
   it('render a message\'s tags through T\'s blocks, its placeholders filled and escaped inside a tag and out', async () => {
     expect((await get('/')).html).toContain('<p class="intro">Lisez <strong>notre histoire</strong>, &lt;Ada>, ou <em>la doc de &lt;Ada></em>.</p>')
     expect((await get('/en')).html).toContain('<p class="intro">Read <strong>our story</strong>, &lt;Ada>, or <em>the docs of &lt;Ada></em>.</p>')
+    // The call form of a script gives what the tag form does, a hostile value and a block returning text escaped alike.
+    expect((await get('/en')).html).toContain('<p class="called">Read &lt;b>our story, &lt;img src=x onerror=1>, or THE DOCS OF &lt;IMG SRC=X ONERROR=1>.</p>')
     expect(islandMessages('T(key="intro" name={name})\nT(name={name} key=\'rich.other\')\np {t(\'nav.home\')}')).toBe(', ["intro","rich.other","nav.home"]')
     expect(islandMessages('const text = T(\'intro\', { name })\nconst more = T( "rich.other")')).toBe(', ["intro","rich.other"]')
   })
@@ -687,6 +689,8 @@ describe('kay check', () => {
     const english = join(fixture, 'src/messages/en.ts')
     const typo = join(fixture, 'src/routes/typo.kay')
     const rich = join(fixture, 'src/routes/rich.kay')
+    const scripted = join(fixture, 'src/routes/scripted.kay')
+    const nested = join(fixture, 'src/routes/nested.kay')
     const links = join(fixture, 'src/routes/links.kay')
     const source = await Bun.file(english).text()
 
@@ -727,6 +731,21 @@ describe('kay check', () => {
           '    strong {text}',
           '',
         ].join('\n')),
+        Bun.write(nested, '--- server\nimport { T, formatDuration } from \'kay/i18n\'\n---\nT(key="greeting" name={formatDuration(\'abc\')})\n'),
+        Bun.write(scripted, [
+          '--- server',
+          'import { T } from \'kay/i18n\'',
+          'const blocks = { about: (text: string) => text, docs: (text: string) => text }',
+          'const missing = T(\'greeting\')',
+          'const id: string = \'intro\'',
+          'const dynamic = T(id, { name: \'Ada\', ...blocks })',
+          'const object = T({ key: \'intro\', name: \'Ada\', ...blocks })',
+          'const either = \'greeting\' as \'intro\' | \'greeting\'',
+          'const union = T(either, { name: \'Ada\', ...blocks })',
+          '---',
+          'p {missing} {dynamic} {object} {union}',
+          '',
+        ].join('\n')),
         Bun.write(links, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n'),
       ])
 
@@ -739,12 +758,13 @@ describe('kay check', () => {
         'src/messages/en.ts': [1, 6, 7, 7, 8, 8, 8],
         'src/routes/typo.kay': [4, 5, 6, 7],
         'src/routes/rich.kay': [5, 6, 7, 15, 18, 23, 25],
+        'src/routes/scripted.kay': [4, 6],
+        'src/routes/nested.kay': [4],
         'src/routes/links.kay': [2, 3],
         'src/routes': [1],
       }
 
       // What the changes break and nothing else: the fixture's own pages pass, their unprefixed links included, as the server sends those on to the visitor's locale. A file reported that should not be is shown with its messages.
-
       expect(found.filter(({ file }) => !(file in expected))).toEqual([])
       expect(lines).toEqual(expected)
       expect(found.filter(({ file }) => file === 'src/messages/en.ts').map(({ line, message }) => [line, message])).toEqual(expect.arrayContaining([
@@ -756,12 +776,15 @@ describe('kay check', () => {
         [8, 'gives intro without <docs>, which src/messages/fr.ts has, so its block renders nothing'],
         [8, 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it'],
       ]))
+      // A call of T with no values, or a key that is no literal, says so in a line; the object form and a union of keys are accepted; a failing call nested in a template call keeps its own overloads' message.
+      expect(found.filter(({ file }) => file === 'src/routes/scripted.kay').map(({ message }) => message)).toEqual(['`T` needs the values of its message', '`T` takes the key of a message as a literal'])
+      expect(found.find(({ file }) => file === 'src/routes/nested.kay')?.message).toContain('No overload matches')
       // A script call of T reads like its template twin: a missing placeholder, a missing block and an unknown value are each named.
       expect(found.filter(({ file, line }) => file === 'src/routes/rich.kay' && line <= 7).map(({ message }) => message.match(/Property '(\w+)' is missing|'(\w+)' does not exist/)?.slice(1).find(Boolean))).toEqual(['name', 'docs', 'nom'])
       expect(found.find(({ file }) => file === 'src/routes')?.message).toContain('are both served at / in en')
     }
     finally {
-      await Promise.all([Bun.write(english, source), rm(typo, { force: true }), rm(rich, { force: true }), rm(links, { force: true })])
+      await Promise.all([Bun.write(english, source), rm(typo, { force: true }), rm(rich, { force: true }), rm(scripted, { force: true }), rm(nested, { force: true }), rm(links, { force: true })])
     }
   })
 
