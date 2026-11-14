@@ -43,10 +43,10 @@ it('shows why a todo was refused', async () => {
 
 ### Test an action as an island calls it
 
-`site.call(action, input)` resolves with the result, and `site.refusal(action, input)` expects the call refused:
+`site.call(action, input)` resolves with the result, and `site.expectRefused(action, input)` expects the call refused:
 
 ```ts
-const refused = await site.refusal(add, { title: '' })
+const refused = await site.expectRefused(add, { title: '' })
 
 expect(refused.status).toBe(422)
 expect(refused.errors).toEqual({ title: 'Write a title' })
@@ -74,7 +74,7 @@ kayjs-auth's `await auth.signInAs(site, { email, username })` signs a test site 
 
 ### Test a library's part
 
-Each library has one helper, called at the top of a file, that clears itself before every test (a library's own helper does it with `resetEachTest(clear)` from `kay/test`, which runs `clear` now and around each test): `const mail = mailTest(site)` from `@kayjs/mail/test` (the site's mails, `waitFor` running its queues), `const model = aiTest()` from `@kayjs/ai/test` (`reply`, `fail`, `asked`), `const as = auth.test(site)` (`signInAs`, `signOut`, `sessionCookie`) and `const editor = cmsTest(site)` from `@kayjs/cms/test` (`signInAs`, `signInWith`, `signOut`, `save`, `entry`, `delete`, `rename`, `move`, `upload`); each library's llms.txt has the rest.
+Each library's `/test` entry exports `test(site)`, taking the `TestSite` and called at the top of a file: it clears the library's fake before every test (a library's own helper does it with `resetEachTest(clear)` from `kay/test`, which runs `clear` now and around each test) and has `reset()`. `test(site)` of `@kayjs/mail/test` gives the site's mails (`waitFor` runs its queues), of `@kayjs/ai/test` the fake model (`reply`, `fail`, `asked`), of `@kayjs/auth/test` `signInAs`, `signOut` and `sessionCookie` (as `auth.test(site)` does) and of `@kayjs/cms/test` `signInAs`, `signInWith`, `save`, `entry`, `delete`, `rename`, `move` and `upload`; each library's llms.txt has the rest. `site.signInAs({ email })` signs in for every library that joined, and `site.fetchStub` and `site.freezeTime` fake the outside world: [Fake the outside world](testing-requests-jobs-sockets.md).
 
 ### Check a page's metadata
 
@@ -212,8 +212,8 @@ it('shows why a todo was refused', async () => {
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
 - `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirectError` with `location` when it redirects, the path under the site's `base` when it has one.
 - A handler returning an async iterable gives every value once its stream ended, `[1, 2, 3]`, and throws when the stream failed.
-- `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler and `message` the `ctx.fail` text or the schema's messages, and fails the test when the call went through.
-- `await site.refusal(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
+- `site.expectRefused(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler and `message` the `ctx.fail` text or the schema's messages, and fails the test when the call went through.
+- `await site.expectRefused(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
 - `site.mcp.initialize()`, `site.mcp.tools()` and `site.mcp.call(name, args)` test an app's MCP endpoint: [MCP endpoint](mcp.md).
 
 ### Reading a page

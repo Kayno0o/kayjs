@@ -65,7 +65,7 @@ async function streamedValues(stream: Connection<unknown> & Settles, url: string
   return values
 }
 
-export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<TestSite, 'call' | 'submit' | 'refusal'> {
+export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<TestSite, 'call' | 'submit' | 'expectRefused' | 'refusal'> {
   const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
     const { headers, body } = encodeCall(input)
 
@@ -77,6 +77,21 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
     const answer = await readActionResponse<unknown>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
 
     return (isStream(answer) ? await streamedValues(answer, action.url) : answer) as Tested<ResultOf<typeof action>>
+  }
+
+  const expectRefused: TestSite['expectRefused'] = async (action, input, init) => {
+    try {
+      await call(action, ...[input, init] as CallArguments<typeof action>)
+    }
+    catch (error) {
+      // `Target` only bounds the action, so its own `refused` types the data as unknown.
+      if (action.refused(error))
+        return error as ActionError<FailuresOf<typeof action>>
+
+      throw error
+    }
+
+    throw new Error(`kay: the call to ${action.url} went through, where a refusal was expected`)
   }
 
   return {
@@ -124,19 +139,7 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
 
       return visit
     },
-    refusal: async (action, input, init) => {
-      try {
-        await call(action, ...[input, init] as CallArguments<typeof action>)
-      }
-      catch (error) {
-        // `Target` only bounds the action, so its own `refused` types the data as unknown.
-        if (action.refused(error))
-          return error as ActionError<FailuresOf<typeof action>>
-
-        throw error
-      }
-
-      throw new Error(`kay: the call to ${action.url} went through, where a refusal was expected`)
-    },
+    expectRefused,
+    refusal: expectRefused,
   }
 }

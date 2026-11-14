@@ -2,11 +2,22 @@ import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { ask } from '../src/ask'
 import { openai } from '../src/openai'
-import { aiTest } from '../src/test'
+import { test } from '../src/test'
 
-const model = aiTest()
+const model = test()
 
-describe('aiTest', () => {
+describe('ai test(site)', () => {
+  it('forgets the scripts and the asks on reset()', async () => {
+    model.reply('scripted')
+    await ask('Hi')
+    model.reply('never heard')
+
+    model.reset()
+
+    expect(model.asked).toHaveLength(0)
+    expect(await ask('Again')).toBe('Fake reply to: Again')
+  })
+
   it('scripts the next answer and reads what was asked', async () => {
     model.reply(['It ', 'works'])
 

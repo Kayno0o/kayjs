@@ -3986,6 +3986,13 @@ interface FetchedResponse
   status: number
   text: () => string
 
+[./test] FetchStub
+interface FetchStub
+  requests: StubbedRequest[]
+
+[./test] FetchStubRoutes
+type FetchStubRoutes = Record<string, ServiceAnswer | ServiceHandler>
+
 [./test] FormValue
 type FormValue = string | Blob
 
@@ -4008,6 +4015,10 @@ interface Interactions
   click: (selector: string) => Promise<void>
   press: (key: string) => Promise<void>
   type: (selector: string, text: string) => Promise<void>
+
+[./test] MatchScreenshotOptions
+interface MatchScreenshotOptions
+  maxDiffPixels?: number | undefined
 
 [./test] McpCall
 interface McpCall
@@ -4133,8 +4144,31 @@ type ServiceRoutes = Record<string, ServiceAnswer | ServiceHandler> | ServiceHan
 [./test] settle
 function settle(): Promise<void>
 
+[./test] SignedIn
+interface SignedIn
+
+[./test] SignInFields
+interface SignInFields
+
+[./test] SignInHook
+interface SignInHook
+  name: string
+  signIn: (who: SignInFields) => Promise<Partial<SignedIn> | undefined>
+  signOut: () => void
+
 [./test] solveWork
 function solveWork(challenge: string): string | undefined
+
+[./test] StubbedRequest
+interface StubbedRequest extends ServiceRequest
+  bytes: Uint8Array<ArrayBufferLike>
+  headers: Headers
+  json: () => unknown
+  method: string
+  path: string
+  query: URLSearchParams
+  text: string
+  url: string
 
 [./test] TestContent
 interface TestContent
@@ -4189,6 +4223,7 @@ interface TestOptions extends PagesOptions
   onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
+  outgoing?: "allow" | "fail" | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   preview?: PreviewConfig | false | undefined
@@ -4231,6 +4266,7 @@ interface TestPage
   goto: (path: string) => Promise<void>
   hover: (selector: string, options?: PointerOptions | undefined) => Promise<void>
   initScript: <Args extends unknown[]>(run: (...args: Args) => unknown, ...args: Args) => Promise<void>
+  matchScreenshot: (name: string, options?: MatchScreenshotOptions | undefined) => Promise<void>
   offline: () => Promise<void>
   onDialog: (handler: DialogHandler) => Promise<void>
   online: () => Promise<void>
@@ -4284,8 +4320,14 @@ interface TestSite
   close: () => Promise<void>
   content: TestContent
   cookies: CookieMap
+  expectRefused: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
+  from?: string;
+}) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   fetch: (path: string, init?: (Omit<RequestInit, "headers"> & VisitInit) | undefined) => Promise<Response>
+  fetchStub: (routes: FetchStubRoutes) => FetchStub
+  freezeTime: (at?: Date | number | string | undefined) => Date
   handle: (request: Request) => Promise<Response>
+  joinSignIn: (hook: SignInHook) => void
   logs: readonly LogEntry[]
   mcp: {
   tools: (init?: VisitInit | undefined) => Promise<McpTool[]>;
@@ -4293,50 +4335,16 @@ interface TestSite
   call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>;
 }
   open: (path: string, options?: BrowserOptions | undefined) => Promise<TestPage>
-  refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
+  /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */ refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
   from?: string;
 }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   runJobs: () => Promise<number>
   runSchedule: (which?: ((signal: AbortSignal) => unknown) | number | string | undefined) => Promise<number>
+  signInAs: (who: SignInFields) => Promise<SignedIn>
+  signOut: () => void
   sitemap: (path?: string | undefined) => Promise<string[]>
-  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
-  params: infer Params;
-} ? Record<never, never> extends Params ? {
-  params?: Params;
-} : {
-  params: Params;
-} : {
-  params?: Record<string, unknown>;
-}) & (SocketRoute<Module, Path> extends {
-  query: infer Query;
-} ? unknown extends Query ? {
-  query?: Record<string, unknown>;
-} : Record<never, never> extends Query ? {
-  query?: Query;
-} : {
-  query: Query;
-} : {
-  query?: Record<string, unknown>;
-}) & ConnectionHooks<Received<SocketRoute<Module, Path>>> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
-  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
-  params: infer Params;
-} ? Record<never, never> extends Params ? {
-  params?: Params;
-} : {
-  params: Params;
-} : {
-  params?: Record<string, unknown>;
-}) & (SocketRoute<Module, Path> extends {
-  query: infer Query;
-} ? unknown extends Query ? {
-  query?: Record<string, unknown>;
-} : Record<never, never> extends Query ? {
-  query?: Query;
-} : {
-  query: Query;
-} : {
-  query?: Record<string, unknown>;
-}) & ConnectionHooks<Received<SocketRoute<Module, Path>>> & VisitInit>) => Promise<Response>
+  socket: OpenSocket & { refused: RefusedSocket; }
+  /** @deprecated `site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */ socketRefusal: RefusedSocket
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends {
   params: infer Params;
 } ? Record<never, never> extends Params ? {

@@ -218,7 +218,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
       macro: {};
       macroFn: {}; ...#4ddeda8d (4531 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
-  test: (site: OAuthSite) => { ...#d43a5614 (9 lines)
+  test: (site: OAuthSite) => { ...#595de294 (10 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
   signInAs(site: { ...#730c06b7 (3 lines)
   enrollTotp(userId: string): Promise<TotpEnrolment>;
@@ -2224,12 +2224,14 @@ function usernameProblem(username: string, rules?: CredentialRules): UsernamePro
 type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
 [./test] authTest
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
 function authTest(site: OAuthSite): AuthTest
 
 [./test] AuthTest
 interface AuthTest
   enrollTotp: (userId: string) => Promise<TotpEnrolment>
   oauth: OAuthTest
+  reset: () => void
   sessionCookie: (userId: string, options?: undefined | { secure?: boolean; }) => Promise<string>
   signInAs: (who: Omit<CreateUserInput, "roles"> & { roles?: string[] | undefined; data?: object | undefined; }) => Promise<BareUser<Record<string, unknown>>>
   signOut: () => void
@@ -2237,3 +2239,6 @@ interface AuthTest
 [./test] OwnTest
 interface OwnTest
   test: (site: OAuthSite) => AuthTest
+
+[./test] test
+function test(site: OAuthSite): AuthTest

@@ -257,14 +257,14 @@
     "max-lines-per-function": 186
   },
   "src/test/browser.ts": {
-    "max-lines": 880,
-    "max-lines-per-function": 468
+    "max-lines": 853,
+    "max-lines-per-function": 451
   },
   "src/test/content.ts": {
     "max-lines-per-function": 173
   },
   "src/test/index.ts": {
-    "max-lines-per-function": 251
+    "max-lines-per-function": 246
   },
   "src/test/network.ts": {
     "max-lines-per-function": 365

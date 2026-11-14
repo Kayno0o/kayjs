@@ -684,9 +684,9 @@ Under `bun test`, `ask` always answers from `fakeAi`, even when a key is set. A 
 
 ```ts
 import { ask } from '@kayjs/ai'
-import { aiTest } from '@kayjs/ai/test'
+import { test as aiTest } from '@kayjs/ai/test'
 
-const model = aiTest()
+const model = aiTest(site)
 
 model.reply(['It ', 'works'])
 
@@ -694,7 +694,7 @@ expect(await ask('Hi')).toBe('It works')
 expect(model.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
-`aiTest()` forgets what was scripted and asked at the start of every test, so you clear nothing by hand. Call it at the top of a test file. `model.clear()` drops them in the middle of a test.
+`aiTest(site)` takes the site `testSite()` made, though the fake model is the process's and the site is optional. It forgets what was scripted and asked at the start of every test, so you clear nothing by hand. Call it at the top of a test file. `model.clear()` drops them in the middle of a test.
 
 Scripts go to the asks in the order they are read. An action that asks several times in a row has passes that may or may not run, so script the one you mean by what it asks. The second argument is a function of the ask, and the script waits for the first ask it accepts:
 

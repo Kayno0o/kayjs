@@ -116,14 +116,14 @@ Under `bun test` the fake embeds the question and the texts, so a test ranks pas
 ### The fake
 
 - `transcribe` answers `Fake transcript`, `speak` a silent 16 kHz WAV, 0.3 s a word, typed `audio/wav` whatever the `format`, and `embed` a unit vector of `dimensions` numbers (256 unless given) from the words of each text: the same text always gets the same vector, and texts sharing words are nearer than texts sharing none, so a search test ranks roughly as a model would.
-- `aiTest()` scripts them: `model.transcript(text)`, `model.speech(blob)` and `model.embedding(vectors)` answer the next call, an `Error` makes it throw, a function of what was given answers it, and a second argument `when` picks the call it is for. `model.heard` (`{ provider, model, audio, language }`), `model.spoken` (`{ provider, model, text, voice, speed, format }`) and `model.embedded` (`{ provider, model, input, dimensions }`, `input` a list even for one text) keep every call; all are cleared between tests, as asks are.
+- `aiTest(site)` scripts them: `model.transcript(text)`, `model.speech(blob)` and `model.embedding(vectors)` answer the next call, an `Error` makes it throw, a function of what was given answers it, and a second argument `when` picks the call it is for. `model.heard` (`{ provider, model, audio, language }`), `model.spoken` (`{ provider, model, text, voice, speed, format }`) and `model.embedded` (`{ provider, model, input, dimensions }`, `input` a list even for one text) keep every call; all are cleared between tests, as asks are.
 
 ```ts
 import { speak, transcribe } from '@kayjs/ai'
-import { aiTest } from '@kayjs/ai/test'
+import { test as aiTest } from '@kayjs/ai/test'
 import { expect, it } from 'bun:test'
 
-const model = aiTest()
+const model = aiTest(site)
 
 it('reads back what was said', async () => {
   model.transcript('Book a table for two')

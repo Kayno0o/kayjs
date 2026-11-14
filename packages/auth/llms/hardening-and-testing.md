@@ -33,7 +33,7 @@ const page = await site.submit(signIn, { identifier: 'ada@example.com', password
 A test site signs in with one call, no form round trip. `authTest(site)` from `@kayjs/auth/test` is the auth that site's `testSite()` built (each site its own, so call it after `testSite()`), and `kay generate resource` writes its test with it:
 
 ```ts
-import { authTest } from '@kayjs/auth/test'
+import { test as authTest } from '@kayjs/auth/test'
 
 const as = authTest(site)
 

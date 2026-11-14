@@ -1,5 +1,6 @@
 import type { Duration } from '../runtime/duration'
 import type { Network, PageResponse } from './network'
+import type { MatchScreenshotOptions } from './screenshot-match'
 import type { WaitUntilOptions } from './wait'
 
 export interface BrowserOptions {
@@ -122,6 +123,8 @@ export interface TestPage {
   // Runs a function in the page, its arguments and result crossing as JSON. Only its source crosses: it sees no variable of the test, only its arguments.
   evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
   waitFor: (selector: string, options?: WaitForOptions) => Promise<void>
+  // Compares the page's viewport with the baseline `__screenshots__/<test file>/<name>.png` beside the test file, failing with the count of differing pixels and writing `<name>.actual.png` and `<name>.diff.png` next to it. The baseline is written when there is none, and rewritten when `KAY_UPDATE_SCREENSHOTS=1` is set; a CI run fails for a missing one. Wait for the page to settle first, and fix what moves (the clock, an animation) so the shot is the same each run.
+  matchScreenshot: (name: string, options?: MatchScreenshotOptions) => Promise<void>
   // Checks the page as it stands, or only the elements `selector` matches, with axe-core: what it breaks, none when it passes.
   a11y: (selector?: string) => Promise<A11yViolation[]>
   // Waits for a function run in the page, as `evaluate` runs it, to return something truthy.

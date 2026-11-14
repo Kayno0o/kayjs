@@ -460,7 +460,7 @@ export default {
 Under `bun test`, mails go to the outbox. `mailTest(site)` reads the ones a test site sent, from an outbox that is empty at the start of every test, so you clear nothing by hand. An enqueued mail reaches it once `site.runJobs()` ran, including one the action enqueued or sent without awaiting.
 
 ```ts
-import { mailTest } from '@kayjs/mail/test'
+import { test as mailTest } from '@kayjs/mail/test'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'

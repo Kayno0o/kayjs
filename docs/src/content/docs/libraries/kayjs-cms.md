@@ -74,7 +74,7 @@ An empty password throws, so an unset environment variable never opens the admin
 A test signs a site in without the form, saves an entry and reads it back, with `cmsTest(site)` from `@kayjs/cms/test`:
 
 ```ts
-import { cmsTest } from '@kayjs/cms/test'
+import { test as cmsTest } from '@kayjs/cms/test'
 
 const editor = cmsTest(site)
 

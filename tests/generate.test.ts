@@ -255,7 +255,7 @@ it('signs a resource test in through authTest, or through the former form\'s own
   const own = resourceFiles('note', ['title:string'], PROJECT).files['tests/notes.test.ts']!
   const module = resourceFiles('note', ['title:string'], { ...PROJECT, authModule: true }).files['tests/notes.test.ts']!
 
-  expect(own).toContain('import { authTest } from \'@kayjs/auth/test\'')
+  expect(own).toContain('import { test as authTest } from \'@kayjs/auth/test\'')
   expect(own).toContain('await authTest(site).signInAs(')
   expect(module).toContain('import { auth } from \'../src/auth\'')
   expect(module).toContain('await auth.signInAs(site, ')

@@ -62,6 +62,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\nButton Save',
     right: '---\nimport Button from \'@kayjs/ui/button.kay\'\n---\nButton Save',
   },
+  'deprecated-test-helpers': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The test helpers of the libraries and of a test site under their names before 1.105. `aiTest`, `mailTest`, `cmsTest` and `authTest` of `@kayjs/ai/test`, `@kayjs/mail/test`, `@kayjs/cms/test` and `@kayjs/auth/test` are `test(site)` in each, with a `reset()`, and a site\'s `signInAs` signs in for every library that joined it; `site.refusal(action, ...)` is `site.expectRefused(action, ...)` and `site.socketRefusal(...)` is `site.socket.refused(...)`. The old names work until 1.108. Found in the TypeScript files and `.kay` files of the project: an import from a library\'s test entry, and a use of the two methods on a name bound once to `testSite()` of `kay/test` (or to an `.as()` of one), as `kay check` reads no types. The fix renames the import and keeps the local name (`test as mailTest`), and renames the method.',
+    wrong: 'import { testSite } from \'kay/test\'\nimport { mailTest } from \'@kayjs/mail/test\'\n\nconst site = await testSite()\nconst mail = mailTest(site)\n\nawait site.refusal(subscribe, { email: \'\' })',
+    right: 'import { testSite } from \'kay/test\'\nimport { test as mailTest } from \'@kayjs/mail/test\'\n\nconst site = await testSite()\nconst mail = mailTest(site)\n\nawait site.expectRefused(subscribe, { email: \'\' })',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
@@ -94,4 +103,5 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.102' },
   { since: '1.103' },
   { since: '1.104' },
+  { since: '1.105' },
 ]

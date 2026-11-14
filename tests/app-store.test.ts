@@ -137,7 +137,7 @@ describe('the app store of a test site', () => {
     try {
       expect(await site.call(actions.perUser, {}, { headers: { 'x-user': 'ada-store' } })).toBe('ok')
       expect(app.seen.some(key => key.endsWith('key:ada-store'))).toBe(true)
-      expect((await site.refusal(actions.perUser, {}, { headers: { 'x-user': 'ada-store' } })).status).toBe(429)
+      expect((await site.expectRefused(actions.perUser, {}, { headers: { 'x-user': 'ada-store' } })).status).toBe(429)
     }
     finally {
       await site.close()

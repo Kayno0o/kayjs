@@ -3,6 +3,7 @@ import type { OAuthSite, OAuthTest } from './oauthTest'
 import type { CreateUserInput } from './password'
 import type { TotpEnrolment } from './twoFactor'
 import { builtOwn } from './own'
+import { signInHook } from './testHook'
 
 // What `auth.test(site)` gives.
 export interface AuthTest {
@@ -10,6 +11,8 @@ export interface AuthTest {
   signInAs: (who: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined, data?: object | undefined }) => Promise<BareUser>
   // Signs the site out, its other cookies kept.
   signOut: () => void
+  // Signs the site out, as the start of a test wants.
+  reset: () => void
   // The `Cookie` header of a new session signed in as that user.
   sessionCookie: (userId: string, options?: { secure?: boolean }) => Promise<string>
   // Turns two-factor on for that member as the app would, so a password sign-in asks for a code: the authenticator's `secret`, `code(offset?)` for the current step and the `recoveryCodes`, all usable at the next sign-in. Throws for a missing member or one who has it already.
@@ -23,19 +26,20 @@ export interface OwnTest {
 }
 
 // The `auth.test(site)` of an app whose kay.config.ts holds `auth()` and no `src/auth.ts` module: the auth that site's `testSite()` built, found as a call needs it, so call it after `testSite()`.
-export function authTest(site: OAuthSite): AuthTest {
+export function test(site: OAuthSite): AuthTest {
   const made = () => {
     const own = builtOwn(site)
 
     if (!own)
-      throw new Error('kayjs-auth: authTest found no `auth()` built for this test site: await `testSite()` first, and give `authTest` the site it returned, of a project whose kay.config.ts registers `auth()` with no `module`')
+      throw new Error('kayjs-auth: test(site) found no `auth()` built for this test site: await `testSite()` first, and give `test` the site it returned, of a project whose kay.config.ts registers `auth()` with no `module`')
 
     return own.test(site)
   }
 
-  return {
+  const helper: AuthTest = {
     signInAs: async who => made().signInAs(who),
     signOut: () => made().signOut(),
+    reset: () => made().signOut(),
     sessionCookie: async (userId, options) => made().sessionCookie(userId, options),
     enrollTotp: async userId => made().enrollTotp(userId),
     oauth: {
@@ -43,4 +47,11 @@ export function authTest(site: OAuthSite): AuthTest {
       signIn: async (provider, options) => made().oauth.signIn(provider, options),
     },
   }
+
+  site.joinSignIn?.(signInHook(helper))
+
+  return helper
 }
+
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+export const authTest = test

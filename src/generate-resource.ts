@@ -360,8 +360,8 @@ function testFile(names: Names, fields: readonly Field[], project: ResourceProje
   const blank = fields.find(field => textual(field)) ?? fields.find(field => field.type !== 'boolean') ?? fields[0]!
   const person = `{ email: 'ada@example.com', username: 'Ada' }`
   const signIn = project.auth ? `  await ${project.authModule ? `auth.signInAs(site, ${person})` : `authTest(site).signInAs(${person})`}\n` : ''
-  const imports = `${project.auth && !project.authModule ? 'import { authTest } from \'@kayjs/auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { db } from '../src/db'\nimport { ${names.pascal} } from '../src/db/${names.slug}'\nimport { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
-  const refusal = `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.refusal(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
+  const imports = `${project.auth && !project.authModule ? 'import { test as authTest } from \'@kayjs/auth/test\'\n' : ''}import { expect, it } from 'bun:test'\nimport { testSite } from 'kay/test'\n${project.authModule ? 'import { auth } from \'../src/auth\'\n' : ''}import { db } from '../src/db'\nimport { ${names.pascal} } from '../src/db/${names.slug}'\nimport { create, remove, update } from '../src/routes/${folder}/_actions.kay'\n`
+  const refusal = `\nit('refuses a ${label} with ${textual(blank) ? 'an empty' : 'an invalid'} ${blank.label.toLowerCase()}', async () => {\n${signIn}  const refused = await site.expectRefused(create, ${object(false, blank)})\n\n  expect(refused.status).toBe(422)\n})\n`
 
   const listed = shown.type === 'boolean' ? `expect(page.text()).not.toContain('No ${plural.toLowerCase()} yet.')` : `expect(page.text()).toContain('${TYPES[shown.type].shown}')`
   const newest = `(await db.repo(${names.pascal}).read.findMany(q => q.orderBy('id', 'desc')))[0]!`

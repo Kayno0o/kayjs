@@ -50,10 +50,10 @@ expect(await room.next()).toEqual({ room: 'general', from: 'anonymous', text: 'h
 room.close()
 ```
 
-`site.socketRefusal(module, path, options)` sends a real upgrade and resolves with the refusal, such as a guard's 401 or the 403 of a cross-site `origin`, and fails when the route accepted it:
+`site.socket.refused(module, path, options)` sends a real upgrade and resolves with the refusal, such as a guard's 401 or the 403 of a cross-site `origin`, and fails when the route accepted it:
 
 ```ts
-const refused = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
+const refused = await site.socket.refused(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
 
 expect(refused.status).toBe(403)
 ```
@@ -68,7 +68,7 @@ expect(refused.status).toBe(403)
 - A default `origin` never replaces the one `call` and `submit` send, and `site.api` sends `accept: application/json` and a JSON body's `content-type` unless the site or the call names them (`site.mcp` always sends its protocol's two); `site.as(cookie).open(path)` opens the browser with that cookie unless `cookies` is given.
 - `site.api(module, path, options)` takes `method` (GET unless named), `params`, `query`, `body` and `headers`, a body with a file going as a form, and resolves with `{ ok, status, headers, body }` for any status, the body parsed as `call()` reads an answer; a param is encoded as one segment, and an empty one or a dot segment throws a `TypeError`.
 - `site.runSchedule(which?)` fires the schedules of the site's app once each, now: `which` is a schedule's text (`'@hourly'`, `'30s'`) or its job function, none fires all of them, and it fails naming the site's schedules when none matches. The run is the production one (timeout, `onSuccess`, `onError`, a job that throws logged not thrown, a `lock` honoured) and waits for a run going. `site.advance(by)` takes a duration, fires schedules in order of their instants (a cap of 1000 runs, then it asks for smaller steps), leaves the clock at the target (also when a run or the cap throws) and drains the queues at the target time, so a job a schedule enqueued runs then, not at its own instant. Every schedule matching `which` fires, two with one text included. The test site runs in the test's process, so `setSystemTime` reaches the server: sessions, rate-limit windows and `cache()` revalidation read it, but a timer already set (`setTimeout`) does not move. The clock stays moved for the rest of the test; `site.close()` and the end of the file put it back, and `setSystemTime()` does it sooner.
-- `site.socketRefusal(module, path, options)` sends the upgrade to the site's server (at the root of its port, whatever the base), keeps the cookies the refusal sets, gives up after 5 seconds, which it starts as `socket` does, and resolves with the response of a refused one; an accepted upgrade is closed and fails the test naming the route. A socket the app closes after accepting is `socket()`'s `status()`.
+- `site.socket.refused(module, path, options)` sends the upgrade to the site's server (at the root of its port, whatever the base), keeps the cookies the refusal sets, gives up after 5 seconds, which it starts as `socket` does, and resolves with the response of a refused one; an accepted upgrade is closed and fails the test naming the route. A socket the app closes after accepting is `socket()`'s `status()`.
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
 - `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did. It also waits for a `queue.enqueue()` or kayjs-mail `send`/`enqueue` the app started and left unawaited, but not for one a timer or other delay has not started yet.
 - Queues keep their jobs in memory under `bun test` unless one names a store, and `files` its files, each `testSite` in a store of its own unless its options name one.
@@ -85,3 +85,26 @@ expect(refused.status).toBe(403)
 - A site made at the top of a test file, as `const site = await testSite()` is, sends each test's requests as a client of its own, so a rate limit counts the posts of one test only: a test posting until it is refused needs no other to run first, and none after it is refused.
 - One made inside a test or a `beforeAll` is one client throughout.
 - A request carrying the header the app's `proxy` setting names still comes from the address it gives.
+
+### Fake the outside world
+
+`site.fetchStub` answers the `fetch` calls the app makes to other hosts, for the test, and `site.freezeTime` stops the clock:
+
+```ts
+const stub = site.fetchStub({
+  'https://api.example.com/orders/*': { status: 'paid' },
+  'POST https://api.example.com/refunds': request => ({ refunded: request.json() }),
+})
+
+await site.call(refund, { order: 12 })
+
+expect(stub.requests[0]?.url).toBe('https://api.example.com/refunds')
+
+site.freezeTime('2026-03-01T10:00:00Z')
+await site.advance('1h')
+```
+
+- `fetchStub(routes)` keys a route by a URL with `*` for any characters, matched without its query unless the key names one, led by a method (`'POST https://…'`) for one verb; a route is a value (an object as JSON, a string as text, a `Response` as it is) or a function of the request (`method`, `path`, `query`, `headers`, `text`, `bytes`, `json()`), as `fakeService` takes them. A later stub wins over an earlier one, the answer lists the `requests` it received with their `url`, and the stubs end with the test.
+- Once a site exists, a `fetch` to another host that no stub answers fails the test with the address and how to stub it; a call to loopback (a `fakeService`, the site's own server) and to a scheme other than http and https goes through. `testSite({ outgoing: 'allow' })` lets unstubbed calls reach the network.
+- `freezeTime(at?)` freezes `Date.now()` and what reads it (sessions, rate-limit windows, cache ages) at a date, now when left out, and resolves with it; `advance` moves it on from there. The real time comes back after each test, an `advance` included, and with `close()`. A page opened with `site.open` has a clock of its own, `page.advance`.
+- `site.signInAs(who)` signs the site in for every library whose `test(site)` joined it: kayjs-auth reads `email` or `username` with `createUser`'s fields and the app's user `data`, kayjs-cms a `role` (or none for a guard holding one password); it resolves with `{ user, role }`, each set by the library that signed in. `site.signOut()` signs the site out of all of them. A library's own `signInAs` stays for a test of one library.

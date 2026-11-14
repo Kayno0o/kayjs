@@ -222,10 +222,10 @@ describe('the subscribe form', () => {
     await site.call(subscribeStrict, { email: first })
     await site.call(subscribeStrict, { email: second })
 
-    const refused = await site.refusal(subscribeStrict, { email: fresh() })
+    const refused = await site.expectRefused(subscribeStrict, { email: fresh() })
 
     expect(refused.status).toBe(429)
-    expect((await site.refusal(subscribeStrict, { email: first })).status).toBe(429)
+    expect((await site.expectRefused(subscribeStrict, { email: first })).status).toBe(429)
     expect(refused.errors['']).toBe('Too many attempts from here in a short time: try again in a few minutes.')
   })
 
@@ -233,10 +233,10 @@ describe('the subscribe form', () => {
     await site.runJobs()
 
     const before = outbox.mails.length
-    const refused = await site.refusal(subscribe, { email: 'nope' })
+    const refused = await site.expectRefused(subscribe, { email: 'nope' })
 
     expect(refused.errors.email).toBe('Please write a valid email address.')
-    expect((await site.refusal(subscribe, { email: 'a@b.test,c@d.test' })).status).toBe(422)
+    expect((await site.expectRefused(subscribe, { email: 'a@b.test,c@d.test' })).status).toBe(422)
 
     await site.runJobs()
     expect(outbox.mails).toHaveLength(before)

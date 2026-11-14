@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { TestSite } from 'kay/test'
 import type { Core } from './core'
 import type { OAuthTokens, OAuthUser } from './oauth/types'
 import { Elysia as ElysiaApp } from 'elysia'
@@ -17,6 +18,8 @@ export interface OAuthTest {
 // A site with a `fetch`, the one `testSite()` returns, is driven through it; one with only its cookies, through the plugin.
 export interface OAuthSite {
   cookies: Bun.CookieMap
+  // The site's `joinSignIn`, which takes the auth into `site.signInAs` and `site.signOut`.
+  joinSignIn?: TestSite['joinSignIn'] | undefined
   fetch?: ((path: string) => Promise<Response>) | undefined
 }
 

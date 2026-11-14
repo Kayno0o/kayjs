@@ -1809,7 +1809,7 @@ describe('routeUrl', () => {
   })
 })
 
-describe('site.api, default headers and socketRefusal', () => {
+describe('site.api, default headers and socket.refused', () => {
   it('calls a route typed from the module, answering status, headers and the body parsed as an island reads it', async () => {
     const created = await site.api(notes, '/', { method: 'post', body: { title: 'first' } })
 
@@ -1939,19 +1939,19 @@ describe('site.api, default headers and socketRefusal', () => {
   })
 
   it('sends a real upgrade for a refusal and returns it, whoever the refusal is from', async () => {
-    const guarded = await site.socketRefusal(secret, '/feed')
+    const guarded = await site.socket.refused(secret, '/feed')
 
     expect(guarded.status).toBe(401)
     expect(await guarded.text()).toBe('Sign in first')
 
-    const crossSite = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.example' } })
+    const crossSite = await site.socket.refused(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.example' } })
 
     expect(crossSite.status).toBe(403)
   })
 
   it('runs the onError and onClose options of a refusal with the refusal, in that order', async () => {
     const seen: string[] = []
-    const response = await site.socketRefusal(secret, '/feed', {
+    const response = await site.socket.refused(secret, '/feed', {
       onError: ({ error }) => void seen.push(`error ${error.status} ${error.message}`),
       onClose: ({ status }) => void seen.push(`close ${status}`),
     })
@@ -1963,8 +1963,8 @@ describe('site.api, default headers and socketRefusal', () => {
   })
 
   it('fails when the upgrade was accepted, naming the route', async () => {
-    await expect(site.socketRefusal(chat, '/:room', { params: { room: 'general' } })).rejects.toThrow('/api/chat/general was accepted')
-    await expect(site.as({ 'x-user': 'ada' }).socketRefusal(secret, '/feed')).rejects.toThrow('/api/private/feed was accepted')
+    await expect(site.socket.refused(chat, '/:room', { params: { room: 'general' } })).rejects.toThrow('/api/chat/general was accepted')
+    await expect(site.as({ 'x-user': 'ada' }).socket.refused(secret, '/feed')).rejects.toThrow('/api/private/feed was accepted')
   })
 
   it('gives a socket the site\'s headers', async () => {
@@ -1983,10 +1983,10 @@ describe('site.api, default headers and socketRefusal', () => {
     room.close()
   })
 
-  it('types socketRefusal on websocket routes only', () => {
+  it('types socket.refused on websocket routes only', () => {
     const typed = async () => {
       // @ts-expect-error: /ticks is no websocket route
-      await site.socketRefusal(chat, '/ticks')
+      await site.socket.refused(chat, '/ticks')
     }
 
     void typed

@@ -88,6 +88,18 @@ export interface CmsUpload {
   height?: number | undefined
 }
 
+declare module 'kay/test' {
+  interface SignInFields {
+    // The role `site.signInAs` signs the cms in as, left out when the guard holds one password.
+    role?: string | undefined
+  }
+
+  interface SignedIn {
+    // The role the cms signed the site in as.
+    role?: string | undefined
+  }
+}
+
 export interface CmsTest {
   // Signs the site in through `passwordGuard()` as `role`, left out when the guard holds one password; a second call switches role. Returns the role.
   signInAs: (role?: string) => Promise<string>
@@ -107,6 +119,8 @@ export interface CmsTest {
   move: (collection: string, slug: string, direction: 'up' | 'down', options?: Pick<EntryRef, 'locale'>) => Promise<CmsSaveOutcome>
   // Uploads a file as a field's drop zone does: the answer is the path to keep in the entry.
   upload: (collection: string, file: File) => Promise<CmsUpload>
+  // Signs the site out of the cms, as the start of a test wants.
+  reset: () => void
 }
 
 async function answered(response: Response, what: string, missing = false): Promise<unknown> {
@@ -121,7 +135,7 @@ async function answered(response: Response, what: string, missing = false): Prom
 
 // The cms as one test site uses it: sign in as an editor, save an entry and read it back, with no form and no cookie handled by hand.
 // Saves go to the content the test site holds, never to the project's.
-export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>): CmsTest {
+export function test(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'> & Partial<Pick<TestSite, 'joinSignIn'>>): CmsTest {
   const path = (collection: string, slug: string) => `${apiUrl(entriesApi)}/${encodeURIComponent(collection)}/${encodeURIComponent(slug)}`
   const localeQuery = (locale: string | undefined) => locale === undefined ? '' : `?locale=${encodeURIComponent(locale)}`
 
@@ -138,7 +152,19 @@ export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>): C
 
   const versioned = (locale: string | undefined, version: string | undefined) => new URLSearchParams({ ...locale !== undefined && { locale }, ...version !== undefined && { version } }).toString()
 
+  // Joins `site.signInAs` for a `role`, or for a `who` with no email or username, which are kayjs-auth's.
+  site.joinSignIn?.({
+    name: 'cms',
+    signIn: async (who) => {
+      const { role, email, username } = who as { role?: string, email?: string, username?: string }
+
+      return role === undefined && (email !== undefined || username !== undefined) ? undefined : { role: await signIn(site, role) }
+    },
+    signOut: () => signOut(site),
+  })
+
   return {
+    reset: () => signOut(site),
     signInAs: async role => signIn(site, role),
     signInWith: async password => signInWith(site, password),
     signOut: () => signOut(site),
@@ -178,3 +204,6 @@ export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch' | 'submit'>): C
     },
   }
 }
+
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+export const cmsTest = test

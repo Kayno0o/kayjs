@@ -203,18 +203,18 @@ describe('kay/test', () => {
       promote: Action<{ name: string }, string>
       demote: ServerAction<Named, Failure<{ error: string }> | undefined>
     }
-    const refused = await site.refusal(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })
+    const refused = await site.expectRefused(demote, { name: 'ada' }, { headers: { 'x-user': 'ada' } })
     const reason: string | undefined = refused.data?.error
 
     expect(refused).toMatchObject({ status: 422, errors: {} })
     expect(reason).toBe('ada stays an admin')
-    expect(await site.refusal(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined, message: 'Write a title' })
+    expect(await site.expectRefused(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined, message: 'Write a title' })
     expect(refused.message).toBe('Action failed with 422')
-    expect(await site.refusal(refuseText, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).toMatchObject({ status: 502, message: 'whisper answered 500' })
+    expect(await site.expectRefused(refuseText, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).toMatchObject({ status: 502, message: 'whisper answered 500' })
     // @ts-expect-error: the handler fails with `error` alone.
     expect(refused.data?.message).toBeUndefined()
-    await expect(site.refusal(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
-    await expect(site.refusal(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirectError', location: '/about' })
+    await expect(site.expectRefused(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
+    await expect(site.expectRefused(promote, { name: 'bob' })).rejects.toMatchObject({ name: 'ActionRedirectError', location: '/about' })
   })
 
   it('calls an action reading its params from the page it names', async () => {

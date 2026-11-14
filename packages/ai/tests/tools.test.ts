@@ -94,7 +94,7 @@ describe('actions as tools', () => {
 
   it('refuses to offer an action that cannot be a tool, naming its place in the list, before anything is asked', async () => {
     for (const which of ['vetoed', 'upload']) {
-      const refused = await site.refusal(refusedTools, { which: which as 'vetoed' })
+      const refused = await site.expectRefused(refusedTools, { which: which as 'vetoed' })
 
       expect(refused.status).toBe(500)
     }
@@ -247,7 +247,7 @@ describe('the token budget', () => {
 
     expect((await conversation()).usage!.outputTokens).toBe(30)
 
-    const refused = await site.refusal(conversing, { prompt: 'go again' })
+    const refused = await site.expectRefused(conversing, { prompt: 'go again' })
 
     expect(refused.status).toBe(429)
     expect(fakeAi.asked).toHaveLength(2)

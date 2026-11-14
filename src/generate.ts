@@ -96,7 +96,7 @@ function actionFiles(segments: readonly string[], tests: boolean, auth: boolean)
   if (tests && !auth) {
     const imported = `../${file.slice(0, -'.kay'.length)}.kay`
 
-    files[`tests/action-${slugOf(segments.join('/'))}.test.ts`] = `${TEST_HEAD}import { ${name} } from '${imported}'\n\nconst site = await testSite()\n\nit('answers a valid ${name}', async () => {\n  expect(await site.call(${name}, { title: 'First' })).toBe('First')\n})\n\nit('refuses an empty title', async () => {\n  const refused = await site.refusal(${name}, { title: '' })\n\n  expect(refused.status).toBe(422)\n})\n`
+    files[`tests/action-${slugOf(segments.join('/'))}.test.ts`] = `${TEST_HEAD}import { ${name} } from '${imported}'\n\nconst site = await testSite()\n\nit('answers a valid ${name}', async () => {\n  expect(await site.call(${name}, { title: 'First' })).toBe('First')\n})\n\nit('refuses an empty title', async () => {\n  const refused = await site.expectRefused(${name}, { title: '' })\n\n  expect(refused.status).toBe(422)\n})\n`
   }
 
   return files

@@ -115,7 +115,7 @@ if (process.env.FIXTURE_NO_ORG) {
   await site.submit(register, { email: 'no-org@example.com', password: PASSWORD }, { from: await site.visit(`${PAGES_AT}/register`) })
 
   const from = `${PAGES_AT}/invitation?invitation=x`
-  const statuses = await Promise.all([switchAccount, accept, reject].map(async action => (await site.refusal(action, { id: 'x' }, { from })).status))
+  const statuses = await Promise.all([switchAccount, accept, reject].map(async action => (await site.expectRefused(action, { id: 'x' }, { from })).status))
 
   console.log(JSON.stringify({
     pages: [(await site.visit(from)).status, (await site.visit(`${PAGES_AT}/account/organizations/x`)).status],

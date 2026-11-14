@@ -22,7 +22,7 @@ describe('a schema shared by a server module and an island', () => {
     const { castVerdict } = await import(join(import.meta.dir, 'fixtures/shared-schema/src/routes/index.kay')) as { castVerdict: Action<{ choice: 'smash' | 'pass' }, string> }
 
     expect(await site.call(castVerdict, { choice: 'pass' })).toBe('pass')
-    await site.refusal(castVerdict, { choice: 'maybe' } as unknown as { choice: 'pass' })
+    await site.expectRefused(castVerdict, { choice: 'maybe' } as unknown as { choice: 'pass' })
   })
 
   it('types a module reading an action\'s input and an island reading the schema\'s type', async () => {

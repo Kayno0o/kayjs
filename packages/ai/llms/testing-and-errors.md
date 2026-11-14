@@ -8,10 +8,10 @@ Under `bun test`, and in development until a provider is configured, `ask()` ans
 
 ```ts
 import { ask } from '@kayjs/ai'
-import { aiTest } from '@kayjs/ai/test'
+import { test as aiTest } from '@kayjs/ai/test'
 import { expect, it } from 'bun:test'
 
-const model = aiTest()
+const model = aiTest(site)
 
 it('asks for the summary', async () => {
   model.reply(['It ', 'works'])
@@ -22,7 +22,7 @@ it('asks for the summary', async () => {
 })
 ```
 
-`aiTest()` scripts and reads `fakeAi`, which forgets its scripts and asks at the start of every test, so no test clears it by hand; call it at the top of a file. It has `reply`, `fail`, `asked`, `last()` and `clear()`, which the bullets below describe on `fakeAi`, the process's own; `clear()` drops the asks and every script not yet read, for a test outside `bun test`'s hooks or one that scripts in two stages.
+`aiTest(site)` (`test` of `@kayjs/ai/test`, the site optional as the fake is the process's) scripts and reads `fakeAi`, which forgets its scripts and asks at the start of every test, so no test clears it by hand; call it at the top of a file. It has `reply`, `fail`, `asked`, `last()` and `clear()`, which the bullets below describe on `fakeAi`, the process's own; `clear()` drops the asks and every script not yet read, for a test outside `bun test`'s hooks or one that scripts in two stages.
 
 An action that asks several times in a row (grouping, script, a revision only when the script misses its length, pronunciation) scripts the pass it means by what it asks, so the passes read before it, and the conditional ones that may not run, count for nothing:
 

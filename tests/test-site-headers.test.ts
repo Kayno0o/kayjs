@@ -39,7 +39,7 @@ describe('testSite({ headers }) reaches every method', () => {
     await expect(site.call(enter, { name: 'Ada' })).rejects.toBeDefined()
     expect(lastTo(enter.url).headers.get('x-test')).toBe('default')
 
-    await expect(site.refusal(enter, { name: 'Ada' })).rejects.toBeDefined()
+    await expect(site.expectRefused(enter, { name: 'Ada' })).rejects.toBeDefined()
     expect(lastTo(enter.url).headers.get('x-test')).toBe('default')
   })
 
@@ -98,12 +98,12 @@ describe('site.api under a base and a trailing slash', () => {
 
 describe('socketRefusal under a base', () => {
   it('refuses a cross-site upgrade on either site', async () => {
-    expect((await site.socketRefusal(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
+    expect((await site.socket.refused(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
     expect((await strict.socketRefusal(cookies, '/feed', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
   })
 
   it('keeps the cookie a refusal sets', async () => {
-    const refused = await site.socketRefusal(cookies, '/gate')
+    const refused = await site.socket.refused(cookies, '/gate')
 
     expect(refused.status).toBe(401)
     expect(site.cookies.get('gated')).toBe('1')
@@ -113,7 +113,7 @@ describe('socketRefusal under a base', () => {
   it('closes an accepted connection, which the server sees close, and fails naming the route', async () => {
     const before = (await site.api(cookies, '/sockets')).body as { opened: number, closed: number }
 
-    await expect(site.socketRefusal(cookies, '/watch')).rejects.toThrow('was accepted')
+    await expect(site.socket.refused(cookies, '/watch')).rejects.toThrow('was accepted')
 
     let now = before
 

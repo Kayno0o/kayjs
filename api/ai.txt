@@ -1063,7 +1063,14 @@ function pgConversations(source: PgSource): ConversationStore & { close: () => P
 function sqliteConversations(path?: string): ConversationStore
 
 [./test] aiTest
-function aiTest(): AiTest
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+function aiTest(_site?: TestSite | undefined): AiTest
 
 [./test] AiTest
-type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'>
+type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'> & {
+  // Forgets the scripts and the asks seen, as the start of every test does;
+  the same as `clear`. reset: () => void
+}
+
+[./test] test
+function test(_site?: TestSite | undefined): AiTest

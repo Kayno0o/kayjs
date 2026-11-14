@@ -2,9 +2,11 @@ import type { Elysia } from 'elysia'
 import type { BareUser, Core } from './core'
 import type { OAuthSite, OAuthTest } from './oauthTest'
 import type { CreateUserInput } from './password'
+import type { AuthTest } from './test'
 import type { TotpEnrolment } from './twoFactor'
 import { load } from './load'
 import { dropSession } from './testCookies'
+import { signInHook } from './testHook'
 
 // Who `signInAs` signs in: `createUser`'s fields and the app's own user `data` fields.
 export type TestMember<Role extends string, UserData extends object> = Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined, data?: { [Field in keyof UserData]?: UserData[Field] | undefined } | undefined }
@@ -47,12 +49,19 @@ export function testHelpers<Role extends string, UserData extends object>(core: 
   return {
     ...helpers,
     // The test calls on one test site, so a test names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })` and `as.signOut()`.
-    test: (site: OAuthSite) => ({
-      signInAs: async (who: TestMember<Role, UserData>) => helpers.signInAs(site, who),
-      signOut: () => helpers.signOut(site),
-      sessionCookie: async (userId: string, cookieOptions?: { secure?: boolean }) => helpers.sessionCookie(userId, cookieOptions),
-      enrollTotp: async (userId: string) => helpers.enrollTotp(userId),
-      oauth: helpers.oauth(site),
-    }),
+    test: (site: OAuthSite) => {
+      const own = {
+        signInAs: async (who: TestMember<Role, UserData>) => helpers.signInAs(site, who),
+        signOut: () => helpers.signOut(site),
+        reset: () => helpers.signOut(site),
+        sessionCookie: async (userId: string, cookieOptions?: { secure?: boolean }) => helpers.sessionCookie(userId, cookieOptions),
+        enrollTotp: async (userId: string) => helpers.enrollTotp(userId),
+        oauth: helpers.oauth(site),
+      }
+
+      site.joinSignIn?.(signInHook(own as unknown as AuthTest))
+
+      return own
+    },
   }
 }

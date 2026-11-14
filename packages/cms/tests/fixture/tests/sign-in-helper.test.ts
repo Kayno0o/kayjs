@@ -4,7 +4,7 @@ import { expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { cms } from '../../../src/extension'
 import { passwordGuard } from '../../../src/password'
-import { cmsTest } from '../../../src/test'
+import { test as cmsTest } from '../../../src/test'
 
 const ROOT = join(import.meta.dir, '..')
 
@@ -26,6 +26,24 @@ test('a lone password signs the site in as editor in one call, and out again', a
 
   cmsTest(site).signOut()
 
+  expect((await site.fetch('/admin')).status).toBe(302)
+})
+
+test('site.signInAs signs the site in through the cms once it joined, and site.signOut out again', async () => {
+  const site = await siteWith({ editor: 'pw-editor', admin: 'pw-admin' })
+
+  await expect(site.signInAs({ role: 'editor' })).rejects.toThrow('call `test(site)`')
+
+  cmsTest(site)
+
+  expect(await site.signInAs({ role: 'admin' })).toEqual({ role: 'admin' })
+  expect((await site.fetch('/_kay/cms/redirects/paths?q=a')).status).toBe(200)
+
+  site.signOut()
+  expect((await site.fetch('/admin')).status).toBe(302)
+
+  await site.signInAs({ role: 'editor' })
+  cmsTest(site).reset()
   expect((await site.fetch('/admin')).status).toBe(302)
 })
 

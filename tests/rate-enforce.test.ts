@@ -156,7 +156,7 @@ describe('a site with one limit on a guard, an action and a layout', () => {
   it('counts the guard and the action together, and the pages of the layout together', async () => {
     expect(await site.call(post, {})).toBe('ok')
     expect((await site.visit('/guarded')).status).toBe(200)
-    expect((await site.refusal(post, {})).status).toBe(429)
+    expect((await site.expectRefused(post, {})).status).toBe(429)
 
     const refused = await site.fetch('/guarded')
 

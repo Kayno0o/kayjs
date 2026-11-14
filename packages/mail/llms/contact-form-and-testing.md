@@ -29,7 +29,7 @@ export const contact = action(...contactForm(mail, { fields: { phone: s.Optional
 Under `bun test` mails go to the outbox, with no SMTP server to stub:
 
 ```ts
-import { mailTest } from '@kayjs/mail/test'
+import { test as mailTest } from '@kayjs/mail/test'
 import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { signUp } from '../src/routes/index.kay'

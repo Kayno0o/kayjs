@@ -1,18 +1,17 @@
-import type { AxeResults } from '../runtime/dev-a11y'
 import type { Duration } from '../runtime/duration'
-import type { A11yViolation, BrowserOptions, DialogHandler, PageDialog, TestPage } from './page-types'
+import type { BrowserOptions, DialogHandler, PageDialog, TestPage } from './page-types'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { within } from '@kaynooo/utils/promise'
 import { afterAll } from 'bun:test'
-import { resolvePeer } from '../peers'
-import { withUnreadable } from '../runtime/dev-a11y'
 import { optionMs } from '../runtime/duration'
 import { EAGER_ISLANDS } from '../runtime/markers'
+import { auditA11y } from './a11y'
 import { installClock } from './clock'
 import { createNetwork } from './network'
+import { matchView } from './screenshot-match'
 import { waitForText } from './text-match'
 
 // A `Cookie` header, `name=value; other=value`, as a list; a value keeps any `=` after the first.
@@ -749,36 +748,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
     evaluate: async (run, ...args) => serial(async () => inView(script(run, args))),
     waitFor: async (selector, wait = {}) => atCaller(new Error('the call'), async () => serial(async () => waitForText({ poll, inView, selector, wait, timeout: waitMs(wait.timeout) }))),
-    a11y: async selector => serial(async () => {
-      // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
-      if (!await inView<boolean>('!!window.axe')) {
-        const { exceptionDetails } = await cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() })
-
-        if (exceptionDetails)
-          throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
-      }
-
-      const violations = await inView<A11yViolation[] | null>(script(async (unreadable: typeof withUnreadable, context?: string) => {
-        const { axe } = window as unknown as { axe: Axe }
-
-        if (context !== undefined && document.querySelector(context) === null)
-          return null
-
-        // A dev server's own check may be running, and axe-core runs one at a time. This runs in the page, so it cannot reach an import such as utils' `sleep`.
-        while (axe._running)
-          await new Promise(resolve => setTimeout(resolve, 25))
-
-        // Leaving out a dev server's dev tool.
-        const results = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations', 'incomplete'] })
-
-        return unreadable(results).map(({ id, impact, help, helpUrl, tags, nodes }) => ({ id, impact, help, helpUrl, tags, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
-      }, [withUnreadable, selector]))
-
-      if (violations === null)
-        throw new Error(`kay: nothing matches ${selector} to check`)
-
-      return violations
-    }),
+    matchScreenshot: async (name, options) => matchView(new Error('the call').stack, name, options, serial, async () => inView('document.fonts.ready.then(() => true)'), async () => live(async () => view.screenshot({ encoding: 'buffer', format: 'png' }))),
+    a11y: async selector => serial(async () => auditA11y(selector, cdp, async (run, args) => inView(script(run, args)), async () => inView<boolean>('!!window.axe'))),
     waitUntil: async (condition, wait = {}, ...args) => atCaller(new Error('the call'), async () => serial(async () => poll(script(condition, args), wait.what ?? 'the condition to hold', waitMs(wait.timeout)))),
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
@@ -1133,20 +1104,6 @@ function attempt<T>(run: () => T): T | undefined {
   catch {
     return undefined
   }
-}
-
-interface Axe {
-  _running?: boolean
-  run: (context: unknown, options: unknown) => Promise<AxeResults<Omit<A11yViolation, 'nodes'> & { nodes: { target: (string | string[])[], html: string }[] }>>
-}
-
-let axe: string | undefined
-
-// axe-core's browser build, read once where the app installed it; a plain error naming the install command when it did not.
-async function axeSource(): Promise<string> {
-  axe ??= await Bun.file(resolvePeer('axe-core', 'axe-core/axe.min.js')).text()
-
-  return axe
 }
 
 // Runs in the page: the point of the element a click reaches, or why none does, as `reach` reads it.

@@ -9,6 +9,7 @@ import { localState } from '../src/check/local-state'
 import { persistedStorage } from '../src/check/persisted-storage'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
+import { testHelpers } from '../src/check/test-helpers'
 
 import { compileKay } from '../src/compiler'
 import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
@@ -22,6 +23,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
 
   'deprecated-persisted-storage': persistedStorage,
   'deprecated-schema-type': schemaType,
+  'deprecated-test-helpers': testHelpers,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
 }
 

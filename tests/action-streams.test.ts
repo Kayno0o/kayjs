@@ -137,7 +137,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('answers an iterable throwing before its first value as a handler throwing', async () => {
-    const refusal = await site.refusal(actions.breaksEarly, {})
+    const refusal = await site.expectRefused(actions.breaksEarly, {})
 
     expect(refusal.status).toBe(500)
     expect(refusal.errors['']).toBe('Something went wrong on our side; try again later')
@@ -154,14 +154,14 @@ describe('an action returning an async iterable', () => {
   })
 
   it('validates the input before the first value', async () => {
-    const refusal = await site.refusal(actions.count, { to: 9 })
+    const refusal = await site.expectRefused(actions.count, { to: 9 })
 
     expect(refusal.status).toBe(422)
     expect(refusal.errors.to).toBe('Too many')
   })
 
   it('answers ctx.fail as for any action, or the stream the handler returned instead', async () => {
-    const refusal = await site.refusal(actions.refuses, { full: true })
+    const refusal = await site.expectRefused(actions.refuses, { full: true })
 
     expect(refusal.status).toBe(409)
     expect(refusal.errors['']).toBe('Full')
@@ -204,17 +204,17 @@ describe('an action returning an async iterable', () => {
     const jar = await testSite({ root: 'tests/fixtures/action-streams', islands: false })
 
     expect(await jar.call(actions.limited)).toEqual(['ok'])
-    expect((await jar.refusal(actions.limited, {})).status).toBe(429)
+    expect((await jar.expectRefused(actions.limited, {})).status).toBe(429)
     await jar.close()
   })
 
   it('runs its guards before the first value', async () => {
-    expect((await site.refusal(secret, {})).status).toBe(401)
+    expect((await site.expectRefused(secret, {})).status).toBe(401)
     expect(await site.call(secret, {}, { headers: { 'x-member': 'yes' } })).toEqual(['secret'])
   })
 
   it('refuses another site\'s post before the handler runs', async () => {
-    expect((await site.refusal(actions.count, { to: 1 }, { headers: { origin: 'https://elsewhere.example' } })).status).toBe(403)
+    expect((await site.expectRefused(actions.count, { to: 1 }, { headers: { origin: 'https://elsewhere.example' } })).status).toBe(403)
   })
 
   it('sends the cookies the handler set before its first value', async () => {
@@ -304,10 +304,10 @@ describe('an action returning an async iterable', () => {
   it('counts a succeeded-only rate limit once the first value is there', async () => {
     const limited = await testSite({ root: 'tests/fixtures/action-streams', islands: false })
 
-    expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)
-    expect((await limited.refusal(actions.counted, { fail: true })).status).toBe(500)
+    expect((await limited.expectRefused(actions.counted, { fail: true })).status).toBe(500)
+    expect((await limited.expectRefused(actions.counted, { fail: true })).status).toBe(500)
     expect(await limited.call(actions.counted, { fail: false })).toEqual(['ok'])
-    expect((await limited.refusal(actions.counted, { fail: false })).status).toBe(429)
+    expect((await limited.expectRefused(actions.counted, { fail: false })).status).toBe(429)
     await limited.close()
   })
 

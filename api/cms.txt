@@ -878,7 +878,8 @@ interface CmsSaveOptions
 type CmsSaveOutcome = SaveOutcome
 
 [./test] cmsTest
-function cmsTest(site: Pick<TestSite, "cookies" | "fetch" | "submit">): CmsTest
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+function cmsTest(site: Pick<TestSite, "cookies" | "fetch" | "submit"> & Partial<Pick<TestSite, "joinSignIn">>): CmsTest
 
 [./test] CmsTest
 interface CmsTest
@@ -886,6 +887,7 @@ interface CmsTest
   entry: (collection: string, slug: string, options?: Pick<EntryRef, "locale"> | undefined) => Promise<StoredEntry | undefined>
   move: (collection: string, slug: string, direction: "down" | "up", options?: Pick<EntryRef, "locale"> | undefined) => Promise<SaveOutcome>
   rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome & { slug?: string; }>
+  reset: () => void
   save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions | undefined) => Promise<SaveOutcome>
   signInAs: (role?: string | undefined) => Promise<string>
   signInWith: (password: string) => Promise<Visit>
@@ -897,3 +899,6 @@ interface CmsUpload
   height?: number | undefined
   path: string
   width?: number | undefined
+
+[./test] test
+function test(site: Pick<TestSite, "cookies" | "fetch" | "submit"> & Partial<Pick<TestSite, "joinSignIn">>): CmsTest

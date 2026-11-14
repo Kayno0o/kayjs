@@ -1,7 +1,7 @@
 import type { Action } from 'kay'
 import { describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { mailTest } from '../src/test'
+import { test } from '../src/test'
 
 interface Answers { name: string, email: string, topic: 'quote' | 'other', message: string }
 
@@ -10,9 +10,9 @@ const { contact } = await import(`${import.meta.dir}/fixture/src/routes/contact.
 const fields: Answers = { name: 'Ada Lovelace', email: 'ada@example.com', topic: 'quote', message: 'Hello,\nI would like a quote.' }
 
 const site = await testSite({ root: 'tests/fixture' })
-const mail = mailTest(site)
+const mail = test(site)
 
-describe('mailTest', () => {
+describe('mail test(site)', () => {
   it('reads the mails the site sent', async () => {
     expect(mail.mails).toHaveLength(0)
 
@@ -40,6 +40,16 @@ describe('mailTest', () => {
     await site.call(contact, fields)
 
     expect((await waited).subject).toBe('Message from Ada Lovelace')
+  })
+
+  it('empties the outbox on reset()', async () => {
+    await site.call(contact, fields)
+    await site.runJobs()
+    expect(mail.mails).toHaveLength(1)
+
+    mail.reset()
+
+    expect(mail.mails).toHaveLength(0)
   })
 
   it('names the mails the outbox holds when none came', async () => {

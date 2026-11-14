@@ -751,6 +751,7 @@ component default
   wordingId?: string | undefined
 
 [./test] mailTest
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
 function mailTest(site: Pick<TestSite, "runJobs">): MailTest
 
 [./test] MailTest
@@ -760,6 +761,10 @@ interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' | 'link
   link: (mail: Mail, match?: RegExp | string | undefined) => string
   links: (mail: Mail) => string[]
   mails: readonly SentMail[]
+  reset: () => void
   to: (address: string) => SentMail[]
   token: (mail: Mail, match?: RegExp | string | undefined) => string
   waitFor: (address: string, options?: Omit<MailWaitOptions, "site"> | undefined) => Promise<SentMail>
+
+[./test] test
+function test(site: Pick<TestSite, "runJobs">): MailTest

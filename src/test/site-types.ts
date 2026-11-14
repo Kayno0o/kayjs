@@ -1,3 +1,4 @@
+import type { SignedIn, SignInFields } from '.'
 import type { Action, ActionError, FailuresOf, NoInputAction, ResultOf, STAMP_FIELD, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
@@ -5,10 +6,20 @@ import type { PagesOptions } from '../server/app'
 import type { LogEntry } from '../server/log'
 import type { PluginInput } from '../server/plugin'
 import type { TestContent } from './content'
+import type { FetchStub, FetchStubRoutes } from './outgoing'
 import type { PageReading } from './page'
 import type { BrowserOptions, TestPage } from './page-types'
 
+export interface SignInHook {
+  // The library, such as `auth`: a second hook of the same name replaces the first, so `test(site)` called in each test joins once.
+  name: string
+  signIn: (who: SignInFields) => Promise<Partial<SignedIn> | undefined>
+  signOut: () => void
+}
+
 export interface TestOptions extends PagesOptions {
+  // Whether a call to another host that no `site.fetchStub` answers fails (`'fail'`, the default) or goes to the network (`'allow'`); a call to loopback, such as a `fakeService`, always goes through.
+  outgoing?: 'fail' | 'allow' | undefined
   // Headers every request of the site sends unless the call gives one of the same name, such as an `authorization` bearer token; `site.as()` adds to them.
   headers?: Record<string, string> | undefined
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
@@ -62,6 +73,10 @@ export type CallArguments<Target> = object extends InputOf<Target> ? [input?: In
 // What `submit` takes besides the action and its fields.
 export type SubmitInit = VisitInit & { from?: string | Visit, openedFor?: Duration | 0, stamp?: string | undefined }
 
+export type OpenSocket = <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
+
+export type RefusedSocket = <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => Promise<Response>
+
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
@@ -76,6 +91,8 @@ export interface TestSite {
   // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
+  expectRefused: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
+  /** @deprecated `site.expectRefused`, the name every test helper of refusals shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
   refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailuresOf<Target>>>
   // The site's MCP endpoint, as an agent calls it: `mcp: true` serves it. Calls carry the cookies so far and the headers given, such as an `Authorization` bearer token.
   mcp: {
@@ -92,10 +109,11 @@ export interface TestSite {
   api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiRequest<Module, Path, M> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
   // The same site with these headers added to every request, a string being a `Cookie` header such as `auth.sessionCookie` returns; the site it was made from is unchanged and shares its cookies.
   as: (who: string | Record<string, string>) => TestSite
-  // A websocket route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test. `onError({ error })` and `onClose({ status: 'failed' })` of the options run with the refusal; there is no connection, so `onOpen` and `onData` never do.
-  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
-  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
+  // `socket.refused(module, path, options)` is a route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test. `onError({ error })` and `onClose({ status: 'failed' })` of the options run with the refusal; there is no connection, so `onOpen` and `onData` never do.
+  socket: OpenSocket & { refused: RefusedSocket }
+  /** @deprecated `site.socket.refused`, beside the `site.socket` it refuses. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+  socketRefusal: RefusedSocket
   // A route of a module under `src/api` answering with `eventStream()`, read as an island reads it.
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set, under its `base` when it has one; its cookies are the browser's, not `cookies`.
@@ -108,6 +126,16 @@ export interface TestSite {
   runSchedule: (which?: string | number | ((signal: AbortSignal) => unknown)) => Promise<number>
   // Moves the clock forward by a duration with `setSystemTime` from `bun:test`, firing each schedule at every instant it falls due on the way, in order with the clock at that instant, then runs the queue jobs now due; resolves with how many scheduled runs it fired. Sessions, rate-limit windows, caches and sleeps read the moved clock. Restore it with `setSystemTime()`.
   advance: (by: Duration | number) => Promise<number>
+  // Signs the site in for every library whose `test(site)` joined it: kayjs-auth reads `email` or `username` (with the `createUser` fields and the app's user `data`), kayjs-cms a `role`, or none for a guard holding one password. A second call switches member. Answers what each library signed in as.
+  signInAs: (who: SignInFields) => Promise<SignedIn>
+  // Signs the site out of every library that joined it, its other cookies kept.
+  signOut: () => void
+  // What a library's `test(site)` calls to take part in `signInAs` and `signOut`: `signIn` answers undefined for a `who` it has nothing to do with.
+  joinSignIn: (hook: SignInHook) => void
+  // Stands in for the outside services the app calls with `fetch`, for the test: routes keyed by a URL pattern with `*` for any characters, `'https://api.x/*'`, led by a method for one verb (`'POST https://api.x/v1/orders'`), each a value (JSON, a string as text, a `Response` as it is) or a function of the request. A later stub wins over an earlier one; the stubs end with the test. A call to loopback goes through, any other `http` or `https` call no stub answers fails, unless `testSite({ outgoing: 'allow' })`. The answer lists the requests the stub received.
+  fetchStub: (routes: FetchStubRoutes) => FetchStub
+  // Freezes the clock at a date (now when left out), which `Date.now()`, sessions, rate-limit windows and cache ages read; `advance` moves it on from there. The real time comes back after the test, and with `close()`.
+  freezeTime: (at?: Date | number | string) => Date
   cookies: Bun.CookieMap
   // What the server logged since the test began, in order: the messages kay and libraries wrote, a `logFrom('reply').info(...)` of the app's included (`{ type: 'message', level, from, message, request?, error? }`), and the request lines when the app's `log` option logs them. Emptied before each test of a site made at the top of a file or a describe. The log is the process's, so two sites open at once each hear the other's lines.
   logs: readonly LogEntry[]

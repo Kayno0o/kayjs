@@ -59,6 +59,7 @@ import { apiOf } from './site-api'
 import { mcpOf } from './site-mcp'
 import { ORIGIN, withDefaults } from './site-scope'
 import { socketsOf } from './site-socket'
+import { createWorld, worldOf } from './site-world'
 import { closeAfterTests, openSites } from './sites'
 import { assertKayWritable } from './writable'
 
@@ -70,18 +71,26 @@ export { cookieJar } from './cookies'
 export type { Interactions } from './interact'
 export type { Mounted } from './mount'
 export { mountComponent, persistedCookie, readPersisted, settle, writePersisted } from './mount'
+export type { FetchStub, FetchStubRoutes, StubbedRequest } from './outgoing'
 export type { EnvOverride, EnvRestore } from './override-env'
 export { overrideEnv } from './override-env'
 export type { Found, PageReading } from './page'
 export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, DragOptions, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, PointerOptions, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './page-types'
 export { resetEachTest } from './reset'
 export { scratchDir } from './scratch'
+export type { MatchScreenshotOptions } from './screenshot-match'
 export type { FakeService, ServiceAnswer, ServiceHandler, ServiceRequest, ServiceRoutes } from './service'
 export { fakeService } from './service'
-export type { ApiResult, FormValue, McpCall, McpInitialize, McpTool, TestOptions, TestSite, TestSocket, TestStream, Visit, VisitInit } from './site-types'
+export type { ApiResult, FormValue, McpCall, McpInitialize, McpTool, SignInHook, TestOptions, TestSite, TestSocket, TestStream, Visit, VisitInit } from './site-types'
 export type { WaitUntilOptions } from './wait'
 export { solveWork }
 export { waitUntil } from './wait'
+
+// What `site.signInAs` takes: each library's `test(site)` adds the fields it reads with a `declare module 'kay/test'`, kayjs-auth the member's `email`, `username`, `roles`, `data` and the rest of `createUser`'s, kayjs-cms the `role`.
+export interface SignInFields {}
+
+// What `site.signInAs` answers, each library adding what it signed in as: kayjs-auth the `user`, kayjs-cms the `role`.
+export interface SignedIn {}
 
 const MAX_REDIRECTS = 10
 // Scheduled runs one `advance()` fires before it refuses, so a short schedule over a long span never loops for good.
@@ -277,8 +286,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
   const logs: LogEntry[] = []
-  // Shared by `as()` views of the site: whether `advance()` moved the clock, which closing the site and the end of the file put back.
-  const clockMoved = { value: false }
+  // Shared by `as()` views of the site.
+  const world = createWorld(options.outgoing === 'allow')
   const untap = tapLogs(entry => void logs.push(entry))
 
   try {
@@ -287,12 +296,10 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       logs.length = 0
     })
     afterAll(release)
-    afterAll(() => {
-      if (clockMoved.value)
-        setSystemTime()
-    })
   }
   catch {}
+
+  world.resetEachTest()
 
   // What kay sends through the app on the visitor's behalf, as the page a refused post renders, goes through all of it, as a server would send it.
   const handle = async (request: Request): Promise<Response> => {
@@ -425,6 +432,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       ...apiOf(scope),
       ...socketsOf(scope),
       ...actionsOf(scope),
+      ...worldOf(world),
       content,
       logs,
       handle,
@@ -445,7 +453,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         const cursors = new Map(scheduledOf(app).map(entry => [entry, Date.now()]))
         let fired = 0
 
-        clockMoved.value = true
+        world.clock.moved = true
 
         try {
           for (;;) {
@@ -519,11 +527,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       },
       close: async () => {
         forget()
-
-        if (clockMoved.value) {
-          setSystemTime()
-          clockMoved.value = false
-        }
+        world.release()
 
         setSiteFiles(undefined, ownFiles)
         untap()

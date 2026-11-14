@@ -72,7 +72,7 @@ An action with no input, such as a sign-out button, takes no fields: `site.submi
 
 `site.call(action, input)` calls an action as an island does, and throws `ActionError` when it fails. An action with no input takes no second argument: `site.call(signOut)`.
 
-`site.refusal(action, input)` makes a call that you expect to be refused. It resolves with the `ActionError`, its `status`, `errors`, `message` and `data` typed from the handler. It fails the test when the call goes through.
+`site.expectRefused(action, input)` makes a call that you expect to be refused. It resolves with the `ActionError`, its `status`, `errors`, `message` and `data` typed from the handler. It fails the test when the call goes through.
 
 ### Testing an MCP endpoint
 
@@ -122,10 +122,10 @@ expect(answer.status()).toBe('done')
 
 Both take `headers` in their options, to call as a signed-in client.
 
-To test that a socket is refused, `site.socketRefusal` sends a real upgrade and resolves with the refusal. It fails when the route accepted the connection.
+To test that a socket is refused, `site.socket.refused` sends a real upgrade and resolves with the refusal. It fails when the route accepted the connection.
 
 ```ts
-const refused = await site.socketRefusal(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
+const refused = await site.socket.refused(chat, '/:room', { params: { room: 'general' }, headers: { origin: 'https://evil.test' } })
 
 expect(refused.status).toBe(403)
 ```
@@ -190,7 +190,30 @@ const token = mail.token(sent, '/auth/reset-password')
 
 ## Testing a library
 
-Each library has one helper. Call it at the top of a test file, and it clears itself before every test, so no test cleans up by hand. `mailTest(site)` reads the mails, `aiTest()` scripts the fake model, `auth.test(site)` signs the site in and out, and `cmsTest(site)` signs in as an editor, saves an entry and reads it back. Each library's page shows its helper.
+Each library's test entry exports one helper with one shape, `test(site)`, which takes the site `testSite()` made. Call it at the top of a test file, and it clears the library's fake before every test, so no test cleans up by hand; `reset()` clears it in the middle of a test.
+
+Import it under the library's name, as `bun:test` has a `test` too: `import { test as mailTest } from '@kayjs/mail/test'`. `mailTest(site)` reads the mails, `aiTest(site)` scripts the fake model, `authTest(site)` signs the site in and out, and `cmsTest(site)` signs in as an editor, saves an entry and reads it back. Each library's page shows its helper.
+
+Once the helpers are called, `site.signInAs({ email })` signs the site in for every library that took part (kayjs-auth reads an `email` or a `username`, kayjs-cms a `role`) and `site.signOut()` signs it out of all of them.
+
+## Faking the outside world
+
+`site.fetchStub` answers the `fetch` calls your app makes to another service, for one test, and lists what it received. A call to another host that nothing stubs fails the test, so a test never reaches the network by accident; `testSite({ outgoing: 'allow' })` lets it through.
+
+```ts
+const stub = site.fetchStub({
+  'https://api.example.com/orders/*': { status: 'paid' },
+  'POST https://api.example.com/refunds': request => ({ refunded: request.json() }),
+})
+
+await site.call(refund, { order: 12 })
+
+expect(stub.requests[0]?.url).toBe('https://api.example.com/refunds')
+```
+
+A key is a URL with `*` for any characters, led by a method for one verb. A route is a value (an object as JSON, a string as text, a `Response`) or a function of the request. Calls to your own machine, such as a `fakeService`, go through.
+
+`site.freezeTime('2026-03-01T10:00:00Z')` stops the clock at a date, for sessions, rate-limit windows and cache ages; `site.advance('1h')` moves it on from there, and the real time comes back after the test.
 
 ## Calling an API route
 

@@ -23,7 +23,7 @@ it('hands the model the files posted with the messages of a chat, only those of 
 })
 
 it('refuses a file whose bytes are no image, whatever its declared type', async () => {
-  const refused = await site.refusal(reply, { messages: [{ role: 'user', content: 'x', attachments: [new File(['not a png'], 'a.png', { type: 'image/png' })] }] })
+  const refused = await site.expectRefused(reply, { messages: [{ role: 'user', content: 'x', attachments: [new File(['not a png'], 'a.png', { type: 'image/png' })] }] })
 
   expect(refused.status).toBe(415)
   expect(fakeAi.asked).toHaveLength(0)

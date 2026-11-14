@@ -1,6 +1,6 @@
 import type { ConnectionHooks } from '../runtime/live'
 import type { SiteScope } from './site-scope'
-import type { TestSite } from './site-types'
+import type { OpenSocket, RefusedSocket, TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
 import { connectionHooks } from '../runtime/connection'
 import { openSocket, readEvents, refusalOf, resumeHeaders, routeUrl, streamRequest } from '../runtime/live'
@@ -28,54 +28,58 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
     return Object.fromEntries(headers)
   }
 
+  const open: OpenSocket = (module, path, ...[options]) => {
+    const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+    const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: upgradeHeaders(url, options?.headers) }), options)
+    const tested = Object.assign(client, inbox(client))
+
+    connections.add(client)
+    client.start()
+
+    return tested
+  }
+
+  const refused: RefusedSocket = async (module, path, ...[options]) => {
+    const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
+    const attempt = new AbortController()
+    const timer = setTimeout(() => attempt.abort(), REFUSAL_TIMEOUT_MS)
+    const connection = { close: () => attempt.abort() }
+
+    connections.add(connection)
+
+    try {
+      const response = await NativeFetch(`http://localhost:${listening().port}${url}`, { headers: { ...UPGRADE, ...upgradeHeaders(url, options?.headers) }, redirect: 'manual', signal: attempt.signal })
+
+      if (response.status === 101) {
+        await response.body?.cancel()
+
+        throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
+      }
+
+      jar.keep(response, new URL(url, 'http://localhost').pathname)
+
+      const error = await refusalOf(response.clone())
+
+      for (const hook of [() => options?.onError?.({ error }), () => options?.onClose?.({ status: 'failed' })]) {
+        try {
+          hook()
+        }
+        catch (thrown) {
+          console.error(thrown)
+        }
+      }
+
+      return response
+    }
+    finally {
+      clearTimeout(timer)
+      connections.delete(connection)
+    }
+  }
+
   return {
-    socket: (module, path, ...[options]) => {
-      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: upgradeHeaders(url, options?.headers) }), options)
-      const tested = Object.assign(client, inbox(client))
-
-      connections.add(client)
-      client.start()
-
-      return tested
-    },
-    socketRefusal: async (module, path, ...[options]) => {
-      const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const attempt = new AbortController()
-      const timer = setTimeout(() => attempt.abort(), REFUSAL_TIMEOUT_MS)
-      const connection = { close: () => attempt.abort() }
-
-      connections.add(connection)
-
-      try {
-        const response = await NativeFetch(`http://localhost:${listening().port}${url}`, { headers: { ...UPGRADE, ...upgradeHeaders(url, options?.headers) }, redirect: 'manual', signal: attempt.signal })
-
-        if (response.status === 101) {
-          await response.body?.cancel()
-
-          throw new Error(`kay: the upgrade to ${url} was accepted, where a refusal was expected`)
-        }
-
-        jar.keep(response, new URL(url, 'http://localhost').pathname)
-
-        const error = await refusalOf(response.clone())
-
-        for (const hook of [() => options?.onError?.({ error }), () => options?.onClose?.({ status: 'failed' })]) {
-          try {
-            hook()
-          }
-          catch (thrown) {
-            console.error(thrown)
-          }
-        }
-
-        return response
-      }
-      finally {
-        clearTimeout(timer)
-        connections.delete(connection)
-      }
-    },
+    socket: Object.assign(open, { refused }),
+    socketRefusal: refused,
     stream: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
       const init = streamRequest(options)

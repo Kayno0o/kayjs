@@ -1,7 +1,8 @@
+import type { SignInHook } from 'kay/test'
 import { afterEach, expect, it } from 'bun:test'
 import { discordProvider } from '../src/oauth/providers'
 import { buildOwn } from '../src/own'
-import { authTest } from '../src/test'
+import { test as authTest } from '../src/test'
 
 afterEach(() => {
   delete process.env.AUTH_DATABASE_URL
@@ -20,6 +21,24 @@ it('signs a site in through the auth() built with no module', async () => {
   expect(site.cookies.size).toBeGreaterThan(0)
 
   authTest(site).signOut()
+
+  expect(site.cookies.size).toBe(0)
+})
+
+it('joins site.signInAs for a who with an email or a username, and resets by signing out', async () => {
+  let joined: SignInHook | undefined
+  const site = { cookies: new Bun.CookieMap(), joinSignIn: (hook: SignInHook) => void (joined = hook) }
+
+  authTest(site)
+
+  await buildOwn({}, { root: process.cwd(), extensions: [], modules: {}, testCookies: site.cookies })
+
+  expect(joined?.name).toBe('auth')
+  expect(await joined?.signIn({})).toBeUndefined()
+  expect((await joined?.signIn({ email: 'ada@example.com', username: 'Ada' }))?.user?.email).toBe('ada@example.com')
+  expect(site.cookies.size).toBeGreaterThan(0)
+
+  authTest(site).reset()
 
   expect(site.cookies.size).toBe(0)
 })

@@ -18,6 +18,15 @@ export interface ServiceRequest {
   json: () => unknown
 }
 
+// A request as a fake reads it, its body read once.
+export async function requestOf(incoming: Request): Promise<ServiceRequest> {
+  const bytes = new Uint8Array(await incoming.arrayBuffer())
+  const text = new TextDecoder().decode(bytes)
+  const url = new NativeURL(incoming.url)
+
+  return { method: incoming.method, path: url.pathname, query: url.searchParams, headers: incoming.headers, text, bytes, json: () => JSON.parse(text) as unknown }
+}
+
 export type ServiceHandler = (request: ServiceRequest) => ServiceAnswer | Promise<ServiceAnswer>
 
 // Routes keyed by `path` or `METHOD path`, each a value or a function of the request; a bare function answers every request.
@@ -42,7 +51,7 @@ export interface FakeService {
 const METHOD_KEY = /^([a-z]+) (?=\/)/i
 const STALL_RELEASED = 'the fake service ended the test with this request unanswered'
 
-function answerOf(value: ServiceAnswer): Response {
+export function answerOf(value: ServiceAnswer): Response {
   if (value instanceof Response)
     return value.clone()
 
@@ -102,10 +111,7 @@ export function fakeService(routes: ServiceRoutes): FakeService {
     port: 0,
     hostname: '127.0.0.1',
     async fetch(incoming) {
-      const bytes = new Uint8Array(await incoming.arrayBuffer())
-      const text = new TextDecoder().decode(bytes)
-      const url = new NativeURL(incoming.url)
-      const request: ServiceRequest = { method: incoming.method, path: url.pathname, query: url.searchParams, headers: incoming.headers, text, bytes, json: () => JSON.parse(text) as unknown }
+      const request = await requestOf(incoming)
 
       requests.push(request)
 

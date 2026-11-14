@@ -53,6 +53,7 @@ import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unusedStatusPages } from './status-pages'
+import { testHelpers } from './test-helpers'
 import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
@@ -160,6 +161,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => persistedStorage(root, options),
 
   async ({ root, options }) => schemaType(root, options),
+  async ({ root, options }) => testHelpers(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

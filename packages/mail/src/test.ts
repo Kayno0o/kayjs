@@ -9,11 +9,13 @@ export interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' 
   readonly mails: readonly SentMail[]
   // The newest mail to this address, once there is one: the site's queues run first, so a mail the app enqueued is delivered.
   waitFor: (address: string, options?: Omit<MailWaitOptions, 'site'>) => Promise<SentMail>
+  // Empties the outbox, as the start of every test does.
+  reset: () => void
 }
 
 // Reads the mails a test site sent, from an outbox that is empty at the start of every test, so no test clears it by hand.
 // Called at the top of a file or a `describe`, as `testSite()` is.
-export function mailTest(site: Pick<TestSite, 'runJobs'>): MailTest {
+export function test(site: Pick<TestSite, 'runJobs'>): MailTest {
   resetEachTest(() => outbox.clear())
 
   return {
@@ -27,5 +29,9 @@ export function mailTest(site: Pick<TestSite, 'runJobs'>): MailTest {
     link: (mail, match) => outbox.link(mail, match),
     token: (mail, match) => outbox.token(mail, match),
     waitFor: async (address, options) => outbox.waitFor(address, { ...options, site }),
+    reset: () => outbox.clear(),
   }
 }
+
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+export const mailTest = test

@@ -1,13 +1,17 @@
+import type { TestSite } from 'kay/test'
 import type { Fake } from './fake'
 import { resetEachTest } from 'kay/test'
 import { fakeAi } from './fake'
 
 // The fake `ask()` answers from, as one test reads it.
-export type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'>
+export type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'> & {
+  // Forgets the scripts and the asks seen, as the start of every test does; the same as `clear`.
+  reset: () => void
+}
 
 // Scripts and reads the fake model, which forgets its scripts and the asks it saw at the start of every test, so no test clears it by hand.
-// Called at the top of a file or a `describe`, as `testSite()` is.
-export function aiTest(): AiTest {
+// Called at the top of a file or a `describe`, as `testSite()` is. The model is the process's, so the site only gives the helper the shape of every library's `test(site)`.
+export function test(_site?: TestSite): AiTest {
   resetEachTest(() => fakeAi.clear())
 
   return {
@@ -18,6 +22,7 @@ export function aiTest(): AiTest {
     reply: (script, when) => fakeAi.reply(script, when),
     fail: (error, when) => fakeAi.fail(error, when),
     clear: () => fakeAi.clear(),
+    reset: () => fakeAi.clear(),
     get heard() {
       return fakeAi.heard
     },
@@ -32,3 +37,6 @@ export function aiTest(): AiTest {
     embedding: (answer, when) => fakeAi.embedding(answer, when),
   }
 }
+
+/** @deprecated `test(site)`, the same helper under the name every library's test entry shares. Removed in 1.108.0; `deprecated-test-helpers` rewrites it. */
+export const aiTest = test

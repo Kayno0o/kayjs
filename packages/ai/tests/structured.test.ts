@@ -399,7 +399,7 @@ describe('streaming a structured reply', () => {
   it('fails the action of a streaming answer the schema refuses', async () => {
     fakeAi.reply({ data: { title: 'x' } })
 
-    const refused = await site.refusal(whole, { prompt: 'go' })
+    const refused = await site.expectRefused(whole, { prompt: 'go' })
 
     expect(refused.status).toBe(500)
   })
@@ -478,7 +478,7 @@ describe('structured replies with tools', () => {
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
     fakeAi.reply({ data: answer })
 
-    const refused = await site.refusal(outcome, { prompt: 'go', maxSteps: 1 })
+    const refused = await site.expectRefused(outcome, { prompt: 'go', maxSteps: 1 })
 
     expect(refused.status).toBe(500)
     expect(fakeAi.asked).toHaveLength(1)
@@ -489,7 +489,7 @@ describe('structured replies with tools', () => {
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
     fakeAi.reply({ data: { title: 'x' } })
 
-    const refused = await site.refusal(outcome, { prompt: 'go' })
+    const refused = await site.expectRefused(outcome, { prompt: 'go' })
 
     expect(refused.status).toBe(500)
     expect(done).toEqual(['addNote:Milk'])

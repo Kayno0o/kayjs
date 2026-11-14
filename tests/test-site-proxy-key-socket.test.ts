@@ -12,5 +12,5 @@ it('sends the key with a socket upgrade, and a test can send none', async () => 
 
   socket.send({ type: 'say', text: 'hi' })
   expect(await socket.next()).toMatchObject({ type: 'echo' })
-  expect((await site.socketRefusal(rooms, '/', { headers: { [HEADER]: '' } })).status).toBe(403)
+  expect((await site.socket.refused(rooms, '/', { headers: { [HEADER]: '' } })).status).toBe(403)
 })
