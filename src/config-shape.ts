@@ -1,5 +1,5 @@
 import type { BudgetConfig } from './build/budget'
-import type { ActionsConfig, CardConfig, ClientConfig, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, JobsConfig, KayConfig, LimitsConfig, LiveConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, PreviewConfig, ProxyConfig, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ActionsConfig, CardConfig, ClientConfig, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImageFormats, ImageLimits, ImagesInput, JobsConfig, KayConfig, LimitsConfig, LiveConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, PreviewConfig, ProxyConfig, RemoteImages, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
 import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
@@ -8,8 +8,8 @@ import { nearest } from './nearest'
 // A key takes `true` to accept any value while its type is too open to check; a lane adding a key to `KayConfig` adds it here, beside its type, with a check from `config-rules.ts` (`str`, `bool`, `oneOf('a', 'b')`, `list(str)`, `bag({ ... })`, `either(...)`), and a bag it holds as a `Record<keyof ItsInterface, Rule>` passed to `bag`.
 const localized = either(str, map(str))
 const guardOption = either(fn, list(fn), bag({ load: fn }), lit(false))
-const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(bool, map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(list(str), bool), cookies: either(bool, bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
-const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: map(map(str)), messages: str }
+const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(bool, map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(fn, list(str), bool), cookies: either(bool, bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
+const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: either(fn, map(map(str))), messages: str }
 const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
   if (Array.isArray(locales) && typeof defaultLocale === 'string' && !locales.includes(defaultLocale))
     out.push(`\`${path}.defaultLocale\` is ${JSON.stringify(defaultLocale)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
@@ -24,9 +24,9 @@ const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyle
 const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
 const OFFLINE: Record<keyof OfflineConfig, Rule> = { pages: list(str), fallback: str }
 const HEALTH: Record<keyof HealthConfig, Rule> = { path: str, timeout: duration, check: fn }
-const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: list(str), trustPrivate: lit(false), key: str, open: list(str) }
+const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: either(fn, list(str)), trustPrivate: lit(false), key: str, open: list(str) }
 const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
-const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: list(str) }
+const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: either(fn, list(str)), allow: either(fn, list(str)) }
 const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration, sharedNotBefore: fn }
 // The limit of kay's own routes: `RateLimit` but for `key`, as they count the client's address.
 const KAY_ROUTE_LIMIT: Record<string, Rule> = { max: num, window: duration, store: obj, onLimit: fn }
@@ -38,8 +38,12 @@ const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: either(str, bag({ light: str, dark: str })), backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, transform: fn, preprocess: fn, containers: bool, footnotes: bool, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
-const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(bool, bag({ quality: num })), maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
-const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
+const AVIF = either(bool, bag({ quality: num }))
+const REMOTE_IMAGES: Record<keyof RemoteImages, Rule> = { hosts: either(fn, list(str)), maxSize: bytes, timeout: duration }
+const IMAGE_FORMATS: Record<keyof ImageFormats, Rule> = { quality: num, webp: bag({ quality: num }), avif: AVIF }
+const IMAGE_LIMITS: Record<keyof ImageLimits, Rule> = { variants: either(num, lit(false)), queue: either(num, lit(false)) }
+const IMAGES: Record<keyof ImagesInput, Rule> = { ttl: duration, dirs: map(str), remote: either(fn, list(str), bag(REMOTE_IMAGES)), formats: bag(IMAGE_FORMATS), limits: bag(IMAGE_LIMITS), remoteMaxSize: bytes, remoteTimeout: duration, rateLimit: either(bool, bag(KAY_ROUTE_LIMIT)), maxVariants: either(num, lit(false)), queue: either(num, lit(false)), quality: num, webp: bag({ quality: num }), widths: list(num), avif: AVIF, maxDensity: numOrInfinity, placeholder: bool, aspects: list(str), card: bag(CARD), resolve: fn, guards: guardOption, guard: guardOption }
+const CORS = bag({ origins: either(oneOf('*'), list(str), fn), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof KayConfig, Rule> = {
   dirs: bag(DIRS),
   limits: bag(LIMITS),

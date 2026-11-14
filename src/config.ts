@@ -447,26 +447,16 @@ export interface ImagesConfig {
   ttl?: Duration | undefined
   // Directories of images added at runtime, such as uploads, by the URL path the app serves them at: `{ '/uploads/': 'data/uploads' }`. The image route resizes those as well as imported images, reading them on each request; a directory is relative to the root, or where an executable runs.
   dirs?: Record<string, string> | undefined
-  // Hosts whose images are resized too, each an origin and maybe a path, its host maybe starting with `*.` for any subdomain: `['https://cms.example.com/uploads/', 'https://*.cdn.example.com']`. The image route downloads them, keeping a copy it revalidates; a host not listed is refused, so the route is no open proxy.
-  remote?: string[] | undefined
-  // The most a remote original may weigh, bytes or a size such as `'10mb'`: a bigger one answers 413 and is not kept. 25 MB by default.
-  remoteMaxSize?: ByteSize | undefined
-  // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
-  remoteTimeout?: Duration | undefined
+  // Images on other hosts, resized too: `{ hosts: ['https://cms.example.com/uploads/'] }`. The image route downloads them, keeping a copy it revalidates; a host not listed is refused, so the route is no open proxy.
+  remote?: RemoteImages | undefined
+  // How the variants are encoded.
+  formats?: ImageFormats | undefined
   // The most variants one client may have the image route encode in a window, counted by its address (the forwarded one behind a trusted `proxy`); a variant already made is never counted. Past it the route answers 429 with `Retry-After`. `{ max: 120, window: '1m' }` by default, `false` for no limit.
   rateLimit?: Omit<RateLimit, 'key'> | boolean | undefined
-  // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
-  maxVariants?: number | false | undefined
-  // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
-  queue?: number | false | undefined
-  // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG, which `webp.quality` leaves alone; `image(src, { quality })` sets one image's variants.
-  quality?: number | undefined
-  // WebP variants beside the AVIF ones: `{ quality: 75 }` over `quality`, for the variants alone.
-  webp?: { quality?: number | undefined } | undefined
+  // What the route spends on variants nobody has made yet.
+  limits?: ImageLimits | undefined
   // The widths in pixels `image()` resizes to and the route makes, whole numbers from 1 to 16384, at most 16, in any order: `[480, 960, 1440, 1920]`. Defaults to `[320, 640, 960, 1280, 1920, 2560]`, and no variant is wider than the last width, which a list of your own does not do: it also gets each image's own size. Each width is a file per image, so a short ladder builds fewer.
   widths?: number[] | undefined
-  // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.
-  avif?: boolean | { quality?: number } | undefined
   // The most pixels per CSS pixel an image loads at on a denser screen, at least 1. Defaults to 2: a 3x phone loads what a 2x one does, which looks the same; `Infinity` leaves the browser's choice.
   maxDensity?: number | undefined
   // `false` leaves out the color an image's box shows until it loads, which kay reads off each imported, Markdown, `dirs` and `remote` image without transparency; `image(src, { placeholder: false })` and `no-placeholder` on an `img` leave out one image's. Shown as a `style` attribute, so a CSP without `'unsafe-inline'` for styles drops it.
@@ -481,6 +471,49 @@ export interface ImagesConfig {
   guards?: GuardOption | false | undefined
   // Replaced by `guards` in 1.105, and works until 1.108.
   guard?: GuardOption | false | undefined
+}
+
+export interface RemoteImages {
+  // Each an origin and maybe a path, its host maybe starting with `*.` for any subdomain: `['https://cms.example.com/uploads/', 'https://*.cdn.example.com']`.
+  hosts?: string[] | undefined
+  // The most a remote original may weigh, bytes or a size such as `'10mb'`: a bigger one answers 413 and is not kept. 25 MB by default.
+  maxSize?: ByteSize | undefined
+  // How long the image route waits for a remote host, redirects included, a string such as `'30s'`; 10 seconds by default. A slower host answers 502.
+  timeout?: Duration | undefined
+}
+
+export interface ImageFormats {
+  // WebP quality, 1 to 100. Defaults to 80. It also sets the quality of the share cards' JPEG, which `webp.quality` leaves alone; `image(src, { quality })` sets one image's variants.
+  quality?: number | undefined
+  // WebP variants beside the AVIF ones: `{ quality: 75 }` over `quality`, for the variants alone.
+  webp?: { quality?: number | undefined } | undefined
+  // AVIF variants beside the WebP ones, a third to a half smaller, sent to a browser whose `Accept` names `image/avif`: on at quality 50 by default, `false` serves WebP alone. Development and a static export serve WebP.
+  avif?: boolean | { quality?: number } | undefined
+}
+
+export interface ImageLimits {
+  // The most variants the route keeps cached of one source image, so a client varying width, quality, crop and format cannot fill the cache without bound. Past it the oldest cached variant of that image is removed to make room, and one asked for again is encoded again, within `rateLimit`. Counted from the files on disk. 256 by default, `false` for no limit.
+  variants?: number | false | undefined
+  // The most encodes waiting for one of the four being drawn; past it the route answers 503 with `Retry-After` rather than queue more. 128 by default, `false` for no limit.
+  queue?: number | false | undefined
+}
+
+// `images` as an app written it before 1.105 may still: the flat keys, each of which works until 1.108.
+export interface DeprecatedImages {
+  /** @deprecated Written `remote: { maxSize }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  remoteMaxSize?: ByteSize | undefined
+  /** @deprecated Written `remote: { timeout }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  remoteTimeout?: Duration | undefined
+  /** @deprecated Written `limits: { variants }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  maxVariants?: number | false | undefined
+  /** @deprecated Written `limits: { queue }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  queue?: number | false | undefined
+  /** @deprecated Written `formats: { quality }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  quality?: number | undefined
+  /** @deprecated Written `formats: { webp }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  webp?: { quality?: number | undefined } | undefined
+  /** @deprecated Written `formats: { avif }`; `deprecated-images-keys` rewrites it. Removed in 1.108. */
+  avif?: boolean | { quality?: number } | undefined
 }
 
 export interface CardConfig {
@@ -598,6 +631,27 @@ export interface InternalConfig {
 // The config as kay reads it once loaded: what `kay.config.ts` wrote and what kay added.
 export type LoadedConfig = KayConfig & InternalConfig
 
+// A list a CMS or a database may hold: the value, or a function returning it (or a promise of it), which kay calls once as the config loads.
+export type Loadable<Value> = Value | (() => Value | Promise<Value>)
+
+// `cors` of the config: `origins` may be loaded.
+export type ConfigCors = Omit<CorsOptions, 'origins' | 'credentials'> & ({ origins: '*', credentials?: false | undefined } | { origins: Loadable<readonly string[]>, credentials?: boolean | undefined })
+
+type Over<Bag, Given> = Omit<Bag, keyof Given> & Given
+
+// What `kay.config.ts` may write: `KayConfig` with each list that may come from a CMS or a database loadable, and the keys of before 1.105 `kay check --fix` rewrites. Kay turns it into a `KayConfig` as it loads.
+export interface ConfigInput extends Omit<KayConfig, 'cors' | 'security' | 'proxy' | 'robots' | 'redirects' | 'i18n' | 'images'> {
+  cors?: ConfigCors | undefined
+  security?: boolean | Over<SecurityConfig, { hosts?: Loadable<string[]> | boolean | undefined }> | undefined
+  proxy?: boolean | number | Over<ProxyConfig, { trusted?: Loadable<string[]> | undefined }> | undefined
+  robots?: boolean | Over<RobotsConfig, { disallow?: Loadable<string[]> | undefined, allow?: Loadable<string[]> | undefined }> | undefined
+  redirects?: Loadable<Redirects> | undefined
+  i18n?: Over<I18nConfig, { paths?: Loadable<Record<string, Record<string, string>>> | undefined }> | undefined
+  images?: ImagesInput | undefined
+}
+
+export type ImagesInput = Over<ImagesConfig, { remote?: Loadable<string[]> | Over<RemoteImages, { hosts?: Loadable<string[]> | undefined }> | undefined }> & DeprecatedImages
+
 export const CONFIG_FILE = 'kay.config.ts'
 // The app's own request values for templates, listed as an extension's `context` while the file exists.
 export const APP_CONTEXT = 'src/context.ts'
@@ -629,7 +683,7 @@ type Deepest = [unknown, unknown, unknown, unknown]
 type Checked<Given, Known, Depth extends unknown[] = []> = UnknownKeys<Given, Known> & (Depth['length'] extends Deepest['length'] ? unknown : { [Key in keyof Known]?: [BagOf<NonNullable<Known[Key]>>] extends [never] ? unknown : Checked<Key extends keyof Given ? Given[Key] : unknown, BagOf<NonNullable<Known[Key]>>, [...Depth, unknown]> })
 
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
-export function defineConfig<Config extends KayConfig>(config: Config & Checked<Config, KayConfig>): Config {
+export function defineConfig<Config extends ConfigInput>(config: Config & Checked<Config, ConfigInput>): Config {
   return config
 }
 

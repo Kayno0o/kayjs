@@ -9,9 +9,10 @@ import { cmsOptions } from '../src/check/cms-options'
 import { configSwitches } from '../src/check/config-switches'
 import { applySafeFixes } from '../src/check/fixes'
 import { formatDurationNumbers } from '../src/check/format-duration'
-
 import { guardOptions } from '../src/check/guard-options'
 import { hookNames } from '../src/check/hook-names'
+
+import { imagesKeys } from '../src/check/images-keys'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
@@ -21,6 +22,7 @@ import { schemaType } from '../src/check/schema-type'
 import { sourceReaders } from '../src/check/source-readers'
 import { storeNames } from '../src/check/store-names'
 import { testHelpers } from '../src/check/test-helpers'
+import { ttlNames } from '../src/check/ttl-names'
 
 import { compileKay } from '../src/compiler'
 import { DEPRECATED_LINTS } from '../src/compiler/deprecated-lints'
@@ -53,6 +55,8 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-format-duration': formatDurationNumbers,
   'deprecated-guard-option': guardOptions,
   'deprecated-config-switch': configSwitches,
+  'deprecated-images-keys': imagesKeys,
+  'deprecated-ttl-names': ttlNames,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {

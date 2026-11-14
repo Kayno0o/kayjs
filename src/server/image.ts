@@ -1,4 +1,5 @@
 import type { Context, Elysia } from 'elysia'
+import type { ImagesConfig } from '../config'
 import type { Guard, GuardContext } from '../runtime'
 import type { Duration } from '../runtime/duration'
 import type { Aspect, ImageVariant } from '../runtime/image'
@@ -91,14 +92,14 @@ export function variantName(source: string, variant: number | ImageVariant, form
   return inFormat(`${basename(source, extname(source))}${variantSuffix(typeof variant === 'number' ? { width: variant } : variant)}`, format)
 }
 
-// The WebP quality of the variants: `images.webp.quality`, else `images.quality`, else the default applied where it is read.
-export function webpQuality(images: { quality?: number | undefined, webp?: { quality?: number | undefined } | undefined } | undefined): number | undefined {
-  return images?.webp?.quality ?? images?.quality
+// The WebP quality of the variants: `images.formats.webp.quality`, else `images.formats.quality`, else the default applied where it is read.
+export function webpQuality(images: Pick<ImagesConfig, 'formats'> | undefined): number | undefined {
+  return images?.formats?.webp?.quality ?? images?.formats?.quality
 }
 
-// `images.avif` as a quality, or undefined when it is off.
-export function avifQuality(images: { avif?: boolean | { quality?: number | undefined } | undefined } | undefined): number | undefined {
-  return images?.avif === false ? undefined : bagOf(images?.avif)?.quality ?? DEFAULT_AVIF_QUALITY
+// `images.formats.avif` as a quality, or undefined when it is off.
+export function avifQuality(images: Pick<ImagesConfig, 'formats'> | undefined): number | undefined {
+  return images?.formats?.avif === false ? undefined : bagOf(images?.formats?.avif)?.quality ?? DEFAULT_AVIF_QUALITY
 }
 
 function inFormat(name: string, format: VariantFormat): string {
@@ -731,7 +732,7 @@ export function sourceFile(whole: string, options: ImageRouteOptions): { path: s
 }
 
 // `images.maxDensity`, `images.widths`, `images.aspects`, `images.remote`, `images.placeholder` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; `inlineStyles` is whether the site's CSP lets an element carry a `style` attribute. Returns the density.
-export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, placeholder?: boolean | undefined, resolve?: unknown, guards?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
+export async function applyImageConfig(images: { maxDensity?: number | undefined, widths?: number[] | undefined, aspects?: string[] | undefined, remote?: { hosts?: string[] | undefined } | undefined, placeholder?: boolean | undefined, resolve?: unknown, guards?: unknown, guard?: unknown } | undefined, inlineStyles = true): Promise<number> {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if ((images?.guards ?? images?.guard) !== undefined && images?.resolve === undefined)
@@ -740,7 +741,7 @@ export async function applyImageConfig(images: { maxDensity?: number | undefined
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
 
-  const patterns = await remotePatterns(images?.remote)
+  const patterns = await remotePatterns(images?.remote?.hosts)
 
   setMaxDensity(maxDensity)
   setImageWidths(images?.widths)

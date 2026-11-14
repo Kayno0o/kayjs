@@ -4,10 +4,12 @@ import { signedText, signText, useScriptSecret } from './stamp'
 
 export interface SignOptions {
   // How long the signature stays valid: `'1h'` when left out.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
 }
 
-const DEFAULT_MAX_AGE = '1h'
+const DEFAULT_TTL = '1h'
 // Keeps what the app signs from passing for what kay signs with the same secret, such as a private file link.
 const SIGNING_USE = 'kay-signed'
 // Only digits, so the first dot always ends the expiry whatever the signature holds.
@@ -33,10 +35,10 @@ export const signed = {
   sign(use: string, value: string, options: SignOptions = {}): string {
     checked(use, value)
 
-    const seconds = durationSeconds(options.maxAge ?? DEFAULT_MAX_AGE, 'signed.sign()\'s maxAge')
+    const seconds = durationSeconds(options.ttl ?? options.maxAge ?? DEFAULT_TTL, 'signed.sign()\'s ttl')
 
     if (seconds > MAX_SECONDS)
-      throw new RangeError('kay: signed.sign()\'s maxAge is at most 1 year (\'52w\')')
+      throw new RangeError('kay: signed.sign()\'s ttl is at most 1 year (\'52w\')')
 
     useScriptSecret()
 

@@ -130,13 +130,13 @@ describe('images.remote caps', () => {
     await rm(cache, { recursive: true, force: true })
   })
 
-  it('cuts a download off past remoteMaxSize, and gives up on a host slower than remoteTimeout', async () => {
-    const limits = remoteLimits({ remoteMaxSize: '1kb', remoteTimeout: '100ms' })
+  it('cuts a download off past remote.maxSize, and gives up on a host slower than remote.timeout', async () => {
+    const limits = remoteLimits({ remote: { maxSize: '1kb', timeout: '100ms' } })
     const fetchRemote = remoteImages(join(cache, 'capped'), await remotePatterns([`${origin}/`]), undefined, undefined, limits)
 
     expect(limits).toEqual({ bytes: 1024, timeoutMs: 100 })
     // The size cap is checked under a timeout a loaded runner cannot reach, so a slow local answer is not taken for a slow host.
-    const sized = remoteImages(join(cache, 'sized'), await remotePatterns([`${origin}/`]), undefined, undefined, remoteLimits({ remoteMaxSize: '1kb', remoteTimeout: '10s' }))
+    const sized = remoteImages(join(cache, 'sized'), await remotePatterns([`${origin}/`]), undefined, undefined, remoteLimits({ remote: { maxSize: '1kb', timeout: '10s' } }))
 
     expect(await sized(`${origin}/big.jpg`)).toEqual({ status: 413, message: 'The image is over 1024 bytes' })
     expect(await fetchRemote(`${origin}/slow.jpg`)).toEqual({ status: 502, message: 'The host did not give the image' })
@@ -145,15 +145,15 @@ describe('images.remote caps', () => {
   it('keeps 25 MB and 10 s when unset, and a larger cap lets the same image through', async () => {
     expect(remoteLimits(undefined)).toEqual({ bytes: 25 * 1024 * 1024, timeoutMs: 10_000 })
 
-    const roomy = remoteImages(join(cache, 'roomy'), await remotePatterns([`${origin}/`]), undefined, undefined, remoteLimits({ remoteMaxSize: '10kb' }))
+    const roomy = remoteImages(join(cache, 'roomy'), await remotePatterns([`${origin}/`]), undefined, undefined, remoteLimits({ remote: { maxSize: '10kb' } }))
 
     expect(await roomy(`${origin}/big.jpg`)).toMatchObject({ key: expect.any(String) })
   })
 
   it('refuses a size or a timeout that is not positive', () => {
-    expect(() => remoteLimits({ remoteMaxSize: 0 })).toThrow('images.remoteMaxSize is 0')
-    expect(() => remoteLimits({ remoteMaxSize: '20 mb' as never })).toThrow('images.remoteMaxSize is \'20 mb\'')
-    expect(() => remoteLimits({ remoteTimeout: -1 as never })).toThrow('images.remoteTimeout is -1')
+    expect(() => remoteLimits({ remote: { maxSize: 0 } })).toThrow('images.remote.maxSize is 0')
+    expect(() => remoteLimits({ remote: { maxSize: '20 mb' as never } })).toThrow('images.remote.maxSize is \'20 mb\'')
+    expect(() => remoteLimits({ remote: { timeout: -1 as never } })).toThrow('images.remote.timeout is -1')
   })
 })
 
@@ -325,13 +325,13 @@ describe('security.csp: false in a layout', () => {
   })
 })
 
-describe('images.webp', () => {
-  it('sets the WebP quality over images.quality, which stays the default and the cards\' alone', () => {
+describe('images.formats.webp', () => {
+  it('sets the WebP quality over images.formats.quality, which stays the default and the cards\' alone', () => {
     expect(webpQuality(undefined)).toBeUndefined()
-    expect(webpQuality({ quality: 70 })).toBe(70)
-    expect(webpQuality({ webp: { quality: 75 } })).toBe(75)
-    expect(webpQuality({ quality: 70, webp: { quality: 75 } })).toBe(75)
-    expect(webpQuality({ quality: 70, webp: {} })).toBe(70)
+    expect(webpQuality({ formats: { quality: 70 } })).toBe(70)
+    expect(webpQuality({ formats: { webp: { quality: 75 } } })).toBe(75)
+    expect(webpQuality({ formats: { quality: 70, webp: { quality: 75 } } })).toBe(75)
+    expect(webpQuality({ formats: { quality: 70, webp: {} } })).toBe(70)
   })
 })
 

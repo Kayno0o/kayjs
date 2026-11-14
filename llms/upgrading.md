@@ -125,4 +125,12 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 - `defineConfig` refuses a key it does not know in every option bag, however deep (`images: { widht: 1 }`, `security: { cookies: { httpOnlee: true } }`), where it checked 11 of them and let a typo in the others through.
 
+### `images` is grouped, and lists may come from a function
+
+`images: { remote: { hosts, maxSize, timeout }, formats: { quality, webp, avif }, limits: { variants, queue } }` replaces the flat `remoteMaxSize`, `remoteTimeout`, `quality`, `webp`, `avif`, `maxVariants` and `queue`; `remote: [...]` stays for hosts alone. `deprecated-images-keys` (`kay check --fix`) moves them; the flat keys work until 1.108.
+
+### `ttl` is how long data lives
+
+`signed.sign(use, value, { ttl })`, `files.url(key, { ttl })` and the `ttl` of an action's `protect.minTime` and `protect.proofOfWork` replace `maxAge`, which stays for an HTTP header or a cookie. `deprecated-ttl-names` (`kay check --fix`) renames it; `maxAge` works there until 1.108.
+
 Releases before 1.105 are in [Upgrading, older releases](upgrading-archive.md).

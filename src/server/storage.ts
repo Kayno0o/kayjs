@@ -66,6 +66,8 @@ export interface PutOptions {
 
 export interface UrlOptions {
   // How long a link to a private file stays valid, an hour by default; it is rounded up so pages rendered minutes apart give the same link, which the browser keeps cached.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
 }
 
@@ -401,7 +403,7 @@ export const files = {
 
     readScriptSecret()
 
-    const seconds = durationSeconds(options.maxAge ?? DEFAULT_EXPIRES, 'files.url()\'s maxAge')
+    const seconds = durationSeconds(options.ttl ?? options.maxAge ?? DEFAULT_EXPIRES, 'files.url()\'s ttl')
     const step = Math.min(EXPIRY_STEP, seconds)
     const until = Math.ceil((Date.now() / 1000 + seconds) / step) * step
 

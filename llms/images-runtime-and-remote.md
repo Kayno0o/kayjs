@@ -31,7 +31,7 @@ img({...image(post.photo, { width: post.photoWidth, height: post.photoHeight })}
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] },
+  images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } },
 })
 ```
 
@@ -62,10 +62,10 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 - The `src` is what any visitor typed: look it up, or `safePath('media', name)` from `kay/server`, never a plain join, as the path `resolve` returns is read as it is, `../` and symlinks followed; `resolve: src => safePath('media', src.slice('/media/'.length))` gives the real path of a file inside `media`, or undefined for a 404 (see [Files from a folder](server.md#files-from-a-folder)).
 - `images.guards` without `resolve` fails the boot.
 - A remote original and the variants of a runtime image are named after a truncated SHA-256 of their address, so none can be made to share a name with another.
-- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `images.remote` lists: `images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] }`, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain of a domain (`*.com`, `*.co.uk` and `*.vercel.app` are refused: a wildcard never covers a public suffix, by the whole Public Suffix List, which kay ships), and maybe a path every URL starts with.
+- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `images.remote.hosts` lists (a list, or a function returning one, a promise of it too, for hosts a CMS or a database holds): `images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } }`, or `remote: [...]` for hosts alone, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain of a domain (`*.com`, `*.co.uk` and `*.vercel.app` are refused: a wildcard never covers a public suffix, by the whole Public Suffix List, which kay ships), and maybe a path every URL starts with.
 - An entry may name `http:`, `localhost` or an IP, as a CMS running beside the app in development does.
 - A download goes only to public addresses: each hop, redirects included, resolves its host once and connects to the address it checked, answering 502 when any answer is loopback, private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254.169.254`), unique-local (`fd00::/8`), reserved, or such an IPv4 address inside an IPv6 one (`::ffff:127.0.0.1`), whatever the spelling of the IP. An entry naming one address or `localhost` (`http://10.0.0.5:9000`, `http://localhost:9000`) is the app's own host and may be private; a host listed by name never may, so an internal CDN is listed by its address. The host is asked directly (`HTTP_PROXY` is not read) and a compressed answer is refused.
-- A download is cut off past 25 MB and given up on after 10 s, answering 413 and 502: `images: { remote: [...], remoteMaxSize: '10mb', remoteTimeout: '30s' }` changes them, a size such as `'10mb'` or bytes, a duration such as `'30s'`.
+- A download is cut off past 25 MB and given up on after 10 s, answering 413 and 502: `images: { remote: { hosts: [...], maxSize: '10mb', timeout: '30s' } }` changes them, a size such as `'10mb'` or bytes, a duration such as `'30s'`.
 - Give their size, `image(post.cover.url, { width: post.cover.width, height: post.cover.height })`, for the variants, which the route makes from a copy it downloads into `.kay/cache/images/remote` and keeps for the host's `Cache-Control: max-age`, a minute to a week, an hour without one, then asks again with its ETag or date; a changed image gets new variants under a new ETag.
 - A host that fails leaves the last copy served, and one that never answered is asked again a minute later, the route answering 502 meanwhile.
 - A host not listed is refused with 403, as is a redirect to one, so the route is no open proxy.
@@ -79,7 +79,7 @@ img({...image(post.cover.url, { width: post.cover.width, height: post.cover.heig
 
 A variant no file holds yet costs an encode, so the route bounds what a client can ask for; a variant already made, and an imported image's built ones, are never limited.
 - `images.rateLimit` (`{ max: 120, window: '1m' }` by default): the new variants one client may have encoded in a window, counted by its address, the forwarded one behind a trusted `proxy`; past it the route answers 429 with `Retry-After`.
-- `images.maxVariants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `rateLimit`.
+- `images.limits.variants` (256): the variants kept cached of one source, counted from the files in `.kay/cache/images`; past it the oldest of that source's is removed to make room for the one asked for, so no client can lock others out, and a removed one is encoded again when asked, within `rateLimit`.
 - Requests asking for the same new variant at once count once.
-- `images.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
+- `images.limits.queue` (128): the encodes waiting for one of the four drawn at once; past it the route answers 503 with `Retry-After: 5`.
 - Each takes a whole number from 1 or `false` for no limit, and `kay check` refuses any other value.

@@ -135,7 +135,7 @@ To sign a link or a value of your own, such as a picture link you send in a push
 ```ts
 import { signed } from 'kay/server'
 
-const url = `https://example.com/shot/${id}?sig=${signed.sign('shot', id, { maxAge: '7d' })}`
+const url = `https://example.com/shot/${id}?sig=${signed.sign('shot', id, { ttl: '7d' })}`
 
 signed.verify('shot', id, sig)
 ```

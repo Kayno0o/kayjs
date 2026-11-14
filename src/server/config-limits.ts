@@ -140,7 +140,7 @@ export function checkRequestIdHeader(name: string | undefined): void {
     throw new KayError('config-invalid', `kay: observe.requestIdHeader is ${JSON.stringify(name)}; it names a header of its own, such as x-correlation-id`)
 }
 
-// Past this, a download is cut off unless `images.remoteMaxSize` says otherwise: an image worth resizing is a few megabytes.
+// Past this, a download is cut off unless `images.remote.maxSize` says otherwise: an image worth resizing is a few megabytes.
 export const MAX_REMOTE_BYTES = 25 * 1024 * 1024
 export const FETCH_TIMEOUT_MS = 10_000
 
@@ -156,29 +156,31 @@ export interface ImageLimits {
 }
 
 // Unless `images.rateLimit`, `images.maxVariants` or `images.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
-const DEFAULT_IMAGE_LIMITS = { maxVariants: 256, queue: 128 } as const
+const DEFAULT_IMAGE_LIMITS = { variants: 256, queue: 128 } as const
 
 // The limits of the image route on variants it has to encode, each a whole number from 1 or `false` for none.
-export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'maxVariants' | 'queue'> | undefined): ImageLimits {
-  const read = (name: 'maxVariants' | 'queue'): number | undefined => {
-    const value = images?.[name] ?? DEFAULT_IMAGE_LIMITS[name]
+export function imageLimits(images: Pick<ImagesConfig, 'rateLimit' | 'limits'> | undefined): ImageLimits {
+  const read = (name: 'variants' | 'queue'): number | undefined => {
+    const value = images?.limits?.[name] ?? DEFAULT_IMAGE_LIMITS[name]
 
     if (value === false)
       return undefined
 
     if (!Number.isSafeInteger(value) || value < 1)
-      throw new KayError('config-invalid', `kay: images.${name} is ${String(value)}; it takes a whole number from 1, or false for no limit`)
+      throw new KayError('config-invalid', `kay: images.limits.${name} is ${String(value)}; it takes a whole number from 1, or false for no limit`)
 
     return value
   }
 
-  return { rate: rateLimitOf('images', images?.rateLimit, DEFAULT_IMAGE_PER_MINUTE), maxVariants: read('maxVariants'), queue: read('queue') }
+  return { rate: rateLimitOf('images', images?.rateLimit, DEFAULT_IMAGE_PER_MINUTE), maxVariants: read('variants'), queue: read('queue') }
 }
 
-// `images.remoteMaxSize` and `images.remoteTimeout` with their defaults, each refused when it is no positive size or duration.
-export function remoteLimits(images: Pick<ImagesConfig, 'remoteMaxSize' | 'remoteTimeout'> | undefined): RemoteLimits {
+// `images.remote.maxSize` and `images.remote.timeout` with their defaults, each refused when it is no positive size or duration.
+export function remoteLimits(images: Pick<ImagesConfig, 'remote'> | undefined): RemoteLimits {
+  const { maxSize, timeout } = images?.remote ?? {}
+
   return {
-    bytes: images?.remoteMaxSize === undefined ? MAX_REMOTE_BYTES : Math.floor(byteSize(images.remoteMaxSize, 'images.remoteMaxSize')),
-    timeoutMs: images?.remoteTimeout === undefined ? FETCH_TIMEOUT_MS : Math.round(durationSeconds(images.remoteTimeout, 'images.remoteTimeout') * 1000),
+    bytes: maxSize === undefined ? MAX_REMOTE_BYTES : Math.floor(byteSize(maxSize, 'images.remote.maxSize')),
+    timeoutMs: timeout === undefined ? FETCH_TIMEOUT_MS : Math.round(durationSeconds(timeout, 'images.remote.timeout') * 1000),
   }
 }

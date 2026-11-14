@@ -156,7 +156,7 @@ describe('proof-of-work', () => {
   })
 
   it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {
-    const solve = action({} as never, () => 0, { protect: { proofOfWork: { difficulty: 50, maxAge: '1m' } } })
+    const solve = action({} as never, () => 0, { protect: { proofOfWork: { difficulty: 50, ttl: '1m' } } })
 
     ;(solve as { url: string }).url = '/_kay/action/a'
 

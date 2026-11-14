@@ -1,19 +1,16 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
-import type { Node, NodeOfType } from '../compiler/estree'
-import type { Edit } from './renamed-exports'
+import type { Property } from './regroup'
 import { lintLevel } from '../compiler/lints'
 import { keyName } from '../compiler/object-literal'
 import { renamePackages } from '../package-names'
 import { importsOf, walk } from './ast'
+import { nameOf, regrouped } from './regroup'
 import { scan } from './renamed-exports'
 
 const NEEDLE = /\brateLimit\b/
 const FROM_AUTH = (source: string) => renamePackages(source) === '@kayjs/auth'
 const CALLS = ['auth', 'authCore']
-const PUNCTUATION = /^[\s,]*$/
 const HELP = 'group the limit under its feature, `signIn: { ip, account }`'
-
-type Property = Extract<NodeOfType<'ObjectExpression'>['properties'][number], { type: 'Property' }>
 
 // The parts of each feature, the first being what a bare limit on the feature was.
 const GROUPS: Record<string, string[]> = {
@@ -74,18 +71,13 @@ export async function authRateLimits(root: string, options: CheckOptions): Promi
         if (old.length === 0)
           return
 
-        const fixed = regrouped(limits.value, text)
+        const fixed = regrouped(limits.value, text, movedTo)
 
         for (const [index, property] of old.entries())
           report(base + property.start, base + property.end, `\`${nameOf(property)}\` of kayjs-auth's \`rateLimit\` is grouped by feature since 1.105`, HELP, index === 0 && fixed !== undefined ? fixed.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end })) : null)
       })
     }
   })
-}
-
-// The key of a property written as a name or a string, an empty text for any other.
-function nameOf(property: Node): string {
-  return property.type === 'Property' ? keyName(property) ?? '' : ''
 }
 
 // A flat key that is a part of a feature, or a feature written as a bare limit or a list.
@@ -104,77 +96,4 @@ function movedTo(name: string, property: Property): [string, string] | undefined
     return FLAT[name]
 
   return isOld(property) ? [name, GROUPS[name]![0]!] : undefined
-}
-
-// The edits that group the old keys, leaving every other property, its comments and the object's layout as written: the first old property of a feature becomes `feature: { part: value }` holding all of its parts, the others are removed. Undefined where that cannot be done without reading what a value is: a spread, a computed or shorthand key, a part named twice, a feature written both ways, or a comment that a removal would take.
-function regrouped(object: NodeOfType<'ObjectExpression'>, text: string): Edit[] | undefined {
-  const properties: Property[] = []
-
-  for (const property of object.properties) {
-    if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init')
-      return undefined
-
-    properties.push(property)
-  }
-
-  const features = new Map<string, { first: number, parts: Map<string, string> }>()
-  const kept = new Set<string>()
-  const moved = new Set<number>()
-
-  for (const [index, property] of properties.entries()) {
-    const name = nameOf(property)
-    const target = movedTo(name, property)
-
-    if (target === undefined) {
-      kept.add(name)
-
-      continue
-    }
-
-    const [feature, part] = target
-    const held = features.get(feature) ?? { first: index, parts: new Map<string, string>() }
-
-    if (property.shorthand || held.parts.has(part))
-      return undefined
-
-    held.parts.set(part, text.slice(property.value.start, property.value.end))
-    features.set(feature, held)
-    moved.add(index)
-  }
-
-  if ([...features.keys()].some(feature => kept.has(feature)))
-    return undefined
-
-  const firsts = new Set([...features.values()].map(({ first }) => first))
-  const gone = [...moved].filter(index => !firsts.has(index))
-  const lastKept = properties.findLastIndex((_, index) => !gone.includes(index))
-  const edits: Edit[] = []
-  const deleted: [number, number][] = []
-
-  for (const [feature, { first, parts }] of features) {
-    const property = properties[first]!
-
-    edits.push({ start: property.start, end: property.end, text: `${feature}: { ${[...parts].map(([part, value]) => `${part}: ${value}`).join(', ')} }` })
-  }
-
-  for (const index of gone.filter(index => index < lastKept))
-    deleted.push([properties[index]!.start, properties[index + 1]!.start])
-
-  if (gone.some(index => index > lastKept))
-    deleted.push([properties[lastKept]!.end, properties.at(-1)!.end])
-
-  for (const [start, end] of deleted) {
-    let rest = text.slice(start, end)
-
-    for (const index of gone)
-      rest = rest.replace(text.slice(properties[index]!.start, properties[index]!.end), '')
-
-    // A comment between the properties would be lost with them.
-    if (!PUNCTUATION.test(rest))
-      return undefined
-
-    edits.push({ start, end, text: '' })
-  }
-
-  return edits
 }

@@ -56,7 +56,7 @@ console.log(JSON.stringify([first, signed.verify('shot', 'abc', token), signed.v
     const script = `${HEAD}
 const until = String(Math.ceil(Date.now() / 1000) + 600)
 let threw = false
-try { signed.sign('shot', 'abc', { maxAge: 60 }) } catch { threw = true }
+try { signed.sign('shot', 'abc', { ttl: 60 }) } catch { threw = true }
 console.log(JSON.stringify([
   signed.verify('shot', 'abc', until + '.' + signText('shot', 'abc\\0' + until)),
   signed.verify('shot', 'abc', until + '.' + signText('kay-file', 'abc\\n' + until)),
@@ -104,8 +104,8 @@ const token = signed.sign('a', 'b\\0c')
 let strings = false
 try { signed.sign(undefined, 'x') } catch { strings = true }
 let long = false
-try { signed.sign('a', 'b', { maxAge: '99999999w' }) } catch { long = true }
-console.log(JSON.stringify([signed.verify('a', 'b\\0c', token), signed.verify('a\\0b', 'c', token), strings, long, signed.verify('a', 'b', signed.sign('a', 'b', { maxAge: '1h' }))]))
+try { signed.sign('a', 'b', { ttl: '99999999w' }) } catch { long = true }
+console.log(JSON.stringify([signed.verify('a', 'b\\0c', token), signed.verify('a\\0b', 'c', token), strings, long, signed.verify('a', 'b', signed.sign('a', 'b', { ttl: '1h' }))]))
 `
 
     expect(await isolated(script)).toEqual([true, false, true, true, true])

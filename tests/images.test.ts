@@ -393,7 +393,7 @@ describe('image route', () => {
 
       expect(response.headers.get('content-type')).toBe('image/webp')
       expect(response.headers.get('vary')).toBe('save-data')
-      expect([avifQuality(undefined), avifQuality({}), avifQuality({ avif: { quality: 70 } }), avifQuality({ avif: false })]).toEqual([50, 50, 70, undefined])
+      expect([avifQuality(undefined), avifQuality({}), avifQuality({ formats: { avif: { quality: 70 } } }), avifQuality({ formats: { avif: false } })]).toEqual([50, 50, 70, undefined])
     }
     finally {
       await rm(cache, { recursive: true, force: true })
@@ -862,7 +862,7 @@ describe('remote images', () => {
 
   it('gives a listed remote image its variants through the route, and refuses an unlisted one as the server renders it', async () => {
     try {
-      await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: ['https://cms.example.com/uploads/'] } })
+      await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: { hosts: ['https://cms.example.com/uploads/'] } } })
 
       const props = image('https://cms.example.com/uploads/a.jpg', { width: 1000, height: 600 })
 
@@ -881,7 +881,7 @@ describe('remote images', () => {
 
       expect(() => shareCard({ title: 'x', image: 'https://elsewhere.example.com/a.jpg' })).toThrow('so the card cannot be drawn on it')
       expect(image('https://elsewhere.example.com/a.svg', { width: 10, height: 10 })).toEqual({ src: 'https://elsewhere.example.com/a.svg', width: 10, height: 10 })
-      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: ['cms.example.com'] } })).rejects.toThrow('images.remote holds cms.example.com')
+      await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { remote: { hosts: ['cms.example.com'] } } })).rejects.toThrow('images.remote holds cms.example.com')
     }
     finally {
       setRemoteImages(undefined)

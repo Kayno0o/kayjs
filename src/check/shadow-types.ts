@@ -39,15 +39,16 @@ import { cmsOptions } from './cms-options'
 import { configSwitches } from './config-switches'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
-
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
+
 import { formatDurationNumbers } from './format-duration'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
-import { guardOptions } from './guard-options'
 
+import { guardOptions } from './guard-options'
 import { unguardedRoutes, unguardedTools } from './guards'
+
 import { hookNames } from './hook-names'
+import { imagesKeys } from './images-keys'
 
 import { islandOnlyComponents } from './island-only'
 
@@ -71,6 +72,7 @@ import { testHelpers } from './test-helpers'
 import { textSizeColour } from './text-size-colour'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
+import { ttlNames } from './ttl-names'
 
 import { uiTypes } from './ui-types'
 import { unmountedJobs } from './unmounted-jobs'
@@ -193,6 +195,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => formatDurationNumbers(root, options),
   async ({ root, options }) => guardOptions(root, options),
   async ({ root, options }) => configSwitches(root, options),
+  async ({ root, options }) => imagesKeys(root, options),
+  async ({ root, options }) => ttlNames(root, options),
   async ({ root, options }) => rateEnforce(root, options),
   async ({ root, options }) => authRateLimits(root, options),
 ]

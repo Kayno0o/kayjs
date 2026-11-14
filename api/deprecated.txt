@@ -63,6 +63,8 @@ kay [./server] QueueOptions.lostAfter	1.108	deprecated-job-options	`timeout`, th
 kay [./server] RateLimit	1.108.0	deprecated-import-path	Import `RateLimit` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimitRefusal	1.108.0	deprecated-import-path	Import `RateLimitRefusal` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
 kay [./server] RateLimiter.enforce	1.108	deprecated-rate-enforce	`check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it.
+kay [./server] SignOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
+kay [./server] UrlOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [./server] WorkflowOptions.lostAfter	1.108	deprecated-job-options	`timeout`, the one name of a job's time limit. Removed in 1.108; `deprecated-job-options` rewrites it.
 kay [./server] diskFiles	1.108	deprecated-disk-files	`diskFiles({ dir, ...hooks })`. Removed in 1.108; `deprecated-disk-files` rewrites it.
 kay [./server] s	1.108.0	deprecated-import-path	Import `s` from `kay`, its one home. Removed in 1.108.0; `deprecated-import-path` rewrites it.
@@ -78,6 +80,7 @@ kay [.] Local.syncStatus	1.108.0	deprecated-source-readers	Write `sync.status()`
 kay [.] Local.unsynced	1.108.0	deprecated-source-readers	Write `sync.queued()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] LocalHooks.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] LocalOptions.onSync	1.108.0	deprecated-source-readers	Write `onData`, which hands `value` where this hands `rows`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
+kay [.] MinTimeOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [.] PageSettings.cacheControl	1.108.0	deprecated-page-cache	Write `cache: { browser, shared, swr }`, or `cache: false`. Removed in 1.108.0; `deprecated-page-cache` rewrites `false`.
 kay [.] PageSettings.feed	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
 kay [.] PageSettings.lastmod	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
@@ -85,6 +88,7 @@ kay [.] PageSettings.noindex	1.108.0	deprecated-page-seo	Write it in `seo`. Remo
 kay [.] PageSettings.search	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
 kay [.] PageSettings.sitemap	1.108.0	deprecated-page-seo	Write it in `seo`. Removed in 1.108.0; `deprecated-page-seo` rewrites it.
 kay [.] PageSettings.ttl	1.108.0	deprecated-page-cache	Write `cache: '1h'`. Removed in 1.108.0; `deprecated-page-cache` rewrites it.
+kay [.] ProofOfWorkOptions.maxAge	1.108	deprecated-ttl-names	Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108.
 kay [.] Resource.value	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] ServerAction.succeeded	1.108.0	deprecated-source-readers	Write `data()`, which reads what the last success returned; `status() === 'ready'` tells whether there was one. Removed in 1.108.0; `deprecated-source-readers` rewrites it.
 kay [.] Socket.last	1.108.0	deprecated-source-readers	Write `data()`. Removed in 1.108.0; `deprecated-source-readers` rewrites it.

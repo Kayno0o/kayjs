@@ -83,6 +83,8 @@ export interface MinTimeOptions {
   // The least time between the page rendering the form and its post, a string such as '3s'.
   after: Duration
   // The most, past which a post is refused as sent from a page left open too long or a copied stamp: a day by default.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
   // Answers a post sent too soon as if it went through, the handler never running, rather than refusing it.
   pretend?: boolean | undefined
@@ -94,6 +96,8 @@ export interface ProofOfWorkOptions {
   // The highest number the server picks a challenge's from, which the browser finds by hashing every number from 0 up: half of it on average, so the time a post costs a bot, and a person's browser, grows with it. 100,000 by default.
   difficulty?: number | undefined
   // How long a challenge stays good: a day by default.
+  ttl?: Duration | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */
   maxAge?: Duration | undefined
   // Answers a wrong or replayed solution as if it went through, the handler never running, rather than refusing it.
   pretend?: boolean | undefined

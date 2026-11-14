@@ -288,6 +288,23 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { proxy: 2 }',
     right: '// kay.config.ts\nexport default { proxy: { hops: 2 } }',
   },
+  'deprecated-images-keys': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'The flat keys of `images` in kay.config.ts, grouped since 1.105: `remoteMaxSize` and `remoteTimeout` are `remote: { maxSize, timeout }`, `quality`, `webp` and `avif` are `formats: { quality, webp, avif }`, `maxVariants` and `queue` are `limits: { variants, queue }`. They work until 1.108. The fix moves the keys into their group, unless the object spreads or already has it.',
+    wrong: '// kay.config.ts\nexport default { images: { remoteMaxSize: \'10mb\', remoteTimeout: \'30s\', avif: false } }',
+    right: '// kay.config.ts\nexport default { images: { remote: { maxSize: \'10mb\', timeout: \'30s\' }, formats: { avif: false } } }',
+  },
+  'deprecated-ttl-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    summary: '`maxAge` where it says how long something lives, `ttl` since 1.105, `maxAge` staying for an HTTP header or a cookie: the option of `signed.sign()` and `files.url()` from `kay/server`, and the `proofOfWork` and `minTime` of an action\'s `protect`. It works until 1.108. The fix renames the key, unless a `ttl` is written too.',
+    wrong: '---\nimport { signed } from \'kay/server\'\n\nconst token = signed.sign(\'shot\', \'1\', { maxAge: \'1d\' })\n---\np {token}',
+    right: '---\nimport { signed } from \'kay/server\'\n\nconst token = signed.sign(\'shot\', \'1\', { ttl: \'1d\' })\n---\np {token}',
+  },
   'deprecated-guard-option': {
     level: 'warn',
     group: 'deprecated',

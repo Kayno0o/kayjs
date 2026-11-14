@@ -721,9 +721,10 @@ type Memo<T> = () => T
 [.] MinTimeOptions
 interface MinTimeOptions
   after: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   plain?: boolean | undefined
   pretend?: boolean | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] MinTimeRefusal
 type MinTimeRefusal = 'early' | 'expired'
@@ -934,9 +935,10 @@ function previewing(): boolean
 [.] ProofOfWorkOptions
 interface ProofOfWorkOptions
   difficulty?: number | undefined
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   pretend?: boolean | undefined
   store?: RateStore | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] ProofOfWorkRefusal
 type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
@@ -2769,67 +2771,80 @@ class CspViolationError
 const dataTableNames: readonly string[]
 
 [./server] defineConfig
-function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & {
+function defineConfig<Config extends ConfigInput>(config: Config & UnknownKeys<Config, ConfigInput> & {
+  cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<ConfigCors | undefined>, [unknown]>;
+  security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, Omit<SecurityConfig, "hosts"> & {
+    hosts?: Loadable<string[]> | boolean | undefined;
+  }, [unknown]>;
+  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, Omit<ProxyConfig, "trusted"> & {
+    trusted?: Loadable<string[]> | undefined;
+  }, [unknown]>;
+  robots?: Checked<"robots" extends keyof Config ? Config[keyof Config & "robots"] : unknown, Omit<RobotsConfig, "allow" | "disallow"> & {
+    disallow?: Loadable<string[]> | undefined;
+    allow?: Loadable<string[]> | undefined;
+  }, [unknown]>;
+  redirects?: unknown;
+  i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, Omit<I18nConfig, "paths"> & {
+    paths?: Loadable<Record<string, Record<string, string>>> | undefined;
+  }, [unknown]>;
+  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, Omit<ImagesConfig, "remote"> & {
+    remote?: Loadable<string[]> | Over<RemoteImages, {
+      hosts?: Loadable<string[]> | undefined;
+    }> | undefined;
+  } & DeprecatedImages, [unknown]>;
+  head?: unknown;
+  search?: unknown;
+  client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
+  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
+  base?: unknown;
+  seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
+  live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
+  markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
+  contentConfig?: unknown;
+  extensions?: unknown;
+  store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
   dirs?: Checked<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig, [unknown]>;
   limits?: Checked<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig, [unknown]>;
   serve?: Checked<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig, [unknown]>;
   observe?: Checked<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, ObserveConfig, [unknown]>;
-  client?: Checked<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig, [unknown]>;
   actions?: Checked<"actions" extends keyof Config ? Config[keyof Config & "actions"] : unknown, ActionsConfig, [unknown]>;
   publicCache?: unknown;
   minify?: unknown;
   lang?: unknown;
   site?: unknown;
-  seo?: Checked<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig, [unknown]>;
-  robots?: Checked<"robots" extends keyof Config ? Config[keyof Config & "robots"] : unknown, RobotsConfig, [unknown]>;
   sitemap?: Checked<"sitemap" extends keyof Config ? Config[keyof Config & "sitemap"] : unknown, SitemapConfig, [unknown]>;
-  head?: unknown;
-  images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, ImagesConfig, [unknown]>;
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
   favicon?: Checked<"favicon" extends keyof Config ? Config[keyof Config & "favicon"] : unknown, FaviconConfig, [unknown]>;
   manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
   entry?: unknown;
-  offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
-  search?: unknown;
   fonts?: unknown;
-  security?: Checked<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, SecurityConfig, [unknown]>;
-  proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, ProxyConfig, [unknown]>;
   guards?: Checked<"guards" extends keyof Config ? Config[keyof Config & "guards"] : unknown, GuardsConfig, [unknown]>;
   requireGuards?: unknown;
-  cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<CorsOptions | undefined>, [unknown]>;
   openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
   mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
   health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
   metrics?: Checked<"metrics" extends keyof Config ? Config[keyof Config & "metrics"] : unknown, MetricsConfig, [unknown]>;
   jobs?: Checked<"jobs" extends keyof Config ? Config[keyof Config & "jobs"] : unknown, JobsConfig, [unknown]>;
   rewrite?: unknown;
-  redirects?: unknown;
   runtimeRedirects?: Checked<"runtimeRedirects" extends keyof Config ? Config[keyof Config & "runtimeRedirects"] : unknown, {
     hosts?: string[] | undefined;
   }, [unknown]>;
-  live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
-  i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, I18nConfig, [unknown]>;
   timeZone?: unknown;
-  base?: unknown;
   links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
     outside?: "new-tab" | "same-tab" | undefined;
     schemes?: string[] | undefined;
   }, [unknown]>;
   trailingSlash?: unknown;
-  contentConfig?: unknown;
-  markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
   plugins?: unknown;
   librarySettings?: unknown;
   lints?: unknown;
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
-  store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
   env?: Checked<"env" extends keyof Config ? Config[keyof Config & "env"] : unknown, {
     compose?: string | string[] | undefined;
     example?: string | undefined;
   }, [unknown]>;
   checks?: unknown;
-  extensions?: unknown;
   beforeRequest?: unknown;
   onResponse?: unknown;
   onStart?: unknown;
@@ -3854,7 +3869,8 @@ const signed: { sign(use: string, value: string, options?: SignOptions): string;
 
 [./server] SignOptions
 interface SignOptions
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] SNIFFED_BYTES
 const SNIFFED_BYTES: 4096
@@ -3964,7 +3980,8 @@ function typeOfName(name: string): string
 
 [./server] UrlOptions
 interface UrlOptions
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  /** @deprecated Written `ttl`; `deprecated-ttl-names` rewrites it. Removed in 1.108. */ maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] verifyWork
 function verifyWork(solution: null | string | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>

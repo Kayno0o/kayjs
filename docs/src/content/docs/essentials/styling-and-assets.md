@@ -318,11 +318,13 @@ export default defineConfig({
 
 An image gets variants at 320, 640, 960, 1280, 1920 and 2560 pixels, those narrower than the image itself. None is wider than 2560, even for a larger photograph, which keeps the files small. A screen that needs more, a 4K display at full size, asks with `images.widths: [320, 960, 1920, 3840]`. `images.widths` sets another list, which also gets the image's own size: whole numbers from 1 to 16384, at most 16, in any order. A shorter list builds fewer files.
 
-`quality={90}` on an `img` (`image(photo, { quality: 90 })` for a spread) encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too; `images.webp: { quality }` sets the WebP variants alone, as `images.avif` does the AVIF ones. The AVIF variants move the same step from `images.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
+`quality={90}` on an `img` (`image(photo, { quality: 90 })` for a spread) encodes that one image's variants at a quality of its own, for a photograph that shows banding at the default. `images.formats.quality`, 80 by default, is the quality of all the others, and of the JPEG share cards too.
+
+`images.formats.webp: { quality }` sets the WebP variants alone, as `images.formats.avif` does the AVIF ones. The AVIF variants move the same step from `images.formats.avif`'s quality, so 90 gives WebP at 90 and AVIF at 60 by default.
 
 ```ts
 export default defineConfig({
-  images: { widths: [480, 960, 1440, 1920], quality: 75 },
+  images: { widths: [480, 960, 1440, 1920], formats: { quality: 75 } },
 })
 ```
 
@@ -351,13 +353,13 @@ Without the size the image keeps its `src` alone.
 
 ### Limits on new variants
 
-Each variant the server has to draw costs an encode, so the image route limits what one client can ask for. A client may have 120 new variants drawn a minute (`images.rateLimit`) before the route answers 429 with `Retry-After`, and once 128 draws are waiting (`images.queue`) the route answers 503 until they clear. A variant that already exists is never limited.
+Each variant the server has to draw costs an encode, so the image route limits what one client can ask for. A client may have 120 new variants drawn a minute (`images.rateLimit`) before the route answers 429 with `Retry-After`, and once 128 draws are waiting (`images.limits.queue`) the route answers 503 until they clear. A variant that already exists is never limited.
 
-One image keeps at most 256 cached variants (`images.maxVariants`). Past that, the oldest is removed to make room for a new one, so nobody is refused. Each option takes a whole number, or `false` to turn the limit off.
+One image keeps at most 256 cached variants (`images.limits.variants`). Past that, the oldest is removed to make room for a new one, so nobody is refused. Each option takes a whole number, or `false` to turn the limit off.
 
 ```ts
 export default defineConfig({
-  images: { rateLimit: { max: 600, window: '1m' }, maxVariants: false },
+  images: { rateLimit: { max: 600, window: '1m' }, limits: { variants: false } },
 })
 ```
 
@@ -365,11 +367,11 @@ export default defineConfig({
 
 The variants the server draws on request are kept in `.kay/cache/images`. It removes the ones nothing wrote for 30 days, at start and once a day, and draws one again if it is asked for later.
 
-An image on a CMS or a CDN is resized too, once its host is in `images.remote`. Each entry is an origin, and its host can start with `*.` for any subdomain. A download is cut off past 25 MB and given up on after 10 s; `remoteMaxSize` and `remoteTimeout` change them.
+An image on a CMS or a CDN is resized too, once its host is in `images.remote.hosts`. Each entry is an origin, and its host can start with `*.` for any subdomain. `hosts` is a list, or a function returning one, for hosts a CMS or a database holds. A download is cut off past 25 MB and given up on after 10 s; `remote.maxSize` and `remote.timeout` change them.
 
 ```ts
 export default defineConfig({
-  images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] },
+  images: { remote: { hosts: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] } },
 })
 ```
 

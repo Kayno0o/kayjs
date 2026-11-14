@@ -36,8 +36,8 @@ An imported image gets WebP variants at several widths. Each also comes as AVIF,
 
 | Criterion | Mark | What kay does |
 | --- | --- | --- |
-| 5.1 Image format | Met | WebP and AVIF variants. An animated GIF and an SVG keep their format. `images.avif: false` serves WebP alone. |
-| 5.2 Image compression | Met | Variants use `images.quality`. `image(src, { quality })` sets one image's. |
+| 5.1 Image format | Met | WebP and AVIF variants. An animated GIF and an SVG keep their format. `images.formats.avif: false` serves WebP alone. |
+| 5.2 Image compression | Met | Variants use `images.formats.quality`. `image(src, { quality })` sets one image's. |
 | 6.4 Image size matches display | Met, and Checked | The `sizes` you write picks the variant. `unsized-image` warns of an image with no size. `large-public-image` warns of a raster over 256 KiB in `public/`, which is sent whole. |
 | 4.8 Few fonts | App | `fonts` self-hosts font files. Each family gets a fallback of matching metrics. A font in several subsets loads only the files the page's text needs. How many families you declare is up to you. |
 | 5.8 Archive or delete old content | App | `files.delete` removes a file with its variants. The server removes image variants nobody asked for in 30 days. |

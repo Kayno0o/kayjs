@@ -22,8 +22,8 @@ describe('true on a feature key is the key left out', () => {
   it('reads the same favicon, avif quality, rate limit and health timeout', () => {
     expect(faviconSource('/root', true)).toEqual(faviconSource('/root', undefined))
     expect(faviconSource('/root', false)).toBeUndefined()
-    expect(avifQuality({ avif: true })).toBe(avifQuality({}))
-    expect(avifQuality({ avif: false })).toBeUndefined()
+    expect(avifQuality({ formats: { avif: true } })).toBe(avifQuality({}))
+    expect(avifQuality({ formats: { avif: false } })).toBeUndefined()
     expect(rateLimitOf('live', true, 7)).toEqual(rateLimitOf('live', undefined, 7))
     expect(rateLimitOf('live', false, 7)).toBeUndefined()
     expect(healthTimeoutMs(true)).toBe(healthTimeoutMs(undefined))

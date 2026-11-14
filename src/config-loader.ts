@@ -1,11 +1,12 @@
 import type { BunPlugin } from 'bun'
-import type { InternalConfig, KayConfig, LoadedConfig } from './config'
+import type { ConfigInput, InternalConfig, KayConfig, LoadedConfig } from './config'
 import { existsSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { APP_CONTEXT, CONFIG_FILE } from './config'
+import { resolveConfig } from './config-resolve'
 import { CONFIG_GROUPS, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { OLD_PACKAGE_NAME, RENAMED_PACKAGES } from './package-names'
@@ -116,7 +117,7 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 
   checkedConfig(config)
 
-  return config
+  return resolveConfig(config)
 }
 
 const MODULE_DIRECTORY = /^.*\/node_modules\//
@@ -130,9 +131,9 @@ const REPLACED_EXPORTS: Record<string, string> = {
 }
 
 // The config's import, a missing export reported as the removal it is rather than as Bun's bare module error, so `kay check` and `kay upgrade` point at the note that renames it.
-async function importedConfig(file: string, fresh: boolean): Promise<{ default?: KayConfig }> {
+async function importedConfig(file: string, fresh: boolean): Promise<{ default?: ConfigInput }> {
   try {
-    return await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
+    return await import(fresh ? `${file}?${Date.now()}` : file) as { default?: ConfigInput }
   }
   catch (error) {
     const removed = error instanceof SyntaxError ? REMOVED_EXPORT.exec(error.message) : null
@@ -148,7 +149,7 @@ async function importedConfig(file: string, fresh: boolean): Promise<{ default?:
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
-function checkedConfig(config: LoadedConfig, where = CONFIG_FILE): void {
+function checkedConfig(config: ConfigInput & InternalConfig, where = CONFIG_FILE): void {
   const { checks, env, publicEnv } = config
 
   if (publicEnv !== undefined)
@@ -317,7 +318,10 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), options))))
+  // The options are resolved as the file is, so a code call may pass a list's function or an old key as `kay.config.ts` may.
+  const given = await resolveConfig(options) as Options
+
+  return withTailwind(root, withPublicFields(root, withAppContext(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), given))))
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

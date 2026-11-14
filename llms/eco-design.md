@@ -82,8 +82,8 @@ Links go to where each feature is documented. A row marked `Met` claims only wha
 
 | Criterion | Status | What kay does | Where |
 | --- | --- | --- | --- |
-| 5.1 Image format suited to its use | Met | An imported PNG, JPEG, WebP, GIF or AVIF gets WebP variants, each also as an AVIF for a browser that takes it, on the same URL; an animated GIF and an SVG keep their format; `images.avif: false` serves WebP alone | [Responsive images](images.md#responsive-images) |
-| 5.2 Image compression suited to its context | Met | Variants are made at `images.quality` and `images.avif`'s quality; `image(src, { quality })` sets one image's | [Responsive images](images.md#responsive-images) |
+| 5.1 Image format suited to its use | Met | An imported PNG, JPEG, WebP, GIF or AVIF gets WebP variants, each also as an AVIF for a browser that takes it, on the same URL; an animated GIF and an SVG keep their format; `images.formats.avif: false` serves WebP alone | [Responsive images](images.md#responsive-images) |
+| 5.2 Image compression suited to its context | Met | Variants are made at `images.formats.quality` and `images.formats.avif`'s quality; `image(src, { quality })` sets one image's | [Responsive images](images.md#responsive-images) |
 | 5.8 Archive or delete obsolete content | App | `files.delete` removes a file with its variants and cards; the server removes the image variants nothing asked for in 30 days | [Stored files](files.md), [Responsive images](images.md#responsive-images) |
 
 ### Frontend

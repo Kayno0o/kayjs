@@ -65,7 +65,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 - A form posting to the action renders a hidden `kay_since` field by itself, a stamp of when it rendered bound to the action and signed with a key derived from [the app secret](environment.md#the-app-secret) (so an app without sessions needs no `session()` for one), else a key of the process, which a restart changes: a production server refuses to start on it unless `KAY_EPHEMERAL_SECRET=1`; a test server never does.
 - A plain form post whose stamp is missing, forged, another action's or older than `maxAge`, a day by default, fails the same way, and the page it answers keeps the stamp the form rendered with, so the visitor does not wait again from zero.
 - A prerendered page holding such a form is still rendered once: the server signs a fresh stamp into it on every visit, as it splices in an inline server island, so the page goes out gzipped rather than in brotli and kept by no cache.
-- `minTime: { after: '3s', maxAge: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.
+- `minTime: { after: '3s', ttl: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.
 - A form the server renders inside an island carries its honeypot and stamp like any other. A form an island builds in the browser (a branch shown after a click) asks `/_kay/fields/` plus the action's path, a GET answering `{ html }`, the same markup with a stamp signed at that moment, when it takes focus or is posted, and adds it to the form before the post reads its fields: it costs no request on page load, no code on a page without such a form, and for a form of an action with neither check one cached request per action and no field. The stamp is dated from that first focus or post, not from when the form appeared, so a button-only form with `minTime: '3s'` clicked at once is refused as `early`: `plain: true` leaves a form the script posts unchecked. A form post with no stamp is refused; a call from kay's script without one goes through, a stamp it sends still checked.
 - `minTime: { after: '3s', plain: true }` checks only a form the browser posts itself, without kay's script: the page swap's post and an island's call go through, for a form whose script already proves something, such as a `data-kay-work` field below: the header marking the swap's post proves nothing, so a script sending it skips `minTime`.
 - `site.submit` from a `Visit` sends its form's stamp, and `setSystemTime` from `bun:test` moves the clock past `minTime`.
@@ -85,7 +85,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 - The refusals of these limits, and the one for a post over `maxSize`, read in English unless the site words them once for every action under `kay.protection.*` and `kay.action.*` in its catalogs ([Locales](locales-texts.md)), or `messages` gives an action's own, as a schema's `error` does for a field: `` messages: { honeypot: 'Laissez ce champ vide', minTime: reason => reason === 'early' ? 'Un instant, puis renvoyez-le' : 'Ce formulaire a expiré, renvoyez-le', rateLimit: wait => `Réessayez dans ${wait} s`, maxSize: bytes => `${bytes} octets au plus` } ``.
 - `rateLimit` is given the seconds to wait.
-- `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `maxAge`, as a page from before a restart sends.
+- `minTime` is given `early` for a post sent too soon or `expired` for a stamp missing, forged or past `ttl`, as a page from before a restart sends.
 - `proofOfWork` is given `missing`, `expired` or `wrong` as below.
 - `maxSize` is given the most bytes a post may send, as a number whatever size `maxSize` was written as.
 - Each is a string or a function; `serverError` is given the error and the action's `ctx` (see [Refused posts](actions.md#refused-posts)). A function runs in the request's locale, so it may word the refusal with `t()`; `serverError` may be async.
@@ -96,10 +96,10 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 - The page carries a challenge for each action its forms post to, the hash of a random salt and a number up to the difficulty, signed as the `minTime` stamp is and bound to the action.
 - kay's script solves it in a worker, a same-origin file the browser build ships, from the moment one of those forms takes focus, then sends the solution with the post in an `x-kay-work` header.
 - `proofOfWork: 300_000` sets the difficulty, 100,000 by default: the browser hashes half of it on average, some tens of milliseconds on a laptop, more on an old phone.
-- `{ difficulty, maxAge: '1h', pretend: true, store }` sets how long a challenge stays good, a day by default.
+- `{ difficulty, ttl: '1h', pretend: true, store }` sets how long a challenge stays good, a day by default.
 - `pretend` answers a wrong number or a solution sent twice as `honeypot`'s `pretend` does.
 - `store` keeps the solutions already used, each going through once, a `RateStore` as `rateLimit` takes, `sqliteRates(path)` sharing them between the processes of a machine, this process's memory by default.
-- A post without a solution, or to a challenge past `maxAge`, another action's or signed before a restart, fails with 422 and `errors['']` carrying a fresh challenge in the same header: an island's call, a script's with no form on the page included, solves it and goes again by itself, the call waiting on it then.
+- A post without a solution, or to a challenge past `ttl`, another action's or signed before a restart, fails with 422 and `errors['']` carrying a fresh challenge in the same header: an island's call, a script's with no form on the page included, solves it and goes again by itself, the call waiting on it then.
 - A form posted without JavaScript sends none and is refused, unless the action sets `minTime` too: a post without JavaScript is then checked by `minTime` alone, so the pair stops no script that waits it out.
 - A form posted with `navigation: false` and no island has no script either, nor does one with `data-reload` or a `target`, which the swap leaves to the browser.
 - A prerendered page gets a fresh challenge on every visit, as a stamp.
@@ -109,7 +109,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 - `workChallenge(scope, { difficulty, maxAge })` from `kay/server` signs a challenge bound to `scope` rather than to an action, for code checking it itself, as kayjs-auth's CAPTCHA does: `input(type="hidden" name="proof" data-kay-work={workChallenge('contact')})` posts its solution as the field's value, kay's script solving it from the moment the form takes focus.
 - `await verifyWork(input.proof, 'contact', { difficulty, store })` from `kay/server` answers `undefined` once for each solution, else `missing`, `expired` (past `maxAge`, another scope's, signed before a restart, or easier than `difficulty`) or `wrong`. The solutions used are kept in `store`, else the app store's `rates`, else this process's memory.
-- The difficulty is signed into the challenge, so a scope asking more refuses one handed out before, the page then signing a harder one; `difficulty` is 100,000 by default and `maxAge` a day.
+- The difficulty is signed into the challenge, so a scope asking more refuses one handed out before, the page then signing a harder one; `difficulty` is 100,000 by default and `ttl` a day.
 - A prerendered page gets a fresh challenge in the field on every visit, as a stamp; `site.submit` solves the field unless the test gives its value.
 
 ### Body limit

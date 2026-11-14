@@ -656,7 +656,7 @@ async function imageRouteOf({ project: { root }, options, env, setup: { source, 
     ttl: options.images?.ttl,
     limits: imageLimits(options.images),
     saveData: options.client?.saveData,
-    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
+    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote?.hosts), imageCache, undefined, remoteLimits(options.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
       const path = await lookup(src, ctx)

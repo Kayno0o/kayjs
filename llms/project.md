@@ -96,6 +96,9 @@ export default defineConfig({
 - A directory inside the project holding a `kay.config.ts` of its own, such as an example app or a documentation site, is another project: its components are never the outer one's islands, and it checks and builds from its own root.
 
 - A feature key is `false` for off, `true` for its defaults or an object of options: `robots`, `sitemap`, `favicon`, `security`, `health`, `preview`, `offline`, `metrics`, `openapi`, `mcp`, `proxy`, `images.avif` and the rate limits. `defineConfig` refuses a key it does not know in any option bag, as a type error.
+- A list that may come from a CMS or a database is the list, or a function returning it (or a promise of it): `cors.origins`, `security.hosts`, `images.remote.hosts`, `proxy.trusted`, `redirects`, `robots.disallow`, `robots.allow` and `i18n.paths`. Kay calls it once as the config loads, `kay dev` again after a change to the file.
+- `images` is `{ remote: { hosts, maxSize, timeout }, formats: { quality, webp, avif }, limits: { variants, queue }, rateLimit, ttl, widths, ... }`; `remote: [...]` is hosts alone.
+- A duration key is `ttl` for how long data lives, `timeout` for how long to wait and `maxAge` only for the HTTP or cookie attribute of that name.
 - `proxy: false` is none, `proxy: true` is one proxy in front, `proxy: { hops: 2 }` two, `{ header }` a header the proxy sets, `{ key: 'x-upstream-key', open }` refuses requests without the shared key ([Production](proxy-and-security.md#behind-a-proxy)).
 - `extensions` lists what libraries add to the app, one value each, such as `extensions: [auth()]`: pages laid over `src/routes` and API modules over `src/api` under a prefix, message catalogs under `src/messages`, an app file at the same path or an app key winning, config laid under the app's, such as Bun plugins or head tags (see [Extensions](component-libraries.md#extensions)), and a hook rewriting each prerendered page (see [Page hooks](prerendering.md#page-hooks)).
 
