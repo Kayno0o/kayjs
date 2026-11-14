@@ -155,7 +155,7 @@ export interface ImageLimits {
   queue: number | undefined
 }
 
-// Unless `images.rateLimit`, `images.maxVariants` or `images.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
+// Unless `images.rateLimit`, `images.limits.variants` or `images.limits.queue` say otherwise: a page asks for a few variants per image, so a client asking for hundreds is probing the encoder.
 const DEFAULT_IMAGE_LIMITS = { variants: 256, queue: 128 } as const
 
 // The limits of the image route on variants it has to encode, each a whole number from 1 or `false` for none.

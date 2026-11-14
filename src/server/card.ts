@@ -46,7 +46,7 @@ export interface CardSetup {
   // The locale a page outside any locale reads the name in.
   defaultLocale?: string | undefined
   quality?: number | undefined
-  // `images.aspects` and `images.avif`, which the variants a template's images are served as depend on.
+  // `images.aspects` and `images.formats.avif`, which the variants a template's images are served as depend on.
   variants?: { aspects?: readonly string[] | undefined, avif?: unknown } | undefined
   // An executable, which only reads what its build wrote.
   bundled?: boolean | undefined

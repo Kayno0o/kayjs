@@ -39,7 +39,7 @@ async function cachedOf(dir: string, stem: string): Promise<string[]> {
 }
 
 // What the image route runs an encode through: it answers why not, or undefined once the variant is written. Not while the draw queue is full, nor for a client that asked for too many new variants this minute; a refused variant counts for neither.
-// `images.maxVariants` bounds the cache of one source without refusing anyone: past it the oldest cached variant of that source is removed, `forgotten` told to drop the files it holds open, and the one asked for is encoded.
+// `images.limits.variants` bounds the cache of one source without refusing anyone: past it the oldest cached variant of that source is removed, `forgotten` told to drop the files it holds open, and the one asked for is encoded.
 // It runs inside the one write a variant gets, so requests for the same new variant at once count once. A variant's name is its source's stem followed by its `suffix`.
 export function encodeGate(limits: ImageLimits, dir: string, forgotten: { clear: () => void }[]) {
   // The cached variants of each source by stem, read from the folder once, so what a restart or an earlier run left counts.
