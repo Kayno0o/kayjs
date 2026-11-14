@@ -2,16 +2,8 @@
 import type { Action, Component, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ByteSize } from 'kay/library'
-import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
-import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
->>>>>>> 05a7f63 (fix: ignore the Enter that ends an IME composition in text fields)
-=======
 import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatLabelProps, ChatLabels, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
 import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
-=======
-import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
-import { composing, durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
->>>>>>> 05a7f63 (fix: ignore the Enter that ends an IME composition in text fields)
 import BareIconButton from '@kayjs/ui/bare-icon-button.kay'
 import Icon from '@kayjs/ui/icon.kay'
 import Notice from '@kayjs/ui/notice.kay'
