@@ -255,6 +255,24 @@ export const DEPRECATED_LINTS = {
     wrong: '// kay.config.ts\nexport default { jobs: { guard: ctx => ctx.deny(401) } }',
     right: '// kay.config.ts\nexport default { jobs: { guards: ctx => ctx.deny(401) } }',
   },
+  'deprecated-rate-enforce': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`enforce(ctx)` on what `rateLimit()` returns, `check(ctx)` since 1.105: `limiter().enforce(key)` counts under a key and refuses nothing, so one name held two jobs, and `check` is the guard\'s call that refuses with a 429. `count(from)` now gives the window, `{ count, resetAt, wait }`, beside `hit`. The old name works until 1.108. Found on a name bound once to a call of `rateLimit` imported from `kay/server`, in the TypeScript files and `.kay` files of the project, as `kay check` reads no types: a limit reached through a property, a parameter or another file is not found. The fix renames the method.',
+    wrong: 'import { guard } from \'kay\'\nimport { rateLimit } from \'kay/server\'\n\nconst visits = rateLimit(\'account\', { max: 60, window: \'1m\' })\n\nexport default guard(async (ctx) => {\n  await visits.enforce(ctx)\n})',
+    right: 'import { guard } from \'kay\'\nimport { rateLimit } from \'kay/server\'\n\nconst visits = rateLimit(\'account\', { max: 60, window: \'1m\' })\n\nexport default guard(async (ctx) => {\n  await visits.check(ctx)\n})',
+  },
+  'deprecated-auth-rate-limits': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'kayjs-auth\'s `rateLimit` as 26 flat keys, grouped by feature since 1.105: `signIn: { ip, account, accountAll }` (`signIn`, `signInAccount`, `signInAccountAll`), `{ ip, account }` for `resend`, `forgot`, `magicLink`, `emailChange`, `twoFactor` and `emailCode`, `invite: { sender, address }` and `oauth: { register, registerAll, document, token }`; `register`, `reprove`, `link`, `export` and `organization` stay one limit. A bare limit or a list on a feature that has a group is its `ip` (or first) part. The old keys work until 1.108. Found in the `rateLimit` object written in a call of `auth` or `authCore` imported from `@kayjs/auth`. The fix writes the whole object grouped, attached to the first report; an object that spreads, names a key twice or holds a computed or shorthand key is reported with no fix.',
+    wrong: 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { signIn: { max: 20, window: \'15m\' }, signInAccount: { max: 3, window: \'15m\' } } } as never)',
+    right: 'import { authCore } from \'@kayjs/auth\'\n\nexport const auth = authCore({ rateLimit: { signIn: { ip: { max: 20, window: \'15m\' }, account: { max: 3, window: \'15m\' } } } } as never)',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

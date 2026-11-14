@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 
 import { aiLanguage } from '../src/check/ai-language'
+import { authRateLimits } from '../src/check/auth-rate-limits'
 import { cmsOptions } from '../src/check/cms-options'
 import { applySafeFixes } from '../src/check/fixes'
 
@@ -13,6 +14,7 @@ import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/c
 import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
+import { rateEnforce } from '../src/check/rate-enforce'
 import { renamedPackages } from '../src/check/renamed-packages'
 import { schemaType } from '../src/check/schema-type'
 import { storeNames } from '../src/check/store-names'
@@ -27,6 +29,8 @@ type Name = keyof typeof DEPRECATED_LINTS
 // The project-wide lints, each by the check that finds it; a deprecated lint of the compiler is found by `compileKay`, so it needs no entry.
 const SITE: Record<string, (root: string, options: CheckOptions) => Promise<CheckDiagnostic[]>> = {
   'deprecated-ai-language': aiLanguage,
+  'deprecated-rate-enforce': rateEnforce,
+  'deprecated-auth-rate-limits': authRateLimits,
   'deprecated-job-handler': jobHandlers,
   'deprecated-schedule-call': scheduleCalls,
   'deprecated-job-options': jobOptions,

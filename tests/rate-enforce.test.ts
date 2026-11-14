@@ -42,6 +42,39 @@ function guardContext(from: Request) {
   }
 }
 
+describe('check and count', () => {
+  it('check denies with 429 and Retry-After past the limit, as enforce, which stays as its alias', async () => {
+    const limit = rateLimit('check-basic', { max: 1, window: '1m', store: memoryRates() })
+
+    await limit.check(guardContext(request()).ctx)
+
+    const over = guardContext(request())
+
+    await expect(limit.check(over.ctx)).rejects.toThrow('denied')
+    expect(over.denied.status).toBe(429)
+    expect(Number(over.headers.get('retry-after'))).toBeGreaterThan(0)
+
+    const alias = guardContext(request())
+
+    await expect(limit.enforce(alias.ctx)).rejects.toThrow('denied')
+    expect(alias.denied.status).toBe(429)
+  })
+
+  it('count gives the window and the wait, which hit gives alone', async () => {
+    const limit = rateLimit('count-basic', { max: 2, window: '1m', store: memoryRates() })
+    const first = await limit.count('ada')
+    const second = await limit.count('ada', null, 1)
+    const third = await limit.count('ada')
+
+    expect([first.count, second.count, third.count]).toEqual([1, 2, 3])
+    expect(first.wait).toBeUndefined()
+    expect(third.wait).toBeGreaterThan(0)
+    expect(third.resetAt).toBe(first.resetAt)
+    expect(await limit.hit('ada')).toBeGreaterThan(0)
+    expect(await limit.hit('bob')).toBeUndefined()
+  })
+})
+
 describe('enforce', () => {
   it('lets a request under the limit through and denies the one past it with 429 and Retry-After', async () => {
     const limit = rateLimit('enforce-basic', { max: 1, window: '1m', store: memoryRates() })

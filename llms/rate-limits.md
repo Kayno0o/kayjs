@@ -26,7 +26,7 @@ form(action={subscribe})
 
 ### Limit attempts in a guard or an API route
 
-`rateLimit(name, { max, window })` from `kay/server` counts attempts from the request's client; `await limit.enforce(ctx)` counts the guard's request and, once over the limit, sets `Retry-After` and denies with 429 in one call:
+`rateLimit(name, { max, window })` from `kay/server` counts attempts from the request's client; `await limit.check(ctx)` counts the guard's request and, once over the limit, sets `Retry-After` and denies with 429 in one call:
 
 ```ts
 // src/routes/account/_guard.ts
@@ -36,7 +36,7 @@ import { rateLimit } from 'kay/server'
 const visits = rateLimit('account', { max: 60, window: '1m' })
 
 export default guard(async (ctx) => {
-  await visits.enforce(ctx)
+  await visits.check(ctx)
 })
 ```
 
@@ -46,7 +46,7 @@ An API route or module sets its own with `api({ rateLimit })` or the route's `de
 
 The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: visits }`, `api({ rateLimit: visits })` or `page.rateLimit` and they count in the guard's counter, so one client has one allowance across all of them. An options object keeps counting apart, as before, and so does a copy of the object when it is given to an action or route (`{ ...visits, max: 5 }` is a limit of its own there), while the copy's `hit` and `enforce` are the original's and still count in it.
 
-- A guard calling `visits.enforce(ctx)` on the same object as an action behind it counts a post twice: once in the guard, once in the action.
+- A guard calling `visits.check(ctx)` on the same object as an action behind it counts a post twice: once in the guard, once in the action.
 - On a layout's `page.rateLimit` a shared object counts every page under the layout together, where a plain options object counts each route apart.
 - kayjs-auth and kayjs-ai take `onLimit` but not a `rateLimit()` object, as they count under keys of their own, not the client's address: one is refused at boot.
 
@@ -91,18 +91,29 @@ The object `rateLimit()` returns is a limit: give it to `protect: { rateLimit: v
 ### Outside an action
 
 - A guard, an API route or a library limits attempts the same way with `rateLimit(name, { max, window, store })` from `kay/server`: `await limit.hit(request)` counts one from the request's client and gives the seconds to wait once over the limit, else `undefined`.
-- Two `enforce`s, not alike: `limiter().enforce(key, weight?)` counts under a key and answers the seconds to wait, refusing nothing; `rateLimit().enforce(ctx, message?)` is the guard's call below.
-- `await limit.enforce(ctx, message?)` takes a guard's `ctx`, counts under the limit's `key` or the client's address, and past the limit sets `Retry-After` and calls `ctx.deny(429, message)`, `message` a text or a function of the seconds to wait.
-- `onLimit(refusal)` on a limit (`RateLimitRefusal`: `name`, the key counted, `wait` in seconds, `request` when there is one) runs for each request an action, a page, an API route, `enforce` or `hit` refused, beside the answer, which never waits for it; one that throws or rejects is logged. A limit object from `rateLimit()` shared with an action reports the action's URL as `name`.
+- `limiter().enforce(key, weight?)` counts under a key and answers the seconds to wait, refusing nothing; `rateLimit().check(ctx, message?)` is the guard's call, which refuses (`rateLimit().enforce(ctx)` was its name until 1.105, `deprecated-rate-enforce`).
+- `await limit.check(ctx, message?)` takes a guard's `ctx`, counts under the limit's `key` or the client's address, and past the limit sets `Retry-After` and calls `ctx.deny(429, message)`, `message` a text or a function of the seconds to wait.
+- `onLimit(refusal)` on a limit (`RateLimitRefusal`: `name`, the key counted, `wait` in seconds, `request` when there is one) runs for each request an action, a page, an API route, `check` or `hit` refused, beside the answer, which never waits for it; one that throws or rejects is logged. A limit object from `rateLimit()` shared with an action reports the action's URL as `name`.
+- `await limit.count(request)` counts as `hit` does and gives the window, `{ count, resetAt, wait }`, `wait` the seconds to wait once over `max`, else `undefined`: for an app that shows the count or decides itself.
 - `await limit.hit(user.email)` counts under the app's own key instead, such as an account or a socket, whoever sends the request.
 - `await limit.hit(user.email, undefined, tokens)` counts `tokens` at once, a whole number from 1, so `max` caps tokens or bytes rather than attempts; a store of the app's own must add the weight, and one ignoring it throws when a window's first hit shows it.
 - Limits of one name count together; an action's counts under its URL.
 
 - A library or route limiting attempts its own way reads the client as `rateLimit` does: `clientAddress(request, server)` and `rateKey(address)` from `kay/server` give the address, read through the `proxy` setting, and the key a limit counts it under, an IPv6 address's /64 block. A library guarding what kay's actions and API do not reach reads `crossSiteRefused(request, site?)` from `kay/server`, true for a browser's cross-site POST or websocket upgrade that no `api({ cors })` module let in, `site` an extra public URL whose host counts as the request's own; `crossSiteResponse(request, 'action' | 'request', site?)` from `kay/server` is the 403 `Response` for one it refused, headed `Cross-site action refused` or `Cross-site request refused`, saying the `Origin` or `Sec-Fetch-Site` it saw and the origins kay took for the site.
 
+### When a request is counted
+
+Each kind of route counts at one place, and a refusal there is the 429:
+
+- An action counts before its guards, `resolve` hooks and handler, so a flood is turned away before any work, and `count: 'succeeded'` counts after the handler under the key the check used.
+- A page, a layout, an endpoint file, an API route or module and a route's `detail` count after the guards, a request they refuse included, so a guard cannot be guessed at full speed; the 429 replaces the refusal.
+- A guard's own `check(ctx)` or `hit()` counts where the guard runs.
+- kay's own routes (`images`, `mcp`, `live`, the beacons) count first, before reading the body.
+- Once `admit` (#3306) exists, the recommendation is to count there for every kind: after the guards that admit a request, before any work.
+
 ### In the libraries
 
 - Every limit is one `RateLimit` (from `kay`, `kay/server` and `kay/library`): `{ max, window, store?, key?, onLimit? }`. Every `rateLimit` option takes one or a list of them, each counted apart, and `false` lifts a default one. kayjs-auth, kayjs-ai, `basicAuth` and kay's own routes (`images`, `mcp`, `live`) count under keys or the address of their own and take no `key`; a `key` there is refused at boot, a `store` and an `onLimit` are taken.
 - kayjs-ai takes `ai({ rateLimit, budget, key })` and `ask(messages, { key })`, see [Limits and the token budget](../packages/ai/llms/limits.md).
-- kayjs-auth takes `authCore({ rateLimit: { signIn: { max, window } } })`, one entry per kind of attempt, each a limit or a list of them, see [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
-- kayjs-mail's contact form takes the action's `protection: { rateLimit }` ([Contact form](../packages/mail/llms/contact-form-and-testing.md)); `smtp({ rateLimit: { max: 5, window: '1s' } })` caps the mails sent (one window, in memory: no list, `store` or `key`), and `MAIL_RATE_LIMIT=5/1s` sets it from the environment.
+- kayjs-auth takes `authCore({ rateLimit: { signIn: { ip, account, accountAll } } })`, one entry per feature, each part a limit or a list of them (`{ ip, account }` on `resend`, `forgot`, `magicLink`, `emailChange`, `twoFactor` and `emailCode`, `invite: { sender, address }`, `oauth: { register, registerAll, document, token }`, a bare limit for `register`, `reprove`, `link`, `export` and `organization`; the flat keys of before 1.105 work until 1.108, `deprecated-auth-rate-limits`), see [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
+- kayjs-mail's contact form takes the action's `protection: { rateLimit }` ([Contact form](../packages/mail/llms/contact-form-and-testing.md)); `smtp({ rateLimit: { max: 5, window: '1s' } })` caps the mails sent, a throttle on the transport with no client to count, so `{ max, window }` alone (no list, `store`, `key` or `onLimit`), and `MAIL_RATE_LIMIT=5/1s` is read into that same `{ max, window }`.

@@ -56,7 +56,7 @@ authCore({ scopes: ['posts:read', 'posts:write'] })
 - The consent page says that the name of a client that registered itself is its own and was not checked (`auth.consent.unverified`), and shows the host of one named by a metadata document (`auth.consent.from`).
 - The consent page, the token form and the lists of tokens and approved apps show each scope as the app words it under `auth.scopes.<scope>` in its messages (`auth: { scopes: { 'posts:read': 'Read your posts' } }`), the scope's code when no catalog has it; a label is shown as text, never as markup, and a language needs its own, as any text the app words. `scopeLabel` is not exported: an app's own page uses `wording('auth.scopes.posts:read', 'posts:read')` from `kay/words`.
 - `oauthServer.clients()` lists `{ id, name, scopes, createdAt, lastUsedAt }` of the apps the user approved, and `oauthServer.revokeGrant(id)` revokes one with its tokens (`{ ok: true }`, or `{ ok: false, error: { code: 'not-found' | 'signed-out' } }`; session only), for a page of the app's own. `oauthServer.authorize(params)` and `oauthServer.decide(fields, allow)` are what the consent page calls.
-- Limits (`rateLimit`): `oauthRegister` 20 per hour, `oauthRegisterAll` unset (a ceiling on all addresses together), `oauthDocument` 30 per 15 minutes (metadata documents read for an address), `oauthToken` 300 per 15 minutes (the token and the revocation endpoints each count their own).
+- Limits (`rateLimit.oauth`): `register` 20 per hour, `registerAll` unset (a ceiling on all addresses together), `document` 30 per 15 minutes (metadata documents read for an address), `token` 300 per 15 minutes (the token and the revocation endpoints each count their own).
 
 ### Bearer tokens
 

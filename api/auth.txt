@@ -216,7 +216,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
       schema: {};
       standaloneSchema: {};
       macro: {};
-      macroFn: {}; ...#4ddeda8d (4531 lines)
+      macroFn: {}; ...#33ea7752 (4531 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
   test: (site: OAuthSite) => { ...#595de294 (10 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
@@ -226,7 +226,7 @@ function authCore<Data extends AuthSessionData, Role extends string = string, Pr
   signOut(site: { ...#2b384ff2 (3 lines)
   [PAGES_OF]: PagesHandle | undefined;
   [CHECK_USER]: (input: CreateUserInput) => Promise<RegisterErrors>;
-  plugin: Elysia<"", { ...#1be8a05d (2288 lines)
+  plugin: Elysia<"", { ...#8a197439 (2288 lines)
   hasRole: (required: Role) => Predicate<BareUser<Record<string, unknown>>>;
   isGranted: (role: Role, user: BareUser<Record<string, unknown>>) => boolean;
   memberOf: (role?: OrgRole | undefined, memberOptions?: { ...#6ade75cc (3 lines)
@@ -376,7 +376,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
   proxy?: ProxyConfig | boolean | number | undefined
-  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", LimitOption>> | undefined
+  rateLimit?: LimitsOption | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
@@ -1027,7 +1027,34 @@ type LimitOption = AuthRateLimit | AuthRateLimit[]
 type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegisterAll?: AuthRateLimit }
 
 [.] LimitsOption
-type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
+interface LimitsOption
+  emailChange?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ emailChangeAccount?: LimitOption | undefined
+  emailCode?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ emailCodeAccount?: LimitOption | undefined
+  export?: LimitOption | undefined
+  forgot?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ forgotAccount?: LimitOption | undefined
+  invite?: LimitOption | undefined | { sender?: LimitOption | undefined; address?: LimitOption | undefined; }
+  /** @deprecated `invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ inviteAddress?: LimitOption | undefined
+  link?: LimitOption | undefined
+  magicLink?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ magicLinkAccount?: LimitOption | undefined
+  oauth?: undefined | { register?: LimitOption | undefined; registerAll?: LimitOption | undefined; document?: LimitOption | undefined; token?: LimitOption | undefined; }
+  /** @deprecated `oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthDocument?: LimitOption | undefined
+  /** @deprecated `oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthRegister?: LimitOption | undefined
+  /** @deprecated `oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthRegisterAll?: LimitOption | undefined
+  /** @deprecated `oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ oauthToken?: LimitOption | undefined
+  organization?: LimitOption | undefined
+  register?: LimitOption | undefined
+  reprove?: LimitOption | undefined
+  resend?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ resendAccount?: LimitOption | undefined
+  signIn?: (PerClientAndAccount & { accountAll?: LimitOption | undefined; }) | LimitOption | undefined
+  /** @deprecated `signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ signInAccount?: LimitOption | undefined
+  /** @deprecated `signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ signInAccountAll?: LimitOption | undefined
+  twoFactor?: LimitOption | PerClientAndAccount | undefined
+  /** @deprecated `twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */ twoFactorAccount?: LimitOption | undefined
 
 [.] linkedinProvider
 function linkedinProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
@@ -1331,7 +1358,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
   proxy?: ProxyConfig | boolean | number | undefined
-  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", LimitOption>> | undefined
+  rateLimit?: LimitsOption | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined

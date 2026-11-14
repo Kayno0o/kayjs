@@ -1,6 +1,6 @@
 import type { Server } from 'bun'
 import type { GuardContext } from '../runtime'
-import type { RateLimit } from '../runtime/action'
+import type { RateLimit, RateWindow } from '../runtime/action'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { actionKey, clientAddress, makeLimiter, rateKey, shareLimiter, waitFor } from './protection'
@@ -12,7 +12,11 @@ export interface RateLimiter extends RateLimit {
   // Counts an attempt from the request's client, or under the app's own key such as an account id: the seconds it must wait before the next one once over the limit, else undefined. `server` is the one serving the request, read from `pages()`'s app when left out.
   // `weight` counts that many at once, the tokens a reply used say, against a `max` of tokens.
   hit: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<number | undefined>
-  // Not `limiter().enforce(key, weight)`, which takes a key and answers the seconds to wait. This one takes a guard's `ctx`: it counts the request under the limit's `key` or the client's address and, once over the limit, sets `Retry-After` and denies with 429, `message` (a text or a function of the seconds to wait) in place of kay's.
+  // Counts as `hit` does and gives the window, `{ count, resetAt }`, with the seconds to wait once past `max`: for the app that shows the count or decides itself.
+  count: (from: Request | string, server?: Server<unknown> | null, weight?: number) => Promise<RateWindow & { wait: number | undefined }>
+  // For a guard: takes its `ctx`, counts the request under the limit's `key` or the client's address and, once over the limit, sets `Retry-After` and denies with 429, `message` (a text or a function of the seconds to wait) in place of kay's.
+  check: (ctx: Pick<GuardContext, 'request' | 'headers' | 'deny' | 'locale' | 'cookies' | 'locals'>, message?: string | ((wait: number) => string)) => Promise<void>
+  /** @deprecated `check(ctx, message?)`, as `limiter().enforce(key)` counts under a key and refuses nothing. Removed in 1.108; `deprecated-rate-enforce` rewrites it. */
   enforce: (ctx: Pick<GuardContext, 'request' | 'headers' | 'deny' | 'locale' | 'cookies' | 'locals'>, message?: string | ((wait: number) => string)) => Promise<void>
 }
 
@@ -23,7 +27,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
 
   const counting = makeLimiter({ name, max: limit.max, ms: durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000, store: limit.store })
 
-  const hit = async (key: string, weight: number, request?: Request): Promise<number | undefined> => {
+  const hit = async (key: string, weight: number, request?: Request): Promise<RateWindow & { wait: number | undefined }> => {
     const window = await counting.hit(key, weight)
 
     // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
@@ -35,21 +39,25 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
     if (wait !== undefined)
       refused(name, limit, { key, wait, request })
 
-    return wait
+    return { ...window, wait }
+  }
+
+  const count: RateLimiter['count'] = async (from, server, weight = 1) => {
+    if (!Number.isSafeInteger(weight) || weight < 1)
+      throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
+
+    return hit(typeof from === 'string' ? `key:${from}` : rateKey(clientAddress(from, server)), weight, typeof from === 'string' ? undefined : from)
   }
 
   const limiter: RateLimiter = {
     ...limit,
-    hit: async (from, server, weight = 1) => {
-      if (!Number.isSafeInteger(weight) || weight < 1)
-        throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
-
-      return hit(typeof from === 'string' ? `key:${from}` : rateKey(clientAddress(from, server)), weight, typeof from === 'string' ? undefined : from)
-    },
-    enforce: async (ctx, message) => {
+    count,
+    hit: async (from, server, weight) => (await count(from, server, weight)).wait,
+    enforce: async (ctx, message) => limiter.check(ctx, message),
+    check: async (ctx, message) => {
       const { request } = ctx
       const key = await actionKey(name, limiter, request, clientAddress(request, undefined), () => ({ request, locale: ctx.locale, cookies: ctx.cookies, locals: ctx.locals }))
-      const wait = await hit(key, 1, request)
+      const { wait } = await hit(key, 1, request)
 
       if (wait === undefined)
         return

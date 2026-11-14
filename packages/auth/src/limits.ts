@@ -56,8 +56,100 @@ export type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oaut
 // A limit as the app writes it, alone or in a list that is each counted apart.
 export type LimitOption = AuthRateLimit | AuthRateLimit[]
 
-// The limits `rateLimit` overrides, the rest keeping their defaults.
-export type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
+// What a feature's limits are counted per, `ip` the client's address and `account` the account the attempt is about.
+export interface PerClientAndAccount {
+  ip?: LimitOption | undefined
+  account?: LimitOption | undefined
+}
+
+// The limits `rateLimit` overrides, grouped by feature and the rest keeping their defaults: `{ signIn: { ip, account, accountAll }, forgot: { ip, account }, register }`.
+// A feature with a limit per address and per account, or a few, takes an object; a bare limit or a list on it is the `ip` one, as before 1.105.
+export interface LimitsOption {
+  // Wrong passwords: `ip` per client address, `account` per client and account (tight, so it never keeps the holder out) and `accountAll` the looser ceiling on the account from every client together.
+  signIn?: LimitOption | (PerClientAndAccount & { accountAll?: LimitOption | undefined }) | undefined
+  register?: LimitOption | undefined
+  resend?: LimitOption | PerClientAndAccount | undefined
+  forgot?: LimitOption | PerClientAndAccount | undefined
+  magicLink?: LimitOption | PerClientAndAccount | undefined
+  emailChange?: LimitOption | PerClientAndAccount | undefined
+  twoFactor?: LimitOption | PerClientAndAccount | undefined
+  emailCode?: LimitOption | PerClientAndAccount | undefined
+  reprove?: LimitOption | undefined
+  link?: LimitOption | undefined
+  export?: LimitOption | undefined
+  organization?: LimitOption | undefined
+  // Invitations a manager sends (`sender`) and those an address receives (`address`).
+  invite?: LimitOption | { sender?: LimitOption | undefined, address?: LimitOption | undefined } | undefined
+  // The OAuth server's endpoints: `register` per address, `registerAll` a ceiling on all addresses together (none by default), `document` and `token`.
+  oauth?: { register?: LimitOption | undefined, registerAll?: LimitOption | undefined, document?: LimitOption | undefined, token?: LimitOption | undefined } | undefined
+  /** @deprecated `signIn.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  signInAccount?: LimitOption | undefined
+  /** @deprecated `signIn.accountAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  signInAccountAll?: LimitOption | undefined
+  /** @deprecated `resend.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  resendAccount?: LimitOption | undefined
+  /** @deprecated `forgot.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  forgotAccount?: LimitOption | undefined
+  /** @deprecated `magicLink.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  magicLinkAccount?: LimitOption | undefined
+  /** @deprecated `emailChange.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  emailChangeAccount?: LimitOption | undefined
+  /** @deprecated `twoFactor.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  twoFactorAccount?: LimitOption | undefined
+  /** @deprecated `emailCode.account`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  emailCodeAccount?: LimitOption | undefined
+  /** @deprecated `invite.address`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  inviteAddress?: LimitOption | undefined
+  /** @deprecated `oauth.register`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  oauthRegister?: LimitOption | undefined
+  /** @deprecated `oauth.registerAll`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  oauthRegisterAll?: LimitOption | undefined
+  /** @deprecated `oauth.document`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  oauthDocument?: LimitOption | undefined
+  /** @deprecated `oauth.token`. Removed in 1.108; `deprecated-auth-rate-limits` rewrites it. */
+  oauthToken?: LimitOption | undefined
+}
+
+// Where each part of a group is counted, under the name the bucket has in `DEFAULT_LIMITS`: the bare limit of a feature is its first part.
+export const LIMIT_GROUPS: Record<string, Record<string, keyof Limits>> = {
+  signIn: { ip: 'signIn', account: 'signInAccount', accountAll: 'signInAccountAll' },
+  resend: { ip: 'resend', account: 'resendAccount' },
+  forgot: { ip: 'forgot', account: 'forgotAccount' },
+  magicLink: { ip: 'magicLink', account: 'magicLinkAccount' },
+  emailChange: { ip: 'emailChange', account: 'emailChangeAccount' },
+  twoFactor: { ip: 'twoFactor', account: 'twoFactorAccount' },
+  emailCode: { ip: 'emailCode', account: 'emailCodeAccount' },
+  invite: { sender: 'invite', address: 'inviteAddress' },
+  oauth: { register: 'oauthRegister', registerAll: 'oauthRegisterAll', document: 'oauthDocument', token: 'oauthToken' },
+}
+
+// The buckets `rateLimit` names, each with its limit and where the app wrote it: a group is read part by part, a bare limit on a feature that has a group is its first part.
+function bucketsOf(given: LimitsOption | undefined): [keyof Limits, LimitOption | undefined, string][] {
+  const buckets: [keyof Limits, LimitOption | undefined, string][] = []
+
+  for (const [name, value] of Object.entries(given ?? {}) as [string, unknown][]) {
+    const group = Object.hasOwn(LIMIT_GROUPS, name) ? LIMIT_GROUPS[name]! : undefined
+
+    if (group === undefined || value === undefined || Array.isArray(value) || (typeof value === 'object' && value !== null && 'max' in value)) {
+      // A bare limit on a feature with a group is its first part, as it was before the groups.
+      buckets.push([(group ? Object.values(group)[0]! : name) as keyof Limits, value as LimitOption | undefined, `rateLimit.${name}`])
+
+      continue
+    }
+
+    if (typeof value !== 'object' || value === null)
+      throw configError('auth', 'rateLimit', `rateLimit.${name} is ${String(value)}; give it { ${Object.keys(group).join(', ')} } or a limit`)
+
+    for (const [part, option] of Object.entries(value)) {
+      if (!Object.hasOwn(group, part))
+        throw configError('auth', 'rateLimit', `rateLimit.${name}.${part} is not a limit of ${name}; it has ${Object.keys(group).join(', ')}`)
+
+      buckets.push([group[part]!, option as LimitOption | undefined, `rateLimit.${name}.${part}`])
+    }
+  }
+
+  return buckets
+}
 
 export type ResolvedLimits = Record<keyof typeof DEFAULT_LIMITS, LimitSet> & { oauthRegisterAll?: LimitSet }
 
@@ -65,17 +157,17 @@ export type ResolvedLimits = Record<keyof typeof DEFAULT_LIMITS, LimitSet> & { o
 export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
   const limits = Object.fromEntries(Object.entries(DEFAULT_LIMITS).map(([name, limit]) => [name, [limit]])) as unknown as ResolvedLimits
 
-  for (const [name, option] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
+  for (const [name, option, where] of bucketsOf(given)) {
     if (!option)
       continue
 
     const list = [option].flat()
 
     if (list.length === 0)
-      throw configError('auth', 'rateLimit', `rateLimit.${name} is an empty list; give it a limit or leave it out`)
+      throw configError('auth', 'rateLimit', `${where} is an empty list; give it a limit or leave it out`)
 
     for (const [index, limit] of list.entries()) {
-      const place = list.length === 1 ? `rateLimit.${name}` : `rateLimit.${name}[${index}]`
+      const place = list.length === 1 ? where : `${where}[${index}]`
 
       durationSeconds(limit.window, `${place}.window`)
 

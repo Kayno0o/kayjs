@@ -93,6 +93,10 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 ## 1.104.0
 
+### Rate limits are one type and one check
+
+`limit.enforce(ctx)` on what `rateLimit()` returns is `limit.check(ctx)`: `limiter().enforce(key)` counts under a key and refuses nothing, so the one name held two jobs. `limit.count(request)` gives the window, `{ count, resetAt, wait }`, where `hit` gives the wait alone. kayjs-auth's `rateLimit` is grouped by feature: `signInAccount` is `signIn.account`, `signInAccountAll` `signIn.accountAll`, a bare `signIn` limit is `signIn.ip`, likewise `{ ip, account }` on `resend`, `forgot`, `magicLink`, `emailChange`, `twoFactor` and `emailCode`, `invite` is `invite.sender` and `inviteAddress` `invite.address`, and `oauthRegister`, `oauthRegisterAll`, `oauthDocument` and `oauthToken` are `oauth.register`, `.registerAll`, `.document` and `.token`. The old forms work until 1.108. `kay upgrade` rewrites both (`deprecated-rate-enforce`, `deprecated-auth-rate-limits`). Nothing else changes: `images.rateLimit`, `mcp.rateLimit`, `live.rateLimit` and `basicAuth({ rateLimit })` now also take `store` and `onLimit`.
+
 ### The forms 1.100 deprecated are gone
 
 `deprecated-ui-item-keys`, `deprecated-infinite-list-options` and `deprecated-cms-test-helpers` go with them: run `kay upgrade` on 1.103 first and it rewrites every one it can find. On 1.104 the old names are refused or ignored.

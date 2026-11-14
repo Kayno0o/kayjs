@@ -249,7 +249,7 @@ A prerendered page with a limit is still counted by the kay server, and answered
 
 ## Rate limit a guard or an API route
 
-Outside an action, use `rateLimit(name, { max, window })` from `kay/server`. Call `enforce` with the guard's context: it counts the request, and once the client is over the limit it sets `Retry-After` and denies with 429.
+Outside an action, use `rateLimit(name, { max, window })` from `kay/server`. Call `check` with the guard's context: it counts the request, and once the client is over the limit it sets `Retry-After` and denies with 429.
 
 ```ts
 import { guard } from 'kay'
@@ -258,16 +258,18 @@ import { rateLimit } from 'kay/server'
 const visits = rateLimit('account', { max: 60, window: '1m' })
 
 export default guard(async (ctx) => {
-  await visits.enforce(ctx)
+  await visits.check(ctx)
 })
 ```
 
-`enforce(ctx, message)` words the refusal: a text, or a function of the seconds to wait. To answer another way, call `hit` with the request: it gives the seconds to wait once the client is over the limit, else `undefined`. Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
+`check(ctx, message)` words the refusal: a text, or a function of the seconds to wait. To answer another way, call `hit` with the request: it gives the seconds to wait once the client is over the limit, else `undefined`. Pass your own key to count something other than the client, such as `visits.hit(user.email)`.
+
+`count` counts as `hit` does and gives the window instead, `{ count, resetAt, wait }`, for a page that shows how many attempts are left.
 
 The object `rateLimit()` returns is a limit like any other, so `protect: { rateLimit: visits }` on an action, `api({ rateLimit: visits })` or a page's `rateLimit` takes it and counts in the same counter: one client, one allowance across the guard, the action and the API.
 
-- A copy of the object, `{ ...visits, max: 5 }`, is a limit of its own and counts apart when an action or route takes it; its `hit` and `enforce` are still the original's and count in it.
-- A guard calling `enforce` on the object an action also takes counts a post twice, once in each.
+- A copy of the object, `{ ...visits, max: 5 }`, is a limit of its own and counts apart when an action or route takes it; its `hit` and `check` are still the original's and count in it.
+- A guard calling `check` on the object an action also takes counts a post twice, once in each.
 - On a layout's `page.rateLimit` the shared object counts every page under the layout together, where a plain options object counts each route apart.
 - kayjs-auth and kayjs-ai take `onLimit` but not this object, as they count under keys of their own.
 

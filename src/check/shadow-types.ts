@@ -34,27 +34,30 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 
 import { aiLanguage } from './ai-language'
+import { authRateLimits } from './auth-rate-limits'
 import { cmsOptions } from './cms-options'
 import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 
 import { formatDurationNumbers } from './format-duration'
-import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { guardOptions } from './guard-options'
 
+import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
+
 import { islandOnlyComponents } from './island-only'
 
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
-
 import { largePublicImages } from './large-images'
+
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from './one-state-api'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
+import { rateEnforce } from './rate-enforce'
 import { removedUiTokens } from './removed-ui-tokens'
 import { schemaType } from './schema-type'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
@@ -185,6 +188,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => storeNames(root, options),
   async ({ root, options }) => formatDurationNumbers(root, options),
   async ({ root, options }) => guardOptions(root, options),
+  async ({ root, options }) => rateEnforce(root, options),
+  async ({ root, options }) => authRateLimits(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

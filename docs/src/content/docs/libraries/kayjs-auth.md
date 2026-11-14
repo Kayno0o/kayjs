@@ -818,7 +818,7 @@ authCore({
 
 The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
 
-In production, set `site` in `kay.config.ts` or in `authCore`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
+In production, set `site` in `kay.config.ts` or in `authCore`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauth: { registerAll } }` adds a ceiling on all addresses together.
 
 The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
@@ -828,7 +828,7 @@ Attempts are counted where every process shares them: in the store (`memoryAuth`
 
 Give the app `sqliteRates` or `pgRates` as `store.rates` rather than `memoryRates`, which drops open windows past 10,000, so a flood of typed addresses could lift a lockout.
 
-`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window, store? }` with `window` a string such as `'1h'`, as the defaults are written, or a list of them: each is counted apart and any can refuse. `store` counts that one in a store of its own.
+`rateLimit` overrides any of `DEFAULT_LIMITS`, grouped by feature (`signIn: { ip, account, accountAll }`, `forgot: { ip, account }`, `invite: { sender, address }`, `oauth: { register, registerAll, document, token }`), each `{ max, window, store? }` with `window` a string such as `'1h'`, as the defaults are written, or a list of them: each is counted apart and any can refuse. `store` counts that one in a store of its own.
 
 ```ts
 authCore({
@@ -839,7 +839,7 @@ authCore({
 
 Wrong passwords are counted twice for an account. Six from one address stop that address, so a stranger who keeps guessing cannot lock the owner out from their own device. Sixty from all addresses together stop every sign-in to that account for the rest of the 15 minutes and mail its owner, when the address is verified, at most once a day.
 
-A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `rateLimit.signInAccount` and `rateLimit.signInAccountAll` to change them.
+A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `rateLimit.signIn.account` and `rateLimit.signIn.accountAll` to change them.
 
 Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `authCore` instead, or every client counts as the proxy.
 
