@@ -731,7 +731,7 @@ describe('kay check', () => {
           '    strong {text}',
           '',
         ].join('\n')),
-        Bun.write(nested, '--- server\nimport { T, formatDuration } from \'kay/i18n\'\n---\nT(key="greeting" name={formatDuration(\'abc\')})\n'),
+        Bun.write(nested, '--- server\nimport { T, formatDuration } from \'kay/i18n\'\n---\nT(key="greeting" name={formatDuration(\'abc\')})\nT(key="greeting" name="{" nom="x")\n'),
         Bun.write(scripted, [
           '--- server',
           'import { T } from \'kay/i18n\'',
@@ -742,8 +742,10 @@ describe('kay check', () => {
           'const object = T({ key: \'intro\', name: \'Ada\', ...blocks })',
           'const either = \'greeting\' as \'intro\' | \'greeting\'',
           'const union = T(either, { name: \'Ada\', ...blocks })',
+          'const typo = T(\'nope\', { name: \'Ada\' })',
+          'const typoAlone = T(\'nope\')',
           '---',
-          'p {missing} {dynamic} {object} {union}',
+          'p {missing} {dynamic} {object} {union} {typo} {typoAlone}',
           '',
         ].join('\n')),
         Bun.write(links, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n'),
@@ -758,8 +760,8 @@ describe('kay check', () => {
         'src/messages/en.ts': [1, 6, 7, 7, 8, 8, 8],
         'src/routes/typo.kay': [4, 5, 6, 7],
         'src/routes/rich.kay': [5, 6, 7, 15, 18, 23, 25],
-        'src/routes/scripted.kay': [4, 6],
-        'src/routes/nested.kay': [4],
+        'src/routes/scripted.kay': [4, 6, 10, 11],
+        'src/routes/nested.kay': [4, 5],
         'src/routes/links.kay': [2, 3],
         'src/routes': [1],
       }
@@ -777,8 +779,8 @@ describe('kay check', () => {
         [8, 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it'],
       ]))
       // A call of T with no values, or a key that is no literal, says so in a line; the object form and a union of keys are accepted; a failing call nested in a template call keeps its own overloads' message.
-      expect(found.filter(({ file }) => file === 'src/routes/scripted.kay').map(({ message }) => message)).toEqual(['`T` needs the values of its message', '`T` takes the key of a message as a literal'])
-      expect(found.find(({ file }) => file === 'src/routes/nested.kay')?.message).toContain('No overload matches')
+      expect(found.filter(({ file }) => file === 'src/routes/scripted.kay').map(({ message }) => message)).toEqual(['`T` needs the values of its message', '`T` takes the key of a message as a literal', '`T` has no message `nope`', '`T` needs the values of its message'])
+      expect(found.filter(({ file }) => file === 'src/routes/nested.kay').map(({ message }) => message.includes('No overload matches') ? 'wrapped' : message)).toEqual(['wrapped', '`T` does not take `nom`'])
       // A script call of T reads like its template twin: a missing placeholder, a missing block and an unknown value are each named.
       expect(found.filter(({ file, line }) => file === 'src/routes/rich.kay' && line <= 7).map(({ message }) => message.match(/Property '(\w+)' is missing|'(\w+)' does not exist/)?.slice(1).find(Boolean))).toEqual(['name', 'docs', 'nom'])
       expect(found.find(({ file }) => file === 'src/routes')?.message).toContain('are both served at / in en')

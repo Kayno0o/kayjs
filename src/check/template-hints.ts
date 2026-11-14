@@ -44,6 +44,8 @@ const KEYWORD_ALIAS = /^\w+<(.*)>$/
 const NAME_AT = /^[\w:-]+(?==)/
 const TAG_NAME = /^[\w$.:-]+$/
 const RICH_KEY_TYPE = /^Argument of type '[^']*' is not assignable to parameter of type '(?:\{ key: )?KeysOf</
+const LITERAL_ARGUMENT = /^Argument of type '"([^']*)"'/
+const QUOTED = /"[^"]*"|'[^']*'/g
 const RICH_CALL = /\bT\(\s*$/
 const NO_OVERLOAD = /^No overload matches this call\.\n {2}The last overload gave the following error\.\n {4}([\s\S]*)$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
@@ -475,8 +477,9 @@ export function lastOverload(diagnostic: TsgoDiagnostic, source: string, span: S
   const lineStart = source.lastIndexOf('\n', span.start - 1) + 1
   const line = source.slice(lineStart).trimStart()
   const before = source.slice(lineStart, span.start)
-  // An error inside a `{...}` of the call is a call of its own, which keeps its overloads.
-  const nested = before.split('{').length !== before.split('}').length
+  // An error inside a `{...}` of the call is a call of its own, which keeps its overloads; a brace in a quoted string is no brace.
+  const unquoted = before.replaceAll(QUOTED, '')
+  const nested = unquoted.split('{').length !== unquoted.split('}').length
 
   return !nested && (line.startsWith('@') || COMPONENT_CALL.test(line)) ? { ...diagnostic, code: ASSIGNABILITY, message: found[1]!.replaceAll(/\n {2}/g, '\n') } : diagnostic
 }
@@ -487,6 +490,11 @@ export function richCallHint(diagnostic: TsgoDiagnostic, source: string, span: S
     return undefined
 
   const props = diagnostic.message.includes('{ key:')
+  // TypeScript prints the argument as its literal only where no overload could take the key: a key the catalog lacks, which a lone `T('key')` leaves undistinguished from a key whose values are missing.
+  const written = LITERAL_ARGUMENT.exec(diagnostic.message)?.[1]
+
+  if (written !== undefined)
+    return { span, message: `\`T\` has no message \`${written}\``, help: 'the keys are those of the default locale\'s messages' }
 
   return {
     span,
