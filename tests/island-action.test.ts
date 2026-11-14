@@ -111,6 +111,44 @@ describe('the wire of an action', () => {
     expect(() => unflattenValue([{ run: 1 }, ['Action', 2], [3, 4], '/_kay/action/a/b', ['x']], serverWritten)).toThrow(/malformed/)
   })
 
+  it('adds the fields of a `with` on a `with` to the fixed ones on a call, `track()` and a form, and drops `__proto__`', async () => {
+    const bodies: string[] = []
+    const real = globalThis.fetch
+
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body))
+
+      return new Response('"ok"')
+    }) as typeof fetch
+
+    try {
+      const stub = actionStub('/_kay/action/a/b', { a: 1 }) as unknown as { with: (fields: object) => ((input: object) => Promise<unknown>) & { track: () => (input: object) => Promise<unknown> } }
+      const more = stub.with(JSON.parse('{ "b": 2, "__proto__": 9 }') as object)
+
+      for (const call of [more, more.track()]) {
+        try {
+          await call({ n: 1 })
+        }
+        catch {
+          // The answer is no devalue; the body is what is looked at.
+        }
+      }
+
+      expect(formAction(more as unknown as Action<unknown, unknown>)).toContain('a%3D1%26b%3D2')
+    }
+    finally {
+      globalThis.fetch = real
+    }
+
+    expect(bodies).toHaveLength(2)
+
+    for (const body of bodies) {
+      expect(body).toContain('"a":1')
+      expect(body).toContain('"b":2')
+      expect(body).not.toContain('__proto__')
+    }
+  })
+
   it('renders an island passed an action whatever its props are typed as, in production and in dev, a promoted one included', async () => {
     for (const rendered of [site, developed]) {
       expect((await rendered.fetch('/untyped')).status).toBe(200)

@@ -37,7 +37,7 @@ export function collectForms<T>(render: () => T): { result: T, forms: Set<Action
 export const PAYLOAD_PARAM = 'kay_with'
 
 // Fields as a form posts them: text, numbers, booleans and dates as text, a list as one entry per item, nothing for undefined and null.
-function payloadQuery(fields: Record<string, unknown>): string {
+export function payloadQuery(fields: Record<string, unknown>): string {
   const query = new URLSearchParams()
 
   for (const [name, value] of Object.entries(fields)) {

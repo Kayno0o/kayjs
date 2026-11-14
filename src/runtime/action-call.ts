@@ -4,7 +4,7 @@ import type { TrackHooks } from './call-result'
 import type { Duration } from './duration'
 import type { ConnectionStatus, LoadStatus } from './live'
 import { ActionError, ActionRedirectError } from './action-error'
-import { withFields } from './action-form'
+import { PAYLOAD_PARAM, payloadQuery, withFields } from './action-form'
 import { networkFailures, refusedAt, superseding } from './action-marks'
 import { refreshed, refreshedIn, refreshedUnlessFollowed } from './action-navigate'
 import { onStreamEnd, SETTLED } from './action-owner'
@@ -20,7 +20,7 @@ import { pageData } from './page-data'
 import { randomId } from './random-id'
 import { getOwner, liveOwner, ownSignal, untrack } from './reactive'
 import { OUTCOME_SCRIPT } from './swap'
-import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, malformed, serverWritten } from './wire'
+import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, FIXED_FIELDS, malformed, serverWritten } from './wire'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -154,14 +154,17 @@ export function actionStub(url: string, fixed?: Record<string, unknown>): Action
 
   warmCode()
 
-  const stub = Object.defineProperties(call, {
+  // `with` adds to the fields fixed, so a call, `track()` and a form all carry them; a form posts to the URL holding them, as it does on the server.
+  return Object.defineProperties(call, {
     ...reads,
     url: { value: url, enumerable: true },
     [ACTION]: { value: true },
+    with: { value: (fields: Record<string, unknown>) => actionStub(url, { ...fixed, ...fields }) },
+    ...fixed && {
+      formUrl: { value: `${url}?${PAYLOAD_PARAM}=${encodeURIComponent(payloadQuery(fixed))}` },
+      [FIXED_FIELDS]: { value: fixed },
+    },
   }) as unknown as Action<unknown, unknown>
-
-  // A form of the island posts to the URL carrying the fixed fields, as it does on the server.
-  return fixed === undefined ? stub : withFields(stub, fixed)
 }
 
 // Called by the lazy chunk a page handing an island an action loads, so the props revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
@@ -208,7 +211,7 @@ function withFixed(input: unknown, fixed: Record<string, unknown> | undefined): 
   if (fixed === undefined)
     return input
 
-  const set = Object.entries(fixed).filter(([, value]) => value !== undefined && value !== null)
+  const set = Object.entries(fixed).filter(([name, value]) => name !== '__proto__' && value !== undefined && value !== null)
 
   if (!(input instanceof FormData))
     return { ...input as object | undefined, ...Object.fromEntries(set) }
