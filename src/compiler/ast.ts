@@ -229,7 +229,7 @@ export function sectionOf(element: ElementNode, source: string): Extract<Attribu
   return attribute?.kind === 'boolean' || attribute?.kind === 'expression' ? attribute : undefined
 }
 
-// `Card(server)` renders per request inside a prerendered page, `Card(server defer)` or `Card(defer)` once the browser fetches it on approach (`server="defer"` before 1.105).
+// `Card(server)` renders per request inside a prerendered page, `Card(server defer)` once the browser fetches it on approach (`server="defer"` before 1.105).
 export const SERVER_ISLAND_ATTRIBUTE = 'server'
 export const SERVER_ISLAND_DEFER = 'defer'
 export const SERVER_ISLAND_MODES = new Set(['defer'])
@@ -245,7 +245,7 @@ export interface ServerIslandMark {
   // Undefined for a value no mode answers to.
   mode: 'inline' | 'defer' | undefined
   noscript: NamedAttribute | undefined
-  // The bare `defer` written beside a `server` attribute, which is no prop either.
+  // The bare `defer` written beside `server`, the word of `server defer`, which is no prop either.
   defer?: NamedAttribute | undefined
 }
 
@@ -255,20 +255,17 @@ export function serverIslandOf(element: ElementNode, source: string): ServerIsla
     return undefined
 
   const named = (name: string) => element.attributes.find((candidate): candidate is NamedAttribute => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === name)
-  const server = named(SERVER_ISLAND_ATTRIBUTE)
-  // Only a bare `defer` is the mark: a value is a prop of the component.
-  const defer = [named(SERVER_ISLAND_DEFER)].find(candidate => candidate?.kind === 'boolean')
-  const attribute = server ?? defer
+  const attribute = named(SERVER_ISLAND_ATTRIBUTE)
 
   if (!attribute)
     return undefined
 
-  const noscript = named(SERVER_ISLAND_NOSCRIPT)
+  // `defer` is the mark only as a bare word beside `server`: alone, or with a value, it is a prop of the component, which may have one of its own.
+  const defer = [named(SERVER_ISLAND_DEFER)].find(candidate => candidate?.kind === 'boolean')
+  const written = attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined
+  const mode = attribute.kind === 'boolean' ? ['inline', 'defer'][Number(defer !== undefined)] as 'inline' | 'defer' : written
 
-  if (attribute.kind === 'boolean')
-    return { attribute, mode: defer === undefined ? 'inline' : 'defer', noscript, defer: attribute === defer ? undefined : defer }
-
-  return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined, noscript }
+  return { attribute, mode, noscript: named(SERVER_ISLAND_NOSCRIPT), defer }
 }
 
 // The `@failed` block under a server island call, which the server renders inside the island hidden for the browser to show when the island fails for good; it is not a prop of the component.
@@ -286,7 +283,7 @@ export function marksServerIsland(element: ElementNode, name: string, source: st
 
   const mark = serverIslandOf(element, source)
 
-  return mark !== undefined && (name === SERVER_ISLAND_NOSCRIPT || (name === SERVER_ISLAND_DEFER && (mark.defer !== undefined || mark.attribute.kind === 'boolean')))
+  return mark !== undefined && (name === SERVER_ISLAND_NOSCRIPT || (name === SERVER_ISLAND_DEFER && mark.defer !== undefined))
 }
 
 // A key naming the loop's index, as `for row, i of rows key={i}` writes it: rows are matched by their position.

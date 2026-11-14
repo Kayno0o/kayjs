@@ -18,8 +18,8 @@ type Role = 'island' | 'static'
 interface Explained {
   file: string
   role: Role
-  // `declared` when the component's `island()` call decided the role, `inferred` when its code did.
-  how?: 'declared' | 'inferred'
+  // `declared` when the component's `island()` call decided the role, `inferred` when its code did, or nothing in it needs the browser.
+  how: 'declared' | 'inferred'
   // The settings of the component's `island()` call, as it writes them.
   declared?: string
   cause?: { kind: string, name: string, line: number, description: string, meaning: string, interactive?: Readonly<Record<string, boolean>> | undefined } | undefined
@@ -69,7 +69,7 @@ async function explained(root: string, files: string[], pages: readonly string[]
 
     const declared = declaredCall(source)
 
-    found.push({ file: relative(root, file), role: island === undefined ? 'static' : 'island', ...cause && { how: cause.name === 'island()' ? 'declared' : 'inferred', cause: shown(cause) }, ...declared !== undefined && { declared } })
+    found.push({ file: relative(root, file), role: island === undefined ? 'static' : 'island', how: declared !== undefined || cause?.name === 'island()' ? 'declared' : 'inferred', ...cause && { cause: shown(cause) }, ...declared !== undefined && { declared } })
   }
 
   return { found, broken }
@@ -79,7 +79,8 @@ function lines(entry: Explained): string[] {
   return [
     `${entry.file}: ${ROLE_WORDS[entry.role]}`,
     ...entry.declared === undefined ? [] : [`  declared: ${entry.declared}`],
-    ...entry.cause === undefined ? [] : [`  decided: ${entry.how === 'declared' ? 'by its island() declaration' : 'inferred from its code'}`, `  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`, ...entry.cause.interactive === undefined ? [] : [`  interactive props: ${Object.entries(entry.cause.interactive).map(([name, on]) => on ? `${name} (on unless false)` : name).join(', ')}`]],
+    `  decided: ${entry.how === 'declared' ? 'by its island() declaration' : 'inferred from its code'}`,
+    ...entry.cause === undefined ? [] : [`  cause: ${entry.cause.description}`, `  meaning: ${entry.cause.meaning}`, ...entry.cause.interactive === undefined ? [] : [`  interactive props: ${Object.entries(entry.cause.interactive).map(([name, on]) => on ? `${name} (on unless false)` : name).join(', ')}`]],
   ]
 }
 

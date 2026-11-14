@@ -63,7 +63,7 @@ Section(title="Contact")
 
 - `server` renders it on every GET and splices it into the prerendered page: it arrives with the page and needs no JavaScript.
 - Only the island is rendered and compressed, the rest of the page being deflated once; the page then goes out as gzip, never brotli, with `Cache-Control: private, no-store` and no ETag.
-- `defer` is a word beside `server`, or alone (`ContactForm(defer)`): a use with `defer` and a value is a prop of the component. It was `server="defer"`, which `kay upgrade` rewrites (`deprecated-island-attributes`) and which works until 1.108.
+- `defer` is a bare word beside `server`: `defer` alone, or with a value, is a prop of the component, which may have one of its own. It was `server="defer"`, which `kay upgrade` rewrites (`deprecated-island-attributes`) and which works until 1.108.
 - `server defer` serves the page as any prerendered page, brotli and ETag included, and the browser fetches the island a screen before it scrolls into view, or once the page is idle, then hydrates what it brought.
 - Until then the page shows the component as the build rendered it, inert and with its forms' field names and actions taken out, so it keeps its place and size and a bot has nothing to post. Pick it for what sits low on the page.
 - A page deferring an island ships kay's browser entry; with `navigation: false` and no island the build fails.

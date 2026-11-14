@@ -82,7 +82,7 @@ export const DEPRECATED_LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.105',
-    summary: '`hydrate="client"` and `server="defer"` on a component call, `render="client"` and `server defer` since 1.105: `hydrate` says only when an island hydrates (`load`, `idle`, `visible`, `interaction`, `media(...)`), `render="client"` that a use renders in the browser only, and a deferred server island is the bare `defer` beside `server` (`defer` alone means both). The old spellings work until 1.108. The fix writes the new one.',
+    summary: '`hydrate="client"` and `server="defer"` on a component call, `render="client"` and `server defer` since 1.105: `hydrate` says only when an island hydrates (`load`, `idle`, `visible`, `interaction`, `media(...)`), `render="client"` that a use renders in the browser only, and a deferred server island is the bare `defer` beside `server`. The old spellings work until 1.108. The fix writes the new one.',
     wrong: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(hydrate="client")\nCard(server="defer")',
     right: '---\nimport Chart from \'./chart.kay\'\nimport Card from \'./card.kay\'\n---\nChart(render="client")\nCard(server defer)',
   },

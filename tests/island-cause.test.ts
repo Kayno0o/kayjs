@@ -163,6 +163,7 @@ describe('kay explain island', () => {
   it('says what an island() declaration settled and what the code did', async () => {
     const root = await project({
       'src/components/declared.kay': '---\nisland({ render: \'client\', hydrate: \'idle\', persist: true })\n---\np Map\n',
+      'src/components/pinned.kay': '---\nisland({ render: \'static\' })\n---\np Static\n',
       'src/components/empty.kay': '---\nisland()\n---\np Static markup\n',
     })
     const [declared, empty, inferred] = await Promise.all([
@@ -176,6 +177,8 @@ describe('kay explain island', () => {
     expect(JSON.parse(empty.stdout)).toMatchObject({ role: 'island', how: 'declared', declared: 'island()' })
     expect(inferred.stdout).toContain('decided: inferred from its code')
     expect(inferred.stdout).not.toContain('declared:')
+    expect((await kay(['explain', 'island', 'src/components/plain.kay'], root)).stdout).toContain('decided: inferred from its code')
+    expect((await kay(['explain', 'island', 'src/components/pinned.kay'], root)).stdout).toContain('decided: by its island() declaration')
   })
 
   it('reports the error of a file that does not compile instead of a role', async () => {

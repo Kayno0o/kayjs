@@ -2,10 +2,14 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import type { ScriptAnalysis } from './script'
 import { elementsIn } from './ast'
 import { islandExport } from './island-arguments'
+import { declaredIsland, readableCall } from './island-declaration'
 
 const FENCE_WORD = /^---([ \t]+)(client|island|static)\b/
 const LABELED_LINE = /^---[ \t]*[a-z<]/
 const TRAILING_COMMA = /,$/
+
+// The line ending a file writes, which what a fix inserts follows.
+export const eolOf = (source: string): string => source.includes('\r\n') ? '\r\n' : '\n'
 // A `//` comment closing the text, which would swallow what a call writes after it on the same line.
 const LINE_COMMENT_END = /\/\/[^\n]*$/
 
@@ -40,6 +44,16 @@ export function wordEdit(line: Span, wordEnd: number, before: string): Fix['edit
   return before.trim() === '' ? { start: line.start + 3, end: wordEnd, text: '' } : { start: line.start + 4, end: wordEnd, text: 'script' }
 }
 
+// An `island()` call in a `--- module` fence, which declares nothing there: the call belongs to the component's script.
+function islandInModule(file: KayFile): Diagnostic[] {
+  const declared = file.module === undefined ? undefined : declaredIsland(file.source, file.module)
+
+  return declared === undefined ? [] : [{ ...declared.span, code: 'fence-invalid', message: '`island()` goes in the component\'s script, not its `--- module` fence', help: 'move it to the top of the script fence' }]
+}
+
+// What a fence or a module fence says wrongly beside an `island()` call.
+export const islandProblems = (file: KayFile): Diagnostic[] => [...fenceBesideCall(file), ...islandInModule(file)]
+
 // A fence line naming a role beside an `island()` call: the two say it twice, and the fence line would win over the call. The fix drops the word, which may change the role the call says.
 export function fenceBesideCall(file: KayFile): Diagnostic[] {
   const island = file.island
@@ -72,7 +86,7 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
     const rest = file.source.slice(module.start, exported.statement.start) + file.source.slice(exported.statement.end, module.end)
     const labeled = LABELED_LINE.test(file.source.slice(module.end, module.end + 8))
     const header = file.source.lastIndexOf('\n', module.start - 2) + 1
-    const own = file.source[exported.statement.end] === '\n' ? 1 : 0
+    const own = file.source.startsWith('\r\n', exported.statement.end) ? 2 : Number(file.source[exported.statement.end] === '\n')
 
     // A fence holding nothing else goes with its line, when a labeled line closes it and the next fence does not need it.
     if (rest.trim() === '' && labeled && file.source.slice(header, module.start).trim() === '--- module') {
@@ -88,10 +102,11 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
   if (word !== null)
     edits.push(wordEdit(line, line.start + 3 + word[1]!.length + word[2]!.length, before))
 
+  const eol = eolOf(file.source)
   const properties = [render === undefined ? '' : `render: '${render}'`, exported?.properties ?? ''].filter(each => each !== '')
 
   // The call goes first in the script, which a `--- client` or `--- island` fence line no longer opens.
-  edits.push({ start: file.script.start, end: file.script.start, text: `island(${properties.length === 0 ? '' : `{ ${properties.join(', ')}${LINE_COMMENT_END.test(properties.at(-1)!) ? '\n' : ' '}}`})\n` })
+  edits.push({ start: file.script.start, end: file.script.start, text: `island(${properties.length === 0 ? '' : `{ ${properties.join(', ')}${LINE_COMMENT_END.test(properties.at(-1)!) ? eol : ' '}}`})${eol}` })
 
   const at = word === null ? exported!.statement : { start: line.start + 3 + word[1]!.length, end: line.start + 3 + word[1]!.length + word[2]!.length }
 
@@ -101,7 +116,8 @@ export function deprecatedIslandForms(file: KayFile, script: ScriptAnalysis): Di
     checkOnly: true,
     message: word === null ? '`export const island` in a `--- module` fence is `island({ ... })` in the script, deprecated since 1.105' : `\`--- ${word[2]}\` is \`island(${render === undefined ? '' : `{ render: '${render}' }`})\` in the script, deprecated since 1.105`,
     help: 'write `island({ render: \'client\' | \'static\', hydrate, persist, interactive })` at the top of the script, and `---` for its fence line',
-    fixes: [{ title: 'Write `island()` in the script', safe: true, edits }],
+    // A value the call cannot read, a variable of the module fence, would fail in the script: the author decides.
+    ...(exported === undefined || readableCall(`island({ ${exported.properties}\n})`)) && { fixes: [{ title: 'Write `island()` in the script', safe: true, edits }] },
   }]
 }
 
@@ -125,7 +141,7 @@ export function deprecatedIslandAttributes(file: KayFile): Diagnostic[] {
       if (name === 'server' && attribute.text === 'defer') {
         const quoted = '"\''.includes(file.source[attribute.value.end] ?? '')
 
-        found.push({ ...attribute.name, code: 'deprecated-island-attributes', checkOnly: true, message: '`server="defer"` is `server defer`, deprecated since 1.105', help: 'write `server defer`, or `defer` alone', fixes: [{ title: 'Write `server defer`', safe: true, edits: [{ start: attribute.name.start, end: attribute.value.end + (quoted ? 1 : 0), text: 'server defer' }] }] })
+        found.push({ ...attribute.name, code: 'deprecated-island-attributes', checkOnly: true, message: '`server="defer"` is `server defer`, deprecated since 1.105', help: 'write `server defer`', fixes: [{ title: 'Write `server defer`', safe: true, edits: [{ start: attribute.name.start, end: attribute.value.end + (quoted ? 1 : 0), text: 'server defer' }] }] })
       }
     }
   }

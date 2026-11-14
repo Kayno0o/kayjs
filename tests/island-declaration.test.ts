@@ -1,6 +1,7 @@
 import type { Diagnostic } from '../src/compiler/ast'
 import { describe, expect, it } from 'bun:test'
 import { browserRole, compileKay, rendersAsIsland } from '../src/compiler'
+import { islandFence } from '../src/compiler/island-marker'
 import { parseKay } from '../src/compiler/parser'
 
 const part = 'src/components/part.kay'
@@ -115,11 +116,42 @@ describe('what the review found', () => {
   })
 })
 
+describe('what the second review round settled', () => {
+  it('offers no safe fix for an export holding a value the call cannot read', () => {
+    const source = '--- module\nconst when = \'idle\'\nexport const island = { hydrate: when }\n--- island\n---\nbutton Go\n'
+
+    expect(lints(source, 'deprecated-island-fence')[0]!.fixes).toBeUndefined()
+  })
+
+  it('keeps the other settings when the pinned call becomes a plain one', () => {
+    const source = '---\nisland({ render: \'static\', hydrate: \'idle\' })\nconst a = 1\n---\nbutton(onClick={() => 1}) {a}\n'
+    const fix = islandFence(parseKay(source))!
+
+    expect(fix.edits.map(edit => edit.text)).toEqual(['island({ hydrate: \'idle\' })'])
+    expect(islandFence(parseKay('---\nisland({ render: \'static\' })\n---\np\n'))!.edits.map(edit => edit.text)).toEqual(['island()'])
+  })
+
+  it('writes the file\'s own line endings', () => {
+    const source = '--- island\r\nconst a = 1\r\n---\r\np {a}\r\n'
+    const fixed = apply(source, lints(source, 'deprecated-island-fence')[0]!)
+
+    expect(fixed).toBe('---\r\nisland()\r\nconst a = 1\r\n---\r\np {a}\r\n')
+    expect(fixed.replaceAll('\r\n', '')).not.toContain('\n')
+    expect(islandFence(parseKay('---\r\nconst a = 1\r\n---\r\np {a}\r\n'))!.edits[0]!.text).toBe('island()\r\n')
+  })
+
+  it('reports an island() call in a module fence', () => {
+    const source = '--- module\nisland()\nexport const a = 1\n--- script\nconst b = 2\n---\np {b}\n'
+
+    expect(lints(source, 'fence-invalid').map(diagnostic => diagnostic.message)).toEqual(['`island()` goes in the component\'s script, not its `--- module` fence'])
+  })
+})
+
 describe('render="client" and defer at a use', () => {
   const card = (attributes: string) => `---\nimport Card from './card.kay'\n---\nCard(${attributes})\n`
 
-  it('reads server defer and a bare defer as a deferred server island, and server alone as an inline one', () => {
-    for (const attributes of ['server defer', 'defer', 'server="defer"']) {
+  it('reads server defer as a deferred server island, and server alone as an inline one', () => {
+    for (const attributes of ['server defer', 'server="defer"', 'server="defer" defer']) {
       const html = compileKay(card(attributes), 'src/routes/page.kay', { output: 'html', page: true }).tsx
 
       expect(html).toContain('"defer"')
@@ -127,7 +159,18 @@ describe('render="client" and defer at a use', () => {
     }
 
     expect(compileKay(card('server'), 'src/routes/page.kay', { output: 'html', page: true }).tsx).toContain('"inline"')
-    expect(compileKay(card('defer="x"'), 'src/routes/page.kay', { output: 'html', page: true }).tsx).not.toContain('KayServerIsland(')
+    const html = (attributes: string) => compileKay(card(attributes), 'src/routes/page.kay', { output: 'html', page: true }).tsx
+
+    expect(html('server="defer" defer')).not.toContain('"defer": true')
+  })
+
+  it('leaves a defer of the component\'s own, alone or with a value, to the component', () => {
+    const html = (attributes: string) => compileKay(card(attributes), 'src/routes/page.kay', { output: 'html', page: true }).tsx
+
+    expect(html('defer')).not.toContain('KayServerIsland(')
+    expect(html('defer="x"')).not.toContain('KayServerIsland(')
+    expect(html('server defer={x}')).toContain('"inline"')
+    expect(html('server defer={x}')).toContain('"defer"')
   })
 
   it('rewrites the old spellings', () => {

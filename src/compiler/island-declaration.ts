@@ -140,7 +140,14 @@ function interactiveOf(value: Node): Record<string, boolean> | undefined {
   return props
 }
 
-// The declaration of a script fence, read as the parser needs it: before any analysis, only when the script writes an `island(` at the start of a line.
+// Whether an `island({ ... })` written as text reads whole: nothing in it is a value the call cannot take as written.
+export function readableCall(text: string): boolean {
+  const problems: Diagnostic[] = []
+
+  return islandDeclaration(parseProgram(text, { recover: true }).program, node => ({ start: node.start, end: node.end }), problems) !== undefined && problems.length === 0
+}
+
+// The declaration of a script fence, read as the parser needs it: before any analysis, only when the script text names `island(`, a pre-filter for the parse that finds the top-level call.
 export function declaredIsland(source: string, script: Span): IslandDeclaration | undefined {
   const text = source.slice(script.start, script.end)
 
