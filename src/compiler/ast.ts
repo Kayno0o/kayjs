@@ -570,6 +570,8 @@ export interface TemplateFacts {
 
 export interface KayFile {
   source: string
+  // Set when a `button(action)` outside a form was wrapped in one.
+  wrapsButtons?: boolean
   script?: Span | undefined
   server?: Span | undefined
   // The `--- server` line itself.

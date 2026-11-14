@@ -1,5 +1,6 @@
 import type { Diagnostic, Span } from './ast'
 import type { ScriptAnalysis } from './script'
+import { BUTTON_FORM_KEY } from '../runtime/button-form'
 
 const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 
@@ -96,10 +97,10 @@ export function exportsIslandOptions(script: ScriptAnalysis): boolean {
   return islandExport(script)?.form === 'const'
 }
 
-// The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
+// The message keys an island's source names, as the third argument to `island()`, with the flag of a lone button's form when it writes one, or nothing for an island naming none; the live values it imports go last.
 // Under `kay dev` the cause goes last, as the `data-why` the dev tool shows. A component exporting `island` passes it last of all.
-export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false, options = false): string {
-  const keys = messageKeys(source)
+export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false, options = false, wrapsButtons = false): string {
+  const keys = wrapsButtons ? [...messageKeys(source), BUTTON_FORM_KEY] : messageKeys(source)
 
   if (options)
     return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, ${fallback ? 'KayFallback' : 'undefined'}, island`

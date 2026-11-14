@@ -177,6 +177,20 @@ describe('a button given an action, alone', () => {
     expect((await site.visit('/')).html).not.toContain(BUTTON_FORM_STYLE)
   })
 
+  it('is ruled for an island page only when an island writes one, hashed under a strict style-src', async () => {
+    const strict = await testSite({ root, islands: false, security: { csp: { 'style-src': ['\'self\''] } } })
+    const plain = await strict.visit('/island-plain')
+    const late = await strict.visit('/island-late')
+
+    expect(plain.html).toContain('data-component=')
+    expect(plain.html).not.toContain(BUTTON_FORM_STYLE)
+    expect(late.html).toContain('data-component=')
+    expect(late.html).not.toContain('<form data-kay-button-form')
+    expect(late.html).toContain(`<style>${BUTTON_FORM_STYLE}</style>`)
+    expect(late.html).not.toContain('kay:button-form')
+    expect(late.headers.get('content-security-policy')).toContain(sourceHash(BUTTON_FORM_STYLE))
+  })
+
   it('names the button when it sits in a p', () => {
     expect(messages('p\n  button(action={save}) Go\n')).toContain('This `button` with an `action` sits inside a `p`')
   })

@@ -5,6 +5,7 @@ import type { Html } from './rendered'
 import { KayError } from '../compiler/errors'
 import { isAction } from './action'
 import { issueScope } from './action-form'
+import { BUTTON_FORM_KEY } from './button-form'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
@@ -157,6 +158,9 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
     const state = localeState()
+
+    if (messages.includes(BUTTON_FORM_KEY))
+      noteMessage(BUTTON_FORM_KEY)
 
     for (const key of messages) {
       if (state === undefined || state.messages.has(key) || state.fallback?.has(key))

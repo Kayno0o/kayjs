@@ -29,7 +29,7 @@ import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
 import { BUILD_META, LOADING_META } from '../runtime/swap'
 import { LINK_SCHEMES_META } from '../runtime/url'
 import { encodeValue, unsendable } from '../runtime/wire'
-import { buttonFormRule } from './button-form-rule'
+import { buttonFormRule, withoutButtonForm } from './button-form-rule'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { STYLE_TAG } from './compress'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, liveReload, problemsBlock, STYLES_SCRIPT, typeProblemsBlock } from './dev'
@@ -503,7 +503,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const body = polish ? polish(markup) : markup
   const headHtml = polish ? polish(head.html) : head.html
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
-  const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
+  const words = checked === '' ? withoutButtonForm(islands.messages) : new Set([...withoutButtonForm(islands.messages), ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) + resourcesScript(resourcesUsed()) : '') + liveText
   // A page rendering an island that uses `installPrompt` keeps the browser's install offer from the first moment, unless the worker's registration script already does. A streamed block or deferred server island renders after the head, so such a page carries it whenever the app has one.
   const keepsInstallOffer = client.installs?.some(id => streamed || defers || islands.used.has(id)) === true && !(options.offline && options.installOffer)
@@ -511,8 +511,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const sheets = stylesheets(client, styled)
   // The nearest-`data-prefetch` selector is needed once the page holds the attribute or may gain it later: a streamed part, an island, or a server island spliced into a prerendered page.
   const mayPrefetchPerLink = shipsEntry || streamed || (scan?.modes.length ?? 0) > 0 || [markup, head.html, head.root].some(html => DATA_PREFETCH.test(html))
-  const mayGain = hasIslands || streamed
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, mayGain, options.sameTabLinks === true)}${buttonFormRule(markup, mayGain)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${buttonFormRule(markup, streamed, islands.messages)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : pageSpeculation(options, mayPrefetchPerLink)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

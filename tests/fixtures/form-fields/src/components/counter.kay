@@ -1,0 +1,6 @@
+--- island
+import { signal } from 'kay'
+
+const clicks = signal(0)
+---
+button.count(type="button" onClick={() => clicks += 1}) {clicks()}

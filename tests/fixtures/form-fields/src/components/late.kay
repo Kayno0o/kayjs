@@ -1,0 +1,10 @@
+--- island
+import type { Action } from 'kay'
+import { signal } from 'kay'
+
+const { run } = props<{ run: Action<{ by?: number }, unknown> }>()
+const shown = signal(false)
+---
+button.show(type="button" onClick={() => shown = true}) Show
+if (shown())
+  button.late(action={run}) Add

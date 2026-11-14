@@ -623,7 +623,7 @@ class ModuleShell {
   private islandTail(src: string): string {
     const html = this.options.output === 'html'
 
-    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script))
+    return islandMessages(src, this.options.client, html ? this.options.lives : undefined, html ? this.options.cause : undefined, false, html && exportsIslandOptions(this.script), this.file.wrapsButtons === true)
   }
 
   private get wrapped(): boolean {

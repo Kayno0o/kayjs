@@ -9,6 +9,7 @@ import { child } from '../runtime/html'
 import { collectIslands, unrevivableAction } from '../runtime/island.server'
 import { LATE_PART_END, SHELL_END } from '../runtime/markers'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
+import { withoutButtonForm } from './button-form-rule'
 import { islandChunks } from './client'
 import { formsScript } from './forms'
 import { hydrationScript } from './hydration'
@@ -126,7 +127,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         for (const form of fresh)
           formsShipped.add(form)
 
-        const keys = new Set(rendered.islands.messages)
+        const keys = withoutButtonForm(rendered.islands.messages)
 
         // The browser's form check words a refusal as the server does, so the first checked form sends the `kay.invalid.*` messages too.
         if (checked !== '' && !wordsShipped) {

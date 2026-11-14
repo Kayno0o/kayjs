@@ -397,7 +397,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}${fallback?.code ?? ''}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), undefined, fallback !== undefined)})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}${fallback?.code ?? ''}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), undefined, fallback !== undefined, false, file.wrapsButtons === true)})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {
