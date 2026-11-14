@@ -27,6 +27,6 @@ const TOOL_LABELS = { search_docs: 'Searched the docs', read_page: 'Read a page'
 Shell(nav={nav} current={current})
   slot
 TooltipHost(persist hydrate="idle")
-ChatLauncher(action={reply} label="Ask the docs" greeting="What do you want to know about kay?" suggestions={SUGGESTIONS} toolLabels={TOOL_LABELS} placeholder="How do I..." toolDetails={false} labels={{ open: "Ask the docs", close: "Close the chat" }} icons={{ open: MessageCircle, close: X, new: Plus, expand: ArrowsMaximize, collapse: ArrowsMinimize, send: ArrowUp, stop: PlayerStopFilled }})
+ChatLauncher(action={reply} label="Ask the docs" greeting="What do you want to know about kay?" suggestions={SUGGESTIONS} toolLabels={TOOL_LABELS} placeholder="How do I..." toolDetails={false} labels={{ open: 'Ask the docs', close: 'Close the chat' }} icons={{ open: MessageCircle, close: X, new: Plus, expand: ArrowsMaximize, collapse: ArrowsMinimize, send: ArrowUp, stop: PlayerStopFilled }})
   @note
     | An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].
