@@ -3,7 +3,8 @@ import type { Mailer } from '../src'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { enqueue, mail, mailer, outbox, registeredMailer, send } from '../src'
+import { enqueue, mail, mailer, outbox, send } from '../src'
+import { runningMailer } from '../src/running'
 
 const message = (subject: string) => ({ to: 'ada@example.com', subject, text: 'Hello' })
 
@@ -48,7 +49,7 @@ describe('mail() by convention and by hand', () => {
     const built = await build(mail(), { mail: { mail: own } })
 
     expect(built).toBe(own)
-    expect(await registeredMailer()).toBe(own)
+    expect(runningMailer()).toBe(own)
     own.listen(0)
     stops.push(async () => void await own.stop())
     await send(message('From the file'))
@@ -115,7 +116,7 @@ describe('mail() with no module', () => {
   it('has enqueue queue the mail on the running mailer', async () => {
     const own = await running(mail({ from: 'site@site.test', queue: { name: 'registered' } }))
 
-    expect(await registeredMailer()).toBe(own)
+    expect(runningMailer()).toBe(own)
     expect(await enqueue(message('Queued'))).toBeString()
     await own.drain()
     expect(outbox.mails.map(sent => sent.subject)).toEqual(['Queued'])
@@ -124,14 +125,14 @@ describe('mail() with no module', () => {
   it('registers nothing at config evaluation, and nothing once the site stopped', async () => {
     const extension = mail({ from: 'later@site.test' })
 
-    expect(await registeredMailer()).toBeUndefined()
-    await expect(send(message('Nowhere'))).rejects.toThrow('no mailer is registered')
+    expect(runningMailer()).toBeUndefined()
+    await expect(send(message('Nowhere'))).rejects.toThrow('no mailer is running')
 
     const site = await start(extension)
 
-    expect(await registeredMailer()).toBe(site.mailer)
+    expect(runningMailer()).toBe(site.mailer)
     await site.stop()
-    expect(await registeredMailer()).toBeUndefined()
+    expect(runningMailer()).toBeUndefined()
   })
 
   it('keeps two sites of one process apart: each builds its own, the latest started sends, and stopping one leaves the other', async () => {
@@ -157,7 +158,7 @@ describe('mail() with no module', () => {
 
     expect(one.mailer).not.toBe(two.mailer)
     await two.stop()
-    expect(await registeredMailer()).toBe(one.mailer)
+    expect(runningMailer()).toBe(one.mailer)
     await one.stop()
   })
 
@@ -180,13 +181,13 @@ describe('mail() with no module', () => {
     await extension.serverModule!.prepare!(own)
     await extension.serverModule!.prepare!(other)
     await extension.serverModule!.prepare!(own)
-    expect(await registeredMailer()).toBe(own)
+    expect(runningMailer()).toBe(own)
     own.listen(0)
     await own.stop()
-    expect(await registeredMailer()).toBe(other)
+    expect(runningMailer()).toBe(other)
     other.listen(0)
     await other.stop()
-    expect(await registeredMailer()).toBeUndefined()
+    expect(runningMailer()).toBeUndefined()
   })
 
   it('registers a mailer a server function loads', async () => {
@@ -213,7 +214,7 @@ describe('mail() on real test sites', () => {
     try {
       await send(message('Latest'))
       expect(outbox.last()?.from).toBe('second@site.test')
-      expect(await registeredMailer()).not.toBeUndefined()
+      expect(runningMailer()).not.toBeUndefined()
     }
     finally {
       await second.close()

@@ -44,6 +44,7 @@ import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 
 import { localState } from './local-state'
+import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { persistedStorage } from './persisted-storage'
@@ -161,6 +162,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => persistedStorage(root, options),
 
   async ({ root, options }) => schemaType(root, options),
+  async ({ root, options }) => mailApi(root, options),
   async ({ root, options }) => testHelpers(root, options),
 ]
 

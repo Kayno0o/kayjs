@@ -206,6 +206,49 @@ describe('smtp', () => {
   })
 })
 
+describe('every setting of the environment is an option', () => {
+  // A production server whose environment sets none of the mail variables.
+  async function bare(run: () => Promise<unknown>, extra: Record<string, string> = {}): Promise<void> {
+    const saved = { ...process.env }
+
+    for (const name of Object.keys(process.env).filter(key => key.startsWith('MAIL_')))
+      delete process.env[name]
+
+    Object.assign(process.env, { NODE_ENV: 'production' }, extra)
+
+    try {
+      await run()
+    }
+    finally {
+      process.env = saved
+    }
+  }
+
+  it('takes the server and the sender from `url` and `from` with no variable set, and clear text from `smtp.insecure`', async () => {
+    await bare(async () => mailer({ url: `smtp://127.0.0.1:${server.port}`, from: 'site@option.test', smtp: { insecure: true }, queue: { name: 'option-url' } }).send({ to: 'bob@example.com', subject: 'From options', text: 'Hello' }))
+
+    expect(server.greetings.at(-1)).toBe('option.test')
+    expect(server.received.at(-1)?.from).toBe('<site@option.test>')
+  })
+
+  it('prefers `url` and `smtp.insecure` to the variables', async () => {
+    await bare(async () => mailer({ url: `smtp://127.0.0.1:${server.port}`, smtp: { insecure: true }, queue: { name: 'option-wins' } }).send({ to: 'bob@example.com', subject: 'Option wins', text: 'Hello' }), { MAIL_URL: 'smtp://127.0.0.1:1', MAIL_INSECURE: 'false', MAIL_FROM: 'site@env.test' })
+
+    expect(server.received.at(-1)?.from).toBe('<site@env.test>')
+  })
+
+  it('signs with `smtp.dkim`, the domain left out being the sender\'s', async () => {
+    await bare(async () => mailer({ url: `smtp://127.0.0.1:${server.port}`, from: 'site@option.test', smtp: { insecure: true, dkim: { selector: 'mail', privateKey } }, queue: { name: 'option-dkim' } }).send({ to: 'bob@example.com', subject: 'Signed', text: 'Hello' }))
+
+    expect(server.received.at(-1)!.data).toContain('d=option.test;')
+  })
+
+  it('refuses a dkim key that is none, and a `url` beside a `transport`', () => {
+    expect(() => mailer({ url: 'smtp://127.0.0.1', smtp: { dkim: { selector: 'mail', privateKey: 'nope' } }, from: 'a@b.test', queue: { name: 'option-bad-key' } })).toThrow('is no private key')
+    expect(() => mailer({ url: 'smtp://127.0.0.1', transport: smtp({ host: '127.0.0.1' }) })).toThrow('takes `url` or `transport`')
+  })
+})
+
 describe('mailer({ smtp })', () => {
   const production = { NODE_ENV: 'production', MAIL_INSECURE: 'true', MAIL_FROM: 'site@env.test' }
 

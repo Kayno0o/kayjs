@@ -595,23 +595,6 @@ describe('a link of a list this process does not declare', () => {
 })
 
 describe('what the subscriber is told and what is kept', () => {
-  it('shows the stock notice by default, with no privacy link and no wording id', async () => {
-    const { html } = await site.visit('/subscribe')
-
-    expect(html).toContain('kmail-subscribe-notice')
-    expect(html).toContain('We use your address to send you the mails of this site')
-    expect(html).not.toContain('Privacy policy')
-    expect(html).toContain('name="wording" value="stock"')
-  })
-
-  it('shows a notice of its own with the privacy link and posts its wording id', async () => {
-    const { html } = await site.visit('/notice')
-
-    expect(html).toContain('One mail a month about the spring season.')
-    expect(html).toContain('href="/privacy"')
-    expect(html).toContain('name="wording" value="spring-v1"')
-  })
-
   it('names the list and links the policy in the confirmation mail', async () => {
     const email = fresh()
 

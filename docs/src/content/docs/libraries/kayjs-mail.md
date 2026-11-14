@@ -32,13 +32,15 @@ export default defineConfig({
 })
 ```
 
-Send from anywhere with `send`, or `enqueue` to leave the mail to the queue. Both use the mailer the config registered, and assume one running site per process: when several run, as test sites can, call the `send` of each site's own mailer.
+A page, an action or a guard sends through the mailer of its own site, `ctx.locals.mail`: `send` mails now, `enqueue` leaves the mail to the queue. Two sites in one process, as test sites are, each use their own. A job or a script uses the mailer `src/mail.ts` exports.
 
 ```ts
-import { send } from '@kayjs/mail'
-
-await send({ to: 'ada@example.com', subject: 'Hello', text: 'Hi Ada' })
+export const hello = action(async (_input, { locals }) => {
+  await locals.mail.send({ to: 'ada@example.com', subject: 'Hello', text: 'Hi Ada' })
+})
 ```
+
+The `send` and `enqueue` imported from `@kayjs/mail` work until 1.108, and `registeredMailer()` is gone. `kay check` reports them as `deprecated-mail-send`.
 
 A transport or views of your own need a module. `src/mail.ts` exports `mailer({ ... })` as `mail`, and `mail()` with no argument uses it. `mail({ module: './src/mail' })` names another path, relative to the project root, and `mail({ server: false })` builds no mailer, for an app that uses `new Elysia().use(mail)` by hand.
 
@@ -50,15 +52,15 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 
 | Variable | Use |
 | --- | --- |
-| `MAIL_URL` | The server to send through, such as `smtp://user:pass@mail.example.com:465`, or a provider's API: `resend://API_KEY`, `postmark://SERVER_TOKEN`, `sendgrid://API_KEY`, `mailgun://API_KEY@mg.example.com` or `ses://ACCESS_KEY_ID:SECRET@eu-west-1`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
-| `MAIL_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
-| `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
-| `MAIL_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
-| `MAIL_FROM` | Optional. The sender, `noreply@` the site's host when left out. A site with no domain, such as `localhost`, gives none. |
-| `MAIL_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
-| `MAIL_TO` | Optional. Where a mail naming no recipient goes, such as a contact form's. |
+| `MAIL_URL` (`url`) | The server to send through, such as `smtp://user:pass@mail.example.com:465`, or a provider's API: `resend://API_KEY`, `postmark://SERVER_TOKEN`, `sendgrid://API_KEY`, `mailgun://API_KEY@mg.example.com` or `ses://ACCESS_KEY_ID:SECRET@eu-west-1`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
+| `MAIL_RATE_LIMIT` (`smtp.rateLimit`) | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
+| `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY` (`smtp.dkim`) | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
+| `MAIL_DKIM_DOMAIN` (`smtp.dkim.domain`) | Optional. The domain the signature vouches for, the sender's by default. |
+| `MAIL_FROM` (`from`) | Optional. The sender, `noreply@` the site's host when left out. A site with no domain, such as `localhost`, gives none. |
+| `MAIL_INSECURE` (`smtp.insecure`) | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
+| `MAIL_TO` (`to`) | Optional. Where a mail naming no recipient goes, such as a contact form's. |
 
-`smtps://` instead of `smtp://` speaks TLS from the start on any port. On a port other than 465 with `smtp://` a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
+Each variable also has an option, named in the table, which wins over it: `mail({ url: 'smtp://mail.example.com', smtp: { rateLimit: { max: 5, window: '1s' } } })`. `smtps://` instead of `smtp://` speaks TLS from the start on any port. On a port other than 465 with `smtp://` a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `MAIL_INSECURE=true` for a local Mailpit. A password in `MAIL_URL` overrides it, so a password never goes in clear.
 
 Each mail sent is logged with how many recipients it went to at which domains, and not its subject, which can hold a visitor's name. Set `mailer({ logSubjects: true })` to log it, and `mailer({ logRecipients: true })` to name the recipients in full.
 
@@ -297,15 +299,14 @@ The same transports exist as `resend({ apiKey })`, `postmark({ token })`, `sendg
 
 ## A contact form
 
-`contactForm(mail, options)` gives the arguments of `action` for a contact form. A site writes no schema, no error mapping and no mail wrapper.
+`contactForm(options)` gives the arguments of `action` for a contact form. A site writes no schema, no error mapping and no mail wrapper, and the mail goes through the mailer of the request's site, `ctx.locals.mail`; `contactForm(mail, options)` names a mailer of your own.
 
 ```kay
 --- server
 import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
-import { mail } from '../mail'
 
-export const contact = action(...contactForm(mail, {
+export const contact = action(...contactForm({
   fields: { phone: s.Optional(s.String({ maxLength: 30 })) },
   reach: 'hello@example.com',
 }))
@@ -348,7 +349,7 @@ The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`m
 --- server
 import { action } from 'kay'
 import { mail } from '../mail'
-import SubscribeForm from '@kayjs/mail/subscribe-form.kay'
+import SubscribeForm from '@kayjs/ui/subscribe-form.kay'
 
 export const subscribe = action(...mail.list().form())
 ---

@@ -61,6 +61,8 @@ export const INTERNAL: Record<string, InternalRules> = {
     entries: [/^\.\/pages\//],
     names: { '.': ['challengeOf', 'createOAuthClient', 'createOAuthTokenRefresher', 'createPkcePair', 'createTokenRefresher', 'OAuthExchangeError', 'SIGNED_IN_HINT'], './rules': ['DEFAULT_RULES', 'mixesConfusableScripts'] },
   },
+  // What kayjs-auth reads of the mail extension to send through the running site's mailer.
+  mail: { entries: [/^\.\/internal$/] },
   // The room the entry screen's parts watch through: `entryRoom` and `Member` are documented, the rest only the shipped parts use.
   cms: { entries: [], names: { './form': ['createShown', 'formScope'], './room': ['editorsOf', 'hashOf', 'openRoom', 'watchRoom', 'WATCHED_ROWS'] } },
 }

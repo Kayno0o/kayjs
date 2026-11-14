@@ -9,9 +9,8 @@ ContactForm is the form for the action `contactForm` from [kayjs-mail](/librarie
 ```kay
 --- server
 import { contactForm } from '@kayjs/mail'
-import { mail } from '../mail'
 
-export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))
+export const contact = action(...contactForm({ reach: 'hello@example.com' }))
 ---
 ---
 import ContactForm from '@kayjs/ui/contact-form.kay'

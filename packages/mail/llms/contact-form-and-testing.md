@@ -4,15 +4,14 @@
 
 ### A contact form
 
-`contactForm(mail, options)` gives the arguments of `action` for a contact form, so a site writes no schema, error mapping or mail wrapper; spread into `action(...)`, which kay finds by name:
+`contactForm(options)` gives the arguments of `action` for a contact form, so a site writes no schema, error mapping or mail wrapper; spread into `action(...)`, which kay finds by name. The mail goes through `ctx.locals.mail`, the mailer of the request's site; `contactForm(mail, options)` names a mailer of your own instead:
 
 ```kay
 --- server
 import { contactForm } from '@kayjs/mail'
 import { s, action } from 'kay'
-import { mail } from '../mail'
 
-export const contact = action(...contactForm(mail, { fields: { phone: s.Optional(s.String({ maxLength: 30 })) }, reach: 'hello@example.com' }))
+export const contact = action(...contactForm({ fields: { phone: s.Optional(s.String({ maxLength: 30 })) }, reach: 'hello@example.com' }))
 ---
 ```
 

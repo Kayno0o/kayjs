@@ -79,6 +79,24 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count()}',
     right: '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter',
   },
+  'deprecated-mail-form': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: 'kayjs-mail\'s own `SubscribeForm`, kayjs-ui\'s since 1.105: mail ships the actions (`mail.list().form()`, `contactForm()`) and kayjs-ui the forms, so the unstyled `@kayjs/mail/subscribe-form.kay` is gone and `@kayjs/ui/subscribe-form.kay` takes its props (`label`, `submitLabel`, `sentLabel`, `noticeText`, `privacy`, `privacyLabel`, `wordingId`) and reads the list\'s `privacy` from its action. The old file works until 1.108. Found on an import of it in the TypeScript files and `.kay` files of the project. The fix writes the new path, safe when the project lists `@kayjs/ui` and not otherwise, as its `kmail-subscribe` classes are replaced by the themed form\'s own.',
+    wrong: '---\nimport SubscribeForm from \'@kayjs/mail/subscribe-form.kay\'\nimport { subscribe } from \'./actions\'\n---\nSubscribeForm(action={subscribe})',
+    right: '---\nimport SubscribeForm from \'@kayjs/ui/subscribe-form.kay\'\nimport { subscribe } from \'./actions\'\n---\nSubscribeForm(action={subscribe})',
+  },
+  'deprecated-mail-send': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`send`, `enqueue` and `registeredMailer` imported from `@kayjs/mail`, which sent through the mailer of the latest site started in the process, so two sites in one process (test sites, say) mixed their mails. Since 1.105 a mail is sent through the site that answers the request: `ctx.locals.mail.send()` and `.enqueue()` in a page, an action or a guard, and the mailer `src/mail.ts` exports in a job or a script. `send` and `enqueue` work until 1.108, `registeredMailer` is gone. Found on an import from `@kayjs/mail` in the TypeScript files and `.kay` files of the project; no fix, as a call has no request to read the mailer from unless its function is given one.',
+    wrong: '--- server\nimport { action } from \'kay\'\nimport { send } from \'@kayjs/mail\'\n\nexport const notify = action(async () => {\n  await send({ to: \'ada@example.com\', subject: \'Hi\', text: \'Hello\' })\n})\n---\np x',
+    right: '--- server\nimport { action } from \'kay\'\n\nexport const notify = action(async (_input, { locals }) => {\n  await locals.mail.send({ to: \'ada@example.com\', subject: \'Hi\', text: \'Hello\' })\n})\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

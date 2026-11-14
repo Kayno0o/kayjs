@@ -499,18 +499,20 @@ describe('the mailer auth() picks', () => {
   })
 
   test('takes no running mail() for no mailer, and lets a failing registered mailer through', async () => {
-    const real = await import('@kayjs/mail')
+    const real = await import('@kayjs/mail/internal')
     const site = { root, extensions: [MAIL_EXTENSION], modules: {} }
 
     expect(await emailOf(undefined, site)).toBeUndefined()
 
-    void mock.module('@kayjs/mail', () => ({ ...real, registeredMailer: async () => Promise.reject(new Error('loader failed')) }))
+    void mock.module('@kayjs/mail/internal', () => ({ ...real, runningMailer: () => {
+      throw new Error('loader failed')
+    } }))
 
     try {
       await expect(emailOf(undefined, site)).rejects.toThrow('loader failed')
     }
     finally {
-      void mock.module('@kayjs/mail', () => real)
+      void mock.module('@kayjs/mail/internal', () => real)
     }
   })
 

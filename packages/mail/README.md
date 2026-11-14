@@ -21,15 +21,14 @@ import { mail } from '@kayjs/mail'
 export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
 ```
 
-`send(message)` and `enqueue(message)` from `@kayjs/mail` use that mailer. A transport or views of your own go in a `src/mail.ts` exporting `mailer({ ... })` as `mail`, listed with `mail({ module: './src/mail' })`.
+A page, an action or a guard sends through the mailer of its own site, `ctx.locals.mail`. A transport or views of your own go in a `src/mail.ts` exporting `mailer({ ... })` as `mail`, listed with `mail({ module: './src/mail' })`.
 
 ```kay
 --- server
-import { enqueue } from '@kayjs/mail'
 import Welcome from '../mails/welcome.kay'
 
-export const signUp = action(schema, async ({ name, email }) => {
-  await enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name } })
+export const signUp = action(schema, async ({ name, email }, { locals }) => {
+  await locals.mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name } })
 })
 ---
 ```

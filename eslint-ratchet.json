@@ -55,7 +55,7 @@
     "max-lines-per-function": 334
   },
   "packages/mail/src/mailer.ts": {
-    "max-lines-per-function": 245
+    "max-lines-per-function": 238
   },
   "packages/mail/src/text.ts": {
     "complexity": 41

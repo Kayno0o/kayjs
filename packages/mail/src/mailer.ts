@@ -26,6 +26,7 @@ import { log } from './log'
 import { messageId } from './message-id'
 import { addressOf, outbox, PREVIEW_ROUTES, sameAddress } from './outbox'
 import { providerFromUrl, providerName, providerOf } from './providers'
+import { register, runningOrThrow } from './running'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
 
@@ -68,9 +69,11 @@ export interface MailerOptions {
   fromName?: string | undefined
   // Where a mail naming no recipient goes, such as a contact form's, `MAIL_TO` when left out.
   to?: Address | Address[] | undefined
-  // Where mails go: the outbox in development and under `bun test`, else SMTP configured from the environment.
+  // Where mails go: the outbox in development and under `bun test`, else SMTP or a provider's API configured from the environment.
   transport?: Transport | undefined
-  // The SMTP built from the environment, with these over what it sets: the name it greets the server with (the sender's domain by default), `timeout`, `maxConnections` and `rateLimit`. Options left out keep the environment's and smtp()'s defaults; it takes none with a `transport`, which is not built from the environment.
+  // The server or provider mails go through, `MAIL_URL` when left out: `smtp://user:pass@mail.example.com:465`, `resend://KEY`. It takes no `transport`, which replaces the environment's server.
+  url?: string | undefined
+  // The SMTP built from the environment, with these over what it sets: the name it greets the server with (the sender's domain by default), `timeout`, `maxConnections`, `rateLimit` (`MAIL_RATE_LIMIT`), `insecure` (`MAIL_INSECURE`) and `dkim` (`MAIL_DKIM_*`). Options left out keep the environment's and smtp()'s defaults; it takes none with a `transport`, which is not built from the environment.
   smtp?: SmtpOverrides | undefined
   // The locale mails are written in unless one names its own: their component renders `t()` in it, and the `<html lang>` of the document follows. The site's default locale (the request's, while one runs) when left out.
   locale?: string | undefined
@@ -110,7 +113,8 @@ export class MailNotConfiguredError extends KayError {
   }
 }
 
-export type Mailer = KayPlugin & {
+// What a mailer does, which a handler of the running site reads as `ctx.locals.mail` and a module of the app as the mailer it made.
+export interface MailApi {
   // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`.
   configured: boolean
   // Renders the message and sends it now, throwing when the server refuses it or cannot be reached.
@@ -137,6 +141,9 @@ export type Mailer = KayPlugin & {
   // What an address is on, for the export of a person's data: each list with its state and dates, pending rows included.
   subscriptions: (address: string) => Promise<Subscription[]>
 }
+
+// The mailer is the server plugin and the API both: listed in the extensions it adds `mail` to the locals of every page, action and guard of its site.
+export type Mailer = KayPlugin<{ mail: MailApi }> & MailApi
 
 // A mail given up keeps 7 days, its body and links dropped: who it was for and why it failed is what an app needs to see.
 const FAILED_KEPT = '7d'
@@ -359,22 +366,24 @@ function defined<T extends object>(options: T): Partial<T> {
   return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) as Partial<T>
 }
 
-// SMTP from `MAIL_URL`, `MAIL_INSECURE`, `MAIL_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
-function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, provider: HttpProvider | undefined, missing: () => string[] } {
-  const env = defineEnv(smtpEnv({ optional }))
+// SMTP from `MAIL_URL`, `MAIL_INSECURE`, `MAIL_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`. Each has an option (`url`, `smtp.insecure`, `smtp.rateLimit`, `smtp.dkim`, `from`, `to`) that wins over its variable.
+function fromEnvironment(options: MailerOptions, optional: boolean): { transport: Transport, from: Address, to: string | undefined, server: string, provider: HttpProvider | undefined, missing: () => string[] } {
+  const { from, fromName, url, smtp: { dkim: givenDkim, ...overrides } = {} } = options
+  const env = defineEnv(smtpEnv({ optional: optional || url !== undefined }))
+  const mailUrl = url ?? env.MAIL_URL
 
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
-  const provider = env.MAIL_URL === undefined ? undefined : providerOf(env.MAIL_URL)
-  const server = env.MAIL_URL === undefined || env.MAIL_URL === '' || provider !== undefined ? undefined : parseMailUrl(env.MAIL_URL)
-  const api = provider === undefined ? undefined : providerFromUrl(env.MAIL_URL)
+  const provider = mailUrl === undefined ? undefined : providerOf(mailUrl)
+  const server = mailUrl === undefined || mailUrl === '' || provider !== undefined ? undefined : parseMailUrl(mailUrl)
+  const api = provider === undefined ? undefined : providerFromUrl(mailUrl)
 
-  if ((env.MAIL_DKIM_SELECTOR === undefined) !== (env.MAIL_DKIM_PRIVATE_KEY === undefined))
+  if (givenDkim === undefined && (env.MAIL_DKIM_SELECTOR === undefined) !== (env.MAIL_DKIM_PRIVATE_KEY === undefined))
     throw configError('mail', 'dkim', 'MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
 
   // A `.env` file often holds the key on one line, its line breaks written `\\n`.
-  const dkimKey = env.MAIL_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
+  const dkimKey = givenDkim?.privateKey ?? env.MAIL_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
 
-  if (dkimKey !== undefined)
+  if (dkimKey !== undefined && givenDkim === undefined)
     checkKey(dkimKey, 'MAIL_DKIM_PRIVATE_KEY')
 
   const rateLimit = rateFromText(env.MAIL_RATE_LIMIT)
@@ -384,7 +393,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const missing = () => [...server === undefined && api === undefined ? ['MAIL_URL'] : [], ...from === undefined && env.MAIL_FROM === undefined && defaultSender() === undefined ? ['MAIL_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= api ?? smtp({ host: server!.host, port: server!.port, secure: server!.secure, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= api ?? smtp({ host: server!.host, port: server!.port, secure: server!.secure, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: givenDkim?.domain ?? env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: givenDkim?.selector ?? env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {
@@ -408,7 +417,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
 // The environment's SMTP, which the development pages send a mail over when asked: read on the first ask, so a server never asking reads none of it.
 function relay(options: MailerOptions): Relay {
   let settings: ReturnType<typeof fromEnvironment> | undefined
-  const read = () => settings ??= fromEnvironment(options.from, options.fromName, true, options.smtp)
+  const read = () => settings ??= fromEnvironment(options, true)
 
   return {
     missing: () => read().missing(),
@@ -444,54 +453,19 @@ function conventionalMailer(app: ExtensionApp | undefined): Mailer | undefined {
   return exported as Mailer
 }
 
-// The mailers of the sites running in this process, the latest started last: what `send` and `enqueue` use. A site that is closed without stopping (kaynooo/kayjs#3053) leaves its entry until the next start.
-const running: Mailer[] = []
-
-// Registers a started site's mailer for `send`, and takes it off when the site stops. A mailer a module exports is the same one at each start, so it is listed once, as the latest.
-function register(mailerOf: Mailer): void {
-  const known = running.includes(mailerOf)
-
-  if (known)
-    running.splice(running.indexOf(mailerOf), 1)
-
-  running.push(mailerOf)
-
-  if (known)
-    return
-
-  mailerOf.onStop(() => {
-    const at = running.indexOf(mailerOf)
-
-    if (at >= 0)
-      running.splice(at, 1)
-  })
-}
-
-/** The mailer of the running site `mail()` registered, the latest started when several run in one process; undefined when none runs. */
-export async function registeredMailer(): Promise<Mailer | undefined> {
-  return Promise.resolve(running.at(-1))
-}
-
-async function registeredOrThrow(): Promise<Mailer> {
-  const found = await registeredMailer()
-
-  if (found === undefined)
-    throw new Error('kayjs-mail: no mailer is registered; add mail() to the extensions of kay.config.ts and start the server, or call send on the result of mailer()')
-
-  return found
-}
-
-/** Renders and sends the message now through the mailer of the running site that `mail()` in kay.config.ts registered, as its `send`; throws when no such site runs, and for a mailer written with `mailer()` and used by hand, call its own `send`. */
+// Renders and sends the message now through the mailer of the running site that `mail()` in kay.config.ts registered, the latest started when several run; throws when none does.
+// @deprecated Send through `ctx.locals.mail.send()` in a page, an action or a guard, and through the mailer of `src/mail.ts` elsewhere: one site per request, not the latest started. Removed in 1.108; `deprecated-mail-send` finds it.
 export async function send<P extends object>(message: MailMessage<P>): Promise<Delivery> {
-  return (await registeredOrThrow()).send(message)
+  return runningOrThrow().send(message)
 }
 
-/** Renders the message now and leaves it to the queue of the running site's registered mailer, as its `enqueue`; throws when no such site runs. */
+// Renders the message now and leaves it to the queue of the running site's registered mailer, as its `enqueue`; throws when none runs.
+// @deprecated Enqueue through `ctx.locals.mail.enqueue()` in a page, an action or a guard, and through the mailer of `src/mail.ts` elsewhere: one site per request, not the latest started. Removed in 1.108; `deprecated-mail-send` finds it.
 export async function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOptions): Promise<string> {
-  return (await registeredOrThrow()).enqueue(message, options)
+  return runningOrThrow().enqueue(message, options)
 }
 
-const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, url: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
@@ -537,24 +511,35 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   return { name: '@kayjs/mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
 }
 
-// Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
-export function mailer(options: MailerOptions = {}): Mailer {
+// Throws for an option that cannot be used, where the mailer is made rather than at its first mail.
+function checkMailerOptions(options: MailerOptions): void {
+  if (options.url !== undefined && options.transport !== undefined)
+    throw configError('mail', 'url', 'mailer() takes `url` or `transport`, not both: `url` names the server the environment would, which a `transport` replaces')
+
   if (options.smtp !== undefined) {
     if (options.transport !== undefined)
       throw configError('mail', 'smtp', 'mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
 
     // Even where mails go to the outbox, so a broken option fails in development rather than in production.
     checkOptions(options.smtp, 'mailer({ smtp })')
+
+    if (options.smtp.dkim !== undefined)
+      checkKey(options.smtp.dkim.privateKey, 'mailer({ smtp: { dkim } })\'s privateKey')
   }
 
   for (const name of ['beforeSend', 'onSend', 'onError', 'onSuppress'] as const) {
     if (options[name] !== undefined && typeof options[name] !== 'function')
       throw configError('mail', name, `mailer({ ${name} }) is a function`)
   }
+}
+
+// Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
+export function mailer(options: MailerOptions = {}): Mailer {
+  checkMailerOptions(options)
 
   const described = (mail: Mail): string => options.logSubjects ? quoted(mail.subject) : 'A mail'
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
-  const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true, options.smtp) : undefined
+  const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options, options.optional === true) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
   // A custom transport sends in production too, where `kay@localhost` as the sender fails SPF and lands in spam without an error.
   // Read when asked, as the site may be set after the mailer is made.
@@ -879,8 +864,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
+  // Global, so the pages, actions and guards after this plugin read the mailer of their own site as `ctx.locals.mail`.
+  plugin.derive({ as: 'global' }, () => ({ mail: sending }))
+
   lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...await approve(mail), via }), enqueueRun: async (run, key) => listJobs.enqueue({ ...run, via }, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
-  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer
+  return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as unknown as Mailer
 }

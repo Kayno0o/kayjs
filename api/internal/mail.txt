@@ -1,0 +1,2 @@
+[./internal] runningMailer
+function runningMailer(): Mailer | undefined

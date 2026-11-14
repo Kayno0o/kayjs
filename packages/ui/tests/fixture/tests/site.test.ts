@@ -1155,6 +1155,13 @@ describe('SubscribeForm', () => {
     expect(html).not.toContain('Almost done')
   })
 
+  test('links the privacy page of the list\'s own privacy option and records the stock wording when given neither prop', async () => {
+    const { html } = await site.visit('/subscribe-list-privacy')
+
+    expect(html).toContain('href="/legal"')
+    expect(html).toContain('name="wording" value="stock"')
+  })
+
   test('words its labels in the page\'s language with no props', async () => {
     const french = (await site.visit('/fr/subscribe')).html
 

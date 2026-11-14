@@ -1,6 +1,6 @@
 import type { ActionContext, ActionProtect, ActionProtection, Failure, JSX, Schema, Static } from 'kay'
 import type { Hook } from 'kay/library'
-import type { Mailer } from './mailer'
+import type { MailApi } from './mailer'
 import type { Address, MailField } from './types'
 import { s } from 'kay'
 import { configError, dispatch } from 'kay/library'
@@ -68,12 +68,19 @@ export type ContactInput<Extra extends Record<string, Schema> = Record<never, Sc
 // The object schema built below, typed by the input it validates.
 type ContactSchema<Extra extends Record<string, Schema>, Consent extends boolean> = Schema & { static: ContactInput<Extra, Consent> }
 
-// The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm(mail, { reach: 'hello@example.com' }))`. A post is checked, queued as a mail to the site with the visitor in `replyTo` (the queue retries it, so a relay that is down never loses it or holds the visitor up) and answered with a refusal worded in the page's language when the mailer is not configured or the mail cannot be rendered, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
-export function contactForm<const Extra extends Record<string, Schema> = Record<never, Schema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<Mailer, 'enqueue'>, options: ContactOptions<Extra, Honeypot, Consent> = {}): [
+// What `contactForm` gives `action`: the schema, the handler and the protection.
+type ContactArguments<Extra extends Record<string, Schema>, Honeypot extends string, Consent extends boolean> = [
   schema: ContactSchema<Extra, Consent>,
   handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext) => Promise<Failure<string> | undefined>,
   protection: ActionProtection<Honeypot>,
-] {
+]
+
+// The arguments of `action` for a contact form, for a page to spread: `export const contact = action(...contactForm({ reach: 'hello@example.com' }))`. The mail goes through the mailer of the request's site, `ctx.locals.mail`, unless the first argument is a mailer of your own. A post is checked, queued as a mail to the site with the visitor in `replyTo` (the queue retries it, so a relay that is down never loses it or holds the visitor up) and answered with a refusal worded in the page's language when the mailer is not configured or the mail cannot be rendered, with `rateLimit`, `honeypot` and `minTime` set. Pair it with `ContactForm` from kayjs-ui.
+export function contactForm<const Extra extends Record<string, Schema> = Record<never, Schema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(options?: ContactOptions<Extra, Honeypot, Consent>): ContactArguments<Extra, Honeypot, Consent>
+export function contactForm<const Extra extends Record<string, Schema> = Record<never, Schema>, const Honeypot extends string = 'website', const Consent extends boolean = false>(mail: Pick<MailApi, 'enqueue'>, options?: ContactOptions<Extra, Honeypot, Consent>): ContactArguments<Extra, Honeypot, Consent>
+export function contactForm<const Extra extends Record<string, Schema>, const Honeypot extends string, const Consent extends boolean>(first: Pick<MailApi, 'enqueue'> | ContactOptions<Extra, Honeypot, Consent> = {}, second: ContactOptions<Extra, Honeypot, Consent> = {}): ContactArguments<Extra, Honeypot, Consent> {
+  const mailer = 'enqueue' in first && typeof first.enqueue === 'function' ? first : undefined
+  const options = mailer === undefined ? first as ContactOptions<Extra, Honeypot, Consent> : second
   const { fields = {} as Extra, labels = {}, reach, maxLinks = 3, maxLength = 5000, consent = false } = options
   const honeypot = options.honeypot ?? 'website' as Honeypot
   const refusal = (key: keyof typeof DEFAULT_ERRORS) => ({ error: options.errors?.[key] ?? ERROR_WORDS[key] })
@@ -119,7 +126,7 @@ export function contactForm<const Extra extends Record<string, Schema> = Record<
 
     try {
       // From stays the mailer's own address so SPF and DKIM hold; replying goes to the visitor.
-      id = await mail.enqueue({
+      id = await (mailer ?? (ctx.locals as unknown as { mail: Pick<MailApi, 'enqueue'> }).mail).enqueue({
         to: typeof options.to === 'function' ? options.to(input) : options.to,
         replyTo: { name, address: email },
         subject,

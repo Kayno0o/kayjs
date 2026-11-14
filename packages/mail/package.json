@@ -20,6 +20,7 @@
   "exports": {
     "./*.kay": "./src/*.kay",
     "./add": "./src/add.ts",
+    "./internal": "./src/internal.ts",
     "./pg": "./src/pg.ts",
     "./sqlite": "./src/sqlite.ts",
     "./test": "./src/test.ts",

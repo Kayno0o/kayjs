@@ -33,8 +33,8 @@ export interface SmtpSettings {
   dkim?: DkimSettings | undefined
 }
 
-// What the environment does not set, which `mailer({ smtp })` gives the SMTP built from it.
-export type SmtpOverrides = Pick<SmtpSettings, 'name' | 'timeout' | 'maxConnections' | 'rateLimit'>
+// What `mailer({ smtp })` sets on the SMTP built from the environment, each over its variable (`insecure` is `MAIL_INSECURE`, `rateLimit` is `MAIL_RATE_LIMIT`, `dkim` is `MAIL_DKIM_*`, a `domain` left out being the sender's).
+export type SmtpOverrides = Pick<SmtpSettings, 'name' | 'timeout' | 'maxConnections' | 'rateLimit' | 'insecure'> & { dkim?: (Omit<DkimSettings, 'domain'> & { domain?: string | undefined }) | undefined }
 
 // A domain name or an address literal: the greeting is written into the conversation, so a line break or a space in it would add commands.
 const GREETING = /^[\w.\-:[\]]{1,255}$/
