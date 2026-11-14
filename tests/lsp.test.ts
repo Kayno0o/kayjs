@@ -485,12 +485,17 @@ describe('kay lsp', () => {
 
   it('reports a bind: on a prop not typed Bindable at the attribute', async () => {
     await Bun.write(join(workspace, 'site/src/components/about.kay'), 'p x\n')
-    await editor.open('site/src/components/about.kay')
 
-    const diagnostics = await editor.change('site/src/components/about.kay', '---\nimport List from \'../components/list.kay\'\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
+    try {
+      await editor.open('site/src/components/about.kay')
 
-    expect(brief(diagnostics).map(d => [d.start.line, d.code])).toEqual([[5, 2345], [5, 2345]])
-    await rm(join(workspace, 'site/src/components/about.kay'))
+      const diagnostics = await editor.change('site/src/components/about.kay', '---\nimport List from \'../components/list.kay\'\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
+
+      expect(brief(diagnostics).map(d => [d.start.line, d.code])).toEqual([[5, 2345], [5, 2345]])
+    }
+    finally {
+      await rm(join(workspace, 'site/src/components/about.kay'), { force: true })
+    }
   })
 
   it('shows the signature of the call under the cursor, an action call sending an object on its typed input', async () => {

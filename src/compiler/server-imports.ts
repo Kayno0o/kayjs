@@ -3,11 +3,12 @@ import type { ScriptAnalysis, ServerAnalysis } from './script'
 import type { ImportBinding } from './script-shared'
 import { templateExpressions } from './browser'
 
+const NEEDS_ESCAPE = /['\\]/
 const WORD = /(?<![\w$.])[a-z_$][\w$]*/gi
 
 // The statement that brings a binding into the script fence.
 function importLine(binding: ImportBinding): string {
-  const source = JSON.stringify(binding.source).replaceAll('"', '\'')
+  const source = NEEDS_ESCAPE.test(binding.source) ? JSON.stringify(binding.source) : `'${binding.source}'`
 
   if (binding.imported === 'default')
     return `import ${binding.local} from ${source}\n`

@@ -99,7 +99,7 @@ describe('a name the template reads that only the server fence imports', () => {
     expect(found!.fixes![0]!.edits).toEqual([{ start: at, end: at, text: 'import { formatFileSize } from \'@kaynooo/utils/format\'\n' }])
   })
 
-  it('keeps the page an island, since a handler makes it one, and refuses what the browser would throw on', () => {
+  it('keeps the page an island, since a handler makes it one, and leaves the server import out of its browser module', () => {
     const compiled = compileKay(hydrating, route, { page: true, output: 'dom', includeServer: false })
 
     expect(compiled.island).toBeDefined()

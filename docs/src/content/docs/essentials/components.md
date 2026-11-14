@@ -30,7 +30,7 @@ li(class={size})
 
 `---` opens the component script: imports, props, signals, functions. It runs wherever the component renders.
 
-`--- server` runs on the server for each request and never reaches the browser. Only a page or a layout has one: a component takes its values as props, which the page computes in its own `--- server`.
+`--- server` runs on the server for each request and never reaches the browser. Only a page or a layout has one: a component takes its values as props, which the page computes in its own `--- server`. A page that hydrates, which a handler in it makes it, runs its template in the browser without that fence, so a function the template calls and the server fence imports is the error `server-import-in-island`: import it in the script fence too, or move what reads it into a component.
 
 `--- module` holds code that runs once per bundle rather than per render. What it exports, such as `export const visits = signal(0)` or `export function label(n: number)`, other files import from the `.kay` file with its types: `import { label } from './counter.kay'`. It takes no props and no default export, and a `--- client` component has none.
 
