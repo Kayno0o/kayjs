@@ -1,3 +1,5 @@
+import type { ByteSize } from './byte-size'
+import type { Duration } from './duration'
 import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
@@ -93,13 +95,16 @@ export function formatNumber(value: number, options?: NumberFormatOptions): stri
 }
 
 // kept: free, a format by the locale, which a kept copy is stored per.
-export function formatBytes(bytes: number, options?: NumberFormatOptions): string {
-  return formatBytesIn(formatLocale(), bytes, options)
+export function formatBytes(size: ByteSize, options?: NumberFormatOptions): string {
+  return formatBytesIn(formatLocale(), size, options)
 }
 
 // kept: free, a format by the locale, which a kept copy is stored per.
-export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string {
-  return formatDurationIn(formatLocale(), milliseconds, options)
+export function formatDuration(duration: Duration, options?: DurationFormatOptions): string
+// Milliseconds, until 1.108: `deprecated-format-duration` rewrites a literal.
+export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string
+export function formatDuration(duration: Duration | number, options?: DurationFormatOptions): string {
+  return formatDurationIn(formatLocale(), duration, options)
 }
 
 // kept: free

@@ -120,7 +120,7 @@ import { formatBytes, formatDate, formatDuration, formatList, formatNumber, form
 ---
 p {formatNumber(1234.5)}
 p {formatBytes(1536)}
-p {formatDuration(7_500_000)}
+p {formatDuration('125m')}
 p {formatDate(new Date(), { dateStyle: 'long' })}
 p {formatRelativeTime(new Date(Date.now() - 3 * 86_400_000))}
 p {formatList(['Ada', 'Grace'])}
@@ -217,7 +217,7 @@ export default defineMessages({
 - Using it makes the component an island.
 - `T` renders a message holding markup, such as a link mid-sentence: see [Messages holding markup](#messages-holding-markup).
 - `formatNumber(value, options)` and `formatDate(value, options)` format through `Intl` for the request's locale, and so do `formatRelativeTime(date)`, a date relative to now in the largest unit it reaches, `3 days ago`, `yesterday` or `in 2 hours`, `formatRelativeTime(2, 'week')` in the unit given, and `formatList(['Ada', 'Grace'])`, `Ada and Grace`. Outside a request, in a job, an alert or a push, these and `direction()` use the site's default locale (`en` when the site names none) instead of throwing, so a page and a mail format the same date alike. Each takes a `locale` among its options (`formatDate(date, { locale: user.locale })`) that wins over the request's, for a mail written in its reader's language. `formatDate` options that name no part of the date (none, a `locale`, a lone `timeZone` or `calendar`) give the medium date, as no options do.
-- `formatBytes(1536)` is `1.5 kB` and `formatDuration(7_500_000)`, in milliseconds, is `2 hr 5 min`, each in the page's locale with a `locale` option of its own, `unitDisplay: 'long'` for the unit in full. `timeZone: 'Europe/Paris'` in kay.config.ts is the zone every `formatDate`, a message's date placeholder, `RelativeTime`'s tooltip write in; a chart's labels keep the machine's zone, on the server and in the islands alike, unless a call names its own `timeZone`, so on the server a time of day built from an instant is written in the server's zone until the island rewrites it in the visitor's, and `timeZone()` from `kay/i18n` reads it.
+- `formatBytes(1536)` is `1.5 kB` (a `ByteSize`: bytes or `'1.5kb'`) and `formatDuration('125m')` (a `Duration`, `'7500s'`, `'2h'`) is `2 hr 5 min`, a number of milliseconds being deprecated since 1.105 (`deprecated-format-duration`), each in the page's locale with a `locale` option of its own, `unitDisplay: 'long'` for the unit in full. `timeZone: 'Europe/Paris'` in kay.config.ts is the zone every `formatDate`, a message's date placeholder, `RelativeTime`'s tooltip write in; a chart's labels keep the machine's zone, on the server and in the islands alike, unless a call names its own `timeZone`, so on the server a time of day built from an instant is written in the server's zone until the island rewrites it in the visitor's, and `timeZone()` from `kay/i18n` reads it.
 - In an island, give `formatRelativeTime` the moment it is relative to, `{ now }`, from the server, so the browser renders what the server did, or use `relativeTime`.
 - `locales()` is the configured locales in `i18n`'s order, only the page's own without `i18n`; `localeName('fr')` is `Français`, `localeName('pt-BR')` is `Português (Brasil)`, each in its own language through `Intl.DisplayNames`, first letter capitalized, a code `Intl` cannot read as written.
 - `direction()` is `rtl` or `ltr`, for the request's locale or the one given.

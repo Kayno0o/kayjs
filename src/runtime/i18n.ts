@@ -1,5 +1,9 @@
+import type { ByteSize } from './byte-size'
 import type { CheckedHref, Register } from './checks'
+import type { Duration } from './duration'
 import type { JSX } from './jsx'
+import { byteCount } from './byte-count'
+import { durationMs } from './duration'
 import { kayLog } from './log'
 
 // What the server and the browser share of i18n: message lookup, formatting through `Intl`, and locale paths.
@@ -284,8 +288,9 @@ export function formatDate(page: string, value: Date | number, given?: DateForma
 // Each unit of a byte count, a count taking the largest one it reaches.
 const BYTE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const
 
-// A size in bytes in the largest unit that keeps it under 1024, `1.5 MB` or `1,5 Mo`, one decimal at most; the other number options are `Intl`'s.
-export function formatBytes(page: string, bytes: number, given?: NumberFormatOptions): string {
+// A size in bytes, or written with its unit as every size option is (`'1.5kb'`), in the largest unit that keeps it under 1024, `1.5 MB` or `1,5 Mo`, one decimal at most; the other number options are `Intl`'s.
+export function formatBytes(page: string, given: ByteSize, options?: NumberFormatOptions): string {
+  const bytes = typeof given === 'number' ? given : byteCount(given) ?? 0
   let size = Math.abs(bytes)
   let unit = 0
 
@@ -295,15 +300,16 @@ export function formatBytes(page: string, bytes: number, given?: NumberFormatOpt
     unit++
   }
 
-  return formatNumber(page, Math.sign(bytes) * size, { style: 'unit', unit: BYTE_UNITS[unit], unitDisplay: 'short', ...given?.maximumFractionDigits === undefined && given?.minimumFractionDigits === undefined && { maximumFractionDigits: unit === 0 ? 0 : 1 }, ...given })
+  return formatNumber(page, Math.sign(bytes) * size, { style: 'unit', unit: BYTE_UNITS[unit], unitDisplay: 'short', ...options?.maximumFractionDigits === undefined && options?.minimumFractionDigits === undefined && { maximumFractionDigits: unit === 0 ? 0 : 1 }, ...options })
 }
 
 // Each unit of a duration with its length in milliseconds.
 const DURATION_UNITS: readonly [string, number][] = [['day', 86_400_000], ['hour', 3_600_000], ['minute', 60_000], ['second', 1000]]
 
-// A length of time in milliseconds in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
-export function formatDuration(page: string, milliseconds: number, given?: DurationFormatOptions): string {
+// A length of time, written with its unit (`'125m'`) or in milliseconds, in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
+export function formatDuration(page: string, duration: Duration | number, given?: DurationFormatOptions): string {
   const [locale, options] = withLocale(page, given)
+  const milliseconds = typeof duration === 'number' ? duration : durationMs(duration)
   const total = Number.isFinite(milliseconds) ? Math.round(Math.max(0, milliseconds) / 1000) * 1000 : 0
   const reached = DURATION_UNITS.findIndex(([, length]) => total >= length)
   const first = reached === -1 ? DURATION_UNITS.length - 1 : reached

@@ -2363,12 +2363,13 @@ function direction(of?: string | undefined): Direction
 type Direction = 'ltr' | 'rtl'
 
 [./i18n] formatBytes
-function formatBytes(bytes: number, options?: NumberFormatOptions | undefined): string
+function formatBytes(size: ByteSize, options?: NumberFormatOptions | undefined): string
 
 [./i18n] formatDate
 function formatDate(value: Date | number, options?: DateFormatOptions | undefined): string
 
 [./i18n] formatDuration
+function formatDuration(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, options?: DurationFormatOptions | undefined): string
 function formatDuration(milliseconds: number, options?: DurationFormatOptions | undefined): string
 
 [./i18n] formatList

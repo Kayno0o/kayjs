@@ -213,6 +213,15 @@ export const DEPRECATED_LINTS = {
     wrong: '---\nimport { diskFiles } from \'kay/server\'\n\nexport const files = diskFiles(\'data/uploads\', { onWrite: audit })\n---\np x',
     right: '---\nimport { diskFiles } from \'kay/server\'\n\nexport const files = diskFiles({ dir: \'data/uploads\', onWrite: audit })\n---\np x',
   },
+  'deprecated-format-duration': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.105',
+    site: true,
+    summary: '`formatDuration(ms)` with a bare number, a `Duration` since 1.105: kay\'s durations carry their unit everywhere, `formatDuration(\'125m\')`, and `formatBytes` takes a `ByteSize` the same way (`formatBytes(\'1.5kb\')`), which also still takes a number of bytes. The old form works until 1.108. Found on a call imported from `kay/i18n` whose argument is a number written as a literal or as arithmetic of literals, in the TypeScript files and `.kay` files of the project; a number held in a variable is a type error in the editor and `kay check` reads no types here. The fix writes the value in milliseconds, `\'7500000ms\'`.',
+    wrong: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(7_500_000)}',
+    right: '---\nimport { formatDuration } from \'kay/i18n\'\n---\np {formatDuration(\'7500000ms\')}',
+  },
 } as const satisfies Record<string, Lint>
 
 // Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.

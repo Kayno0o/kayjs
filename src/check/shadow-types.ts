@@ -39,13 +39,15 @@ import { ownFile } from './diagnose'
 import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 
+import { formatDurationNumbers } from './format-duration'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+
 import { unguardedRoutes, unguardedTools } from './guards'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from './job-shapes'
 
 import { islandOnlyComponents } from './island-only'
-import { largePublicImages } from './large-images'
 
+import { largePublicImages } from './large-images'
 import { localState } from './local-state'
 import { mailApi } from './mail-api'
 import { mcpRoutes } from './mcp-routes'
@@ -180,6 +182,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => jobOptions(root, options),
   async ({ root, options }) => diskFilesCalls(root, options),
   async ({ root, options }) => storeNames(root, options),
+  async ({ root, options }) => formatDurationNumbers(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

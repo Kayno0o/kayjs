@@ -7,6 +7,7 @@ import { aiLanguage } from '../src/check/ai-language'
 import { cmsOptions } from '../src/check/cms-options'
 import { applySafeFixes } from '../src/check/fixes'
 import { diskFilesCalls, jobHandlers, jobOptions, scheduleCalls } from '../src/check/job-shapes'
+import { formatDurationNumbers } from '../src/check/format-duration'
 import { localState } from '../src/check/local-state'
 import { mailApi } from '../src/check/mail-api'
 import { listenTarget, movedImports, navigateQuery, navigationHooks, persistedCall, persistedQuery } from '../src/check/one-state-api'
@@ -40,6 +41,7 @@ const SITE: Record<string, (root: string, options: CheckOptions) => Promise<Chec
   'deprecated-test-helpers': testHelpers,
   'deprecated-cms-options': cmsOptions,
   'deprecated-store-names': storeNames,
+  'deprecated-format-duration': formatDurationNumbers,
   'deprecated-package-names': async (root, options) => renamedPackages(root, options.lints),
   // Its fix is safe only in a project that lists kayjs-ui, where the new form comes from.
   'deprecated-mail-form': async (root, options) => {

@@ -25,6 +25,9 @@ describe('formatBytes', () => {
     expect(formatBytes(1536, { unitDisplay: 'long' })).toBe('1.5 kilobytes')
     expect(formatBytes(1048575)).toBe('1 MB')
     expect(formatBytes(1536, { minimumFractionDigits: 2 })).toBe('1.50 kB')
+    expect(formatBytes('1.5kb')).toBe('1.5 kB')
+    expect(formatBytes('5mb')).toBe('5 MB')
+    expect(formatBytes('800b')).toBe('800 byte')
   })
 })
 
@@ -40,6 +43,10 @@ describe('formatDuration', () => {
     expect(formatDuration(-5000)).toBe('0 sec')
     expect(formatDuration(Number.NaN)).toBe('0 sec')
     expect(formatDuration(125 * 60_000, { locale: 'fr' }).replaceAll(/\s/g, ' ')).toBe('2 h 5 min')
+    expect(formatDuration('125m')).toBe('2 hr 5 min')
+    expect(formatDuration('45s')).toBe('45 sec')
+    expect(formatDuration('1.5h')).toBe('1 hr 30 min')
+    expect(formatDuration('3d')).toBe('3 days')
   })
 })
 
