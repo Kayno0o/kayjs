@@ -128,7 +128,7 @@ export interface KayConfig extends AppHooks {
   // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, the push subscriptions, the small keyed values libraries keep with an end (`kv`), and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions and jobs stay in `data/app.sqlite`, the one file kay and its libraries share (`session({ store: false })` keeps sessions in their cookie), and the others in memory.
   store?: AppStore | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
-  env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined
+  env?: { compose?: string | string[] | undefined, example?: string | undefined } | boolean | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
@@ -608,10 +608,19 @@ type CaseVariant<Key, Known> = { [Name in keyof Known & string]: Lowercase<Name>
 // What an unknown key's value must be: a string naming the problem, which nothing a config gives matches, so the error lands on the key.
 type Misspelled<Key, Known> = [CaseVariant<Key, Known>] extends [never] ? 'unknown option' : `unknown option, did you mean \`${CaseVariant<Key, Known> & string}\`?`
 
-type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known>]: Misspelled<Key, Known> } : unknown
+// A symbol key is no option a config names, and an object a library returns may carry one, as `pgData()`'s `Symbol.asyncDispose` does.
+type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known | symbol>]: Misspelled<Key, Known> } : unknown
 
-// The option bag a key's type holds, if any: an object type that is no list, no function, no record of free keys and has no required key, so a class, a `Logger` or a list of entries is never checked as one.
-type BagOf<Value> = Value extends readonly unknown[] ? never : Value extends (...args: never[]) => unknown ? never : Value extends object ? (string extends keyof Value ? never : Record<never, never> extends Value ? Value : never) : never
+type Method = (...args: never[]) => unknown
+
+// The keys of a type that are required methods, which an object an app hands over (a `Tracer`) has and an option bag has not.
+type RequiredMethods<Value> = keyof { [Key in keyof Value as Record<never, never> extends Pick<Value, Key> ? never : Value[Key] extends Method ? Key : never]: unknown }
+
+// The types that take any name for a key, which no typo can be told from: the level of each lint.
+type FreeKeys = LintLevels
+
+// The option bag a key's type holds, if any: an object type that is no list, no function, no record of free keys and has no required method, so a `Tracer`, a list of entries or a function is never checked as one.
+type BagOf<Value> = Value extends readonly unknown[] | Method | FreeKeys ? never : Value extends object ? (string extends keyof Value ? never : [RequiredMethods<Value>] extends [never] ? Value : never) : never
 
 // How deep the option bags nest at most, which no config comes near.
 type Deepest = [unknown, unknown, unknown, unknown]

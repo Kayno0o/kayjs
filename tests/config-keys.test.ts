@@ -47,12 +47,23 @@ describe('the unknown keys defineConfig refuses by type', () => {
     expect(defineConfig({ images: { widht: 1 } })).toBeDefined()
     // @ts-expect-error a bag held by a bag
     expect(defineConfig({ security: { cookies: { httpOnlee: true } } })).toBeDefined()
-    // @ts-expect-error a bag three levels down
-    expect(defineConfig({ images: { card: { font: { famly: 'Inter' } } } })).toBeDefined()
+    // @ts-expect-error a bag three levels down, whose own `family` is required
+    expect(defineConfig({ images: { card: { font: { family: 'Inter', wieght: 400 } } } })).toBeDefined()
+    // @ts-expect-error a bag with required keys
+    expect(defineConfig({ i18n: { locales: ['en'], defaultLocale: 'en', mesages: 'm' } })).toBeDefined()
+    // @ts-expect-error the extra key of a favicon
+    expect(defineConfig({ favicon: { image: 'a.png', svg: 'a.svg', sizes: [1] } })).toBeDefined()
     // @ts-expect-error a bag that takes a switch
     expect(defineConfig({ health: { pth: '/up' } })).toBeDefined()
     // @ts-expect-error the library bags
     expect(defineConfig({ store: { sesions: undefined } })).toBeDefined()
+  })
+
+  it('leaves an object a library hands over alone, as a store carrying a symbol key', () => {
+    const store = { sql: undefined, ping: async () => true, [Symbol.asyncDispose]: async () => undefined }
+
+    expect(defineConfig({ store })).toBeDefined()
+    expect(defineConfig({ store: { ...store, files: undefined } })).toBeDefined()
   })
 
   it('takes true, false or a bag where a feature switches, and keeps the contextual type of a callback', () => {

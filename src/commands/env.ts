@@ -5,6 +5,7 @@ import type { EnvFiles } from './env-compare'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { loadConfigWithin } from '../config-loader'
+import { bagOf } from '../config-switch'
 import { projectPaths } from '../project'
 import { describeEnv } from '../server/env'
 import { buildingWithoutEnv, fileFormOf, listingEnv } from '../server/env-state'
@@ -110,7 +111,7 @@ export const env: Command = {
 async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
   const { env } = await loadConfigWithin(root)
 
-  return env === false ? undefined : env ?? await defaultEnvFiles(root)
+  return env === false ? undefined : bagOf(env) ?? await defaultEnvFiles(root)
 }
 
 // The path of an extension's module relative to the root, none when it does not resolve, which the build reports.

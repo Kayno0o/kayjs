@@ -267,7 +267,7 @@ export const DEPRECATED_LINTS = {
     group: 'deprecated',
     since: '1.105',
     site: true,
-    summary: '`proxy: 2` in kay.config.ts, `proxy: { hops: 2 }` since 1.105, and `proxy: 1`, `proxy: true`: every feature key of the config is `false` for off, `true` for its defaults or an object of options, so the number of proxies was a third form of the same switch. The number works until 1.108. Found in the object kay.config.ts exports. The fix writes `true` for 1 and `{ hops: n }` for a whole number above it; a number that is no whole number from 1 is reported with no fix.',
+    summary: '`proxy: 2` in kay.config.ts, `proxy: { hops: 2 }` since 1.105, where `proxy: 1` is `proxy: true`: every feature key of the config is `false` for off, `true` for its defaults or an object of options, so the number of proxies was a third form of the same switch. The number works until 1.108. Found in the object kay.config.ts exports. The fix writes `true` for 1 and `{ hops: n }` for a whole number above it; a number that is no whole number from 1 is reported with no fix.',
     wrong: '// kay.config.ts\nexport default { proxy: 2 }',
     right: '// kay.config.ts\nexport default { proxy: { hops: 2 } }',
   },

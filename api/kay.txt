@@ -2751,7 +2751,7 @@ function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Con
   head?: unknown;
   images?: Checked<"images" extends keyof Config ? Config[keyof Config & "images"] : unknown, ImagesConfig, [unknown]>;
   budget?: Checked<"budget" extends keyof Config ? Config[keyof Config & "budget"] : unknown, BudgetConfig, [unknown]>;
-  favicon?: unknown;
+  favicon?: Checked<"favicon" extends keyof Config ? Config[keyof Config & "favicon"] : unknown, FaviconConfig, [unknown]>;
   manifest?: Checked<"manifest" extends keyof Config ? Config[keyof Config & "manifest"] : unknown, ManifestConfig, [unknown]>;
   entry?: unknown;
   offline?: Checked<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig, [unknown]>;
@@ -2761,7 +2761,7 @@ function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Con
   proxy?: Checked<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, ProxyConfig, [unknown]>;
   guards?: Checked<"guards" extends keyof Config ? Config[keyof Config & "guards"] : unknown, GuardsConfig, [unknown]>;
   requireGuards?: unknown;
-  cors?: unknown;
+  cors?: Checked<"cors" extends keyof Config ? Config[keyof Config & "cors"] : unknown, NonNullable<CorsOptions | undefined>, [unknown]>;
   openapi?: Checked<"openapi" extends keyof Config ? Config[keyof Config & "openapi"] : unknown, OpenApiConfig, [unknown]>;
   mcp?: Checked<"mcp" extends keyof Config ? Config[keyof Config & "mcp"] : unknown, McpConfig, [unknown]>;
   health?: Checked<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig, [unknown]>;
@@ -2773,7 +2773,7 @@ function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Con
     hosts?: string[] | undefined;
   }, [unknown]>;
   live?: Checked<"live" extends keyof Config ? Config[keyof Config & "live"] : unknown, LiveConfig, [unknown]>;
-  i18n?: unknown;
+  i18n?: Checked<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, I18nConfig, [unknown]>;
   timeZone?: unknown;
   base?: unknown;
   links?: Checked<"links" extends keyof Config ? Config[keyof Config & "links"] : unknown, {
@@ -2785,10 +2785,7 @@ function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Con
   markdown?: Checked<"markdown" extends keyof Config ? Config[keyof Config & "markdown"] : unknown, MarkdownConfig, [unknown]>;
   plugins?: unknown;
   librarySettings?: unknown;
-  lints?: Checked<"lints" extends keyof Config ? Config[keyof Config & "lints"] : unknown, Partial<Record<"a11y" | "anchor-is-valid" | "async-reply" | "autofocus" | "brace-in-attribute" | "broken-canonical" | "browser-global-at-load" | "click-without-key" | "code" | "constant-signal" | "css-import-without-text" | "dangling-aria" | "dangling-label" | "default-favicon" | "default-locale-path" | "deprecated" | "deprecated-ai-labels" | "deprecated-ai-language" | "deprecated-auth-rate-limits" | "deprecated-cms-options" | "deprecated-config-switch" | "deprecated-disk-files" | "deprecated-format-duration" | "deprecated-guard-option" | "deprecated-if-alias" | "deprecated-image-options" | "deprecated-import-path" | "deprecated-island-attributes" | "deprecated-island-fence" | "deprecated-job-handler" | "deprecated-job-options" | "deprecated-listen-target" | "deprecated-local-state" | "deprecated-mail-form" | "deprecated-mail-send" | "deprecated-navigate-query" | "deprecated-navigation-hooks" | "deprecated-package-names" | "deprecated-page-cache" | "deprecated-page-island" | "deprecated-page-seo" | "deprecated-persisted-call" | "deprecated-persisted-query" | "deprecated-rate-enforce" | "deprecated-schedule-call" | "deprecated-schema-type" | "deprecated-script-fence" | "deprecated-store-names" | "deprecated-test-helpers" | "deprecated-ui-props" | "draft-entry" | "draft-message" | "duplicate-description" | "duplicate-id" | "duplicate-title" | "empty-control" | "empty-heading" | "endpoint-export" | "external-redirect" | "fieldset-without-legend" | "forms" | "hand-tooltip" | "held-back-reference" | "hidden-focusable" | "hidden-tool" | "hydration-mismatch" | "i18n" | "incomplete-match" | "interactive-tabindex" | "invalid-aria-value" | "invalid-autocomplete" | "invalid-nesting" | "island-marker" | "island-prop" | "islands" | "large-public-image" | "link-as-button" | "literal-tag" | "long-description" | "long-title" | "meta-refresh" | "missing-alt" | "missing-autocomplete" | "missing-captcha" | "missing-captions" | "missing-description" | "missing-label" | "missing-share-image" | "missing-site" | "missing-state" | "missing-title" | "mouse-only-event" | "multiple-h1" | "nested-control" | "no-access-key" | "noindex-in-sitemap" | "old-bun-image" | "once-read-prop" | "one-way-hreflang" | "orphan-page" | "over-budget" | "performance" | "positional-key" | "positive-tabindex" | "public-env-outside-src" | "redirect-chain" | "redundant-alt" | "redundant-role" | "removed-ui-token" | "secret-prop" | "section-not-a-link" | "security" | "seo" | "serial-awaits" | "server-only-import" | "signal-set-call" | "skipped-heading" | "table-without-header" | "text-size-colour" | "trusted-folder" | "unannounced-click" | "unbounded-string" | "uncalled-signal" | "uncaught-await" | "uncontrolled-autoplay" | "undescribed-page" | "ungrouped-radios" | "unguarded-route" | "unguarded-tool" | "unkept-page" | "unkeyed-rows" | "unknown-aria" | "unknown-role" | "unknown-tool-label" | "unmounted-jobs" | "unowned-effect" | "unreachable-click" | "unreachable-selector" | "unreachable-tooltip" | "unread-name" | "unreturned-fail" | "unsized-image" | "unsized-share-image" | "unstructured-page" | "unsupported-aria" | "untitled-page" | "untyped-socket" | "unused-selector" | "unused-status-page", LintLevel>> & {
-    satisfied?: ("anchor-is-valid" | "async-reply" | "autofocus" | "brace-in-attribute" | "broken-canonical" | "browser-global-at-load" | "click-without-key" | "constant-signal" | "css-import-without-text" | "dangling-aria" | "dangling-label" | "default-favicon" | "default-locale-path" | "deprecated-ai-labels" | "deprecated-ai-language" | "deprecated-auth-rate-limits" | "deprecated-cms-options" | "deprecated-config-switch" | "deprecated-disk-files" | "deprecated-format-duration" | "deprecated-guard-option" | "deprecated-if-alias" | "deprecated-image-options" | "deprecated-import-path" | "deprecated-island-attributes" | "deprecated-island-fence" | "deprecated-job-handler" | "deprecated-job-options" | "deprecated-listen-target" | "deprecated-local-state" | "deprecated-mail-form" | "deprecated-mail-send" | "deprecated-navigate-query" | "deprecated-navigation-hooks" | "deprecated-package-names" | "deprecated-page-cache" | "deprecated-page-island" | "deprecated-page-seo" | "deprecated-persisted-call" | "deprecated-persisted-query" | "deprecated-rate-enforce" | "deprecated-schedule-call" | "deprecated-schema-type" | "deprecated-script-fence" | "deprecated-store-names" | "deprecated-test-helpers" | "deprecated-ui-props" | "draft-entry" | "draft-message" | "duplicate-description" | "duplicate-id" | "duplicate-title" | "empty-control" | "empty-heading" | "endpoint-export" | "external-redirect" | "fieldset-without-legend" | "hand-tooltip" | "held-back-reference" | "hidden-focusable" | "hidden-tool" | "hydration-mismatch" | "incomplete-match" | "interactive-tabindex" | "invalid-aria-value" | "invalid-autocomplete" | "invalid-nesting" | "island-marker" | "island-prop" | "large-public-image" | "link-as-button" | "literal-tag" | "long-description" | "long-title" | "meta-refresh" | "missing-alt" | "missing-autocomplete" | "missing-captcha" | "missing-captions" | "missing-description" | "missing-label" | "missing-share-image" | "missing-site" | "missing-state" | "missing-title" | "mouse-only-event" | "multiple-h1" | "nested-control" | "no-access-key" | "noindex-in-sitemap" | "old-bun-image" | "once-read-prop" | "one-way-hreflang" | "orphan-page" | "over-budget" | "positional-key" | "positive-tabindex" | "public-env-outside-src" | "redirect-chain" | "redundant-alt" | "redundant-role" | "removed-ui-token" | "secret-prop" | "section-not-a-link" | "serial-awaits" | "server-only-import" | "signal-set-call" | "skipped-heading" | "table-without-header" | "text-size-colour" | "trusted-folder" | "unannounced-click" | "unbounded-string" | "uncalled-signal" | "uncaught-await" | "uncontrolled-autoplay" | "undescribed-page" | "ungrouped-radios" | "unguarded-route" | "unguarded-tool" | "unkept-page" | "unkeyed-rows" | "unknown-aria" | "unknown-role" | "unknown-tool-label" | "unmounted-jobs" | "unowned-effect" | "unreachable-click" | "unreachable-selector" | "unreachable-tooltip" | "unread-name" | "unreturned-fail" | "unsized-image" | "unsized-share-image" | "unstructured-page" | "unsupported-aria" | "untitled-page" | "untyped-socket" | "unused-selector" | "unused-status-page")[] | undefined;
-    comments?: AllowRules | undefined;
-  }, [unknown]>;
+  lints?: unknown;
   secret?: unknown;
   preview?: Checked<"preview" extends keyof Config ? Config[keyof Config & "preview"] : unknown, PreviewConfig, [unknown]>;
   store?: Checked<"store" extends keyof Config ? Config[keyof Config & "store"] : unknown, AppStore, [unknown]>;
@@ -2999,7 +2996,7 @@ interface KayConfig extends AppHooks
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
@@ -3257,7 +3254,7 @@ interface PagesOptions extends KayConfig
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
@@ -4300,7 +4297,7 @@ interface TestOptions extends PagesOptions
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
+  env?: boolean | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | boolean | string | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined

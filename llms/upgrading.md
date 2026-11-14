@@ -97,7 +97,7 @@ An app with no `store` now keeps sessions, jobs and every library in one SQLite 
 
 ### Feature keys of kay.config.ts are `false`, `true` or options
 
-`robots`, `sitemap`, `favicon`, `security`, `security.cookies`, `security.csp`, `health`, `preview`, `offline`, `proxy`, `images.avif`, `images.placeholder`, `images.rateLimit` and `live.rateLimit` take `false` for off, `true` for the defaults, which is the same as leaving the key out except for `preview` and `offline`, off until set, and an object of options. `deprecated-config-switch` (`kay check --fix`) rewrites `proxy: 2` as `proxy: { hops: 2 }` and `proxy: 1` as `proxy: true`; the number works until 1.108.
+`robots`, `sitemap`, `favicon`, `security`, `security.cookies`, `security.csp`, `health`, `preview`, `offline`, `proxy`, `images.avif`, `images.placeholder`, `images.rateLimit`, `live.rateLimit`, `mcp.rateLimit` and `env` take `false` for off, `true` for the defaults, which is the same as leaving the key out except for `preview` and `offline`, off until set, and an object of options. `deprecated-config-switch` (`kay check --fix`) rewrites `proxy: 2` as `proxy: { hops: 2 }` and `proxy: 1` as `proxy: true`; the number works until 1.108.
 
 - `defineConfig` refuses a key it does not know in every option bag, however deep (`images: { widht: 1 }`, `security: { cookies: { httpOnlee: true } }`), where it checked 11 of them and let a typo in the others through.
 

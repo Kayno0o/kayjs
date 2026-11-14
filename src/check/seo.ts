@@ -92,7 +92,7 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
   if (config.seo?.image === undefined && ![...sources].some(source => source.includes('og:image')))
     report('missing-share-image', { ...at('seo', 'image'), message: 'No page has a share image', note: 'a link shared to a social network shows no picture', help: 'set `seo.image`, or an `og:image` per page with `shareCard()` from `kay/image`' })
 
-  if (config.favicon === undefined)
+  if (config.favicon === undefined || config.favicon === true)
     report('default-favicon', { ...at('favicon'), message: 'The site shows kay\'s mark as its favicon', help: 'set `favicon` to a square image of the site\'s own, 512 pixels or more, or a square SVG' })
 
   return found

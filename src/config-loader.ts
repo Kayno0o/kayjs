@@ -179,14 +179,14 @@ function checkedConfig(config: LoadedConfig, where = CONFIG_FILE): void {
   if (notFunction >= 0)
     throw new KayError('config-invalid', `kay: \`checks[${notFunction}]\` in ${where} is not a function`)
 
-  if (env === undefined || env === false)
+  if (env === undefined || typeof env === 'boolean')
     return
 
   const { compose, example } = (typeof env === 'object' && env !== null ? env : {}) as { compose?: unknown, example?: unknown }
   const files = Array.isArray(compose) ? compose : [compose]
 
   if (typeof env !== 'object' || env === null || Array.isArray(env) || files.some(file => file !== undefined && typeof file !== 'string') || (example !== undefined && typeof example !== 'string'))
-    throw new KayError('config-invalid', `kay: \`env\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), or \`false\``)
+    throw new KayError('config-invalid', `kay: \`env\` in ${where} is \`{ compose, example }\`, each a file name (\`compose\` may be a list of them), \`true\` or \`false\``)
 }
 
 // The config with the catalogs of the libraries the app installs listed before its own extensions, so those and the app's messages win key by key; one an extension of the same name already brings is left alone.
@@ -227,9 +227,9 @@ function withExtensions<Config extends KayConfig>(config: Config): Config {
   return merged.lints === undefined && satisfied.length === 0 ? merged : { ...merged, lints: { ...levels, ...satisfied.length > 0 && { satisfied } } }
 }
 
-// `over` merged onto `under`: plain objects key by key, arrays joined, anything else `over`'s unless it leaves it undefined.
+// `over` merged onto `under`: plain objects key by key, arrays joined, anything else `over`'s unless it leaves it undefined. A `true` over an object asks for the defaults, which the object is.
 function underlay(under: unknown, over: unknown): unknown {
-  if (over === undefined)
+  if (over === undefined || (over === true && isPlainObject(under)))
     return under
 
   if (Array.isArray(under) && Array.isArray(over))
