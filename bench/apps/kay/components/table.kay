@@ -35,6 +35,6 @@ table.table
         td.id {row.id}
         // The benchmark driver clicks an `a` in each row, as the other frameworks render it.
         // kay-allow link-as-button
-        td.label: a(onClick={() => selected.set(row.id)}) {row.label}
+        td.label: a(onClick={() => selected = row.id}) {row.label}
         // kay-allow link-as-button
         td.remove: a(onClick={() => rows.set(list => list.filter(item => item.id !== row.id))}) x

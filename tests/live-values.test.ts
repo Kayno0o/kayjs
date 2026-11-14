@@ -513,6 +513,12 @@ describe('writing a live value in a browser', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors = 1}) Reset\n')).toEqual(['`visitors` is a live value, which the server writes and a browser only reads'])
   })
 
+  it('names `.set(value)` and `.set(key, value)` as the way to write it', () => {
+    const [diagnostic] = compileKay('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors = 1}) Reset\n', 'src/components/writer.kay', { importedSignals: imported, check: true }).diagnostics
+
+    expect(diagnostic?.help).toBe('write it with `visitors.set(value)`, or `visitors.set(key, value)` for a keyed one, from a server fence, an action or a job')
+  })
+
   it('is refused where a script or a handler calls its setter', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\nbutton(onClick={() => visitors.set(1)}) Reset\n')).toEqual(['`visitors` is a live value, written on the server: from a server fence, an action or a job'])
     expect(compile('---\nimport { room } from \'../live\'\n\nroom.set(\'a\', { id: \'a\', users: 1 })\n---\np Hi\n')).toEqual(['`room` is a live value, written on the server: from a server fence, an action or a job'])

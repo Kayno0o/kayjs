@@ -208,7 +208,7 @@ ul
     li {tier}
 ```
 
-`selection<Key>()` holds one selected key among many rows, or none. It is a signal: read it as `selected()`, write it with `selected = id`. `selected.is(id)` re-runs only the two rows a change touches, not every row.
+`selection<Key>()` holds one selected key among many rows, or none. It is a signal: read it as `selected()`, write it with `selected = id`. Every state primitive is assigned the same way; only a `live` value is written with `.set`, on the server, and assigning it is an error that says so. `selected.is(id)` re-runs only the two rows a change touches, not every row.
 
 ```kay
 ---

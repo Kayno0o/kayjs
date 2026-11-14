@@ -367,7 +367,7 @@ class RewriteFinder {
     const rightEnd = right && map.isExact(node.end - 1) ? map.toSource(node.end - 1) : undefined
 
     if (kind === 'memo' || kind === 'live') {
-      this.diagnostics.push({ ...span, message: kind === 'live' ? `\`${name}\` is a live value, which the server writes and a browser only reads` : `\`${name}\` is a memo, which cannot be written`, help: kind === 'live' ? `\`${name}.set(...)\` from a server fence, an action or a job` : 'write the signals it is derived from' })
+      this.diagnostics.push({ ...span, message: kind === 'live' ? `\`${name}\` is a live value, which the server writes and a browser only reads` : `\`${name}\` is a memo, which cannot be written`, help: kind === 'live' ? `write it with \`${name}.set(value)\`, or \`${name}.set(key, value)\` for a keyed one, from a server fence, an action or a job` : 'write the signals it is derived from' })
 
       return
     }
